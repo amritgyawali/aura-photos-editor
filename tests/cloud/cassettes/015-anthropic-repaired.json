@@ -1,0 +1,25 @@
+{
+  "name": "015-anthropic-repaired",
+  "note": "The answer to the one repair message. Matched on the repair instruction's own wording, which only appears on a second attempt, so it is checked before the malformed cassette even though that one is numbered higher - matching is by sorted name and 015 sorts before 020.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["seg-ring-exchange", "did not match the required schema"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_015",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"scene\":\"ceremony\",\"ritual\":\"ring_exchange\",\"tradition\":\"christian\",\"confidence\":0.78,\"reasons\":[\"the officiant is holding a small open box between the couple\",\"both hands are raised at chest height in consecutive frames\"],\"boundary_hint\":null,\"notes\":null}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 3104, "output_tokens": 87 }
+  }
+}

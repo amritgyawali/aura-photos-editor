@@ -1,0 +1,25 @@
+{
+  "name": "110-anthropic-truncated",
+  "note": "The token ceiling was hit mid-object. stop_reason is max_tokens and the JSON is unterminated, which is the single most diagnosable schema failure there is - and the one the runbook tells an operator to read stop_reason for.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["seg-truncated"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_110",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"scene\":\"speeches\",\"ritual\":null,\"tradition\":\"civil\",\"confidence\":0.66,\"reasons\":[\"a man is standing with a microphone while the rest of the room is seated\",\"glasses and plates are on the tables in front of the seated guests\",\"the sequence covers"
+      }
+    ],
+    "stop_reason": "max_tokens",
+    "usage": { "input_tokens": 2755, "output_tokens": 512 }
+  }
+}

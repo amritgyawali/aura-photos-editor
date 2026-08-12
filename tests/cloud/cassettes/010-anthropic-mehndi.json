@@ -1,0 +1,25 @@
+{
+  "name": "010-anthropic-mehndi",
+  "note": "The happy path. Anthropic Messages shape, a valid SegmentNaming answer for a mehndi segment, matched on the sonnet model id so the tier-downgrade tests do not pick it up.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["\"model\":\"claude-sonnet-4-5\"", "seg-mehndi"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_010",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"scene\":\"ritual\",\"ritual\":\"mehndi\",\"tradition\":\"hindu\",\"confidence\":0.86,\"reasons\":[\"henna is being applied to the seated woman's hands in several frames\",\"marigold garlands and a low decorated seat are visible behind her\",\"the group is informal and seated on the floor rather than in rows\"],\"boundary_hint\":\"9\",\"notes\":null}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 2871, "output_tokens": 118 }
+  }
+}

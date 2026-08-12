@@ -1,0 +1,20 @@
+{
+  "name": "100-anthropic-probe-ok",
+  "note": "The Check button's probe. Matched on the probe prompt's own wording and on the cheap tier, so it cannot be mistaken for a task call.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["Reply with the single word OK", "claude-haiku-4-5"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_100",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-haiku-4-5",
+    "content": [{ "type": "text", "text": "OK" }],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 14, "output_tokens": 2 }
+  }
+}

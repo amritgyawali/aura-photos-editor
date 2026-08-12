@@ -34,6 +34,7 @@ pub mod contract {
 
 /// Named error constructors, one module per domain in the code registry.
 pub mod errors {
+    pub mod cloud;
     pub mod db;
     pub mod gpu;
     pub mod io;

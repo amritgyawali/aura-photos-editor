@@ -418,3 +418,129 @@ summary      = "Delta patch did not apply cleanly"
 user_message = "A small model update could not be applied, so AURA will fetch the whole model instead. The version you have keeps working."
 runbook      = "docs/runbooks/AURA-ML-5012.md"
 introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-CLOUD-6001"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "No cloud AI key configured"
+user_message = "No AI key is set up, so AURA used its own built-in models for this step. Add a key in Settings to turn the extra reasoning on."
+runbook      = "docs/runbooks/AURA-CLOUD-6001.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6002"
+severity     = "degraded"
+recovery     = "ask_user"
+summary      = "The provider rejected the API key"
+user_message = "Your AI provider would not accept the key. Check it in Settings; AURA carried on with its own models in the meantime."
+runbook      = "docs/runbooks/AURA-CLOUD-6002.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6003"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "The AI provider could not be reached"
+user_message = "AURA could not reach the AI service, so it used its own models instead. Nothing was lost and nothing is waiting."
+runbook      = "docs/runbooks/AURA-CLOUD-6003.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6004"
+severity     = "degraded"
+recovery     = "retry"
+summary      = "The AI provider rate-limited or is overloaded"
+user_message = "The AI service is busy. AURA slowed down and used its own models for the frames it could not wait for."
+runbook      = "docs/runbooks/AURA-CLOUD-6004.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6005"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "The response did not match the task schema after one repair"
+user_message = "The AI service answered in a form AURA could not use, so AURA used its own models for that step instead."
+runbook      = "docs/runbooks/AURA-CLOUD-6005.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6006"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The project or monthly spending cap was reached"
+user_message = "This job reached the AI spending limit you set. AURA finished the rest with its own models; raise the limit in Settings if you want more."
+runbook      = "docs/runbooks/AURA-CLOUD-6006.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6007"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "Cloud AI is switched off for this project or globally"
+user_message = "Cloud AI is switched off, so AURA used its own models. Everything still runs; some wording and grouping is simpler."
+runbook      = "docs/runbooks/AURA-CLOUD-6007.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6008"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "No consent granted for this class of data leaving the machine"
+user_message = "This job has not been given permission to send anything to a cloud AI, so AURA used its own models. You can grant permission per job in Settings."
+runbook      = "docs/runbooks/AURA-CLOUD-6008.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6009"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "The payload builder refused to build an upload"
+user_message = "AURA would not send one item to the AI service because it did not pass the privacy check. That item was set aside and the rest continued."
+runbook      = "docs/runbooks/AURA-CLOUD-6009.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6010"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "The provider returned an unrecognised response"
+user_message = "The AI service returned something AURA did not understand, so AURA used its own models for that step."
+runbook      = "docs/runbooks/AURA-CLOUD-6010.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6011"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "The agent loop hit its step, token or time limit"
+user_message = "An AI reasoning step took more work than it is allowed, so AURA stopped it and used its own models for that decision."
+runbook      = "docs/runbooks/AURA-CLOUD-6011.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6012"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "The operating system credential store could not be used"
+user_message = "AURA could not use this computer's secure key store, so the key was not saved. Nothing was written anywhere else."
+runbook      = "docs/runbooks/AURA-CLOUD-6012.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6013"
+severity     = "warning"
+recovery     = "halt"
+summary      = "Cloud work cancelled by the photographer"
+user_message = "The AI step was stopped. Everything finished so far has been saved."
+runbook      = "docs/runbooks/AURA-CLOUD-6013.md"
+introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-CLOUD-6014"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The estimated cost of one call exceeded the task ceiling"
+user_message = "One AI request would have cost more than that kind of step is allowed to, so AURA used its own models instead."
+runbook      = "docs/runbooks/AURA-CLOUD-6014.md"
+introduced   = "PHASE-04"

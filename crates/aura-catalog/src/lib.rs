@@ -23,6 +23,7 @@
 //! before migrations, and a refusal to open a catalog we do not fully understand.
 
 pub mod backup;
+pub mod consent;
 pub mod db;
 pub mod guard;
 pub mod migrate;
@@ -216,6 +217,9 @@ impl Catalog {
             "task",
             "setting",
             "decision_ledger",
+            "cloud_calls",
+            "cloud_cache",
+            "cloud_budget",
         ];
         if !COUNTABLE.contains(&table) {
             return Err(statement_failed(

@@ -9,6 +9,7 @@ members = [
   "crates/aura-preview",
   "crates/aura-infer",
   "crates/aura-models",
+  "crates/aura-cloud",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",

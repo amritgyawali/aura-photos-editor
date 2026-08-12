@@ -1,0 +1,25 @@
+{
+  "name": "030-anthropic-unrepairable",
+  "note": "Both attempts fail: a scene name outside the controlled vocabulary, which the JSON Schema cannot catch and Validate can. One matcher answers both the first attempt and the repair, which is exactly the case that must end in a local fallback rather than a second repair.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["seg-unrepairable"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_030",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"scene\":\"elephant_procession\",\"ritual\":\"baraat\",\"tradition\":\"hindu\",\"confidence\":0.71,\"reasons\":[\"a decorated animal leads the group\"],\"boundary_hint\":null,\"notes\":null}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 2760, "output_tokens": 64 }
+  }
+}

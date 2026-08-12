@@ -1,0 +1,27 @@
+{
+  "name": "040-openai-mehndi",
+  "note": "The same question in the OpenAI Chat Completions shape. Provider-swap test: the same task on three providers must yield a schema-valid answer and a comparable decision.",
+  "provider": "openai",
+  "matcher": {
+    "url_suffix": "/v1/chat/completions",
+    "body_contains": ["seg-mehndi"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "chatcmpl_cassette_040",
+    "object": "chat.completion",
+    "model": "gpt-5-mini",
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\"scene\":\"ritual\",\"ritual\":\"mehndi\",\"tradition\":\"hindu\",\"confidence\":0.81,\"reasons\":[\"henna paste is being applied to a seated woman's palms\",\"marigold decoration and floor seating are visible\"],\"boundary_hint\":\"9\",\"notes\":null}"
+        }
+      }
+    ],
+    "usage": { "prompt_tokens": 2903, "completion_tokens": 102 }
+  }
+}

@@ -101,6 +101,38 @@ pub struct SizeBudget {
     pub max_bytes: u64,
 }
 
+/// One count ceiling.
+///
+/// Added in phase 04. Not everything worth budgeting is a duration or a size:
+/// "at most 75 cloud calls for a 3,000 image wedding" is the budget that keeps
+/// the cost budget true, and a run that met its millisecond targets by making
+/// four hundred calls would have passed every other kind of check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CountBudget {
+    /// Maximum number of whatever is being counted.
+    pub max_count: u64,
+}
+
+/// One money ceiling, in hundredths of a US cent.
+///
+/// An integer unit, because this file is read by people as well as by tests and
+/// a float in a budget invites an argument about rounding. 15,000 is USD 1.50.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CostBudget {
+    /// Maximum spend, in hundredths of a US cent.
+    pub max_usd_hundredths_of_a_cent: u64,
+}
+
+impl CostBudget {
+    /// The ceiling in US dollars.
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn max_usd(self) -> f64 {
+        // A budget in dollars never approaches 2^53 hundredths of a cent.
+        self.max_usd_hundredths_of_a_cent as f64 / 10_000.0
+    }
+}
+
 /// The parsed contents of `perf/budgets.toml`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Budgets {
@@ -110,6 +142,12 @@ pub struct Budgets {
     /// Size ceilings keyed by name.
     #[serde(default)]
     pub size: BTreeMap<String, SizeBudget>,
+    /// Count ceilings keyed by name.
+    #[serde(default)]
+    pub count: BTreeMap<String, CountBudget>,
+    /// Money ceilings keyed by name.
+    #[serde(default)]
+    pub cost: BTreeMap<String, CostBudget>,
 }
 
 impl Budgets {
@@ -169,6 +207,42 @@ impl Budgets {
             return Err(format!(
                 "{name} used {measured_bytes} bytes, budget {} bytes",
                 budget.max_bytes
+            ));
+        }
+        Ok(())
+    }
+
+    /// Check a measured count against its ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable breach description.
+    pub fn check_count(&self, name: &str, measured: u64) -> Result<(), String> {
+        let Some(budget) = self.count.get(name) else {
+            return Ok(());
+        };
+        if measured > budget.max_count {
+            return Err(format!(
+                "{name} was {measured}, budget {}",
+                budget.max_count
+            ));
+        }
+        Ok(())
+    }
+
+    /// Check a measured spend against its ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable breach description.
+    pub fn check_cost(&self, name: &str, measured_usd: f64) -> Result<(), String> {
+        let Some(budget) = self.cost.get(name) else {
+            return Ok(());
+        };
+        if measured_usd > budget.max_usd() {
+            return Err(format!(
+                "{name} cost ${measured_usd:.4}, budget ${:.4}",
+                budget.max_usd()
             ));
         }
         Ok(())

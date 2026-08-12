@@ -403,6 +403,224 @@ pub enum InferEvent {
     },
 }
 
+/// What Settings > AI Keys shows about the configured provider.
+///
+/// Added in PHASE-04; see `docs/adr/ADR-0010-cloud-ipc-surface.md`.
+///
+/// `keyFingerprint` is four characters from each end of the key and nothing in
+/// between, so a photographer with three keys can tell which one is stored
+/// without the panel ever holding the secret. There is no command that returns
+/// the key itself, and there never will be.
+///
+/// The four booleans are deliberately separate rather than a flags enum, for the
+/// same reason `ProjectConsent`'s five are: each one is a distinct promise with
+/// its own switch in the panel, and a support engineer reading a bug report must
+/// be able to see which of them was on.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudStatusDto {
+    /// `anthropic`, `openai`, `google` or `compat`.
+    pub provider: String,
+    /// The endpoint in use. Never carries a key.
+    pub endpoint: String,
+    /// True when a key is stored for this provider.
+    pub key_present: bool,
+    /// `sk-a...9xQz`, or empty when no key is stored.
+    pub key_fingerprint: String,
+    /// Which credential store answered: `dpapi`, `keychain`, `libsecret`.
+    pub key_store: String,
+    /// The global switch. When true the crate is inert.
+    pub offline_studio_mode: bool,
+    /// The per-project switch.
+    pub project_enabled: bool,
+    /// Whether faces are blurred before upload.
+    pub blur_faces: bool,
+    /// Which transport is wired in: `http`, `cassette` or `offline`.
+    pub transport: String,
+    /// Set when the circuit breaker is open, saying why calls stopped.
+    pub breaker_reason: Option<String>,
+    /// Models the three tiers currently resolve to, cheapest first.
+    pub tier_models: Vec<String>,
+}
+
+/// Store a key for one provider.
+///
+/// The key crosses the IPC boundary exactly once, on its way from the text field
+/// to the operating system's credential store, and is never returned.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetAiKeyInput {
+    /// `anthropic`, `openai`, `google` or `compat`.
+    pub provider: String,
+    /// The key as pasted. Trimmed before it is stored.
+    pub key: String,
+    /// Endpoint override, for a compatible or region-pinned server.
+    pub endpoint: Option<String>,
+}
+
+/// What the Check button found.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyCheckDto {
+    /// True when the provider accepted the key.
+    pub ok: bool,
+    /// The model that answered the probe, when one did.
+    pub model: String,
+    /// A sentence for the panel, whether it worked or not.
+    pub message: String,
+}
+
+/// Set the spending caps.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCloudBudgetInput {
+    /// The project whose cap is being set.
+    pub project_id: String,
+    /// Ceiling for this job, in US dollars.
+    pub cap_usd: f64,
+    /// Ceiling for the calendar month, in US dollars.
+    pub month_cap_usd: f64,
+    /// When false, passing the cap warns instead of stopping.
+    pub hard_stop: bool,
+}
+
+/// Set the privacy switches.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCloudPrivacyInput {
+    /// The project being changed.
+    pub project_id: String,
+    /// Cloud AI on for this job.
+    pub enabled: bool,
+    /// The global switch, which overrides the per-project one.
+    pub offline_studio_mode: bool,
+    /// Blur faces in every derivative before upload.
+    pub blur_faces: bool,
+}
+
+/// The live spend meter.
+///
+/// Not `Eq`: money is a float here because the provider bills in fractions of a
+/// cent, and comparing two of them for exact equality is banned by the lint block
+/// for the same reason it is everywhere else.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudSpendDto {
+    /// This job's ceiling.
+    pub cap_usd: f64,
+    /// Billed against this job.
+    pub spent_usd: f64,
+    /// The month's ceiling.
+    pub month_cap_usd: f64,
+    /// Billed against the month.
+    pub month_spent_usd: f64,
+    /// Calls made for this job.
+    pub calls: u64,
+    /// Calls answered on a cheaper tier than the task asked for.
+    pub downgrades: u64,
+    /// Decisions answered by AURA's own models instead.
+    pub fallbacks: u64,
+    /// Cache hits over cache hits plus provider calls.
+    pub cache_hit_rate: f64,
+    /// True when the cap has stopped further calls.
+    pub stopped: bool,
+}
+
+/// One row of the audit viewer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudCallDto {
+    /// Identifier of the call, also carried on the decision it produced.
+    pub id: String,
+    /// Registry name of the task.
+    pub task: String,
+    /// Task version, which pins the prompt and the schema.
+    pub task_version: u32,
+    /// The model that answered, or `local`.
+    pub model: String,
+    /// `cloud`, `cache` or `local_fallback`.
+    pub source: String,
+    /// Set when the answer was local, saying why.
+    pub fallback_reason: Option<String>,
+    /// Prompt tokens billed.
+    pub tokens_in: u32,
+    /// Completion tokens billed.
+    pub tokens_out: u32,
+    /// What it cost, in US dollars.
+    pub cost_usd: f64,
+    /// Wall clock, including retries.
+    pub latency_ms: u64,
+    /// `ok`, `repaired`, `schema_invalid`, `fallback`, `cache` or `refused`.
+    pub status: String,
+    /// Repairs attempted. Zero or one.
+    pub retry_count: u32,
+    /// Hash of the prompt this answer was made from.
+    pub prompt_hash: String,
+    /// Confidence of the decision.
+    pub confidence: f32,
+    /// The decision this call justifies, when the caller supplied one.
+    pub decision_ref: Option<String>,
+}
+
+/// What the response cache is holding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudCacheStatsDto {
+    /// Entries stored.
+    pub entries: u64,
+    /// Bytes of stored responses.
+    pub bytes: u64,
+    /// Lifetime hits.
+    pub hits: u64,
+}
+
+/// Cloud events pushed to the UI, mirroring section 11's telemetry.
+///
+/// Typed on both sides in PHASE-04 and not yet emitted, for the same reason
+/// `InferEvent` was not in phase 03: the Tauri shell has not been launched on the
+/// development machine, so an emitter would be code nobody has run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CloudEvent {
+    /// One call finished, billed or not.
+    Call {
+        /// Registry name of the task.
+        task: String,
+        /// The model that answered.
+        model: String,
+        /// What it cost.
+        cost_usd: f64,
+        /// Wall clock.
+        latency_ms: u64,
+        /// The outcome.
+        status: String,
+    },
+    /// One decision used AURA's own models instead.
+    Fallback {
+        /// Registry name of the task.
+        task: String,
+        /// Why.
+        reason: String,
+    },
+    /// A cap stopped further calls.
+    BudgetStop {
+        /// The ceiling that was reached.
+        cap_usd: f64,
+        /// What had been spent.
+        spent_usd: f64,
+    },
+    /// Periodic cache accounting, so the panel is live.
+    Cache {
+        /// Hits over lookups.
+        hit_rate: f64,
+        /// Entries stored.
+        entries: u64,
+        /// Bytes stored.
+        bytes: u64,
+    },
+}
+
 /// Progress and completion events pushed to the UI during an import.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]

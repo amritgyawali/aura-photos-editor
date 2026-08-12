@@ -161,6 +161,88 @@ export type InferEvent =
   | { kind: 'planChanged'; selectedEp: string }
   | { kind: 'modelRejected'; name: string; code: string; message: string };
 
+export type CloudStatusDto = {
+  provider: string;
+  endpoint: string;
+  keyPresent: boolean;
+  keyFingerprint: string;
+  keyStore: string;
+  offlineStudioMode: boolean;
+  projectEnabled: boolean;
+  blurFaces: boolean;
+  transport: string;
+  breakerReason: string | null;
+  tierModels: string[];
+};
+
+export type SetAiKeyInput = {
+  provider: string;
+  key: string;
+  endpoint: string | null;
+};
+
+export type KeyCheckDto = {
+  ok: boolean;
+  model: string;
+  message: string;
+};
+
+export type SetCloudBudgetInput = {
+  projectId: string;
+  capUsd: number;
+  monthCapUsd: number;
+  hardStop: boolean;
+};
+
+export type SetCloudPrivacyInput = {
+  projectId: string;
+  enabled: boolean;
+  offlineStudioMode: boolean;
+  blurFaces: boolean;
+};
+
+export type CloudSpendDto = {
+  capUsd: number;
+  spentUsd: number;
+  monthCapUsd: number;
+  monthSpentUsd: number;
+  calls: number;
+  downgrades: number;
+  fallbacks: number;
+  cacheHitRate: number;
+  stopped: boolean;
+};
+
+export type CloudCallDto = {
+  id: string;
+  task: string;
+  taskVersion: number;
+  model: string;
+  source: string;
+  fallbackReason: string | null;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  latencyMs: number;
+  status: string;
+  retryCount: number;
+  promptHash: string;
+  confidence: number;
+  decisionRef: string | null;
+};
+
+export type CloudCacheStatsDto = {
+  entries: number;
+  bytes: number;
+  hits: number;
+};
+
+export type CloudEvent =
+  | { kind: 'call'; task: string; model: string; costUsd: number; latencyMs: number; status: string }
+  | { kind: 'fallback'; task: string; reason: string }
+  | { kind: 'budgetStop'; capUsd: number; spentUsd: number }
+  | { kind: 'cache'; hitRate: number; entries: number; bytes: number };
+
 export type IpcError = {
   code: string;
   message: string;

@@ -67,6 +67,12 @@ jobs:
       - name: phase 03 verify - runtime, integrity, memory, cancellation, rollback
         run: cargo run --release --package aura-cli -- verify --phase 03 --work target/phase03-verify
 
+      # Acceptance criterion 7 of phase 04: CI contains no network access and
+      # still fully tests the gateway. Every provider response in this run comes
+      # from a cassette in tests/cloud/cassettes.
+      - name: phase 04 verify - cloud gateway, keys, payload, cache, budget, offline
+        run: cargo run --release --package aura-cli -- verify --phase 04 --work target/phase04-verify
+
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
     name: ui type-check, tests and build
@@ -123,5 +129,9 @@ jobs:
       - name: decode benchmarks
         run: cargo bench --package aura-preview --bench decode -- --warm-up-time 1 --measurement-time 3
 
+      # Release, because a budget is a claim about the binary a photographer
+      # runs. The cloud payload builder is a pixel loop and is more than an
+      # order of magnitude slower unoptimised; asserting a debug number would
+      # mean either a failing gate or a budget too loose to catch anything.
       - name: budget assertions
-        run: cargo test --package aura-perf --all-targets
+        run: cargo test --release --package aura-perf --all-targets

@@ -5,7 +5,16 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aura_cache::CacheBudget;
+use aura_catalog::consent::CatalogConsent;
 use aura_catalog::Catalog;
+use aura_cloud::audit::{AuditSink, CatalogAudit};
+use aura_cloud::budget::{CatalogBudget, CostGovernor};
+use aura_cloud::cache::{CatalogCache, ResponseCache};
+use aura_cloud::keys::{KeyStore, OsKeyStore, Platform};
+use aura_cloud::provider::{
+    Provider, ProviderClient, ProviderConfig, ProviderKind, ThreadSleeper, Transport,
+};
+use aura_cloud::{CloudAiGateway, CloudPolicy};
 use aura_core::clock::{Clock, SystemClock};
 use aura_core::progress::CancelToken;
 use aura_core::AuraResult;
@@ -40,6 +49,40 @@ pub struct AppState {
     models_root: PathBuf,
     /// The inference runtime and the hardware plan, built on first use.
     infer: Arc<Mutex<InferSlot>>,
+    /// The cloud gateway and its switches, built on first use.
+    cloud: Arc<Mutex<CloudSlot>>,
+    /// Where the operating system's credential store keeps its blob, on the one
+    /// platform that needs a file. Per installation, never per project.
+    key_dir: PathBuf,
+}
+
+/// The lazily-built cloud state.
+///
+/// Nothing here is constructed until something asks, and a catalog that is
+/// opened and closed without touching an AI feature never reads a credential
+/// store, never resolves a provider and never opens a socket.
+#[derive(Debug)]
+struct CloudSlot {
+    gateway: Option<Arc<CloudAiGateway>>,
+    keys: Option<Arc<dyn KeyStore>>,
+    provider: ProviderKind,
+    endpoint: Option<String>,
+    policy: CloudPolicy,
+    /// Swapped for a cassette transport by the tests and the phase gate.
+    transport: Option<Arc<dyn Transport>>,
+}
+
+impl Default for CloudSlot {
+    fn default() -> Self {
+        Self {
+            gateway: None,
+            keys: None,
+            provider: ProviderKind::Anthropic,
+            endpoint: None,
+            policy: CloudPolicy::default(),
+            transport: None,
+        }
+    }
 }
 
 /// The lazily-built inference state.
@@ -72,6 +115,8 @@ impl AppState {
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
+            cloud: Arc::new(Mutex::new(CloudSlot::default())),
+            key_dir: default_key_dir(),
         })
     }
 
@@ -87,6 +132,8 @@ impl AppState {
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
+            cloud: Arc::new(Mutex::new(CloudSlot::default())),
+            key_dir: default_key_dir(),
         }
     }
 
@@ -294,6 +341,153 @@ impl AppState {
         Ok(engine)
     }
 
+    /// Point the credential blob directory somewhere else. Tests use this.
+    #[must_use]
+    pub fn with_key_dir(mut self, dir: &Path) -> Self {
+        self.key_dir = dir.to_path_buf();
+        *self.cloud.lock() = CloudSlot::default();
+        self
+    }
+
+    /// Use a different key store. The tests and the phase gate use an in-memory
+    /// one so that no test ever writes to a developer's real keychain.
+    #[must_use]
+    pub fn with_key_store(self, keys: Arc<dyn KeyStore>) -> Self {
+        {
+            let mut slot = self.cloud.lock();
+            slot.keys = Some(keys);
+            slot.gateway = None;
+        }
+        self
+    }
+
+    /// Use a different transport. The tests and the phase gate pass a cassette
+    /// transport, which is how CI exercises the whole gateway with no network.
+    #[must_use]
+    pub fn with_cloud_transport(self, transport: Arc<dyn Transport>) -> Self {
+        {
+            let mut slot = self.cloud.lock();
+            slot.transport = Some(transport);
+            slot.gateway = None;
+        }
+        self
+    }
+
+    /// The credential store, built on first use.
+    ///
+    /// # Errors
+    ///
+    /// Never in itself; the signature matches the other accessors so a caller
+    /// does not have to know which of them can fail.
+    pub fn key_store(&self) -> AuraResult<Arc<dyn KeyStore>> {
+        let mut slot = self.cloud.lock();
+        if let Some(keys) = &slot.keys {
+            return Ok(Arc::clone(keys));
+        }
+        let keys: Arc<dyn KeyStore> = Arc::new(OsKeyStore::new(&self.key_dir));
+        slot.keys = Some(Arc::clone(&keys));
+        Ok(keys)
+    }
+
+    /// Which credential store this machine uses, for the settings panel.
+    #[must_use]
+    pub fn key_store_name(&self) -> &'static str {
+        Platform::host().as_str()
+    }
+
+    /// The cloud policy in force.
+    #[must_use]
+    pub fn cloud_policy(&self) -> CloudPolicy {
+        self.cloud.lock().policy
+    }
+
+    /// Change the switches. Rebuilds the gateway on next use.
+    ///
+    /// # Errors
+    ///
+    /// Never in itself; the signature matches the other setters.
+    pub fn set_cloud_policy(&self, policy: CloudPolicy) -> AuraResult<()> {
+        let mut slot = self.cloud.lock();
+        slot.policy = policy;
+        slot.gateway = None;
+        Ok(())
+    }
+
+    /// Choose the provider and, optionally, its endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Never in itself; the signature matches the other setters.
+    pub fn set_cloud_provider(
+        &self,
+        provider: ProviderKind,
+        endpoint: Option<&str>,
+    ) -> AuraResult<()> {
+        let mut slot = self.cloud.lock();
+        slot.provider = provider;
+        slot.endpoint = endpoint.map(ToString::to_string);
+        slot.gateway = None;
+        Ok(())
+    }
+
+    /// The cloud gateway, assembled on first use.
+    ///
+    /// # Errors
+    ///
+    /// Never in itself. Every cloud failure is a degradation handled inside the
+    /// gateway, so building one cannot fail; the `Result` is here so a caller
+    /// does not have to know that.
+    pub fn cloud(&self) -> AuraResult<Arc<CloudAiGateway>> {
+        {
+            let slot = self.cloud.lock();
+            if let Some(gateway) = &slot.gateway {
+                return Ok(Arc::clone(gateway));
+            }
+        }
+        let keys = self.key_store()?;
+
+        let mut slot = self.cloud.lock();
+        let provider = build_provider(slot.provider, slot.endpoint.as_deref());
+        let transport = slot.transport.clone().unwrap_or_else(|| {
+            Arc::new(aura_cloud::http::HttpTransport::new()) as Arc<dyn Transport>
+        });
+
+        let client = Arc::new(ProviderClient::new(
+            provider,
+            transport,
+            Arc::new(ThreadSleeper),
+        ));
+        let cache: Arc<dyn ResponseCache> = Arc::new(CatalogCache::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ));
+        let audit: Arc<dyn AuditSink> = Arc::new(CatalogAudit::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ));
+        let governor = Arc::new(CostGovernor::new(Arc::new(CatalogBudget::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))));
+        let consent = Arc::new(CatalogConsent::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ));
+
+        let gateway = Arc::new(CloudAiGateway::new(
+            client,
+            keys,
+            cache,
+            audit,
+            governor,
+            consent,
+            Arc::clone(&self.clock),
+            slot.policy,
+        ));
+        slot.gateway = Some(Arc::clone(&gateway));
+        Ok(gateway)
+    }
+
     /// Where `hardware_plan.json` lives: beside the catalog, like the cache.
     fn plan_root(&self) -> PathBuf {
         self.cache_root.parent().map_or_else(
@@ -335,6 +529,47 @@ impl AppState {
     pub fn finish_job(&self, job_id: &str) {
         self.jobs.lock().remove(job_id);
     }
+}
+
+/// Build a provider for one vendor at one endpoint.
+///
+/// The endpoint is the user's when they gave one, so a region-pinned or
+/// self-hosted deployment is a setting rather than a rebuild.
+fn build_provider(kind: ProviderKind, endpoint: Option<&str>) -> Arc<dyn Provider> {
+    match kind {
+        ProviderKind::Anthropic => Arc::new(aura_cloud::anthropic::AnthropicProvider::new(
+            endpoint.unwrap_or(aura_cloud::anthropic::DEFAULT_ENDPOINT),
+        )),
+        ProviderKind::OpenAi => Arc::new(aura_cloud::openai::OpenAiProvider::new(
+            endpoint.unwrap_or(aura_cloud::openai::DEFAULT_ENDPOINT),
+        )),
+        ProviderKind::Google => Arc::new(aura_cloud::google::GoogleProvider::new(
+            endpoint.unwrap_or(aura_cloud::google::DEFAULT_ENDPOINT),
+        )),
+        // A compatible server runs whatever the user loaded into it, so there is
+        // no default model name worth guessing. `local-model` is what Ollama and
+        // LM Studio both accept as an alias, and Settings overwrites it.
+        ProviderKind::Compat => Arc::new(aura_cloud::compat::provider(
+            endpoint.unwrap_or(aura_cloud::compat::DEFAULT_ENDPOINT),
+            "local-model",
+        )),
+    }
+}
+
+/// Fold an endpoint into a configuration without rebuilding the alias table.
+#[must_use]
+pub fn config_at(mut config: ProviderConfig, endpoint: &str) -> ProviderConfig {
+    config.endpoint = endpoint.trim_end_matches('/').to_string();
+    config
+}
+
+/// Where the credential blob lives on the one platform that needs a file.
+///
+/// Beside the models rather than beside a catalog: a key belongs to the machine
+/// and its user, not to one wedding, and a photographer who archives a project
+/// folder must not archive their API key with it.
+fn default_key_dir() -> PathBuf {
+    PathBuf::from("credentials")
 }
 
 /// Models live with the installation rather than with a catalog: one pack serves

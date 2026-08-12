@@ -28,6 +28,9 @@ Never load two phase files into one session.
 | Preview troubleshooting | `docs/runbooks/previews.md` |
 | Hardware troubleshooting | `docs/runbooks/hardware.md` |
 | Adding a model | `docs/runbooks/adding-a-model.md` |
+| Cloud AI policy | `docs/adr/ADR-0009-cloud-ai-policy.md` |
+| Using your own AI key | `docs/using-your-own-ai-key.md` |
+| Recorded provider responses | `tests/cloud/cassettes/` |
 
 ## Non-negotiables enforced by the build
 
@@ -72,6 +75,34 @@ transfers; verify-then-rename installs; automatic rollback; `AURADLT1` deltas);
 `tools/model-sign`; two signed placeholder models with cards; the hardware IPC
 surface (ADR-0008) and its Settings panel; and `aura-cli verify --phase 03` as
 the gate. Its exit report is `docs/progress/PHASE-03-EXIT.md`.
+
+Phase 04 is implemented: `aura-cloud` (the frozen `CloudTask` contract and the
+seven-step gateway; four providers behind one shape; three transports - a
+hand-written HTTP/1.1 client, a cassette replayer and an offline refusal; keys in
+the OS credential store by command invocation with the secret only ever on stdin;
+a JSON Schema subset validator with exactly one repair retry; a payload builder
+that cannot upload an original; a cost governor that prices before it calls; a
+response cache; an audit trail with a row for every decision including the ones
+that never reached a model; bounded agent primitives; and `SegmentNaming` as the
+reference task), migration 4, the cloud IPC surface (ADR-0010) and its Settings
+panel, and `aura-cli verify --phase 04` as the gate. Its exit report is
+`docs/progress/PHASE-04-EXIT.md`. TLS is waived (ADR-0009), so this build reaches
+`http://` OpenAI-compatible endpoints and not the public HTTPS providers.
+
+Four rules that phase 04 added and every later phase inherits:
+
+- **`CloudAiGateway` is the only way to reach a model provider.** No phase may
+  open a socket; `scripts/check-banned.sh` enforces it exactly as it does for the
+  inference runtime.
+- **A task without a local fallback does not compile**, and neither does one
+  whose `Output` cannot state its confidence and reasons. Invariants 2 and 6 are
+  trait bounds, not review items.
+- **Bump `CloudTask::VERSION` on any prompt, schema or ceiling change.** The
+  cache key contains it, and a stale answer served under a contract that no
+  longer exists is worse than no answer.
+- **Cloud proposes; deterministic code decides.** A cloud answer may not overrule
+  a local decision at confidence 0.90 or above unless it cites contradicting
+  visual evidence, and the conflict is logged.
 
 Four rules that phase 03 added and every later phase inherits:
 

@@ -1,0 +1,25 @@
+{
+  "name": "020-anthropic-malformed-then-repaired",
+  "note": "The first answer to the ring-exchange segment: confidence out of range and an invented field. Sorted before the repair cassette, and the repair cassette matches on the repair turn's text, so the two play in order.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["seg-ring-exchange"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_020",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "Here is the analysis:\n```json\n{\"scene\":\"ceremony\",\"ritual\":\"ring_exchange\",\"tradition\":\"christian\",\"confidence\":1.4,\"reasons\":[\"the officiant is holding a small open box\"],\"lighting\":\"tungsten\",\"notes\":null}\n```"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 2810, "output_tokens": 96 }
+  }
+}

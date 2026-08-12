@@ -6,6 +6,15 @@ type-complexity-threshold      = 300
 # Names that must never appear as bare identifiers
 disallowed-names = ["foo", "bar", "baz", "tmp", "data", "thing"]
 
+# Product and vendor names that are spelled this way in the world, and that
+# clippy::doc_markdown would otherwise demand backticks around in every doc
+# comment that mentions them. Added in phase 04, where four vendors and half a
+# dozen self-hosted inference servers are named on nearly every page.
+doc-valid-idents = [
+  "AURA", "OpenAI", "DirectML", "TensorRT", "CoreML", "DPAPI", "LibRaw",
+  "LiteLLM", "vLLM", "GiB", "MiB", "..",
+]
+
 # Ban the APIs that break determinism or panic silently
 [[disallowed-methods]]
 path   = "std::option::Option::unwrap"
