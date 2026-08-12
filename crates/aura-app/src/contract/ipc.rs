@@ -254,6 +254,155 @@ impl From<aura_core::AuraError> for IpcError {
     }
 }
 
+/// One execution provider and what is known about it.
+///
+/// Added in PHASE-03; see `docs/adr/ADR-0008-inference-ipc-surface.md`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderNoteDto {
+    /// `tensorrt`, `cuda`, `directml`, `coreml` or `cpu`.
+    pub ep: String,
+    /// A sentence for the panel: why it is unavailable, or why it was set aside.
+    pub reason: String,
+}
+
+/// How fast a provider was, when it was measured.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProbeScoreDto {
+    /// Which provider.
+    pub ep: String,
+    /// Median of the probe runs, in milliseconds.
+    pub median_ms: f32,
+}
+
+/// What the hardware probe decided, for Settings > Hardware.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HardwarePlanDto {
+    /// Accelerator name, when one was found.
+    pub gpu: Option<String>,
+    /// Providers that will be tried, most preferred first.
+    pub ep_order: Vec<String>,
+    /// The one that will actually answer the next request.
+    pub selected_ep: String,
+    /// The user's override, when they set one.
+    pub override_ep: Option<String>,
+    /// Providers that are not present, each with a reason.
+    pub unavailable: Vec<ProviderNoteDto>,
+    /// Providers set aside on this machine after a failed check.
+    pub set_aside: Vec<ProviderNoteDto>,
+    /// Memory ceiling the scheduler admits work against, in megabytes.
+    pub vram_budget_mb: u32,
+    /// Worker threads for processor-side work.
+    pub cpu_threads: u16,
+    /// Probe timings, one per measured provider.
+    pub probe_scores_ms: Vec<ProbeScoreDto>,
+    /// RFC 3339 timestamp of the measurement.
+    pub probed_at: String,
+    /// False when this is the conservative plan rather than a measurement.
+    pub probed: bool,
+}
+
+/// One pinned model and what is installed of it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelStatusDto {
+    /// Registry name.
+    pub name: String,
+    /// Pinned version.
+    pub version: String,
+    /// What the model does, in one phrase.
+    pub task: String,
+    /// The version in use, once it has proved itself.
+    pub active_version: Option<String>,
+    /// A version installed but not yet proved.
+    pub pending_version: Option<String>,
+    /// Versions that failed their first real use here.
+    pub rejected_versions: Vec<String>,
+    /// Repository-relative path of the model card.
+    pub model_card: String,
+    /// Declared peak working set per image, in megabytes.
+    pub working_set_mb: u32,
+    /// Shipped files for this version.
+    pub file_count: u32,
+    /// True when this model may not be quantised to int8.
+    pub int8_forbidden: bool,
+}
+
+/// What warmup did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WarmupReportDto {
+    /// Models loaded.
+    pub loaded: u32,
+    /// Wall clock for the whole warmup.
+    pub elapsed_ms: u64,
+    /// Which provider answered.
+    pub ep_used: String,
+}
+
+/// Runtime counters for the settings panel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InferStatsDto {
+    /// Sessions currently resident in the pool.
+    pub resident_sessions: u32,
+    /// Requests served from a resident session.
+    pub pool_hits: u64,
+    /// Requests that had to load a model.
+    pub pool_loads: u64,
+    /// Requests admitted by the scheduler.
+    pub requests: u64,
+    /// Times a batch had to shrink to fit memory.
+    pub downshifts: u64,
+    /// Mean admission overhead, in milliseconds. Budgeted at 0.4 ms.
+    pub mean_overhead_ms: f32,
+    /// Memory high-water mark, in megabytes.
+    pub peak_memory_mb: u64,
+}
+
+/// Choose the execution provider by hand.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetExecutionProviderInput {
+    /// A provider name, or `auto` to return to the negotiated order.
+    pub ep: String,
+}
+
+/// Progress and refusals pushed to the UI while models load.
+///
+/// Typed on both sides in PHASE-03 and not yet emitted, for the same reason
+/// `IngestEvent` was not in phase 01: the Tauri shell has not been launched on
+/// the development machine, so an emitter would be code nobody has run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum InferEvent {
+    /// One model finished loading during warmup.
+    WarmupProgress {
+        /// Models finished.
+        done: u32,
+        /// Models in this warmup.
+        total: u32,
+        /// The model that just finished.
+        model: String,
+    },
+    /// The plan changed: a re-check, an override, or a provider set aside.
+    PlanChanged {
+        /// The provider that will answer from now on.
+        selected_ep: String,
+    },
+    /// A model was refused by the integrity chain.
+    ModelRejected {
+        /// Registry name.
+        name: String,
+        /// Registered error code.
+        code: String,
+        /// Photographer-facing sentence.
+        message: String,
+    },
+}
+
 /// Progress and completion events pushed to the UI during an import.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]

@@ -99,6 +99,68 @@ export type PreviewEvent =
   | { kind: 'failed'; photoId: string; code: string; message: string }
   | { kind: 'cacheStats'; bytesUsed: number; budgetBytes: number; hitRate: number };
 
+export type ProviderNoteDto = {
+  ep: string;
+  reason: string;
+};
+
+export type ProbeScoreDto = {
+  ep: string;
+  medianMs: number;
+};
+
+export type HardwarePlanDto = {
+  gpu: string | null;
+  epOrder: string[];
+  selectedEp: string;
+  overrideEp: string | null;
+  unavailable: ProviderNoteDto[];
+  setAside: ProviderNoteDto[];
+  vramBudgetMb: number;
+  cpuThreads: number;
+  probeScoresMs: ProbeScoreDto[];
+  probedAt: string;
+  probed: boolean;
+};
+
+export type ModelStatusDto = {
+  name: string;
+  version: string;
+  task: string;
+  activeVersion: string | null;
+  pendingVersion: string | null;
+  rejectedVersions: string[];
+  modelCard: string;
+  workingSetMb: number;
+  fileCount: number;
+  int8Forbidden: boolean;
+};
+
+export type WarmupReportDto = {
+  loaded: number;
+  elapsedMs: number;
+  epUsed: string;
+};
+
+export type InferStatsDto = {
+  residentSessions: number;
+  poolHits: number;
+  poolLoads: number;
+  requests: number;
+  downshifts: number;
+  meanOverheadMs: number;
+  peakMemoryMb: number;
+};
+
+export type SetExecutionProviderInput = {
+  ep: string;
+};
+
+export type InferEvent =
+  | { kind: 'warmupProgress'; done: number; total: number; model: string }
+  | { kind: 'planChanged'; selectedEp: string }
+  | { kind: 'modelRejected'; name: string; code: string; message: string };
+
 export type IpcError = {
   code: string;
   message: string;

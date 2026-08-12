@@ -1,0 +1,22 @@
+[package]
+name         = "aura-models"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+description  = "Signed model registry: manifests, integrity, resumable updates, atomic swap and rollback"
+
+[dependencies]
+aura-core     = { path = "../aura-core" }
+aura-infer    = { path = "../aura-infer" }
+blake3        = { workspace = true }
+ed25519-dalek = { workspace = true }
+parking_lot   = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+sha2          = { workspace = true }
+tracing       = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

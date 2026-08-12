@@ -3,6 +3,12 @@ import { listen } from '@tauri-apps/api/event';
 
 import type {
   CacheStatsDto,
+  HardwarePlanDto,
+  InferEvent,
+  InferStatsDto,
+  ModelStatusDto,
+  SetExecutionProviderInput,
+  WarmupReportDto,
   CreateProjectInput,
   GetPreviewInput,
   ImageRowLite,
@@ -91,6 +97,26 @@ export const api = {
 
   onPreviewEvent: (handler: (event: PreviewEvent) => void): Promise<() => void> =>
     listen<PreviewEvent>('preview', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+
+  hardwarePlan: (): Promise<HardwarePlanDto> => invoke<HardwarePlanDto>('hardware_plan'),
+
+  recheckHardware: (): Promise<HardwarePlanDto> => invoke<HardwarePlanDto>('recheck_hardware'),
+
+  setExecutionProvider: (input: SetExecutionProviderInput): Promise<HardwarePlanDto> =>
+    invoke<HardwarePlanDto>('set_execution_provider', { input }),
+
+  listModels: (): Promise<ModelStatusDto[]> => invoke<ModelStatusDto[]>('list_models'),
+
+  warmupModels: (): Promise<WarmupReportDto> => invoke<WarmupReportDto>('warmup_models'),
+
+  inferStats: (): Promise<InferStatsDto> => invoke<InferStatsDto>('infer_stats'),
+
+  onInferEvent: (handler: (event: InferEvent) => void): Promise<() => void> =>
+    listen<InferEvent>('infer', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },

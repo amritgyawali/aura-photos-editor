@@ -29,13 +29,16 @@ pub mod contract {
     pub mod consent;
     pub mod error;
     pub mod ids;
+    pub mod priority;
 }
 
 /// Named error constructors, one module per domain in the code registry.
 pub mod errors {
     pub mod db;
+    pub mod gpu;
     pub mod io;
     pub mod job;
+    pub mod ml;
     pub mod raw;
 }
 
@@ -45,3 +48,4 @@ pub mod redact;
 
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
 pub use contract::ids::{ContentHash, FileId, ImportId, PhotoId, ProjectId, RunId};
+pub use contract::priority::Priority;

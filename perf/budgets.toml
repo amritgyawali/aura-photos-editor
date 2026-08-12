@@ -44,3 +44,35 @@ max_bytes = 3758096384  # 3.5 GB
 
 [size.peak_rss_batch_proxy]
 max_bytes = 2684354560  # 2.5 GB
+
+# Phase 03 performance budgets, from PHASE-03 section 11.
+#
+# The two GPU throughput rows in that section - 220 img/s on an RTX 4070 and
+# 110 img/s on an M3 Pro - are not here, because this build has no GPU backend
+# and a budget nothing can measure is a wish. They are waived with their reasons
+# in docs/adr/ADR-0007-inference-runtime.md and the waiver expires when a GPU
+# backend lands.
+
+# One model, parsed, compiled and its weights rounded, with nothing cached.
+[stage.cold_model_load]
+max_elapsed_ms = 900
+
+# The scheduler's own cost, measured over 1,000 admissions so a 0.4 ms budget is
+# expressible in whole milliseconds.
+[stage.infer_admission_1000]
+max_elapsed_ms  = 400
+max_ms_per_unit = 1
+
+# The processor path with a quantised model: section 11 asks for 18 images per
+# second, which is 55 ms per image.
+[stage.infer_embedding_cpu_int8]
+max_elapsed_ms  = 3000
+max_ms_per_unit = 55
+
+# Enumerate the providers, run the reference model twenty times on each, decide.
+[stage.hardware_probe]
+max_elapsed_ms = 15000
+
+# Loading the models a project open needs before the photographer sees anything.
+[stage.warmup_startup_models]
+max_elapsed_ms = 2500

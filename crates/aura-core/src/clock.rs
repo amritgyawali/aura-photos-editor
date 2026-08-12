@@ -16,6 +16,17 @@ pub trait Clock: Send + Sync + std::fmt::Debug {
     /// Monotonic milliseconds since process start. Never goes backwards, so
     /// lease expiry and progress ETAs are safe against NTP corrections.
     fn monotonic_ms(&self) -> u64;
+
+    /// Monotonic microseconds since process start.
+    ///
+    /// Added in phase 03. Milliseconds are the right unit for a lease and the
+    /// wrong one for a scheduler whose budget is 0.4 ms per request: measured in
+    /// whole milliseconds, that budget can only ever read 0 or 1. The default
+    /// implementation scales the millisecond reading, so a clock that only knows
+    /// milliseconds - every test clock - keeps working.
+    fn monotonic_us(&self) -> u64 {
+        self.monotonic_ms().saturating_mul(1_000)
+    }
 }
 
 /// Production clock: real wall time plus a real monotonic base.
@@ -39,6 +50,10 @@ impl Clock for SystemClock {
 
     fn monotonic_ms(&self) -> u64 {
         u64::try_from(self.start.elapsed().as_millis()).unwrap_or(u64::MAX)
+    }
+
+    fn monotonic_us(&self) -> u64 {
+        u64::try_from(self.start.elapsed().as_micros()).unwrap_or(u64::MAX)
     }
 }
 

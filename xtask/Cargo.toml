@@ -6,6 +6,8 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+aura-infer  = { path = "../crates/aura-infer" }
+aura-models = { path = "../crates/aura-models" }
 blake3.workspace     = true
 walkdir.workspace    = true
 serde.workspace      = true

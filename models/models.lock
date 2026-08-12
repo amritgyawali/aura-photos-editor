@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "generated_at": "2026-08-12T00:00:00Z",
+  "models": [
+    {
+      "name": "aura_tiny_embedding",
+      "version": "1.0.0",
+      "task": "embedding",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          3,
+          32,
+          32
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "srgb"
+      },
+      "output": {
+        "embedding": [
+          1,
+          32
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "aura_tiny_embedding_1.0.0.fp32.onnx",
+          "sha256": "8b5263bea5cbe686deed5c4bc6c7c0d8d4f8adf1c96c42f447d486d72504d445",
+          "bytes": 8534
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "aura_tiny_embedding_1.0.0.fp16.onnx",
+          "sha256": "bcd761b68a91e4a51b2aa4fe7a3b0e258e2f72696ad3aeb94ec5ddce41d212d7",
+          "bytes": 8534
+        },
+        {
+          "ep": "cpu",
+          "precision": "int8",
+          "file": "aura_tiny_embedding_1.0.0.int8.onnx",
+          "sha256": "17ddd10915cafe4deb93a6070e6fdd8f1e633550c6cd4ddc5f71d5d0dcf79e75",
+          "bytes": 8534
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/aura_tiny_embedding.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": false,
+        "require_fp32": false
+      },
+      "opset": 13
+    },
+    {
+      "name": "aura_tiny_scene",
+      "version": "1.0.0",
+      "task": "multiclass",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          3,
+          32,
+          32
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "srgb"
+      },
+      "output": {
+        "scene_probs": [
+          1,
+          6
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "aura_tiny_scene_1.0.0.fp32.onnx",
+          "sha256": "2a9cf8f7c09cf97b38dba375eeb609afef3085239e76482840a48a33ee457556",
+          "bytes": 1672
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "aura_tiny_scene_1.0.0.fp16.onnx",
+          "sha256": "22a74cbc19b1a0d80d4b6e3567e2914eeaa133be106fb308b57a7ff5f1c65efe",
+          "bytes": 1672
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/aura_tiny_scene.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
+    }
+  ]
+}

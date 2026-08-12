@@ -2,6 +2,61 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 03 - Inference runtime and the signed model registry
+
+One local AI runtime behind one frozen interface, and a model registry that
+refuses anything it cannot verify. Nothing in phases 01 and 02 calls it yet;
+every AI phase from 05 onwards calls nothing else.
+
+### Added
+
+- `aura-infer`: the frozen `InferService`, a hardware probe that measures a
+  machine and writes `hardware_plan.json`, execution-provider negotiation with a
+  per-machine set-aside list, a session pool, a batch scheduler with a memory
+  ledger, cooperative cancellation, and warmup with visible progress.
+- A deterministic interpreter over a documented subset of ONNX opset 13:
+  nineteen operators, a protobuf reader *and* writer, and three genuinely
+  different numeric paths (fp32, fp16, int8). Pure safe Rust. ONNX Runtime is
+  **not** linked - see `docs/adr/ADR-0007-inference-runtime.md` for the four
+  reasons and for how a backend is added later without touching a caller.
+- `aura-models`: `models.lock` verified by ed25519 then sha256 then model card,
+  in that order and entirely offline; resumable transfers against a transport
+  port; verify-then-rename installs; a pending/active/rejected state machine that
+  rolls a model back automatically when it fails its first real use; and the
+  `AURADLT1` block delta with its encoder.
+- `tools/model-sign`: offline signing. The release key never enters the
+  repository or CI.
+- Two placeholder models with model cards, and `cargo xtask models` as the CI
+  gate that refuses a model without one (Article VI rule M1).
+- `ml/export_onnx`: a second implementation of the file format in Python, which
+  produces byte-identical files to the Rust generator - and, where onnxruntime
+  happens to be installed, compares our interpreter against it (worst difference
+  1.6e-7 on the placeholder models).
+- Six IPC commands and a Settings > Hardware panel that lists unavailable
+  providers *with their reasons* rather than hiding them
+  (`docs/adr/ADR-0008-inference-ipc-surface.md`).
+- 17 error codes with runbooks: `AURA-GPU-4001..4005`, `AURA-ML-5001..5012`.
+- `aura-cli verify --phase 03`: model integrity, probe, warmup, throughput,
+  parity, a forced memory squeeze, cancellation, a misbehaving provider and a
+  real rollback, in one run.
+
+### Changed
+
+- `Priority` moved to `aura-core` so the runtime does not depend on preview
+  infrastructure. Phase 02's copy is untouched, and a test keeps the two in step.
+- `Clock` gained `monotonic_us`, because a 0.4 ms budget measured in whole
+  milliseconds can only ever read 0 or 1.
+- `scripts/check-banned.sh` refuses any use of ONNX Runtime outside `aura-infer`.
+
+### Known gaps
+
+- No GPU backend, so two of the phase's throughput budgets are unmeasurable and
+  are waived with an expiry condition in ADR-0007.
+- The models are placeholders; the first trained weights arrive in phase 05.
+- No network transport: nothing in the workspace opens a socket yet.
+- `InferEvent` is typed on both sides and not emitted, like `IngestEvent` and
+  `PreviewEvent` before it, because the Tauri shell has never been launched here.
+
 ## Phase 02.1 - Proprietary mosaic codecs, X-Trans, and a parallel decode path
 
 A follow-up to phase 02 that closes most of the camera-coverage gap ADR-0004
