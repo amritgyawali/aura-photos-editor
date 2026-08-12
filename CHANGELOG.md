@@ -2,6 +2,85 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 04 - Cloud AI gateway and the agentic reasoning runtime
+
+Paste one API key and the app gains a governed reasoning layer. It is a bonus
+tier and never a dependency: with the network unplugged a full wedding still
+completes, every decision marked `local_fallback`.
+
+### Added
+
+- `aura-cloud`: the frozen `CloudTask` contract and the seven-step gateway -
+  policy, render, inspect, cache, govern, call, settle. It is the only crate in
+  the product allowed to open a socket, and `scripts/check-banned.sh` enforces
+  that the way it already enforces one runtime for models.
+- Four providers behind one shape - Anthropic Messages, OpenAI Chat Completions,
+  Google `generateContent`, and OpenAI-compatible self-hosted servers - with
+  three-tier model aliasing, so a task names a capability and never a vendor.
+- Three transports: a hand-written HTTP/1.1 client, a cassette replayer, and an
+  offline refusal. The HTTP client does **not** speak TLS, so this build reaches
+  `http://` endpoints - a local Ollama, LM Studio or studio gateway - and not the
+  public HTTPS providers. The waiver and its expiry condition are in
+  `docs/adr/ADR-0009-cloud-ai-policy.md`.
+- Keys in the operating system's own credential store, by command invocation
+  rather than FFI, with the secret written to the child's **stdin** and never to
+  `argv`. A test asserts that for all three platforms' command shapes at once.
+- A JSON Schema validator that refuses a keyword it does not implement rather
+  than ignoring it, reports every failing rule at once in a stable order, and
+  writes its complaint for a model to act on. Exactly one repair round trip, then
+  the local answer.
+- A payload builder that cannot upload an original: a full-resolution tiled
+  decode and a scene-linear buffer are both refused by type, tiles are capped at
+  768 px, and the EXIF summary is an allow-list with no GPS, no filename, no
+  serial number and no absolute time. Optional pre-upload face blur.
+- A cost governor that prices every call **before** it is made, drops a tier
+  rather than a decision when the budget runs low, and stops at the cap without
+  stopping the gallery.
+- A response cache keyed on task, version, prompt hash, image content hashes and
+  model, so re-running a wedding is nearly free and produces identical decisions.
+- An audit trail with a row for every decision **including the ones that never
+  reached a model**, which are usually the ones worth reading.
+- Bounded agent primitives - step cap, deterministic tool ordering, structured
+  scratchpad, four limits checked before each step, cancel within one step - for
+  phases 27 and 29 to build on.
+- `SegmentNaming`, the reference task, with section 7's prompt and schema copied
+  verbatim and a controlled vocabulary of eighteen scenes, eighteen rituals and
+  eight traditions.
+- Migration 4: `cloud_calls`, `cloud_cache`, `cloud_budget`. The consent gate
+  frozen in phase 01 has its first caller.
+- Ten IPC commands and a Settings > AI keys panel: key entry, Check, caps, the
+  privacy switches, a live spend meter and the audit viewer
+  (`docs/adr/ADR-0010-cloud-ipc-surface.md`). No command returns a key.
+- 14 error codes with runbooks: `AURA-CLOUD-6001..6014`.
+- `aura-cli verify --phase 04`: sixteen checks, no network.
+
+### Changed
+
+- Budget assertions now run in release. A budget is a claim about the binary a
+  photographer runs, and the payload builder is roughly ten times slower
+  unoptimised.
+- `aura-perf` gained count and cost budget kinds. Not everything worth budgeting
+  is a duration or a size.
+
+### Measured
+
+Gateway overhead 0.08 ms per call (budget 15 ms). 75 calls and USD 1.04 for a
+3,000 image wedding (budgets 75 and USD 1.50). 100 % cache hit rate on a re-run
+(budget 70 %). A total cloud outage costs 9 ms against a 135 s pipeline floor
+(budget 3 %).
+
+### Rules every later phase inherits
+
+- **`CloudAiGateway` is the only way to reach a model provider.** No phase may
+  open a socket; the lint enforces it.
+- **A task without a local fallback does not compile**, and neither does one
+  whose answer cannot state its confidence and reasons.
+- **Bump `CloudTask::VERSION` on any prompt, schema or ceiling change.** The
+  cache key contains it, and a stale answer is worse than no answer.
+- **Cloud proposes; deterministic code decides.** A cloud answer may not overrule
+  a local decision at confidence 0.90 or above unless it cites contradicting
+  visual evidence, and the conflict is logged.
+
 ## Phase 03 - Inference runtime and the signed model registry
 
 One local AI runtime behind one frozen interface, and a model registry that

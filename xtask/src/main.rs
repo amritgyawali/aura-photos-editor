@@ -20,6 +20,7 @@ use walkdir::WalkDir;
 /// Files that are frozen contracts even though they do not live in a `contract/` directory.
 const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0001_init.sql",
+    "crates/aura-catalog/migrations/0004_cloud_audit.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];
