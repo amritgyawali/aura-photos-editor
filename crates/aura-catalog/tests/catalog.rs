@@ -41,8 +41,26 @@ fn seed_project(catalog: &Catalog) -> String {
 #[test]
 fn fresh_catalog_reaches_current_version_and_is_clean() {
     let (_dir, catalog) = fresh();
-    assert_eq!(catalog.schema_version().expect("version"), 1);
+    // Not a literal: the version moves with the migration list, and a test that
+    // hard-coded it would have to be edited by the same person who forgot to add
+    // the migration.
+    assert_eq!(
+        catalog.schema_version().expect("version"),
+        aura_catalog::APP_SCHEMA_VERSION
+    );
     catalog.integrity_check().expect("integrity");
+}
+
+#[test]
+fn a_fresh_catalog_has_the_cloud_tables_migration_4_adds() {
+    let (_dir, catalog) = fresh();
+    for table in ["cloud_calls", "cloud_cache", "cloud_budget"] {
+        assert_eq!(
+            catalog.count(table).unwrap_or(-1),
+            0,
+            "{table} is missing from a fresh catalog"
+        );
+    }
 }
 
 #[test]
