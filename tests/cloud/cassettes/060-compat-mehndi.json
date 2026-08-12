@@ -1,0 +1,26 @@
+{
+  "name": "060-compat-mehndi",
+  "note": "A self-hosted OpenAI-compatible server. Same wire shape, a local model name, and no usage block at all - which several local servers omit and the parser must therefore default to zero rather than fail on.",
+  "provider": "compat",
+  "matcher": {
+    "url_suffix": "/v1/chat/completions",
+    "body_contains": ["seg-mehndi", "local-model"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "chatcmpl-local-060",
+    "object": "chat.completion",
+    "model": "local-model",
+    "choices": [
+      {
+        "index": 0,
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\"scene\":\"ritual\",\"ritual\":\"mehndi\",\"tradition\":\"hindu\",\"confidence\":0.62,\"reasons\":[\"henna application to hands is visible in most tiles\"],\"boundary_hint\":null,\"notes\":null}"
+        }
+      }
+    ]
+  }
+}

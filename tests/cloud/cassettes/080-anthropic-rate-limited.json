@@ -1,0 +1,18 @@
+{
+  "name": "080-anthropic-rate-limited",
+  "note": "A 429 with a Retry-After. Retryable, so the client backs off and tries again; because this matcher answers every attempt, the run ends in a local fallback after the bounded attempts, which is the behaviour the outage test asserts.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["seg-busy"]
+  },
+  "status": 429,
+  "headers": [
+    ["content-type", "application/json"],
+    ["retry-after", "2"]
+  ],
+  "body": {
+    "type": "error",
+    "error": { "type": "rate_limit_error", "message": "number of requests has exceeded your rate limit" }
+  }
+}

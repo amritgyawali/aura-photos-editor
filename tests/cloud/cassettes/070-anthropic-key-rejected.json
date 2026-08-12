@@ -1,0 +1,18 @@
+{
+  "name": "070-anthropic-key-rejected",
+  "note": "A 401 whose body echoes a key-shaped string back at us, which is a real provider behaviour and the reason the error detail is scrubbed before it reaches a log or an audit row.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["seg-rejected"]
+  },
+  "status": 401,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "type": "error",
+    "error": {
+      "type": "authentication_error",
+      "message": "invalid x-api-key: sk-ant-api03-NOTAREALKEY000000000000000000000000000000AA"
+    }
+  }
+}

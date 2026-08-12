@@ -1,0 +1,28 @@
+{
+  "name": "050-google-mehndi",
+  "note": "The same question in the Google generateContent shape, including the upper-case finishReason and camelCase usage block that the parser has to normalise.",
+  "provider": "google",
+  "matcher": {
+    "url_suffix": ":generateContent",
+    "body_contains": ["seg-mehndi"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "candidates": [
+      {
+        "finishReason": "STOP",
+        "content": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "{\"scene\":\"ritual\",\"ritual\":\"mehndi\",\"tradition\":\"hindu\",\"confidence\":0.79,\"reasons\":[\"henna is being applied to the hands of a seated woman\",\"the setting is informal with floor seating and flowers\"],\"boundary_hint\":\"9\",\"notes\":null}"
+            }
+          ]
+        }
+      }
+    ],
+    "usageMetadata": { "promptTokenCount": 1204, "candidatesTokenCount": 96 },
+    "modelVersion": "gemini-2.5-flash"
+  }
+}

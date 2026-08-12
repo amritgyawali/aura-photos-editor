@@ -59,6 +59,7 @@ version = "0.1.0"
 dependencies = [
  "aura-cache",
  "aura-catalog",
+ "aura-cloud",
  "aura-core",
  "aura-infer",
  "aura-ingest",
@@ -113,6 +114,7 @@ version = "0.1.0"
 dependencies = [
  "aura-cache",
  "aura-catalog",
+ "aura-cloud",
  "aura-core",
  "aura-infer",
  "aura-ingest",
@@ -126,6 +128,24 @@ dependencies = [
  "time",
  "tracing",
  "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "aura-cloud"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-raw",
+ "blake3",
+ "parking_lot",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "tracing",
  "uuid",
 ]
 
@@ -223,6 +243,8 @@ dependencies = [
 name = "aura-perf"
 version = "0.1.0"
 dependencies = [
+ "aura-catalog",
+ "aura-cloud",
  "aura-core",
  "aura-infer",
  "aura-raw",

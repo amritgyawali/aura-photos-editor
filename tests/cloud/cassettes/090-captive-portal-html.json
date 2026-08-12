@@ -1,0 +1,15 @@
+{
+  "name": "090-captive-portal-html",
+  "note": "A hotel captive portal answering 200 with HTML. The status says success and the envelope is not JSON, which is AURA-CLOUD-6010 rather than a schema failure, and is the most common real-world cloud failure on a wedding day.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["seg-portal"]
+  },
+  "status": 200,
+  "headers": [
+    ["content-type", "text/html; charset=utf-8"],
+    ["server", "GuestWiFi/2.1"]
+  ],
+  "body_text": "<html><head><title>Sign in to continue</title></head><body><h1>Please accept the terms to use this network.</h1></body></html>"
+}
