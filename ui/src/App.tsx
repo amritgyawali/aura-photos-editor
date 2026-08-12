@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 
 import { api, asIpcError, inTauri } from './ipc/client';
+import { AiKeysPanel } from './components/AiKeysPanel';
 import { CacheSettings } from './components/CacheSettings';
 import { Filmstrip } from './components/Filmstrip';
 import { HardwarePanel } from './components/HardwarePanel';
@@ -223,6 +224,7 @@ export function App(): JSX.Element {
         <ProblemsPanel problems={problems} />
         <CacheSettings projectId={activeProjectId} onError={setError} />
         <HardwarePanel onError={setError} />
+        <AiKeysPanel projectId={activeProjectId} onError={setError} />
       </aside>
 
       <main className="main">

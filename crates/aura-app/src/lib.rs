@@ -22,6 +22,7 @@
 //! No command may take longer than 50 ms. Anything heavier returns a job handle
 //! and streams progress events.
 
+pub mod cloud_commands;
 pub mod commands;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
@@ -34,6 +35,10 @@ pub mod infer_commands;
 pub mod preview_commands;
 pub mod state;
 
+pub use cloud_commands::{
+    check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend, cloud_status,
+    purge_cloud_cache, set_ai_key, set_cloud_budget, set_cloud_privacy,
+};
 pub use commands::{
     cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
     start_ingest,

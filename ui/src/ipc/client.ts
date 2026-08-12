@@ -3,6 +3,15 @@ import { listen } from '@tauri-apps/api/event';
 
 import type {
   CacheStatsDto,
+  CloudCacheStatsDto,
+  CloudCallDto,
+  CloudEvent,
+  CloudSpendDto,
+  CloudStatusDto,
+  KeyCheckDto,
+  SetAiKeyInput,
+  SetCloudBudgetInput,
+  SetCloudPrivacyInput,
   HardwarePlanDto,
   InferEvent,
   InferStatsDto,
@@ -117,6 +126,45 @@ export const api = {
 
   onInferEvent: (handler: (event: InferEvent) => void): Promise<() => void> =>
     listen<InferEvent>('infer', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+
+  cloudStatus: (): Promise<CloudStatusDto> => invoke<CloudStatusDto>('cloud_status'),
+
+  /**
+   * The one command that carries the key, and it carries it one way only.
+   * There is deliberately no `getAiKey`.
+   */
+  setAiKey: (input: SetAiKeyInput): Promise<CloudStatusDto> =>
+    invoke<CloudStatusDto>('set_ai_key', { input }),
+
+  clearAiKey: (provider: string): Promise<CloudStatusDto> =>
+    invoke<CloudStatusDto>('clear_ai_key', { provider }),
+
+  checkAiKey: (): Promise<KeyCheckDto> => invoke<KeyCheckDto>('check_ai_key'),
+
+  setCloudBudget: (input: SetCloudBudgetInput): Promise<CloudSpendDto> =>
+    invoke<CloudSpendDto>('set_cloud_budget', { input }),
+
+  setCloudPrivacy: (input: SetCloudPrivacyInput): Promise<CloudStatusDto> =>
+    invoke<CloudStatusDto>('set_cloud_privacy', { input }),
+
+  cloudSpend: (projectId: string): Promise<CloudSpendDto> =>
+    invoke<CloudSpendDto>('cloud_spend', { projectId }),
+
+  cloudCalls: (projectId: string, limit: number): Promise<CloudCallDto[]> =>
+    invoke<CloudCallDto[]>('cloud_calls', { projectId, limit }),
+
+  cloudCacheStats: (): Promise<CloudCacheStatsDto> =>
+    invoke<CloudCacheStatsDto>('cloud_cache_stats'),
+
+  purgeCloudCache: (task: string, taskVersion: number): Promise<number> =>
+    invoke<number>('purge_cloud_cache', { task, taskVersion }),
+
+  onCloudEvent: (handler: (event: CloudEvent) => void): Promise<() => void> =>
+    listen<CloudEvent>('cloud', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },
