@@ -73,12 +73,7 @@ pub trait PreviewService: Send + Sync + std::fmt::Debug {
     ///
     /// Whatever the decoder raised: `AURA-RAW-2001` through `AURA-RAW-2008`, or
     /// a catalog error when the photograph cannot be located.
-    fn get(
-        &self,
-        id: ImageId,
-        level: PixelLevel,
-        prio: Priority,
-    ) -> AuraResult<Arc<PixelBuffer>>;
+    fn get(&self, id: ImageId, level: PixelLevel, prio: Priority) -> AuraResult<Arc<PixelBuffer>>;
 
     /// Ask for images to be produced in the background. Returns immediately.
     ///

@@ -32,7 +32,7 @@ use aura_raw::timeout::{self, DecodeLimits};
 use aura_raw::{codec, full, meta, proxy, thumb};
 use parking_lot::Mutex;
 
-use crate::contract::service::{ImageId, Priority, PreviewService};
+use crate::contract::service::{ImageId, PreviewService, Priority};
 use crate::pool::{DecodePool, Handler};
 use crate::request::{Request, Served};
 use crate::source::{PreviewRecord, PreviewSource};
@@ -167,11 +167,12 @@ impl Previews {
         } else {
             config.workers
         };
-        let pool = DecodePool::new(workers, config.queue_capacity, Arc::clone(&inner));
+        let pool = DecodePool::new(workers, config.queue_capacity, &Arc::clone(&inner));
         Ok(Self { inner, pool })
     }
 
     /// Abandon queued work for cells that have scrolled out of view.
+    #[must_use = "the count tells the caller how much speculative work it saved"]
     pub fn cancel(&self, ids: &[ImageId]) -> usize {
         self.pool.cancel(ids)
     }
@@ -228,12 +229,7 @@ impl Handler for Inner {
 }
 
 impl PreviewService for Previews {
-    fn get(
-        &self,
-        id: ImageId,
-        level: PixelLevel,
-        prio: Priority,
-    ) -> AuraResult<Arc<PixelBuffer>> {
+    fn get(&self, id: ImageId, level: PixelLevel, prio: Priority) -> AuraResult<Arc<PixelBuffer>> {
         // Visible and interactive requests are served on the calling thread.
         // Queueing them behind a batch would be exactly the stutter the priority
         // model exists to prevent, and the pool deliberately leaves a core free
@@ -243,7 +239,9 @@ impl PreviewService for Previews {
 
     fn prefetch(&self, ids: &[ImageId], level: PixelLevel) {
         for id in ids {
-            self.pool.submit(*id, level, Priority::AiBatch);
+            // A dropped prefetch is the backpressure working, not a failure:
+            // the queue is full because someone is already being served.
+            let _accepted = self.pool.submit(*id, level, Priority::AiBatch);
         }
     }
 
@@ -274,17 +272,17 @@ impl Inner {
     ) -> AuraResult<Arc<PixelBuffer>> {
         let key = Self::memory_key(id, level);
         if let Some(found) = self.memory.lock().get(&key) {
-            self.report(id, level, prio, Served::Memory, &found);
+            Self::report(id, level, prio, Served::Memory, &found);
             return Ok(found);
         }
 
         let file = self.source.locate(id)?;
-        if let Some(found) = self.from_disk(&file.content_hash, level) {
+        if let Some(found) = self.read_cached(&file.content_hash, level) {
             let buffer = Arc::new(found);
             self.memory
                 .lock()
                 .insert(key, &buffer, self.config.memory_budget_bytes);
-            self.report(id, level, prio, Served::Disk, &buffer);
+            Self::report(id, level, prio, Served::Disk, &buffer);
             return Ok(buffer);
         }
 
@@ -294,7 +292,7 @@ impl Inner {
                 self.memory
                     .lock()
                     .insert(key, &buffer, self.config.memory_budget_bytes);
-                self.report(id, level, prio, Served::Decoded, &buffer);
+                Self::report(id, level, prio, Served::Decoded, &buffer);
                 Ok(buffer)
             }
             Err(error) => {
@@ -305,7 +303,7 @@ impl Inner {
     }
 
     /// Read a cached artefact and turn it back into a buffer.
-    fn from_disk(&self, content_hash: &str, level: PixelLevel) -> Option<PixelBuffer> {
+    fn read_cached(&self, content_hash: &str, level: PixelLevel) -> Option<PixelBuffer> {
         let artefact = match level {
             PixelLevel::Thumb(_) => Artefact::Thumb,
             PixelLevel::Proxy2048 => Artefact::Proxy,
@@ -397,7 +395,7 @@ impl Inner {
                 render_path: result.render_path.to_string(),
             });
         });
-        self.record(id, 1, &key, result.buffer.width, result.buffer.height, result.buffer.source, result.jpeg.len() as u64);
+        self.record(id, 1, &key, &result.buffer, result.jpeg.len() as u64);
 
         Ok(result.buffer)
     }
@@ -447,15 +445,19 @@ impl Inner {
         let proxy_key = CacheKey::new(content_hash, PIPELINE_VER, Artefact::Proxy);
         self.store(&proxy_key, &result.jpeg);
 
-        let linear_bytes = result.pair.linear.as_linear16().map_or_else(Vec::new, |samples| {
-            aura_cache::encode_linear(
-                aura_cache::LinearHeader {
-                    width: result.pair.linear.width,
-                    height: result.pair.linear.height,
-                },
-                samples,
-            )
-        });
+        let linear_bytes = result
+            .pair
+            .linear
+            .as_linear16()
+            .map_or_else(Vec::new, |samples| {
+                aura_cache::encode_linear(
+                    aura_cache::LinearHeader {
+                        width: result.pair.linear.width,
+                        height: result.pair.linear.height,
+                    },
+                    samples,
+                )
+            });
         if !linear_bytes.is_empty() {
             self.store(
                 &CacheKey::new(content_hash, PIPELINE_VER, Artefact::Linear),
@@ -465,7 +467,6 @@ impl Inner {
 
         let clipping = result.clipping;
         let profile = result.profile.clone();
-        let neutral = [0.0f32; 3];
         self.merge_sidecar(id, content_hash, |sidecar| {
             sidecar.tier2 = Some(TierMeta {
                 w: result.pair.srgb.width,
@@ -483,7 +484,9 @@ impl Inner {
                 illuminant: profile.illuminant.to_string(),
             };
             sidecar.clipping = clipping;
-            if sidecar.as_shot_neutral == neutral {
+            // A sidecar written by tier 1 has no white balance in it yet; a
+            // zeroed triple means "not measured", never "neutral is black".
+            if sidecar.as_shot_neutral.iter().all(|value| *value <= 0.0) {
                 sidecar.as_shot_neutral = [1.0, 1.0, 1.0];
             }
         });
@@ -491,9 +494,7 @@ impl Inner {
             id,
             2,
             &proxy_key,
-            result.pair.srgb.width,
-            result.pair.srgb.height,
-            result.pair.srgb.source,
+            &result.pair.srgb,
             result.jpeg.len() as u64,
         );
 
@@ -543,23 +544,14 @@ impl Inner {
         }
     }
 
-    fn record(
-        &self,
-        id: ImageId,
-        tier: i64,
-        key: &CacheKey,
-        width: u32,
-        height: u32,
-        source: PixelSource,
-        bytes: u64,
-    ) {
+    fn record(&self, id: ImageId, tier: i64, key: &CacheKey, buffer: &PixelBuffer, bytes: u64) {
         let record = PreviewRecord {
             id,
             tier,
             rel_cache_path: format!("{}/{}", key.shard(), key.file_name()),
-            width,
-            height,
-            source: source.as_str().to_string(),
+            width: buffer.width,
+            height: buffer.height,
+            source: buffer.source.as_str().to_string(),
             bytes,
             stage_version: PIPELINE_VER,
         };
@@ -597,7 +589,6 @@ impl Inner {
     }
 
     fn report(
-        &self,
         id: ImageId,
         level: PixelLevel,
         prio: Priority,

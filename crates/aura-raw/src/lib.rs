@@ -15,6 +15,11 @@
 )]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
+// Product names and standards - LibRaw, ColorChecker, Bayer, Rec.2020 - read as
+// prose in this crate's documentation, not as identifiers, and wrapping every
+// one of them in code font makes the explanations harder to read rather than
+// easier.
+#![allow(clippy::doc_markdown)]
 // Imaging code converts between integer sample codes and floating point on
 // every pixel. Spelling out a `try_from` and an error path for each of those
 // conversions would bury the arithmetic that actually matters, so the numeric
@@ -55,6 +60,7 @@
 
 pub mod cfa;
 pub mod codec;
+pub mod codecs;
 
 /// The colour pipeline: matrices, profiles, the working space and the curve.
 pub mod colour {

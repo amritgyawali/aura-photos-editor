@@ -57,10 +57,13 @@ checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 name = "aura-app"
 version = "0.1.0"
 dependencies = [
+ "aura-cache",
  "aura-catalog",
  "aura-core",
  "aura-ingest",
  "aura-jobs",
+ "aura-preview",
+ "aura-raw",
  "parking_lot",
  "rusqlite",
  "serde",
@@ -106,11 +109,14 @@ dependencies = [
 name = "aura-cli"
 version = "0.1.0"
 dependencies = [
+ "aura-cache",
  "aura-catalog",
  "aura-core",
  "aura-ingest",
  "aura-jobs",
  "aura-perf",
+ "aura-preview",
+ "aura-raw",
  "serde",
  "serde_json",
  "time",
@@ -183,6 +189,7 @@ name = "aura-perf"
 version = "0.1.0"
 dependencies = [
  "aura-core",
+ "aura-raw",
  "serde",
  "serde_json",
  "tempfile",
@@ -199,6 +206,7 @@ dependencies = [
  "aura-catalog",
  "aura-core",
  "aura-raw",
+ "blake3",
  "criterion",
  "parking_lot",
  "serde",
@@ -215,6 +223,7 @@ dependencies = [
  "jpeg-encoder",
  "png",
  "proptest",
+ "rayon",
  "serde",
  "serde_json",
  "tempfile",

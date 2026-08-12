@@ -4,7 +4,9 @@
 use std::path::{Path, PathBuf};
 
 use aura_app::contract::ipc::{
-    CreateProjectInput, ImageRowLite, IngestEvent, IpcError, ListImagesInput, SetCameraLabelInput,
+    CacheStatsDto, CreateProjectInput, GetPreviewInput, ImageRowLite, IngestEvent, IpcError,
+    ListImagesInput, PrefetchInput, PreviewEvent, PreviewPayload, SetCacheBudgetInput,
+    SetCameraLabelInput,
 };
 
 fn types_ts() -> String {
@@ -98,6 +100,91 @@ fn ipc_error_matches_typescript_and_carries_a_runbook() {
         !error.message.contains("D:/DCIM"),
         "a photographer-facing message must not leak a path"
     );
+}
+
+#[test]
+fn preview_types_match_typescript() {
+    assert_keys_declared(
+        &GetPreviewInput {
+            project_id: "prj_1".to_string(),
+            photo_id: "pht_1".to_string(),
+            level: "thumb".to_string(),
+            priority: "visible".to_string(),
+        },
+        "GetPreviewInput",
+    );
+    assert_keys_declared(
+        &PreviewPayload {
+            photo_id: "pht_1".to_string(),
+            tier: 1,
+            width: 512,
+            height: 341,
+            source: "embedded".to_string(),
+            data_url: "data:image/jpeg;base64,".to_string(),
+        },
+        "PreviewPayload",
+    );
+    assert_keys_declared(
+        &PrefetchInput {
+            project_id: "prj_1".to_string(),
+            photo_ids: Vec::new(),
+            level: "proxy".to_string(),
+        },
+        "PrefetchInput",
+    );
+    assert_keys_declared(
+        &CacheStatsDto {
+            bytes_used: 0,
+            budget_bytes: 0,
+            entries: 0,
+            hits: 0,
+            misses: 0,
+            evictions: 0,
+            hit_rate: 0.0,
+        },
+        "CacheStatsDto",
+    );
+    assert_keys_declared(
+        &SetCacheBudgetInput {
+            project_id: "prj_1".to_string(),
+            budget_bytes: 40 * 1024 * 1024 * 1024,
+        },
+        "SetCacheBudgetInput",
+    );
+}
+
+#[test]
+fn every_preview_event_variant_is_declared_in_typescript() {
+    let ts = types_ts();
+    let variants = [
+        PreviewEvent::Ready {
+            photo_id: "pht_1".to_string(),
+            tier: 1,
+        },
+        PreviewEvent::Failed {
+            photo_id: "pht_1".to_string(),
+            code: "AURA-RAW-2002".to_string(),
+            message: String::new(),
+        },
+        PreviewEvent::CacheStats {
+            bytes_used: 0,
+            budget_bytes: 0,
+            hit_rate: 0.0,
+        },
+    ];
+
+    for variant in variants {
+        let json = serde_json::to_value(&variant).expect("serialise");
+        let kind = json
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .expect("tagged with kind")
+            .to_string();
+        assert!(
+            ts.contains(&format!("kind: '{kind}'")),
+            "PreviewEvent variant {kind} is missing from types.ts"
+        );
+    }
 }
 
 #[test]

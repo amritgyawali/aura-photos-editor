@@ -8,7 +8,7 @@
 //! raw code values
 //!   -> subtract black, divide by (white - black)      [demosaic::Levels]
 //!   -> multiply by as-shot neutral                    [white balance]
-//!   -> half-size demosaic                             [demosaic::half_size]
+//!   -> half-size demosaic                             [demosaic::bin]
 //!   -> camera matrix, adapted to D65                  [colour::working_space]
 //!   -> linear Rec.2020                                *** the 16-bit buffer is written here ***
 //!   -> neutral filmic-lite curve                      [colour::curve]
@@ -29,9 +29,7 @@ use crate::codec::{self, Rgb8};
 use crate::colour::curve::{scene_to_linear_u16, scene_to_srgb_byte};
 use crate::colour::profile::{self, CameraProfile, ProfileSource};
 use crate::colour::working_space;
-use crate::contract::pixels::{
-    ColourSpace, PixelBuffer, PixelData, PixelSource, ProxyPair,
-};
+use crate::contract::pixels::{ColourSpace, PixelBuffer, PixelData, PixelSource, ProxyPair};
 use crate::contract::sidecar::ClippingStats;
 use crate::demosaic::{self, Levels, RgbF32};
 use crate::format::MosaicSupport;
@@ -172,7 +170,7 @@ fn render_working(
                 white: meta.white_level,
                 white_balance: meta.as_shot_neutral,
             };
-            let half = demosaic::half_size(&mosaic, meta.cfa, levels);
+            let half = demosaic::bin(&mosaic, meta.cfa, levels);
             let (width, height) = demosaic::fit_long_edge(half.width, half.height, PROXY_EDGE);
             let scaled = demosaic::resize(&half, width, height);
 
@@ -198,19 +196,16 @@ fn render_working(
     // space and resized, so downstream code sees a buffer of the right shape in
     // the right space - but the pixels carry the camera's look, and the sidecar
     // says so.
-    let preview = match embedded {
-        Some(image) => image.clone(),
-        None => {
-            let reference = meta.best_preview().ok_or_else(|| {
-                unsupported(path, "no mosaic and no embedded preview to render from")
-            })?;
-            let stream = bytes
-                .get(reference.offset..reference.offset.saturating_add(reference.len))
-                .ok_or_else(|| {
-                    aura_core::errors::raw::corrupt("preview range is outside the file")
-                })?;
-            codec::decode_jpeg(stream, limits)?
-        }
+    let preview = if let Some(image) = embedded {
+        image.clone()
+    } else {
+        let reference = meta
+            .best_preview()
+            .ok_or_else(|| unsupported(path, "no mosaic and no embedded preview to render from"))?;
+        let stream = bytes
+            .get(reference.offset..reference.offset.saturating_add(reference.len))
+            .ok_or_else(|| aura_core::errors::raw::corrupt("preview range is outside the file"))?;
+        codec::decode_jpeg(stream, limits)?
     };
 
     let linear_srgb = demosaic::from_srgb8(&preview.data, preview.width, preview.height);
@@ -243,11 +238,12 @@ fn orient_working(image: RgbF32, exif: u16) -> RgbF32 {
     if orientation.is_identity() {
         return image;
     }
-    let (data, width, height) = apply_orientation(&image.data, image.width, image.height, 3, orientation);
+    let (rotated, width, height) =
+        apply_orientation(&image.data, image.width, image.height, 3, orientation);
     RgbF32 {
         width,
         height,
-        data,
+        data: rotated,
     }
 }
 

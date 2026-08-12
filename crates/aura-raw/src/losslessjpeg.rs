@@ -179,6 +179,10 @@ struct Component {
 /// Returns `AURA-RAW-2002` when the stream is not a lossless frame, when a
 /// required header is missing, or when a Huffman code cannot be resolved, and
 /// `AURA-RAW-2005` when the declared frame exceeds the sample ceiling.
+// One function because it is one state machine: the marker walk, the frame
+// header and the scan all read the same cursor, and splitting them would mean
+// threading six mutable locals through three signatures for no gain.
+#[allow(clippy::too_many_lines)]
 pub fn decode(bytes: &[u8]) -> AuraResult<LosslessImage> {
     if !matches!(bytes.get(..2), Some([0xFF, 0xD8])) {
         return Err(corrupt("lossless jpeg does not start with FFD8"));
@@ -331,10 +335,7 @@ pub fn decode(bytes: &[u8]) -> AuraResult<LosslessImage> {
                     0
                 };
                 let above = if y > 0 {
-                    samples
-                        .get(position - width as usize)
-                        .copied()
-                        .unwrap_or(0)
+                    samples.get(position - width as usize).copied().unwrap_or(0)
                 } else {
                     0
                 };

@@ -73,6 +73,9 @@ pub mod tag {
     pub const SUB_IFDS: u16 = 0x014A;
     /// Offset of the EXIF directory.
     pub const EXIF_IFD: u16 = 0x8769;
+    /// The manufacturer's private block, which for several bodies is a complete
+    /// TIFF of its own carrying the decode tables.
+    pub const MAKER_NOTE: u16 = 0x927C;
     /// Repeat pattern dimensions of the colour filter array.
     pub const CFA_REPEAT_DIM: u16 = 0x828D;
     /// The colour filter array pattern itself.
@@ -308,17 +311,24 @@ impl<'a> TiffFile<'a> {
     ///
     /// Returns `AURA-RAW-2002` when the range runs past the end of the file.
     pub fn slice(&self, offset: usize, len: usize) -> AuraResult<&'a [u8]> {
-        let end = offset.checked_add(len).ok_or_else(|| {
-            corrupt(format!(
-                "slice offset {offset} plus length {len} overflows"
-            ))
-        })?;
+        let end = offset
+            .checked_add(len)
+            .ok_or_else(|| corrupt(format!("slice offset {offset} plus length {len} overflows")))?;
         self.bytes.get(offset..end).ok_or_else(|| {
             corrupt(format!(
                 "slice {offset}..{end} runs past the {} byte file",
                 self.bytes.len()
             ))
         })
+    }
+
+    /// Where an entry's values actually live in the buffer.
+    ///
+    /// Needed by the manufacturers' private blocks, which are not TIFF values at
+    /// all but raw byte runs that a private parser has to walk itself.
+    #[must_use]
+    pub fn payload_at(&self, entry: &Entry) -> Option<usize> {
+        self.payload_position(entry)
     }
 
     fn u16_at(&self, at: usize) -> AuraResult<u16> {

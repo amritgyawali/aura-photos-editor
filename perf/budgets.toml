@@ -13,3 +13,34 @@ max_elapsed_ms = 1000
 
 [stage.reimport_noop_4000]
 max_elapsed_ms = 5000
+
+# Phase 02 performance budgets, from PHASE-02 section 11.
+
+# Tier 1: the camera's embedded JPEG for 4,000 files on 8 cores.
+[stage.tier1_embedded_4000]
+max_elapsed_ms  = 180000
+max_ms_per_unit = 45
+
+# Tier 2: the 2048 px proxy, CPU-only path. The GPU-assisted budget of 120 ms
+# is not asserted here because this build has no GPU path; see
+# docs/adr/ADR-0004-raw-decode-backend.md.
+[stage.tier2_proxy]
+max_elapsed_ms  = 250
+max_ms_per_unit = 250
+
+# Tier 3: full sensor resolution, tiled, on a 45 MP frame.
+[stage.tier3_full]
+max_elapsed_ms = 1800
+
+# A preview already in the cache. This is the number that decides whether
+# scrolling feels instant.
+[stage.preview_cache_read]
+max_elapsed_ms = 8
+
+# Sizes are budgets too: a cache that quietly grows fills the drive the wedding
+# is being edited from.
+[size.cache_per_1000_images]
+max_bytes = 3758096384  # 3.5 GB
+
+[size.peak_rss_batch_proxy]
+max_bytes = 2684354560  # 2.5 GB

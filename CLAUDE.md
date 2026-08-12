@@ -21,7 +21,9 @@ Never load two phase files into one session.
 | Frozen contracts | `crates/*/src/contract/**`, `crates/aura-catalog/migrations/0001_init.sql`, `ui/src/ipc/types.ts` |
 | Contract digests | `contracts.lock`, checked by `cargo xtask contracts --check` |
 | Budgets | `perf/budgets.toml`, asserted by `cargo test -p aura-perf` |
-| Phase progress | `docs/progress/PHASE-01.md` and `PHASE-01-EXIT.md` |
+| Phase progress | `docs/progress/PHASE-0N.md` and `PHASE-0N-EXIT.md` |
+| Camera coverage | `docs/camera-support.md` (what decodes, what falls back) |
+| Preview troubleshooting | `docs/runbooks/previews.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -37,6 +39,29 @@ Never load two phase files into one session.
 Phase 01 is implemented: workspace, error taxonomy, catalog schema v1 with the
 six-step refusal chain, idempotent ingest with clock alignment, the job graph with
 leases, the typed IPC surface, the virtualised grid, the fixture generator, CI and
-the runbooks. Phase 02 (RAW decode and the preview pyramid) has not started, and
-nothing in `docs/plan/phases/PHASE-02-*.md` may be built until the phase 01 gate in
-`docs/progress/PHASE-01-EXIT.md` is fully green.
+the runbooks.
+
+Phase 02 is implemented: `aura-raw` (containers, the three decode tiers and the
+colour pipeline, pure Rust with no LibRaw - see ADR-0004), `aura-cache`
+(content-addressed, budgeted, self-healing), `aura-preview` (the frozen
+`PreviewService`, strict-priority scheduling), the preview IPC surface (ADR-0005),
+real pixels in the grid, and `aura-cli verify --phase 02` as the gate. Its exit
+report is `docs/progress/PHASE-02-EXIT.md`, which lists three conditions - real
+camera files, a photographed ColorChecker, and the CI matrix - before phase 03
+starts. Nothing in `docs/plan/phases/PHASE-03-*.md` may be built until then.
+
+A follow-up inside phase 02 (section 7b of the exit report) added the
+manufacturer mosaic codecs in `crates/aura-raw/src/codecs/` - Nikon compressed
+NEF, Sony ARW2, Olympus compressed ORF - plus X-Trans, and made the decode path
+parallel over output rows. Canon CRX, Panasonic RW2 and compressed RAF remain
+undecoded. **A new codec must ship with an encoder** in `fixtures.rs`: with no
+camera files in the repository, a round trip is the only real proof, and
+`tests/codecs.rs` is where it goes.
+
+Two rules that phase 02 added and every later phase inherits:
+
+- **`PIPELINE_VER` is a contract.** It keys both the preview cache and every
+  training dataset. Bumping it needs ML-lead sign-off and a model re-validation.
+- **Pixels carry their provenance.** `PixelSource` says whether a buffer came
+  from the camera's own JPEG or from AURA's documented render. Never mix the two
+  in a score without recording which one it was.

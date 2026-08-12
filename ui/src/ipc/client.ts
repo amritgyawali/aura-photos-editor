@@ -2,15 +2,21 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  CacheStatsDto,
   CreateProjectInput,
+  GetPreviewInput,
   ImageRowLite,
   IngestEvent,
   IpcError,
   JobHandle,
   ListImagesInput,
+  PrefetchInput,
+  PreviewEvent,
+  PreviewPayload,
   ProblemRow,
   ProjectHandle,
   ProjectSummary,
+  SetCacheBudgetInput,
   SetCameraLabelInput,
   StartIngestInput,
 } from './types';
@@ -60,6 +66,31 @@ export const api = {
 
   onIngestEvent: (handler: (event: IngestEvent) => void): Promise<() => void> =>
     listen<IngestEvent>('ingest', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+
+  getPreview: (input: GetPreviewInput): Promise<PreviewPayload> =>
+    invoke<PreviewPayload>('get_preview', { input }),
+
+  prefetchPreviews: (input: PrefetchInput): Promise<number> =>
+    invoke<number>('prefetch_previews', { input }),
+
+  cancelPreviews: (projectId: string, photoIds: string[]): Promise<number> =>
+    invoke<number>('cancel_previews', { projectId, photoIds }),
+
+  previewStats: (projectId: string): Promise<CacheStatsDto> =>
+    invoke<CacheStatsDto>('preview_stats', { projectId }),
+
+  setCacheBudget: (input: SetCacheBudgetInput): Promise<CacheStatsDto> =>
+    invoke<CacheStatsDto>('set_cache_budget', { input }),
+
+  purgeCache: (projectId: string): Promise<CacheStatsDto> =>
+    invoke<CacheStatsDto>('purge_cache', { projectId }),
+
+  onPreviewEvent: (handler: (event: PreviewEvent) => void): Promise<() => void> =>
+    listen<PreviewEvent>('preview', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },

@@ -2,9 +2,9 @@
 //!
 //! CR3 broke with twenty years of TIFF-derived RAW containers and used the MP4
 //! box structure instead. The parts we need are shallow: `CMT1` holds the EXIF
-//! directory in TIFF form, and `PRVW`/`THMB` hold JPEG previews. Everything else
-//! - the CTMD metadata track, the CRX-compressed sensor data - is not read by
-//! this build (see `docs/camera-support.md`).
+//! directory in TIFF form, and `PRVW`/`THMB` hold JPEG previews. Everything
+//! else (the CTMD metadata track, the CRX-compressed sensor data) is not read
+//! by this build - see `docs/camera-support.md`.
 //!
 //! The walk is depth- and count-bounded, and a box whose declared size does not
 //! advance the cursor terminates the walk, so a malformed file cannot loop.
@@ -124,12 +124,24 @@ fn walk_range(
         // a sixteen-byte identifier.
         match &kind {
             b"moov" | b"trak" | b"mdia" | b"minf" | b"stbl" | b"moof" | b"traf" => {
-                walk_range(bytes, payload_start, payload_start + payload_len, depth + 1, out)?;
+                walk_range(
+                    bytes,
+                    payload_start,
+                    payload_start + payload_len,
+                    depth + 1,
+                    out,
+                )?;
             }
             b"uuid" => {
                 let after_uuid = payload_start.saturating_add(16);
                 if after_uuid < payload_start + payload_len {
-                    walk_range(bytes, after_uuid, payload_start + payload_len, depth + 1, out)?;
+                    walk_range(
+                        bytes,
+                        after_uuid,
+                        payload_start + payload_len,
+                        depth + 1,
+                        out,
+                    )?;
                 }
             }
             _ => {}

@@ -250,10 +250,16 @@ fn every_mosaic_encoding_decodes_to_the_same_colours() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let mut baseline: Option<Vec<Lab>> = None;
 
+    // Every Bayer encoding, including the three proprietary ones. Sony's is
+    // lossy by construction, so the tolerance below is what its eleven-bit
+    // reduction costs - which is far less than a colour error would.
     for encoding in [
         MosaicEncoding::Unpacked16,
         MosaicEncoding::Packed14,
         MosaicEncoding::LosslessJpeg,
+        MosaicEncoding::NikonCompressed,
+        MosaicEncoding::SonyArw2,
+        MosaicEncoding::OlympusCompressed,
     ] {
         let loaded = load(
             directory.path(),
@@ -270,7 +276,14 @@ fn every_mosaic_encoding_decodes_to_the_same_colours() {
             None,
             &loaded.path,
         )
-        .unwrap_or_else(|e| panic!("tier 2 for {}: [{}] {}", encoding.as_str(), e.code, e.detail));
+        .unwrap_or_else(|e| {
+            panic!(
+                "tier 2 for {}: [{}] {}",
+                encoding.as_str(),
+                e.code,
+                e.detail
+            )
+        });
 
         let samples = result.pair.linear.as_linear16().expect("linear buffer");
         let measured = proxy_patches(&loaded.fixture, samples, result.pair.linear.width);
@@ -324,7 +337,11 @@ fn a_file_without_a_colour_matrix_uses_the_bundled_profile() {
     let samples = result.pair.linear.as_linear16().expect("linear buffer");
     let measured = proxy_patches(&loaded.fixture, samples, result.pair.linear.width);
     let delta = summarise(&reference_patches(&loaded.fixture), &measured);
-    assert!(delta.mean <= 2.0, "bundled profile drifted: {:.3}", delta.mean);
+    assert!(
+        delta.mean <= 2.0,
+        "bundled profile drifted: {:.3}",
+        delta.mean
+    );
 }
 
 #[test]
@@ -384,6 +401,43 @@ fn tiled_full_decode_matches_a_whole_image_decode() {
     assert!(
         assembled == reference,
         "tiled and whole-image decodes disagree; the halo is wrong"
+    );
+}
+
+/// The halo argument has to hold for X-Trans too, where interpolation reaches
+/// two photosites rather than one.
+#[test]
+fn tiled_full_decode_matches_a_whole_image_decode_on_xtrans() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let loaded = load(
+        directory.path(),
+        FixtureOptions {
+            encoding: MosaicEncoding::XTrans16,
+            ..FixtureOptions::default()
+        },
+    );
+
+    let tiled = full::tier3(
+        &loaded.bytes,
+        &loaded.meta,
+        DecodeLimits::tier3(),
+        clock().as_ref(),
+    )
+    .expect("tiled decode");
+    let whole = full::tier3_whole(
+        &loaded.bytes,
+        &loaded.meta,
+        DecodeLimits::tier3(),
+        clock().as_ref(),
+    )
+    .expect("whole decode");
+
+    let image = tiled.as_tiled().expect("tier 3 is tiled");
+    let assembled = full::assemble(image, tiled.width, tiled.height);
+    let reference = whole.as_linear16().expect("whole decode is linear");
+    assert!(
+        assembled == reference,
+        "tiled and whole-image X-Trans decodes disagree; the halo is too small"
     );
 }
 

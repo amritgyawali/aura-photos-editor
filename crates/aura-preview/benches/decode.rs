@@ -24,8 +24,7 @@ fn fixture(directory: &Path, encoding: MosaicEncoding) -> (Vec<u8>, aura_raw::Ra
         FixtureOptions {
             body: 1,
             encoding,
-            with_preview: true,
-            orientation: 1,
+            ..FixtureOptions::default()
         },
     )
     .expect("write the bench fixture");
@@ -65,15 +64,8 @@ fn tiers(criterion: &mut Criterion) {
 
         group.bench_function(format!("tier2/{}", encoding.as_str()), |bencher| {
             bencher.iter(|| {
-                proxy::tier2(
-                    &bytes,
-                    &parsed,
-                    DecodeLimits::tier2(),
-                    &clock,
-                    None,
-                    &path,
-                )
-                .expect("tier 2")
+                proxy::tier2(&bytes, &parsed, DecodeLimits::tier2(), &clock, None, &path)
+                    .expect("tier 2")
             });
         });
 

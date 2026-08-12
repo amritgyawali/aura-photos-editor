@@ -34,6 +34,50 @@ impl PreviewRef {
     }
 }
 
+/// How a mosaic's samples are actually encoded.
+///
+/// The TIFF compression code is not enough on its own: Nikon, Sony and Olympus
+/// all reuse codes that mean something else in baseline TIFF, and two files with
+/// the same code can need different decoders depending on how many bytes they
+/// stored. This enum is the decision, made once while the container is walked,
+/// so the pixel path never has to re-derive it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MosaicScheme {
+    /// Unpacked or bit-packed samples, most significant bit first.
+    Packed,
+    /// Lossless JPEG (SOF3), which is what DNG and CR2 use.
+    LosslessJpeg,
+    /// Nikon's Huffman coding plus a per-body linearisation curve.
+    Nikon(Box<crate::codecs::nikon::NikonParams>),
+    /// Sony's sixteen-photosites-in-sixteen-bytes block coding.
+    SonyArw2 {
+        /// The four knots of the body's linearisation curve, when the file let
+        /// us read them. `None` means a plain linear expansion was used and the
+        /// render is flagged as approximate.
+        curve: Option<[u16; 4]>,
+    },
+    /// Olympus's adaptive predictive coding.
+    Olympus,
+    /// A compression this build does not implement; the payload is the code the
+    /// file declared, so the message can name it.
+    Unsupported(u16),
+}
+
+impl MosaicScheme {
+    /// Stable text for telemetry and the sidecar.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Packed => "packed",
+            Self::LosslessJpeg => "lossless-jpeg",
+            Self::Nikon(_) => "nikon",
+            Self::SonyArw2 { .. } => "sony-arw2",
+            Self::Olympus => "olympus",
+            Self::Unsupported(_) => "unsupported",
+        }
+    }
+}
+
 /// Where the sensor mosaic lives and how it is encoded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MosaicRef {
@@ -43,13 +87,29 @@ pub struct MosaicRef {
     pub height: u32,
     /// Bits in each sample as declared by the file, 8 to 16.
     pub bits_per_sample: u16,
-    /// TIFF compression code.
+    /// TIFF compression code, kept for diagnostics and the support matrix.
     pub compression: u16,
+    /// Which decoder these bytes need.
+    pub scheme: MosaicScheme,
     /// Strips or tiles, as `(offset, length)` pairs in file order.
     pub segments: Vec<(usize, usize)>,
     /// Rows in each strip; equals `height` when the image is a single strip.
     pub rows_per_strip: u32,
 }
+
+/// Fujifilm's 6x6 X-Trans layout, as the bodies write it: 0 red, 1 green,
+/// 2 blue, row-major from the top-left photosite.
+///
+/// Files carry their own copy in the RAF block directory; this is the layout
+/// every X-Trans body has shipped with, used when that block is missing.
+pub const XTRANS_DEFAULT: [u8; 36] = [
+    1, 1, 0, 1, 1, 2, //
+    1, 1, 2, 1, 1, 0, //
+    2, 0, 1, 0, 2, 1, //
+    1, 1, 2, 1, 1, 0, //
+    1, 1, 0, 1, 1, 2, //
+    0, 2, 1, 2, 0, 1, //
+];
 
 /// The colour filter array layout, named by the colours of the top-left 2x2.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,17 +122,48 @@ pub enum CfaPattern {
     Grbg,
     /// Green, blue / red, green.
     Gbrg,
-    /// Not a 2x2 Bayer array - X-Trans, or a pattern we did not recognise.
+    /// Fujifilm X-Trans: a 6x6 array with no 2x2 period, carried inline because
+    /// the layout is per-file rather than per-manufacturer.
+    XTrans([u8; 36]),
+    /// A pattern we did not recognise.
     Unknown,
 }
 
 impl CfaPattern {
+    /// The side of the smallest block that is guaranteed to contain all three
+    /// colours: two for Bayer, three for X-Trans. This is the binning factor the
+    /// proxy path uses, and it is why an X-Trans proxy is a third of the sensor
+    /// rather than a half.
+    #[must_use]
+    pub const fn block(self) -> u32 {
+        match self {
+            Self::XTrans(_) => 3,
+            _ => 2,
+        }
+    }
+
+    /// How far interpolation has to look to be sure of finding every colour.
+    ///
+    /// A Bayer array has all three colours inside any 3x3 window; X-Trans does
+    /// not - its sparsest red and blue spacing needs 5x5.
+    #[must_use]
+    pub const fn radius(self) -> i64 {
+        match self {
+            Self::XTrans(_) => 2,
+            _ => 1,
+        }
+    }
+
     /// Which colour plane the pixel at `(x, y)` belongs to: 0 red, 1 green,
     /// 2 blue. Unknown patterns are treated as green, which is neutral.
     #[must_use]
-    pub const fn colour_at(self, x: u32, y: u32) -> u8 {
-        let even_row = y % 2 == 0;
-        let even_column = x % 2 == 0;
+    pub fn colour_at(self, x: u32, y: u32) -> u8 {
+        if let Self::XTrans(pattern) = self {
+            let index = (y % 6) as usize * 6 + (x % 6) as usize;
+            return pattern.get(index).copied().unwrap_or(1);
+        }
+        let even_row = y.is_multiple_of(2);
+        let even_column = x.is_multiple_of(2);
         match self {
             Self::Rggb => match (even_row, even_column) {
                 (true, true) => 0,
@@ -94,7 +185,7 @@ impl CfaPattern {
                 (true, false) => 2,
                 (false, true) => 0,
             },
-            Self::Unknown => 1,
+            Self::XTrans(_) | Self::Unknown => 1,
         }
     }
 
@@ -106,11 +197,21 @@ impl CfaPattern {
             Self::Bggr => "bggr",
             Self::Grbg => "grbg",
             Self::Gbrg => "gbrg",
+            Self::XTrans(_) => "xtrans",
             Self::Unknown => "unknown",
         }
     }
 
     fn from_codes(codes: &[u64]) -> Self {
+        // A 6x6 pattern is X-Trans. Adobe's converter writes Fujifilm files as
+        // DNGs exactly this way, so this is the path a converted RAF takes.
+        if codes.len() == 36 {
+            let mut pattern = [1u8; 36];
+            for (slot, code) in pattern.iter_mut().zip(codes.iter()) {
+                *slot = u8::try_from(*code).unwrap_or(1).min(2);
+            }
+            return Self::XTrans(pattern);
+        }
         match (
             codes.first().copied(),
             codes.get(1).copied(),
@@ -166,7 +267,7 @@ impl RawMeta {
     #[must_use]
     pub fn mosaic_support(&self) -> MosaicSupport {
         match &self.mosaic {
-            Some(mosaic) => crate::format::mosaic_support_for(mosaic.compression),
+            Some(mosaic) => crate::format::mosaic_support_for(&mosaic.scheme),
             None => MosaicSupport::NoMosaic,
         }
     }
@@ -231,8 +332,31 @@ fn read_jpeg(bytes: &[u8]) -> AuraResult<RawMeta> {
 fn read_raf(bytes: &[u8]) -> AuraResult<RawMeta> {
     let header = raf::header(bytes)?;
     let mut meta = default_meta(RawFormat::Raf);
-    // X-Trans is not a 2x2 array, and this build does not demosaic it.
-    meta.cfa = CfaPattern::Unknown;
+    let sensor = raf::sensor(bytes, header.cfa_header_offset, header.cfa_header_len);
+    meta.cfa = CfaPattern::XTrans(sensor.xtrans.unwrap_or(XTRANS_DEFAULT));
+
+    // Fujifilm stores uncompressed sensor data as sixteen-bit little-endian
+    // samples. A file smaller than that is one of the compressed variants,
+    // which this build does not decode; it still reaches tier 1 and renders its
+    // proxy from the embedded preview.
+    if sensor.width > 0 && sensor.height > 0 && header.cfa_len > 0 {
+        let pixels = sensor.width as usize * sensor.height as usize;
+        let scheme = if header.cfa_len >= pixels * 2 {
+            MosaicScheme::Packed
+        } else {
+            MosaicScheme::Unsupported(0)
+        };
+        meta.mosaic = Some(MosaicRef {
+            width: sensor.width,
+            height: sensor.height,
+            bits_per_sample: 16,
+            compression: tiff::compression::NONE,
+            scheme,
+            segments: vec![(header.cfa_offset, header.cfa_len)],
+            rows_per_strip: sensor.height,
+        });
+        meta.little_endian = true;
+    }
 
     let preview = bytes
         .get(header.jpeg_offset..header.jpeg_offset.saturating_add(header.jpeg_len))
@@ -294,11 +418,31 @@ fn read_cr3(bytes: &[u8]) -> AuraResult<RawMeta> {
     Ok(meta)
 }
 
+/// Compression codes the manufacturers use for their own schemes. None of these
+/// mean what baseline TIFF says they mean.
+///
+/// Panasonic's 34316 is deliberately absent: RW2's scheme is not implemented, so
+/// it falls through to `Unsupported` and its files render tier 2 from the
+/// embedded preview. See `docs/camera-support.md`.
+mod private_compression {
+    /// Nikon's compressed NEF.
+    pub(super) const NIKON: u16 = 34_713;
+    /// Sony's ARW block coding.
+    pub(super) const SONY: u16 = 32_767;
+}
+
 fn read_tiff_family(bytes: &[u8], format: RawFormat) -> AuraResult<RawMeta> {
     let file = tiff::TiffFile::parse(bytes)?;
     let mut meta = default_meta(format);
     meta.little_endian = file.little();
     apply_common_tags(&file, &mut meta);
+
+    // Per-manufacturer decode parameters, read once before the mosaic hunt so
+    // the scheme decision has everything it needs. Both are keyed off what the
+    // file actually contains rather than off the container we sniffed, because a
+    // converter can put Nikon's decode table inside a DNG.
+    let nikon = nikon_table(bytes, &file);
+    let sony_curve = sony_curve(&file);
 
     let mut best_mosaic: Option<MosaicRef> = None;
 
@@ -337,10 +481,12 @@ fn read_tiff_family(bytes: &[u8], format: RawFormat) -> AuraResult<RawMeta> {
 
         // Photometric 32803 is "colour filter array": the sensor itself.
         if photometric == Some(32_803) {
-            if let Some(mosaic) = mosaic_from_ifd(&file, ifd, compression) {
-                let better = best_mosaic
-                    .as_ref()
-                    .is_none_or(|current| mosaic.width * mosaic.height > current.width * current.height);
+            if let Some(mosaic) =
+                mosaic_from_ifd(&file, ifd, compression, format, nikon, sony_curve)
+            {
+                let better = best_mosaic.as_ref().is_none_or(|current| {
+                    mosaic.width * mosaic.height > current.width * current.height
+                });
                 if better {
                     best_mosaic = Some(mosaic);
                 }
@@ -348,16 +494,82 @@ fn read_tiff_family(bytes: &[u8], format: RawFormat) -> AuraResult<RawMeta> {
         }
     }
 
+    // A Nikon curve carries the body's black and white points, and for a real
+    // NEF it is the only place they are stated. A file that also carries the
+    // DNG level tags has said so explicitly, and an explicit statement wins.
+    let declares_levels = file.find(tiff::tag::BLACK_LEVEL).is_some();
+    if let (false, Some(MosaicScheme::Nikon(params))) = (
+        declares_levels,
+        best_mosaic.as_ref().map(|mosaic| &mosaic.scheme),
+    ) {
+        meta.black_level = params.black_level();
+        meta.white_level = params.white_level().max(meta.black_level + 1);
+    }
+
     meta.mosaic = best_mosaic;
     sort_previews(&mut meta);
 
     if meta.previews.is_empty() && meta.mosaic.is_none() {
-        return Err(corrupt("tiff container holds neither a preview nor a mosaic"));
+        return Err(corrupt(
+            "tiff container holds neither a preview nor a mosaic",
+        ));
     }
     Ok(meta)
 }
 
-fn mosaic_from_ifd(file: &tiff::TiffFile<'_>, ifd: &tiff::Ifd, compression: u16) -> Option<MosaicRef> {
+/// Decide which decoder a mosaic needs.
+///
+/// The declared compression code is the first input, but not the only one: a
+/// file that stores fewer bytes than its declared bit depth would need is
+/// compressed whatever it says, and that is exactly how Olympus marks its own
+/// scheme.
+fn scheme_for(
+    compression: u16,
+    format: RawFormat,
+    pixels: usize,
+    stored_bytes: usize,
+    bits: u16,
+    nikon: Option<NikonTable<'_>>,
+    sony_curve: Option<[u16; 4]>,
+) -> MosaicScheme {
+    match compression {
+        tiff::compression::NONE => {
+            // An ORF that declares no compression but stores fewer bytes than
+            // its own bit depth needs is compressed whatever it says: that is
+            // how Olympus marks its scheme, and it is the only file in the
+            // world that lies this particular way.
+            if format == RawFormat::Orf && stored_bytes * 8 < pixels * usize::from(bits.max(1)) {
+                MosaicScheme::Olympus
+            } else {
+                MosaicScheme::Packed
+            }
+        }
+        tiff::compression::JPEG => MosaicScheme::LosslessJpeg,
+        private_compression::NIKON => match nikon.and_then(|table| table.read(bits as u8)) {
+            Some(params) => MosaicScheme::Nikon(Box::new(params)),
+            // A compressed NEF whose decode table we could not read is not
+            // guessable: the curve is per body. Say so rather than render it
+            // through an identity curve that would be quietly wrong.
+            None => MosaicScheme::Unsupported(compression),
+        },
+        private_compression::SONY if stored_bytes == pixels => {
+            MosaicScheme::SonyArw2 { curve: sony_curve }
+        }
+        private_compression::SONY if stored_bytes * 8 == pixels * usize::from(bits.max(1)) => {
+            MosaicScheme::Packed
+        }
+        other => MosaicScheme::Unsupported(other),
+    }
+}
+
+fn mosaic_from_ifd(
+    file: &tiff::TiffFile<'_>,
+    ifd: &tiff::Ifd,
+    compression: u16,
+    format: RawFormat,
+    nikon: Option<NikonTable<'_>>,
+    sony_curve: Option<[u16; 4]>,
+) -> Option<MosaicRef> {
     let width = ifd
         .get(tiff::tag::IMAGE_WIDTH)
         .and_then(|entry| file.u64s(entry).first().copied())? as u32;
@@ -385,10 +597,15 @@ fn mosaic_from_ifd(file: &tiff::TiffFile<'_>, ifd: &tiff::Ifd, compression: u16)
     if offsets.is_empty() {
         return None;
     }
-    let segments = offsets
+    let segments: Vec<(usize, usize)> = offsets
         .iter()
         .enumerate()
-        .map(|(index, at)| (*at as usize, counts.get(index).copied().unwrap_or(0) as usize))
+        .map(|(index, at)| {
+            (
+                *at as usize,
+                counts.get(index).copied().unwrap_or(0) as usize,
+            )
+        })
         .collect();
 
     let rows_per_strip = ifd
@@ -396,14 +613,104 @@ fn mosaic_from_ifd(file: &tiff::TiffFile<'_>, ifd: &tiff::Ifd, compression: u16)
         .and_then(|entry| file.u64s(entry).first().copied())
         .unwrap_or(u64::from(height)) as u32;
 
+    let pixels = width as usize * height as usize;
+    let stored_bytes = segments.iter().map(|(_, len)| *len).sum::<usize>();
+    let scheme = scheme_for(
+        compression,
+        format,
+        pixels,
+        stored_bytes,
+        bits,
+        nikon,
+        sony_curve,
+    );
+
     Some(MosaicRef {
         width,
         height,
         bits_per_sample: bits,
         compression,
+        scheme,
         segments,
         rows_per_strip: rows_per_strip.max(1),
     })
+}
+
+/// Where Nikon's decode table sits, and which byte order to read it in.
+///
+/// Located separately from being read, because the sample precision that picks
+/// the Huffman tree is a property of the *image* directory, and the MakerNote is
+/// usually found before that directory is.
+#[derive(Debug, Clone, Copy)]
+struct NikonTable<'a> {
+    bytes: &'a [u8],
+    at: usize,
+    little: bool,
+}
+
+impl NikonTable<'_> {
+    fn read(self, bits: u8) -> Option<crate::codecs::nikon::NikonParams> {
+        crate::codecs::nikon::read_params(self.bytes, self.at, self.little, bits).ok()
+    }
+}
+
+/// Find Nikon's decode table inside the MakerNote.
+///
+/// The MakerNote is a complete TIFF of its own, ten bytes into the entry, with
+/// its own byte order - which is often the opposite of the container's. Getting
+/// that wrong produces a decode table full of plausible nonsense, so the header
+/// is read from the MakerNote itself rather than inherited.
+fn nikon_table<'a>(bytes: &'a [u8], file: &tiff::TiffFile<'a>) -> Option<NikonTable<'a>> {
+    let entry = file.find(tiff::tag::MAKER_NOTE)?;
+    let start = file.payload_at(entry)?;
+    if bytes.get(start..start + 6) != Some(b"Nikon\0") {
+        return None;
+    }
+    let inner = tiff::TiffFile::parse_at(bytes, start + 10).ok()?;
+    // 0x0096 on current bodies, 0x008C on the ones that predate it.
+    let table = inner
+        .find(nikon_tag::DECODE_TABLE_2)
+        .or_else(|| inner.find(nikon_tag::DECODE_TABLE_1))?;
+    Some(NikonTable {
+        bytes,
+        at: inner.payload_at(table)?,
+        little: inner.little(),
+    })
+}
+
+/// Nikon MakerNote tags this build reads.
+mod nikon_tag {
+    /// The older decode table.
+    pub(super) const DECODE_TABLE_1: u16 = 0x008C;
+    /// The current decode table: Huffman version, predictors and curve.
+    pub(super) const DECODE_TABLE_2: u16 = 0x0096;
+}
+
+/// Read the four knots of Sony's linearisation curve, when the file exposes
+/// them outside its encrypted sub-directory.
+///
+/// Returning `None` is not a failure: it means the render will use a plain
+/// linear expansion and be flagged as approximate, which is the honest
+/// alternative to inventing a curve we cannot verify.
+fn sony_curve(file: &tiff::TiffFile<'_>) -> Option<[u16; 4]> {
+    const SONY_TONE_CURVE: u16 = 0x7010;
+    let entry = file.find(SONY_TONE_CURVE)?;
+    let values = file.u64s(entry);
+    if values.len() < 4 {
+        return None;
+    }
+    let mut knots = [0u16; 4];
+    for (slot, value) in knots.iter_mut().zip(values.iter()) {
+        *slot = u16::try_from((*value >> 2) & 0x0FFF).unwrap_or(0);
+    }
+    // The knots must be strictly increasing or the curve is not a curve.
+    if knots
+        .windows(2)
+        .any(|pair| pair.first().copied().unwrap_or(0) >= pair.get(1).copied().unwrap_or(0))
+    {
+        return None;
+    }
+    Some(knots)
 }
 
 /// Read the tags every container spells the same way.
@@ -459,9 +766,12 @@ fn apply_common_tags(file: &tiff::TiffFile<'_>, meta: &mut RawMeta) {
     }
     if let Some(entry) = file.find(tiff::tag::CFA_PATTERN) {
         let codes = file.u64s(entry);
-        // Some writers prefix the pattern with its two-byte dimensions.
-        let pattern = if codes.len() >= 6 {
-            codes.get(2..6).map(<[u64]>::to_vec).unwrap_or_default()
+        // EXIF's spelling prefixes the pattern with its two-byte dimensions;
+        // DNG's does not, and a 6x6 X-Trans pattern is 36 codes either way.
+        let pattern = if codes.len() == 36 || codes.len() == 4 {
+            codes
+        } else if codes.len() >= 6 {
+            codes.get(2..).map(<[u64]>::to_vec).unwrap_or_default()
         } else {
             codes
         };

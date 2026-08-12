@@ -7,7 +7,10 @@ use aura_raw::format::{sniff, MosaicSupport, RawFormat};
 use aura_raw::meta::{self, CfaPattern};
 use aura_raw::orientation::{apply, Orientation};
 
-fn fixture_bytes(directory: &std::path::Path, options: FixtureOptions) -> (Vec<u8>, std::path::PathBuf) {
+fn fixture_bytes(
+    directory: &std::path::Path,
+    options: FixtureOptions,
+) -> (Vec<u8>, std::path::PathBuf) {
     let path = directory.join("fixture.dng");
     fixtures::write_bench_raw(&path, options).expect("write the fixture");
     let bytes = std::fs::read(&path).expect("read the fixture");
@@ -65,8 +68,14 @@ fn the_tiff_reader_finds_the_tags_the_pipeline_depends_on() {
 
     assert_eq!(file.text(tag::MAKE).as_deref(), Some("AURA"));
     assert_eq!(file.text(tag::MODEL).as_deref(), Some("Bench-01"));
-    assert_eq!(file.scalar(tag::BLACK_LEVEL), Some(u64::from(fixtures::BLACK_LEVEL)));
-    assert_eq!(file.scalar(tag::WHITE_LEVEL), Some(u64::from(fixtures::WHITE_LEVEL)));
+    assert_eq!(
+        file.scalar(tag::BLACK_LEVEL),
+        Some(u64::from(fixtures::BLACK_LEVEL))
+    );
+    assert_eq!(
+        file.scalar(tag::WHITE_LEVEL),
+        Some(u64::from(fixtures::WHITE_LEVEL))
+    );
     assert!(file.matrix3(tag::COLOR_MATRIX_2).is_some());
     assert!(file.find(tag::SUB_IFDS).is_some());
     assert!(file.ifds().len() >= 2, "IFD0 and the mosaic sub-directory");
@@ -225,11 +234,19 @@ fn every_orientation_is_a_permutation_of_the_same_pixels() {
         let orientation = Orientation::from_exif(value);
         assert_eq!(orientation.to_exif(), value);
         let (out, width, height) = apply(&data, 2, 3, 1, orientation);
-        assert_eq!(out.len(), data.len(), "orientation {value} changed the size");
+        assert_eq!(
+            out.len(),
+            data.len(),
+            "orientation {value} changed the size"
+        );
         assert_eq!(width as usize * height as usize, data.len());
         let mut sorted = out.clone();
         sorted.sort_unstable();
-        assert_eq!(sorted, vec![1, 2, 3, 4, 5, 6], "orientation {value} lost a pixel");
+        assert_eq!(
+            sorted,
+            vec![1, 2, 3, 4, 5, 6],
+            "orientation {value} lost a pixel"
+        );
     }
 }
 

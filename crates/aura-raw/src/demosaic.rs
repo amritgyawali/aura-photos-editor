@@ -2,11 +2,13 @@
 //!
 //! Two paths, chosen by what the caller is going to do with the result:
 //!
-//! * [`half_size`] bins each 2x2 Bayer quad into one RGB pixel. It is three to
-//!   five times faster than a full interpolation, it introduces no interpolation
-//!   artefacts at all (every channel is a real measurement), and half of a
-//!   modern sensor is still far more than the 2048 px the proxy needs. This is
-//!   the tier 2 path, and therefore the path every model is trained on.
+//! * [`bin`] collapses each colour-complete block of the array into one RGB
+//!   pixel - a 2x2 quad on Bayer, a 3x3 block on X-Trans. It is three to five
+//!   times faster than a full interpolation, it introduces no interpolation
+//!   artefacts at all (every channel is a real measurement), and a half or a
+//!   third of a modern sensor is still far more than the 2048 px the proxy
+//!   needs. This is the tier 2 path, and therefore the path every model is
+//!   trained on.
 //! * [`full_bilinear`] interpolates every missing sample from its neighbours at
 //!   full sensor resolution. This is the tier 3 path, used only on the survivors
 //!   that reach final render.
@@ -14,8 +16,28 @@
 //! Both paths take black level, white level and the as-shot white balance, so
 //! their output is camera-native RGB in `0.0..1.0` with a neutral subject
 //! landing on a neutral triple - the input the colour matrix expects.
+//!
+//! ## Why these loops are parallel
+//!
+//! Interpolation and area-average resize were the two hot spots that kept a
+//! 45 MP frame outside its tier 2 budget (ADR-0004). Both are embarrassingly
+//! parallel over output rows and both read only immutable inputs, so each row is
+//! computed independently into its own slice of the output. The result is
+//! bit-identical to the serial version whatever the thread count, which matters:
+//! invariant 4 says the same input must produce the same pixels on every
+//! machine, so a parallel reduction with a floating-point accumulator would not
+//! have been acceptable here.
+//!
+//! Small images stay serial. Below [`PARALLEL_MIN`] samples the scheduling costs
+//! more than the work, and the tiled tier 3 path calls this once per 512 px
+//! tile.
+
+use rayon::prelude::*;
 
 use crate::meta::CfaPattern;
+
+/// Output samples below which the loops stay on one thread.
+const PARALLEL_MIN: usize = 1 << 18;
 
 /// An interleaved RGB image in floating point, three samples per pixel.
 #[derive(Debug, Clone, PartialEq)]
@@ -53,15 +75,38 @@ impl RgbF32 {
         ]
     }
 
-    fn set(&mut self, x: u32, y: u32, value: [f32; 3]) {
-        if x >= self.width || y >= self.height {
+    /// Fill every row, in parallel when the image is big enough to pay for it.
+    ///
+    /// `row_fn` receives the row index and that row's own slice, so no two
+    /// threads ever touch the same sample and the result does not depend on the
+    /// order the rows finish in.
+    fn fill_rows<F>(&mut self, row_fn: F)
+    where
+        F: Fn(u32, &mut [f32]) + Send + Sync,
+    {
+        let stride = self.width as usize * 3;
+        if stride == 0 {
             return;
         }
-        let at = (y as usize * self.width as usize + x as usize) * 3;
-        for (offset, sample) in value.iter().enumerate() {
-            if let Some(slot) = self.data.get_mut(at + offset) {
-                *slot = *sample;
+        if self.data.len() >= PARALLEL_MIN {
+            self.data
+                .par_chunks_mut(stride)
+                .enumerate()
+                .for_each(|(y, row)| row_fn(y as u32, row));
+        } else {
+            for (y, row) in self.data.chunks_mut(stride).enumerate() {
+                row_fn(y as u32, row);
             }
+        }
+    }
+}
+
+/// Write one pixel into a row slice.
+fn put(row: &mut [f32], x: usize, value: [f32; 3]) {
+    let at = x * 3;
+    for (offset, sample) in value.iter().enumerate() {
+        if let Some(slot) = row.get_mut(at + offset) {
+            *slot = *sample;
         }
     }
 }
@@ -96,24 +141,27 @@ impl Levels {
     }
 }
 
-/// Bin each 2x2 Bayer quad into one RGB pixel.
+/// Collapse each colour-complete block of the array into one RGB pixel.
 ///
-/// The output is half the sensor's width and height, and every channel of every
-/// output pixel is measured rather than guessed.
+/// The block is 2x2 on a Bayer array and 3x3 on X-Trans, which is the smallest
+/// window that is guaranteed to contain all three colours in either layout. The
+/// output is correspondingly a half or a third of the sensor, and every channel
+/// of every output pixel is measured rather than guessed.
 #[must_use]
-pub fn half_size(mosaic: &crate::cfa::Mosaic, cfa: CfaPattern, levels: Levels) -> RgbF32 {
-    let width = mosaic.width / 2;
-    let height = mosaic.height / 2;
+pub fn bin(mosaic: &crate::cfa::Mosaic, cfa: CfaPattern, levels: Levels) -> RgbF32 {
+    let factor = cfa.block().max(1);
+    let width = mosaic.width / factor;
+    let height = mosaic.height / factor;
     let mut out = RgbF32::black(width, height);
 
-    for y in 0..height {
+    out.fill_rows(|y, row| {
         for x in 0..width {
             let mut sums = [0.0f32; 3];
             let mut counts = [0u32; 3];
-            for dy in 0..2u32 {
-                for dx in 0..2u32 {
-                    let sx = x * 2 + dx;
-                    let sy = y * 2 + dy;
+            for dy in 0..factor {
+                for dx in 0..factor {
+                    let sx = x * factor + dx;
+                    let sy = y * factor + dy;
                     let colour = cfa.colour_at(sx, sy);
                     let value = levels.normalise(mosaic.at(sx, sy), colour);
                     if let (Some(sum), Some(count)) = (
@@ -134,18 +182,23 @@ pub fn half_size(mosaic: &crate::cfa::Mosaic, cfa: CfaPattern, levels: Levels) -
                     }
                 }
             }
-            out.set(x, y, pixel);
+            put(row, x as usize, pixel);
         }
-    }
+    });
     out
 }
 
 /// Full-resolution interpolation.
 ///
 /// Each pixel keeps its own measured channel and takes the mean of the nearest
-/// same-colour neighbours for the other two. Averaging over the 3x3
-/// neighbourhood handles the frame edges without a special case, which matters
-/// because edge artefacts in a proxy become edge artefacts in a mask.
+/// same-colour neighbours for the other two. Averaging over the neighbourhood
+/// handles the frame edges without a special case, which matters because edge
+/// artefacts in a proxy become edge artefacts in a mask.
+///
+/// The neighbourhood is 3x3 on a Bayer array. X-Trans needs 5x5: its red and
+/// blue photosites are sparse enough that a 3x3 window centred on some greens
+/// contains neither, and a window with no red in it would interpolate red from
+/// nothing.
 #[must_use]
 pub fn full_bilinear(mosaic: &crate::cfa::Mosaic, cfa: CfaPattern, levels: Levels) -> RgbF32 {
     full_bilinear_region(mosaic, cfa, levels, 0, 0, mosaic.width, mosaic.height)
@@ -167,17 +220,18 @@ pub fn full_bilinear_region(
     height: u32,
 ) -> RgbF32 {
     let mut out = RgbF32::black(width, height);
-    for y in 0..height {
+    let radius = cfa.radius();
+    out.fill_rows(|y, row| {
+        let sy = origin_y + y;
         for x in 0..width {
             let sx = origin_x + x;
-            let sy = origin_y + y;
             let mut sums = [0.0f32; 3];
             let mut counts = [0u32; 3];
 
-            for dy in -1i64..=1 {
-                for dx in -1i64..=1 {
-                    let nx = sx as i64 + dx;
-                    let ny = sy as i64 + dy;
+            for dy in -radius..=radius {
+                for dx in -radius..=radius {
+                    let nx = i64::from(sx) + dx;
+                    let ny = i64::from(sy) + dy;
                     if nx < 0 || ny < 0 {
                         continue;
                     }
@@ -213,9 +267,9 @@ pub fn full_bilinear_region(
                     *slot = value;
                 }
             }
-            out.set(x, y, pixel);
+            put(row, x as usize, pixel);
         }
-    }
+    });
     out
 }
 
@@ -245,7 +299,7 @@ fn area_average(source: &RgbF32, target_width: u32, target_height: u32) -> RgbF3
     let scale_x = f64::from(source.width) / f64::from(target_width);
     let scale_y = f64::from(source.height) / f64::from(target_height);
 
-    for y in 0..target_height {
+    out.fill_rows(|y, row| {
         let from_y = (f64::from(y) * scale_y) as u32;
         let to_y = ((f64::from(y + 1) * scale_y).ceil() as u32).min(source.height);
         for x in 0..target_width {
@@ -273,9 +327,9 @@ fn area_average(source: &RgbF32, target_width: u32, target_height: u32) -> RgbF3
                     *slot = (*sum / divisor) as f32;
                 }
             }
-            out.set(x, y, pixel);
+            put(row, x as usize, pixel);
         }
-    }
+    });
     out
 }
 
@@ -284,7 +338,7 @@ fn bilinear(source: &RgbF32, target_width: u32, target_height: u32) -> RgbF32 {
     let scale_x = f64::from(source.width.saturating_sub(1)) / f64::from(target_width.max(1));
     let scale_y = f64::from(source.height.saturating_sub(1)) / f64::from(target_height.max(1));
 
-    for y in 0..target_height {
+    out.fill_rows(|y, row| {
         let source_y = f64::from(y) * scale_y;
         let y0 = source_y as u32;
         let fy = (source_y - f64::from(y0)) as f32;
@@ -310,9 +364,9 @@ fn bilinear(source: &RgbF32, target_width: u32, target_height: u32) -> RgbF32 {
                     *slot = top + (bottom - top) * fy;
                 }
             }
-            out.set(x, y, pixel);
+            put(row, x as usize, pixel);
         }
-    }
+    });
     out
 }
 
@@ -322,9 +376,9 @@ fn bilinear(source: &RgbF32, target_width: u32, target_height: u32) -> RgbF32 {
 /// every edge, and on a wedding that shows up first as grey fringes around a
 /// white dress against a dark background.
 #[must_use]
-pub fn from_srgb8(data: &[u8], width: u32, height: u32) -> RgbF32 {
+pub fn from_srgb8(encoded: &[u8], width: u32, height: u32) -> RgbF32 {
     let mut out = RgbF32::black(width, height);
-    for (index, sample) in data
+    for (index, sample) in encoded
         .iter()
         .take(width as usize * height as usize * 3)
         .enumerate()
@@ -351,7 +405,7 @@ pub fn to_srgb8(image: &RgbF32) -> Vec<u8> {
 #[must_use]
 pub fn apply_matrix(image: &RgbF32, matrix: crate::colour::matrix::Mat3) -> RgbF32 {
     let mut out = RgbF32::black(image.width, image.height);
-    for (target, source) in out.data.chunks_exact_mut(3).zip(image.data.chunks_exact(3)) {
+    let rotate = |target: &mut [f32], source: &[f32]| {
         let input = [
             f64::from(source.first().copied().unwrap_or(0.0)),
             f64::from(source.get(1).copied().unwrap_or(0.0)),
@@ -360,6 +414,16 @@ pub fn apply_matrix(image: &RgbF32, matrix: crate::colour::matrix::Mat3) -> RgbF
         let rotated = crate::colour::matrix::apply(matrix, input);
         for (slot, value) in target.iter_mut().zip(rotated.iter()) {
             *slot = *value as f32;
+        }
+    };
+    if out.data.len() >= PARALLEL_MIN {
+        out.data
+            .par_chunks_exact_mut(3)
+            .zip(image.data.par_chunks_exact(3))
+            .for_each(|(target, source)| rotate(target, source));
+    } else {
+        for (target, source) in out.data.chunks_exact_mut(3).zip(image.data.chunks_exact(3)) {
+            rotate(target, source);
         }
     }
     out

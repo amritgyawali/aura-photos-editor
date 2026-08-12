@@ -62,15 +62,14 @@ impl DecodePool {
     #[must_use]
     pub fn default_worker_count() -> usize {
         std::thread::available_parallelism()
-            .map(std::num::NonZeroUsize::get)
-            .unwrap_or(4)
+            .map_or(4, std::num::NonZeroUsize::get)
             .saturating_sub(1)
             .max(1)
     }
 
     /// Start a pool.
     #[must_use]
-    pub fn new<H: Handler>(workers: usize, capacity: usize, handler: Arc<H>) -> Self {
+    pub fn new<H: Handler>(workers: usize, capacity: usize, handler: &Arc<H>) -> Self {
         let shared = Arc::new(Shared {
             queue: Mutex::new(PriorityQueue::with_capacity(capacity)),
             ready: Condvar::new(),
@@ -80,15 +79,15 @@ impl DecodePool {
             dropped: AtomicU64::new(0),
         });
 
-        let mut handles = Vec::with_capacity(workers.max(1));
+        let mut threads = Vec::with_capacity(workers.max(1));
         for index in 0..workers.max(1) {
             let shared = Arc::clone(&shared);
-            let handler = Arc::clone(&handler);
+            let handler = Arc::clone(handler);
             let spawned = std::thread::Builder::new()
                 .name(format!("aura-preview-{index}"))
                 .spawn(move || worker_loop(&shared, handler.as_ref()));
             match spawned {
-                Ok(handle) => handles.push(handle),
+                Ok(handle) => threads.push(handle),
                 // A machine that cannot start a thread will still work, just
                 // serially: the service falls back to decoding inline.
                 Err(error) => tracing::warn!(
@@ -101,11 +100,12 @@ impl DecodePool {
 
         Self {
             shared,
-            workers: handles,
+            workers: threads,
         }
     }
 
     /// Submit work. Returns false when the request was dropped or merged.
+    #[must_use = "a dropped request is not an error, but the caller may want to know"]
     pub fn submit(&self, id: ImageId, level: PixelLevel, priority: Priority) -> bool {
         let accepted = {
             let mut queue = self.shared.queue.lock();
@@ -119,7 +119,8 @@ impl DecodePool {
         accepted
     }
 
-    /// Abandon queued work for these images.
+    /// Abandon queued work for these images. Returns how many were dropped.
+    #[must_use = "the count tells the caller how much speculative work it saved"]
     pub fn cancel(&self, ids: &[ImageId]) -> usize {
         self.shared.queue.lock().cancel(ids)
     }

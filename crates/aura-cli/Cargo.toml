@@ -17,6 +17,9 @@ aura-catalog = { path = "../aura-catalog" }
 aura-ingest  = { path = "../aura-ingest" }
 aura-jobs    = { path = "../aura-jobs" }
 aura-perf    = { path = "../aura-perf" }
+aura-raw     = { path = "../aura-raw" }
+aura-cache   = { path = "../aura-cache" }
+aura-preview = { path = "../aura-preview" }
 serde.workspace      = true
 serde_json.workspace = true
 time.workspace       = true

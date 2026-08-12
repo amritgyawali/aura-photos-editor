@@ -12,6 +12,9 @@ aura-core    = { path = "../aura-core" }
 aura-catalog = { path = "../aura-catalog" }
 aura-ingest  = { path = "../aura-ingest" }
 aura-jobs    = { path = "../aura-jobs" }
+aura-cache   = { path = "../aura-cache" }
+aura-preview = { path = "../aura-preview" }
+aura-raw     = { path = "../aura-raw" }
 rusqlite.workspace    = true
 serde.workspace       = true
 serde_json.workspace  = true

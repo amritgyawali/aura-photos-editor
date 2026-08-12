@@ -16,4 +16,5 @@ time.workspace       = true
 tracing.workspace    = true
 
 [dev-dependencies]
+aura-raw.path      = "../aura-raw"
 tempfile.workspace = true

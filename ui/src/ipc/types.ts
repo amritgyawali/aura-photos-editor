@@ -57,6 +57,48 @@ export type ProblemRow = {
   message: string;
 };
 
+export type GetPreviewInput = {
+  projectId: string;
+  photoId: string;
+  level: string;
+  priority: string;
+};
+
+export type PreviewPayload = {
+  photoId: string;
+  tier: number;
+  width: number;
+  height: number;
+  source: string;
+  dataUrl: string;
+};
+
+export type PrefetchInput = {
+  projectId: string;
+  photoIds: string[];
+  level: string;
+};
+
+export type CacheStatsDto = {
+  bytesUsed: number;
+  budgetBytes: number;
+  entries: number;
+  hits: number;
+  misses: number;
+  evictions: number;
+  hitRate: number;
+};
+
+export type SetCacheBudgetInput = {
+  projectId: string;
+  budgetBytes: number;
+};
+
+export type PreviewEvent =
+  | { kind: 'ready'; photoId: string; tier: number }
+  | { kind: 'failed'; photoId: string; code: string; message: string }
+  | { kind: 'cacheStats'; bytesUsed: number; budgetBytes: number; hitRate: number };
+
 export type IpcError = {
   code: string;
   message: string;
