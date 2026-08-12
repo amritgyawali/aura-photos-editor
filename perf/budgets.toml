@@ -76,3 +76,45 @@ max_elapsed_ms = 15000
 # Loading the models a project open needs before the photographer sees anything.
 [stage.warmup_startup_models]
 max_elapsed_ms = 2500
+
+# Phase 04 performance budgets, from PHASE-04 section 11.
+#
+# Provider latency is deliberately absent: it is somebody else's service and
+# cannot be a budget we assert. What is asserted is the gateway's own cost, the
+# call count, the price, and how much of a wedding a total cloud outage costs.
+
+# The gateway's own work per call, excluding the provider: policy, payload
+# inspection, cache lookup, cost estimate, audit row. Measured on the cache path,
+# which is that work with no network in it.
+[stage.cloud_gateway_overhead]
+max_elapsed_ms  = 15
+max_ms_per_unit = 15
+
+# Building the thing that is actually uploaded: twelve 384 px tiles, laid out
+# into a 1536 x 864 sheet and JPEG encoded.
+#
+# Measured, not guessed: 167 ms in release on the development machine, so the
+# budget is 250 ms - enough headroom for a slower laptop, tight enough that a
+# two-times regression fails. At one sheet per 40 images this is about 12 s
+# across a 3,000 image wedding, and it is off the critical path.
+[stage.cloud_contact_sheet_build]
+max_elapsed_ms = 250
+
+# Calls for a 3,000 image wedding at the default one-per-40-images policy.
+[count.cloud_calls_per_3000_images]
+max_count = 75
+
+# Cost for that wedding at default settings, in hundredths of a US cent so the
+# budget file stays integer-only.
+[cost.cloud_per_3000_images]
+max_usd_hundredths_of_a_cent = 15000  # USD 1.50
+
+# What a total cloud outage costs the wall clock of a full run, as a percentage.
+# Cloud work never blocks a pipeline stage, so the only cost is bounded retries.
+[count.cloud_outage_overhead_percent]
+max_count = 3
+
+# The size of the thing that leaves the machine. Not a speed budget - a privacy
+# one, asserted in the same place so it cannot be raised quietly.
+[size.cloud_payload]
+max_bytes = 4194304  # 4 MB

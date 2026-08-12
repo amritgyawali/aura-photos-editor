@@ -30,6 +30,12 @@ bench:
     cargo bench --package aura-ingest --bench ingest_throughput
     cargo bench --package aura-preview --bench decode
 
+# Budget assertions. Release, because a budget is a claim about the binary a
+# photographer runs, and the payload builder is an order of magnitude slower
+# unoptimised.
+budgets:
+    cargo test --release --package aura-perf --all-targets
+
 # The per-machine model table PERF and the scheduler's cost model both read.
 bench-models:
     cargo bench --package aura-infer --bench model_bench
@@ -64,6 +70,12 @@ phase-02-verify:
 # memory squeeze, cancellation, a misbehaving provider and a rollback.
 phase-03-verify:
     cargo run --release --package aura-cli -- verify --phase 03 --work target/phase03-verify
+
+# The phase 04 gate: the migration, key safety, the payload, a cassette-backed
+# call, a cached re-run, one repair, an offline wedding, a cap, and a key-leak
+# scan of everything stored. Never touches a network.
+phase-04-verify:
+    cargo run --release --package aura-cli -- verify --phase 04 --work target/phase04-verify
 
 # Weight-space parity for every fp32/variant pair, plus the cross-runtime check
 # against onnxruntime when it happens to be installed for Python.

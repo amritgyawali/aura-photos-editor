@@ -48,6 +48,35 @@ if [ -n "$ort_users" ]; then
   fail=1
 fi
 
+# Phase 04: nothing outside aura-cloud may open a socket.
+#
+# Acceptance criterion in section 3: "the gateway is the only crate allowed to
+# make outbound network calls; a CI lint enforces this". The lint is here rather
+# than in review for the same reason the ONNX one is: a direct `TcpStream` in a
+# phase that needed one thing from an API is exactly the shortcut a hurried
+# change makes, and by the time review notices there are three of them.
+net_users=$(grep -rlnE 'std::net::(TcpStream|TcpListener|UdpSocket)|ToSocketAddrs|\breqwest::|\bureq::|\bhyper::|\bcurl::|\btungstenite::|\brustls::|\bnative_tls::' \
+  crates --include='*.rs' | grep -v '^crates/aura-cloud/' || true)
+if [ -n "$net_users" ]; then
+  echo "BANNED: outbound network APIs used outside crates/aura-cloud"
+  echo "$net_users"
+  echo "Every cloud call goes through aura-cloud. See docs/adr/ADR-0009-cloud-ai-policy.md."
+  fail=1
+fi
+
+# Phase 04: a key must never be written where it can be read back.
+#
+# The credential store is the only place an API key lives. A key in an
+# environment variable, a config file or a catalog row is a key in a backup, a
+# support bundle and a process listing.
+key_sinks=$(grep -rnE 'env::set_var\("[A-Z_]*(KEY|TOKEN|SECRET)|INSERT INTO .*api_key|api_key *=' \
+  crates --include='*.rs' | grep -v '// ALLOW-BANNED:' || true)
+if [ -n "$key_sinks" ]; then
+  echo "BANNED: an API key is being written somewhere other than the credential store"
+  echo "$key_sinks"
+  fail=1
+fi
+
 # TypeScript: no any, no non-null assertion on IPC boundaries
 if [ -d ui/src ]; then
   if matches=$(grep -rnE ':\s*any\b|as any' ui/src --include='*.ts' --include='*.tsx' || true); then

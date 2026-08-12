@@ -17,8 +17,9 @@ use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 use aura_ingest::fixtures;
 
 mod phase03;
+mod phase04;
 
-const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() -> ExitCode {
     tracing_subscriber::fmt()
@@ -37,6 +38,7 @@ fn main() -> ExitCode {
         Some("verify") => match flag(&args, "--phase").as_deref() {
             Some("02") => cmd_verify_previews(&args),
             Some("03") => phase03::verify(&args),
+            Some("04") => phase04::verify(&args),
             _ => cmd_verify(&args),
         },
         Some("infer") => phase03::infer(&args),
@@ -48,7 +50,7 @@ fn main() -> ExitCode {
                  aura-cli raw-fixtures --out DIR\n  \
                  aura-cli import --catalog FILE --project NAME --root DIR [--root DIR]\n  \
                  aura-cli previews --catalog FILE --project NAME [--level thumb|proxy]\n  \
-                 aura-cli verify [--phase 01|02|03] --work DIR\n  \
+                 aura-cli verify [--phase 01|02|03|04] --work DIR\n  \
                  aura-cli infer --model FILE [--precision fp32|fp16|int8] [--batch N]\n  \
                  aura-cli info --catalog FILE"
             );
@@ -57,7 +59,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn flag(args: &[String], name: &str) -> Option<String> {
+pub(crate) fn flag(args: &[String], name: &str) -> Option<String> {
     let index = args.iter().position(|a| a == name)?;
     args.get(index + 1).cloned()
 }
@@ -166,7 +168,11 @@ fn cmd_import(args: &[String]) -> ExitCode {
     }
 }
 
-fn ensure_project(catalog: &Catalog, clock: &dyn Clock, name: &str) -> Result<ProjectId, String> {
+pub(crate) fn ensure_project(
+    catalog: &Catalog,
+    clock: &dyn Clock,
+    name: &str,
+) -> Result<ProjectId, String> {
     let existing = catalog
         .read(repo::list_projects)
         .map_err(|e| format!("[{}] {}", e.code, e.user_message))?;
