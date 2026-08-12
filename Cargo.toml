@@ -1,0 +1,92 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/aura-core",
+  "crates/aura-catalog",
+  "crates/aura-ingest",
+  "crates/aura-raw",
+  "crates/aura-cache",
+  "crates/aura-preview",
+  "crates/aura-jobs",
+  "crates/aura-perf",
+  "crates/aura-app",
+  "crates/aura-cli",
+  "xtask",
+]
+
+[workspace.package]
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.88"
+license      = "UNLICENSED"
+authors      = ["AURA"]
+
+[workspace.dependencies]
+# Errors and results
+thiserror   = "2"
+
+# Serialisation
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+toml        = "0.8"
+
+# Async runtime: current_thread by default, explicit pools where needed
+tokio       = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time", "fs", "signal"] }
+
+# Data
+rusqlite    = { version = "0.32", features = ["bundled", "backup", "functions", "limits"] }
+uuid        = { version = "1", features = ["v4", "v7", "serde"] }
+blake3      = "1"
+time        = { version = "0.3", features = ["formatting", "parsing", "macros", "serde-well-known"] }
+
+# Filesystem
+walkdir     = "2"
+fs4         = "0.9"
+dirs        = "5"
+
+# Imaging metadata (no decode in phase 01)
+kamadak-exif = "0.5"
+
+# Imaging codecs. Pure Rust, permissively licensed, no C toolchain: see
+# docs/adr/ADR-0004-raw-decode-backend.md for why LibRaw is not linked.
+zune-jpeg    = "0.4"
+jpeg-encoder = "0.6"
+png          = "0.17"
+
+# Text
+unicode-normalization = "0.1"
+
+# Observability
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Concurrency
+rayon             = "1"
+crossbeam-channel = "0.5"
+parking_lot       = "0.12"
+
+# Testing
+proptest    = "1"
+tempfile    = "3"
+insta       = { version = "1", features = ["json"] }
+criterion   = { version = "0.5", features = ["html_reports"] }
+
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1
+panic         = "abort"
+strip         = "debuginfo"
+
+# Release-speed builds for the fixture generator and benchmarks
+[profile.bench]
+inherits  = "release"
+debug     = true
+
+# Fast iteration without losing overflow checks
+[profile.dev]
+overflow-checks = true
+debug           = 1
+
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,12 @@
+/target
+/graphify-out
+/ui/node_modules
+/ui/dist
+/tests/fixtures/generated
+/perf/results
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.DS_Store
+.env
+*.aura-license

@@ -1,0 +1,113 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # Lane 1 - the cheap gates. Nothing else runs until these are clean.
+  gates:
+    name: format, lints and banned patterns
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: banned patterns (R1 and determinism)
+        run: bash scripts/check-banned.sh
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: frozen contracts
+        run: cargo run --package xtask -- contracts --check
+
+  # Lane 2 - the test matrix. Windows first: it is where photographers are.
+  test:
+    name: tests on ${{ matrix.os }}
+    needs: gates
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo test
+        run: cargo test --workspace --all-targets
+
+      - name: phase 01 verify on the reference fixtures
+        run: cargo run --release --package aura-cli -- verify --work target/phase01-verify
+
+  # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
+  ui:
+    name: ui type-check, tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: install
+        working-directory: ui
+        run: npm ci || npm install
+
+      - name: type-check
+        working-directory: ui
+        run: npm run lint
+
+      - name: unit tests
+        working-directory: ui
+        run: npm test
+
+      - name: build
+        working-directory: ui
+        run: npx vite build
+
+  # Lane 4 - supply chain. Advisory and licence failures block the merge.
+  supply-chain:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  # Lane 5 - budgets. A regression against perf/budgets.toml fails the build.
+  budgets:
+    name: benchmarks
+    needs: gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: ingest benchmarks
+        run: cargo bench --package aura-ingest -- --warm-up-time 1 --measurement-time 3
+
+      - name: budget assertions
+        run: cargo test --package aura-perf --all-targets

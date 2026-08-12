@@ -1,0 +1,12 @@
+# Determinism: byte-identical checkouts on every OS. Mixed line endings change
+# file hashes and break the contract digest in contracts.lock.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
+*.sqlite binary
+*.ARW binary
+*.CR3 binary
+*.NEF binary
+*.RAF binary
+*.DNG binary

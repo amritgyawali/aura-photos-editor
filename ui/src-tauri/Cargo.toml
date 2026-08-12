@@ -1,0 +1,27 @@
+# Deliberately NOT a workspace member: the desktop shell pulls the whole Tauri
+# toolchain, and `cargo test --workspace` must stay fast and headless in CI.
+# Build it with `cargo tauri dev` or `cargo build --manifest-path ui/src-tauri/Cargo.toml`.
+[package]
+name = "aura-desktop"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "UNLICENSED"
+authors = ["AURA"]
+description = "AURA desktop shell."
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+aura-app     = { path = "../../crates/aura-app" }
+aura-core    = { path = "../../crates/aura-core" }
+tauri        = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+tracing      = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

@@ -1,0 +1,22 @@
+[package]
+name         = "aura-raw"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+description  = "RAW containers, the three decode tiers and the colour pipeline"
+
+[dependencies]
+aura-core  = { path = "../aura-core" }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+tracing    = { workspace = true }
+zune-jpeg  = { workspace = true }
+jpeg-encoder = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tempfile = { workspace = true }
+png      = { workspace = true }
+time     = { workspace = true }

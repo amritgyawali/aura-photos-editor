@@ -1,0 +1,24 @@
+[package]
+name = "aura-catalog"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+description = "AURA catalog: SQLite schema v1, migrations, single-writer actor and locks."
+
+[dependencies]
+aura-core   = { path = "../aura-core" }
+rusqlite.workspace    = true
+serde.workspace       = true
+serde_json.workspace  = true
+time.workspace        = true
+tracing.workspace     = true
+parking_lot.workspace = true
+crossbeam-channel.workspace = true
+fs4.workspace         = true
+blake3.workspace      = true
+
+[dev-dependencies]
+tempfile.workspace = true
+proptest.workspace = true

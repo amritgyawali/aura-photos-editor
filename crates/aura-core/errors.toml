@@ -1,0 +1,264 @@
+# The error-code registry. One entry per code used anywhere in the product.
+# CI fails if a code appears in Rust source but not here, or if an entry lacks a
+# runbook file. Runbook paths are relative to the workspace root.
+
+[[error]]
+code         = "AURA-IO-1001"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "Source folder does not exist"
+user_message = "That folder is not there any more. Reconnect the drive or choose the folder again."
+runbook      = "docs/runbooks/AURA-IO-1001.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-IO-1002"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "Permission denied reading the source folder"
+user_message = "AURA is not allowed to read that folder. Grant access in system settings, then try again."
+runbook      = "docs/runbooks/AURA-IO-1002.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-IO-1003"
+severity     = "run_blocking"
+recovery     = "retry"
+summary      = "Volume disconnected during a run"
+user_message = "The drive was disconnected. Plug it back in and AURA will carry on from where it stopped."
+runbook      = "docs/runbooks/AURA-IO-1003.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-IO-1004"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "Disk full"
+user_message = "The disk is full. Free up space and AURA will resume; nothing done so far is lost."
+runbook      = "docs/runbooks/AURA-IO-1004.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-IO-1005"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "Path exceeds the operating system limit"
+user_message = "One file is nested too deeply for Windows to open. It has been set aside; the rest imported normally."
+runbook      = "docs/runbooks/AURA-IO-1005.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-IO-1006"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "File unreadable or truncated"
+user_message = "One file could not be read and was set aside. Check the card before formatting it."
+runbook      = "docs/runbooks/AURA-IO-1006.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-IO-1007"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "File changed while being read"
+user_message = "A file was still being written while AURA read it. It will be retried."
+runbook      = "docs/runbooks/AURA-IO-1007.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-IO-1008"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "Catalog location is inside a cloud-synced folder"
+user_message = "Catalogs cannot live in a synced folder such as Dropbox, iCloud Drive, OneDrive or Google Drive, because syncing corrupts them. Choose a folder on this computer."
+runbook      = "docs/runbooks/AURA-IO-1008.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-IO-1009"
+severity     = "warning"
+recovery     = "retry"
+summary      = "Preview cache entry could not be written or read back"
+user_message = "AURA could not store a preview on disk, so it will be built again when needed. Check free space on the cache drive."
+runbook      = "docs/runbooks/AURA-IO-1009.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-IO-1010"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "Zero-byte file"
+user_message = "One file is empty, which usually means a failed card transfer. It has been set aside."
+runbook      = "docs/runbooks/AURA-IO-1010.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-RAW-2001"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "File is not a RAW format AURA can read"
+user_message = "AURA does not recognise this file as a photo it can develop. It has been set aside; the rest of the import continues."
+runbook      = "docs/runbooks/AURA-RAW-2001.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-RAW-2002"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "RAW file is corrupt or truncated"
+user_message = "This photo file is damaged and could not be opened. Copy it from the card again, then re-run the import."
+runbook      = "docs/runbooks/AURA-RAW-2002.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-RAW-2003"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "No embedded preview in the file; one was rendered instead"
+user_message = "This camera did not store a preview inside the file, so AURA rendered one. The first thumbnails may appear more slowly."
+runbook      = "docs/runbooks/AURA-RAW-2003.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-RAW-2004"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "Decode exceeded its per-file time limit"
+user_message = "One photo took too long to open and was set aside so the rest could finish. You can retry it from the Problems list."
+runbook      = "docs/runbooks/AURA-RAW-2004.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-RAW-2005"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "Decode would exceed the per-file memory ceiling"
+user_message = "One photo is larger than AURA is allowed to open in one piece and was set aside. Contact support with the camera model."
+runbook      = "docs/runbooks/AURA-RAW-2005.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-RAW-2006"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "No colour profile for this camera; a generic matrix was used"
+user_message = "AURA has no colour profile for this camera yet and used a generic one. Colours may drift slightly until a profile ships."
+runbook      = "docs/runbooks/AURA-RAW-2006.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-RAW-2007"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Mosaic compression unsupported; the proxy came from the embedded preview"
+user_message = "AURA cannot develop this camera's raw data yet, so it used the picture the camera stored inside the file. Editing is limited."
+runbook      = "docs/runbooks/AURA-RAW-2007.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-RAW-2008"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "The decode worker stopped before returning a result"
+user_message = "One photo stopped the decoder and was set aside. AURA kept running and the rest of the import is unaffected."
+runbook      = "docs/runbooks/AURA-RAW-2008.md"
+introduced   = "PHASE-02"
+
+[[error]]
+code         = "AURA-DB-3001"
+severity     = "fatal"
+recovery     = "ask_user"
+summary      = "Catalog could not be opened or is not an AURA catalog"
+user_message = "AURA could not open this catalog. Restart the app; if it happens again, contact support."
+runbook      = "docs/runbooks/AURA-DB-3001.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-DB-3002"
+severity     = "fatal"
+recovery     = "halt"
+summary      = "Schema migration failed and was rolled back"
+user_message = "AURA could not upgrade this catalog. Your work is untouched; contact support before importing again."
+runbook      = "docs/runbooks/AURA-DB-3002.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-DB-3003"
+severity     = "fatal"
+recovery     = "ask_user"
+summary      = "Catalog failed its integrity check"
+user_message = "This catalog file is damaged. Restore the most recent backup from the same folder."
+runbook      = "docs/runbooks/AURA-DB-3003.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-DB-3004"
+severity     = "fatal"
+recovery     = "ask_user"
+summary      = "Catalog was written by a newer build"
+user_message = "This catalog was made by a newer version of AURA. Update AURA and open it again."
+runbook      = "docs/runbooks/AURA-DB-3004.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-DB-3005"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "Another AURA instance holds the catalog write lock"
+user_message = "This catalog is already open in another AURA window. Close it and try again."
+runbook      = "docs/runbooks/AURA-DB-3005.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-DB-3006"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "Catalog statement or transaction failed unexpectedly"
+user_message = "AURA hit an internal catalog problem and stopped safely. Nothing already imported is lost."
+runbook      = "docs/runbooks/AURA-DB-3006.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-DB-3007"
+severity     = "fatal"
+recovery     = "halt"
+summary      = "Pre-migration backup could not be verified"
+user_message = "AURA could not make a safe backup before upgrading this catalog, so it stopped. Free some disk space and try again."
+runbook      = "docs/runbooks/AURA-DB-3007.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-DB-3008"
+severity     = "run_blocking"
+recovery     = "retry"
+summary      = "Catalog busy for longer than the write timeout"
+user_message = "The catalog is busy. AURA will try again in a moment."
+runbook      = "docs/runbooks/AURA-DB-3008.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-JOB-7001"
+severity     = "warning"
+recovery     = "halt"
+summary      = "Run cancelled by the photographer"
+user_message = "The import was stopped. Everything finished so far has been saved."
+runbook      = "docs/runbooks/AURA-JOB-7001.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-JOB-7002"
+severity     = "degraded"
+recovery     = "retry"
+summary      = "Worker lease expired and the task was reclaimed"
+user_message = "One step stopped responding and was restarted automatically."
+runbook      = "docs/runbooks/AURA-JOB-7002.md"
+introduced   = "PHASE-01"
+
+[[error]]
+code         = "AURA-JOB-7003"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "Task exceeded its retry budget"
+user_message = "One step kept failing and was set aside so the rest of the import could finish."
+runbook      = "docs/runbooks/AURA-JOB-7003.md"
+introduced   = "PHASE-01"

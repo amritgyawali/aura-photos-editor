@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cargo fmt --all -- --check
+./scripts/check-banned.sh
+cargo clippy --workspace --all-targets -- -D warnings
+cargo xtask contracts --check

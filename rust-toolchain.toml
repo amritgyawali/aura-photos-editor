@@ -1,0 +1,9 @@
+# Pinned exactly. A floating toolchain silently changes float codegen and
+# iteration behaviour, which breaks determinism level D0. The version is a
+# contract; bumping it requires re-running the golden determinism suite and an
+# ADR if any digest changes. See docs/adr/ADR-0002-toolchain-and-layout.md.
+[toolchain]
+channel    = "1.97.1"
+components = ["rustfmt", "clippy", "rust-src"]
+targets    = ["x86_64-pc-windows-msvc"]
+profile    = "minimal"

@@ -1,0 +1,7 @@
+edition                  = "2021"
+max_width                = 100
+use_field_init_shorthand = true
+newline_style            = "Unix"
+reorder_imports          = true
+# group_imports = "StdExternalCrate" is nightly-only; the layout is followed by
+# hand (std, then external crates, then crate-local) and reviewed in PRs.

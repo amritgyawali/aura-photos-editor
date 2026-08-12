@@ -1,0 +1,34 @@
+[package]
+name = "aura-ingest"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+description = "AURA ingest: scan, hash, pair, EXIF, journal and multi-camera clock alignment."
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+walkdir.workspace      = true
+blake3.workspace       = true
+kamadak-exif.workspace = true
+unicode-normalization.workspace = true
+rayon.workspace        = true
+crossbeam-channel.workspace = true
+parking_lot.workspace  = true
+serde.workspace        = true
+serde_json.workspace   = true
+time.workspace         = true
+tracing.workspace      = true
+uuid.workspace         = true
+rusqlite.workspace     = true
+
+[dev-dependencies]
+tempfile.workspace = true
+proptest.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "ingest_throughput"
+harness = false

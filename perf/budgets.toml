@@ -1,0 +1,15 @@
+# Phase 01 performance budgets, from PHASE-01 section 11.
+# Each entry is asserted by a test or a benchmark; a breach fails CI.
+
+[stage.ingest_4000_files]
+max_elapsed_ms  = 90000
+max_ms_per_unit = 20
+
+[stage.catalog_open]
+max_elapsed_ms = 400
+
+[stage.timeline_recompute_4000]
+max_elapsed_ms = 1000
+
+[stage.reimport_noop_4000]
+max_elapsed_ms = 5000

@@ -1,0 +1,28 @@
+# Cognitive load ceilings - a function above these is a review finding
+cognitive-complexity-threshold = 20
+too-many-arguments-threshold   = 7
+type-complexity-threshold      = 300
+
+# Names that must never appear as bare identifiers
+disallowed-names = ["foo", "bar", "baz", "tmp", "data", "thing"]
+
+# Ban the APIs that break determinism or panic silently
+[[disallowed-methods]]
+path   = "std::option::Option::unwrap"
+reason = "R1: return a coded AuraError instead"
+
+[[disallowed-methods]]
+path   = "std::result::Result::unwrap"
+reason = "R1: return a coded AuraError instead"
+
+[[disallowed-methods]]
+path   = "std::time::SystemTime::now"
+reason = "R3: wall-clock reads must go through aura_core::clock"
+
+[[disallowed-types]]
+path   = "std::collections::HashMap"
+reason = "R3: iteration order is non-deterministic; use BTreeMap or IndexMap"
+
+[[disallowed-types]]
+path   = "std::collections::HashSet"
+reason = "R3: iteration order is non-deterministic; use BTreeSet"
