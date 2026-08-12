@@ -45,7 +45,7 @@ pub fn decode_jpeg(bytes: &[u8], limits: DecodeLimits) -> AuraResult<Rgb8> {
     }
 
     let expected = width as usize * height as usize * 3;
-    let data = match pixels.len() {
+    let interleaved = match pixels.len() {
         // Already interleaved RGB.
         len if len == expected => pixels,
         // Greyscale: widen it so every caller sees three channels.
@@ -66,7 +66,7 @@ pub fn decode_jpeg(bytes: &[u8], limits: DecodeLimits) -> AuraResult<Rgb8> {
     Ok(Rgb8 {
         width,
         height,
-        data,
+        data: interleaved,
     })
 }
 
@@ -97,12 +97,7 @@ pub fn encode_jpeg(image: &Rgb8, quality: u8) -> AuraResult<Vec<u8>> {
     let mut out = Vec::with_capacity(expected / 8);
     let encoder = jpeg_encoder::Encoder::new(&mut out, quality);
     encoder
-        .encode(
-            &image.data,
-            width,
-            height,
-            jpeg_encoder::ColorType::Rgb,
-        )
+        .encode(&image.data, width, height, jpeg_encoder::ColorType::Rgb)
         .map_err(|e| corrupt(format!("jpeg encode failed: {e}")))?;
     Ok(out)
 }

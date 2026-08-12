@@ -114,6 +114,121 @@ pub struct ProblemRow {
     pub message: String,
 }
 
+/// Ask for the pixels of one photograph.
+///
+/// Added in PHASE-02; see `docs/adr/ADR-0005-preview-ipc-surface.md`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetPreviewInput {
+    /// The project the photograph belongs to.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// `thumb` or `proxy`. Full-resolution renders never cross the IPC boundary.
+    pub level: String,
+    /// `visible`, `interactive`, `aiBatch` or `background`.
+    pub priority: String,
+}
+
+/// Pixels, encoded for the web view.
+///
+/// The bytes are a JPEG in a `data:` URL rather than an array, because a
+/// 4,000-cell grid crossing the IPC boundary as JSON arrays of numbers costs
+/// roughly eight times the bytes and a great deal of garbage collection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewPayload {
+    /// The photograph these pixels belong to.
+    pub photo_id: String,
+    /// Which tier produced them: 1, 2 or 3.
+    pub tier: i64,
+    /// Width in pixels.
+    pub width: i64,
+    /// Height in pixels.
+    pub height: i64,
+    /// `embedded` when the camera rendered it, `decoded` when AURA did.
+    pub source: String,
+    /// A complete `data:image/jpeg;base64,...` URL.
+    pub data_url: String,
+}
+
+/// Ask for several photographs to be produced in the background.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrefetchInput {
+    /// The project the photographs belong to.
+    pub project_id: String,
+    /// The photographs.
+    pub photo_ids: Vec<String>,
+    /// `thumb` or `proxy`.
+    pub level: String,
+}
+
+/// What the cache is doing, for the settings panel.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheStatsDto {
+    /// Bytes currently stored.
+    pub bytes_used: u64,
+    /// The ceiling those bytes are measured against.
+    pub budget_bytes: u64,
+    /// How many artefacts are stored.
+    pub entries: u64,
+    /// Lifetime hits.
+    pub hits: u64,
+    /// Lifetime misses.
+    pub misses: u64,
+    /// Lifetime evictions.
+    pub evictions: u64,
+    /// Hits divided by requests, 0.0 to 1.0.
+    pub hit_rate: f64,
+}
+
+/// Change the cache ceiling from the settings panel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCacheBudgetInput {
+    /// The project whose cache is being resized.
+    pub project_id: String,
+    /// The new ceiling in bytes. Values below the floor are clamped, and the
+    /// clamped value is what `preview_stats` reports back.
+    pub budget_bytes: u64,
+}
+
+/// Preview progress pushed to the UI while thumbnails fill in.
+///
+/// Not `Eq`: the cache statistics carry a hit rate, and comparing two floats for
+/// exact equality is banned by the lint block for good reason.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum PreviewEvent {
+    /// Pixels for one photograph are now available at this tier.
+    Ready {
+        /// The photograph.
+        photo_id: String,
+        /// Which tier finished.
+        tier: i64,
+    },
+    /// One photograph could not be decoded; the rest continue.
+    Failed {
+        /// The photograph.
+        photo_id: String,
+        /// Registered error code.
+        code: String,
+        /// Photographer-facing sentence.
+        message: String,
+    },
+    /// Periodic cache accounting, so the settings panel is live.
+    CacheStats {
+        /// Bytes stored.
+        bytes_used: u64,
+        /// The ceiling.
+        budget_bytes: u64,
+        /// Hits divided by requests.
+        hit_rate: f64,
+    },
+}
+
 /// What the UI is told when a command fails. Never a Rust type name, never a path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

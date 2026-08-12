@@ -70,15 +70,13 @@ pub fn probe(bytes: &[u8]) -> AuraResult<JpegInfo> {
             at += 1;
             continue;
         }
-        let marker = match bytes.get(at + 1).copied() {
-            Some(value) => value,
-            None => break,
+        let Some(marker) = bytes.get(at + 1).copied() else {
+            break;
         };
         at += 2;
         match marker {
-            // Padding and standalone markers carry no payload.
-            0xFF | 0x01 | 0xD0..=0xD7 => continue,
-            SOI => continue,
+            // Padding, restart and standalone markers carry no payload.
+            0xFF | 0x01 | 0xD0..=0xD7 | SOI => continue,
             EOI => {
                 if let Some(found) = info.as_mut() {
                     found.byte_len = Some(at);
@@ -124,7 +122,7 @@ pub fn probe(bytes: &[u8]) -> AuraResult<JpegInfo> {
             while scan + 1 < bytes.len() {
                 if bytes.get(scan).copied() == Some(0xFF) {
                     match bytes.get(scan + 1).copied() {
-                        Some(0x00) | Some(0xFF) => scan += 2,
+                        Some(0x00 | 0xFF) => scan += 2,
                         Some(value) if (0xD0..=0xD7).contains(&value) => scan += 2,
                         Some(EOI) => {
                             if let Some(found) = info.as_mut() {

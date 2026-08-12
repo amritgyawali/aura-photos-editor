@@ -6,8 +6,8 @@ use aura_raw::colour::curve::{
 };
 use aura_raw::colour::de2000::{ciede2000, xyz_d65_to_lab, Lab};
 use aura_raw::colour::matrix::{
-    apply, bradford, determinant, invert, mul, Mat3, IDENTITY, REC2020_TO_XYZ_D65,
-    SRGB_TO_XYZ_D65, WHITE_D50, WHITE_D65,
+    apply, bradford, determinant, invert, mul, Mat3, IDENTITY, REC2020_TO_XYZ_D65, SRGB_TO_XYZ_D65,
+    WHITE_D50, WHITE_D65,
 };
 use aura_raw::colour::profile::{self, ProfileSource, BENCH_MAKE};
 use aura_raw::colour::working_space::{camera_to_working, rec2020_to_srgb, xyz_d65_to_rec2020};
@@ -50,7 +50,18 @@ fn de2000_matches_the_published_worked_examples() {
         ),
     ];
     for ((l1, a1, b1), (l2, a2, b2), expected) in cases {
-        let got = ciede2000(Lab { l: l1, a: a1, b: b1 }, Lab { l: l2, a: a2, b: b2 });
+        let got = ciede2000(
+            Lab {
+                l: l1,
+                a: a1,
+                b: b1,
+            },
+            Lab {
+                l: l2,
+                a: a2,
+                b: b2,
+            },
+        );
         assert!(
             close(got, expected, 1e-3),
             "dE2000 for {l1},{a1},{b1} vs {l2},{a2},{b2}: got {got}, expected {expected}"
@@ -75,7 +86,11 @@ fn inverting_a_matrix_twice_returns_the_original() {
     let inverse = invert(SRGB_TO_XYZ_D65).expect("sRGB primaries are invertible");
     let round_trip = invert(inverse).expect("and so is the inverse");
     assert!(matrices_close(round_trip, SRGB_TO_XYZ_D65, 1e-9));
-    assert!(matrices_close(mul(inverse, SRGB_TO_XYZ_D65), IDENTITY, 1e-9));
+    assert!(matrices_close(
+        mul(inverse, SRGB_TO_XYZ_D65),
+        IDENTITY,
+        1e-9
+    ));
 }
 
 #[test]
@@ -157,7 +172,11 @@ fn a_camera_matrix_takes_a_neutral_sensor_signal_to_neutral_light() {
 #[test]
 fn a_file_matrix_beats_the_bundled_table() {
     let embedded: Mat3 = [[2.0, 0.1, 0.0], [0.0, 1.8, 0.1], [0.1, 0.0, 1.6]];
-    let resolved = profile::resolve(BENCH_MAKE, &aura_raw::fixtures::bench_model(1), Some(embedded));
+    let resolved = profile::resolve(
+        BENCH_MAKE,
+        &aura_raw::fixtures::bench_model(1),
+        Some(embedded),
+    );
     assert_eq!(resolved.source, ProfileSource::EmbeddedDng);
     assert!(matrices_close(resolved.xyz_to_camera, embedded, 1e-12));
 }
@@ -252,7 +271,10 @@ fn the_sixteen_bit_linear_buffer_keeps_four_stops_of_headroom() {
     // somewhere to live instead of being clipped into the same value.
     let white = scene_to_linear_u16(1.0);
     let specular = scene_to_linear_u16(3.5);
-    assert!(white < specular, "headroom collapsed: {white} vs {specular}");
+    assert!(
+        white < specular,
+        "headroom collapsed: {white} vs {specular}"
+    );
     assert_eq!(scene_to_linear_u16(4.0), u16::MAX);
 
     for scene in [0.0f32, 0.05, 0.18, 0.5, 1.0, 2.0, 3.9] {
@@ -269,5 +291,8 @@ fn a_neutral_scene_value_stays_neutral_as_a_lab_colour() {
     let grey = [0.18, 0.18, 0.18];
     let xyz = apply(REC2020_TO_XYZ_D65, grey);
     let lab = xyz_d65_to_lab(xyz);
-    assert!(lab.a.abs() < 0.02 && lab.b.abs() < 0.02, "grey has a cast: {lab:?}");
+    assert!(
+        lab.a.abs() < 0.02 && lab.b.abs() < 0.02,
+        "grey has a cast: {lab:?}"
+    );
 }

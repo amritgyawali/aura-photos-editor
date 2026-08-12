@@ -104,9 +104,7 @@ fn extract(
     if let Some(preview) = meta.best_preview() {
         let stream = bytes
             .get(preview.offset..preview.offset.saturating_add(preview.len))
-            .ok_or_else(|| {
-                aura_core::errors::raw::corrupt("preview range is outside the file")
-            })?;
+            .ok_or_else(|| aura_core::errors::raw::corrupt("preview range is outside the file"))?;
         let image = codec::decode_jpeg(stream, limits)?;
         return Ok(Extracted {
             image,
@@ -131,7 +129,7 @@ fn extract(
         white: meta.white_level,
         white_balance: meta.as_shot_neutral,
     };
-    let half = demosaic::half_size(&mosaic, meta.cfa, levels);
+    let half = demosaic::bin(&mosaic, meta.cfa, levels);
     let quarter = demosaic::resize(&half, (half.width / 2).max(1), (half.height / 2).max(1));
 
     Ok(Extracted {
@@ -154,11 +152,12 @@ fn orient(image: Rgb8, exif: u16) -> Rgb8 {
     if orientation.is_identity() {
         return image;
     }
-    let (data, width, height) = apply_orientation(&image.data, image.width, image.height, 3, orientation);
+    let (rotated, width, height) =
+        apply_orientation(&image.data, image.width, image.height, 3, orientation);
     Rgb8 {
         width,
         height,
-        data,
+        data: rotated,
     }
 }
 

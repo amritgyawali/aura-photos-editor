@@ -144,7 +144,11 @@ pub fn sniff(bytes: &[u8]) -> RawFormat {
         return RawFormat::Dng;
     }
 
-    match file.text(tiff::tag::MAKE).unwrap_or_default().to_ascii_uppercase() {
+    match file
+        .text(tiff::tag::MAKE)
+        .unwrap_or_default()
+        .to_ascii_uppercase()
+    {
         make if make.starts_with("NIKON") => RawFormat::Nef,
         make if make.starts_with("SONY") => RawFormat::Arw,
         make if make.starts_with("OLYMPUS") || make.starts_with("OM ") => RawFormat::Orf,
@@ -167,11 +171,11 @@ pub enum MosaicSupport {
     NoMosaic,
 }
 
-/// Whether this build can decode a mosaic with the given TIFF compression code.
+/// Whether this build can decode a mosaic encoded the given way.
 #[must_use]
-pub const fn mosaic_support_for(compression: u16) -> MosaicSupport {
-    match compression {
-        tiff::compression::NONE | tiff::compression::JPEG => MosaicSupport::Decodable,
-        _ => MosaicSupport::CompressionUnsupported,
+pub const fn mosaic_support_for(scheme: &crate::meta::MosaicScheme) -> MosaicSupport {
+    match scheme {
+        crate::meta::MosaicScheme::Unsupported(_) => MosaicSupport::CompressionUnsupported,
+        _ => MosaicSupport::Decodable,
     }
 }

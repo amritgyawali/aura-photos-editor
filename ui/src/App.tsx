@@ -1,12 +1,14 @@
 import { useCallback, useEffect } from 'react';
 
 import { api, asIpcError, inTauri } from './ipc/client';
+import { CacheSettings } from './components/CacheSettings';
 import { Filmstrip } from './components/Filmstrip';
 import { ImportWizard } from './components/ImportWizard';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
 import { VirtualGrid } from './components/grid/VirtualGrid';
 import { PAGE_SIZE, useStore } from './state/store';
+import { useThumbnails } from './stores/thumbnailStore';
 
 export function App(): JSX.Element {
   const projects = useStore((state) => state.projects);
@@ -24,6 +26,11 @@ export function App(): JSX.Element {
   const setProblems = useStore((state) => state.setProblems);
   const setProgress = useStore((state) => state.setProgress);
   const setError = useStore((state) => state.setError);
+
+  const clearThumbnails = useThumbnails((state) => state.clear);
+  const prefetchThumbnails = useThumbnails((state) => state.requestMany);
+  const putThumbnail = useThumbnails((state) => state.put);
+  const markThumbnailFailed = useThumbnails((state) => state.markFailed);
 
   const refreshProjects = useCallback(async () => {
     if (!inTauri()) {
@@ -65,6 +72,52 @@ export function App(): JSX.Element {
   useEffect(() => {
     void refreshProjects();
   }, [refreshProjects]);
+
+  // A different wedding is a different set of pixels; keeping the old bitmaps
+  // would show the previous couple's frames for a few hundred milliseconds.
+  useEffect(() => {
+    clearThumbnails();
+  }, [activeProjectId, clearThumbnails]);
+
+  // Thumbnails for rows that exist but are not on screen yet are queued at
+  // batch priority, so scrolling lands on pixels that are already there.
+  useEffect(() => {
+    if (activeProjectId && rows.length > 0) {
+      void prefetchThumbnails(
+        activeProjectId,
+        rows.map((row) => row.id),
+      );
+    }
+  }, [activeProjectId, prefetchThumbnails, rows]);
+
+  useEffect(() => {
+    if (!inTauri()) {
+      return;
+    }
+    let dispose: (() => void) | null = null;
+    void api
+      .onPreviewEvent((event) => {
+        if (event.kind === 'failed') {
+          markThumbnailFailed(event.photoId, event.message);
+        } else if (event.kind === 'ready' && activeProjectId) {
+          void api
+            .getPreview({
+              projectId: activeProjectId,
+              photoId: event.photoId,
+              level: event.tier >= 2 ? 'proxy' : 'thumb',
+              priority: 'background',
+            })
+            .then((payload) => putThumbnail(event.photoId, payload))
+            .catch(() => undefined);
+        }
+      })
+      .then((unlisten) => {
+        dispose = unlisten;
+      });
+    return () => {
+      dispose?.();
+    };
+  }, [activeProjectId, markThumbnailFailed, putThumbnail]);
 
   useEffect(() => {
     if (activeProjectId) {
@@ -167,6 +220,7 @@ export function App(): JSX.Element {
           onCancel={() => void cancelImport()}
         />
         <ProblemsPanel problems={problems} />
+        <CacheSettings projectId={activeProjectId} onError={setError} />
       </aside>
 
       <main className="main">

@@ -92,12 +92,24 @@ pub struct Budget {
     pub max_ms_per_unit: u64,
 }
 
+/// One size ceiling. Bytes are budgets too: a preview cache that quietly grows
+/// fills the drive the wedding is being edited from, and peak resident memory
+/// decides whether a 16 GB laptop can proxy a whole wedding at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SizeBudget {
+    /// Maximum bytes.
+    pub max_bytes: u64,
+}
+
 /// The parsed contents of `perf/budgets.toml`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Budgets {
     /// Budgets keyed by stage name. `BTreeMap` so reports are ordered.
     #[serde(default)]
     pub stage: BTreeMap<String, Budget>,
+    /// Size ceilings keyed by name.
+    #[serde(default)]
+    pub size: BTreeMap<String, SizeBudget>,
 }
 
 impl Budgets {
@@ -137,6 +149,27 @@ impl Budgets {
                     measurement.stage, per_unit, budget.max_ms_per_unit
                 ));
             }
+        }
+        Ok(())
+    }
+
+    /// Check a measured size against its ceiling.
+    ///
+    /// Returns `Ok(())` when the name has no budget, for the same reason
+    /// [`Budgets::check`] does: an unmeasured thing is not a failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable breach description.
+    pub fn check_size(&self, name: &str, measured_bytes: u64) -> Result<(), String> {
+        let Some(budget) = self.size.get(name) else {
+            return Ok(());
+        };
+        if measured_bytes > budget.max_bytes {
+            return Err(format!(
+                "{name} used {measured_bytes} bytes, budget {} bytes",
+                budget.max_bytes
+            ));
         }
         Ok(())
     }

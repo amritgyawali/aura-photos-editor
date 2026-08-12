@@ -112,7 +112,7 @@ impl PreviewSource for CatalogSource {
             width_px: i64::from(record.width),
             height_px: i64::from(record.height),
             source: record.source.clone(),
-            bytes: record.bytes as i64,
+            bytes: i64::try_from(record.bytes).unwrap_or(i64::MAX),
             stage_version: i64::from(record.stage_version),
         };
         self.catalog

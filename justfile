@@ -26,15 +26,29 @@ test:
 
 # Budget benchmarks.
 bench:
-    cargo bench --package aura-ingest
+    cargo bench --package aura-ingest --bench ingest_throughput
+    cargo bench --package aura-preview --bench decode
 
 # Generate the three reference weddings into tests/fixtures/generated.
 fixtures:
     cargo run --release --package aura-cli -- fixtures --out tests/fixtures/generated
 
-# The phase gate: fixtures, import, re-import, digest comparison, integrity.
+# Generate the synthetic RAW bench set into tests/fixtures/raw.
+raw-fixtures:
+    cargo run --release --package aura-cli -- raw-fixtures --out tests/fixtures/raw
+
+# The phase 01 gate: fixtures, import, re-import, digest comparison, integrity.
 phase-01-verify:
     cargo run --release --package aura-cli -- verify --work target/phase01-verify
+
+# The phase 02 gate: RAW fixtures, import, both preview tiers, a cached second
+# pass, and the ColorChecker measurement on all eight bench bodies.
+phase-02-verify:
+    cargo run --release --package aura-cli -- verify --phase 02 --work target/phase02-verify
+
+# Build previews for an existing catalog, the way the app does.
+previews CATALOG PROJECT LEVEL="thumb":
+    cargo run --release --package aura-cli -- previews --catalog {{CATALOG}} --project {{PROJECT}} --level {{LEVEL}}
 
 # Re-lock the frozen contracts after an approved ADR.
 relock:

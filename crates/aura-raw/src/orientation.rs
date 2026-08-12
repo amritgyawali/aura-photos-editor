@@ -78,8 +78,14 @@ impl Orientation {
     }
 
     /// Where the source pixel for destination `(x, y)` lives.
+    ///
+    /// `width` and `height` are the **source** dimensions. For the four
+    /// axis-swapping orientations the destination is `height x width`, so the
+    /// destination `x` indexes rows of the source and the destination `y`
+    /// indexes its columns - which is exactly the mistake that produces a
+    /// subtraction overflow on a non-square image, and why every one of the
+    /// eight is covered by a test on a 2x3 frame.
     const fn source_of(self, x: u32, y: u32, width: u32, height: u32) -> (u32, u32) {
-        // `width` and `height` are the *source* dimensions.
         match self {
             Self::Normal => (x, y),
             Self::FlipHorizontal => (width - 1 - x, y),
@@ -87,7 +93,7 @@ impl Orientation {
             Self::FlipVertical => (x, height - 1 - y),
             Self::Transpose => (y, x),
             Self::Rotate90 => (y, height - 1 - x),
-            Self::Transverse => (height - 1 - y, width - 1 - x),
+            Self::Transverse => (width - 1 - y, height - 1 - x),
             Self::Rotate270 => (width - 1 - y, x),
         }
     }
@@ -101,18 +107,18 @@ impl Orientation {
 /// reshaping it would hide that.
 #[must_use]
 pub fn apply<T: Copy + Default>(
-    data: &[T],
+    samples: &[T],
     width: u32,
     height: u32,
     channels: usize,
     orientation: Orientation,
 ) -> (Vec<T>, u32, u32) {
     let expected = width as usize * height as usize * channels;
-    if data.len() != expected || width == 0 || height == 0 {
-        return (data.to_vec(), width, height);
+    if samples.len() != expected || width == 0 || height == 0 {
+        return (samples.to_vec(), width, height);
     }
     if orientation.is_identity() {
-        return (data.to_vec(), width, height);
+        return (samples.to_vec(), width, height);
     }
 
     let (out_width, out_height) = if orientation.swaps_axes() {
@@ -131,7 +137,7 @@ pub fn apply<T: Copy + Default>(
             let source = (sy as usize * width as usize + sx as usize) * channels;
             let target = (y as usize * out_width as usize + x as usize) * channels;
             for channel in 0..channels {
-                let value = data.get(source + channel).copied().unwrap_or_default();
+                let value = samples.get(source + channel).copied().unwrap_or_default();
                 if let Some(slot) = out.get_mut(target + channel) {
                     *slot = value;
                 }

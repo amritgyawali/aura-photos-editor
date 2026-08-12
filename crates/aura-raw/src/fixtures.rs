@@ -51,6 +51,11 @@ pub const WHITE_BALANCE: [f64; 3] = [2.0, 1.0, 1.5];
 pub const CHART_DESATURATION: f64 = 0.8;
 
 /// How the mosaic is stored in a generated fixture.
+///
+/// Each proprietary variant is written by the same encoder the corresponding
+/// decoder is tested against, which is what makes the round trip a real test:
+/// the encoder walks its format's state machine forwards, the decoder walks it
+/// backwards, and the two share nothing but the published constants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MosaicEncoding {
     /// Sixteen bits per sample, unpacked.
@@ -59,20 +64,68 @@ pub enum MosaicEncoding {
     Packed14,
     /// Lossless JPEG, the way DNG and CR2 store a mosaic.
     LosslessJpeg,
+    /// Sixteen bits per sample over a 6x6 X-Trans array, the way Adobe's
+    /// converter writes a Fujifilm file.
+    XTrans16,
+    /// Nikon's Huffman coding, with a decode table in a synthetic MakerNote.
+    NikonCompressed,
+    /// Sony's ARW2 block coding. Lossy by construction: samples are reduced to
+    /// eleven bits, so a fixture round trip is exact only to a multiple of
+    /// eight code values.
+    SonyArw2,
+    /// Olympus's adaptive predictive coding, in an ORF-magic container.
+    OlympusCompressed,
 }
 
 impl MosaicEncoding {
     const fn bits(self) -> u16 {
         match self {
-            Self::Unpacked16 => 16,
-            Self::Packed14 | Self::LosslessJpeg => 14,
+            Self::Unpacked16 | Self::XTrans16 => 16,
+            Self::Packed14
+            | Self::LosslessJpeg
+            | Self::NikonCompressed
+            | Self::SonyArw2
+            | Self::OlympusCompressed => 14,
         }
     }
 
     const fn tiff_compression(self) -> u16 {
         match self {
-            Self::Unpacked16 | Self::Packed14 => compression::NONE,
+            Self::Unpacked16 | Self::Packed14 | Self::XTrans16 | Self::OlympusCompressed => {
+                compression::NONE
+            }
             Self::LosslessJpeg => compression::JPEG,
+            Self::NikonCompressed => 34_713,
+            Self::SonyArw2 => 32_767,
+        }
+    }
+
+    /// The container magic to write. Olympus needs its own, because "this file
+    /// is uncompressed but too small to be" is only a safe inference for a
+    /// container that identifies itself as an ORF.
+    const fn container_magic(self) -> u16 {
+        match self {
+            Self::OlympusCompressed => 0x4F52,
+            _ => 42,
+        }
+    }
+
+    /// The colour filter array this encoding lays the chart out on.
+    #[must_use]
+    pub const fn cfa(self) -> crate::meta::CfaPattern {
+        match self {
+            Self::XTrans16 => crate::meta::CfaPattern::XTrans(crate::meta::XTRANS_DEFAULT),
+            _ => crate::meta::CfaPattern::Rggb,
+        }
+    }
+
+    /// The patch edge has to be a whole number of colour-array periods, or a
+    /// patch starts on a different phase from its neighbour and the binned
+    /// proxy mixes two patches in one pixel.
+    const fn edge_multiple(self) -> u32 {
+        match self {
+            Self::XTrans16 => 6,
+            _ => 2,
         }
     }
 
@@ -83,6 +136,10 @@ impl MosaicEncoding {
             Self::Unpacked16 => "unpacked16",
             Self::Packed14 => "packed14",
             Self::LosslessJpeg => "lossless",
+            Self::XTrans16 => "xtrans16",
+            Self::NikonCompressed => "nikon",
+            Self::SonyArw2 => "arw2",
+            Self::OlympusCompressed => "olympus",
         }
     }
 }
@@ -98,6 +155,12 @@ pub struct FixtureOptions {
     pub with_preview: bool,
     /// EXIF orientation to declare, 1 to 8.
     pub orientation: u16,
+    /// Sensor pixels along one edge of a patch.
+    ///
+    /// The default keeps fixtures small enough for CI. Raising it is how the
+    /// performance lane measures a realistic frame: 24 patches at 1024 px each
+    /// is a 6 x 4 chart of 6144 x 4096 photosites, which is a 25 MP sensor.
+    pub patch_edge: u32,
     /// Whether to write the colour matrix into the file.
     ///
     /// Turning it off is how the bundled-table and generic-fallback paths get
@@ -113,6 +176,7 @@ impl Default for FixtureOptions {
             encoding: MosaicEncoding::Unpacked16,
             with_preview: true,
             orientation: 1,
+            patch_edge: PATCH_EDGE,
             with_colour_matrix: true,
         }
     }
@@ -129,6 +193,8 @@ pub struct BenchFixture {
     pub height: u32,
     /// The body's model string, which is also its profile key.
     pub model: String,
+    /// Sensor pixels along one edge of a patch in this fixture.
+    pub patch_edge: u32,
     /// Linear sRGB of each patch, in reading order. The reference the golden
     /// suite compares a rendered proxy against.
     pub expected_linear_srgb: Vec<[f64; 3]>,
@@ -141,11 +207,8 @@ impl BenchFixture {
     pub fn patch_centre(&self, index: usize, divisor: u32) -> (u32, u32) {
         let column = index as u32 % CHART_COLUMNS;
         let row = index as u32 / CHART_COLUMNS;
-        let edge = PATCH_EDGE / divisor.max(1);
-        (
-            column * edge + edge / 2,
-            row * edge + edge / 2,
-        )
+        let edge = self.patch_edge / divisor.max(1);
+        (column * edge + edge / 2, row * edge + edge / 2)
     }
 
     /// How many patches the chart has.
@@ -201,9 +264,15 @@ pub fn chart_linear_srgb() -> Vec<[f64; 3]> {
         .iter()
         .map(|patch| {
             let linear = [
-                f64::from(srgb_decode((patch.first().copied().unwrap_or(0.0) / 255.0) as f32)),
-                f64::from(srgb_decode((patch.get(1).copied().unwrap_or(0.0) / 255.0) as f32)),
-                f64::from(srgb_decode((patch.get(2).copied().unwrap_or(0.0) / 255.0) as f32)),
+                f64::from(srgb_decode(
+                    (patch.first().copied().unwrap_or(0.0) / 255.0) as f32,
+                )),
+                f64::from(srgb_decode(
+                    (patch.get(1).copied().unwrap_or(0.0) / 255.0) as f32,
+                )),
+                f64::from(srgb_decode(
+                    (patch.get(2).copied().unwrap_or(0.0) / 255.0) as f32,
+                )),
             ];
             // Rec.709 luminance, the axis to pull towards.
             let luma = 0.212_672_9 * linear[0] + 0.715_152_2 * linear[1] + 0.072_175_0 * linear[2];
@@ -228,17 +297,36 @@ pub fn write_bench_raw(path: &Path, options: FixtureOptions) -> Result<BenchFixt
         .ok_or_else(|| format!("no bundled profile for bench body {model}"))?;
 
     let chart = chart_linear_srgb();
-    let width = CHART_COLUMNS * PATCH_EDGE;
-    let height = CHART_ROWS * PATCH_EDGE;
-    let mosaic = build_mosaic(&chart, profile.xyz_to_camera, width, height);
+    // A patch edge has to be a whole number of colour-array periods, or a
+    // binned demosaic straddles the boundary between two patches and every
+    // measurement is polluted.
+    let multiple = options.encoding.edge_multiple();
+    let edge = (options.patch_edge.max(multiple * 2) / multiple) * multiple;
+    let width = CHART_COLUMNS * edge;
+    let height = CHART_ROWS * edge;
+    let mosaic = build_mosaic(
+        &chart,
+        profile.xyz_to_camera,
+        width,
+        height,
+        edge,
+        options.encoding.cfa(),
+    );
 
     let preview = if options.with_preview {
-        Some(build_preview(&chart, width, height)?)
+        Some(build_preview(&chart, width, height, edge)?)
     } else {
         None
     };
 
-    let bytes = write_tiff(&mosaic, width, height, &profile, preview.as_deref(), options)?;
+    let bytes = write_tiff(
+        &mosaic,
+        width,
+        height,
+        &profile,
+        preview.as_deref(),
+        options,
+    );
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
     }
@@ -249,6 +337,7 @@ pub fn write_bench_raw(path: &Path, options: FixtureOptions) -> Result<BenchFixt
         width,
         height,
         model,
+        patch_edge: edge,
         expected_linear_srgb: chart,
     })
 }
@@ -271,8 +360,15 @@ pub fn write_bench_set(dir: &Path) -> Result<Vec<BenchFixture>, String> {
     Ok(out)
 }
 
-/// Raw code values of the chart, laid out as a Bayer RGGB mosaic.
-fn build_mosaic(chart: &[[f64; 3]], xyz_to_camera: Mat3, width: u32, height: u32) -> Vec<u16> {
+/// Raw code values of the chart, laid out on the given colour filter array.
+fn build_mosaic(
+    chart: &[[f64; 3]],
+    xyz_to_camera: Mat3,
+    width: u32,
+    height: u32,
+    edge: u32,
+    cfa: crate::meta::CfaPattern,
+) -> Vec<u16> {
     let adapt = bradford(WHITE_D65, WHITE_D50);
     let span = f64::from(WHITE_LEVEL - BLACK_LEVEL);
     let mut camera_patches = Vec::with_capacity(chart.len());
@@ -298,12 +394,11 @@ fn build_mosaic(chart: &[[f64; 3]], xyz_to_camera: Mat3, width: u32, height: u32
     let mut mosaic = vec![0u16; width as usize * height as usize];
     for y in 0..height {
         for x in 0..width {
-            let column = x / PATCH_EDGE;
-            let row = y / PATCH_EDGE;
+            let column = x / edge;
+            let row = y / edge;
             let index = (row * CHART_COLUMNS + column) as usize;
             let codes = camera_patches.get(index).copied().unwrap_or([0; 3]);
-            // RGGB: red on even rows and even columns.
-            let colour = usize::from(crate::meta::CfaPattern::Rggb.colour_at(x, y));
+            let colour = usize::from(cfa.colour_at(x, y));
             if let Some(slot) = mosaic.get_mut(y as usize * width as usize + x as usize) {
                 *slot = codes.get(colour).copied().unwrap_or(0);
             }
@@ -313,19 +408,24 @@ fn build_mosaic(chart: &[[f64; 3]], xyz_to_camera: Mat3, width: u32, height: u32
 }
 
 /// A small JPEG preview of the same chart, rendered the way a camera would.
-fn build_preview(chart: &[[f64; 3]], width: u32, height: u32) -> Result<Vec<u8>, String> {
+fn build_preview(
+    chart: &[[f64; 3]],
+    width: u32,
+    height: u32,
+    edge: u32,
+) -> Result<Vec<u8>, String> {
     let preview_width = width / 2;
     let preview_height = height / 2;
-    let mut data = Vec::with_capacity(preview_width as usize * preview_height as usize * 3);
+    let mut pixels = Vec::with_capacity(preview_width as usize * preview_height as usize * 3);
     for y in 0..preview_height {
         for x in 0..preview_width {
-            let column = x / (PATCH_EDGE / 2);
-            let row = y / (PATCH_EDGE / 2);
+            let column = x / (edge / 2);
+            let row = y / (edge / 2);
             let index = (row * CHART_COLUMNS + column) as usize;
             let patch = chart.get(index).copied().unwrap_or([0.0; 3]);
             for channel in 0..3usize {
                 let linear = patch.get(channel).copied().unwrap_or(0.0) as f32;
-                data.push(crate::colour::curve::quantise_u8(
+                pixels.push(crate::colour::curve::quantise_u8(
                     crate::colour::curve::srgb_encode(linear),
                 ));
             }
@@ -335,7 +435,7 @@ fn build_preview(chart: &[[f64; 3]], width: u32, height: u32) -> Result<Vec<u8>,
         &crate::codec::Rgb8 {
             width: preview_width,
             height: preview_height,
-            data,
+            data: pixels,
         },
         92,
     )
@@ -359,6 +459,19 @@ fn short(tag: u16, value: u16) -> WriteEntry {
         kind: 3,
         count: 1,
         payload: value.to_le_bytes().to_vec(),
+    }
+}
+
+fn shorts(tag: u16, values: &[u16]) -> WriteEntry {
+    let mut payload = Vec::with_capacity(values.len() * 2);
+    for value in values {
+        payload.extend_from_slice(&value.to_le_bytes());
+    }
+    WriteEntry {
+        tag,
+        kind: 3,
+        count: u32::try_from(values.len()).unwrap_or(0),
+        payload,
     }
 }
 
@@ -438,7 +551,11 @@ fn as_shot_neutral(tag: u16) -> WriteEntry {
     }
 }
 
-fn serialise_ifd(entries: &mut [WriteEntry], ifd_offset: u32, data_offset: u32) -> (Vec<u8>, Vec<u8>) {
+fn serialise_ifd(
+    entries: &mut [WriteEntry],
+    ifd_offset: u32,
+    data_offset: u32,
+) -> (Vec<u8>, Vec<u8>) {
     entries.sort_by_key(|entry| entry.tag);
     let _ = ifd_offset;
     let mut directory = Vec::with_capacity(2 + entries.len() * 12 + 4);
@@ -483,8 +600,8 @@ fn write_tiff(
     profile: &profile::CameraProfile,
     preview: Option<&[u8]>,
     options: FixtureOptions,
-) -> Result<Vec<u8>, String> {
-    let mosaic_bytes = encode_mosaic(mosaic, width, height, options.encoding)?;
+) -> Vec<u8> {
+    let mosaic_bytes = encode_mosaic(mosaic, width, height, options.encoding);
 
     // Two passes: build the entries so the directory sizes are known, compute
     // where the big payloads land, then rewrite the entries that point at them.
@@ -504,9 +621,16 @@ fn write_tiff(
             entries.push(long(tag::JPEG_INTERCHANGE_FORMAT, jpeg_at));
             entries.push(long(tag::JPEG_INTERCHANGE_LENGTH, jpeg_len));
         }
+        if options.encoding == MosaicEncoding::NikonCompressed {
+            entries.push(bytes_entry(tag::MAKER_NOTE, 7, &nikon_makernote()));
+        }
         entries
     };
     let build_ifd1 = |strip_at: u32, strip_len: u32| -> Vec<WriteEntry> {
+        let (repeat, pattern) = match options.encoding.cfa() {
+            crate::meta::CfaPattern::XTrans(layout) => (6u16, layout.to_vec()),
+            _ => (2u16, vec![0, 1, 1, 2]),
+        };
         vec![
             long(tag::NEW_SUBFILE_TYPE, 0),
             long(tag::IMAGE_WIDTH, width),
@@ -518,7 +642,8 @@ fn write_tiff(
             short(tag::SAMPLES_PER_PIXEL, 1),
             long(tag::ROWS_PER_STRIP, height),
             long(tag::STRIP_BYTE_COUNTS, strip_len),
-            bytes_entry(tag::CFA_PATTERN, 1, &[0, 1, 1, 2]),
+            shorts(tag::CFA_REPEAT_DIM, &[repeat, repeat]),
+            bytes_entry(tag::CFA_PATTERN, 1, &pattern),
             long(tag::BLACK_LEVEL, BLACK_LEVEL),
             long(tag::WHITE_LEVEL, WHITE_LEVEL),
         ]
@@ -549,7 +674,7 @@ fn write_tiff(
 
     let mut out = Vec::with_capacity(strip_at as usize + mosaic_bytes.len());
     out.extend_from_slice(b"II");
-    out.extend_from_slice(&42u16.to_le_bytes());
+    out.extend_from_slice(&options.encoding.container_magic().to_le_bytes());
     out.extend_from_slice(&ifd0_offset.to_le_bytes());
     out.extend_from_slice(&directory0);
     out.extend_from_slice(&directory1);
@@ -559,23 +684,11 @@ fn write_tiff(
         out.extend_from_slice(jpeg);
     }
     out.extend_from_slice(&mosaic_bytes);
-    Ok(out)
+    out
 }
 
-fn encode_mosaic(
-    mosaic: &[u16],
-    width: u32,
-    height: u32,
-    encoding: MosaicEncoding,
-) -> Result<Vec<u8>, String> {
+fn encode_mosaic(mosaic: &[u16], width: u32, height: u32, encoding: MosaicEncoding) -> Vec<u8> {
     match encoding {
-        MosaicEncoding::Unpacked16 => {
-            let mut out = Vec::with_capacity(mosaic.len() * 2);
-            for sample in mosaic {
-                out.extend_from_slice(&sample.to_le_bytes());
-            }
-            Ok(out)
-        }
         MosaicEncoding::Packed14 => {
             let row_bytes = (width as usize * 14).div_ceil(8);
             let mut out = vec![0u8; row_bytes * height as usize];
@@ -609,10 +722,74 @@ fn encode_mosaic(
                     }
                 }
             }
-            Ok(out)
+            out
         }
-        MosaicEncoding::LosslessJpeg => Ok(encode_lossless_jpeg(mosaic, width, height, 14)),
+        MosaicEncoding::Unpacked16 | MosaicEncoding::XTrans16 => {
+            let mut out = Vec::with_capacity(mosaic.len() * 2);
+            for sample in mosaic {
+                out.extend_from_slice(&sample.to_le_bytes());
+            }
+            out
+        }
+        MosaicEncoding::LosslessJpeg => encode_lossless_jpeg(mosaic, width, height, 14),
+        // Fourteen-bit lossless, which is what the version byte in the
+        // synthetic MakerNote below declares.
+        MosaicEncoding::NikonCompressed => {
+            crate::codecs::nikon::encode(mosaic, width as usize, height as usize, 5)
+        }
+        MosaicEncoding::SonyArw2 => {
+            crate::codecs::sony::encode(mosaic, width as usize, height as usize)
+        }
+        MosaicEncoding::OlympusCompressed => {
+            crate::codecs::olympus::encode(mosaic, width as usize, height as usize)
+        }
     }
+}
+
+/// What an ARW2 round trip returns for a given target sample.
+///
+/// Sony reduces every photosite to eleven bits, so a fixture cannot expect its
+/// own values back. This is the exact value the decoder will produce, which is
+/// what the round-trip test compares against.
+#[must_use]
+pub const fn arw2_quantise(sample: u16) -> u16 {
+    (sample >> 3) << 3
+}
+
+/// A synthetic Nikon MakerNote carrying a decode table.
+///
+/// Version `0x46` means "lossless, no linearisation curve", which is the one
+/// variant whose curve is the identity - so the fixture's code values survive
+/// the round trip unchanged and the colour chart stays a colour test rather
+/// than a test of a curve we made up.
+fn nikon_makernote() -> Vec<u8> {
+    let mut table = Vec::with_capacity(12);
+    table.push(0x46);
+    table.push(0x30);
+    // Four seed predictors, all zero: the encoder starts from zero too.
+    for _ in 0..4 {
+        table.extend_from_slice(&0u16.to_le_bytes());
+    }
+    // Curve size zero: there is no curve.
+    table.extend_from_slice(&0u16.to_le_bytes());
+
+    let mut out = Vec::with_capacity(64);
+    out.extend_from_slice(b"Nikon\0");
+    out.extend_from_slice(&[0x02, 0x10, 0x00, 0x00]);
+    // From here the block is a complete little-endian TIFF of its own, and
+    // every offset inside it is relative to this point.
+    out.extend_from_slice(b"II");
+    out.extend_from_slice(&42u16.to_le_bytes());
+    out.extend_from_slice(&8u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&0x0096u16.to_le_bytes());
+    out.extend_from_slice(&7u16.to_le_bytes());
+    out.extend_from_slice(&u32::try_from(table.len()).unwrap_or(0).to_le_bytes());
+    // Header (8) + entry count (2) + one entry (12) + next pointer (4) = 26.
+    out.extend_from_slice(&26u32.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&table);
+    out
 }
 
 // ---------------------------------------------------------------------------

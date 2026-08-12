@@ -61,16 +61,13 @@ impl CacheIndex {
     pub fn touch(&mut self, id: &str) -> bool {
         self.clock += 1;
         let clock = self.clock;
-        match self.entries.get_mut(id) {
-            Some(entry) => {
-                entry.last_used = clock;
-                self.hits += 1;
-                true
-            }
-            None => {
-                self.misses += 1;
-                false
-            }
+        if let Some(entry) = self.entries.get_mut(id) {
+            entry.last_used = clock;
+            self.hits += 1;
+            true
+        } else {
+            self.misses += 1;
+            false
         }
     }
 

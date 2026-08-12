@@ -30,10 +30,15 @@ pub mod contract {
     pub mod ipc;
 }
 
+pub mod preview_commands;
 pub mod state;
 
 pub use commands::{
     cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
     start_ingest,
+};
+pub use preview_commands::{
+    cancel_previews, get_preview, prefetch_previews, preview_problems, preview_stats, purge_cache,
+    set_cache_budget,
 };
 pub use state::AppState;

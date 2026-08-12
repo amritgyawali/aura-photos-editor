@@ -68,16 +68,22 @@ pub fn tier3(
                 let halo_height = (y + height + HALO).min(mosaic.height) - halo_y;
 
                 let region = demosaic::full_bilinear_region(
-                    &mosaic, meta.cfa, levels, halo_x, halo_y, halo_width, halo_height,
+                    &mosaic,
+                    meta.cfa,
+                    levels,
+                    halo_x,
+                    halo_y,
+                    halo_width,
+                    halo_height,
                 );
                 let working = demosaic::apply_matrix(&region, matrix);
 
-                let mut data = Vec::with_capacity((width as usize) * (height as usize) * 3);
+                let mut committed = Vec::with_capacity((width as usize) * (height as usize) * 3);
                 for local_y in 0..height {
                     for local_x in 0..width {
                         let pixel = working.pixel(x - halo_x + local_x, y - halo_y + local_y);
                         for channel in pixel {
-                            data.push(crate::colour::curve::scene_to_linear_u16(channel));
+                            committed.push(crate::colour::curve::scene_to_linear_u16(channel));
                         }
                     }
                 }
@@ -87,7 +93,7 @@ pub fn tier3(
                     y,
                     width,
                     height,
-                    data,
+                    data: committed,
                 });
             }
         }
@@ -131,19 +137,19 @@ pub fn tier3_whole(
         check_dimensions(mosaic.width, mosaic.height, 12, limits)?;
         let rgb = demosaic::full_bilinear(&mosaic, meta.cfa, levels);
         let working = demosaic::apply_matrix(&rgb, matrix);
-        let data = working
+        let samples = working
             .data
             .iter()
             .map(|value| crate::colour::curve::scene_to_linear_u16(*value))
             .collect::<Vec<u16>>();
-        Ok::<_, aura_core::AuraError>((working.width, working.height, data))
+        Ok::<_, aura_core::AuraError>((working.width, working.height, samples))
     });
 
-    let (width, height, data) = result?;
+    let (width, height, samples) = result?;
     Ok(PixelBuffer {
         width,
         height,
-        data: PixelData::Linear16(data),
+        data: PixelData::Linear16(samples),
         colour_space: ColourSpace::LinearRec2020,
         source: PixelSource::Demosaiced,
         decode_ms,

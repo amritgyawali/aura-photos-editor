@@ -29,15 +29,22 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("fixtures") => cmd_fixtures(&args),
+        Some("raw-fixtures") => cmd_raw_fixtures(&args),
         Some("import") => cmd_import(&args),
-        Some("verify") => cmd_verify(&args),
+        Some("previews") => cmd_previews(&args),
+        Some("verify") => match flag(&args, "--phase").as_deref() {
+            Some("02") => cmd_verify_previews(&args),
+            _ => cmd_verify(&args),
+        },
         Some("info") => cmd_info(&args),
         _ => {
             eprintln!(
                 "usage:\n  \
                  aura-cli fixtures --out DIR\n  \
+                 aura-cli raw-fixtures --out DIR\n  \
                  aura-cli import --catalog FILE --project NAME --root DIR [--root DIR]\n  \
-                 aura-cli verify --work DIR\n  \
+                 aura-cli previews --catalog FILE --project NAME [--level thumb|proxy]\n  \
+                 aura-cli verify [--phase 01|02] --work DIR\n  \
                  aura-cli info --catalog FILE"
             );
             ExitCode::FAILURE
@@ -310,6 +317,458 @@ fn cmd_verify(args: &[String]) -> ExitCode {
         eprintln!("phase-01 verify: {failures} failures");
         ExitCode::FAILURE
     }
+}
+
+// ---------------------------------------------------------------- PHASE 02
+
+/// Write the synthetic RAW bench set: eight bodies, three mosaic encodings, one
+/// deliberately corrupt file so the quarantine path is exercised too.
+fn cmd_raw_fixtures(args: &[String]) -> ExitCode {
+    let out = PathBuf::from(flag(args, "--out").unwrap_or_else(|| "tests/fixtures/raw".into()));
+    match write_raw_fixtures(&out) {
+        Ok(count) => {
+            println!("{count} synthetic RAW files written to {}", out.display());
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("raw fixtures failed: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// One file per bench body, cycling the mosaic encodings, plus a poison file.
+fn write_raw_fixtures(out: &Path) -> Result<usize, String> {
+    use aura_raw::fixtures::{write_bench_raw, FixtureOptions, MosaicEncoding};
+
+    std::fs::create_dir_all(out).map_err(|e| format!("create {}: {e}", out.display()))?;
+    // Every encoding the decoder claims to read, cycled across the bodies so a
+    // single gate run exercises all of them.
+    let encodings = [
+        MosaicEncoding::Unpacked16,
+        MosaicEncoding::Packed14,
+        MosaicEncoding::LosslessJpeg,
+        MosaicEncoding::NikonCompressed,
+        MosaicEncoding::SonyArw2,
+        MosaicEncoding::OlympusCompressed,
+        MosaicEncoding::XTrans16,
+    ];
+
+    let mut written = 0usize;
+    for body in 1..=8usize {
+        let encoding = encodings[(body - 1) % encodings.len()];
+        let options = FixtureOptions {
+            body,
+            encoding,
+            with_preview: true,
+            // A quarter of the set is rotated, so orientation is exercised by
+            // the gate rather than only by the unit tests.
+            orientation: if body % 4 == 0 { 6 } else { 1 },
+            with_colour_matrix: body % 3 != 0,
+            ..FixtureOptions::default()
+        };
+        let path = out.join(format!("bench-{body:02}-{}.dng", encoding.as_str()));
+        write_bench_raw(&path, options)?;
+        written += 1;
+    }
+
+    // A file with a RAW extension that is not a RAW at all. Every phase-02 run
+    // must set it aside and finish the rest.
+    let poison = out.join("poison.dng");
+    std::fs::write(&poison, b"AURA phase-02 poison fixture: not a photograph")
+        .map_err(|e| format!("write {}: {e}", poison.display()))?;
+    written += 1;
+
+    Ok(written)
+}
+
+/// Build previews for every photograph in a project.
+fn cmd_previews(args: &[String]) -> ExitCode {
+    let Some(catalog_path) = flag(args, "--catalog").map(PathBuf::from) else {
+        eprintln!("--catalog is required");
+        return ExitCode::FAILURE;
+    };
+    let name = flag(args, "--project").unwrap_or_else(|| "Untitled wedding".to_string());
+    let level = match flag(args, "--level").as_deref() {
+        Some("proxy") => aura_raw::PixelLevel::Proxy2048,
+        _ => aura_raw::PixelLevel::Thumb(512),
+    };
+
+    let (catalog, clock) = match open_catalog(&catalog_path) {
+        Ok(pair) => pair,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let project_id = match ensure_project(&catalog, clock.as_ref(), &name) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let cache_root = catalog_path
+        .parent()
+        .map_or_else(|| PathBuf::from("cache"), |parent| parent.join("cache"));
+    match build_previews(
+        std::sync::Arc::new(catalog),
+        &project_id.to_db(),
+        &cache_root,
+        level,
+    ) {
+        Ok(report) => {
+            println!("built    {}", report.built);
+            println!("failed   {}", report.failed);
+            println!(
+                "cache    {} bytes, {} entries",
+                report.bytes, report.entries
+            );
+            println!("hit rate {:.1}%", report.hit_rate * 100.0);
+            println!("elapsed  {} ms", report.elapsed_ms);
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+struct PreviewReport {
+    built: usize,
+    failed: usize,
+    bytes: u64,
+    entries: u64,
+    hit_rate: f64,
+    elapsed_ms: u64,
+    misses: u64,
+    problems: Vec<(String, String)>,
+}
+
+fn build_previews(
+    catalog: std::sync::Arc<Catalog>,
+    project_id: &str,
+    cache_root: &Path,
+    level: aura_raw::PixelLevel,
+) -> Result<PreviewReport, String> {
+    use aura_preview::contract::service::PreviewService;
+    use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews, Priority};
+
+    let started = catalog.clock().monotonic_ms();
+    let source: std::sync::Arc<dyn PreviewSource> = std::sync::Arc::new(CatalogSource::new(
+        std::sync::Arc::clone(&catalog),
+        project_id.to_string(),
+    ));
+    let service = Previews::open(
+        cache_root,
+        aura_cache::CacheBudget::default(),
+        source,
+        PreviewConfig::default(),
+    )
+    .map_err(|e| format!("[{}] {}", e.code, e.detail))?;
+
+    // Hit and miss counters are lifetime figures that survive in the on-disk
+    // index, so a pass is measured as a delta rather than as an absolute.
+    let before = service.cache_stats();
+
+    let photos = catalog
+        .read(|conn| repo::list_photos(conn, project_id, 0, 100_000, repo::PhotoOrder::Timeline))
+        .map_err(|e| format!("[{}] {}", e.code, e.detail))?;
+
+    let mut built = 0usize;
+    let mut failed = 0usize;
+    for row in photos {
+        let Ok(id) = aura_core::PhotoId::from_db(&row.id) else {
+            continue;
+        };
+        match service.get(id, level, Priority::AiBatch) {
+            Ok(_) => built += 1,
+            Err(error) => {
+                failed += 1;
+                tracing::warn!(target: "previews", code = error.code.0, detail = error.detail, "decode failed");
+            }
+        }
+    }
+
+    let stats = service.cache_stats();
+    let hits = stats.hits.saturating_sub(before.hits);
+    let misses = stats.misses.saturating_sub(before.misses);
+    #[allow(clippy::cast_precision_loss)]
+    let hit_rate = if hits + misses == 0 {
+        0.0
+    } else {
+        hits as f64 / (hits + misses) as f64
+    };
+    Ok(PreviewReport {
+        built,
+        failed,
+        bytes: stats.bytes_used,
+        entries: stats.entries,
+        hit_rate,
+        elapsed_ms: catalog.clock().monotonic_ms().saturating_sub(started),
+        misses,
+        problems: service
+            .quarantine()
+            .into_iter()
+            .map(|(id, reason)| (id.to_db(), reason))
+            .collect(),
+    })
+}
+
+/// The phase 02 gate: generate RAW fixtures, import them, build both cached
+/// tiers, prove the second pass costs nothing, and measure the colour chart.
+#[allow(clippy::too_many_lines)]
+fn cmd_verify_previews(args: &[String]) -> ExitCode {
+    let work =
+        PathBuf::from(flag(args, "--work").unwrap_or_else(|| "target/phase02-verify".into()));
+    if let Err(e) = std::fs::create_dir_all(&work) {
+        eprintln!("cannot create {}: {e}", work.display());
+        return ExitCode::FAILURE;
+    }
+
+    let fixture_dir = work.join("raw");
+    let _ = std::fs::remove_dir_all(&fixture_dir);
+    let fixture_count = match write_raw_fixtures(&fixture_dir) {
+        Ok(count) => count,
+        Err(e) => {
+            eprintln!("raw fixtures failed: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let catalog_path = work.join("phase02.sqlite");
+    let _ = std::fs::remove_file(&catalog_path);
+    let cache_root = work.join("cache");
+    let _ = std::fs::remove_dir_all(&cache_root);
+
+    let (catalog, clock) = match open_catalog(&catalog_path) {
+        Ok(pair) => pair,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let project_id = match ensure_project(&catalog, clock.as_ref(), "phase-02") {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let plan = ImportPlan {
+        import_id: ImportId::new(),
+        project_id,
+        roots: vec![fixture_dir.clone()],
+        mode: ImportMode::Reference,
+        extensions: Vec::new(),
+        extract_embedded_previews: true,
+        settle_window_ms: 0,
+    };
+    let import = match aura_ingest::run(&catalog, &plan, &CancelToken::new(), &NullProgress) {
+        Ok(report) => report,
+        Err(e) => {
+            eprintln!("import failed: [{}] {}", e.code, e.detail);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let catalog = std::sync::Arc::new(catalog);
+    let project = project_id.to_db();
+    let mut failures = 0usize;
+
+    println!(
+        "fixtures: {fixture_count} files, imported {}",
+        import.files_imported
+    );
+
+    // Pass one: build both tiers.
+    let mut first_pass_ms = 0u64;
+    for level in [
+        aura_raw::PixelLevel::Thumb(512),
+        aura_raw::PixelLevel::Proxy2048,
+    ] {
+        match build_previews(
+            std::sync::Arc::clone(&catalog),
+            &project,
+            &cache_root,
+            level,
+        ) {
+            Ok(report) => {
+                first_pass_ms += report.elapsed_ms;
+                println!(
+                    "tier {}: built={} failed={} cache={} bytes elapsed={} ms",
+                    level.tier(),
+                    report.built,
+                    report.failed,
+                    report.bytes,
+                    report.elapsed_ms
+                );
+                if report.failed != 1 {
+                    eprintln!(
+                        "expected exactly one undecodable fixture, saw {}",
+                        report.failed
+                    );
+                    failures += 1;
+                }
+                for (photo, reason) in &report.problems {
+                    println!("  quarantined {photo}: {reason}");
+                }
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                failures += 1;
+            }
+        }
+    }
+
+    // Pass two: everything must come from the cache.
+    match build_previews(
+        std::sync::Arc::clone(&catalog),
+        &project,
+        &cache_root,
+        aura_raw::PixelLevel::Thumb(512),
+    ) {
+        Ok(report) => {
+            println!(
+                "second pass: built={} hit_rate={:.1}% elapsed={} ms",
+                report.built,
+                report.hit_rate * 100.0,
+                report.elapsed_ms
+            );
+            // One miss is expected: the poison file has no cache entry to hit.
+            if report.misses > 1 {
+                eprintln!("second pass missed the cache {} times", report.misses);
+                failures += 1;
+            }
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            failures += 1;
+        }
+    }
+
+    // Every photograph that decoded must now have both preview rows.
+    for tier in [1i64, 2] {
+        let missing = catalog
+            .read(|conn| repo::photos_without_preview(conn, &project, tier, 1_000))
+            .unwrap_or_default();
+        // The poison file still becomes a photo row, so exactly one is expected.
+        if missing.len() > 1 {
+            eprintln!("{} photographs have no tier {tier} preview", missing.len());
+            failures += 1;
+        }
+        let built = catalog
+            .read(|conn| repo::count_previews(conn, &project, tier))
+            .unwrap_or(-1);
+        println!("tier {tier} preview rows: {built}");
+    }
+
+    // Colour: the chart must survive the pipeline on every bench body.
+    match verify_colour(&fixture_dir) {
+        Ok(worst) => println!("colour: worst mean dE2000 {worst:.3} across 8 bodies"),
+        Err(e) => {
+            eprintln!("colour check failed: {e}");
+            failures += 1;
+        }
+    }
+
+    println!("first pass total: {first_pass_ms} ms");
+
+    if failures == 0 {
+        println!("phase-02 verify: all fixtures clean");
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("phase-02 verify: {failures} failures");
+        ExitCode::FAILURE
+    }
+}
+
+/// Render each bench body's chart and compare it with what was written.
+fn verify_colour(fixture_dir: &Path) -> Result<f64, String> {
+    use aura_raw::colour::de2000::{summarise, xyz_d65_to_lab};
+    use aura_raw::colour::matrix::{apply, SRGB_TO_XYZ_D65};
+    use aura_raw::colour::working_space::working_to_xyz;
+    use aura_raw::fixtures::{write_bench_raw, FixtureOptions, MosaicEncoding};
+
+    let clock = aura_core::clock::SystemClock::default();
+    // Every encoding the decoder claims to read, cycled across the bodies so a
+    // single gate run exercises all of them.
+    let encodings = [
+        MosaicEncoding::Unpacked16,
+        MosaicEncoding::Packed14,
+        MosaicEncoding::LosslessJpeg,
+        MosaicEncoding::NikonCompressed,
+        MosaicEncoding::SonyArw2,
+        MosaicEncoding::OlympusCompressed,
+        MosaicEncoding::XTrans16,
+    ];
+    let mut worst = 0.0f64;
+
+    for body in 1..=8usize {
+        let encoding = encodings[(body - 1) % encodings.len()];
+        let path = fixture_dir.join(format!("colour-{body:02}.dng"));
+        let fixture = write_bench_raw(
+            &path,
+            FixtureOptions {
+                body,
+                encoding,
+                ..FixtureOptions::default()
+            },
+        )?;
+        let bytes = std::fs::read(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        let meta = aura_raw::read_meta(&bytes, &path).map_err(|e| e.detail.clone())?;
+        let rendered = aura_raw::proxy::tier2(
+            &bytes,
+            &meta,
+            aura_raw::DecodeLimits::tier2(),
+            &clock,
+            None,
+            &path,
+        )
+        .map_err(|e| e.detail.clone())?;
+
+        let samples = rendered
+            .pair
+            .linear
+            .as_linear16()
+            .ok_or_else(|| "the linear buffer is missing".to_string())?;
+        let width = rendered.pair.linear.width as usize;
+
+        // A Bayer proxy is half the sensor; an X-Trans proxy is a third.
+        let divisor = encoding.cfa().block();
+        let measured: Vec<_> = (0..fixture.patch_count())
+            .map(|index| {
+                let (x, y) = fixture.patch_centre(index, divisor);
+                let at = (y as usize * width + x as usize) * 3;
+                let channel = |offset: usize| {
+                    f64::from(aura_raw::colour::curve::linear_u16_to_scene(
+                        samples.get(at + offset).copied().unwrap_or(0),
+                    ))
+                };
+                xyz_d65_to_lab(working_to_xyz([channel(0), channel(1), channel(2)]))
+            })
+            .collect();
+        let expected: Vec<_> = fixture
+            .expected_linear_srgb
+            .iter()
+            .map(|patch| xyz_d65_to_lab(apply(SRGB_TO_XYZ_D65, *patch)))
+            .collect();
+
+        let delta = summarise(&expected, &measured);
+        worst = worst.max(delta.mean);
+        if delta.mean > 2.0 {
+            return Err(format!(
+                "{}: mean dE2000 {:.3} exceeds the 2.0 tolerance",
+                fixture.model, delta.mean
+            ));
+        }
+        // The colour fixtures are working files, not part of the imported set.
+        let _ = std::fs::remove_file(&path);
+    }
+    Ok(worst)
 }
 
 fn cmd_info(args: &[String]) -> ExitCode {

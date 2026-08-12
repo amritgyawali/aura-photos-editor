@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ImageRowLite } from '../../ipc/types';
 import { useStore } from '../../state/store';
+import { useThumbnails } from '../../stores/thumbnailStore';
 import { Cell } from './Cell';
 
 export type VirtualGridProps = {
@@ -30,6 +31,9 @@ export function VirtualGrid({
   const [viewportHeight, setViewportHeight] = useState(600);
   const [viewportWidth, setViewportWidth] = useState(960);
 
+  const activeProjectId = useStore((state) => state.activeProjectId);
+  const releaseThumbnails = useThumbnails((state) => state.release);
+  const previouslyVisible = useRef<string[]>([]);
   const selection = useStore((state) => state.selection);
   const focusedIndex = useStore((state) => state.focusedIndex);
   const focusIndex = useStore((state) => state.focusIndex);
@@ -73,6 +77,17 @@ export function VirtualGrid({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  // Cells that have left the window are not merely lower priority: their decode
+  // is abandoned, so the queue never fills with frames nobody is looking at.
+  useEffect(() => {
+    const nowVisible = visible.map((row) => row.id);
+    const gone = previouslyVisible.current.filter((id) => !nowVisible.includes(id));
+    previouslyVisible.current = nowVisible;
+    if (activeProjectId && gone.length > 0) {
+      void releaseThumbnails(activeProjectId, gone);
+    }
+  }, [activeProjectId, releaseThumbnails, visible]);
 
   const handleScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
