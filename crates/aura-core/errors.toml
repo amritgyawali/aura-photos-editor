@@ -262,3 +262,159 @@ summary      = "Task exceeded its retry budget"
 user_message = "One step kept failing and was set aside so the rest of the import could finish."
 runbook      = "docs/runbooks/AURA-JOB-7003.md"
 introduced   = "PHASE-01"
+
+# Phase 03. GPU 4000-4999 is the hardware and execution-provider domain;
+# ML 5000-5999 is the model registry and the inference runtime.
+
+[[error]]
+code         = "AURA-GPU-4001"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "No hardware accelerator available; the processor path was selected"
+user_message = "AURA did not find a graphics card it can use for AI, so it will use the processor instead. Everything still works, just more slowly."
+runbook      = "docs/runbooks/AURA-GPU-4001.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-GPU-4002"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Execution provider failed its check and was set aside for this machine"
+user_message = "One graphics path gave wrong or unstable results on this computer, so AURA switched to the next one. You can see which is in use under Settings, then Hardware."
+runbook      = "docs/runbooks/AURA-GPU-4002.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-GPU-4003"
+severity     = "warning"
+recovery     = "retry"
+summary      = "Accelerator memory budget reached; the batch size was reduced"
+user_message = "AURA ran short of graphics memory and is working in smaller batches. The job continues and the results are unchanged."
+runbook      = "docs/runbooks/AURA-GPU-4003.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-GPU-4004"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Hardware probe failed; a conservative plan was used"
+user_message = "AURA could not finish measuring this computer, so it chose safe settings. You can re-run the check under Settings, then Hardware."
+runbook      = "docs/runbooks/AURA-GPU-4004.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-GPU-4005"
+severity     = "warning"
+recovery     = "retry"
+summary      = "Saved hardware plan was unreadable and the machine was measured again"
+user_message = "The saved hardware settings could not be read, so AURA measured this computer again. Nothing else was affected."
+runbook      = "docs/runbooks/AURA-GPU-4005.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5001"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "Requested model is not in the pinned registry"
+user_message = "This feature needs an AI model that is not installed. Install the model pack from Settings, then try again."
+runbook      = "docs/runbooks/AURA-ML-5001.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5002"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "Model manifest signature did not verify"
+user_message = "The AI model files did not pass their safety check, so AURA refused to load them. Re-download the model pack from Settings."
+runbook      = "docs/runbooks/AURA-ML-5002.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5003"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Model file digest did not match the manifest"
+user_message = "One AI model file was damaged. AURA kept using the version that already worked and left the damaged one unused."
+runbook      = "docs/runbooks/AURA-ML-5003.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5004"
+severity     = "warning"
+recovery     = "retry"
+summary      = "Model transfer was incomplete and will be resumed"
+user_message = "An AI model was only partly copied. AURA will carry on from where it stopped; nothing already installed was touched."
+runbook      = "docs/runbooks/AURA-ML-5004.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5005"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "Model has no model card"
+user_message = "An AI model arrived without its documentation, so AURA refused to use it. Re-install the model pack from Settings."
+runbook      = "docs/runbooks/AURA-ML-5005.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5006"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Model uses an operation this build cannot run"
+user_message = "One AI model needs a capability this version of AURA does not have. That step was skipped and the rest of the work continues."
+runbook      = "docs/runbooks/AURA-ML-5006.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5007"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "Input tensor shape does not match the model contract"
+user_message = "One photo could not be prepared for the AI step and was set aside. The rest of the batch continues."
+runbook      = "docs/runbooks/AURA-ML-5007.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5008"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "Inference exceeded its deadline"
+user_message = "One AI step took longer than allowed and was stopped. AURA will try it again later in the run."
+runbook      = "docs/runbooks/AURA-ML-5008.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5009"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "New model failed its first real use and the previous version was restored"
+user_message = "A newly installed AI model did not work, so AURA went back to the version that did. Nothing in your catalog was affected."
+runbook      = "docs/runbooks/AURA-ML-5009.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5010"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Model file could not be parsed"
+user_message = "One AI model file could not be read. AURA kept the version that already worked and reported the problem."
+runbook      = "docs/runbooks/AURA-ML-5010.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5011"
+severity     = "warning"
+recovery     = "halt"
+summary      = "Inference cancelled by the photographer"
+user_message = "The AI step was stopped. Everything finished so far has been saved."
+runbook      = "docs/runbooks/AURA-ML-5011.md"
+introduced   = "PHASE-03"
+
+[[error]]
+code         = "AURA-ML-5012"
+severity     = "warning"
+recovery     = "retry"
+summary      = "Delta patch did not apply cleanly"
+user_message = "A small model update could not be applied, so AURA will fetch the whole model instead. The version you have keeps working."
+runbook      = "docs/runbooks/AURA-ML-5012.md"
+introduced   = "PHASE-03"

@@ -30,12 +30,17 @@ pub mod contract {
     pub mod ipc;
 }
 
+pub mod infer_commands;
 pub mod preview_commands;
 pub mod state;
 
 pub use commands::{
     cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
     start_ingest,
+};
+pub use infer_commands::{
+    hardware_plan, infer_stats, list_models, recheck_hardware, set_execution_provider,
+    warmup_models,
 };
 pub use preview_commands::{
     cancel_previews, get_preview, prefetch_previews, preview_problems, preview_stats, purge_cache,

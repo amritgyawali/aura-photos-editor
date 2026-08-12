@@ -6,6 +6,9 @@
 //!   * `contracts [--check]` - hash every frozen contract file and compare with `contracts.lock`.
 //!   * `fixtures`            - generate the synthetic reference weddings (T16).
 //!   * `bench <stage>`       - run the budget benchmarks and write `perf/results` (T18).
+//!   * `models [--generate]` - generate and sign the pinned model set, or check it (phase 03).
+
+mod models;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -27,9 +30,11 @@ fn main() -> ExitCode {
         Some("contracts") => contracts(args.iter().any(|a| a == "--check")),
         Some("fixtures") => fixtures(&args[1..]),
         Some("bench") => bench(&args[1..]),
+        Some("models") => models::run(&args[1..]),
         _ => {
             eprintln!(
-                "usage: cargo xtask [contracts [--check] | fixtures [--out DIR] | bench <stage>]"
+                "usage: cargo xtask [contracts [--check] | fixtures [--out DIR] | \
+                 bench <stage> | models [--generate]]"
             );
             ExitCode::FAILURE
         }

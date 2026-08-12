@@ -34,6 +34,11 @@ jobs:
       - name: frozen contracts
         run: cargo run --package xtask -- contracts --check
 
+      # Article VI rule M1: no model card, no model. The same check refuses an
+      # unsigned manifest and a file whose digest moved.
+      - name: signed models and model cards
+        run: cargo run --package xtask -- models
+
   # Lane 2 - the test matrix. Windows first: it is where photographers are.
   test:
     name: tests on ${{ matrix.os }}
@@ -58,6 +63,9 @@ jobs:
 
       - name: phase 02 verify - previews, cache and colour on the RAW fixtures
         run: cargo run --release --package aura-cli -- verify --phase 02 --work target/phase02-verify
+
+      - name: phase 03 verify - runtime, integrity, memory, cancellation, rollback
+        run: cargo run --release --package aura-cli -- verify --phase 03 --work target/phase03-verify
 
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:

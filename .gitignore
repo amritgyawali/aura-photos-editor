@@ -10,3 +10,5 @@
 .DS_Store
 .env
 *.aura-license
+__pycache__/
+*.pyc

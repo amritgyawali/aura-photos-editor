@@ -3,6 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { api, asIpcError, inTauri } from './ipc/client';
 import { CacheSettings } from './components/CacheSettings';
 import { Filmstrip } from './components/Filmstrip';
+import { HardwarePanel } from './components/HardwarePanel';
 import { ImportWizard } from './components/ImportWizard';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
@@ -221,6 +222,7 @@ export function App(): JSX.Element {
         />
         <ProblemsPanel problems={problems} />
         <CacheSettings projectId={activeProjectId} onError={setError} />
+        <HardwarePanel onError={setError} />
       </aside>
 
       <main className="main">

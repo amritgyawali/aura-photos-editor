@@ -7,10 +7,13 @@ members = [
   "crates/aura-raw",
   "crates/aura-cache",
   "crates/aura-preview",
+  "crates/aura-infer",
+  "crates/aura-models",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",
   "crates/aura-cli",
+  "tools/model-sign",
   "xtask",
 ]
 
@@ -37,6 +40,13 @@ tokio       = { version = "1", features = ["rt", "rt-multi-thread", "macros", "s
 rusqlite    = { version = "0.32", features = ["bundled", "backup", "functions", "limits"] }
 uuid        = { version = "1", features = ["v4", "v7", "serde"] }
 blake3      = "1"
+
+# Model integrity (phase 03). sha256 rather than blake3 because the `models.lock`
+# schema in the phase document pins sha256, and ed25519 for the detached signature
+# over that file. Both are pure Rust and inside the deny.toml licence allow list;
+# see docs/adr/ADR-0007-inference-runtime.md.
+sha2           = "0.10"
+ed25519-dalek  = { version = "2", default-features = false, features = ["std"] }
 time        = { version = "0.3", features = ["formatting", "parsing", "macros", "serde-well-known"] }
 
 # Filesystem

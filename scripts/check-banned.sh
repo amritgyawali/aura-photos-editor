@@ -36,6 +36,18 @@ while IFS= read -r file; do
   fi
 done < <(find crates -name '*.rs' -type f)
 
+# Phase 03: nothing outside aura-infer may link ONNX Runtime directly.
+# Acceptance criterion 7 and section 12 of PHASE-03: one crate owns the runtime,
+# or twenty-five models become twenty-five different answers to "why is it slow
+# on this laptop". The lint is here rather than in review because a direct `ort::`
+# call is exactly the shortcut a hurried change makes.
+ort_users=$(grep -rlnE '(^|[^a-zA-Z_])ort::|onnxruntime_sys|use ort\b' crates --include='*.rs' | grep -v '^crates/aura-infer/' || true)
+if [ -n "$ort_users" ]; then
+  echo "BANNED: ONNX Runtime used outside crates/aura-infer"
+  echo "$ort_users"
+  fail=1
+fi
+
 # TypeScript: no any, no non-null assertion on IPC boundaries
 if [ -d ui/src ]; then
   if matches=$(grep -rnE ':\s*any\b|as any' ui/src --include='*.ts' --include='*.tsx' || true); then

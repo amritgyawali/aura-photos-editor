@@ -16,6 +16,8 @@ use aura_core::{ImportId, ProjectId};
 use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 use aura_ingest::fixtures;
 
+mod phase03;
+
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() -> ExitCode {
@@ -34,8 +36,10 @@ fn main() -> ExitCode {
         Some("previews") => cmd_previews(&args),
         Some("verify") => match flag(&args, "--phase").as_deref() {
             Some("02") => cmd_verify_previews(&args),
+            Some("03") => phase03::verify(&args),
             _ => cmd_verify(&args),
         },
+        Some("infer") => phase03::infer(&args),
         Some("info") => cmd_info(&args),
         _ => {
             eprintln!(
@@ -44,7 +48,8 @@ fn main() -> ExitCode {
                  aura-cli raw-fixtures --out DIR\n  \
                  aura-cli import --catalog FILE --project NAME --root DIR [--root DIR]\n  \
                  aura-cli previews --catalog FILE --project NAME [--level thumb|proxy]\n  \
-                 aura-cli verify [--phase 01|02] --work DIR\n  \
+                 aura-cli verify [--phase 01|02|03] --work DIR\n  \
+                 aura-cli infer --model FILE [--precision fp32|fp16|int8] [--batch N]\n  \
                  aura-cli info --catalog FILE"
             );
             ExitCode::FAILURE
