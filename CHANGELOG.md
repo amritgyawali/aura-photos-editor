@@ -2,6 +2,83 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 05 - Perceptual embeddings and the wedding similarity index
+
+Every image gets a compact perceptual embedding plus a fast similarity index, so
+the app can answer "what looks like this?" across a wedding in milliseconds. It is
+the shared vector substrate that scene clustering, burst grouping, duplicate
+detection, people grouping, reference-frame selection and consistency checks all
+reuse - computed once, in one pass.
+
+### Added
+
+- `aura-index`: the frozen `SimilarityIndex` contract and a deterministic HNSW
+  graph behind it - `M = 32`, `ef_construction = 200`, `ef_search = 64`, cosine
+  distance on L2-normalised fp16 vectors. Levels come from `blake3(image_id)`
+  rather than a generator, every tie breaks by `timeline_ts` then `image_id`, and
+  the parallel build is batched rather than concurrent, so two machines with
+  different core counts produce byte-identical graphs.
+- Filtered queries: k-nearest neighbours, radius search, time-windowed search as a
+  pre-filter over a sorted timeline (not a post-filter, which is what keeps a burst
+  query under a millisecond), camera restriction, exclusion sets, medoids and
+  centroids.
+- `aura-vision`: one decode, five results. The embedding, a 64-bit difference hash,
+  an 8x8x8 HSV histogram, six luminance statistics and an edge-energy summary all
+  come out of the same buffer, which is then dropped - a 4,000-image wedding is
+  never 4,000 resident proxies.
+- A persisted graph snapshot with six named refusals - missing, wrong magic, wrong
+  format, wrong graph parameters, wrong model or preprocessing version, failed
+  digest - each of which is a warning and a rebuild rather than a failure to open
+  the project. A second open of a 4,000-image wedding is a 23 ms read.
+- `wedding_embedding` 1.0.0, signed into `models.lock` with a model card. **It is a
+  placeholder backbone**: there is no labelled wedding data in this repository and
+  no GPU backend, so a ViT-B/16 with a contrastive head cannot be trained or run
+  here. Everything around it is real. See ADR-0011 section 3, and condition C10 in
+  the phase 05 exit report.
+- `ml/models/embed/`: the dataset specification as executable code - wedding-level
+  splits, a cross-tradition holdout, positive and hard-negative mining, and an
+  augmentation policy that *cannot express* a flip or a heavy crop - plus the
+  contrastive loss, the training schedule, the four evaluation gates and an
+  exporter that reproduces the shipped model byte for byte.
+- Migration 5: `embeddings` and `descriptors`, 1,623 bytes per image against a
+  1.6 KB budget, reversible in three statements.
+- The similarity IPC surface (ADR-0012): five commands, five DTOs and three
+  telemetry events, plus `ui/src/components/SimilarPanel.tsx` - the debug "find
+  similar" panel section 8 calls "invaluable for later phases". No command returns a
+  vector, and a test enforces that.
+- `aura-cli verify --phase 05` and `just phase-05-verify`: two cards of RAW
+  fixtures, a cancelled pass that does nothing, a real pass, the index, a
+  five-millisecond query, a time window, a camera filter, the snapshot and its
+  refusals, an incremental second card, and determinism through the whole path.
+- Four error codes with runbooks: `AURA-ML-5013` (unusable vector),
+  `AURA-ML-5014` (snapshot rejected), `AURA-ML-5015` (embedding version drift),
+  `AURA-ML-5016` (project past the documented in-memory ceiling).
+
+### Changed
+
+- `cosine_distance` accumulates into eight fixed lanes rather than one, so the
+  compiler can vectorise it. With borrowed neighbour lists in place of cloned ones
+  this took a 4,000-vector build from 13.3 s to 2.74 s. The lane count is fixed, so
+  determinism is unaffected.
+- `just budgets` and the CI budget lane run with `--test-threads=1`. A budget suite
+  whose cases race each other measures the harness.
+- `aura-catalog` gains `repo::set_capture_time`, for a body that recorded no clock -
+  and for the phase 05 gate, which needs a wedding-shaped timeline over fixtures
+  that carry make and model but no capture time, and says so in its output.
+- `aura-cli infer` gained `--input wedding` and a stopwatch, so a 384 px model can
+  be timed from the command line.
+
+### Known limits
+
+- The embedding carries no wedding semantics yet, so the purity, NMI and retrieval
+  gates from section 6.4 are **deferred**, not passed. The duplicate gate is met and
+  is not deferred: it is answered by the difference hash, which has no learned
+  component. The evaluation harness computes all four and proves it would fail a
+  head that learned nothing.
+- Section 11's two GPU throughput budgets are waived - there is no GPU backend - and
+  the 400 ms cold-build budget is waived for the build and met for the load. Both
+  waivers carry expiry conditions in ADR-0011 section 5.
+
 ## Phase 04 - Cloud AI gateway and the agentic reasoning runtime
 
 Paste one API key and the app gains a governed reasoning layer. It is a bonus
