@@ -426,6 +426,67 @@ pub fn set_primary_file(conn: &Connection, photo_id: &str, file_id: &str) -> Aur
     Ok(())
 }
 
+/// Every photograph in a project, ordered by id so two runs agree.
+///
+/// Used by the phase 05 gate to write a timeline over fixtures that carry none, and
+/// by any later pass that needs a stable walk over a project without loading rows.
+///
+/// # Errors
+///
+/// Returns `AURA-DB-3006` when the query fails.
+pub fn list_photos_for_timeline(conn: &Connection, project_id: &str) -> AuraResult<Vec<String>> {
+    let mut statement = conn
+        .prepare("SELECT photo_id FROM photo WHERE project_id = ?1 ORDER BY photo_id")
+        .map_err(failed("list photographs"))?;
+    let rows = statement
+        .query_map(params![project_id], |row| row.get::<_, String>(0))
+        .map_err(failed("list photographs"))?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(failed("read a photo id"))?);
+    }
+    Ok(out)
+}
+
+/// Set a photograph's capture time when it has none.
+///
+/// Two callers, and both of them are about a camera that did not record one.
+///
+/// The first is the photographer: a body with a dead clock battery, or a scan, or a
+/// file that lost its EXIF to somebody else's software, arrives with no time at all,
+/// and everything downstream that orders by the timeline silently drops it. Being
+/// able to say "these are from about four o'clock" is a real feature, and phase 26's
+/// multi-camera matching is where it gets a screen.
+///
+/// The second is the phase 05 gate, which needs a wedding-shaped timeline over
+/// fixtures that carry make and model but no capture time. It says so in its output
+/// rather than letting the reader assume the fixtures had one.
+///
+/// `IS NULL` in the predicate rather than in the caller: this must never overwrite a
+/// time the camera did record. A clock *correction* is a per-body offset -
+/// [`set_camera_offset`] - not a rewrite of what the file said.
+///
+/// # Errors
+///
+/// Returns `AURA-DB-3006` when the update fails.
+pub fn set_capture_time(
+    conn: &Connection,
+    photo_id: &str,
+    capture_time: &str,
+    now: &str,
+) -> AuraResult<usize> {
+    conn.execute(
+        "UPDATE photo
+            SET capture_time = ?2,
+                capture_time_source = 'unknown',
+                timeline_time = ?2,
+                updated_at = ?3
+          WHERE photo_id = ?1 AND capture_time IS NULL",
+        params![photo_id, capture_time, now],
+    )
+    .map_err(failed("set capture time"))
+}
+
 /// Recompute `timeline_time` for every photo from its body's clock offset.
 ///
 /// This is a single UPDATE so a 4,000-row project re-orders in well under a second.

@@ -220,6 +220,8 @@ impl Catalog {
             "cloud_calls",
             "cloud_cache",
             "cloud_budget",
+            "embeddings",
+            "descriptors",
         ];
         if !COUNTABLE.contains(&table) {
             return Err(statement_failed(

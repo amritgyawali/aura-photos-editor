@@ -10,6 +10,8 @@ members = [
   "crates/aura-infer",
   "crates/aura-models",
   "crates/aura-cloud",
+  "crates/aura-index",
+  "crates/aura-vision",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",
