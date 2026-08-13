@@ -1,0 +1,25 @@
+{
+  "name": "200-anthropic-couple-hint",
+  "note": "PHASE-06 section 7, the happy path. A valid CoupleHint answer using only opaque handles, matched on the decision reference so the SegmentNaming cassettes cannot pick it up. Note that the reasons cite role evidence and never describe a person - that is what the prompt's second rule asks for and what the fixed handle vocabulary makes enforceable.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["\"model\":\"claude-sonnet-4-5\"", "couple-hint-clear"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_200",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"couple\":[\"person_1\",\"person_3\"],\"close_family\":[\"person_2\",\"person_5\"],\"confidence\":0.74,\"reasons\":[\"person_1 and person_3 appear together in 61 frames, more than twice any other pair\",\"both are the largest and most central faces in the frames where they appear together\",\"person_2 appears with person_1 constantly but almost never with person_3, which reads as one side's family rather than the other half of a couple\",\"scene labels are unavailable, so this rests on co-occurrence and framing alone and should be confirmed\"]}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 1214, "output_tokens": 141 }
+  }
+}

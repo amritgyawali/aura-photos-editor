@@ -443,9 +443,11 @@ fn every_cassette_is_played_by_something() {
         let input = support::segment(segment, best, 500, tiles);
         drop(harness.gateway.run(&task, &input, &context!(harness)));
     }
-    // The rejected-key and probe cassettes are played by their own tests, and
-    // the other three vendors' by the provider-swap test; this run covers the
-    // Anthropic scenarios only, so the remaining names are listed explicitly.
+    // The rejected-key and probe cassettes are played by their own tests, the other
+    // three vendors' by the provider-swap test, and the three couple-hint recordings by
+    // `couple_hint.rs` - which is a different task entirely and cannot be driven from
+    // this file's harness. This run covers the Anthropic `SegmentNaming` scenarios only,
+    // so the remaining names are listed explicitly.
     let unplayed = harness.transport.unplayed();
     let expected = [
         "040-openai-mehndi",
@@ -453,6 +455,9 @@ fn every_cassette_is_played_by_something() {
         "060-compat-mehndi",
         "070-anthropic-key-rejected",
         "100-anthropic-probe-ok",
+        "200-anthropic-couple-hint",
+        "205-anthropic-couple-hint-repaired",
+        "210-anthropic-couple-hint-described",
     ];
     for name in unplayed {
         assert!(
