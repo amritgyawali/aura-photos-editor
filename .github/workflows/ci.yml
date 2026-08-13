@@ -73,6 +73,13 @@ jobs:
       - name: phase 04 verify - cloud gateway, keys, payload, cache, budget, offline
         run: cargo run --release --package aura-cli -- verify --phase 04 --work target/phase04-verify
 
+      # Two cards of RAW fixtures, a resumable embedding pass, the index, a
+      # five-millisecond query, a time window, a camera filter, the snapshot and
+      # its refusals, an incremental second card, and determinism. No network of
+      # any kind is involved: nothing in phase 05 can open a socket.
+      - name: phase 05 verify - embeddings, descriptors, index, snapshot, incremental
+        run: cargo run --release --package aura-cli -- verify --phase 05 --work target/phase05-verify
+
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
     name: ui type-check, tests and build
@@ -133,5 +140,23 @@ jobs:
       # runs. The cloud payload builder is a pixel loop and is more than an
       # order of magnitude slower unoptimised; asserting a debug number would
       # mean either a failing gate or a budget too loose to catch anything.
+      # One thread, deliberately. Added in phase 05: three 4,000-vector index
+      # builds sharing a runner's cores measure the harness rather than the code,
+      # and a budget suite that races itself reports a different number every run.
       - name: budget assertions
-        run: cargo test --release --package aura-perf --all-targets
+        run: cargo test --release --package aura-perf --all-targets -- --test-threads=1
+
+      # The evaluation gates from section 6.4 of phase 05. Release, because the
+      # duplicate sweep is sixty photographs through a perceptual hash and the
+      # graph recall check builds a thousand-vector index.
+      - name: embedding evaluation gates
+        run: cargo test --release --package aura-vision --test embedding_eval -- --nocapture
+
+      # Two independent implementations of the metrics have to agree, or neither
+      # is trustworthy. The Python half also self-tests without cargo.
+      - name: python evaluation self-tests
+        run: |
+          python ml/models/embed/dataset.py --self-test
+          python ml/models/embed/train_contrastive.py --dry-run
+          python ml/models/embed/eval_retrieval.py --self-test
+          python ml/models/embed/export.py --placeholder --verify models

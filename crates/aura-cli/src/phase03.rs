@@ -433,7 +433,19 @@ pub fn infer(args: &[String]) -> ExitCode {
         }
     };
 
-    let input = fixtures::sample_input(batch);
+    // Which deterministic input to feed. The phase 03 placeholders take 32 px;
+    // phase 05's embedding model takes 384, and a 32 px tensor into a 384 px graph
+    // is a shape mismatch rather than a smaller test.
+    let input = match crate::flag(args, "--input").as_deref() {
+        Some("wedding") => fixtures::wedding_sample_input(batch),
+        _ => fixtures::sample_input(batch),
+    };
+    // A stopwatch around one run, so `aura-cli infer` can report what a batch cost.
+    // Through the injected clock rather than a wall-clock read, because the second
+    // one is a determinism risk the banned-pattern check refuses on sight - and
+    // rightly: a monotonic source is what a stopwatch wanted in the first place.
+    let stopwatch = aura_core::clock::SystemClock::default();
+    let started = aura_core::clock::Clock::monotonic_us(&stopwatch);
     let outputs = match session.run(&[input.view()]) {
         Ok(outputs) => outputs,
         Err(err) => {
@@ -445,6 +457,13 @@ pub fn infer(args: &[String]) -> ExitCode {
     // Serialised through typed structures rather than the `json!` macro: the
     // macro unwraps internally, and R1 bans that in product code even when the
     // unwrap is unreachable.
+    let elapsed_ms =
+        aura_core::clock::Clock::monotonic_us(&stopwatch).saturating_sub(started) as f64 / 1000.0;
+    eprintln!(
+        "ran batch {batch} in {elapsed_ms:.1} ms ({:.1} ms per image)",
+        elapsed_ms / batch.max(1) as f64
+    );
+
     let report = InferReport {
         model: model_path,
         precision: precision.as_str().to_string(),

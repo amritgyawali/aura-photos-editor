@@ -18,6 +18,8 @@ tracing.workspace    = true
 [dev-dependencies]
 aura-catalog.path  = "../aura-catalog"
 aura-cloud.path    = "../aura-cloud"
+aura-index.path    = "../aura-index"
 aura-infer.path    = "../aura-infer"
 aura-raw.path      = "../aura-raw"
+aura-vision.path   = "../aura-vision"
 tempfile.workspace = true

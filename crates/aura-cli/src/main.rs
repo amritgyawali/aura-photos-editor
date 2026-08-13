@@ -18,6 +18,7 @@ use aura_ingest::fixtures;
 
 mod phase03;
 mod phase04;
+mod phase05;
 
 pub(crate) const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -39,6 +40,7 @@ fn main() -> ExitCode {
             Some("02") => cmd_verify_previews(&args),
             Some("03") => phase03::verify(&args),
             Some("04") => phase04::verify(&args),
+            Some("05") => phase05::verify(&args),
             _ => cmd_verify(&args),
         },
         Some("infer") => phase03::infer(&args),

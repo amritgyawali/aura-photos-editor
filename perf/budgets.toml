@@ -118,3 +118,72 @@ max_count = 3
 # one, asserted in the same place so it cannot be raised quietly.
 [size.cloud_payload]
 max_bytes = 4194304  # 4 MB
+
+# Phase 05 performance budgets, from PHASE-05 section 11.
+#
+# Two of the five rows in that section are absent, and their absence is recorded
+# rather than quietly filled in: "4,000 embeddings on an RTX 4070 in <= 150 s" and
+# "on an M3 Pro in <= 300 s" both describe hardware this build cannot reach,
+# because there is no GPU backend (ADR-0007). They are waived with an expiry
+# condition in docs/adr/ADR-0011-embeddings-and-similarity-index.md section 5.
+#
+# What replaces them is the row below it: the same work on the processor path,
+# measured on the development machine, so a regression in the embedding pass has
+# something real to fail against.
+
+# Building the graph for a 4,000-image wedding from scratch.
+#
+# Section 11 asks for 400 ms and this build does not meet it. The row is kept, with
+# the measured figure and headroom, rather than deleted: 2.7 s in release on the
+# development machine, so a two-times regression fails.
+#
+# Why it is over: ef_construction = 200 with 64 neighbours at layer zero is roughly
+# 30 GFLOP of 512-wide dot products, computed in safe scalar Rust on four cores.
+# Closing the gap needs SIMD intrinsics and therefore `unsafe`, which the workspace
+# forbids. Waived by PERF and CTO in
+# docs/adr/ADR-0011-embeddings-and-similarity-index.md section 5, with an expiry.
+#
+# What acceptance criterion 4 actually asks for - "re-opening a project rebuilds or
+# loads the index in under 400 ms" - is met by the snapshot row below, at 25 ms.
+[stage.index_cold_build_4000]
+max_elapsed_ms = 5500
+
+# One k-nearest-neighbour query at k = 32, measured over 200 queries so a 5 ms
+# budget is expressible in whole milliseconds.
+[stage.index_knn_200_queries]
+max_elapsed_ms  = 1000
+max_ms_per_unit = 5
+
+# A time-windowed query. Section 10.1 asks for under 1 ms, which is why the
+# window is a pre-filter over a sorted timeline rather than a post-filter.
+[stage.index_windowed_200_queries]
+max_elapsed_ms  = 200
+max_ms_per_unit = 1
+
+# Loading a persisted snapshot instead of rebuilding. The reason a second open is
+# instant, and the other half of acceptance criterion 4.
+[stage.index_snapshot_load_4000]
+max_elapsed_ms = 400
+
+# The embedding pass on the processor path, per image, including the model, the
+# four descriptors and the difference hash but not the preview decode.
+#
+# Measured, not guessed: 69 ms per image in release on the development machine
+# (Intel i5-10300H, fp32, one frame at a time, a tier 1 thumbnail in and a row
+# out). The budget is 110 ms, which leaves room for a slower laptop and fails on a
+# two-times regression. This row is what stands in for the two waived GPU
+# throughput rows, and 69 ms is 4.6 minutes for a 4,000-image wedding.
+[stage.embed_image_cpu]
+max_elapsed_ms  = 12000
+max_ms_per_unit = 110
+
+# Section 11: storage per image, vector plus descriptors. 1.6 KB, where a
+# kilobyte is 1,024 bytes. The shipped payload is 1,623 bytes and the margin is
+# fifteen: a future column is a budget conversation, not a quiet addition.
+[size.embedding_per_image]
+max_bytes = 1638
+
+# The in-memory ceiling from section 12, as a count rather than a hope. Past it,
+# AURA-ML-5016 is raised and queries fall back to the exact flat scan.
+[count.index_in_memory_ceiling]
+max_count = 20000

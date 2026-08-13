@@ -33,8 +33,11 @@ bench:
 # Budget assertions. Release, because a budget is a claim about the binary a
 # photographer runs, and the payload builder is an order of magnitude slower
 # unoptimised.
+# One thread, deliberately. A budget suite whose cases run concurrently measures
+# the harness: three 4,000-vector index builds sharing four cores produce a number
+# about `cargo test`, not about the code. Added in phase 05.
 budgets:
-    cargo test --release --package aura-perf --all-targets
+    cargo test --release --package aura-perf --all-targets -- --test-threads=1
 
 # The per-machine model table PERF and the scheduler's cost model both read.
 bench-models:
@@ -76,6 +79,13 @@ phase-03-verify:
 # scan of everything stored. Never touches a network.
 phase-04-verify:
     cargo run --release --package aura-cli -- verify --phase 04 --work target/phase04-verify
+
+# The phase 05 gate: the migration, two cards of fixtures, a resumable embedding
+# pass, the index, a five-millisecond query, a time window, a camera filter, the
+# snapshot and its refusals, an incremental second card, and determinism. Never
+# touches a network - nothing in phase 05 can.
+phase-05-verify:
+    cargo run --release --package aura-cli -- verify --phase 05 --work target/phase05-verify
 
 # Weight-space parity for every fp32/variant pair, plus the cross-runtime check
 # against onnxruntime when it happens to be installed for Python.
