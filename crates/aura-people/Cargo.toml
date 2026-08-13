@@ -1,0 +1,33 @@
+[package]
+name         = "aura-people"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+description  = "Identities, the subject hierarchy, and the encrypted per-project biometric store"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+aura-index   = { path = "../aura-index" }
+aura-preview = { path = "../aura-preview" }
+aura-raw     = { path = "../aura-raw" }
+aura-vision  = { path = "../aura-vision" }
+blake3       = { workspace = true }
+parking_lot  = { workspace = true }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+time         = { workspace = true }
+tracing      = { workspace = true }
+uuid         = { workspace = true }
+
+[dev-dependencies]
+aura-cache   = { path = "../aura-cache" }
+aura-infer   = { path = "../aura-infer" }
+tempfile     = { workspace = true }
+
+[[test]]
+name = "identity_eval"
+path = "../../tests/eval/identity_eval.rs"

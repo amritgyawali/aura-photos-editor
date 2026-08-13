@@ -12,6 +12,7 @@ members = [
   "crates/aura-cloud",
   "crates/aura-index",
   "crates/aura-vision",
+  "crates/aura-people",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",

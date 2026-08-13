@@ -66,6 +66,7 @@ dependencies = [
  "aura-ingest",
  "aura-jobs",
  "aura-models",
+ "aura-people",
  "aura-preview",
  "aura-raw",
  "aura-vision",
@@ -123,10 +124,12 @@ dependencies = [
  "aura-ingest",
  "aura-jobs",
  "aura-models",
+ "aura-people",
  "aura-perf",
  "aura-preview",
  "aura-raw",
  "aura-vision",
+ "rusqlite",
  "serde",
  "serde_json",
  "time",
@@ -261,6 +264,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-people"
+version = "0.1.0"
+dependencies = [
+ "aura-cache",
+ "aura-catalog",
+ "aura-core",
+ "aura-index",
+ "aura-infer",
+ "aura-preview",
+ "aura-raw",
+ "aura-vision",
+ "blake3",
+ "parking_lot",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aura-perf"
 version = "0.1.0"
 dependencies = [
@@ -269,6 +295,7 @@ dependencies = [
  "aura-core",
  "aura-index",
  "aura-infer",
+ "aura-people",
  "aura-raw",
  "aura-vision",
  "serde",
@@ -323,10 +350,13 @@ dependencies = [
  "aura-infer",
  "aura-preview",
  "aura-raw",
+ "blake3",
  "rayon",
  "serde",
  "tempfile",
+ "toml",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
