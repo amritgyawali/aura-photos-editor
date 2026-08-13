@@ -104,6 +104,61 @@
         "require_fp32": false
       },
       "opset": 13
+    },
+    {
+      "name": "wedding_embedding",
+      "version": "1.0.0",
+      "task": "embedding",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          3,
+          384,
+          384
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "srgb"
+      },
+      "output": {
+        "embedding": [
+          1,
+          512
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "wedding_embedding_1.0.0.fp32.onnx",
+          "sha256": "2b43282d1e08cfd54ad2622f929f77740d638683c3e1f53153e4e1c60239492b",
+          "bytes": 925996
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "wedding_embedding_1.0.0.fp16.onnx",
+          "sha256": "57407b812536658af577a242ace9720fb9e1059ce61c9e0d6ebfd27873026012",
+          "bytes": 925996
+        },
+        {
+          "ep": "cpu",
+          "precision": "int8",
+          "file": "wedding_embedding_1.0.0.int8.onnx",
+          "sha256": "f5feea5cc23c6964706bc2e32077272bde1b351a7fbe7d9d4c0e96d742303caa",
+          "bytes": 925996
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/wedding_embedding.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": false,
+        "require_fp32": false
+      },
+      "opset": 13
     }
   ]
 }
