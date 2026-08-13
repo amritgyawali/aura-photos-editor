@@ -111,6 +111,97 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::permissive(),
             },
         ),
+        // PHASE-06. Three models, and their precision policies differ for reasons
+        // that are worth stating rather than copying.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::FACE_DETECT_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "detection",
+                // Segmentation rather than embedding: the batch memory ledger cares
+                // about a dense 640 px activation map, not about a 512-wide vector,
+                // and putting a detector in the embedding column would make the
+                // scheduler start it at a batch size no laptop can hold.
+                class: ModelClass::Segmentation,
+                model: fixtures::face_detect(),
+                input_side: fixtures::FACE_DETECT_INPUT_SIDE,
+                output: BTreeMap::from([
+                    (
+                        "head_8".to_string(),
+                        vec![
+                            1,
+                            fixtures::FACE_HEAD_CHANNELS,
+                            fixtures::face_head_side(8),
+                            fixtures::face_head_side(8),
+                        ],
+                    ),
+                    (
+                        "head_16".to_string(),
+                        vec![
+                            1,
+                            fixtures::FACE_HEAD_CHANNELS,
+                            fixtures::face_head_side(16),
+                            fixtures::face_head_side(16),
+                        ],
+                    ),
+                    (
+                        "head_32".to_string(),
+                        vec![
+                            1,
+                            fixtures::FACE_HEAD_CHANNELS,
+                            fixtures::face_head_side(32),
+                            fixtures::face_head_side(32),
+                        ],
+                    ),
+                ]),
+                // int8 is forbidden. A detection head regresses box distances in
+                // stride units, and per-tensor int8 quantisation of a regression
+                // output moves a 40 px face's box by several pixels - which is the
+                // difference between recall and a missed guest. Section 10.1 asks
+                // for 0.90 recall on small faces and this is part of how it is kept.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::FACE_EMBED_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "embedding",
+                class: ModelClass::Embedding,
+                model: fixtures::face_embed(),
+                input_side: fixtures::FACE_CROP_SIDE,
+                output: BTreeMap::from([(
+                    "embedding".to_string(),
+                    vec![1, fixtures::FACE_EMBED_DIM],
+                )]),
+                // int8 is allowed here, for the same reason it is allowed on
+                // `wedding_embedding`: a normalised 512-d direction survives
+                // per-tensor quantisation, and this model runs once per face.
+                precision_policy: PrecisionPolicy::permissive(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::FACE_QUALITY_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "multiclass",
+                class: ModelClass::Embedding,
+                model: fixtures::face_quality(),
+                input_side: fixtures::FACE_CROP_SIDE,
+                output: BTreeMap::from([(
+                    "quality".to_string(),
+                    vec![1, fixtures::FACE_QUALITY_OUTPUTS],
+                )]),
+                // int8 is forbidden. Four sigmoid outputs quantised per tensor lose
+                // most of their resolution near 0 and 1, and this head's whole job is
+                // to decide whether a face is above 0.4 - a gate whose inputs are
+                // quantised to sixteen levels is a coin toss for anything near it.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {

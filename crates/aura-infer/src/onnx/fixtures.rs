@@ -459,6 +459,444 @@ pub fn wedding_sample_input(batch: usize) -> Tensor {
     }
 }
 
+// ---------------------------------------------------------------------------
+// PHASE-06. The three face models.
+//
+// Same standing as `wedding_embedding`: the graphs are real, the operators are the
+// ones a trained SCRFD and ArcFace export actually use, the weights are
+// deterministic, and **the weights carry no face semantics**. A placeholder
+// detector finds nothing in a photograph, which is why phase 06 ships a separate
+// deterministic reference detector for its fixtures and records the gap as a
+// condition in `docs/progress/PHASE-06-EXIT.md`.
+//
+// What the graphs *do* prove, and what a hand-waved stub would not: the anchor
+// layout, the channel order, the three output strides, the 112 px alignment
+// contract, the batch memory ledger at 640 px, and the fp16/int8 variant path.
+// ---------------------------------------------------------------------------
+
+/// Name of the face detector.
+pub const FACE_DETECT_MODEL: &str = "face_detect";
+/// Name of the face recogniser.
+pub const FACE_EMBED_MODEL: &str = "face_embed";
+/// Name of the face quality head.
+pub const FACE_QUALITY_MODEL: &str = "face_quality";
+
+/// Side of the square the detector takes. PHASE-06 section 6.1: 640 px.
+pub const FACE_DETECT_INPUT_SIDE: usize = 640;
+
+/// Side of the aligned crop the recogniser and the quality head take.
+///
+/// 112 px, which is not a free parameter: it is the `ArcFace` reference geometry,
+/// and the five reference landmarks in `aura_vision::face::align` are expressed in
+/// it. Changing it invalidates every stored template.
+pub const FACE_CROP_SIDE: usize = 112;
+
+/// Width of the recognition template. PHASE-06 section 2.1: 512-d `ArcFace` class.
+pub const FACE_EMBED_DIM: usize = 512;
+
+/// Width of the trunk between the recognition backbone and its projection.
+pub const FACE_TRUNK_DIM: usize = 256;
+
+/// The three output strides, coarsest last.
+///
+/// Three levels rather than one because a wedding is the pathological case for a
+/// single-scale detector: the bride's face at a first look fills a third of the
+/// frame and a guest's face in a wide ceremony frame is forty pixels tall, and
+/// those two cannot be regressed by the same receptive field.
+pub const FACE_DETECT_STRIDES: [usize; 3] = [8, 16, 32];
+
+/// Channels each detection head emits. The layout is the contract:
+///
+/// | Channels | Meaning |
+/// |---|---|
+/// | 0 | face objectness logit |
+/// | 1 | person objectness logit |
+/// | 2..6 | face box, as left/top/right/bottom distances from the anchor centre in stride units |
+/// | 6..10 | person box, same encoding |
+/// | 10..20 | five landmarks, as x/y offsets from the anchor centre in stride units |
+///
+/// One tensor per stride rather than three, because the interpreter has no `Split`
+/// operator and a fused head is what a real export produces anyway.
+/// `aura_vision::face::detect::decode` is the only reader of this layout.
+///
+/// **Faces and bodies are predicted by the same anchor**, which is why phase 06
+/// needs no fourth model and no separate person detector. It is also what gives
+/// face-to-body association for free: two boxes from one anchor are one person by
+/// construction, and only boxes that came from *different* anchors need the
+/// geometric fallback in `aura_vision::face::person`. A person channel that fires
+/// where the face channel does not is the back-of-head case section 6.1 asks for.
+pub const FACE_HEAD_CHANNELS: usize = 20;
+
+/// How many quality numbers the head predicts: usability, blur, occlusion, pose.
+pub const FACE_QUALITY_OUTPUTS: usize = 4;
+
+/// The spatial side of one detection head, for a stride.
+#[must_use]
+pub const fn face_head_side(stride: usize) -> usize {
+    if stride == 0 {
+        return 0;
+    }
+    FACE_DETECT_INPUT_SIDE / stride
+}
+
+/// A 3x3 convolution with a stride, padded to keep the arithmetic obvious.
+fn conv3(name: &str, inputs: &[&str], outputs: &[&str], stride: i64) -> Node {
+    with_ints(
+        with_ints(
+            with_ints(
+                node("Conv", name, inputs, outputs),
+                "kernel_shape",
+                vec![3, 3],
+            ),
+            "pads",
+            vec![1, 1, 1, 1],
+        ),
+        "strides",
+        vec![stride, stride],
+    )
+}
+
+/// A 1x1 convolution. What a detection head is.
+fn conv1(name: &str, inputs: &[&str], outputs: &[&str]) -> Node {
+    with_ints(
+        with_ints(
+            with_ints(
+                node("Conv", name, inputs, outputs),
+                "kernel_shape",
+                vec![1, 1],
+            ),
+            "pads",
+            vec![0, 0, 0, 0],
+        ),
+        "strides",
+        vec![1, 1],
+    )
+}
+
+/// A 2x2 max pool, stride 2.
+fn pool2(name: &str, input: &str, output: &str) -> Node {
+    with_ints(
+        with_ints(
+            node("MaxPool", name, &[input], &[output]),
+            "kernel_shape",
+            vec![2, 2],
+        ),
+        "strides",
+        vec![2, 2],
+    )
+}
+
+/// The face detector: an SCRFD-shaped single-stage network with three heads.
+///
+/// `pixels [N, 3, 640, 640]` to `head_8 [N, 20, 80, 80]`, `head_16 [N, 20, 40, 40]`
+/// and `head_32 [N, 20, 20, 20]`.
+///
+/// Three things about it are deliberate rather than convenient:
+///
+/// * **The stem strides by four and pools once.** A detector that ran even one
+///   full-width convolution at 640 px would spend most of its arithmetic before it
+///   had any features, and would tell a false story about where the cost of a face
+///   pass is. The cost here is concentrated at stride 8, which is where a real
+///   SCRFD's cost is too.
+/// * **No sigmoid in the graph.** Two channels want a logistic and fourteen
+///   regressions do not, and separating them needs `Split`, which this build does
+///   not implement (ADR-0007). The logistic is applied per channel in
+///   `aura_vision::face::detect`, which is where the anchor decode already lives.
+/// * **Landmark channels are last.** Putting them after both boxes means a future
+///   model that drops them is a channel-count change the decoder refuses rather
+///   than a silent reinterpretation of a box as a landmark.
+#[must_use]
+pub fn face_detect() -> OnnxModel {
+    let mut weights = Weights::new(0x00FA_CE01_D37E_C701);
+    let side = FACE_DETECT_INPUT_SIDE;
+
+    let graph = Graph {
+        name: FACE_DETECT_MODEL.to_string(),
+        nodes: vec![
+            // 640 -> 160
+            conv3("stem", &["pixels", "stem_w", "stem_b"], &["stem_out"], 4),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 160 -> 80. Stride 8 from here on.
+            pool2("pool", "stem_relu", "pool_out"),
+            conv3("c1", &["pool_out", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            conv3("c2", &["c1_relu", "c2_w", "c2_b"], &["c2_out"], 1),
+            node("Relu", "c2_act", &["c2_out"], &["p8"]),
+            conv1("head8", &["p8", "h8_w", "h8_b"], &["head_8"]),
+            // 80 -> 40. Stride 16.
+            conv3("d16", &["p8", "d16_w", "d16_b"], &["d16_out"], 2),
+            node("Relu", "d16_act", &["d16_out"], &["p16"]),
+            conv1("head16", &["p16", "h16_w", "h16_b"], &["head_16"]),
+            // 40 -> 20. Stride 32.
+            conv3("d32", &["p16", "d32_w", "d32_b"], &["d32_out"], 2),
+            node("Relu", "d32_act", &["d32_out"], &["p32"]),
+            conv1("head32", &["p32", "h32_w", "h32_b"], &["head_32"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![16, 3, 3, 3], 0.28),
+            weights.tensor("stem_b", vec![16], 0.05),
+            weights.tensor("c1_w", vec![32, 16, 3, 3], 0.16),
+            weights.tensor("c1_b", vec![32], 0.05),
+            weights.tensor("c2_w", vec![32, 32, 3, 3], 0.12),
+            weights.tensor("c2_b", vec![32], 0.05),
+            weights.tensor("h8_w", vec![FACE_HEAD_CHANNELS, 32, 1, 1], 0.10),
+            weights.tensor("h8_b", vec![FACE_HEAD_CHANNELS], 0.02),
+            weights.tensor("d16_w", vec![48, 32, 3, 3], 0.12),
+            weights.tensor("d16_b", vec![48], 0.05),
+            weights.tensor("h16_w", vec![FACE_HEAD_CHANNELS, 48, 1, 1], 0.10),
+            weights.tensor("h16_b", vec![FACE_HEAD_CHANNELS], 0.02),
+            weights.tensor("d32_w", vec![64, 48, 3, 3], 0.12),
+            weights.tensor("d32_b", vec![64], 0.05),
+            weights.tensor("h32_w", vec![FACE_HEAD_CHANNELS, 64, 1, 1], 0.10),
+            weights.tensor("h32_b", vec![FACE_HEAD_CHANNELS], 0.02),
+        ],
+        inputs: vec![dynamic_batch("pixels", &[3, side, side])],
+        outputs: vec![
+            dynamic_batch(
+                "head_8",
+                &[FACE_HEAD_CHANNELS, face_head_side(8), face_head_side(8)],
+            ),
+            dynamic_batch(
+                "head_16",
+                &[FACE_HEAD_CHANNELS, face_head_side(16), face_head_side(16)],
+            ),
+            dynamic_batch(
+                "head_32",
+                &[FACE_HEAD_CHANNELS, face_head_side(32), face_head_side(32)],
+            ),
+        ],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The face recogniser: an aligned 112 px crop to a 512-d template.
+///
+/// `pixels [N, 3, 112, 112] -> embedding [N, 512]`.
+///
+/// L2 normalisation is not in the graph, for the same reason it is not in
+/// `wedding_embedding`: the interpreter has no reduction operator. It happens in
+/// `aura_vision::face::embed` and is covered by that module's preprocessing
+/// version, so a template that has been through the runtime and one that has been
+/// through the store agree bit for bit.
+#[must_use]
+pub fn face_embed() -> OnnxModel {
+    let mut weights = Weights::new(0x00FA_CE02_A2C1_FACE);
+    let side = FACE_CROP_SIDE;
+
+    let graph = Graph {
+        name: FACE_EMBED_MODEL.to_string(),
+        nodes: vec![
+            // 112 -> 56
+            conv3("stem", &["pixels", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 56 -> 28
+            pool2("pool", "stem_relu", "pool_out"),
+            // 28 -> 14
+            conv3("b1", &["pool_out", "b1_w", "b1_b"], &["b1_out"], 2),
+            node("Relu", "b1_act", &["b1_out"], &["b1_relu"]),
+            // 14 -> 7
+            conv3("b2", &["b1_relu", "b2_w", "b2_b"], &["b2_out"], 2),
+            node("Relu", "b2_act", &["b2_out"], &["b2_relu"]),
+            node("GlobalAveragePool", "gap", &["b2_relu"], &["gap_out"]),
+            with_int(
+                node("Flatten", "flatten", &["gap_out"], &["features"]),
+                "axis",
+                1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "trunk",
+                    &["features", "trunk_w", "trunk_b"],
+                    &["trunk_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "trunk_act", &["trunk_out"], &["trunk_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "project",
+                    &["trunk_relu", "project_w", "project_b"],
+                    &["embedding"],
+                ),
+                "transB",
+                1,
+            ),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.26),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("b1_w", vec![48, 24, 3, 3], 0.14),
+            weights.tensor("b1_b", vec![48], 0.05),
+            weights.tensor("b2_w", vec![96, 48, 3, 3], 0.11),
+            weights.tensor("b2_b", vec![96], 0.05),
+            weights.tensor("trunk_w", vec![FACE_TRUNK_DIM, 96], 0.17),
+            weights.tensor("trunk_b", vec![FACE_TRUNK_DIM], 0.05),
+            weights.tensor("project_w", vec![FACE_EMBED_DIM, FACE_TRUNK_DIM], 0.13),
+            weights.tensor("project_b", vec![FACE_EMBED_DIM], 0.05),
+        ],
+        inputs: vec![dynamic_batch("pixels", &[3, side, side])],
+        outputs: vec![dynamic_batch("embedding", &[FACE_EMBED_DIM])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The face quality head: an aligned crop to four independent probabilities.
+///
+/// `pixels [N, 3, 112, 112] -> quality [N, 4]`, in the order usability, blur,
+/// occlusion, pose.
+///
+/// The sigmoid **is** in this graph, unlike the detector's, because all four
+/// outputs are independent probabilities and none of them is a regression. That is
+/// the whole difference: an activation belongs in a graph when it applies to every
+/// channel of a tensor, and in the decoder when it does not.
+#[must_use]
+pub fn face_quality() -> OnnxModel {
+    let mut weights = Weights::new(0x00FA_CE03_9A11_7ADD);
+    let side = FACE_CROP_SIDE;
+
+    let graph = Graph {
+        name: FACE_QUALITY_MODEL.to_string(),
+        nodes: vec![
+            // 112 -> 56
+            conv3("stem", &["pixels", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 56 -> 28
+            pool2("pool", "stem_relu", "pool_out"),
+            // 28 -> 14
+            conv3("b1", &["pool_out", "b1_w", "b1_b"], &["b1_out"], 2),
+            node("Relu", "b1_act", &["b1_out"], &["b1_relu"]),
+            node("GlobalAveragePool", "gap", &["b1_relu"], &["gap_out"]),
+            with_int(
+                node("Flatten", "flatten", &["gap_out"], &["features"]),
+                "axis",
+                1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "trunk",
+                    &["features", "trunk_w", "trunk_b"],
+                    &["trunk_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "trunk_act", &["trunk_out"], &["trunk_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["trunk_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logits"], &["quality"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![16, 3, 3, 3], 0.24),
+            weights.tensor("stem_b", vec![16], 0.05),
+            weights.tensor("b1_w", vec![32, 16, 3, 3], 0.15),
+            weights.tensor("b1_b", vec![32], 0.05),
+            weights.tensor("trunk_w", vec![32, 32], 0.20),
+            weights.tensor("trunk_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![FACE_QUALITY_OUTPUTS, 32], 0.22),
+            weights.tensor("head_b", vec![FACE_QUALITY_OUTPUTS], 0.05),
+        ],
+        inputs: vec![dynamic_batch("pixels", &[3, side, side])],
+        outputs: vec![dynamic_batch("quality", &[FACE_QUALITY_OUTPUTS])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// A deterministic 640 px detector input batch.
+///
+/// Two blobs per image at known positions, on a smooth background, so that a
+/// detector head which has learned anything at all responds differently at
+/// different anchors, and a batching bug that reuses one member's tensor produces
+/// identical head tensors and is caught immediately.
+#[must_use]
+pub fn face_detect_sample_input(batch: usize) -> Tensor {
+    let side = FACE_DETECT_INPUT_SIDE;
+    let mut samples = Vec::with_capacity(batch * 3 * side * side);
+    for image in 0..batch {
+        // Two centres per image, moved by the image index so no two members agree.
+        let centres = [
+            (0.30 + 0.05 * image as f32, 0.35),
+            (0.70, 0.55 - 0.04 * image as f32),
+        ];
+        for channel in 0..3 {
+            for y in 0..side {
+                for x in 0..side {
+                    let across = x as f32 / side as f32;
+                    let down = y as f32 / side as f32;
+                    let mut value = across * 0.25 + down * 0.15 + channel as f32 * 0.08;
+                    for (cx, cy) in centres {
+                        let dx = across - cx;
+                        let dy = down - cy;
+                        let radius = (dx * dx + dy * dy).sqrt();
+                        if radius < 0.06 {
+                            value += 0.55 * (1.0 - radius / 0.06);
+                        }
+                    }
+                    samples.push(value.clamp(0.0, 1.0));
+                }
+            }
+        }
+    }
+    Tensor {
+        shape: vec![batch, 3, side, side],
+        data: samples,
+    }
+}
+
+/// A deterministic 112 px aligned-crop batch, for the recogniser and the quality
+/// head.
+#[must_use]
+pub fn face_crop_sample_input(batch: usize) -> Tensor {
+    let side = FACE_CROP_SIDE;
+    let mut samples = Vec::with_capacity(batch * 3 * side * side);
+    for image in 0..batch {
+        for channel in 0..3 {
+            for y in 0..side {
+                for x in 0..side {
+                    let across = x as f32 / side as f32;
+                    let down = y as f32 / side as f32;
+                    let tint = channel as f32 * 0.09;
+                    let offset = image as f32 * 0.19;
+                    samples.push((across * 0.5 + down * 0.5 + tint + offset).fract());
+                }
+            }
+        }
+    }
+    Tensor {
+        shape: vec![batch, 3, side, side],
+        data: samples,
+    }
+}
+
 /// A model whose only node is an operator this build refuses.
 ///
 /// The negative fixture for `AURA-ML-5006`. Without one, the refusal path is
