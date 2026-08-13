@@ -2,6 +2,100 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 06 - Face detection, recognition and people intelligence
+
+The app learns who matters at this wedding: it finds every face, groups them into
+identities, and ranks the couple, close family and VIPs by evidence rather than by
+guesswork. Every later decision gets a subject hierarchy, so sharpness on the bride's face
+outranks sharpness on a stranger's elbow.
+
+### Added
+
+- `aura-vision::face`: one decoded frame in, everything phase 06 needs out. Detection with
+  a letterbox rather than a centre crop - the faces the tiled pass exists to recover are
+  the ones at the edges of a wide ceremony frame - three output strides from one forward
+  pass, and faces and bodies predicted by the same anchor, which is why the phase ships
+  three models and not four.
+- A conditional 2x2 tiled pass that fires on wide-angle frames with several small
+  detections, and on frames where bodies were found and faces were not. Its cost is
+  recorded per frame in `face_scan.tiled` and reported by `ScanReport::tile_ratio`, because
+  "tiled detection doubles cost" is a failure mode to measure rather than assume.
+- A bokeh gate that works by geometry rather than by score: a blurred highlight has no
+  landmark structure, so its five points collapse towards its centre.
+  `Detection::landmark_spread` measures that, which lets the objectness threshold stay low
+  and keeps small-face recall.
+- ArcFace alignment: a closed-form Umeyama similarity transform onto the published 112 px
+  layout, never affine, because an affine fit to five points can shear and a sheared face
+  is a different face to a recogniser. Head pose is estimated from the same five landmarks.
+- A quality gate that decides which faces may vote on identity: four measured factors -
+  sharpness, occlusion, pose, exposure - combined as a weighted **geometric** mean, so a
+  perfectly exposed, perfectly frontal, completely out-of-focus face cannot score 0.75 and
+  vote, plus two hard cut-offs where the evidence genuinely runs out. A face below the gate
+  is detected, stored and displayed; it just does not vote.
+- Identity clustering with **exact** average linkage computed from running sums: for unit
+  vectors the mean pairwise cosine distance between two clusters is one minus the dot
+  product of their unnormalised means, so exact average linkage costs one dot product per
+  cluster pair rather than `|A| x |B|`.
+- Relative-cohesion verification, which is what actually prevents the chain merge. Two
+  looks of one person sit about 1.7 times their own internal spread apart; two siblings sit
+  at three times it. A wedding of near-lookalikes records refusals rather than producing
+  one identity for six people.
+- Sub-centroids for an identity whose members span two looks - the outfit and hairstyle
+  change - so a face from either look still matches.
+- Role inference from photographic evidence only. **Automation never assigns `bride` or
+  `groom`**: the evidence identifies a pair, which of two people is the bride is not a
+  photographic fact, and the couple may be same-sex. Confidence is capped at 0.62 while
+  scene labels are missing, and the reason string says why.
+- Prominence scoring with a versioned weight file, scene-conditioned tables, and
+  `subject_focus_score` - the prominence-weighted sharpness phases 09 and 12 use instead of
+  naive global sharpness.
+- `aura-people`: the sealed biometric store. Templates, centroids and 112 px crops are
+  encrypted with a key derived from a per-project secret in the operating system's
+  credential store, using BLAKE3 encrypt-then-MAC with a **synthetic nonce** - so
+  re-scanning after a model change cannot reuse a keystream, and sealing stays
+  deterministic.
+- Migration 6: `face_vault`, `face_scan`, `identities`, `faces`, `identity_links`,
+  `person_boxes`, `cooccurrence`, and two views. `face_scan` is new in kind: "no faces in
+  this frame" is a legitimate result, so the resumability ledger records the *look* rather
+  than the finding.
+- Merge, split, rename, mark-couple and an importance slider, all undoable, all recorded in
+  an append-only journal, and all replayed onto a fresh grouping **by face set rather than
+  by identity id** - so a photographer's decision survives a full re-analysis even though
+  re-clustering produces new ids.
+- Biometric erasure that deletes the credential-store entry *first*, so a crash mid-erasure
+  leaves unreadable data rather than readable data, then the crops, then the rows, then
+  verifies that nothing survived. Culling and edit decisions are untouched.
+- `CoupleHint`, the one cloud call phase 06 may make, behind an ambiguity trigger and a
+  two-call cap. Candidates are opaque handles, so a model that answers with a description
+  of a person - or volunteers a gender - fails validation rather than being stored.
+- Three signed models with cards: `face_detect`, `face_embed`, `face_quality`. `int8` is
+  forbidden on the detector, because quantising a box regression moves a 40 px face by
+  several pixels, and on the quality head, because quantising four sigmoids destroys the
+  resolution the 0.4 gate needs.
+- The people IPC surface and the People panel, plus `aura-cli verify --phase 06` as the
+  gate: thirteen checks, from the migration to an erasure that leaves nothing behind.
+- Nine error codes with runbooks: `AURA-ML-5017` to `AURA-ML-5021` and `AURA-SEC-9001` to
+  `AURA-SEC-9005`.
+
+### Changed
+
+- `aura-core` gained the frozen people contract - `Role`, `SubjectHierarchy`,
+  `ImageSubjects`, `PeopleService` - and two typed ids, `FaceId` and `IdentityId`. It still
+  depends on no other workspace crate.
+
+### Known limitations
+
+- **The three shipped models are placeholders.** The detector finds no faces in a
+  photograph and the recogniser's templates carry no identity information. Every gate in
+  section 10.1 is measured against synthetic ground truth with a known answer, which proves
+  the algorithms and says nothing about the weights. Condition C1, a Sev 2 trigger.
+- The quality head's trust weight is 0.0, so the gate is four measured factors. Condition
+  C2.
+- No demographic analysis is published: the fixtures use one skin tone, and a fairness
+  number computed from them would describe a renderer. Condition C5, a Sev 2 trigger.
+- The two GPU throughput budgets are waived with an expiry condition; a measured
+  processor-path row replaces them.
+
 ## Phase 05 - Perceptual embeddings and the wedding similarity index
 
 Every image gets a compact perceptual embedding plus a fast similarity index, so

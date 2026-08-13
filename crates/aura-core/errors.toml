@@ -580,3 +580,93 @@ summary      = "The project is larger than the documented in-memory index ceilin
 user_message = "This project is larger than AURA keeps in memory for instant comparisons, so finding similar photographs will take a little longer."
 runbook      = "docs/runbooks/AURA-ML-5016.md"
 introduced   = "PHASE-05"
+
+[[error]]
+code         = "AURA-ML-5017"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "One photograph could not be scanned for faces"
+user_message = "AURA could not look for faces in one photograph. It is still in your catalog and still exports normally."
+runbook      = "docs/runbooks/AURA-ML-5017.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-ML-5018"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored faces were produced by a different detector or recogniser version"
+user_message = "AURA has improved how it recognises people, so it is re-reading this wedding's faces in the background. The People panel stays available while it works."
+runbook      = "docs/runbooks/AURA-ML-5018.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-ML-5019"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Not enough usable faces to group anybody"
+user_message = "AURA has not found enough clear faces in this wedding to group people yet. Analyse more photographs, or lower the face quality filter in the People panel."
+runbook      = "docs/runbooks/AURA-ML-5019.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-ML-5020"
+severity     = "warning"
+recovery     = "ask_user"
+summary      = "The couple could not be identified with confidence"
+user_message = "AURA is not sure which two people are the couple at this wedding. Open the People panel and confirm - every later decision depends on getting this right."
+runbook      = "docs/runbooks/AURA-ML-5020.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-ML-5021"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "The project has more faces than the documented in-memory ceiling"
+user_message = "This wedding has more faces than AURA groups in one pass, so grouping people will take a little longer. The result is the same."
+runbook      = "docs/runbooks/AURA-ML-5021.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-SEC-9001"
+severity     = "degraded"
+recovery     = "ask_user"
+summary      = "The project's biometric key is not available"
+user_message = "AURA cannot open this wedding's face data: the key is not on this computer. Everything else works. Open Settings to unlock it or start a new face index."
+runbook      = "docs/runbooks/AURA-SEC-9001.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-SEC-9002"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "A sealed biometric record could not be opened"
+user_message = "AURA could not read one stored face and has set it aside. Grouping continues with the rest; re-analysing this wedding will replace it."
+runbook      = "docs/runbooks/AURA-SEC-9002.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-SEC-9003"
+severity     = "run_blocking"
+recovery     = "retry"
+summary      = "Biometric erasure could not complete"
+user_message = "AURA could not finish deleting this wedding's face data, so some is still on this computer. Nothing else changed. Try again; the runbook explains how to remove it by hand."
+runbook      = "docs/runbooks/AURA-SEC-9003.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-SEC-9004"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "A people query crossed a project boundary and was refused"
+user_message = "AURA stopped an operation that would have mixed two weddings' face data. Face data never crosses weddings. Please report this, with the diagnostics bundle."
+runbook      = "docs/runbooks/AURA-SEC-9004.md"
+introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-SEC-9005"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A merge, split, rename or role change was refused"
+user_message = "AURA could not make that change to the People panel. Nothing was changed."
+runbook      = "docs/runbooks/AURA-SEC-9005.md"
+introduced   = "PHASE-06"
