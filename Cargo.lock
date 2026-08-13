@@ -61,12 +61,14 @@ dependencies = [
  "aura-catalog",
  "aura-cloud",
  "aura-core",
+ "aura-index",
  "aura-infer",
  "aura-ingest",
  "aura-jobs",
  "aura-models",
  "aura-preview",
  "aura-raw",
+ "aura-vision",
  "parking_lot",
  "rusqlite",
  "serde",
@@ -116,6 +118,7 @@ dependencies = [
  "aura-catalog",
  "aura-cloud",
  "aura-core",
+ "aura-index",
  "aura-infer",
  "aura-ingest",
  "aura-jobs",
@@ -123,6 +126,7 @@ dependencies = [
  "aura-perf",
  "aura-preview",
  "aura-raw",
+ "aura-vision",
  "serde",
  "serde_json",
  "time",
@@ -166,6 +170,23 @@ dependencies = [
  "tracing",
  "uuid",
  "walkdir",
+]
+
+[[package]]
+name = "aura-index"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "blake3",
+ "parking_lot",
+ "rayon",
+ "rusqlite",
+ "serde",
+ "tempfile",
+ "time",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -246,8 +267,10 @@ dependencies = [
  "aura-catalog",
  "aura-cloud",
  "aura-core",
+ "aura-index",
  "aura-infer",
  "aura-raw",
+ "aura-vision",
  "serde",
  "serde_json",
  "tempfile",
@@ -288,6 +311,22 @@ dependencies = [
  "time",
  "tracing",
  "zune-jpeg",
+]
+
+[[package]]
+name = "aura-vision"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-index",
+ "aura-infer",
+ "aura-preview",
+ "aura-raw",
+ "rayon",
+ "serde",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]

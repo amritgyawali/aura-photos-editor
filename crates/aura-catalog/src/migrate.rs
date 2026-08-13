@@ -10,7 +10,7 @@ use aura_core::AuraResult;
 use rusqlite::{params, Connection, TransactionBehavior};
 
 /// The schema version this build understands.
-pub const APP_SCHEMA_VERSION: i64 = 4;
+pub const APP_SCHEMA_VERSION: i64 = 5;
 
 /// Every migration is (version, name, sql). Embedded so a shipped binary can
 /// never disagree with its own migrations.
@@ -18,15 +18,20 @@ pub const APP_SCHEMA_VERSION: i64 = 4;
 /// Versions 2 and 3 do not exist. Phases 02 and 03 added no tables - previews,
 /// model files and hardware plans are all caches on disk rather than catalog
 /// truth - and phase 04's file name `0004_cloud_audit.sql` is fixed by the phase
-/// document. The loop below skips any version at or below the applied one, so a
-/// gap costs nothing and renumbering a published migration file would cost a
-/// great deal.
+/// document, as phase 05's `0005_embeddings.sql` is. The loop below skips any
+/// version at or below the applied one, so a gap costs nothing and renumbering a
+/// published migration file would cost a great deal.
 const MIGRATIONS: &[(i64, &str, &str)] = &[
     (1, "init", include_str!("../migrations/0001_init.sql")),
     (
         4,
         "cloud_audit",
         include_str!("../migrations/0004_cloud_audit.sql"),
+    ),
+    (
+        5,
+        "embeddings",
+        include_str!("../migrations/0005_embeddings.sql"),
     ),
 ];
 

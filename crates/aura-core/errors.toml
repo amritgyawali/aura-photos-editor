@@ -544,3 +544,39 @@ summary      = "The estimated cost of one call exceeded the task ceiling"
 user_message = "One AI request would have cost more than that kind of step is allowed to, so AURA used its own models instead."
 runbook      = "docs/runbooks/AURA-CLOUD-6014.md"
 introduced   = "PHASE-04"
+
+[[error]]
+code         = "AURA-ML-5013"
+severity     = "item_failed"
+recovery     = "quarantine"
+summary      = "The embedding model returned an unusable vector"
+user_message = "AURA could not read one photograph well enough to compare it with the others. It is still in your catalog and still exports normally."
+runbook      = "docs/runbooks/AURA-ML-5013.md"
+introduced   = "PHASE-05"
+
+[[error]]
+code         = "AURA-ML-5014"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The similarity index snapshot could not be trusted and was discarded"
+user_message = "AURA is rebuilding its similarity index. This takes a moment and then everything is as it was."
+runbook      = "docs/runbooks/AURA-ML-5014.md"
+introduced   = "PHASE-05"
+
+[[error]]
+code         = "AURA-ML-5015"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored vectors were produced by a different embedding version"
+user_message = "AURA has improved how it compares photographs, so it is re-reading this wedding in the background. Grouping stays available while it works."
+runbook      = "docs/runbooks/AURA-ML-5015.md"
+introduced   = "PHASE-05"
+
+[[error]]
+code         = "AURA-ML-5016"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "The project is larger than the documented in-memory index ceiling"
+user_message = "This project is larger than AURA keeps in memory for instant comparisons, so finding similar photographs will take a little longer."
+runbook      = "docs/runbooks/AURA-ML-5016.md"
+introduced   = "PHASE-05"

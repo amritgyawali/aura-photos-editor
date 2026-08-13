@@ -23,6 +23,8 @@ aura-preview = { path = "../aura-preview" }
 aura-infer   = { path = "../aura-infer" }
 aura-models  = { path = "../aura-models" }
 aura-cloud   = { path = "../aura-cloud" }
+aura-index   = { path = "../aura-index" }
+aura-vision  = { path = "../aura-vision" }
 serde.workspace      = true
 serde_json.workspace = true
 time.workspace       = true

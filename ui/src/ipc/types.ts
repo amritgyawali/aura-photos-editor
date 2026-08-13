@@ -243,6 +243,74 @@ export type CloudEvent =
   | { kind: 'budgetStop'; capUsd: number; spentUsd: number }
   | { kind: 'cache'; hitRate: number; entries: number; bytes: number };
 
+export type FindSimilarInput = {
+  projectId: string;
+  photoId: string;
+  k: number;
+  timeWindowS: number | null;
+  cameraId: string | null;
+  exclude: string[];
+};
+
+export type SimilarNeighbourDto = {
+  photoId: string;
+  distance: number;
+  similarity: number;
+  dhashDistance: number;
+  nearDuplicate: boolean;
+};
+
+export type SimilarResultDto = {
+  photoId: string;
+  neighbours: SimilarNeighbourDto[];
+  elapsedMs: number;
+  filterKind: string;
+};
+
+export type IndexStatusDto = {
+  vectors: number;
+  photos: number;
+  coverage: number;
+  filterable: number;
+  modelVer: number;
+  staleModelVersions: number[];
+  buildMs: number;
+  fromSnapshot: boolean;
+};
+
+export type EmbedProjectInput = {
+  projectId: string;
+};
+
+export type EmbedProgressDto = {
+  embedded: number;
+  failed: number;
+  remaining: number;
+  elapsedMs: number;
+  batches: number;
+  cancelled: boolean;
+};
+
+export type DescriptorsDto = {
+  photoId: string;
+  dhashHex: string;
+  lumaMean: number;
+  lumaP1: number;
+  lumaP50: number;
+  lumaP99: number;
+  clipLo: number;
+  clipHi: number;
+  edgeEnergy: number;
+  palette: string[];
+  modelVer: number;
+  pixelSource: string;
+};
+
+export type IndexEvent =
+  | { kind: 'embedProgress'; done: number; total: number; batchSize: number; ep: string }
+  | { kind: 'indexBuilt'; vectors: number; ms: number; snapshotUsed: boolean }
+  | { kind: 'queryTimed'; k: number; ms: number; filterKind: string };
+
 export type IpcError = {
   code: string;
   message: string;

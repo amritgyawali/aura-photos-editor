@@ -31,6 +31,8 @@ Never load two phase files into one session.
 | Cloud AI policy | `docs/adr/ADR-0009-cloud-ai-policy.md` |
 | Using your own AI key | `docs/using-your-own-ai-key.md` |
 | Recorded provider responses | `tests/cloud/cassettes/` |
+| Embedding and index decisions | `docs/adr/ADR-0011-embeddings-and-similarity-index.md` |
+| Embedding evaluation gates | `tests/eval/embedding_eval.rs` + `ml/models/embed/eval_retrieval.py` |
 
 ## Non-negotiables enforced by the build
 
@@ -40,6 +42,19 @@ Never load two phase files into one session.
 - Every crate root carries the lint block, including `#![forbid(unsafe_code)]`.
 - `aura-core` depends on no other workspace crate; a test asserts it.
 - Changing a frozen contract requires an ADR and a re-lock, in that order.
+
+## Building on this machine
+
+The Windows SDK is absent, so the MSVC linker is not available. Use the GNU host
+toolchain for everything:
+
+```bash
+RUSTUP_TOOLCHAIN=1.97.1-x86_64-pc-windows-gnu cargo test --workspace --all-targets
+```
+
+`cargo run --release --package xtask` is the one exception that does not link:
+`windows-sys` needs `dlltool` for a release import library and MinGW is not
+installed. Run xtask in debug (`cargo xtask ...`, which is what the alias does).
 
 ## Current state
 
@@ -88,6 +103,45 @@ reference task), migration 4, the cloud IPC surface (ADR-0010) and its Settings
 panel, and `aura-cli verify --phase 04` as the gate. Its exit report is
 `docs/progress/PHASE-04-EXIT.md`. TLS is waived (ADR-0009), so this build reaches
 `http://` OpenAI-compatible endpoints and not the public HTTPS providers.
+
+Phase 05 is implemented: `aura-index` (the frozen `SimilarityIndex` contract, a
+deterministic HNSW graph at `M = 32` / `ef_construction = 200` / `ef_search = 64`,
+filtered queries with the time window as a pre-filter over a sorted timeline, a
+persisted snapshot with six named refusals, medoids, and the metrics the gates are
+measured with), `aura-vision` (one decode, five results: the embedding, a 64-bit
+difference hash, an 8x8x8 HSV histogram, six luminance statistics and an edge
+summary), migration 5, `wedding_embedding` 1.0.0 signed into `models.lock` with a
+card, the training and evaluation code in `ml/models/embed/`, the similarity IPC
+surface (ADR-0012) and its debug panel, and `aura-cli verify --phase 05` as the
+gate. Its exit report is `docs/progress/PHASE-05-EXIT.md`.
+
+**The shipped embedding is a placeholder backbone and carries no wedding
+semantics.** There is no labelled wedding data in this repository and no GPU
+backend, so the ViT-B/16 with a contrastive head that phase 05 section 6.1
+specifies cannot be trained or run here. Everything around it is real. This is
+condition C10 in the phase 05 exit report, it is a Sev 2 trigger, and **no later
+phase may claim a quality result that depends on the vector being
+wedding-discriminative until it closes.**
+
+Five rules that phase 05 added and every later phase inherits:
+
+- **`SimilarityIndex` is the only way to ask what looks like something.** No phase
+  may keep its own vector store or its own graph. A second index is a second answer
+  to "are these two frames the same shot", and the two will disagree.
+- **A distance is evidence; the deciding phase owns the threshold.** Nothing in
+  `aura-index` decides anything, and `query::NEAR_DUPLICATE_HAMMING` is a label in
+  a debug panel rather than a policy. Phase 07 owns scene thresholds, phase 08 owns
+  duplicate policy.
+- **Bump `PREPROCESS_VER` on any change to the pixels the model sees, and
+  `MODEL_VER` on any change to the model.** Comparing a vector from one version
+  with a vector from another returns a plausible number that means nothing;
+  `AURA-ML-5015` exists so that never happens silently.
+- **Report coverage when you report a result.** A grouping conclusion drawn over a
+  40 %-embedded project is a conclusion about 40 % of a wedding, and
+  `IndexStatusDto.coverage` is how a caller finds out.
+- **Descriptors are computed once.** The histogram, the luminance percentiles, the
+  edge energy and the palette are in the catalog from phase 05 onward. A phase that
+  recomputes one of them is opening a file that did not need opening.
 
 Four rules that phase 04 added and every later phase inherits:
 

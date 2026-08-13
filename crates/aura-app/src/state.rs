@@ -18,6 +18,10 @@ use aura_cloud::{CloudAiGateway, CloudPolicy};
 use aura_core::clock::{Clock, SystemClock};
 use aura_core::progress::CancelToken;
 use aura_core::AuraResult;
+use aura_index::hnsw::{HnswIndex, HnswParams};
+use aura_index::snapshot::Snapshot;
+use aura_index::store::{EmbeddingStore, StoredEmbedding};
+use aura_index::ImageEmbedding;
 use aura_infer::contract::infer::{ExecutionProvider, HardwarePlan};
 use aura_infer::ep::BackendRegistry;
 use aura_infer::plan::{self, PlanPaths};
@@ -26,6 +30,8 @@ use aura_infer::service::InferEngine;
 use aura_infer::source::ModelSource;
 use aura_models::registry::{trusted_public_key, ModelRegistry};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
+use aura_vision::embed::model::{MODEL_VER, PREPROCESS_VER};
+use aura_vision::EmbeddingRunner;
 use parking_lot::Mutex;
 
 /// The version stamped onto rows written through the application layer.
@@ -54,6 +60,11 @@ pub struct AppState {
     /// Where the operating system's credential store keeps its blob, on the one
     /// platform that needs a file. Per installation, never per project.
     key_dir: PathBuf,
+    /// One similarity index per project, built or loaded from a snapshot on first
+    /// use. Per project for the same reason the preview services are: one
+    /// wedding's vectors are never compared with another's, and the memory is
+    /// released when a project is closed.
+    indexes: Arc<Mutex<BTreeMap<String, Arc<HnswIndex>>>>,
 }
 
 /// The lazily-built cloud state.
@@ -117,6 +128,7 @@ impl AppState {
             infer: Arc::new(Mutex::new(InferSlot::default())),
             cloud: Arc::new(Mutex::new(CloudSlot::default())),
             key_dir: default_key_dir(),
+            indexes: Arc::new(Mutex::new(BTreeMap::new())),
         })
     }
 
@@ -134,7 +146,179 @@ impl AppState {
             infer: Arc::new(Mutex::new(InferSlot::default())),
             cloud: Arc::new(Mutex::new(CloudSlot::default())),
             key_dir: default_key_dir(),
+            indexes: Arc::new(Mutex::new(BTreeMap::new())),
         }
+    }
+
+    /// The vector store for this catalog.
+    ///
+    /// Cheap: it holds two `Arc`s and no connection of its own. It is a method
+    /// rather than a field because the store is stateless, and a field would invite
+    /// somebody to cache one against a catalog it does not belong to.
+    #[must_use]
+    pub fn embedding_store(&self) -> EmbeddingStore {
+        EmbeddingStore::new(Arc::clone(&self.catalog), Arc::clone(&self.clock))
+    }
+
+    /// One photograph's vector, or `None` when it has not been analysed.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the row cannot be read.
+    pub fn embedding_of(
+        &self,
+        project_id: &str,
+        photo: aura_core::PhotoId,
+    ) -> AuraResult<Option<ImageEmbedding>> {
+        Ok(self
+            .embedding_store()
+            .load_one(project_id, photo)?
+            .map(|row| row.embedding))
+    }
+
+    /// One photograph's vector and descriptors.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the row cannot be read.
+    pub fn stored_embedding(
+        &self,
+        project_id: &str,
+        photo: aura_core::PhotoId,
+    ) -> AuraResult<Option<StoredEmbedding>> {
+        self.embedding_store().load_one(project_id, photo)
+    }
+
+    /// The similarity index for one project: from a snapshot when there is a good
+    /// one, from the catalog rows otherwise.
+    ///
+    /// The snapshot is a cache and is treated as one. A missing, stale, corrupt or
+    /// differently-parameterised file is a warning (`AURA-ML-5014`) and a rebuild,
+    /// never a refusal to open the project. Acceptance criterion 4 - "re-opening a
+    /// project rebuilds or loads the index in under 400 ms" - is satisfied by either
+    /// branch, which is why the criterion is worded that way.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the project's vectors cannot be read. A snapshot that
+    /// cannot be written is logged and swallowed: the index is already in memory,
+    /// and losing a cache must not lose a session.
+    pub fn similarity_index(&self, project_id: &str) -> AuraResult<Arc<HnswIndex>> {
+        {
+            let indexes = self.indexes.lock();
+            if let Some(found) = indexes.get(project_id) {
+                return Ok(Arc::clone(found));
+            }
+        }
+        let index = self.load_or_build_index(project_id)?;
+        self.indexes
+            .lock()
+            .insert(project_id.to_string(), Arc::clone(&index));
+        Ok(index)
+    }
+
+    /// Throw a project's graph and snapshot away, and build both again.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the vectors cannot be read.
+    pub fn rebuild_similarity_index(&self, project_id: &str) -> AuraResult<Arc<HnswIndex>> {
+        self.indexes.lock().remove(project_id);
+        drop(std::fs::remove_file(self.snapshot_path(project_id)));
+        self.similarity_index(project_id)
+    }
+
+    /// Where a project's graph snapshot lives.
+    #[must_use]
+    pub fn snapshot_path(&self, project_id: &str) -> PathBuf {
+        Snapshot::path_for(&self.cache_root, project_id, MODEL_VER)
+    }
+
+    /// Load a snapshot or build the graph, then leave a fresh snapshot behind.
+    fn load_or_build_index(&self, project_id: &str) -> AuraResult<Arc<HnswIndex>> {
+        let path = self.snapshot_path(project_id);
+        let params = HnswParams::default();
+
+        match Snapshot::load(&path, params, MODEL_VER, PREPROCESS_VER) {
+            Ok(index) => {
+                tracing::info!(
+                    target: "index.build",
+                    vectors = index.len(),
+                    ms = 0,
+                    snapshot_used = true,
+                    "similarity index loaded from a snapshot"
+                );
+                return Ok(Arc::new(index));
+            }
+            Err(err) => {
+                // A first open has no snapshot: the common case, and not worth a
+                // warning. Anything else is.
+                if path.exists() {
+                    tracing::warn!(target: "index", code = %err.code, "{}", err.detail);
+                }
+            }
+        }
+
+        let store = self.embedding_store();
+        let (entries, camera_labels) = store.load_entries(project_id)?;
+
+        // Section 12: a version mismatch is reported, never silently compared.
+        let versions = store.model_versions(project_id)?;
+        for stale in versions.iter().filter(|version| **version != MODEL_VER) {
+            let rows = entries
+                .iter()
+                .filter(|entry| entry.embedding.model_ver == *stale)
+                .count();
+            let mismatch = aura_index::errors::embed_version_mismatch(*stale, MODEL_VER, rows);
+            tracing::warn!(target: "index", code = %mismatch.code, "{}", mismatch.detail);
+        }
+
+        let vectors = entries.len();
+        if vectors > aura_index::hnsw::IN_MEMORY_CEILING {
+            let over =
+                aura_index::errors::index_too_large(vectors, aura_index::hnsw::IN_MEMORY_CEILING);
+            tracing::warn!(target: "index", code = %over.code, "{}", over.detail);
+        }
+
+        let index = HnswIndex::build(entries, params, self.clock.as_ref());
+        index.set_camera_labels(&camera_labels);
+
+        // Section 11: `index.build` {vectors, ms, snapshot_used}.
+        tracing::info!(
+            target: "index.build",
+            vectors = index.len(),
+            ms = index.build_ms(),
+            snapshot_used = false,
+            "similarity index built"
+        );
+
+        if !index.is_empty() {
+            if let Err(err) = Snapshot::write(&index, &path, MODEL_VER, PREPROCESS_VER) {
+                tracing::warn!(target: "index", code = %err.code, "{}", err.detail);
+            }
+        }
+        Ok(Arc::new(index))
+    }
+
+    /// The embedding runner for one project.
+    ///
+    /// Built per call rather than cached: it holds the preview service and the
+    /// inference engine, both of which are already shared, and the batch size is
+    /// read from the hardware plan at construction - so a re-check of the hardware
+    /// takes effect on the next pass rather than after a restart.
+    ///
+    /// # Errors
+    ///
+    /// Whatever opening the preview cache or building the inference engine raised.
+    pub fn embedding_runner(&self, project_id: &str) -> AuraResult<EmbeddingRunner> {
+        let previews = self.previews(project_id)?;
+        let engine = self.infer_engine()?;
+        Ok(EmbeddingRunner::new(
+            previews,
+            engine,
+            Arc::new(self.embedding_store()),
+            Arc::clone(&self.clock),
+        ))
     }
 
     /// Point the preview cache somewhere else. Used by tests and by the

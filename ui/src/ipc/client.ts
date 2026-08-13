@@ -3,6 +3,13 @@ import { listen } from '@tauri-apps/api/event';
 
 import type {
   CacheStatsDto,
+  DescriptorsDto,
+  EmbedProgressDto,
+  EmbedProjectInput,
+  FindSimilarInput,
+  IndexEvent,
+  IndexStatusDto,
+  SimilarResultDto,
   CloudCacheStatsDto,
   CloudCallDto,
   CloudEvent,
@@ -165,6 +172,28 @@ export const api = {
 
   onCloudEvent: (handler: (event: CloudEvent) => void): Promise<() => void> =>
     listen<CloudEvent>('cloud', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+
+  findSimilar: (input: FindSimilarInput): Promise<SimilarResultDto> =>
+    invoke<SimilarResultDto>('find_similar', { input }),
+
+  indexStatus: (projectId: string): Promise<IndexStatusDto> =>
+    invoke<IndexStatusDto>('index_status', { projectId }),
+
+  buildIndex: (projectId: string): Promise<IndexStatusDto> =>
+    invoke<IndexStatusDto>('build_index', { projectId }),
+
+  embedProject: (input: EmbedProjectInput): Promise<EmbedProgressDto> =>
+    invoke<EmbedProgressDto>('embed_project', { input }),
+
+  imageDescriptors: (projectId: string, photoId: string): Promise<DescriptorsDto> =>
+    invoke<DescriptorsDto>('image_descriptors', { projectId, photoId }),
+
+  onIndexEvent: (handler: (event: IndexEvent) => void): Promise<() => void> =>
+    listen<IndexEvent>('index', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },

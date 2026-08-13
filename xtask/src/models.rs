@@ -66,6 +66,7 @@ fn generate() -> ExitCode {
                 task: "embedding",
                 class: ModelClass::Embedding,
                 model: fixtures::tiny_embedding(),
+                input_side: fixtures::INPUT_SIDE,
                 output: BTreeMap::from([(
                     "embedding".to_string(),
                     vec![1, fixtures::EMBEDDING_DIM],
@@ -81,6 +82,7 @@ fn generate() -> ExitCode {
                 task: "multiclass",
                 class: ModelClass::Embedding,
                 model: fixtures::tiny_scene(),
+                input_side: fixtures::INPUT_SIDE,
                 output: BTreeMap::from([(
                     "scene_probs".to_string(),
                     vec![1, fixtures::SCENE_CLASSES],
@@ -88,6 +90,25 @@ fn generate() -> ExitCode {
                 // A scene model conditions colour decisions downstream, so it is
                 // the example of a model whose card forbids int8 (section 12).
                 precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::WEDDING_EMBEDDING_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "embedding",
+                class: ModelClass::Embedding,
+                model: fixtures::wedding_embedding(),
+                input_side: fixtures::WEDDING_INPUT_SIDE,
+                output: BTreeMap::from([(
+                    "embedding".to_string(),
+                    vec![1, fixtures::WEDDING_EMBEDDING_DIM],
+                )]),
+                // int8 is allowed and is the variant the processor path uses: a
+                // 512-d direction survives per-tensor quantisation, and phase 05's
+                // whole argument is that this model runs 4,000 times.
+                precision_policy: PrecisionPolicy::permissive(),
             },
         ),
     ];
@@ -139,6 +160,9 @@ struct Placeholder {
     task: &'static str,
     class: ModelClass,
     model: OnnxModel,
+    /// Side of the square input this model takes. Phase 03's placeholders take
+    /// 32 px; phase 05's embedding model takes 384.
+    input_side: usize,
     output: BTreeMap<String, Vec<usize>>,
     precision_policy: PrecisionPolicy,
 }
@@ -151,11 +175,18 @@ fn build_entry(directory: &Path, spec: &Placeholder) -> ModelEntry {
         task,
         class,
         model,
+        input_side,
         output,
         precision_policy,
     } = spec;
-    let (name, version, task, class, precision_policy) =
-        (*name, *version, *task, *class, *precision_policy);
+    let (name, version, task, class, input_side, precision_policy) = (
+        *name,
+        *version,
+        *task,
+        *class,
+        *input_side,
+        *precision_policy,
+    );
 
     let mut variants = Vec::new();
 
@@ -203,7 +234,7 @@ fn build_entry(directory: &Path, spec: &Placeholder) -> ModelEntry {
         task: task.to_string(),
         class,
         input: InputSpec {
-            shape: vec![1, 3, fixtures::INPUT_SIDE, fixtures::INPUT_SIDE],
+            shape: vec![1, 3, input_side, input_side],
             layout: "NCHW".to_string(),
             range: "0..1".to_string(),
             colour: "srgb".to_string(),
