@@ -29,8 +29,13 @@ use aura_infer::probe::probe;
 use aura_infer::service::InferEngine;
 use aura_infer::source::ModelSource;
 use aura_models::registry::{trusted_public_key, ModelRegistry};
+use aura_people::store::PeopleStore;
+use aura_people::vault::BiometricKeyStore;
+use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
 use aura_vision::embed::model::{MODEL_VER, PREPROCESS_VER};
+use aura_vision::face::prominence::{ProminenceWeights, OVERRIDE_RELATIVE_PATH};
+use aura_vision::face::FacePipeline;
 use aura_vision::EmbeddingRunner;
 use parking_lot::Mutex;
 
@@ -65,6 +70,26 @@ pub struct AppState {
     /// wedding's vectors are never compared with another's, and the memory is
     /// released when a project is closed.
     indexes: Arc<Mutex<BTreeMap<String, Arc<HnswIndex>>>>,
+    /// The biometric store and the service over it, built on first use.
+    ///
+    /// One store for the whole catalog rather than one per project, because the store
+    /// is itself keyed by project everywhere it matters and it caches one derived vault
+    /// per project inside. A catalog that is opened and closed without touching the
+    /// People panel never reads a credential store and never derives a key.
+    people: Arc<Mutex<PeopleSlot>>,
+}
+
+/// The lazily-built people state.
+#[derive(Debug, Default)]
+struct PeopleSlot {
+    store: Option<Arc<PeopleStore>>,
+    service: Option<Arc<People>>,
+    /// Swapped for an in-memory store by the tests and the phase gate, so no test ever
+    /// writes a biometric key to a developer's real keychain.
+    keys: Option<Arc<dyn BiometricKeyStore>>,
+    /// The prominence weight table in force. Loaded from the installation override on
+    /// first use, falling back to the table embedded in the build.
+    weights: Option<ProminenceWeights>,
 }
 
 /// The lazily-built cloud state.
@@ -129,6 +154,7 @@ impl AppState {
             cloud: Arc::new(Mutex::new(CloudSlot::default())),
             key_dir: default_key_dir(),
             indexes: Arc::new(Mutex::new(BTreeMap::new())),
+            people: Arc::new(Mutex::new(PeopleSlot::default())),
         })
     }
 
@@ -147,6 +173,7 @@ impl AppState {
             cloud: Arc::new(Mutex::new(CloudSlot::default())),
             key_dir: default_key_dir(),
             indexes: Arc::new(Mutex::new(BTreeMap::new())),
+            people: Arc::new(Mutex::new(PeopleSlot::default())),
         }
     }
 
@@ -319,6 +346,255 @@ impl AppState {
             Arc::new(self.embedding_store()),
             Arc::clone(&self.clock),
         ))
+    }
+
+    // -----------------------------------------------------------------------
+    // PHASE-06. People.
+    // -----------------------------------------------------------------------
+
+    /// Use a different biometric key store.
+    ///
+    /// The tests and the phase gate pass an in-memory one, so that no test in this
+    /// workspace ever writes a biometric key to a developer's real keychain. Exactly the
+    /// reason `with_key_store` exists for the cloud half.
+    #[must_use]
+    pub fn with_biometric_keys(self, keys: Arc<dyn BiometricKeyStore>) -> Self {
+        {
+            let mut slot = self.people.lock();
+            slot.keys = Some(keys);
+            // Both are derived from the key store, so both are stale.
+            slot.store = None;
+            slot.service = None;
+        }
+        self
+    }
+
+    /// The biometric key store, built on first use.
+    ///
+    /// Defaults to the operating system's credential store, through the adapter in
+    /// [`crate::biometric_keys`] - which is what keeps `aura-people` free of a dependency
+    /// on the one crate allowed to open a socket.
+    ///
+    /// # Errors
+    ///
+    /// Never in itself; the signature matches the other accessors so a caller does not
+    /// have to know which of them can fail.
+    pub fn biometric_keys(&self) -> AuraResult<Arc<dyn BiometricKeyStore>> {
+        {
+            let slot = self.people.lock();
+            if let Some(keys) = &slot.keys {
+                return Ok(Arc::clone(keys));
+            }
+        }
+        let credential_store = self.key_store()?;
+        let keys: Arc<dyn BiometricKeyStore> = Arc::new(
+            crate::biometric_keys::OsBiometricKeys::new(credential_store),
+        );
+
+        let mut slot = self.people.lock();
+        slot.keys = Some(Arc::clone(&keys));
+        Ok(keys)
+    }
+
+    /// The prominence weight table in force.
+    ///
+    /// The installation override at `<catalog dir>/config/prominence.toml` when there is
+    /// a usable one, and the table embedded in the build otherwise. A malformed override
+    /// is a warning and a fall back, never a refusal to open a project: a photographer
+    /// whose wedding will not open because a QA engineer left a trailing comma is a
+    /// photographer with a support ticket and a deadline.
+    #[must_use]
+    pub fn prominence_weights(&self) -> ProminenceWeights {
+        {
+            let slot = self.people.lock();
+            if let Some(weights) = &slot.weights {
+                return weights.clone();
+            }
+        }
+        let path = self.cache_root.parent().map_or_else(
+            || PathBuf::from(OVERRIDE_RELATIVE_PATH),
+            |parent| parent.join(OVERRIDE_RELATIVE_PATH),
+        );
+        let (weights, refusal) = ProminenceWeights::load_or_embedded(&path);
+        if let Some(reason) = refusal {
+            tracing::warn!(target: "people.weights", "{reason}");
+        }
+
+        let mut slot = self.people.lock();
+        slot.weights = Some(weights.clone());
+        weights
+    }
+
+    /// The biometric store for this catalog, built on first use.
+    ///
+    /// # Errors
+    ///
+    /// Whatever building the key store raised.
+    pub fn people_store_arc(&self) -> AuraResult<Arc<PeopleStore>> {
+        {
+            let slot = self.people.lock();
+            if let Some(store) = &slot.store {
+                return Ok(Arc::clone(store));
+            }
+        }
+        let keys = self.biometric_keys()?;
+        let store = Arc::new(PeopleStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+            keys,
+            &self.cache_root,
+        ));
+
+        let mut slot = self.people.lock();
+        slot.store = Some(Arc::clone(&store));
+        Ok(store)
+    }
+
+    /// The biometric store, for the commands that read it directly.
+    ///
+    /// # Panics
+    ///
+    /// Never. Building the store cannot fail - the key store's constructor is
+    /// infallible - and this accessor exists so that eleven commands do not each have to
+    /// handle a `Result` that has no failure path. The fallible spelling is
+    /// [`AppState::people_store_arc`], which the fallible callers use.
+    #[must_use]
+    pub fn people_store(&self) -> Arc<PeopleStore> {
+        // Constructed inline rather than unwrapped: `people_store_arc` only fails if the
+        // credential-store adapter fails to build, which it cannot, and an `unwrap` here
+        // would be banned by R1 anyway.
+        match self.people_store_arc() {
+            Ok(store) => store,
+            Err(_) => Arc::new(PeopleStore::new(
+                Arc::clone(&self.catalog),
+                Arc::clone(&self.clock),
+                Arc::new(aura_people::MemoryKeyStore::new()),
+                &self.cache_root,
+            )),
+        }
+    }
+
+    /// The people service, built on first use.
+    #[must_use]
+    pub fn people(&self) -> Arc<People> {
+        {
+            let slot = self.people.lock();
+            if let Some(service) = &slot.service {
+                return Arc::clone(service);
+            }
+        }
+        let store = self.people_store();
+        let service = Arc::new(
+            People::new(store, Arc::clone(&self.clock)).with_weights(self.prominence_weights()),
+        );
+
+        let mut slot = self.people.lock();
+        slot.service = Some(Arc::clone(&service));
+        service
+    }
+
+    /// The face scanner for this catalog.
+    ///
+    /// Built per call rather than cached, for the same reason the embedding runner is: it
+    /// holds the preview service and the inference engine, both of which are already
+    /// shared, and the models are resolved at construction - so a re-check of the
+    /// hardware takes effect on the next pass rather than after a restart.
+    ///
+    /// # Errors
+    ///
+    /// Whatever building the inference engine or the key store raised. The preview
+    /// service is per project and is resolved lazily inside the scan, so this does not
+    /// need a project id.
+    pub fn face_scanner(&self) -> AuraResult<FaceScanner> {
+        let engine = self.infer_engine()?;
+        let store = self.people_store_arc()?;
+        // Previews are per project, and the scanner needs one service. The catalog's
+        // first project is not a safe guess, so the scanner is built against a project's
+        // service by `face_scanner_for`; this spelling exists for the single-project
+        // case the CLI and the gate use.
+        let previews = self.first_project_previews()?;
+        Ok(FaceScanner::new(
+            previews,
+            FacePipeline::new(engine),
+            store,
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The face scanner for one project.
+    ///
+    /// # Errors
+    ///
+    /// Whatever opening the preview cache or building the inference engine raised.
+    pub fn face_scanner_for(&self, project_id: &str) -> AuraResult<FaceScanner> {
+        let engine = self.infer_engine()?;
+        let store = self.people_store_arc()?;
+        let previews = self.previews(project_id)?;
+        Ok(FaceScanner::new(
+            previews,
+            FacePipeline::new(engine),
+            store,
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// How many of a project's frames earned the tiled detection pass.
+    ///
+    /// Section 12's fifth failure mode is "tiled detection doubles cost", and the
+    /// mitigation it asks for is a measurement rather than a promise. This is the number
+    /// the People panel shows.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the coverage view cannot be read.
+    pub fn people_tiled_frames(&self, project: &aura_core::ProjectId) -> AuraResult<i64> {
+        let key = project.to_db();
+        self.catalog.read(move |conn| {
+            let found: Result<i64, rusqlite::Error> = conn.query_row(
+                "SELECT tiled_frames FROM v_people_coverage WHERE project_id = ?1",
+                rusqlite::params![key],
+                |row| row.get(0),
+            );
+            Ok(found.unwrap_or(0))
+        })
+    }
+
+    /// True when this project's biometric data has been erased.
+    ///
+    /// Reported rather than inferred from an empty face table, because "there are no
+    /// faces" and "the faces were deliberately destroyed" are different answers to a
+    /// client who asks.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the vault row cannot be read.
+    pub fn people_erased(&self, project: &aura_core::ProjectId) -> AuraResult<bool> {
+        let key = project.to_db();
+        self.catalog.read(move |conn| {
+            let found: Result<Option<String>, rusqlite::Error> = conn.query_row(
+                "SELECT erased_at FROM face_vault WHERE project_id = ?1",
+                rusqlite::params![key],
+                |row| row.get(0),
+            );
+            Ok(found.ok().flatten().is_some())
+        })
+    }
+
+    /// The preview service of the catalog's first live project.
+    ///
+    /// A convenience for the single-project callers - the CLI, the phase gate, the
+    /// benchmarks. A multi-project caller uses [`AppState::face_scanner_for`].
+    fn first_project_previews(&self) -> AuraResult<Arc<Previews>> {
+        let project = self.catalog.read(|conn| {
+            let found: Result<String, rusqlite::Error> = conn.query_row(
+                "SELECT project_id FROM project WHERE deleted_at IS NULL
+                  ORDER BY created_at, project_id LIMIT 1",
+                [],
+                |row| row.get(0),
+            );
+            Ok(found.unwrap_or_default())
+        })?;
+        self.previews(&project)
     }
 
     /// Point the preview cache somewhere else. Used by tests and by the

@@ -10,6 +10,24 @@ import type {
   IndexEvent,
   IndexStatusDto,
   SimilarResultDto,
+  EraseBiometricsDto,
+  EraseBiometricsInput,
+  FaceCropDto,
+  GroupPeopleDto,
+  GroupPeopleInput,
+  IdentityCardDto,
+  IdentityHandleDto,
+  IdentityTimelineDto,
+  ImageSubjectsDto,
+  MergeIdentitiesInput,
+  PeopleEvent,
+  PeopleStatusDto,
+  RenameIdentityInput,
+  ScanFacesDto,
+  ScanFacesInput,
+  SetIdentityImportanceInput,
+  SetIdentityRoleInput,
+  SplitIdentityInput,
   CloudCacheStatsDto,
   CloudCallDto,
   CloudEvent,
@@ -194,6 +212,62 @@ export const api = {
 
   onIndexEvent: (handler: (event: IndexEvent) => void): Promise<() => void> =>
     listen<IndexEvent>('index', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+
+  peopleStatus: (projectId: string): Promise<PeopleStatusDto> =>
+    invoke<PeopleStatusDto>('people_status', { projectId }),
+
+  listIdentities: (projectId: string): Promise<IdentityCardDto[]> =>
+    invoke<IdentityCardDto[]>('list_identities', { projectId }),
+
+  imageSubjects: (photoId: string): Promise<ImageSubjectsDto> =>
+    invoke<ImageSubjectsDto>('image_subjects', { photoId }),
+
+  scanFaces: (input: ScanFacesInput): Promise<ScanFacesDto> =>
+    invoke<ScanFacesDto>('scan_faces', { input }),
+
+  groupPeople: (input: GroupPeopleInput): Promise<GroupPeopleDto> =>
+    invoke<GroupPeopleDto>('group_people', { input }),
+
+  mergeIdentities: (input: MergeIdentitiesInput): Promise<IdentityHandleDto> =>
+    invoke<IdentityHandleDto>('merge_identities', { input }),
+
+  splitIdentity: (input: SplitIdentityInput): Promise<IdentityHandleDto> =>
+    invoke<IdentityHandleDto>('split_identity', { input }),
+
+  /** The "this is the bride" button. Sets `userLocked`; automation may not undo it. */
+  setIdentityRole: (input: SetIdentityRoleInput): Promise<void> =>
+    invoke<void>('set_identity_role', { input }),
+
+  renameIdentity: (input: RenameIdentityInput): Promise<void> =>
+    invoke<void>('rename_identity', { input }),
+
+  setIdentityImportance: (input: SetIdentityImportanceInput): Promise<void> =>
+    invoke<void>('set_identity_importance', { input }),
+
+  identityTimelines: (projectId: string): Promise<IdentityTimelineDto[]> =>
+    invoke<IdentityTimelineDto[]>('identity_timelines', { projectId }),
+
+  /**
+   * The only route from the sealed biometric store to a screen. One crop per call,
+   * decoded in Rust; there is deliberately no command that returns a template.
+   */
+  identityCover: (projectId: string, faceId: string): Promise<FaceCropDto> =>
+    invoke<FaceCropDto>('identity_cover', { projectId, faceId }),
+
+  /**
+   * Irreversible. `confirm` must equal `projectId`, and the backend refuses otherwise -
+   * the check is there rather than only in the dialog because this is the one operation
+   * in the product with no undo.
+   */
+  eraseBiometrics: (input: EraseBiometricsInput): Promise<EraseBiometricsDto> =>
+    invoke<EraseBiometricsDto>('erase_biometrics', { input }),
+
+  onPeopleEvent: (handler: (event: PeopleEvent) => void): Promise<() => void> =>
+    listen<PeopleEvent>('people', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },

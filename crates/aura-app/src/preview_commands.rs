@@ -189,7 +189,8 @@ pub fn preview_problems(state: &AppState, project_id: &str) -> IpcResult<Vec<(St
 /// Standard base64, written here rather than pulled in as a dependency: it is
 /// twenty lines, it has no configuration, and a supply-chain review of a crate
 /// that does this much is not a good use of anyone's afternoon.
-fn base64(bytes: &[u8]) -> String {
+#[must_use]
+pub fn base64(bytes: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);

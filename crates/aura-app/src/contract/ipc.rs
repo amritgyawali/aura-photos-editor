@@ -798,6 +798,442 @@ pub enum IndexEvent {
     },
 }
 
+// ---------------------------------------------------------------------------
+// PHASE-06. People. See `docs/adr/ADR-0014-people-ipc-surface.md`.
+//
+// Three rules shape this half of the surface, and the third one is the reason it
+// looks different from the similarity surface.
+//
+// **No template, ever.** There is no `get_face_embedding`. A 512-d recognition
+// template is a biometric identifier, a web view has no use for a number it cannot
+// compare, and a template in a JSON payload is a template in a crash log. Every
+// comparison happens in Rust.
+//
+// **A face crop is a photograph of a person, so it is behind a command that says
+// so.** `identity_cover` decodes exactly one sealed crop and returns it as a data
+// URL. It is the only route from the sealed store to a screen, and it exists because
+// a People panel with no faces in it is unusable.
+//
+// **Every DTO that carries a decision carries its reasons.** Invariant 2 is not
+// satisfied by a confidence alone, and the People panel is the surface where a
+// photographer is most likely to disagree with the product - so `roleReasons` and a
+// face's `reasons` are on the wire rather than reconstructed in the UI.
+// ---------------------------------------------------------------------------
+
+/// What the People panel opens with.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeopleStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs scanned for faces.
+    pub scanned: u32,
+    /// Scanned over total. The number that explains an empty panel.
+    pub coverage: f32,
+    /// Faces found.
+    pub faces: u32,
+    /// Faces that passed the quality gate and may vote on identity.
+    pub voting_faces: u32,
+    /// Identities the grouping produced.
+    pub identities: u32,
+    /// Frames that earned the tiled detection pass.
+    pub tiled_frames: u32,
+    /// True until a photographer has confirmed one half of the couple.
+    pub couple_unconfirmed: bool,
+    /// Detector and recogniser versions still present that are not the current pair,
+    /// as `detector*1000 + recogniser`.
+    pub stale_versions: Vec<u32>,
+    /// True when this project's biometric data has been erased.
+    pub erased: bool,
+    /// Which credential store holds the key, for the Settings panel.
+    pub key_store: String,
+    /// Which prominence weight table version produced the scores.
+    pub weights_ver: u32,
+}
+
+/// Somebody this wedding photographed, for one card in the People panel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentityCardDto {
+    /// Prefixed identity id.
+    pub id: String,
+    /// The photographer's name for them, when they gave one.
+    pub label: Option<String>,
+    /// `bride`, `groom`, `couple`, `family_close`, `family_extended`, `vip`, `guest`,
+    /// `vendor`, `child` or `unknown`.
+    pub role: String,
+    /// How sure, `0..1`.
+    pub role_confidence: f32,
+    /// Why. Never empty above zero confidence.
+    pub role_reasons: Vec<String>,
+    /// True when a photographer set the role and automation may not change it.
+    pub user_locked: bool,
+    /// The importance slider, `0..1`. 0.5 is neutral.
+    pub importance: f32,
+    /// Faces assigned.
+    pub faces: u32,
+    /// Faces that may vote on identity.
+    pub voting_faces: u32,
+    /// Distinct photographs.
+    pub frames: u32,
+    /// First appearance, RFC 3339.
+    pub first_seen: Option<String>,
+    /// Last appearance, RFC 3339.
+    pub last_seen: Option<String>,
+    /// Mean fused quality of their faces.
+    pub mean_quality: f32,
+    /// The face to show on the card, best quality first.
+    pub cover_face_id: Option<String>,
+    /// Mean member-to-centroid distance. High means two looks of one person.
+    pub variance: f32,
+    /// Sub-centroids this identity grew for a change of look.
+    pub sub_count: u32,
+    /// Everybody they were photographed with, most often first.
+    pub companions: Vec<CompanionDto>,
+}
+
+/// One entry in an identity's "seen with" list.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompanionDto {
+    /// The other identity.
+    pub id: String,
+    /// Their name, when they have one.
+    pub label: Option<String>,
+    /// Photographs both appear in.
+    pub frames: u32,
+}
+
+/// One face box, with the quality verdict that decided whether it votes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FaceBoxDto {
+    /// Prefixed face id.
+    pub face_id: String,
+    /// Who it belongs to, when it belongs to anybody.
+    pub identity_id: Option<String>,
+    /// Left edge, normalised.
+    pub x: f32,
+    /// Top edge, normalised.
+    pub y: f32,
+    /// Width, normalised.
+    pub w: f32,
+    /// Height, normalised.
+    pub h: f32,
+    /// Detector objectness.
+    pub det_score: f32,
+    /// Fused usability.
+    pub quality: f32,
+    /// Blur, `0..1`.
+    pub blur: f32,
+    /// Occlusion, `0..1`.
+    pub occlusion: f32,
+    /// Yaw in degrees, positive towards the image's right.
+    pub yaw: f32,
+    /// Pitch in degrees, positive looking down.
+    pub pitch: f32,
+    /// Roll in degrees, positive clockwise in the frame.
+    pub roll: f32,
+    /// Height in source pixels.
+    pub px_height: u32,
+    /// True when this face may vote on identity.
+    pub votes: bool,
+    /// `full` or `tile`.
+    pub found_by: String,
+    /// Why it does or does not vote.
+    pub reasons: Vec<String>,
+}
+
+/// One identity's prominence in one frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProminenceEntryDto {
+    /// Whose.
+    pub identity_id: String,
+    /// Prominence within this frame, `0..1`.
+    pub prominence: f32,
+}
+
+/// Who is in one photograph, and how much of it is about them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageSubjectsDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Every face in the frame, strongest detection first.
+    pub faces: Vec<FaceBoxDto>,
+    /// The identity this photograph is most about.
+    pub dominant: Option<String>,
+    /// Per-identity prominence. An array rather than a map so the order is the
+    /// server's and two panels cannot disagree about it.
+    pub prominence: Vec<ProminenceEntryDto>,
+    /// The prominence-weighted sharpness of the faces present. The number phases 09
+    /// and 12 use instead of global sharpness.
+    pub subject_focus_score: f32,
+    /// People in the frame, including the ones whose faces are not visible.
+    pub people_count: u32,
+    /// Which weight table version produced these numbers.
+    pub weights_ver: u32,
+}
+
+/// Scan a project for faces.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanFacesInput {
+    /// The project to walk.
+    pub project_id: String,
+}
+
+/// What one face pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanFacesDto {
+    /// Photographs looked at.
+    pub scanned: u32,
+    /// Faces found.
+    pub faces: u32,
+    /// Faces that may vote on identity.
+    pub voting: u32,
+    /// Faces below the gate. Stored, visible, and excluded from voting.
+    pub gated: u32,
+    /// Body boxes found.
+    pub person_boxes: u32,
+    /// Bodies with no visible face.
+    pub headless: u32,
+    /// Photographs that could not be scanned; each one is logged with a code.
+    pub failed: u32,
+    /// Photographs still unscanned.
+    pub remaining: u32,
+    /// Frames that earned the tiled pass.
+    pub tiled_frames: u32,
+    /// Tiled frames over scanned frames, `0..1`. Section 12's cost measurement.
+    pub tile_ratio: f32,
+    /// Wall clock for the pass.
+    pub elapsed_ms: u64,
+    /// True when the pass was stopped early.
+    pub cancelled: bool,
+}
+
+/// Group a project's faces into identities.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupPeopleInput {
+    /// The project to group.
+    pub project_id: String,
+}
+
+/// What one grouping pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupPeopleDto {
+    /// Identities created.
+    pub identities: u32,
+    /// Faces assigned to one.
+    pub assigned: u32,
+    /// Faces deliberately left unassigned rather than guessed at.
+    pub unassigned: u32,
+    /// The clustering threshold used.
+    pub threshold: f32,
+    /// Merges the threshold allowed and cohesion verification refused.
+    pub refused_merges: u32,
+    /// Identities that grew sub-centroids for a change of look.
+    pub sub_clustered: u32,
+    /// The couple, as zero or two identity ids.
+    pub couple: Vec<String>,
+    /// The couple decision's confidence.
+    pub couple_confidence: f32,
+    /// True when the top two candidate pairs were within the ambiguity margin.
+    pub couple_ambiguous: bool,
+    /// True when no scene labels were available, so the couple rests on
+    /// co-occurrence and frequency alone.
+    pub scene_starved: bool,
+    /// Photographer decisions replayed onto the new grouping.
+    pub decisions_replayed: u32,
+    /// Decisions whose faces had scattered too far to replay.
+    pub decisions_orphaned: u32,
+    /// Fraction of the project scanned, `0..1`.
+    pub coverage: f32,
+    /// Wall clock.
+    pub elapsed_ms: u64,
+}
+
+/// Fold one identity into another.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeIdentitiesInput {
+    /// The survivor.
+    pub a: String,
+    /// The one absorbed.
+    pub b: String,
+}
+
+/// Move faces out of an identity into a new one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SplitIdentityInput {
+    /// The identity to split.
+    pub identity_id: String,
+    /// The faces to move. Must not be all of them.
+    pub face_ids: Vec<String>,
+}
+
+/// Set a role, and lock it against automation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetIdentityRoleInput {
+    /// The identity.
+    pub identity_id: String,
+    /// The role's stable text.
+    pub role: String,
+}
+
+/// Rename an identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameIdentityInput {
+    /// The identity.
+    pub identity_id: String,
+    /// The new name, or absent to clear it.
+    pub label: Option<String>,
+}
+
+/// Move the importance slider.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetIdentityImportanceInput {
+    /// The identity.
+    pub identity_id: String,
+    /// The new importance, `0..1`. 0.5 is neutral.
+    pub importance: f32,
+}
+
+/// The id of an identity a command created or kept.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentityHandleDto {
+    /// Prefixed identity id.
+    pub id: String,
+}
+
+/// Erase a project's biometric data.
+///
+/// `confirm` must be the project id, spelled out. A destructive command whose only
+/// argument is the thing it destroys is one mis-click from a support ticket that
+/// cannot be undone, and this is the one operation in the product with no undo.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EraseBiometricsInput {
+    /// The project.
+    pub project_id: String,
+    /// The project id again, typed by the photographer.
+    pub confirm: String,
+}
+
+/// What an erasure did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EraseBiometricsDto {
+    /// Face rows deleted.
+    pub faces: u32,
+    /// Identity rows deleted.
+    pub identities: u32,
+    /// Sealed crop files deleted.
+    pub crops: u32,
+    /// True when the credential-store entry was removed.
+    pub key_removed: bool,
+}
+
+/// A gap in somebody's coverage.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverageGapDto {
+    /// Start, milliseconds since the epoch.
+    pub from_ms: i64,
+    /// End, milliseconds since the epoch.
+    pub to_ms: i64,
+    /// How long, in whole minutes.
+    pub minutes: i64,
+}
+
+/// One identity's timeline.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentityTimelineDto {
+    /// Whose.
+    pub identity_id: String,
+    /// First appearance, milliseconds since the epoch.
+    pub first_ms: Option<i64>,
+    /// Last appearance.
+    pub last_ms: Option<i64>,
+    /// Minutes between the two.
+    pub span_minutes: i64,
+    /// Distinct photographs.
+    pub frames: u32,
+    /// Gaps longer than forty-five minutes.
+    pub gaps: Vec<CoverageGapDto>,
+}
+
+/// One sealed face crop, decoded for display.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FaceCropDto {
+    /// The face.
+    pub face_id: String,
+    /// A `data:image/jpeg;base64,...` URL of the 112 px aligned crop.
+    pub data_url: String,
+}
+
+/// People events pushed to the UI, mirroring section 11's four events.
+///
+/// Typed on both sides in PHASE-06 and not yet emitted, for the same reason
+/// `IngestEvent`, `InferEvent`, `CloudEvent` and `IndexEvent` are not: the Tauri
+/// shell has not been launched on the development machine, so an emitter would be
+/// code nobody has run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum PeopleEvent {
+    /// `face.detect` - one frame finished.
+    ScanProgress {
+        /// Photographs finished.
+        done: u64,
+        /// Photographs in this pass.
+        total: u64,
+        /// Faces found so far.
+        faces: u64,
+        /// True when the frame just finished earned the tiled pass.
+        tiled: bool,
+    },
+    /// `identity.cluster` - the identities are ready.
+    IdentitiesGrouped {
+        /// How many.
+        identities: u32,
+        /// Faces used to build the skeleton.
+        faces_used: u32,
+        /// The threshold used.
+        threshold: f32,
+        /// Milliseconds it took.
+        ms: u32,
+    },
+    /// `identity.role_inferred` - one role was decided.
+    RoleInferred {
+        /// The identity.
+        identity_id: String,
+        /// The role's stable text.
+        role: String,
+        /// How sure.
+        confidence: f32,
+        /// How many kinds of evidence were cited.
+        evidence_kinds: u32,
+    },
+    /// `people.user_edit` - the photographer changed something.
+    UserEdit {
+        /// `merge`, `split`, `rename`, `role` or `importance`.
+        action: String,
+        /// How many identities were touched.
+        identities: u32,
+    },
+}
+
 /// Progress and completion events pushed to the UI during an import.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
