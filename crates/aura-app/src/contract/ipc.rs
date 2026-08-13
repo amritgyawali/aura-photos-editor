@@ -621,6 +621,183 @@ pub enum CloudEvent {
     },
 }
 
+/// Ask what looks like one photograph.
+///
+/// Added in PHASE-05; see `docs/adr/ADR-0012-similarity-ipc-surface.md`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FindSimilarInput {
+    /// The project to search.
+    pub project_id: String,
+    /// The photograph to search around.
+    pub photo_id: String,
+    /// How many neighbours to return.
+    pub k: u32,
+    /// Only frames within plus or minus this many seconds, when set.
+    pub time_window_s: Option<u32>,
+    /// Only frames from this camera, when set. The catalog's `cam_...` id.
+    pub camera_id: Option<String>,
+    /// Frames a previous query already claimed.
+    pub exclude: Vec<String>,
+}
+
+/// One neighbour, with everything the panel would otherwise need a second
+/// round trip for.
+///
+/// `distance` and `similarity` are two spellings of one fact on purpose: the
+/// conversion done once in Rust is the reason two panels cannot disagree about
+/// which direction is better.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimilarNeighbourDto {
+    /// The neighbour.
+    pub photo_id: String,
+    /// Cosine distance, zero is identical.
+    pub distance: f32,
+    /// `1 - distance`, clamped to `0..1`. The number a human reads.
+    pub similarity: f32,
+    /// Hamming distance between the two difference hashes, `0..=64`.
+    pub dhash_distance: u32,
+    /// True when the difference hash calls this the same photograph. Evidence,
+    /// not a verdict: the duplicate policy is phase 08's.
+    pub near_duplicate: bool,
+}
+
+/// The answer to one similarity query, and the cost of asking.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimilarResultDto {
+    /// The photograph that was asked about.
+    pub photo_id: String,
+    /// Neighbours, nearest first.
+    pub neighbours: Vec<SimilarNeighbourDto>,
+    /// Wall clock. A float because the budget is 5 ms, and a 5 ms budget measured
+    /// in whole milliseconds is measured in units of itself.
+    pub elapsed_ms: f32,
+    /// `none`, `time`, `camera`, `scene` or `composite`.
+    pub filter_kind: String,
+}
+
+/// What the similarity index is holding.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexStatusDto {
+    /// Vectors in the graph.
+    pub vectors: u32,
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Embedded over total. The number that explains an empty result list.
+    pub coverage: f32,
+    /// Vectors that a filtered query can reach.
+    pub filterable: u32,
+    /// Model version the graph was built at.
+    pub model_ver: u32,
+    /// Versions still present in the catalog that are not the current one.
+    pub stale_model_versions: Vec<u32>,
+    /// Milliseconds the current graph took to build.
+    pub build_ms: u32,
+    /// True when the graph was loaded from a snapshot rather than rebuilt.
+    pub from_snapshot: bool,
+}
+
+/// Embed everything in a project that has no current vector.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbedProjectInput {
+    /// The project to walk.
+    pub project_id: String,
+}
+
+/// What one embedding pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbedProgressDto {
+    /// Photographs that gained a vector.
+    pub embedded: u32,
+    /// Photographs that could not be embedded; each one is logged with a code.
+    pub failed: u32,
+    /// Photographs still without a current vector.
+    pub remaining: u32,
+    /// Wall clock for the pass.
+    pub elapsed_ms: u64,
+    /// Batches submitted to the runtime.
+    pub batches: u32,
+    /// True when the pass was stopped early.
+    pub cancelled: bool,
+}
+
+/// The cheap descriptors of one photograph, for the debug panel's readout.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DescriptorsDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The difference hash as sixteen hex characters.
+    pub dhash_hex: String,
+    /// Mean luminance, `0..1`.
+    pub luma_mean: f32,
+    /// First percentile.
+    pub luma_p1: f32,
+    /// Median.
+    pub luma_p50: f32,
+    /// Ninety-ninth percentile.
+    pub luma_p99: f32,
+    /// Fraction of pixels at or below the black point.
+    pub clip_lo: f32,
+    /// Fraction of pixels at or above the white point.
+    pub clip_hi: f32,
+    /// Mean gradient magnitude.
+    pub edge_energy: f32,
+    /// Five dominant colours as `#rrggbb`, most frequent first.
+    pub palette: Vec<String>,
+    /// Which model version produced this frame's vector.
+    pub model_ver: u32,
+    /// Which pixel tier it was read from, and whether those pixels were the
+    /// camera's JPEG or AURA's render.
+    pub pixel_source: String,
+}
+
+/// Similarity events pushed to the UI, mirroring section 11's three events.
+///
+/// Typed on both sides in PHASE-05 and not yet emitted, for the same reason
+/// `IngestEvent`, `InferEvent` and `CloudEvent` are not: the Tauri shell has not
+/// been launched on the development machine, so an emitter would be code nobody
+/// has run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum IndexEvent {
+    /// `embed.batch` - one batch finished.
+    EmbedProgress {
+        /// Photographs finished.
+        done: u64,
+        /// Photographs in this pass.
+        total: u64,
+        /// Size of the batch just submitted.
+        batch_size: u32,
+        /// Which provider ran it.
+        ep: String,
+    },
+    /// `index.build` - the graph is ready.
+    IndexBuilt {
+        /// Vectors in it.
+        vectors: u32,
+        /// Milliseconds it took.
+        ms: u32,
+        /// True when a snapshot was loaded rather than a graph built.
+        snapshot_used: bool,
+    },
+    /// `index.query` - one query finished. Never the filter's contents: a time
+    /// window plus a camera identifies a shoot.
+    QueryTimed {
+        /// Neighbours asked for.
+        k: u32,
+        /// Wall clock.
+        ms: f32,
+        /// `none`, `time`, `camera`, `scene` or `composite`.
+        filter_kind: String,
+    },
+}
+
 /// Progress and completion events pushed to the UI during an import.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]

@@ -31,6 +31,7 @@ pub mod contract {
     pub mod ipc;
 }
 
+pub mod index_commands;
 pub mod infer_commands;
 pub mod preview_commands;
 pub mod state;
@@ -42,6 +43,9 @@ pub use cloud_commands::{
 pub use commands::{
     cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
     start_ingest,
+};
+pub use index_commands::{
+    build_index, embed_project, find_similar, image_descriptors, index_status,
 };
 pub use infer_commands::{
     hardware_plan, infer_stats, list_models, recheck_hardware, set_execution_provider,
