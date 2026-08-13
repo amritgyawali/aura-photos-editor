@@ -97,6 +97,100 @@ pub fn synthetic(
     }
 }
 
+/// An inference service running all three PHASE-06 face models.
+///
+/// The same argument as [`engine`]: nothing here is a double. The three signed
+/// placeholders are generated on the fly and run through the real `InferService`, so a
+/// test that passes has exercised the batch scheduler, the memory ledger and the
+/// deterministic interpreter rather than a stub of them.
+///
+/// The detector is registered as `Segmentation` because that is the class `models.lock`
+/// gives it, and the class decides which batch-size column the scheduler reads.
+#[must_use]
+pub fn face_engine(dir: &TempDir, batch: u16) -> Arc<dyn InferService> {
+    let detect = dir.path().join("face_detect.onnx");
+    let embed = dir.path().join("face_embed.onnx");
+    let quality = dir.path().join("face_quality.onnx");
+    std::fs::write(&detect, serialise(&fixtures::face_detect())).expect("write the detector");
+    std::fs::write(&embed, serialise(&fixtures::face_embed())).expect("write the recogniser");
+    std::fs::write(&quality, serialise(&fixtures::face_quality())).expect("write the head");
+
+    let source = Arc::new(
+        StaticModelSource::new()
+            .with(
+                aura_infer::contract::infer::ModelRef::new(
+                    aura_vision::face::detect::DETECT_MODEL,
+                    aura_vision::face::detect::DETECT_MODEL_VERSION,
+                ),
+                &detect,
+                Precision::Fp32,
+                ModelClass::Segmentation,
+                32,
+            )
+            .with(
+                aura_infer::contract::infer::ModelRef::new(
+                    aura_vision::face::embed::EMBED_MODEL,
+                    aura_vision::face::embed::EMBED_MODEL_VERSION,
+                ),
+                &embed,
+                Precision::Fp32,
+                ModelClass::Embedding,
+                16,
+            )
+            .with(
+                aura_infer::contract::infer::ModelRef::new(
+                    aura_vision::face::quality::QUALITY_MODEL,
+                    aura_vision::face::quality::QUALITY_MODEL_VERSION,
+                ),
+                &quality,
+                Precision::Fp32,
+                ModelClass::Embedding,
+                16,
+            ),
+    );
+
+    let mut plan = HardwarePlan::conservative(4, "2026-08-13T00:00:00Z".to_string());
+    plan.default_batch = BatchDefaults {
+        embedding: batch,
+        segmentation: 2,
+        retouch: 1,
+    };
+
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock::default());
+    Arc::new(InferEngine::new(
+        BackendRegistry::with_reference(),
+        source,
+        plan,
+        clock,
+    ))
+}
+
+/// A frame with synthetic faces in it, as a `PixelBuffer`.
+///
+/// Wraps `aura_vision::face::fixtures::render_frame` so a test can hand it straight to
+/// the pipeline. The provenance is `Decoded` rather than `Embedded`, because the face
+/// pass runs on the tier 2 proxy and a test whose buffer claimed to be a camera JPEG
+/// would store the wrong `pixel_source`.
+#[must_use]
+pub fn face_frame(
+    width: u32,
+    height: u32,
+    faces: &[aura_vision::face::fixtures::SynthFace],
+) -> PixelBuffer {
+    PixelBuffer {
+        width,
+        height,
+        data: PixelData::Srgb8(aura_vision::face::fixtures::render_frame(
+            width as usize,
+            height as usize,
+            faces,
+        )),
+        colour_space: ColourSpace::Srgb,
+        source: PixelSource::Demosaiced,
+        decode_ms: 1,
+    }
+}
+
 /// A frame of one flat colour.
 #[must_use]
 pub fn flat(width: u32, height: u32, level: u8) -> PixelBuffer {

@@ -187,3 +187,57 @@ max_bytes = 1638
 # AURA-ML-5016 is raised and queries fall back to the exact flat scan.
 [count.index_in_memory_ceiling]
 max_count = 20000
+
+# Phase 06 performance budgets, from PHASE-06 section 11.
+#
+# Two of the five rows in that section are absent, and their absence is recorded
+# rather than quietly filled in: "the face pipeline over 4,000 images in <= 240 s
+# on an RTX 4070" and "<= 480 s on an M3 Pro" both describe hardware this build
+# cannot reach, because there is no GPU backend (ADR-0007). They are waived with
+# an expiry condition in
+# docs/adr/ADR-0013-people-intelligence-and-the-biometric-store.md section 6.
+#
+# What replaces them is the per-image row below, measured on the processor path,
+# so a regression in the face pass has something real to fail against.
+
+# One frame, end to end on the processor path: the 640 px detector pass, the
+# anchor decode, the suppression, one aligned warp per face, the quality
+# measurements, the quality head and the recogniser - but not the proxy decode,
+# which phase 02 already budgets.
+#
+# Measured, not guessed: 148 ms for the detector pass plus 12.9 ms per face for
+# the recogniser and the head, which at the fixture set's 2.4 faces per frame is
+# about 180 ms. The budget is 420 ms, which leaves room for a slower laptop and
+# for the occasional tiled frame in a sample, and fails on a two-times
+# regression.
+#
+# At 180 ms a 4,000-image wedding is twelve minutes without tiling. That is the
+# number the waived GPU rows would have replaced, and it is in the exit report.
+[stage.face_scan_image_cpu]
+max_elapsed_ms  = 12000
+max_ms_per_unit = 420
+
+# Clustering, section 11: 25,000 faces in 12 s. The quadratic part is capped at
+# MAX_SKELETON (4,096) by construction, so this is asserted at the cap rather
+# than at 25,000 - past the cap the work is linear and the cap is what the budget
+# actually constrains.
+[stage.identity_cluster_skeleton]
+max_elapsed_ms = 12000
+
+# The People panel's first paint: the coverage view, the identity summary and one
+# sealed crop per card. Section 11 asks for 300 ms.
+[stage.people_panel_open]
+max_elapsed_ms = 300
+
+# Section 11: face store size per 1,000 images. 25 MB, where a megabyte is
+# 1,048,576 bytes. At the fixture set's 2.4 faces per frame that is 2,400 faces,
+# so the per-face payload has about 10 KB to work with - which the 1,239-byte
+# catalog row and the sealed 112 px crop fit inside with room to spare.
+[size.face_store_per_1000_images]
+max_bytes = 26214400  # 25 MB
+
+# The tiled pass costs five detector passes instead of one, and section 12 names
+# "tiled detection doubles cost" as a failure mode to measure rather than assume.
+# This is the ceiling on how often it may fire across a wedding, as a percentage.
+[count.tiled_frame_percent]
+max_count = 25

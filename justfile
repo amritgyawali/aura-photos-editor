@@ -87,6 +87,14 @@ phase-04-verify:
 phase-05-verify:
     cargo run --release --package aura-cli -- verify --phase 05 --work target/phase05-verify
 
+# The phase 06 gate: the migration, a synthetic wedding scanned for faces, detection
+# recall and bokeh rejection against known positions, sealed templates, a cancelled and
+# a resumed pass, grouping with reasons, a photographer's decision surviving a regroup,
+# the project-scoping refusal, byte-identical face ids across two scans, and an erasure
+# that leaves nothing behind. Never touches a network - nothing in phase 06 can.
+phase-06-verify:
+    cargo run --release --package aura-cli -- verify --phase 06 --work target/phase06-verify
+
 # Weight-space parity for every fp32/variant pair, plus the cross-runtime check
 # against onnxruntime when it happens to be installed for Python.
 parity:
