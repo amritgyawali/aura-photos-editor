@@ -222,6 +222,14 @@ impl Catalog {
             "cloud_budget",
             "embeddings",
             "descriptors",
+            // PHASE-06.
+            "face_vault",
+            "face_scan",
+            "faces",
+            "identities",
+            "identity_links",
+            "person_boxes",
+            "cooccurrence",
         ];
         if !COUNTABLE.contains(&table) {
             return Err(statement_failed(
