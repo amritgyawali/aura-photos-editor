@@ -90,6 +90,18 @@ typed_id!(FileId, "fil");
 typed_id!(RunId, "run");
 typed_id!(ImportId, "imp");
 
+// PHASE-06. Section 5 of the phase document writes `FaceId` and `IdentityId` into
+// the frozen `PeopleService` signatures, so they are ids of the same kind as the
+// five above rather than bare strings.
+//
+// Two of them and not one, even though both name "a thing with a face in it": a
+// merge takes two `IdentityId`s and a split takes an `IdentityId` and a list of
+// `FaceId`s, and getting those two arguments the wrong way round is precisely the
+// catalog-corrupting mistake this macro exists to make impossible. See
+// docs/adr/ADR-0013-people-intelligence-and-the-biometric-store.md section 2.
+typed_id!(FaceId, "fce");
+typed_id!(IdentityId, "idt");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
