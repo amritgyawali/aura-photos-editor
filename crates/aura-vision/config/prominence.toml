@@ -1,0 +1,165 @@
+# Prominence weights - PHASE-06 section 6.4.
+#
+# This file is a contract with QA, not an implementation detail. Section 6.4 asks
+# that "all weights live in a versioned config file so QA can tune without
+# recompiling, and every score records the config version", so:
+#
+#   * `version` is written into `ImageSubjects::weights_ver` on every score. Two
+#     scores with different versions are not comparable, and a phase that sorts
+#     them together is comparing two different opinions about what matters.
+#   * Bump `version` on ANY change below, including a change that looks harmless.
+#     A cull that ran under version 1 and a cull that ran under version 2 disagree,
+#     and the ledger has to be able to say which was which.
+#   * The file that ships is the baseline. A copy at
+#     `<catalog>/config/prominence.toml` overrides it at run time; a missing or
+#     unparseable override is a warning and a fall back to this one, never a
+#     refusal to open a project.
+#
+# The five terms are section 6.4's formula:
+#
+#   prominence = w_area * sqrt(area_frac)
+#              + w_centrality * centrality
+#              + w_sharpness * sharpness
+#              + w_gaze * gaze_to_camera
+#              + w_role * role_weight
+#
+# and the result is divided by the sum of the weights, so every set below is
+# scale-free and a set that sums to 2.0 behaves identically to the same
+# proportions summing to 1.0. That means a tuner can raise one term without
+# having to lower another to keep the total, which is the mistake this
+# normalisation exists to prevent.
+#
+# `sqrt(area_frac)` and not `area_frac`: face area is quadratic in distance, so a
+# face twice as far away covers a quarter of the pixels. The square root makes the
+# term roughly linear in how close somebody was to the camera, which is what a
+# photographer means by "big in the frame".
+
+version = 1
+
+# The baseline, used for any scene not named below and for every frame until
+# phase 07 assigns scenes.
+[base]
+area       = 0.28
+centrality = 0.20
+sharpness  = 0.22
+gaze       = 0.10
+role       = 0.20
+
+# Role weights. The product's opinion about a wedding, and the thing a
+# photographer's importance slider multiplies.
+#
+# `bride` and `groom` sit above `couple` because they are confirmed rather than
+# inferred, and a confirmed subject should outrank an inferred one even when both
+# are the same person - it is what makes confirming worth doing.
+[roles]
+bride           = 1.00
+groom           = 1.00
+couple          = 0.92
+family_close    = 0.70
+family_extended = 0.45
+vip             = 0.55
+child           = 0.50
+guest           = 0.30
+vendor          = 0.10
+unknown         = 0.20
+
+# ---------------------------------------------------------------------------
+# Scene overrides. Section 6.4: "in dance, area matters less; in family_portrait,
+# centrality matters more".
+#
+# Every scene block is a complete weight set rather than a delta. A delta file is
+# unreadable after the third tuning round, and a complete set can be diffed
+# against `base` by eye.
+# ---------------------------------------------------------------------------
+
+# Dancing. Everybody is moving, faces are small and off-centre, and the frame is
+# about energy rather than about one person. Area and centrality both drop;
+# sharpness rises, because a sharp face on a dance floor is the whole difficulty.
+[scenes.dancing]
+area       = 0.14
+centrality = 0.12
+sharpness  = 0.34
+gaze       = 0.10
+role       = 0.30
+
+# The first dance is not dancing. Two people, deliberately lit, and the couple is
+# the entire subject - so role dominates and centrality matters again.
+[scenes.first_dance]
+area       = 0.18
+centrality = 0.22
+sharpness  = 0.24
+gaze       = 0.08
+role       = 0.28
+
+# Posed family groups. Centrality is the strongest available proxy for "who this
+# group is arranged around", and everybody's face is roughly the same size, so
+# area carries almost no information.
+[scenes.family_formals]
+area       = 0.12
+centrality = 0.34
+sharpness  = 0.24
+gaze       = 0.12
+role       = 0.18
+
+# Group photographs of many people. Same argument as family formals, more so.
+[scenes.group_photo]
+area       = 0.10
+centrality = 0.32
+sharpness  = 0.26
+gaze       = 0.12
+role       = 0.20
+
+# The ceremony. Centrality is where the couple stand; gaze is nearly useless
+# because everybody is looking at the officiant or at each other.
+[scenes.ceremony]
+area       = 0.20
+centrality = 0.30
+sharpness  = 0.24
+gaze       = 0.04
+role       = 0.22
+
+# Named rituals. As the ceremony, with more weight on role: a ritual frame is
+# about the two people performing it even when a relative is closer to the camera.
+[scenes.ritual]
+area       = 0.18
+centrality = 0.26
+sharpness  = 0.22
+gaze       = 0.04
+role       = 0.30
+
+# Portraits of the couple. One or two faces, both large, both central, both
+# looking at the lens. Sharpness and gaze are what separate a keeper from a
+# reject.
+[scenes.portraits]
+area       = 0.20
+centrality = 0.16
+sharpness  = 0.30
+gaze       = 0.16
+role       = 0.18
+
+# Getting ready. Candid, often with a mirror, and the subject is whoever the
+# photographer moved towards - which is area, not centrality.
+[scenes.getting_ready]
+area       = 0.34
+centrality = 0.12
+sharpness  = 0.24
+gaze       = 0.08
+role       = 0.22
+
+# Speeches. One person is talking and the reaction shots matter as much; gaze
+# away from the camera is normal and must not be penalised.
+[scenes.speeches]
+area       = 0.24
+centrality = 0.22
+sharpness  = 0.26
+gaze       = 0.04
+role       = 0.24
+
+# Details and venue frames. A face in one of these is incidental, so role is
+# almost all of what decides whether it matters.
+[scenes.details]
+area       = 0.16
+centrality = 0.14
+sharpness  = 0.20
+gaze       = 0.06
+role       = 0.44

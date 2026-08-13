@@ -43,6 +43,18 @@
 //! The vectors themselves belong to `aura-index`, which owns the contract, the
 //! storage and the queries. This crate produces them and forgets them.
 //!
+//! **PHASE-06 adds a second pass with the same discipline.** [`face`] finds faces,
+//! aligns them, measures them, embeds them and finds bodies - all from one decoded
+//! buffer, in [`face::FacePipeline::analyse`], with two batched calls into the
+//! runtime rather than two per face. It runs on the 2048 px proxy rather than the
+//! 384 px thumbnail, and the reason is written down at [`face::FACE_LEVEL`]: a
+//! guest's face is eleven pixels tall on a thumbnail.
+//!
+//! The face pass owns no storage. Templates are biometric data, and everything
+//! durable about them - the envelope, the key, the project scoping, the erasure -
+//! lives in `aura-people`. This crate has no catalog dependency, so it *cannot*
+//! write one; the separation is structural rather than a rule people remember.
+//!
 //! **Preprocessing is a version, not a parameter.** Section 6.1 asks for a fused
 //! export so preprocessing cannot drift between training and inference. The
 //! interpreter in `aura-infer` has no resize operator, so the fusion is achieved
@@ -52,7 +64,10 @@
 //! `docs/adr/ADR-0011-embeddings-and-similarity-index.md` section 4.
 
 pub mod embed;
+pub mod face;
 
 pub use embed::batch::{EmbedProgress, EmbedReport, EmbeddingRunner};
 pub use embed::model::{EmbeddingModel, EMBED_INPUT_SIDE, MODEL_VER, PREPROCESS_VER};
 pub use embed::{run_one, Analysed};
+pub use face::detect::{DetectConfig, Detection, FaceDetector, FrameHint, NormBox};
+pub use face::{FaceObservation, FacePipeline, FramePeople, FACE_LEVEL};

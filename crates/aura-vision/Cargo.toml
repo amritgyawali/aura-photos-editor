@@ -13,9 +13,12 @@ aura-index   = { path = "../aura-index" }
 aura-infer   = { path = "../aura-infer" }
 aura-preview = { path = "../aura-preview" }
 aura-raw     = { path = "../aura-raw" }
+blake3       = { workspace = true }
 rayon        = { workspace = true }
 serde        = { workspace = true }
+toml         = { workspace = true }
 tracing      = { workspace = true }
+uuid         = { workspace = true }
 
 [dev-dependencies]
 aura-catalog = { path = "../aura-catalog" }
