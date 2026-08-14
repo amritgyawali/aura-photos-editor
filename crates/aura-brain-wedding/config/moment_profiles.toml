@@ -1,0 +1,251 @@
+# Moment profiles - PHASE-08 sections 6.1 and 6.2.
+#
+# ===========================================================================
+# THIS FILE IS A PRODUCT DECISION, NOT AN IMPLEMENTATION DETAIL
+# ===========================================================================
+#
+# Section 6.2 says thresholds "come from the scene profile (`dance_floor` needs
+# looser thresholds than `family_portrait`)". They are in a file of their own
+# rather than in `scene_profiles.toml` for one reason, recorded in ADR-0017
+# section 4: `SceneProfile` is a FROZEN contract that ten later phases read, and
+# adding three grouping knobs to it would make every one of them recompile for a
+# number none of them uses.
+#
+# The two files are siblings and follow the same rules. Every override needs a
+# `rationale`; the loader refuses one without it, with `AURA-ML-5031`, for the
+# reason phase 07 gives: a threshold nobody can explain is a magic number, and
+# the friction is the point.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# edge_threshold   0..1, higher is STRICTER
+#     The score two frames must reach before they are the same moment.
+#     Section 6.2's edge score is
+#
+#         0.55 * (1 - embed_dist)
+#       + 0.20 * (1 - dhash_norm)
+#       + 0.15 * identity_overlap
+#       + 0.10 * same_camera
+#
+#     so a pair of frames that are visually near identical, contain the same
+#     people and came off the same body scores close to 1.0, and two frames of
+#     different subjects seconds apart score around 0.3. Raising this number
+#     splits more; lowering it merges more. Section 12's first failure mode is
+#     "merging two different moments hides a keeper", so the default is set on
+#     the splitting side of the argument.
+#
+# window_scale     multiplier on the adaptive cadence window w(t)
+#     Section 6.1 derives w(t) from the local median inter-frame interval per
+#     camera. This scales it per scene. Above 1.0 means "the photographer takes
+#     longer over one thing here"; below means "consecutive frames here are
+#     usually different things".
+#
+# max_group        frames, before the over-large split pass re-clusters
+#     Section 6.2: "split over-large groups (> 60 frames) by re-clustering with
+#     a stricter threshold so a 5-minute dance sequence does not become one
+#     moment". Sixty is the default; a scene where a genuine single moment can
+#     run longer says so here.
+#
+# ---------------------------------------------------------------------------
+# VERSIONING
+# ---------------------------------------------------------------------------
+#
+# Bump `version` on ANY change below. It is written into `moments.profile_ver`
+# on every row, and a grouping made under version 1 and one made under version 2
+# are not comparable - `AURA-ML-5028` exists so that comparison never happens
+# silently. A photographer who split a moment under version 1 keeps the split:
+# `user_locked` outranks every number in this file.
+#
+# The file that ships is the baseline. A copy at
+# `<catalog>/config/moment_profiles.toml` overrides it at run time.
+
+version = 1
+
+# ===========================================================================
+# THE DEFAULT
+# ===========================================================================
+#
+# Every scene not named below uses this, including `unknown` - which is what a
+# wedding that has been embedded but not classified gets for every frame, and
+# is why the default has to be a defensible answer rather than a placeholder.
+
+[defaults]
+edge_threshold = 0.68
+window_scale   = 1.0
+max_group      = 60
+rationale = """
+Tuned on the four regression fixtures in `fixtures::bursts` rather than
+theorised. At 0.68 the 10 fps bouquet toss stays one moment, the slow ceremony
+does not glue consecutive different frames together, and a frame pair has to be
+both visually close and temporally close to join - the embedding term alone
+cannot carry a pair over the line, because 0.55 * 1.0 is below 0.68. That
+property is deliberate: it means no amount of visual similarity groups two
+frames the cadence estimator says are separate events, which is the direction
+section 12's first failure mode says to fail in.
+"""
+
+# ===========================================================================
+# THE LOOSE END: SCENES WHERE ONE THING TAKES MANY FRAMES
+# ===========================================================================
+
+[scenes.dance_floor]
+edge_threshold = 0.60
+window_scale   = 0.85
+max_group      = 40
+rationale = """
+The hardest scene in the phase, and it is hard in both directions at once.
+Frames are visually similar for minutes on end - same room, same lights, same
+crowd - so a threshold that worked elsewhere glues a five-minute sequence into
+one moment. But the frames are also genuinely one continuous event, so
+splitting on appearance alone produces confetti. The answer is a lower
+threshold with a SHORTER window and a HARDER size cap: bursts are recognised
+readily, and the cap then forces the re-cluster pass that section 6.2 asks for.
+Forty rather than sixty because a photographer reviewing the dance floor wants
+stacks they can scan, and a forty-frame stack is already at the limit of that.
+"""
+
+[scenes.first_dance]
+edge_threshold = 0.62
+window_scale   = 1.15
+max_group      = 60
+rationale = """
+One event, several minutes, shot continuously - the closest thing in a wedding
+to a legitimately large moment. The window is stretched because the
+photographer is not changing subject, and the threshold is below the default
+because the light is usually terrible and the embedding distances are
+correspondingly noisy. It stays above the dance floor's because there are two
+people to keep track of rather than forty.
+"""
+
+[scenes.ceremony]
+edge_threshold = 0.66
+window_scale   = 1.25
+max_group      = 60
+rationale = """
+Long lens, static position, slow subject. Consecutive frames minutes apart can
+be near identical and are still separate attempts at the same moment, so the
+window is stretched rather than the threshold lowered - time is the signal that
+carries information here, and appearance is not. Photographers shoot this
+chapter in short takes with gaps between them, which the cadence estimator
+already reads correctly; this only tells it to trust that reading further.
+"""
+
+[scenes.ritual]
+edge_threshold = 0.66
+window_scale   = 1.25
+max_group      = 60
+rationale = """
+The same shooting pattern as the ceremony and, for several traditions, the
+scene the wedding is actually about. It gets the ceremony's numbers explicitly
+rather than by falling through to the default, because a rite that a Western
+head labels `ceremony` and a Hindu head labels `ritual` must group identically -
+a cultural difference in the SCENE label must not become a cultural difference
+in how many moments the day has. Section 12's cultural blind spot, applied to
+grouping.
+"""
+
+# ===========================================================================
+# THE STRICT END: SCENES WHERE EACH FRAME IS A DIFFERENT THING
+# ===========================================================================
+
+[scenes.family_portrait]
+edge_threshold = 0.76
+window_scale   = 0.75
+max_group      = 25
+rationale = """
+The scene section 6.2 names as the strict counterpart of the dance floor, and
+the reason is the failure it prevents: family groups are photographed as a
+conveyor belt, one combination after another, in the same spot under the same
+light with several of the same people. Two consecutive groups are visually
+almost identical and are two DIFFERENT deliverables, and merging them loses a
+family a photograph they paid for. So the threshold is the highest in the file
+and the window is the shortest. Twenty-five frames is already three or four
+takes of one group.
+"""
+
+[scenes.group_portrait]
+edge_threshold = 0.76
+window_scale   = 0.75
+max_group      = 25
+rationale = """
+The family portrait's numbers, for the family portrait's reason. The two scenes
+are separated because the classifier can tell them apart, not because they are
+grouped differently.
+"""
+
+[scenes.details]
+edge_threshold = 0.72
+window_scale   = 0.70
+max_group      = 20
+rationale = """
+Rings, then shoes, then invitations - each is a separate object photographed
+two or three times, often seconds apart on a table under the same light. The
+embedding distance between a shoe and an invitation on the same linen is
+smaller than a reader expects, so this needs the short window more than the
+high threshold; 0.70 is the lowest window scale in the file and does most of
+the work here. Twenty frames is a generous take of one object. Not as strict as
+the portrait scenes because a bracketed detail shot must still group - three
+exposures a stop apart are one photograph, and splitting them would send a
+client the same ring three times.
+"""
+
+[scenes.venue]
+edge_threshold = 0.72
+window_scale   = 0.80
+max_group      = 20
+rationale = """
+Empty-room coverage: one frame per angle, walked round the space in a couple of
+minutes. Consecutive frames are of the same room and are deliberately different
+photographs, which is exactly the case a similarity-led grouping gets wrong.
+"""
+
+# ===========================================================================
+# THE PIVOTAL SCENES, WHERE A MERGE COSTS MOST
+# ===========================================================================
+#
+# Section 12 writes coverage guarantees against `SceneId::is_pivotal`. A wrong
+# merge in one of these is a guarantee that silently passes over a moment the
+# photographer never got to see, so they sit slightly on the strict side even
+# where the shooting pattern would allow otherwise.
+
+[scenes.kiss]
+edge_threshold = 0.70
+window_scale   = 1.0
+max_group      = 30
+rationale = """
+Shot as a burst and delivered as one frame, so grouping it correctly is high
+value and merging it with the frames either side is expensive: the approach,
+the kiss and the turn to the aisle are three moments a photographer sells
+separately. Slightly stricter than the default for that reason, and not as
+strict as a family portrait because a kiss burst really is one thing.
+"""
+
+[scenes.rings]
+edge_threshold = 0.70
+window_scale   = 1.0
+max_group      = 30
+rationale = """
+The kiss's argument with different hands: a short, dense burst bracketed by
+frames that belong to the vows before it and the recessional after it.
+"""
+
+[scenes.cake]
+edge_threshold = 0.70
+window_scale   = 1.0
+max_group      = 30
+rationale = """
+The cut, the feed and the laugh afterwards are three moments inside ninety
+seconds. Pivotal, so a merge costs a coverage guarantee.
+"""
+
+[scenes.exit]
+edge_threshold = 0.64
+window_scale   = 1.10
+max_group      = 45
+rationale = """
+Sparklers and a car, shot at high frame rate in the dark with a moving subject
+and moving light. Embedding distances are noisy and the whole departure is one
+event, so this is the one pivotal scene that leans loose rather than strict.
+"""
