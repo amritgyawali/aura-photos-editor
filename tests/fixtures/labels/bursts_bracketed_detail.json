@@ -1,0 +1,14 @@
+{
+  "schema": "aura.burst-labels.v1",
+  "name": "bracketed_detail",
+  "description": "Three exposures a stop apart of one ring on one surface.",
+  "expected_moments": 1,
+  "expected_near_identical_sets": 1,
+  "why": "Section 10.1 names the one-stop-apart case in the duplicate gate rather than the grouping gate, and this fixture is where the two gates meet: the three frames must group into one moment AND be recognised as one photograph. A bracket is not a set of alternatives - a client is shown one of the three and would not be able to say which - so all three belong to a single near-identical set, and exactly one of them may reach a gallery.",
+  "labelled_by": "PHASE-08 section 8 step 9, authored ground truth",
+  "frames": [
+    { "offset_ms": 0, "camera": 1, "moment": 0 },
+    { "offset_ms": 700, "camera": 1, "moment": 0 },
+    { "offset_ms": 1400, "camera": 1, "moment": 0 }
+  ]
+}

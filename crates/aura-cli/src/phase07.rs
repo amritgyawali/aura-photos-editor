@@ -687,7 +687,7 @@ fn synthetic_vector(seed: usize) -> Vec<f32> {
 /// Whole seconds: `photo.timeline_time` is written by phase 01's ingest at second
 /// resolution, and a gate that wrote milliseconds would be exercising a format the
 /// product does not produce.
-fn rfc3339_ms(ms: i64) -> String {
+pub fn rfc3339_ms(ms: i64) -> String {
     let seconds = ms / 1000;
     let days = seconds.div_euclid(86_400);
     let rest = seconds.rem_euclid(86_400);

@@ -31,3 +31,8 @@ tempfile     = { workspace = true }
 [[test]]
 name = "scene_eval"
 path = "../../tests/eval/scene_eval.rs"
+
+# The section 10.1 gates for PHASE-08, in the same place and for the same reason.
+[[test]]
+name = "burst_eval"
+path = "../../tests/eval/burst_eval.rs"

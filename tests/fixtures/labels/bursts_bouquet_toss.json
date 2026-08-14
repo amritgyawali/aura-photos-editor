@@ -1,0 +1,24 @@
+{
+  "schema": "aura.burst-labels.v1",
+  "name": "bouquet_toss",
+  "description": "Fourteen frames at 10 fps as the bouquet leaves her hand.",
+  "expected_moments": 1,
+  "why": "One press of the shutter, one thing that happened. A photographer asked to group these would not hesitate: this is the shot, and thirteen of the fourteen frames exist so that one of them can be chosen. Splitting it anywhere would mean claiming the bouquet was thrown twice.",
+  "labelled_by": "PHASE-08 section 8 step 9, authored ground truth",
+  "frames": [
+    { "offset_ms": 0, "camera": 1, "moment": 0 },
+    { "offset_ms": 100, "camera": 1, "moment": 0 },
+    { "offset_ms": 200, "camera": 1, "moment": 0 },
+    { "offset_ms": 300, "camera": 1, "moment": 0 },
+    { "offset_ms": 400, "camera": 1, "moment": 0 },
+    { "offset_ms": 500, "camera": 1, "moment": 0 },
+    { "offset_ms": 600, "camera": 1, "moment": 0 },
+    { "offset_ms": 700, "camera": 1, "moment": 0 },
+    { "offset_ms": 800, "camera": 1, "moment": 0 },
+    { "offset_ms": 900, "camera": 1, "moment": 0 },
+    { "offset_ms": 1000, "camera": 1, "moment": 0 },
+    { "offset_ms": 1100, "camera": 1, "moment": 0 },
+    { "offset_ms": 1200, "camera": 1, "moment": 0 },
+    { "offset_ms": 1300, "camera": 1, "moment": 0 }
+  ]
+}
