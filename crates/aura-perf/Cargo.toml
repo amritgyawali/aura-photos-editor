@@ -20,6 +20,7 @@ aura-catalog.path  = "../aura-catalog"
 aura-cloud.path    = "../aura-cloud"
 aura-index.path    = "../aura-index"
 aura-infer.path    = "../aura-infer"
+aura-people.path   = "../aura-people"
 aura-raw.path      = "../aura-raw"
 aura-vision.path   = "../aura-vision"
 tempfile.workspace = true

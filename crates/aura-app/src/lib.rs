@@ -22,6 +22,7 @@
 //! No command may take longer than 50 ms. Anything heavier returns a job handle
 //! and streams progress events.
 
+pub mod biometric_keys;
 pub mod cloud_commands;
 pub mod commands;
 
@@ -33,6 +34,7 @@ pub mod contract {
 
 pub mod index_commands;
 pub mod infer_commands;
+pub mod people_commands;
 pub mod preview_commands;
 pub mod state;
 
@@ -51,6 +53,12 @@ pub use infer_commands::{
     hardware_plan, infer_stats, list_models, recheck_hardware, set_execution_provider,
     warmup_models,
 };
+pub use people_commands::{
+    erase_biometrics, group_people, identity_cover, identity_timelines, list_identities,
+    merge_identities, people_status, rename_identity, scan_faces, set_identity_importance,
+    set_identity_role, split_identity,
+};
+pub use preview_commands::base64;
 pub use preview_commands::{
     cancel_previews, get_preview, prefetch_previews, preview_problems, preview_stats, purge_cache,
     set_cache_budget,

@@ -159,6 +159,171 @@
         "require_fp32": false
       },
       "opset": 13
+    },
+    {
+      "name": "face_detect",
+      "version": "1.0.0",
+      "task": "detection",
+      "class": "segmentation",
+      "input": {
+        "shape": [
+          1,
+          3,
+          640,
+          640
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "srgb"
+      },
+      "output": {
+        "head_16": [
+          1,
+          20,
+          40,
+          40
+        ],
+        "head_32": [
+          1,
+          20,
+          20,
+          20
+        ],
+        "head_8": [
+          1,
+          20,
+          80,
+          80
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "face_detect_1.0.0.fp32.onnx",
+          "sha256": "13e331357fe269f6575a25c8adb9f9dcc018b0483516ab7d0bef360b56ae8dbb",
+          "bytes": 237006
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "face_detect_1.0.0.fp16.onnx",
+          "sha256": "a83fd11bb85d30645ccc11868272cb41aaef19d152968d4c7646cf7e61633407",
+          "bytes": 237006
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/face_detect.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
+    },
+    {
+      "name": "face_embed",
+      "version": "1.0.0",
+      "task": "embedding",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          3,
+          112,
+          112
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "srgb"
+      },
+      "output": {
+        "embedding": [
+          1,
+          512
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "face_embed_1.0.0.fp32.onnx",
+          "sha256": "d9d7fee567da8a97d7c28bb6876a2b91dd1fea17ec65f38efa1fc78f7fd9971a",
+          "bytes": 837393
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "face_embed_1.0.0.fp16.onnx",
+          "sha256": "71619c400b784eded706049582a704c4edfe0aec038a34d9fb4b17f2a7141f7a",
+          "bytes": 837393
+        },
+        {
+          "ep": "cpu",
+          "precision": "int8",
+          "file": "face_embed_1.0.0.int8.onnx",
+          "sha256": "6504a81463db3149b5832f25df2c0ff669cabef6bebaab92bbe9c9c0561eb97a",
+          "bytes": 837393
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/face_embed.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": false,
+        "require_fp32": false
+      },
+      "opset": 13
+    },
+    {
+      "name": "face_quality",
+      "version": "1.0.0",
+      "task": "multiclass",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          3,
+          112,
+          112
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "srgb"
+      },
+      "output": {
+        "quality": [
+          1,
+          4
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "face_quality_1.0.0.fp32.onnx",
+          "sha256": "5f16a22519b0f3f321e5cab43a09d7108b8cbed010083e2c54f8c9790c1d4dd6",
+          "bytes": 26043
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "face_quality_1.0.0.fp16.onnx",
+          "sha256": "30a10e81b901039ff892aa0f0201c207c0b3e7157f41c74a8fac4120440756af",
+          "bytes": 26043
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/face_quality.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
     }
   ]
 }

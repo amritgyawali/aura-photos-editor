@@ -167,9 +167,15 @@ fn stored(id: PhotoId, seed: f32) -> StoredEmbedding {
 }
 
 #[test]
-fn the_catalog_reaches_schema_five_and_has_both_tables() {
+fn the_catalog_reaches_the_current_schema_and_has_both_tables() {
+    // The version is the build's, not phase 05's: every later phase adds a migration and
+    // this test is about *these two tables existing*, not about the catalog stopping at
+    // five. Pinning the literal here would make every future migration a phase 05 failure.
     let fixture = fixture(2);
-    assert_eq!(fixture.catalog.schema_version().expect("version"), 5);
+    assert_eq!(
+        fixture.catalog.schema_version().expect("version"),
+        aura_catalog::migrate::APP_SCHEMA_VERSION
+    );
     assert_eq!(fixture.catalog.count("embeddings").expect("count"), 0);
     assert_eq!(fixture.catalog.count("descriptors").expect("count"), 0);
 }

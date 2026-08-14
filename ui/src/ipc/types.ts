@@ -311,6 +311,195 @@ export type IndexEvent =
   | { kind: 'indexBuilt'; vectors: number; ms: number; snapshotUsed: boolean }
   | { kind: 'queryTimed'; k: number; ms: number; filterKind: string };
 
+export type PeopleStatusDto = {
+  photos: number;
+  scanned: number;
+  coverage: number;
+  faces: number;
+  votingFaces: number;
+  identities: number;
+  tiledFrames: number;
+  coupleUnconfirmed: boolean;
+  staleVersions: number[];
+  erased: boolean;
+  keyStore: string;
+  weightsVer: number;
+};
+
+export type CompanionDto = {
+  id: string;
+  label: string | null;
+  frames: number;
+};
+
+export type IdentityCardDto = {
+  id: string;
+  label: string | null;
+  role: string;
+  roleConfidence: number;
+  roleReasons: string[];
+  userLocked: boolean;
+  importance: number;
+  faces: number;
+  votingFaces: number;
+  frames: number;
+  firstSeen: string | null;
+  lastSeen: string | null;
+  meanQuality: number;
+  coverFaceId: string | null;
+  variance: number;
+  subCount: number;
+  companions: CompanionDto[];
+};
+
+export type FaceBoxDto = {
+  faceId: string;
+  identityId: string | null;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  detScore: number;
+  quality: number;
+  blur: number;
+  occlusion: number;
+  yaw: number;
+  pitch: number;
+  roll: number;
+  pxHeight: number;
+  votes: boolean;
+  foundBy: string;
+  reasons: string[];
+};
+
+export type ProminenceEntryDto = {
+  identityId: string;
+  prominence: number;
+};
+
+export type ImageSubjectsDto = {
+  photoId: string;
+  faces: FaceBoxDto[];
+  dominant: string | null;
+  prominence: ProminenceEntryDto[];
+  subjectFocusScore: number;
+  peopleCount: number;
+  weightsVer: number;
+};
+
+export type ScanFacesInput = {
+  projectId: string;
+};
+
+export type ScanFacesDto = {
+  scanned: number;
+  faces: number;
+  voting: number;
+  gated: number;
+  personBoxes: number;
+  headless: number;
+  failed: number;
+  remaining: number;
+  tiledFrames: number;
+  tileRatio: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type GroupPeopleInput = {
+  projectId: string;
+};
+
+export type GroupPeopleDto = {
+  identities: number;
+  assigned: number;
+  unassigned: number;
+  threshold: number;
+  refusedMerges: number;
+  subClustered: number;
+  couple: string[];
+  coupleConfidence: number;
+  coupleAmbiguous: boolean;
+  sceneStarved: boolean;
+  decisionsReplayed: number;
+  decisionsOrphaned: number;
+  coverage: number;
+  elapsedMs: number;
+};
+
+export type MergeIdentitiesInput = {
+  a: string;
+  b: string;
+};
+
+export type SplitIdentityInput = {
+  identityId: string;
+  faceIds: string[];
+};
+
+export type SetIdentityRoleInput = {
+  identityId: string;
+  role: string;
+};
+
+export type RenameIdentityInput = {
+  identityId: string;
+  label: string | null;
+};
+
+export type SetIdentityImportanceInput = {
+  identityId: string;
+  importance: number;
+};
+
+export type IdentityHandleDto = {
+  id: string;
+};
+
+export type EraseBiometricsInput = {
+  projectId: string;
+  confirm: string;
+};
+
+export type EraseBiometricsDto = {
+  faces: number;
+  identities: number;
+  crops: number;
+  keyRemoved: boolean;
+};
+
+export type CoverageGapDto = {
+  fromMs: number;
+  toMs: number;
+  minutes: number;
+};
+
+export type IdentityTimelineDto = {
+  identityId: string;
+  firstMs: number | null;
+  lastMs: number | null;
+  spanMinutes: number;
+  frames: number;
+  gaps: CoverageGapDto[];
+};
+
+export type FaceCropDto = {
+  faceId: string;
+  dataUrl: string;
+};
+
+export type PeopleEvent =
+  | { kind: 'scanProgress'; done: number; total: number; faces: number; tiled: boolean }
+  | { kind: 'identitiesGrouped'; identities: number; facesUsed: number; threshold: number; ms: number }
+  | {
+      kind: 'roleInferred';
+      identityId: string;
+      role: string;
+      confidence: number;
+      evidenceKinds: number;
+    }
+  | { kind: 'userEdit'; action: string; identities: number };
+
 export type IpcError = {
   code: string;
   message: string;

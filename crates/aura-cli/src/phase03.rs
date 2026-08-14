@@ -436,8 +436,14 @@ pub fn infer(args: &[String]) -> ExitCode {
     // Which deterministic input to feed. The phase 03 placeholders take 32 px;
     // phase 05's embedding model takes 384, and a 32 px tensor into a 384 px graph
     // is a shape mismatch rather than a smaller test.
+    // PHASE-06 adds two more shapes: the detector takes 640 px and the recogniser and
+    // quality head take an aligned 112 px crop. A 384 px tensor into either is a shape
+    // mismatch rather than a smaller test, which is why these are named rather than
+    // inferred from the file.
     let input = match crate::flag(args, "--input").as_deref() {
         Some("wedding") => fixtures::wedding_sample_input(batch),
+        Some("face-detect") => fixtures::face_detect_sample_input(batch),
+        Some("face-crop") => fixtures::face_crop_sample_input(batch),
         _ => fixtures::sample_input(batch),
     };
     // A stopwatch around one run, so `aura-cli infer` can report what a batch cost.

@@ -20,6 +20,7 @@ aura-models  = { path = "../aura-models" }
 aura-cloud   = { path = "../aura-cloud" }
 aura-index   = { path = "../aura-index" }
 aura-vision  = { path = "../aura-vision" }
+aura-people  = { path = "../aura-people" }
 rusqlite.workspace    = true
 serde.workspace       = true
 serde_json.workspace  = true

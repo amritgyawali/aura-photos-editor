@@ -1,0 +1,25 @@
+{
+  "name": "210-anthropic-couple-hint-described",
+  "note": "The failure this task exists to prevent, recorded so the prevention is tested rather than asserted. The model answers with descriptions of people - 'the woman in red', 'the man in the cream sherwani' - instead of the opaque handles it was given, and volunteers a gender inference in its reasons. CoupleHintOutput::validate refuses it because neither string is in PERSON_HANDLES, the gateway sends exactly one repair, and 205 answers it correctly. If the repair had also failed, the local fallback would have taken over; 030 is the equivalent unrepairable case for SegmentNaming.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["couple-hint-described"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_210",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"couple\":[\"the woman in red\",\"the man in the cream sherwani\"],\"close_family\":[],\"confidence\":0.81,\"reasons\":[\"the bride is clearly the woman in red who appears in the most frames\",\"the groom stands beside her in the central compositions\"]}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 1214, "output_tokens": 88 }
+  }
+}

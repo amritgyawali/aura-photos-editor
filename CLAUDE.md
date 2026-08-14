@@ -32,7 +32,10 @@ Never load two phase files into one session.
 | Using your own AI key | `docs/using-your-own-ai-key.md` |
 | Recorded provider responses | `tests/cloud/cassettes/` |
 | Embedding and index decisions | `docs/adr/ADR-0011-embeddings-and-similarity-index.md` |
+| People and biometric decisions | `docs/adr/ADR-0013-people-intelligence-and-the-biometric-store.md` |
+| Prominence weights (versioned, tunable) | `crates/aura-vision/config/prominence.toml` |
 | Embedding evaluation gates | `tests/eval/embedding_eval.rs` + `ml/models/embed/eval_retrieval.py` |
+| Identity evaluation gates | `tests/eval/identity_eval.rs` + `ml/models/face/eval_identity.py` |
 
 ## Non-negotiables enforced by the build
 
@@ -122,6 +125,46 @@ specifies cannot be trained or run here. Everything around it is real. This is
 condition C10 in the phase 05 exit report, it is a Sev 2 trigger, and **no later
 phase may claim a quality result that depends on the vector being
 wedding-discriminative until it closes.**
+
+Phase 06 is implemented: `aura-vision::face` (detection with a letterbox and three
+strides, faces and bodies from one anchor, a conditional tiled pass, a geometric bokeh
+gate, ArcFace alignment and pose, a quality gate that is a weighted geometric mean plus two
+cut-offs, exact average-linkage clustering with relative-cohesion verification and
+sub-centroids, role inference, prominence with a versioned weight file, and the synthetic
+ground truth every gate is measured against), `aura-people` (the sealed biometric store,
+the resumable project walk, the co-occurrence graph, timelines, the importance model and
+the frozen `PeopleService`), migration 6, three signed models with cards, the `CoupleHint`
+cloud task, the people IPC surface (ADR-0014) and its People panel, and
+`aura-cli verify --phase 06` as the gate. Its exit report is
+`docs/progress/PHASE-06-EXIT.md`.
+
+**The three shipped face models are placeholders.** The detector finds no faces in a
+photograph and the recogniser's templates carry no identity information; there is no
+consented face data in this repository and no GPU backend. Every gate in section 10.1 is
+measured against synthetic ground truth with a known answer, which proves the algorithms
+and says nothing about the weights. This is condition C1 in the phase 06 exit report, it is
+a Sev 2 trigger, and **no later phase may claim a quality result that depends on face
+detection or recognition being accurate until it closes.** Condition C5 - no published
+demographic analysis - is the second Sev 2 trigger.
+
+Five rules that phase 06 added and every later phase inherits:
+
+- **`PeopleService` is the only way to ask who is in a photograph.** No phase may keep its
+  own face store, its own clustering, or its own idea of who the couple are.
+- **A photographer's decision is unbeatable.** `identities.user_locked` is checked inside
+  the statement that would overwrite it, and the decision journal is replayed onto every
+  fresh grouping *before* any conclusion is drawn from it. Automation never assigns `bride`
+  or `groom`: the evidence identifies a pair, and which of two people is the bride is not a
+  photographic fact.
+- **Three version columns, because they invalidate three different things.** `model_ver`
+  invalidates frames, `embed_ver` invalidates templates, `quality_ver` invalidates votes.
+  Comparing across any of them returns a plausible number that means nothing;
+  `AURA-ML-5018` exists so that never happens silently.
+- **Report coverage when you report a result.** `SubjectHierarchy::coverage` is how a
+  caller finds out that a grouping conclusion was drawn over 40 % of a wedding.
+- **Never infer anything about a person.** Gender, ethnicity, religion and any relationship
+  beyond couple, close family and guest are out of scope permanently - and the cloud task's
+  output type cannot express them, so the rule is structural rather than remembered.
 
 Five rules that phase 05 added and every later phase inherits:
 

@@ -1,0 +1,25 @@
+{
+  "name": "205-anthropic-couple-hint-repaired",
+  "note": "The answer to the one repair message. Matched on the repair instruction's own wording, which only appears on a second attempt - so this is checked before the malformed cassette even though that one is numbered higher, because matching is by sorted name and 205 sorts before 210. Same convention as 015 and 020.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["couple-hint-described", "did not match the required schema"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_205",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"couple\":[\"person_2\",\"person_4\"],\"close_family\":[],\"confidence\":0.52,\"reasons\":[\"person_2 and person_4 share 44 frames, the highest pair count in the set\",\"the blurred frames show the two of them standing together in the centre of four separate compositions\"]}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 1408, "output_tokens": 96 }
+  }
+}
