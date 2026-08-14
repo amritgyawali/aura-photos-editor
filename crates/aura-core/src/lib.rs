@@ -31,6 +31,7 @@ pub mod contract {
     pub mod ids;
     pub mod people;
     pub mod priority;
+    pub mod scene;
 }
 
 /// Named error constructors, one module per domain in the code registry.
@@ -50,7 +51,11 @@ pub mod redact;
 
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
 pub use contract::ids::{
-    ContentHash, FaceId, FileId, IdentityId, ImportId, PhotoId, ProjectId, RunId,
+    ContentHash, FaceId, FileId, IdentityId, ImportId, PhotoId, ProjectId, RunId, SegmentId,
 };
 pub use contract::people::{FaceRef, ImageSubjects, PeopleService, Role, SubjectHierarchy};
 pub use contract::priority::Priority;
+pub use contract::scene::{
+    AttrFlags, ChapterId, EditIntent, RitualId, SceneId, SceneProfile, SceneResult, SceneScore,
+    Segment, Source, StoryOutline, StoryService,
+};

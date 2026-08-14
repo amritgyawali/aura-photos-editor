@@ -102,6 +102,15 @@ typed_id!(ImportId, "imp");
 typed_id!(FaceId, "fce");
 typed_id!(IdentityId, "idt");
 
+// PHASE-07. Section 5 writes `SegmentId` into the frozen `Segment` shape, so a
+// chapter of the story is an id of the same kind as the seven above.
+//
+// One and not two, unlike phase 06's pair: there is no operation that takes a
+// segment and a chapter as separate ids, because `ChapterId` is a closed enum and
+// not a row. See
+// docs/adr/ADR-0015-wedding-scene-taxonomy-and-story-segmentation.md section 2.
+typed_id!(SegmentId, "seg");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
