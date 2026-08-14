@@ -92,10 +92,14 @@ pub fn verify(args: &[String]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // At LEAST 5, not exactly 5. A later phase's migration adds tables and removes
+    // none, so a catalog at schema 7 still satisfies everything phase 05 asserts - and
+    // an equality check here would fail this gate on every future phase, which is a
+    // false alarm nobody would act on twice.
     match catalog.schema_version() {
-        Ok(5) => println!("migration: catalog at schema 5"),
+        Ok(version) if version >= 5 => println!("migration: catalog at schema {version}"),
         Ok(other) => {
-            eprintln!("migration: catalog is at schema {other}, expected 5");
+            eprintln!("migration: catalog is at schema {other}, expected at least 5");
             failures += 1;
         }
         Err(err) => {

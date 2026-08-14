@@ -241,3 +241,54 @@ max_bytes = 26214400  # 25 MB
 # This is the ceiling on how often it may fire across a wedding, as a percentage.
 [count.tiled_frame_percent]
 max_count = 25
+
+# ---------------------------------------------------------------------------
+# Phase 07 performance budgets, from PHASE-07 section 11.
+#
+# All four rows are here, and none is waived. That is unusual for this project
+# and it has one cause: the scene heads sit on the frozen phase 05 embedding
+# rather than on pixels, so nothing in this phase needs a GPU to be measured
+# honestly. Section 6.1's "scene inference costs almost nothing extra per image"
+# is the design claim, and these are the numbers that hold it to it.
+# ---------------------------------------------------------------------------
+
+# Scene plus attributes for 4,000 images, reusing embeddings. Section 11: 35 s.
+#
+# Asserted per unit rather than in total, so the test can measure a few hundred
+# frames instead of four thousand and still fail on a regression.
+#
+# 35 s over 4,000 frames is 8.75 ms each. The budget schema takes whole
+# milliseconds, so the number here is 8 - the floor rather than the ceiling,
+# which makes this budget slightly STRICTER than section 11 rather than looser.
+# That is the correct direction to round a budget in, and it costs nothing: the
+# measured per-frame cost is dominated by reading the embedding out of SQLite
+# rather than by the two Gemms, and is well under either figure.
+[stage.scene_classify_image]
+max_elapsed_ms  = 35000
+max_ms_per_unit = 8
+
+# Segmentation and smoothing over a whole wedding. Section 11: 2 s.
+#
+# This is the Viterbi pass over nine states, the fused signal, up to eighteen
+# PELT runs during the penalty search, the merge pass and the medoid per chapter.
+# Measured on the 1,692-frame Hindu fixture; a 4,000-frame wedding is linear in
+# the first three and quadratic only inside a chapter, which is a few hundred
+# frames.
+[stage.story_segment_project]
+max_elapsed_ms = 2000
+
+# The timeline's first paint. Section 11: 200 ms.
+#
+# One indexed read of `segments` and one of `v_scene_coverage`. A wedding has at
+# most twenty chapters by construction (changepoint::CHAPTER_BAND), so this is a
+# read of a bounded list rather than of a project.
+[stage.story_timeline_open]
+max_elapsed_ms = 200
+
+# Section 11: extra storage per image, 400 bytes.
+#
+# The `image_scenes` row is 118 bytes of fixed columns plus a top-3 JSON array of
+# at most 132, and the `segment_images` row is 76. Asserted per 1,000 images so
+# the number in the file is readable: 400 x 1,000 = 400,000.
+[size.scene_store_per_1000_images]
+max_bytes = 400000
