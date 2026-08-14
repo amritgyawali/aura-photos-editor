@@ -724,3 +724,48 @@ summary      = "One photograph could not be classified into a scene"
 user_message = "AURA could not tell what one photograph is of and has left it unlabelled. Everything else in this wedding is unaffected."
 runbook      = "docs/runbooks/AURA-ML-5027.md"
 introduced   = "PHASE-07"
+
+[[error]]
+code         = "AURA-ML-5028"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored moments were grouped with a different embedding, grouper or threshold table"
+user_message = "AURA has improved how it groups repeated frames, so it is regrouping this wedding in the background. Your own splits and merges are kept."
+runbook      = "docs/runbooks/AURA-ML-5028.md"
+introduced   = "PHASE-08"
+
+[[error]]
+code         = "AURA-ML-5029"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A split, merge, lock or keep-hint change was refused"
+user_message = "AURA could not make that change to the grouping. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5029.md"
+introduced   = "PHASE-08"
+
+[[error]]
+code         = "AURA-ML-5030"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "The grouping produced a moment count outside the plausible band"
+user_message = "AURA grouped this wedding into an unusual number of moments. The grouping is still usable and every stack can be split or merged by hand."
+runbook      = "docs/runbooks/AURA-ML-5030.md"
+introduced   = "PHASE-08"
+
+[[error]]
+code         = "AURA-ML-5031"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "A moment profile file was refused"
+user_message = "AURA could not load the settings that decide which frames belong to the same moment, so it has not changed anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5031.md"
+introduced   = "PHASE-08"
+
+[[error]]
+code         = "AURA-ML-5032"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be placed in a moment"
+user_message = "AURA could not work out which moment one photograph belongs to and has left it on its own. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5032.md"
+introduced   = "PHASE-08"

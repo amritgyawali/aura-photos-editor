@@ -111,6 +111,17 @@ typed_id!(IdentityId, "idt");
 // docs/adr/ADR-0015-wedding-scene-taxonomy-and-story-segmentation.md section 2.
 typed_id!(SegmentId, "seg");
 
+// PHASE-08. Section 5 writes `MomentId` into the frozen `Moment` shape, so a thing
+// the photographer shot once is an id of the same kind as the eight above.
+//
+// One and not two, unlike phase 06's pair, and for a different reason than phase
+// 07's: a burst is not a row. Section 2.1's two-tier structure stores bursts as a
+// partition *inside* a moment - `moment_images.burst_ix` - because a burst has no
+// identity a photographer can refer to, no lock, and no lifetime independent of the
+// moment that contains it. An id for it would be an id nothing could be looked up by.
+// See docs/adr/ADR-0017-burst-grouping-and-duplicate-policy.md section 2.
+typed_id!(MomentId, "mom");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
