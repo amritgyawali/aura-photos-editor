@@ -1276,3 +1276,291 @@ pub enum IngestEvent {
         elapsed_ms: u64,
     },
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-07. The story surface: what each photograph is of, and how the day was
+// structured. See `docs/adr/ADR-0016-story-ipc-surface.md`.
+//
+// Nine commands, thirteen types and one event. Nothing here can change a
+// photograph: four commands change a chapter, one changes a label, and four are
+// reads. Invariant 1 stays structural rather than remembered.
+// ---------------------------------------------------------------------------
+
+/// Ask for a project's ordered story.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoryOutlineInput {
+    /// The wedding.
+    pub project_id: String,
+}
+
+/// One entry of a scene posterior's top three.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneScoreDto {
+    /// One of the 22 scene slugs, or `unknown`.
+    pub scene: String,
+    /// Its posterior, `0..1`.
+    pub score: f32,
+}
+
+/// What one photograph is of.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The chosen scene slug, or `unknown` when the classifier abstained.
+    pub scene: String,
+    /// Photographer-facing name of that scene.
+    pub scene_title: String,
+    /// How sure, `0..1`. Present even when the label is `unknown`: an abstention
+    /// at 0.46 and one at 0.05 are different situations.
+    pub scene_conf: f32,
+    /// Always three entries, padded with `unknown` at zero.
+    pub top3: Vec<SceneScoreDto>,
+    /// Attribute *names*, never the bitfield. ADR-0016 decision 3.
+    pub attributes: Vec<String>,
+    /// False when the attribute head did not run, which is not the same as no
+    /// attributes being set.
+    pub attributes_measured: bool,
+    /// The named rite's slug, when one was named.
+    pub ritual: Option<String>,
+    /// How sure the rite is.
+    pub ritual_conf: f32,
+    /// `local`, `cloud` or `user`.
+    pub source: String,
+    /// Which classifier produced it.
+    pub model_ver: u16,
+}
+
+/// One chapter of the wedding's story.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChapterDto {
+    /// The chapter.
+    pub segment_id: String,
+    /// Position in the strip, zero-based.
+    pub ordinal: u32,
+    /// One of the nine chapter slugs.
+    pub chapter: String,
+    /// The photographer's own name, when they renamed it.
+    pub label: Option<String>,
+    /// Photographer-facing name: `label` when set, otherwise the chapter's title.
+    pub title: String,
+    /// First frame, milliseconds since the Unix epoch.
+    pub start_ms: i64,
+    /// Last frame, inclusive.
+    pub end_ms: i64,
+    /// Whole minutes.
+    pub duration_minutes: i64,
+    /// The scene most of its frames are.
+    pub dominant_scene: String,
+    /// How sure the chapter label is, `0..1`.
+    pub confidence: f32,
+    /// The frame that represents it.
+    pub key_frame: String,
+    /// Frames in the chapter.
+    pub image_count: u32,
+    /// Why this chapter. Stored, not re-derived; ADR-0016 decision 3.
+    pub reasons: Vec<String>,
+    /// True when the photographer renamed, split, merged or moved it.
+    pub user_locked: bool,
+    /// True when its confidence is below the review threshold.
+    pub needs_review: bool,
+}
+
+/// A project's ordered story, with its coverage attached.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoryOutlineDto {
+    /// The chapters, earliest first.
+    pub chapters: Vec<ChapterDto>,
+    /// Fraction of the project carrying a scene label, `0..1`.
+    ///
+    /// On the DTO rather than behind a second call. A story drawn over a
+    /// 40 %-classified wedding is a story about 40 % of a wedding, and a panel
+    /// that has to ask twice will render first and ask later.
+    pub coverage: f32,
+    /// Chapter ids the photographer should look at.
+    pub needs_review: Vec<String>,
+    /// Which classifier the labels underneath came from.
+    pub scene_ver: u16,
+    /// Which ritual taxonomy named the rites.
+    pub taxonomy_ver: u16,
+}
+
+/// Ask what one photograph is of.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageSceneInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Rename a chapter, or change which chapter it is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetChapterInput {
+    /// The chapter.
+    pub segment_id: String,
+    /// One of the nine chapter slugs.
+    pub chapter: String,
+    /// The photographer's own name for it, or null to clear.
+    pub label: Option<String>,
+}
+
+/// Move the boundary between a chapter and the one after it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveBoundaryInput {
+    /// The earlier of the two chapters.
+    pub segment_id: String,
+    /// The new end of that chapter, milliseconds since the Unix epoch.
+    pub new_end_ms: i64,
+}
+
+/// Split a chapter in two at a photograph.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SplitChapterInput {
+    /// The chapter.
+    pub segment_id: String,
+    /// The first photograph of the new later half.
+    pub photo_id: String,
+}
+
+/// Fold two adjacent chapters into one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeChaptersInput {
+    /// One chapter.
+    pub segment_id_a: String,
+    /// The one immediately before or after it.
+    pub segment_id_b: String,
+}
+
+/// The id of a chapter a command created or kept.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChapterHandleDto {
+    /// Prefixed segment id.
+    pub id: String,
+}
+
+/// One scene's tolerances, with the sentence explaining them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneProfileDto {
+    /// The scene slug.
+    pub scene: String,
+    /// Photographer-facing name.
+    pub title: String,
+    /// Expected survival ratio, minimum.
+    pub keeper_min: f32,
+    /// Expected survival ratio, maximum.
+    pub keeper_max: f32,
+    /// Scene-relative noise tolerance, `0..1`.
+    pub max_acceptable_noise: f32,
+    /// Scene-relative blur tolerance, `0..1`.
+    pub max_acceptable_blur: f32,
+    /// How much subject sharpness dominates, `0..1`.
+    pub subject_focus_weight: f32,
+    /// How much expression matters, `0..1`.
+    pub emotion_weight: f32,
+    /// How much framing matters, `0..1`.
+    pub composition_weight: f32,
+    /// `airy`, `neutral`, `warm`, `moody` or `punchy`.
+    pub editing_intent: String,
+    /// True when phase 12's coverage guarantee applies.
+    pub must_cover: bool,
+    /// Why these numbers. Section 12's third failure mode, answered on the wire.
+    pub rationale: String,
+}
+
+/// Start a scene classification pass.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClassifyScenesInput {
+    /// The wedding.
+    pub project_id: String,
+}
+
+/// What a classification or segmentation pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoryStatusDto {
+    /// Photographs in the project.
+    pub photos: i64,
+    /// Photographs carrying a scene label.
+    pub classified: i64,
+    /// Fraction, `0..1`.
+    pub coverage: f32,
+    /// Chapters in the story.
+    pub chapters: u32,
+    /// Chapters below the review threshold.
+    pub needs_review: u32,
+    /// Chapters the photographer has locked.
+    pub locked: u32,
+    /// The PELT penalty the last segmentation settled on.
+    pub penalty: f32,
+    /// True when the last segmentation fell back to time gaps alone.
+    pub gaps_only: bool,
+    /// Which classifier produced the labels.
+    pub scene_ver: u16,
+    /// Which taxonomy named the rites.
+    pub taxonomy_ver: u16,
+    /// How many rites are declared across every loaded taxonomy file.
+    pub rituals_known: u32,
+}
+
+/// Story events pushed to the UI, mirroring section 11's four events.
+///
+/// Typed on both sides in PHASE-07 and not yet emitted, for the same reason
+/// `PeopleEvent` is not: the Tauri shell has not been launched on the development
+/// machine, so an emitter would be code nobody has run. The four are `tracing`
+/// spans today and this is their wire shape for when the shell runs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum StoryEvent {
+    /// `scene.classified` - a batch of frames finished.
+    SceneClassified {
+        /// Photographs classified so far.
+        images: u64,
+        /// Milliseconds so far.
+        ms: u64,
+        /// Mean top-1 posterior over the labelled frames.
+        mean_conf: f32,
+        /// Frames the classifier refused to label.
+        low_conf_count: u64,
+    },
+    /// `story.segmented` - the chapters are ready.
+    StorySegmented {
+        /// How many chapters.
+        segments: u32,
+        /// The penalty the search settled on.
+        boundary_penalty: f32,
+        /// Distinct chapter kinds on the timeline.
+        chapters: u32,
+    },
+    /// `story.user_edit` - the photographer changed something.
+    StoryUserEdit {
+        /// `rename`, `boundary`, `split` or `merge`.
+        action: String,
+        /// The chapter.
+        segment: String,
+        /// What it was, when the action changed a label.
+        from_label: Option<String>,
+        /// What it became.
+        to_label: Option<String>,
+    },
+    /// `scene.cloud_used` - a naming pass finished.
+    SceneCloudUsed {
+        /// Chapters considered.
+        segments: u32,
+        /// Calls actually made.
+        calls: u32,
+        /// What they cost.
+        cost_usd: f32,
+    },
+}

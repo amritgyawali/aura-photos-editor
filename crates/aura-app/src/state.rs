@@ -4,6 +4,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use aura_brain_wedding::scene::classifier::SceneClassifier;
+use aura_brain_wedding::scene::ritual::RitualClassifier;
+use aura_brain_wedding::scene::taxonomy::Taxonomy;
+use aura_brain_wedding::story::{Story, StoryStore};
 use aura_cache::CacheBudget;
 use aura_catalog::consent::CatalogConsent;
 use aura_catalog::Catalog;
@@ -185,6 +189,236 @@ impl AppState {
     #[must_use]
     pub fn embedding_store(&self) -> EmbeddingStore {
         EmbeddingStore::new(Arc::clone(&self.catalog), Arc::clone(&self.clock))
+    }
+
+    /// The scene and chapter store for this catalog. PHASE-07.
+    ///
+    /// Stateless like the embedding store, and a method for the same reason.
+    #[must_use]
+    pub fn story_store(&self) -> Arc<StoryStore> {
+        Arc::new(StoryStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The story service, built per call.
+    ///
+    /// Not cached, unlike `people()`, and the difference is what the two hold. `People`
+    /// caches a clustering configuration and a weight table that are expensive to
+    /// rebuild; `Story` holds two parsed config files, and parsing them is under a
+    /// millisecond. Caching it would buy nothing and would mean an edited
+    /// `scene_profiles.toml` needed a restart.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5024` when the shipped scene profiles or ritual taxonomies will not
+    /// load. Propagated rather than substituted: a build whose threshold table is broken
+    /// must not open a project, because every downstream number would silently change.
+    pub fn story(&self) -> AuraResult<Arc<Story>> {
+        Ok(Arc::new(Story::new(
+            self.story_store(),
+            Arc::clone(&self.clock),
+        )?))
+    }
+
+    /// The scene classifier, built on the shared inference engine.
+    ///
+    /// # Errors
+    ///
+    /// Whatever building the inference engine raised.
+    pub fn scene_classifier(&self) -> AuraResult<SceneClassifier> {
+        Ok(SceneClassifier::new(self.infer_engine()?))
+    }
+
+    /// The ritual head, with the shipped taxonomy attached.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5024` when the taxonomy will not load, or whatever building the
+    /// inference engine raised.
+    pub fn ritual_classifier(&self) -> AuraResult<RitualClassifier> {
+        let taxonomy = Arc::new(Taxonomy::embedded()?);
+        Ok(RitualClassifier::new(self.infer_engine()?, taxonomy))
+    }
+
+    /// The PELT penalty the last segmentation of this project settled on.
+    ///
+    /// Read back from the stored chapters rather than recomputed. A penalty is a
+    /// property of the pass that produced *these* boundaries, and running the search
+    /// again would report what a pass run now would choose - a different number about a
+    /// different timeline.
+    ///
+    /// Zero means either "no chapters yet" or "the search fell back to time gaps", and
+    /// `StoryStatusDto` distinguishes the two by also carrying the chapter count.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the query fails.
+    pub fn story_penalty(&self, project: &aura_core::ProjectId) -> AuraResult<f32> {
+        let key = project.to_db();
+        self.catalog.read(move |conn| {
+            let found: Result<f64, rusqlite::Error> = conn.query_row(
+                "SELECT penalty FROM segments WHERE project_id = ?1 ORDER BY ordinal LIMIT 1",
+                rusqlite::params![key],
+                |row| row.get(0),
+            );
+            // A penalty is a small positive number by construction - the search
+            // range is 0.0005 to 40 - so the narrowing is exact for every value this
+            // column can hold.
+            #[allow(clippy::cast_possible_truncation)]
+            Ok(found.map_or(0.0, |value| value as f32))
+        })
+    }
+
+    /// One photograph's stored ritual slug.
+    ///
+    /// The catalog stores the slug rather than the `RitualId`, so `SceneResult::ritual`
+    /// is deliberately `None` on a row read back from the database and the text is
+    /// fetched separately. See ADR-0015 section 3: a catalog whose meaning depends on a
+    /// config file that has since been edited is a catalog that lies.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the query fails.
+    pub fn story_ritual_slug(&self, photo: aura_core::PhotoId) -> AuraResult<Option<String>> {
+        let key = photo.to_db();
+        self.catalog.read(move |conn| {
+            let found: Result<Option<String>, rusqlite::Error> = conn.query_row(
+                "SELECT ritual FROM image_scenes WHERE photo_id = ?1",
+                rusqlite::params![key],
+                |row| row.get(0),
+            );
+            Ok(found.unwrap_or(None))
+        })
+    }
+
+    /// Everything the scene pass needs that is not a model.
+    ///
+    /// Assembled here rather than inside `aura-brain-wedding`, because three of the five
+    /// maps come from crates that one deliberately does not link: the face counts and the
+    /// couple presence are `PeopleService`'s answers, and phase 06's rule is that no
+    /// phase keeps its own idea of who the couple are.
+    ///
+    /// A missing map is a documented neutral rather than a failure. A project with no
+    /// face scan classifies perfectly well; two of its sixteen context slots sit at their
+    /// midpoint and the classifier is told so.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the catalog cannot be read.
+    pub fn story_pass_context(
+        &self,
+        project: &aura_core::ProjectId,
+    ) -> AuraResult<aura_brain_wedding::PassContext> {
+        let key = project.to_db();
+        let mut context = aura_brain_wedding::PassContext::default();
+
+        // EXIF, from the catalog's own columns.
+        let exif = self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare("SELECT photo_id, iso, flash_fired FROM photo WHERE project_id = ?1")
+                .map_err(|e| {
+                    aura_core::errors::db::statement_failed("could not read exif for scenes", &e)
+                })?;
+            let mut rows = statement.query(rusqlite::params![key]).map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read exif for scenes", &e)
+            })?;
+            let mut out: Vec<(String, Option<i64>, Option<i64>)> = Vec::new();
+            while let Some(row) = rows.next().map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read an exif row", &e)
+            })? {
+                let Ok(id) = row.get::<_, String>(0) else {
+                    continue;
+                };
+                out.push((id, row.get(1).ok().flatten(), row.get(2).ok().flatten()));
+            }
+            Ok(out)
+        })?;
+        for (id, iso, flash) in exif {
+            let Ok(photo) = aura_core::PhotoId::from_db(&id) else {
+                continue;
+            };
+            if let Some(value) = iso {
+                if let Ok(iso) = u32::try_from(value) {
+                    context.iso.insert(photo, iso);
+                }
+            }
+            if let Some(value) = flash {
+                context.flash.insert(photo, value != 0);
+            }
+        }
+
+        // Faces per frame, from phase 06's ledger. Absent when the face pass has not
+        // run, which is the ordinary case for a project that has embeddings and no faces
+        // yet - and `ContextFeatures` substitutes a documented neutral for it rather
+        // than a zero, because "no faces" and "nobody looked" are different.
+        //
+        // Read from `face_scan` rather than by counting `faces` rows: the ledger is the
+        // resumability record and already holds the count, and a `COUNT(*)` join over a
+        // wedding's faces to learn a number that is stored is work for nothing.
+        let scan_key = project.to_db();
+        let counts = self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare("SELECT photo_id, faces_found FROM face_scan WHERE project_id = ?1")
+                .map_err(|e| {
+                    aura_core::errors::db::statement_failed("could not read face counts", &e)
+                })?;
+            let mut rows = statement.query(rusqlite::params![scan_key]).map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read face counts", &e)
+            })?;
+            let mut out: Vec<(String, i64)> = Vec::new();
+            while let Some(row) = rows.next().map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read a face-count row", &e)
+            })? {
+                let (Ok(id), Ok(count)) = (row.get::<_, String>(0), row.get::<_, i64>(1)) else {
+                    continue;
+                };
+                out.push((id, count));
+            }
+            Ok(out)
+        })?;
+        for (id, count) in counts {
+            let Ok(photo) = aura_core::PhotoId::from_db(&id) else {
+                continue;
+            };
+            context
+                .faces
+                .insert(photo, u32::try_from(count).unwrap_or(0));
+        }
+
+        Ok(context)
+    }
+
+    /// One project's embeddings, keyed by photograph, for the segmenter's first signal
+    /// term.
+    ///
+    /// Loaded here rather than inside the segmenter for the reason
+    /// `Story::segment_with_embeddings` gives: the caller usually already has them, and
+    /// a segmenter that read them itself would open the table a second time.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the vectors cannot be read.
+    pub fn story_embeddings(
+        &self,
+        project: &aura_core::ProjectId,
+    ) -> AuraResult<BTreeMap<aura_core::PhotoId, Vec<f32>>> {
+        let (entries, _) = self.embedding_store().load_entries(&project.to_db())?;
+        Ok(entries
+            .into_iter()
+            .map(|entry| {
+                (
+                    entry.embedding.image_id,
+                    entry
+                        .embedding
+                        .vec
+                        .iter()
+                        .map(|half| half.to_f32())
+                        .collect(),
+                )
+            })
+            .collect())
     }
 
     /// One photograph's vector, or `None` when it has not been analysed.
