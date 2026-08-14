@@ -944,3 +944,263 @@ pub fn sample_input(batch: usize) -> Tensor {
         data: samples,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-07. The two heads that read a wedding as a story.
+//
+// Both are *adapter* models rather than backbones, and that is the whole design
+// of section 6.1: the trunk is the phase 05 embedding, frozen, and a scene head
+// is a small trainable adapter on top of it. So neither of these takes pixels.
+// They take a 512-d vector that has already been computed for every photograph
+// in the project, plus a handful of context numbers, and that is why section 11
+// can budget 35 seconds for four thousand images - the expensive part already
+// happened.
+//
+// A consequence worth stating: these two models are versioned against the
+// embedding they sit on. `image_scenes.embed_ver` records which trunk produced
+// the vector, and a mismatch is `AURA-ML-5022` rather than a plausible wrong
+// answer.
+// ---------------------------------------------------------------------------
+
+/// Name of the phase 07 multi-head scene and attribute classifier.
+pub const SCENE_CLASSIFIER_MODEL: &str = "scene_classifier";
+/// Name of the phase 07 ritual head.
+pub const RITUAL_CLASSIFIER_MODEL: &str = "ritual_classifier";
+
+/// How many context numbers ride alongside the embedding.
+///
+/// Section 6.1's list: hour-of-day offset from the first frame, flash flag, ISO
+/// bucket, face count, dominant-identity presence, and an indoor/outdoor prior
+/// from luminance and colour temperature. Sixteen slots for six families of
+/// feature, because several of them are one-hot: the ISO bucket is four slots
+/// and the hour offset is two - a sine and a cosine, so that 23:00 and 01:00 are
+/// close together rather than a day apart.
+pub const SCENE_CONTEXT_FEATURES: usize = 16;
+
+/// Width of the scene classifier's input: the embedding plus the context.
+pub const SCENE_INPUT_DIM: usize = WEDDING_EMBEDDING_DIM + SCENE_CONTEXT_FEATURES;
+
+/// Width of the trainable adapter between the frozen trunk and the two heads.
+pub const SCENE_ADAPTER_DIM: usize = 256;
+
+/// How many scene classes the head emits. `SceneId::CLASSES`.
+pub const SCENE_CLASSIFIER_CLASSES: usize = 22;
+
+/// How many attribute probabilities the head emits. `AttrFlags::COUNT`.
+pub const SCENE_ATTRIBUTES: usize = 14;
+
+/// How many tradition slots condition the ritual head.
+///
+/// `aura_cloud::tasks::ALLOWED_TRADITIONS` has eight entries and this is the same
+/// eight, one-hot. Section 6.1 calls the ritual head tradition-conditioned: a
+/// `saptapadi` and a `communion` are not competing hypotheses about the same
+/// photograph, and telling the head which taxonomy is in play is what stops it
+/// spending its capacity separating them.
+pub const RITUAL_TRADITIONS: usize = 8;
+
+/// Width of the ritual head's input.
+pub const RITUAL_INPUT_DIM: usize =
+    WEDDING_EMBEDDING_DIM + SCENE_CONTEXT_FEATURES + RITUAL_TRADITIONS;
+
+/// Width of the ritual head's adapter.
+pub const RITUAL_ADAPTER_DIM: usize = 192;
+
+/// How many ritual slots the head emits.
+///
+/// **The slot IS the `RitualId` authored in the taxonomy file**, which is the
+/// reason ADR-0015 insists the id is written down rather than derived from file
+/// order: renumbering a rite would relabel a model output. Slot 0 is
+/// `RitualId::NONE`, which is the abstention, so a head that is unsure answers
+/// "no ritual" through the same softmax as every other answer rather than
+/// through a threshold bolted on outside it.
+///
+/// 160 covers the five shipped traditions' reserved ranges - 10 to 159 - with the
+/// next tradition starting at 160, at which point this constant and the head both
+/// change. That is a retrain, which is correct.
+pub const RITUAL_SLOTS: usize = 160;
+
+/// The multi-head scene and attribute classifier.
+///
+/// `features [N, 528] -> scene_probs [N, 22]`, `attr_probs [N, 14]`.
+///
+/// Two heads on one adapter, exactly section 6.1: a 22-way softmax over scenes
+/// and fourteen independent sigmoids over attributes. Independent sigmoids and
+/// not a second softmax, because a frame can be indoors *and* backlit *and* have
+/// a crowd, and a mutually exclusive encoding would force the model to choose
+/// between three true things.
+///
+/// Both activations are **in the graph**, by the rule [`face_quality`] states: an
+/// activation belongs in a graph when it applies to every channel of a tensor,
+/// and in the decoder when it does not. A softmax over all 22 scene classes and a
+/// sigmoid over all 14 attributes both qualify. The abstention is *not* in the
+/// graph - `SceneId::Unknown` is a decision the decoder makes from the top-1
+/// margin, and a model cannot be trained to say "I am not sure" through a slot
+/// that competes with the classes it is unsure between.
+#[must_use]
+pub fn scene_classifier() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_5CE7_E01A_BE15);
+
+    let graph = Graph {
+        name: SCENE_CLASSIFIER_MODEL.to_string(),
+        nodes: vec![
+            with_int(
+                node(
+                    "Gemm",
+                    "adapter",
+                    &["features", "adapter_w", "adapter_b"],
+                    &["adapter_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "adapter_act", &["adapter_out"], &["adapter_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "scene_head",
+                    &["adapter_relu", "scene_w", "scene_b"],
+                    &["scene_logits"],
+                ),
+                "transB",
+                1,
+            ),
+            with_int(
+                node("Softmax", "scene_norm", &["scene_logits"], &["scene_probs"]),
+                "axis",
+                -1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "attr_head",
+                    &["adapter_relu", "attr_w", "attr_b"],
+                    &["attr_logits"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "attr_squash", &["attr_logits"], &["attr_probs"]),
+        ],
+        initializers: vec![
+            weights.tensor("adapter_w", vec![SCENE_ADAPTER_DIM, SCENE_INPUT_DIM], 0.06),
+            weights.tensor("adapter_b", vec![SCENE_ADAPTER_DIM], 0.02),
+            weights.tensor(
+                "scene_w",
+                vec![SCENE_CLASSIFIER_CLASSES, SCENE_ADAPTER_DIM],
+                0.09,
+            ),
+            weights.tensor("scene_b", vec![SCENE_CLASSIFIER_CLASSES], 0.02),
+            weights.tensor("attr_w", vec![SCENE_ATTRIBUTES, SCENE_ADAPTER_DIM], 0.09),
+            weights.tensor("attr_b", vec![SCENE_ATTRIBUTES], 0.02),
+        ],
+        inputs: vec![dynamic_batch("features", &[SCENE_INPUT_DIM])],
+        outputs: vec![
+            dynamic_batch("scene_probs", &[SCENE_CLASSIFIER_CLASSES]),
+            dynamic_batch("attr_probs", &[SCENE_ATTRIBUTES]),
+        ],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The tradition-conditioned ritual head.
+///
+/// `features [N, 536] -> ritual_probs [N, 160]`.
+///
+/// One softmax over every rite in every shipped taxonomy plus slot 0 for "no
+/// ritual". Section 6.1 asks for a "don't guess" abstain threshold and slot 0 is
+/// half of it; the other half is `ritual::ABSTAIN_MARGIN` in the decoder, because
+/// a head that is split evenly between `saptapadi_pheras` and `saat_phera` has
+/// not abstained - it has told you the tradition and not the rite, and that is a
+/// different answer from silence.
+#[must_use]
+pub fn ritual_classifier() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_217A_11A5_10B5);
+
+    let graph = Graph {
+        name: RITUAL_CLASSIFIER_MODEL.to_string(),
+        nodes: vec![
+            with_int(
+                node(
+                    "Gemm",
+                    "adapter",
+                    &["features", "adapter_w", "adapter_b"],
+                    &["adapter_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "adapter_act", &["adapter_out"], &["adapter_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "ritual_head",
+                    &["adapter_relu", "ritual_w", "ritual_b"],
+                    &["ritual_logits"],
+                ),
+                "transB",
+                1,
+            ),
+            with_int(
+                node(
+                    "Softmax",
+                    "ritual_norm",
+                    &["ritual_logits"],
+                    &["ritual_probs"],
+                ),
+                "axis",
+                -1,
+            ),
+        ],
+        initializers: vec![
+            weights.tensor(
+                "adapter_w",
+                vec![RITUAL_ADAPTER_DIM, RITUAL_INPUT_DIM],
+                0.06,
+            ),
+            weights.tensor("adapter_b", vec![RITUAL_ADAPTER_DIM], 0.02),
+            weights.tensor("ritual_w", vec![RITUAL_SLOTS, RITUAL_ADAPTER_DIM], 0.07),
+            weights.tensor("ritual_b", vec![RITUAL_SLOTS], 0.02),
+        ],
+        inputs: vec![dynamic_batch("features", &[RITUAL_INPUT_DIM])],
+        outputs: vec![dynamic_batch("ritual_probs", &[RITUAL_SLOTS])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// A deterministic batch of scene-classifier features, for benchmarks and parity.
+#[must_use]
+pub fn scene_sample_input(batch: usize) -> Tensor {
+    let mut weights = Weights::new(0x0000_5CE7_5A11_9127);
+    let samples = (0..batch * SCENE_INPUT_DIM)
+        .map(|_| weights.next(0.5) + 0.5)
+        .collect();
+    Tensor {
+        shape: vec![batch, SCENE_INPUT_DIM],
+        data: samples,
+    }
+}
+
+/// A deterministic batch of ritual-head features.
+#[must_use]
+pub fn ritual_sample_input(batch: usize) -> Tensor {
+    let mut weights = Weights::new(0x0000_217A_5A11_9127);
+    let samples = (0..batch * RITUAL_INPUT_DIM)
+        .map(|_| weights.next(0.5) + 0.5)
+        .collect();
+    Tensor {
+        shape: vec![batch, RITUAL_INPUT_DIM],
+        data: samples,
+    }
+}

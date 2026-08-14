@@ -1,0 +1,486 @@
+# Scene profiles - PHASE-07 sections 5 and 6.3.
+#
+# ===========================================================================
+# THIS FILE IS A PRODUCT DECISION, NOT AN IMPLEMENTATION DETAIL
+# ===========================================================================
+#
+# Section 8 step 7 says so in as many words: "author `scene_profiles.toml` with
+# the consultant and get PM sign-off - this file is a product decision, not a
+# code detail". Every number below is one of two things:
+#
+#   * a tolerance, which says what a photograph of this kind is allowed to be;
+#   * a weight, which says what makes a photograph of this kind good.
+#
+# and section 12's third failure mode is that the file becomes a dumping ground
+# of magic numbers. So the loader refuses any profile without a `rationale`
+# longer than eight characters - `AURA-ML-5024` - and the rationale is expected
+# to say *why a photographer would agree*, not to restate the number.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# keeper_rate = [min, max]
+#     The share of frames of this scene a normal cull should keep. Phase 12
+#     culls towards this band and reports when it lands outside it. A band, not
+#     a number, because a photographer who shot 400 dance frames and one who
+#     shot 40 both need the answer "keep the good ones".
+#
+# max_acceptable_noise   0..1, higher means noisier is acceptable
+# max_acceptable_blur    0..1, higher means softer is acceptable
+#     Scene-RELATIVE, not absolute. Phase 09 measures noise and blur; these say
+#     how much of it this kind of photograph is allowed to have before it stops
+#     being usable. A dance floor at ISO 12800 is a dance floor. A family
+#     portrait at ISO 12800 is a mistake.
+#
+# subject_focus_weight + emotion_weight + composition_weight
+#     How the composite quality score is split, and they sum to at most 1.0.
+#     `subject_focus_weight` multiplies phase 06's `subject_focus_score` - the
+#     prominence-weighted sharpness of the FACES, not of the frame - which is
+#     why `details` can set it to zero without saying "sharpness does not
+#     matter".
+#
+# editing_intent
+#     airy | neutral | warm | moody | punchy. Phases 15-17 translate this into
+#     tone and colour targets. It is a direction, not a parameter: the numbers
+#     belong to the phase that grades.
+#
+# must_cover
+#     True when phase 12's coverage guarantee applies - "this wedding must
+#     contain at least one good frame of this". It is set on eleven scenes and
+#     it is the shortest, most argued-over list in the file.
+#
+# ---------------------------------------------------------------------------
+# VERSIONING
+# ---------------------------------------------------------------------------
+#
+# Bump `version` on ANY change below, including one that looks harmless. It is
+# written into `scene_profiles.profile_ver` on every row, and a cull that ran
+# under version 1 and a cull that ran under version 2 disagree. The ledger has
+# to be able to say which was which.
+#
+# The file that ships is the baseline. A copy at
+# `<catalog>/config/scene_profiles.toml` overrides it at run time, and a
+# photographer's per-project edit lands in the `scene_profiles` table with
+# `user_edited = 1` and is never overwritten by a reload.
+
+version = 1
+
+# ===========================================================================
+# GETTING READY
+# ===========================================================================
+
+# Two profiles, not one, because the two halves of a couple are usually
+# photographed in different rooms by different shooters under different light -
+# and because a photographer selecting "the bride getting ready" does not want
+# the groom's room in the same chapter.
+
+[scenes.getting_ready_bride]
+keeper_rate          = [0.18, 0.40]
+max_acceptable_noise = 0.55
+max_acceptable_blur  = 0.30
+subject_focus_weight = 0.40
+emotion_weight       = 0.35
+composition_weight   = 0.20
+editing_intent       = "airy"
+must_cover           = false
+rationale = """
+Window-lit rooms, often small and dim, shot wide open. Noise tolerance is above
+neutral because pushing ISO in a hotel room is the normal answer and a
+photographer will not reject a frame for grain they chose. Emotion is weighted
+heavily: this chapter is bought for the mother-of-the-bride reaction, not for
+technical perfection. Airy, because the whole chapter is sold on light. The
+keeper band is low - photographers shoot this chapter loosely and expect to
+keep a fifth of it.
+"""
+
+[scenes.getting_ready_groom]
+keeper_rate          = [0.12, 0.32]
+max_acceptable_noise = 0.55
+max_acceptable_blur  = 0.30
+subject_focus_weight = 0.42
+emotion_weight       = 0.33
+composition_weight   = 0.25
+editing_intent       = "neutral"
+must_cover           = false
+rationale = """
+Same light, different shoot. The keeper band is lower because this chapter is
+shot faster and repeated less, and the intent is neutral rather than airy
+because the rooms are usually darker and a lifted-shadow grade on a dark suit
+turns it grey. Consultant note: photographers report shooting roughly half as
+many frames here and delivering roughly the same number.
+"""
+
+# ===========================================================================
+# DETAILS AND VENUE
+# ===========================================================================
+
+[scenes.details]
+keeper_rate          = [0.08, 0.25]
+max_acceptable_noise = 0.30
+max_acceptable_blur  = 0.15
+subject_focus_weight = 0.00
+emotion_weight       = 0.00
+composition_weight   = 0.75
+editing_intent       = "airy"
+must_cover           = true
+rationale = """
+The one scene that ignores faces entirely, which is why subject_focus_weight
+and emotion_weight are both zero and composition carries almost everything.
+These frames are made deliberately, usually on a tripod or with flash, so the
+noise and blur tolerances are the tightest in the file: a soft detail shot has
+no excuse. must_cover is true because an album with no ring shot is a
+complaint, and the keeper band is the lowest here because photographers shoot
+twenty variations of one flat lay and deliver two.
+"""
+
+[scenes.venue]
+keeper_rate          = [0.06, 0.20]
+max_acceptable_noise = 0.32
+max_acceptable_blur  = 0.15
+subject_focus_weight = 0.00
+emotion_weight       = 0.00
+composition_weight   = 0.72
+editing_intent       = "neutral"
+must_cover           = true
+rationale = """
+The empty room before the guests arrive. Same argument as details - made
+deliberately, no faces, composition is the whole judgement - and must_cover is
+true for the same reason: a client who paid for a venue expects to see it.
+Neutral rather than airy because half of these are shot at dusk with the venue
+lighting on, and an airy grade destroys exactly what the photographer stayed
+late for.
+"""
+
+# ===========================================================================
+# CEREMONY
+# ===========================================================================
+
+[scenes.first_look]
+keeper_rate          = [0.20, 0.45]
+max_acceptable_noise = 0.50
+max_acceptable_blur  = 0.32
+subject_focus_weight = 0.38
+emotion_weight       = 0.45
+composition_weight   = 0.17
+editing_intent       = "warm"
+must_cover           = true
+rationale = """
+The highest emotion weight in the file, and it is not close. A first look is
+bought entirely for one expression that lasts under two seconds, and a
+technically better frame taken half a second later is worth less. Blur
+tolerance is above neutral for the same reason. must_cover because it is a
+staged, scheduled moment: if it happened and there is no frame of it, that is a
+coverage failure and not an editorial choice.
+"""
+
+[scenes.ceremony_entrance]
+keeper_rate          = [0.15, 0.35]
+max_acceptable_noise = 0.60
+max_acceptable_blur  = 0.40
+subject_focus_weight = 0.42
+emotion_weight       = 0.33
+composition_weight   = 0.25
+editing_intent       = "neutral"
+must_cover           = false
+rationale = """
+A processional is a moving subject in whatever light the room has, shot from a
+fixed position the photographer is not allowed to leave. Blur tolerance is high
+because the alternative to a slightly soft frame is no frame. Not must_cover on
+its own - the ceremony is - because an entrance that was not photographed is
+absorbed by the ceremony chapter rather than being a gap.
+"""
+
+[scenes.ceremony]
+keeper_rate          = [0.12, 0.30]
+max_acceptable_noise = 0.62
+max_acceptable_blur  = 0.35
+subject_focus_weight = 0.45
+emotion_weight       = 0.30
+composition_weight   = 0.25
+editing_intent       = "neutral"
+must_cover           = true
+rationale = """
+The reference row for the whole file: every other noise tolerance is written as
+a multiple of this one. Ceremonies are dark, flash is often forbidden, and the
+photographer is pinned to one position - so noise is tolerated well above the
+portrait scenes and composition is weighted down because it is largely not the
+photographer's choice. Subject focus dominates: a ceremony frame where the
+couple is soft is not a ceremony frame. must_cover, obviously.
+"""
+
+[scenes.vows]
+keeper_rate          = [0.15, 0.38]
+max_acceptable_noise = 0.62
+max_acceptable_blur  = 0.30
+subject_focus_weight = 0.42
+emotion_weight       = 0.40
+composition_weight   = 0.18
+editing_intent       = "neutral"
+must_cover           = true
+rationale = """
+The ceremony's tolerances with the emotion weight of a first look. Vows are the
+one part of the ceremony where the faces are doing something specific, so blur
+tolerance tightens relative to the ceremony as a whole - a soft frame of a
+spoken vow is a soft frame of a face, which is the failure this scene cannot
+have.
+"""
+
+[scenes.rings]
+keeper_rate          = [0.20, 0.50]
+max_acceptable_noise = 0.58
+max_acceptable_blur  = 0.22
+subject_focus_weight = 0.30
+emotion_weight       = 0.25
+composition_weight   = 0.45
+editing_intent       = "neutral"
+must_cover           = true
+rationale = """
+A hands-and-object moment inside a face-and-emotion chapter, so composition
+outweighs both other terms and the blur tolerance is the tightest of any
+ceremony scene: the ring has to be sharp or the frame is worthless. The keeper
+band is the highest in the ceremony chapter because the moment is short and
+almost every frame of it is used.
+"""
+
+[scenes.kiss]
+keeper_rate          = [0.25, 0.55]
+max_acceptable_noise = 0.62
+max_acceptable_blur  = 0.34
+subject_focus_weight = 0.40
+emotion_weight       = 0.38
+composition_weight   = 0.22
+editing_intent       = "warm"
+must_cover           = true
+rationale = """
+The single most-reproduced frame of most weddings, and it lasts about a second.
+The keeper band is the highest of any scene because there are usually fewer than
+ten frames and most of them are delivered. Warm, because it is the frame that
+gets printed. must_cover is not negotiable.
+"""
+
+[scenes.ritual]
+keeper_rate          = [0.14, 0.38]
+max_acceptable_noise = 0.65
+max_acceptable_blur  = 0.38
+subject_focus_weight = 0.38
+emotion_weight       = 0.30
+composition_weight   = 0.32
+editing_intent       = "warm"
+must_cover           = true
+rationale = """
+The highest noise tolerance of any non-dance scene, and the reason is specific:
+Hindu, Nepali and Sikh rites are frequently held at night around fire, indoors,
+under a mandap, with no flash permitted. A tolerance copied from a Christian
+daylight ceremony would reject the entire chapter of a Nepali wedding, which is
+precisely the cultural blind spot section 12 names first. Composition is
+weighted above the ceremony's because ritual objects - the fire, the garlands,
+the sindoor - have to be IN the frame for it to mean anything.
+"""
+
+# ===========================================================================
+# PORTRAITS
+# ===========================================================================
+
+[scenes.family_portrait]
+keeper_rate          = [0.25, 0.55]
+max_acceptable_noise = 0.35
+max_acceptable_blur  = 0.14
+subject_focus_weight = 0.50
+emotion_weight       = 0.15
+composition_weight   = 0.35
+editing_intent       = "neutral"
+must_cover           = true
+rationale = """
+The tightest blur tolerance in the file. A posed group is made under the
+photographer's control, everybody is stationary, and there is no defensible
+reason for a soft one - so it is graded the way the client will grade it, which
+is by checking whether Grandma's eyes are open. Emotion is weighted lowest of
+any people scene for the same reason: nobody expects a posed group to be
+moving. must_cover, and phase 12 is expected to treat a missing family
+combination as a coverage failure rather than a preference.
+"""
+
+[scenes.group_portrait]
+keeper_rate          = [0.20, 0.48]
+max_acceptable_noise = 0.38
+max_acceptable_blur  = 0.16
+subject_focus_weight = 0.48
+emotion_weight       = 0.18
+composition_weight   = 0.34
+editing_intent       = "neutral"
+must_cover           = false
+rationale = """
+Family formals without the obligation. Same tolerances, slightly relaxed
+because a large group of friends is shot faster and with less control, and
+must_cover is false because there is no fixed list of groups the client
+expects.
+"""
+
+[scenes.couple_portrait]
+keeper_rate          = [0.22, 0.50]
+max_acceptable_noise = 0.40
+max_acceptable_blur  = 0.20
+subject_focus_weight = 0.45
+emotion_weight       = 0.30
+composition_weight   = 0.25
+editing_intent       = "warm"
+must_cover           = true
+rationale = """
+The scene the wedding is sold on. Tolerances close to family portraits because
+it is equally controlled, but emotion is weighted twice as high: a posed couple
+frame with a dead expression is a failure and a posed group with one is normal.
+Warm is the near-universal delivery grade for this chapter.
+"""
+
+[scenes.golden_hour]
+keeper_rate          = [0.25, 0.55]
+max_acceptable_noise = 0.42
+max_acceptable_blur  = 0.24
+subject_focus_weight = 0.42
+emotion_weight       = 0.28
+composition_weight   = 0.30
+editing_intent       = "warm"
+must_cover           = false
+rationale = """
+Couple portraits in the twenty minutes photographers plan the whole day around.
+Backlight and flare are the point, so the technical measurements from phase 09
+will read worse than the frames actually are - the blur and noise tolerances
+are widened relative to couple_portrait to compensate, deliberately and with
+the reason recorded here rather than being discovered later as a bug.
+"""
+
+# ===========================================================================
+# RECEPTION
+# ===========================================================================
+
+[scenes.reception_entrance]
+keeper_rate          = [0.15, 0.38]
+max_acceptable_noise = 0.75
+max_acceptable_blur  = 0.48
+subject_focus_weight = 0.38
+emotion_weight       = 0.40
+composition_weight   = 0.22
+editing_intent       = "punchy"
+must_cover           = true
+rationale = """
+A dark room, moving subjects, usually flash, usually with a spotlight and
+smoke. Noise and blur tolerances jump here and stay high for the rest of the
+reception. Punchy, because this is where the delivered gallery changes gear and
+a neutral grade makes the entrance look like the dinner. must_cover: it is a
+scheduled, announced moment.
+"""
+
+[scenes.speeches]
+keeper_rate          = [0.10, 0.28]
+max_acceptable_noise = 0.72
+max_acceptable_blur  = 0.35
+subject_focus_weight = 0.40
+emotion_weight       = 0.42
+composition_weight   = 0.18
+editing_intent       = "warm"
+must_cover           = true
+rationale = """
+Long, repetitive, and bought for reactions rather than for the speaker - which
+is why the keeper band is one of the lowest in the file while emotion is one of
+the highest. Blur tolerance is lower than the rest of the reception because a
+seated speaker is not a moving subject and there is no excuse for a soft one.
+"""
+
+[scenes.cake]
+keeper_rate          = [0.20, 0.48]
+max_acceptable_noise = 0.70
+max_acceptable_blur  = 0.38
+subject_focus_weight = 0.35
+emotion_weight       = 0.35
+composition_weight   = 0.30
+editing_intent       = "punchy"
+must_cover           = true
+rationale = """
+Short, announced, and photographed by forty guests at once. Composition is
+weighted up relative to the rest of the reception because the cake itself has
+to be in the frame - the whole point of the moment is an object - and the
+keeper band is high because there are rarely more than twenty frames of it.
+"""
+
+# ===========================================================================
+# DANCE
+# ===========================================================================
+
+[scenes.first_dance]
+keeper_rate          = [0.18, 0.42]
+max_acceptable_noise = 0.80
+max_acceptable_blur  = 0.42
+subject_focus_weight = 0.42
+emotion_weight       = 0.36
+composition_weight   = 0.22
+editing_intent       = "moody"
+must_cover           = true
+rationale = """
+The first dance is not dancing, and it is graded as its own scene for the same
+reason phase 06's prominence file gives it its own weight set: two people,
+deliberately lit, in a room that has been darkened on purpose. Moody rather
+than punchy - the room is dark because somebody chose that, and lifting it
+throws the lighting design away. must_cover.
+"""
+
+[scenes.dance_floor]
+keeper_rate          = [0.06, 0.22]
+max_acceptable_noise = 0.90
+max_acceptable_blur  = 0.65
+subject_focus_weight = 0.25
+emotion_weight       = 0.50
+composition_weight   = 0.15
+editing_intent       = "punchy"
+must_cover           = false
+rationale = """
+Section 6.3's worked example, and the row that proves the whole file matters:
+noise tolerance 0.90 against the ceremony's 0.62 - about three times the budget
+once phase 09's measurement is non-linear - emotion 0.50, composition 0.15, and
+blur EXPECTED rather than merely tolerated because motion is what a dance floor
+photograph is of. The keeper band is the lowest of any people scene: a
+photographer shoots six hundred dance frames and delivers sixty. must_cover is
+false because there is no specific dance frame anybody asked for.
+"""
+
+# ===========================================================================
+# THE REST
+# ===========================================================================
+
+[scenes.candid]
+keeper_rate          = [0.08, 0.25]
+max_acceptable_noise = 0.65
+max_acceptable_blur  = 0.40
+subject_focus_weight = 0.35
+emotion_weight       = 0.45
+composition_weight   = 0.20
+editing_intent       = "neutral"
+must_cover           = false
+rationale = """
+The catch-all, and it is weighted towards emotion because a candid that is not
+about an expression is not a candid, it is a frame of a room. Tolerances sit
+between the ceremony and the reception because a candid can be anywhere, and a
+neutral intent because the grade should come from wherever the frame actually
+was rather than from this label.
+"""
+
+[scenes.exit]
+keeper_rate          = [0.20, 0.50]
+max_acceptable_noise = 0.85
+max_acceptable_blur  = 0.55
+subject_focus_weight = 0.35
+emotion_weight       = 0.42
+composition_weight   = 0.23
+editing_intent       = "punchy"
+must_cover           = true
+rationale = """
+Sparklers, confetti, a car, and almost always full dark. Tolerances close to
+the dance floor's, keeper band far higher because the send-off lasts ninety
+seconds and every usable frame is delivered. must_cover: it is the last frame
+of the story and its absence is the kind of thing a client notices a year
+later.
+"""
+
+# `unknown` has no profile and never will. It is the abstention, not a scene, so
+# a request for its profile is a request for `SceneProfile::neutral` - which is
+# what `StoryService::profile` returns, with `AURA-ML-5023` logged once.

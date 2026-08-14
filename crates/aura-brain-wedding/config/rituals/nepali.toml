@@ -1,0 +1,117 @@
+# Nepali ritual taxonomy - PHASE-07 section 2.1.
+#
+# See `hindu.toml` for what every field means and for the one rule that
+# matters: `id` is authored, unique across every file, and never reused.
+#
+# Reserved id range for this file: 40 - 69.
+#
+# ---------------------------------------------------------------------------
+# WHY THIS FILE EXISTS SEPARATELY FROM `hindu.toml`
+# ---------------------------------------------------------------------------
+#
+# A Nepali Hindu wedding shares several rites with an Indian Hindu one and is
+# not the same wedding. Three differences matter to a photographer and
+# therefore to this product:
+#
+#   * The **swayambar** is a distinct staged event with its own name, its own
+#     seating and its own timing. Filing it under `jaimala_varmala` because
+#     garlands are involved loses the thing a Nepali client will look for.
+#   * **Jantee** is a procession like a baraat and is walked rather than
+#     ridden, at night, with a band - which is a different photographic problem
+#     from a horse in daylight.
+#   * The sequence is compressed differently. A Nepali wedding frequently runs
+#     the ceremony overnight; the `night = true` flags below are not incidental
+#     and they are the evidence behind `scene_profiles.toml`'s ritual noise
+#     tolerance of 0.65, the highest of any non-dance scene.
+#
+# Section 1 of the phase document calls this a competitive moat, and it is: a
+# global tool that handles Western structure adequately and Nepali structure
+# poorly is the gap this file is the fix for. Where a rite genuinely IS the
+# same rite, the slug is deliberately the same as `hindu.toml`'s so that the
+# two do not fragment - `haldi`, `mehendi`, `sindoor_mangalsutra` and `vidaai`
+# are declared once, in `hindu.toml`, and are NOT redeclared here.
+
+version   = 1
+tradition = "nepali"
+title     = "Nepali"
+
+# Rites this file adds. The shared ones live in `hindu.toml` and are found by
+# the loader's union - a taxonomy is loaded as one table across all files, so a
+# Nepali wedding matches `haldi` from `hindu.toml` without a duplicate id.
+
+[[ritual]]
+id          = 40
+slug        = "supari_chhopne"
+title       = "Supari Chhopne"
+aliases     = ["supari", "betel nut ceremony", "engagement"]
+phase       = "pre"
+night       = false
+evidence    = "betel nuts and offerings exchanged between two family groups, indoors, seated in a circle"
+
+[[ritual]]
+id          = 41
+slug        = "mehendi_nepali"
+title       = "Mehendi (Nepali)"
+aliases     = ["mehendi raat"]
+cloud_label = "mehndi"
+phase       = "pre"
+night       = true
+evidence    = "henna applied in the evening with music; distinguished from the Indian daytime mehendi by light alone"
+
+[[ritual]]
+id          = 42
+slug        = "jantee"
+title       = "Jantee"
+aliases     = ["janti", "janti procession", "groom's party"]
+cloud_label = "baraat"
+phase       = "day"
+night       = true
+evidence    = "a walking procession, a panche baja band, lanterns, at night, in the street; no horse"
+
+[[ritual]]
+id          = 43
+slug        = "swayambar"
+title       = "Swayambar"
+aliases     = ["swayamvar", "garland ceremony"]
+cloud_label = "jaimala_varmala"
+phase       = "day"
+night       = true
+evidence    = "the couple garlanding each other on a decorated stage, seated audience, formal staging"
+
+[[ritual]]
+id          = 44
+slug        = "kanyadaan_nepali"
+title       = "Kanyadaan (Nepali)"
+aliases     = ["kanyadan"]
+cloud_label = "kanyadaan"
+phase       = "day"
+night       = true
+evidence    = "the bride's parents washing the couple's feet and joining their hands, at the mandap, late"
+
+[[ritual]]
+id          = 45
+slug        = "saat_phera"
+title       = "Saat Phera"
+aliases     = ["sat phera", "seven circles"]
+cloud_label = "saptapadi_pheras"
+phase       = "day"
+night       = true
+evidence    = "seven circuits of the sacred fire; the fire and the priest are the fixed points of the frame"
+
+[[ritual]]
+id          = 46
+slug        = "dubo_ko_mala"
+title       = "Dubo Ko Mala"
+aliases     = ["dubo mala", "grass garland"]
+phase       = "day"
+night       = true
+evidence    = "a garland of dubo grass placed on the couple; small, green, close to the neck"
+
+[[ritual]]
+id          = 47
+slug        = "reception_nepali"
+title       = "Reception (Nepali)"
+aliases     = ["bhoj", "wedding reception"]
+phase       = "post"
+night       = true
+evidence    = "a receiving line, the couple standing for hours, guest-by-guest portraits with gifts"

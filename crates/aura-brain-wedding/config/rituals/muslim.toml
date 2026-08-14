@@ -1,0 +1,118 @@
+# Muslim ritual taxonomy - PHASE-07 section 2.1.
+#
+# See `hindu.toml` for what every field means and for the one rule that
+# matters: `id` is authored, unique across every file, and never reused.
+#
+# Reserved id range for this file: 100 - 129.
+#
+# ---------------------------------------------------------------------------
+# TWO THINGS A PHOTOGRAPHER NEEDS FROM THIS FILE
+# ---------------------------------------------------------------------------
+#
+# 1. **The nikah is a contract, not a procession.** The photographic moment is
+#    two people, two witnesses, an officiant and a document on a table - often
+#    in a small room, often brief, and frequently the only part of the day that
+#    is legally the wedding. A pipeline that expects a Christian aisle finds
+#    nothing here and labels the whole chapter `other`.
+#
+# 2. **Segregated celebrations are common and are two separate events.** Where
+#    the men's and women's celebrations are held apart, they are two chapters
+#    with two sets of frames, frequently by two shooters, and they interleave
+#    in the timeline. That is the two-shooter regression fixture in section
+#    10.1, arriving from a cultural direction rather than a staffing one.
+#
+# The product does not and will not infer anybody's religion. This file names
+# rites from visible objects and staging, and nothing in phase 07 reads a
+# tradition off a person - see `aura_cloud::tasks::SEGMENT_NAMING_SYSTEM`'s
+# third rule, which is enforced structurally rather than by prompt.
+
+version   = 1
+tradition = "muslim"
+title     = "Muslim"
+
+[[ritual]]
+id          = 100
+slug        = "mangni"
+title       = "Mangni"
+aliases     = ["engagement", "mangni ceremony"]
+phase       = "pre"
+night       = true
+evidence    = "rings and gifts exchanged between two family groups, seated indoors, formal clothing"
+
+[[ritual]]
+id          = 101
+slug        = "mayoun"
+title       = "Mayoun"
+aliases     = ["mayun", "ubtan", "tel baan"]
+cloud_label = "haldi"
+phase       = "pre"
+night       = false
+evidence    = "turmeric paste applied to the seated subject in yellow, at home, with close family only"
+
+[[ritual]]
+id          = 102
+slug        = "mehndi_muslim"
+title       = "Mehndi"
+aliases     = ["mehendi", "henna night", "rasm-e-henna"]
+cloud_label = "mehndi"
+phase       = "pre"
+night       = true
+evidence    = "henna, staged dancing and singing, heavy coloured decor, often a marquee, at night"
+
+[[ritual]]
+id          = 103
+slug        = "baraat_muslim"
+title       = "Baraat"
+aliases     = ["barat", "groom's arrival"]
+cloud_label = "baraat"
+phase       = "day"
+night       = true
+evidence    = "the groom's party arriving at the venue with drums and a decorated car"
+
+[[ritual]]
+id          = 104
+slug        = "nikah"
+title       = "Nikah"
+aliases     = ["nikkah", "marriage contract", "aqd"]
+cloud_label = "nikah"
+phase       = "day"
+night       = false
+evidence    = "a signed contract on a table, an officiant, two witnesses, a small room; the legal moment"
+
+[[ritual]]
+id          = 105
+slug        = "sehra_bandi"
+title       = "Sehra Bandi"
+aliases     = ["sehrabandi", "tying the sehra"]
+phase       = "day"
+night       = false
+evidence    = "a floral or beaded veil tied to the groom's turban by male relatives, before departure"
+
+[[ritual]]
+id          = 106
+slug        = "arsi_mushaf"
+title       = "Arsi Mushaf"
+aliases     = ["mirror ceremony", "first look (mirror)"]
+phase       = "day"
+night       = false
+evidence    = "the couple seeing each other's reflection in a mirror held between them under a shawl"
+
+[[ritual]]
+id          = 107
+slug        = "rukhsati"
+title       = "Rukhsati"
+aliases     = ["rukhsat", "farewell", "vidaai"]
+cloud_label = "vidaai"
+phase       = "day"
+night       = true
+evidence    = "the departure; a Quran held over the bride's head; a car; families embracing, visible distress"
+
+[[ritual]]
+id          = 108
+slug        = "walima"
+title       = "Walima"
+aliases     = ["valima", "reception"]
+cloud_label = "walima"
+phase       = "post"
+night       = true
+evidence    = "a hosted banquet the day after, a stage with two seats, a receiving line, formal portraits"

@@ -66,7 +66,7 @@ fn generate() -> ExitCode {
                 task: "embedding",
                 class: ModelClass::Embedding,
                 model: fixtures::tiny_embedding(),
-                input_side: fixtures::INPUT_SIDE,
+                input: Placeholder::image(fixtures::INPUT_SIDE),
                 output: BTreeMap::from([(
                     "embedding".to_string(),
                     vec![1, fixtures::EMBEDDING_DIM],
@@ -82,7 +82,7 @@ fn generate() -> ExitCode {
                 task: "multiclass",
                 class: ModelClass::Embedding,
                 model: fixtures::tiny_scene(),
-                input_side: fixtures::INPUT_SIDE,
+                input: Placeholder::image(fixtures::INPUT_SIDE),
                 output: BTreeMap::from([(
                     "scene_probs".to_string(),
                     vec![1, fixtures::SCENE_CLASSES],
@@ -100,7 +100,7 @@ fn generate() -> ExitCode {
                 task: "embedding",
                 class: ModelClass::Embedding,
                 model: fixtures::wedding_embedding(),
-                input_side: fixtures::WEDDING_INPUT_SIDE,
+                input: Placeholder::image(fixtures::WEDDING_INPUT_SIDE),
                 output: BTreeMap::from([(
                     "embedding".to_string(),
                     vec![1, fixtures::WEDDING_EMBEDDING_DIM],
@@ -125,7 +125,7 @@ fn generate() -> ExitCode {
                 // scheduler start it at a batch size no laptop can hold.
                 class: ModelClass::Segmentation,
                 model: fixtures::face_detect(),
-                input_side: fixtures::FACE_DETECT_INPUT_SIDE,
+                input: Placeholder::image(fixtures::FACE_DETECT_INPUT_SIDE),
                 output: BTreeMap::from([
                     (
                         "head_8".to_string(),
@@ -171,7 +171,7 @@ fn generate() -> ExitCode {
                 task: "embedding",
                 class: ModelClass::Embedding,
                 model: fixtures::face_embed(),
-                input_side: fixtures::FACE_CROP_SIDE,
+                input: Placeholder::image(fixtures::FACE_CROP_SIDE),
                 output: BTreeMap::from([(
                     "embedding".to_string(),
                     vec![1, fixtures::FACE_EMBED_DIM],
@@ -190,7 +190,7 @@ fn generate() -> ExitCode {
                 task: "multiclass",
                 class: ModelClass::Embedding,
                 model: fixtures::face_quality(),
-                input_side: fixtures::FACE_CROP_SIDE,
+                input: Placeholder::image(fixtures::FACE_CROP_SIDE),
                 output: BTreeMap::from([(
                     "quality".to_string(),
                     vec![1, fixtures::FACE_QUALITY_OUTPUTS],
@@ -199,6 +199,65 @@ fn generate() -> ExitCode {
                 // most of their resolution near 0 and 1, and this head's whole job is
                 // to decide whether a face is above 0.4 - a gate whose inputs are
                 // quantised to sixteen levels is a coin toss for anything near it.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        // PHASE-07. Two heads, and neither of them takes pixels: section 6.1's
+        // "shared trunk = the Phase 05 embedding (frozen) plus a small trainable
+        // adapter, so scene inference costs almost nothing extra per image".
+        // That is what makes section 11's 35-second budget for four thousand
+        // images achievable at all - the expensive part already ran in phase 05.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::SCENE_CLASSIFIER_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "multiclass",
+                // Embedding rather than segmentation: the memory ledger is
+                // reasoning about a 528-wide vector and a 256-wide adapter, which
+                // is the cheapest thing in the product. Filing it as a
+                // segmentation model would make the scheduler reserve a dense
+                // activation map that never exists.
+                class: ModelClass::Embedding,
+                model: fixtures::scene_classifier(),
+                input: Placeholder::features(fixtures::SCENE_INPUT_DIM),
+                output: BTreeMap::from([
+                    (
+                        "scene_probs".to_string(),
+                        vec![1, fixtures::SCENE_CLASSIFIER_CLASSES],
+                    ),
+                    (
+                        "attr_probs".to_string(),
+                        vec![1, fixtures::SCENE_ATTRIBUTES],
+                    ),
+                ]),
+                // int8 is forbidden, and the argument is `face_quality`'s. A
+                // 22-way softmax quantised per tensor loses most of its
+                // resolution exactly where the decision is made - around the
+                // top-1 margin that decides `SceneId::Unknown` - and every
+                // threshold in phases 09 to 29 hangs off which class wins.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::RITUAL_CLASSIFIER_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "multiclass",
+                class: ModelClass::Embedding,
+                model: fixtures::ritual_classifier(),
+                input: Placeholder::features(fixtures::RITUAL_INPUT_DIM),
+                output: BTreeMap::from([(
+                    "ritual_probs".to_string(),
+                    vec![1, fixtures::RITUAL_SLOTS],
+                )]),
+                // int8 is forbidden for a sharper version of the same reason. A
+                // 160-way softmax spends most of its mass on slot 0 and the rest
+                // spread thinly, so the difference between `saptapadi_pheras` and
+                // `saat_phera` lives in the third decimal place. Quantising that
+                // does not make the head faster in any way a photographer would
+                // notice; it makes the abstention margin meaningless.
                 precision_policy: PrecisionPolicy::no_int8(),
             },
         ),
@@ -251,11 +310,45 @@ struct Placeholder {
     task: &'static str,
     class: ModelClass,
     model: OnnxModel,
-    /// Side of the square input this model takes. Phase 03's placeholders take
-    /// 32 px; phase 05's embedding model takes 384.
-    input_side: usize,
+    /// What one sample of this model's input looks like, without the batch
+    /// dimension.
+    ///
+    /// A full spec rather than a side length, because PHASE-07's two heads do not
+    /// take pixels. They sit on the frozen phase 05 embedding - section 6.1's
+    /// "shared trunk = the Phase 05 embedding (frozen) plus a small trainable
+    /// adapter" - so their input is a feature vector and their manifest shape has
+    /// to say so, or every call fails the runtime's shape check with
+    /// `AURA-ML-5007`.
+    input: InputSpec,
     output: BTreeMap<String, Vec<usize>>,
     precision_policy: PrecisionPolicy,
+}
+
+impl Placeholder {
+    /// The input spec for a square image model at `side` pixels.
+    fn image(side: usize) -> InputSpec {
+        InputSpec {
+            shape: vec![1, 3, side, side],
+            layout: "NCHW".to_string(),
+            range: "0..1".to_string(),
+            colour: "srgb".to_string(),
+        }
+    }
+
+    /// The input spec for a feature-vector model of `width` samples.
+    ///
+    /// `range` is `unbounded` rather than `0..1`: an embedding's components are a
+    /// direction on the unit sphere and roughly half of them are negative. A
+    /// manifest that claimed `0..1` would be documenting a normalisation nobody
+    /// performs.
+    fn features(width: usize) -> InputSpec {
+        InputSpec {
+            shape: vec![1, width],
+            layout: "NC".to_string(),
+            range: "unbounded".to_string(),
+            colour: "none".to_string(),
+        }
+    }
 }
 
 /// Build one manifest entry, writing its variant files.
@@ -266,18 +359,12 @@ fn build_entry(directory: &Path, spec: &Placeholder) -> ModelEntry {
         task,
         class,
         model,
-        input_side,
+        input,
         output,
         precision_policy,
     } = spec;
-    let (name, version, task, class, input_side, precision_policy) = (
-        *name,
-        *version,
-        *task,
-        *class,
-        *input_side,
-        *precision_policy,
-    );
+    let (name, version, task, class, precision_policy) =
+        (*name, *version, *task, *class, *precision_policy);
 
     let mut variants = Vec::new();
 
@@ -324,12 +411,7 @@ fn build_entry(directory: &Path, spec: &Placeholder) -> ModelEntry {
         version,
         task: task.to_string(),
         class,
-        input: InputSpec {
-            shape: vec![1, 3, input_side, input_side],
-            layout: "NCHW".to_string(),
-            range: "0..1".to_string(),
-            colour: "srgb".to_string(),
-        },
+        input: input.clone(),
         output: output.clone(),
         variants,
         licence: "proprietary".to_string(),
