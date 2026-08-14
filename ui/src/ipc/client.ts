@@ -36,6 +36,19 @@ import type {
   SceneProfileDto,
   SetChapterInput,
   SplitChapterInput,
+  DuplicateSetDto,
+  GroupMomentsInput,
+  LockMomentInput,
+  MergeMomentsInput,
+  MomentDto,
+  MomentEditDto,
+  MomentEvent,
+  MomentHandleDto,
+  MomentListDto,
+  MomentStatusDto,
+  MomentsInput,
+  SetKeepHintInput,
+  SplitMomentInput,
   StoryEvent,
   StoryOutlineDto,
   StoryStatusDto,
@@ -327,6 +340,62 @@ export const api = {
 
   onStoryEvent: (handler: (event: StoryEvent) => void): Promise<() => void> =>
     listen<StoryEvent>('story', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+
+  // -- PHASE-08: the moments surface ---------------------------------------
+
+  /**
+   * Every moment in a wedding, or one chapter's. The grid virtualises this list
+   * exactly as it virtualises frames.
+   */
+  listMoments: (input: MomentsInput): Promise<MomentListDto> =>
+    invoke<MomentListDto>('list_moments', { input }),
+
+  momentStatus: (projectId: string): Promise<MomentStatusDto> =>
+    invoke<MomentStatusDto>('moment_status', { projectId }),
+
+  /** The moment one photograph is in. Null when it has not been grouped. */
+  momentOfImage: (photoId: string): Promise<MomentDto | null> =>
+    invoke<MomentDto | null>('moment_of_image', { photoId }),
+
+  /**
+   * The duplicate sets inside one moment - only the ones that cap the gallery.
+   * The alternatives phase 12 chooses between are the moment's frames grouped by
+   * `burstIx`; a variant set is not stored because it constrains nothing.
+   */
+  momentDuplicates: (momentId: string): Promise<DuplicateSetDto[]> =>
+    invoke<DuplicateSetDto[]>('moment_duplicates', { momentId }),
+
+  /** Regroup a wedding. Preserves every moment the photographer has locked. */
+  groupMoments: (input: GroupMomentsInput): Promise<MomentStatusDto> =>
+    invoke<MomentStatusDto>('group_moments', { input }),
+
+  /** Break a moment in two. Locks BOTH halves - a split is one statement about two. */
+  splitMoment: (input: SplitMomentInput): Promise<MomentHandleDto> =>
+    invoke<MomentHandleDto>('split_moment', { input }),
+
+  mergeMoments: (input: MergeMomentsInput): Promise<MomentHandleDto> =>
+    invoke<MomentHandleDto>('merge_moments', { input }),
+
+  /** Pin a grouping against re-analysis, or release it. */
+  lockMoment: (input: LockMomentInput): Promise<MomentHandleDto> =>
+    invoke<MomentHandleDto>('lock_moment', { input }),
+
+  /**
+   * "Keep this one." Moves where phase 12 starts from; culls nothing, and cannot -
+   * every other frame in the set stays exactly as eligible as it was.
+   */
+  setKeepHint: (input: SetKeepHintInput): Promise<MomentHandleDto> =>
+    invoke<MomentHandleDto>('set_keep_hint', { input }),
+
+  undoMomentEdit: (projectId: string): Promise<MomentEditDto> =>
+    invoke<MomentEditDto>('undo_moment_edit', { projectId }),
+
+  onMomentEvent: (handler: (event: MomentEvent) => void): Promise<() => void> =>
+    listen<MomentEvent>('moments', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },

@@ -1564,3 +1564,283 @@ pub enum StoryEvent {
         cost_usd: f32,
     },
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-08. The moments surface: what the photographer shot once, and the
+// near-identical frames inside it. See
+// `docs/adr/ADR-0018-moments-ipc-surface.md`.
+//
+// Nine commands, eight types and one event. Nothing here can reject a
+// photograph: five commands change a grouping, one moves a hint, and three are
+// reads. Section 2.2 puts every question about a photograph's fate in phase 12,
+// and this surface keeps that structural rather than remembered - there is no
+// `cull`, no `reject` and no rank on the wire.
+// ---------------------------------------------------------------------------
+
+/// Ask for a project's moments.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentsInput {
+    /// The wedding.
+    pub project_id: String,
+    /// Only moments inside this chapter, when the caller wants one chapter's stacks.
+    pub segment_id: Option<String>,
+}
+
+/// One frame inside a stacked cell.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentFrameDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Position in the moment, in timeline order.
+    pub position: u32,
+    /// Which burst inside the moment. Frames sharing this came off one press of the
+    /// shutter.
+    pub burst_ix: u32,
+    /// True when a duplicate set caps this frame out of the gallery unless it is the
+    /// one kept.
+    pub suppressed: bool,
+}
+
+/// One moment, as the grid's stacked cell draws it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentDto {
+    /// The moment.
+    pub moment_id: String,
+    /// The chapter it sits in, when the wedding has been segmented.
+    pub segment_id: Option<String>,
+    /// The frame the stack shows when collapsed.
+    ///
+    /// The keep hint of the moment's first duplicate set when it has one, and the
+    /// first frame otherwise. **Not a decision** - see `keepHint` on
+    /// [`DuplicateSetDto`] and section 2.2.
+    pub cover: String,
+    /// Every frame, in timeline order.
+    pub frames: Vec<MomentFrameDto>,
+    /// How many frames. The count badge.
+    pub frame_count: u32,
+    /// How many presses of the shutter.
+    pub burst_count: u32,
+    /// How many bodies contributed. Two or more draws the two-shooter badge.
+    pub camera_count: u32,
+    /// First frame's timeline time, milliseconds since the Unix epoch.
+    pub start_ms: i64,
+    /// Last frame's timeline time.
+    pub end_ms: i64,
+    /// How long the photographer spent on it, in seconds.
+    pub duration_s: i64,
+    /// Mean pairwise appearance distance inside the moment, `0..1`.
+    pub diversity: f32,
+    /// How many keepers phase 12 may take before it is arguing with the evidence.
+    pub suggested_keepers: u32,
+    /// How sure the grouping is, `0..1`. Invariant 2.
+    pub confidence: f32,
+    /// Why these frames are one moment. Invariant 2.
+    pub reasons: Vec<String>,
+    /// True when the photographer split, merged or pinned this moment.
+    pub user_locked: bool,
+    /// How many duplicate sets constrain delivery from this moment.
+    pub duplicate_sets: u32,
+}
+
+/// A project's moments, with the coverage the conclusion was drawn over.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentListDto {
+    /// Every moment, earliest first.
+    pub moments: Vec<MomentDto>,
+    /// Fraction of the project's groupable frames that are in a moment, `0..1`.
+    pub coverage: f32,
+    /// Which embedding produced the distances underneath.
+    pub embed_ver: u16,
+    /// Which grouping implementation produced the moments.
+    pub group_ver: u16,
+    /// Which threshold table it read.
+    pub profile_ver: u16,
+}
+
+/// Ask what moment a photograph is in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentOfImageInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// One set of frames that say the same thing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateSetDto {
+    /// `identical`, `near_identical` or `variant`.
+    pub kind: String,
+    /// The frames, in timeline order.
+    pub photo_ids: Vec<String>,
+    /// The technically strongest frame.
+    ///
+    /// **A hint, not a decision.** Phase 12 chooses what a client sees; this is where
+    /// the review panel puts the left-hand image and where "keep this one" starts.
+    pub keep_hint: String,
+    /// How sure the classification is, `0..1`.
+    pub confidence: f32,
+    /// Why these frames are the same photograph. Invariant 2.
+    pub reasons: Vec<String>,
+    /// True when the photographer pressed "keep this one".
+    pub user_chosen: bool,
+    /// True when at most one of these frames may reach a gallery.
+    pub caps_gallery: bool,
+}
+
+/// Start a grouping pass.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupMomentsInput {
+    /// The wedding.
+    pub project_id: String,
+}
+
+/// What a grouping pass did, and what the moments view header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentStatusDto {
+    /// Photographs in the project.
+    pub photos: i64,
+    /// Photographs that have an embedding and can therefore be grouped.
+    pub groupable: i64,
+    /// Photographs that are in a moment.
+    pub grouped: i64,
+    /// Fraction, `0..1`, against `groupable` rather than `photos` - an ungrouped frame
+    /// with no embedding is a phase 05 gap, not a phase 08 failure.
+    pub coverage: f32,
+    /// Moments in the project.
+    pub moments: i64,
+    /// Moments the photographer has locked.
+    pub locked: i64,
+    /// Mean frames per moment. The headline number: 3,000 files should become roughly
+    /// 700 to 1,100 moments.
+    pub mean_size: f32,
+    /// Presses of the shutter across every moment.
+    pub bursts: i64,
+    /// Duplicate sets by class: identical, near identical, variant.
+    pub duplicates: [i64; 3],
+    /// Median inter-frame interval across the wedding, in milliseconds.
+    pub median_interval_ms: i64,
+    /// True when the last pass produced a moment count outside the plausible band.
+    /// `AURA-ML-5030`.
+    pub implausible: bool,
+    /// Which embedding produced the distances.
+    pub embed_ver: u16,
+    /// Which grouping implementation produced the moments.
+    pub group_ver: u16,
+    /// Which threshold table it read.
+    pub profile_ver: u16,
+}
+
+/// Break a moment in two at a photograph.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SplitMomentInput {
+    /// The moment.
+    pub moment_id: String,
+    /// The photograph that starts the new later half.
+    pub photo_id: String,
+}
+
+/// Fold two moments into one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeMomentsInput {
+    /// The survivor.
+    pub moment_id_a: String,
+    /// The one absorbed.
+    pub moment_id_b: String,
+}
+
+/// Pin a moment against re-analysis, or release it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LockMomentInput {
+    /// The moment.
+    pub moment_id: String,
+    /// True to pin, false to release.
+    pub locked: bool,
+}
+
+/// Record which frame of a duplicate set the photographer would keep.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetKeepHintInput {
+    /// The moment.
+    pub moment_id: String,
+    /// The photograph to start from. Nothing is culled; see [`DuplicateSetDto`].
+    pub photo_id: String,
+}
+
+/// The id of a moment a command created or kept.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentHandleDto {
+    /// Prefixed moment id.
+    pub id: String,
+}
+
+/// What an undo reversed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentEditDto {
+    /// `split`, `merge`, `lock`, `unlock` or `keep_hint`.
+    pub action: String,
+    /// The moment the photographer acted on.
+    pub moment_id: String,
+    /// The other moment, for a merge or a split.
+    pub other_id: Option<String>,
+    /// The photograph, for a split or a keep-hint change.
+    pub photo_id: Option<String>,
+    /// How many frames the moment held at the time.
+    pub moment_size: u32,
+}
+
+/// Moment events pushed to the UI, mirroring section 11's three events.
+///
+/// Typed on both sides in PHASE-08 and not yet emitted, for the same reason
+/// `PeopleEvent` and `StoryEvent` are not: the Tauri shell has not been launched
+/// on the development machine, so an emitter would be code nobody has run. The
+/// three are `tracing` spans today and this is their wire shape for when the
+/// shell runs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum MomentEvent {
+    /// `moments.built` - a grouping pass finished.
+    MomentsBuilt {
+        /// Frames considered.
+        images: u64,
+        /// Moments written.
+        moments: u64,
+        /// Presses of the shutter across them.
+        bursts: u64,
+        /// Mean frames per moment.
+        mean_size: f32,
+        /// Milliseconds.
+        ms: u64,
+    },
+    /// `duplicates.found` - the three counters, once per pass.
+    DuplicatesFound {
+        /// Sets of the same file imported twice.
+        identical: u64,
+        /// Sets of one photograph that exists more than once.
+        near_identical: u64,
+        /// Alternatives phase 12 chooses between.
+        variant: u64,
+    },
+    /// `moments.user_edit` - the photographer changed a grouping.
+    ///
+    /// Carries the moment's size and never its frames: a telemetry event carrying
+    /// photo ids is a telemetry event carrying a shoot.
+    MomentsUserEdit {
+        /// `split`, `merge`, `lock`, `unlock` or `keep_hint`.
+        action: String,
+        /// How many frames the moment held.
+        moment_size: u32,
+    },
+}

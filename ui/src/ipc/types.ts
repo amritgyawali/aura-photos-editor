@@ -649,3 +649,120 @@ export type StoryEvent =
       toLabel: string | null;
     }
   | { kind: 'sceneCloudUsed'; segments: number; calls: number; costUsd: number };
+
+// -- PHASE-08: the moments surface -------------------------------------------
+//
+// Nine commands, eight types and one event. Nothing here can reject a
+// photograph: five commands change a grouping, one moves a hint, three are
+// reads. Section 2.2 puts every question about a photograph's fate in phase 12.
+
+export type MomentsInput = {
+  projectId: string;
+  segmentId: string | null;
+};
+
+export type MomentFrameDto = {
+  photoId: string;
+  position: number;
+  burstIx: number;
+  suppressed: boolean;
+};
+
+export type MomentDto = {
+  momentId: string;
+  segmentId: string | null;
+  cover: string;
+  frames: MomentFrameDto[];
+  frameCount: number;
+  burstCount: number;
+  cameraCount: number;
+  startMs: number;
+  endMs: number;
+  durationS: number;
+  diversity: number;
+  suggestedKeepers: number;
+  confidence: number;
+  reasons: string[];
+  userLocked: boolean;
+  duplicateSets: number;
+};
+
+export type MomentListDto = {
+  moments: MomentDto[];
+  coverage: number;
+  embedVer: number;
+  groupVer: number;
+  profileVer: number;
+};
+
+export type MomentOfImageInput = {
+  photoId: string;
+};
+
+export type DuplicateSetDto = {
+  kind: string;
+  photoIds: string[];
+  keepHint: string;
+  confidence: number;
+  reasons: string[];
+  userChosen: boolean;
+  capsGallery: boolean;
+};
+
+export type GroupMomentsInput = {
+  projectId: string;
+};
+
+export type MomentStatusDto = {
+  photos: number;
+  groupable: number;
+  grouped: number;
+  coverage: number;
+  moments: number;
+  locked: number;
+  meanSize: number;
+  bursts: number;
+  duplicates: [number, number, number];
+  medianIntervalMs: number;
+  implausible: boolean;
+  embedVer: number;
+  groupVer: number;
+  profileVer: number;
+};
+
+export type SplitMomentInput = {
+  momentId: string;
+  photoId: string;
+};
+
+export type MergeMomentsInput = {
+  momentIdA: string;
+  momentIdB: string;
+};
+
+export type LockMomentInput = {
+  momentId: string;
+  locked: boolean;
+};
+
+export type SetKeepHintInput = {
+  momentId: string;
+  photoId: string;
+};
+
+export type MomentHandleDto = {
+  id: string;
+};
+
+export type MomentEditDto = {
+  action: string;
+  momentId: string;
+  otherId: string | null;
+  photoId: string | null;
+  momentSize: number;
+};
+
+export type MomentEvent =
+  | { kind: 'momentsBuilt'; images: number; moments: number; bursts: number; meanSize: number; ms: number }
+  | { kind: 'duplicatesFound'; identical: number; nearIdentical: number; variant: number }
+  | { kind: 'momentsUserEdit'; action: string; momentSize: number };
