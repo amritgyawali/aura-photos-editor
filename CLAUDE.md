@@ -36,6 +36,11 @@ Never load two phase files into one session.
 | Prominence weights (versioned, tunable) | `crates/aura-vision/config/prominence.toml` |
 | Embedding evaluation gates | `tests/eval/embedding_eval.rs` + `ml/models/embed/eval_retrieval.py` |
 | Identity evaluation gates | `tests/eval/identity_eval.rs` + `ml/models/face/eval_identity.py` |
+| Scene and story decisions | `docs/adr/ADR-0015-wedding-scene-taxonomy-and-story-segmentation.md` |
+| Scene thresholds (versioned, PM-owned) | `crates/aura-brain-wedding/config/scene_profiles.toml` |
+| Ritual taxonomies (extensible) | `crates/aura-brain-wedding/config/rituals/` |
+| Adding a wedding tradition | `docs/adding-a-tradition.md` |
+| Scene evaluation gates | `tests/eval/scene_eval.rs` + `ml/models/scene/eval_scene.py` |
 
 ## Non-negotiables enforced by the build
 
@@ -146,6 +151,50 @@ and says nothing about the weights. This is condition C1 in the phase 06 exit re
 a Sev 2 trigger, and **no later phase may claim a quality result that depends on face
 detection or recognition being accurate until it closes.** Condition C5 - no published
 demographic analysis - is the second Sev 2 trigger.
+
+Phase 07 is implemented: `aura-core::contract::scene` (the frozen 22-scene vocabulary, the
+fourteen attributes, nine chapters, `SceneProfile` and `StoryService`),
+`aura-brain-wedding` (a multi-head classifier that is an adapter on the *frozen* phase 05
+embedding and opens no pixels, sixteen context features, an attribute decoder in which
+four bits are measured rather than predicted, a tradition-conditioned ritual head with two
+abstention mechanisms, the ritual taxonomy loader and the scene-profile registry; then HMM
+smoothing over nine chapters, PELT change-point detection with a log-space penalty search,
+a merge pass, medoid key frames and `Story` - the one implementation of `StoryService`),
+migration 7, 22 scene profiles and 48 rites across five traditions in editable config, two
+signed models with cards, the `SegmentNaming` cost policy, the story IPC surface
+(ADR-0016) with its timeline, and `aura-cli verify --phase 07` as the gate. Its exit
+report is `docs/progress/PHASE-07-EXIT.md`.
+
+**The two shipped scene models are placeholders.** The classifier's posterior over a real
+photograph describes a random projection of its embedding, and the ritual head names no
+rite. Every gate in section 10.1 is measured against synthetic weddings whose chapter
+boundaries are known by construction, which proves the algorithms and says nothing about
+the weights. This is condition C1 in the phase 07 exit report, it is a Sev 2 trigger, and
+**no later phase may claim a quality result that depends on scene classification being
+accurate until it closes.** Condition C5 - no per-tradition accuracy published - is the
+second Sev 2 trigger, and the disparity it guards is *cultural* rather than demographic.
+
+Phase 07 half-closes phase 06's condition C3: `PeopleStore::scene_labels` feeds real
+coarse labels into the co-occurrence graph, so `RoleOutcome::scene_starved` is false on a
+classified wedding and `SCENELESS_CONFIDENCE_CEILING` stops capping the couple decision at
+0.62. The other half needs twenty real weddings and a human.
+
+Five rules that phase 07 added and every later phase inherits:
+
+- **`StoryService` is the only way to ask what a photograph is of.** No phase may keep its
+  own scene classifier or its own idea of where the ceremony was.
+- **A profile is evidence about a scene; the deciding phase owns the action.** Nothing in
+  `aura-brain-wedding` culls, grades or crops. `SceneProfile::max_acceptable_noise` is a
+  tolerance phase 09 measures against and phase 12 acts on.
+- **Four version columns, because they invalidate four different things.** `model_ver`
+  invalidates the posterior, `preprocess_ver` the context features, `taxonomy_ver` the
+  rite's name, and `embed_ver` everything, because the trunk is underneath all of it.
+  `AURA-ML-5022` exists so a comparison across any of them never happens silently.
+- **Report coverage when you report a result.** `StoryOutline::coverage` is how a caller
+  finds out that a story was drawn over 40 % of a wedding.
+- **A photographer's chapter is unbeatable, and a boundary belongs to two chapters.**
+  `segments.user_locked` and `image_scenes.source = 'user'` are checked inside the
+  statements that would overwrite them, and moving a boundary locks both sides.
 
 Five rules that phase 06 added and every later phase inherits:
 
