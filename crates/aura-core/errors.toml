@@ -670,3 +670,57 @@ summary      = "A merge, split, rename or role change was refused"
 user_message = "AURA could not make that change to the People panel. Nothing was changed."
 runbook      = "docs/runbooks/AURA-SEC-9005.md"
 introduced   = "PHASE-06"
+
+[[error]]
+code         = "AURA-ML-5022"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored scene labels were produced by a different classifier, taxonomy or embedding version"
+user_message = "AURA has improved how it reads a wedding's story, so it is re-labelling this wedding in the background. The timeline stays available while it works."
+runbook      = "docs/runbooks/AURA-ML-5022.md"
+introduced   = "PHASE-07"
+
+[[error]]
+code         = "AURA-ML-5023"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "No scene profile for a scene, so neutral tolerances were used"
+user_message = "AURA has no tuned settings for one kind of photograph in this wedding and is judging it neutrally. Results are still usable; the runbook explains how to add the missing settings."
+runbook      = "docs/runbooks/AURA-ML-5023.md"
+introduced   = "PHASE-07"
+
+[[error]]
+code         = "AURA-ML-5024"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "A scene profile or ritual taxonomy file was refused"
+user_message = "AURA could not load the settings that decide how photographs are judged, so nothing was changed. Restore the file or reinstall; the runbook explains what is wrong with it."
+runbook      = "docs/runbooks/AURA-ML-5024.md"
+introduced   = "PHASE-07"
+
+[[error]]
+code         = "AURA-ML-5025"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A chapter rename, split, merge or boundary move was refused"
+user_message = "AURA could not make that change to the timeline. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5025.md"
+introduced   = "PHASE-07"
+
+[[error]]
+code         = "AURA-ML-5026"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "The timeline could not be split into a plausible number of chapters"
+user_message = "AURA could not divide this wedding into sensible chapters, so it made one per clear break in the day. Open the timeline and adjust the boundaries; your edits are kept."
+runbook      = "docs/runbooks/AURA-ML-5026.md"
+introduced   = "PHASE-07"
+
+[[error]]
+code         = "AURA-ML-5027"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be classified into a scene"
+user_message = "AURA could not tell what one photograph is of and has left it unlabelled. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5027.md"
+introduced   = "PHASE-07"

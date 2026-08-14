@@ -28,6 +28,17 @@ import type {
   SetIdentityImportanceInput,
   SetIdentityRoleInput,
   SplitIdentityInput,
+  ChapterHandleDto,
+  ClassifyScenesInput,
+  MergeChaptersInput,
+  MoveBoundaryInput,
+  SceneDto,
+  SceneProfileDto,
+  SetChapterInput,
+  SplitChapterInput,
+  StoryEvent,
+  StoryOutlineDto,
+  StoryStatusDto,
   CloudCacheStatsDto,
   CloudCallDto,
   CloudEvent,
@@ -268,6 +279,54 @@ export const api = {
 
   onPeopleEvent: (handler: (event: PeopleEvent) => void): Promise<() => void> =>
     listen<PeopleEvent>('people', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+
+  // -- PHASE-07: the story surface -----------------------------------------
+
+  /** What the timeline opens with. One read; section 11 budgets 200 ms. */
+  storyOutline: (projectId: string): Promise<StoryOutlineDto> =>
+    invoke<StoryOutlineDto>('story_outline', { projectId }),
+
+  storyStatus: (projectId: string): Promise<StoryStatusDto> =>
+    invoke<StoryStatusDto>('story_status', { projectId }),
+
+  /** What one photograph is of, for the Explain panel. Null when unclassified. */
+  imageScene: (photoId: string): Promise<SceneDto | null> =>
+    invoke<SceneDto | null>('image_scene', { photoId }),
+
+  /**
+   * Every scene's tolerances, with the sentence explaining them. The rationale is
+   * on the wire because "why is my dance floor being judged this way" is a
+   * question a photographer asks, and invariant 2 says it has to have an answer.
+   */
+  sceneProfiles: (projectId: string): Promise<SceneProfileDto[]> =>
+    invoke<SceneProfileDto[]>('scene_profiles', { projectId }),
+
+  classifyScenes: (input: ClassifyScenesInput): Promise<StoryStatusDto> =>
+    invoke<StoryStatusDto>('classify_scenes', { input }),
+
+  segmentStory: (projectId: string): Promise<StoryOutlineDto> =>
+    invoke<StoryOutlineDto>('segment_story', { projectId }),
+
+  /** Rename a chapter. Sets `userLocked`; re-analysis may not undo it. */
+  setChapter: (input: SetChapterInput): Promise<ChapterHandleDto> =>
+    invoke<ChapterHandleDto>('set_chapter', { input }),
+
+  /** Move a boundary. Locks BOTH chapters either side of it - a boundary is shared. */
+  moveChapterBoundary: (input: MoveBoundaryInput): Promise<ChapterHandleDto> =>
+    invoke<ChapterHandleDto>('move_chapter_boundary', { input }),
+
+  splitChapter: (input: SplitChapterInput): Promise<ChapterHandleDto> =>
+    invoke<ChapterHandleDto>('split_chapter', { input }),
+
+  mergeChapters: (input: MergeChaptersInput): Promise<ChapterHandleDto> =>
+    invoke<ChapterHandleDto>('merge_chapters', { input }),
+
+  onStoryEvent: (handler: (event: StoryEvent) => void): Promise<() => void> =>
+    listen<StoryEvent>('story', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },

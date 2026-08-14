@@ -324,6 +324,102 @@
         "require_fp32": false
       },
       "opset": 13
+    },
+    {
+      "name": "scene_classifier",
+      "version": "1.0.0",
+      "task": "multiclass",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          528
+        ],
+        "layout": "NC",
+        "range": "unbounded",
+        "colour": "none"
+      },
+      "output": {
+        "attr_probs": [
+          1,
+          14
+        ],
+        "scene_probs": [
+          1,
+          22
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "scene_classifier_1.0.0.fp32.onnx",
+          "sha256": "84973d60663c81bb2c077b2719b9dd9bd3aea0e7f3bb45094e35deb9fe9cc251",
+          "bytes": 579391
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "scene_classifier_1.0.0.fp16.onnx",
+          "sha256": "a7e3568be54e44c80570a5015bdd4b3d92a2c8678b04a6e81c575ee53c7265c6",
+          "bytes": 579391
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/scene_classifier.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
+    },
+    {
+      "name": "ritual_classifier",
+      "version": "1.0.0",
+      "task": "multiclass",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          536
+        ],
+        "layout": "NC",
+        "range": "unbounded",
+        "colour": "none"
+      },
+      "output": {
+        "ritual_probs": [
+          1,
+          160
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "ritual_classifier_1.0.0.fp32.onnx",
+          "sha256": "9f6b0a19d492f54f86baeb757c6f3e2c37db3412173033de1d8c48363edd028e",
+          "bytes": 536441
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "ritual_classifier_1.0.0.fp16.onnx",
+          "sha256": "9d933cb4f58926ce9c316ad5bcc8f57c0c7b8b66d81919174799c74742fde407",
+          "bytes": 536441
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/ritual_classifier.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
     }
   ]
 }

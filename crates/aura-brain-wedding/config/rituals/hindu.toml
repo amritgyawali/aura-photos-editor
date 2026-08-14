@@ -1,0 +1,164 @@
+# Hindu ritual taxonomy - PHASE-07 section 2.1.
+#
+# ===========================================================================
+# HOW A TAXONOMY FILE WORKS
+# ===========================================================================
+#
+# Rituals live in config rather than in a Rust enum because section 12's first
+# failure mode is cultural blind spots, and a tradition that needs a rite this
+# product has never heard of must be addable by editing a file rather than by
+# shipping a build. `docs/adding-a-tradition.md` is the procedure.
+#
+# THE ONE RULE THAT MATTERS: `id` IS AUTHORED, NEVER DERIVED FROM FILE ORDER.
+#
+# Deriving an id from position would mean that inserting one rite renumbered
+# every rite after it and silently relabelled every stored row in every
+# catalog. So ids are written down, they are unique across ALL taxonomy files,
+# and `Taxonomy::load` refuses a duplicate with `AURA-ML-5024`. Id ranges are
+# reserved per tradition so two people editing two files cannot collide:
+#
+#   hindu      10 -  39
+#   nepali     40 -  69
+#   christian  70 -  99
+#   muslim    100 - 129
+#   civil     130 - 159
+#   (next tradition starts at 160)
+#
+# Id 0 is reserved for `RitualId::NONE`.
+#
+# The catalog stores the SLUG, not the id. A catalog whose meaning depends on a
+# config file that has since been edited is a catalog that lies.
+#
+# ---------------------------------------------------------------------------
+# FIELDS
+# ---------------------------------------------------------------------------
+#
+# id          authored, unique across every file, never reused
+# slug        stored in `image_scenes.ritual`; snake_case, stable for ever
+# title       what a photographer sees
+# aliases     regional and transliterated spellings, used to match a cloud
+#             answer and a photographer's search, never stored
+# cloud_label the member of `aura_cloud::tasks::ALLOWED_RITUALS` this maps to,
+#             or absent when phase 04's vocabulary has no word for it. See
+#             ADR-0015 section 4: that vocabulary is frozen into three
+#             cassettes and every cached answer, so it is mapped, not edited.
+# phase       "pre" (before the wedding day), "day", or "post"
+# evidence    visible objects and staging a classifier or a human can key on.
+#             Documentation, not features - nothing reads this at run time -
+#             and it is here because it is the knowledge a consultant has and a
+#             file does not.
+# night       true when the rite is typically after dark. Read by nothing in
+#             phase 07; recorded because the `night` and `mixed_light`
+#             attributes are what make a ceremony tolerance defensible, and the
+#             tolerance argument in `scene_profiles.toml` cites it.
+
+version   = 1
+tradition = "hindu"
+title     = "Hindu"
+
+[[ritual]]
+id          = 10
+slug        = "haldi"
+title       = "Haldi"
+aliases     = ["pithi", "gaye holud", "ubtan", "turmeric ceremony"]
+cloud_label = "haldi"
+phase       = "pre"
+night       = false
+evidence    = "turmeric paste applied by hand; yellow clothing; outdoors or in a courtyard; bowls and leaves"
+
+[[ritual]]
+id          = 11
+slug        = "mehendi"
+title       = "Mehendi"
+aliases     = ["mehndi", "henna"]
+cloud_label = "mehndi"
+phase       = "pre"
+night       = false
+evidence    = "henna cones and patterned hands; seated subject with a group around; often a marquee"
+
+[[ritual]]
+id          = 12
+slug        = "sangeet"
+title       = "Sangeet"
+aliases     = ["sangeet ceremony", "musical night"]
+phase       = "pre"
+night       = true
+evidence    = "staged performances, choreographed dancing, an audience seated facing a stage, coloured lighting"
+
+[[ritual]]
+id          = 13
+slug        = "baraat"
+title       = "Baraat"
+aliases     = ["barat", "groom's procession", "ghodi"]
+cloud_label = "baraat"
+phase       = "day"
+night       = false
+evidence    = "a procession in the street; a horse, a car or a palanquin; a drum band; dancing while moving"
+
+[[ritual]]
+id          = 14
+slug        = "milni"
+title       = "Milni"
+aliases     = ["milani", "greeting of the families"]
+phase       = "day"
+night       = false
+evidence    = "pairs of relatives garlanding each other at the venue entrance, two family groups facing"
+
+[[ritual]]
+id          = 15
+slug        = "jaimala_varmala"
+title       = "Jaimala / Varmala"
+aliases     = ["jaymala", "varmala", "garland exchange"]
+cloud_label = "jaimala_varmala"
+phase       = "day"
+night       = true
+evidence    = "the couple exchanging heavy flower garlands, usually raised on a stage, often lifted by friends"
+
+[[ritual]]
+id          = 16
+slug        = "kanyadaan"
+title       = "Kanyadaan"
+aliases     = ["kanyadan", "giving away"]
+cloud_label = "kanyadaan"
+phase       = "day"
+night       = true
+evidence    = "parents joining the couple's hands, seated at the mandap, water poured over joined hands"
+
+[[ritual]]
+id          = 17
+slug        = "saptapadi_pheras"
+title       = "Saptapadi / Pheras"
+aliases     = ["saptapadi", "pheras", "seven steps", "mangal phera"]
+cloud_label = "saptapadi_pheras"
+phase       = "day"
+night       = true
+evidence    = "the couple circling a fire; the sacred fire itself is the strongest single object in the frame"
+
+[[ritual]]
+id          = 18
+slug        = "sindoor_mangalsutra"
+title       = "Sindoor / Mangalsutra"
+aliases     = ["sindoor", "sindur", "mangalsutra", "mangal sutra"]
+cloud_label = "sindoor_mangalsutra"
+phase       = "day"
+night       = true
+evidence    = "vermilion applied to the hair parting; a black-and-gold necklace being tied; close, two people"
+
+[[ritual]]
+id          = 19
+slug        = "vidaai"
+title       = "Vidaai"
+aliases     = ["bidaai", "vidai", "farewell"]
+cloud_label = "vidaai"
+phase       = "day"
+night       = true
+evidence    = "the departure; rice thrown backwards over a shoulder; a car; visible distress, families embracing"
+
+[[ritual]]
+id          = 20
+slug        = "griha_pravesh"
+title       = "Griha Pravesh"
+aliases     = ["gruhapravesham", "welcome home"]
+phase       = "post"
+night       = true
+evidence    = "arrival at the marital home, a pot of rice tipped at a threshold, an aarti plate"

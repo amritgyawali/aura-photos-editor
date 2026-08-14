@@ -95,6 +95,15 @@ phase-05-verify:
 phase-06-verify:
     cargo run --release --package aura-cli -- verify --phase 06 --work target/phase06-verify
 
+# The phase 07 gate: the migration, the shipped taxonomies and profiles, the scene
+# classifier through the real graph, a synthetic wedding labelled and segmented, the
+# chapter band and the 45-second boundary error, a photographer's chapter surviving a
+# re-analysis, a photographer's scene surviving a re-classification, the coarse labels
+# reaching the people graph, the cloud cost policy without a network, determinism, and
+# the version check. Never touches a network - nothing in the local half of phase 07 can.
+phase-07-verify:
+    cargo run --release --package aura-cli -- verify --phase 07 --work target/phase07-verify
+
 # Weight-space parity for every fp32/variant pair, plus the cross-runtime check
 # against onnxruntime when it happens to be installed for Python.
 parity:

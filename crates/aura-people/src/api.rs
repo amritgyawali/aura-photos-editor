@@ -264,8 +264,11 @@ impl People {
         // 4. Build the graph over what the photographer actually said.
         let assigned_faces = self.store.load_faces(project)?;
         let timestamps = self.store.photo_timestamps(project)?;
-        // Scenes arrive in phase 07. Empty until then, and reported as such.
-        let scenes: BTreeMap<PhotoId, String> = BTreeMap::new();
+        // PHASE-07. The scene labels are real now. An empty map is still a legitimate
+        // answer - a project whose scene pass has not run - and `RoleOutcome::
+        // scene_starved` reports which of the two happened, so a couple decision made
+        // without scenes is still capped at `SCENELESS_CONFIDENCE_CEILING`.
+        let scenes = self.store.scene_labels(project)?;
         let graph = CooccurrenceGraph::build(&assigned_faces, &scenes);
         self.store.put_cooccurrence(project, &graph.to_rows())?;
 
@@ -575,7 +578,7 @@ impl People {
     pub fn timelines(&self, project: &ProjectId) -> AuraResult<Vec<IdentityTimeline>> {
         let faces = self.store.load_faces(project)?;
         let timestamps = self.store.photo_timestamps(project)?;
-        let scenes: BTreeMap<PhotoId, String> = BTreeMap::new();
+        let scenes = self.store.scene_labels(project)?;
         let rows = self.store.load_cooccurrence(project)?;
         let graph = CooccurrenceGraph::from_rows(&rows);
         Ok(timeline::build_timelines(

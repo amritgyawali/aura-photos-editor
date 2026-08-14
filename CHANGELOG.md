@@ -2,6 +2,114 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 07 - Wedding scene AI and story timeline segmentation
+
+The app reads the wedding as a story. Every photograph gets a scene label, fourteen
+attributes and a confidence; the day is split into ordered chapters with boundaries,
+counts and durations. From this phase onward no threshold in the product is global - a
+dark dance frame and a formal family portrait are judged by different rows of the same
+table, which is invariant 7 finally becoming a lookup instead of a promise.
+
+### Added
+
+- `aura-brain-wedding`: the scene half and the story half of the wedding brain. Nothing
+  in it opens a pixel. The classifier is a small adapter on the *frozen* phase 05
+  embedding - section 6.1's design - which is why scene inference for four thousand
+  images fits in eight milliseconds of arithmetic where phase 06's face pass needs twelve
+  minutes for the same wedding.
+- A 22-class scene head and fourteen independent attribute sigmoids on one adapter. The
+  abstention is deliberately **not** a softmax slot: a model cannot usefully be trained to
+  say "I am not sure" through an output that competes with the classes it is unsure
+  between, so `SceneId::Unknown` is a decoder decision from the top-1 margin - and the
+  margin, not the confidence floor, is what actually rejects.
+- Four of the fourteen attributes are **decided rather than predicted**. `flash`,
+  `night`, `tungsten` and `indoor` are recorded exactly by the camera or by the phase 05
+  luminance statistics, and where a measurement exists it beats the head. A trained model
+  will still be wrong about flash on a frame lit by a window at 1/200th; the EXIF will
+  not.
+- A tradition-conditioned ritual head with **two** abstention mechanisms, because they
+  answer different questions. Slot 0 is "no rite" and competes in the same softmax as
+  every rite; the margin handles the case where the head has correctly identified a fire
+  circumambulation and cannot tell whether to call it `saptapadi_pheras` or `saat_phera`.
+  Naming either at 0.36 would put a Nepali wedding's rites under Hindu names in a
+  client-facing timeline.
+- Forty-eight rites across five traditions - Hindu, Nepali, Christian, Muslim, civil - in
+  editable config files, with `docs/adding-a-tradition.md` as the procedure a
+  photographer's consultant can follow without a compiler. The rite's authored id **is**
+  the model's output slot, which is why a duplicate is refused rather than resolved.
+- HMM smoothing over nine chapters before segmentation rather than after. A single
+  misclassified frame in the reception is a wrong label; fed to a change-point detector it
+  is a two-frame "Getting Ready" chapter between the speeches and the cake, and by then no
+  amount of smoothing helps.
+- PELT change-point detection over a three-term fused signal, with the penalty **searched
+  in log space** rather than fixed. A penalty tuned on a ten-hour Hindu wedding gives two
+  chapters for a registry office and forty for a three-day Nepali wedding; the search is
+  what makes section 10.1's 6-to-20 chapter band hold on all three.
+- `scene_profiles.toml`: twenty-two scenes, each with tolerances, weights, an editing
+  intent, a coverage flag and **a written rationale**. The loader refuses a profile
+  without one. That friction is the point - somebody who cannot write a sentence
+  explaining why the dance floor tolerates three times the ceremony's noise has not
+  finished deciding it.
+- Migration 7: `image_scenes`, `segments`, `segment_images` and `scene_profiles`, plus two
+  views. The user-override guards are inside the statements that would overwrite them, not
+  around them: a read-then-write leaves a window in which a photographer loses a race with
+  a background pass.
+- Nine IPC commands and the story timeline. Chapter cards are sized by **duration**, not
+  by frame count - a ninety-minute dinner and a six-minute cake cutting with forty
+  photographs each are not the same shape of event. Moving a boundary locks both chapters
+  either side of it, because a boundary is shared.
+- The `SegmentNaming` cost policy: at most sixteen calls per wedding, least-confident
+  first, locked chapters never priced, and phase 04's rule enforced - a cloud answer may
+  not overrule a local decision at 0.90 or above without citing visible evidence, and the
+  conflict is logged.
+- Two signed placeholder models with cards, six error codes with runbooks, two ADRs, and
+  four training and evaluation scripts under `ml/models/scene/`.
+
+### Changed
+
+- `aura-people` now receives real scene labels. **Half of phase 06's condition C3
+  closes**: the couple contest's getting-ready, ceremony and portrait terms turn on,
+  `RoleOutcome::scene_starved` is false on a classified wedding, and
+  `SCENELESS_CONFIDENCE_CEILING` stops capping the couple decision at 0.62.
+- `xtask` learned that a model can take a feature vector rather than pixels. The two scene
+  heads declare `[N, 528]` and `[N, 536]` with an `NC` layout and an `unbounded` range, so
+  the runtime's shape check passes and the manifest documents a normalisation nobody
+  performs.
+- The catalog's countable-table list gained the four new tables.
+
+### Fixed
+
+Three bugs the evaluation harness found in code that read correctly, recorded because each
+one is an argument for building the fixtures before the gates.
+
+- The penalty search never reached its own range. Linear bisection of `0.0005..40` spends
+  its first ten steps between 40 and 0.04, and one fixture's answer is 0.008 - so it fell
+  back to gap-only segmentation and produced three chapters against a six-chapter floor.
+- Masking the ritual head by tradition made it abstain *more*, not less. Zeroing another
+  tradition's slots without renormalising left the distribution summing to under one, so
+  establishing the tradition made naming a rite harder rather than easier.
+- The per-image storage estimate was 25 % low: 330 bytes claimed, 410 measured, against a
+  400-byte budget. Writing the top-3 as pairs rather than as objects closed it - the words
+  "scene" and "score" repeated three times per photograph were a fifth of the budget.
+
+### Known limitations
+
+Both models are **placeholders with no training**, which is condition C1 of
+`docs/progress/PHASE-07-EXIT.md` and a Sev 2 trigger. Every number in section 10.1 is
+measured against synthetic ground truth whose answer is known by construction: that proves
+the algorithms and says nothing about the weights. No later phase may claim a quality
+result that depends on scene classification being accurate until it closes.
+
+One phase 06 budget - `identity_cluster_skeleton` - does not reproduce on the development
+machine: 21.7 s against a 12 s budget where the phase 06 report records 2.1 s. It was
+ruled out as a phase 07 effect by measurement and is recorded in section 4 of the phase 07
+exit report for PERF to resolve against phase 06.
+
+Per-tradition accuracy is **not published and not approximated** - condition C5, the
+second Sev 2 trigger. The disparity this phase risks is cultural rather than demographic,
+which is precisely the gap section 1 claims as a competitive moat, and an unmeasured
+version of that claim is one the product cannot support.
+
 ## Phase 06 - Face detection, recognition and people intelligence
 
 The app learns who matters at this wedding: it finds every face, groups them into

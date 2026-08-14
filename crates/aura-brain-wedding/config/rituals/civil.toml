@@ -1,0 +1,104 @@
+# Civil and secular ritual taxonomy - PHASE-07 section 2.1.
+#
+# See `hindu.toml` for what every field means and for the one rule that
+# matters: `id` is authored, unique across every file, and never reused.
+#
+# Reserved id range for this file: 130 - 159.
+#
+# ---------------------------------------------------------------------------
+# WHY A CIVIL FILE IS NOT AN EMPTY FILE
+# ---------------------------------------------------------------------------
+#
+# A civil ceremony is the case an unthinking taxonomy handles worst: it has no
+# religious objects, so a ritual head trained on fire, garlands, chalices and
+# contracts finds nothing and abstains on every frame. That is correct
+# behaviour and a useless answer.
+#
+# What a civil ceremony DOES have is a signing, a reading, a declaration and
+# frequently a borrowed rite - handfasting, a unity candle, a sand ceremony,
+# a tea ceremony - chosen for meaning rather than for faith. This file names
+# those, and it names the two structural moments a registry office always has,
+# so that the ritual head has something to be confident about instead of
+# abstaining its way through the only chapter that matters.
+#
+# Rites that appear here AND in a faith file are declared once, in the faith
+# file, and referenced by the same slug: `handfasting` and `unity_candle` live
+# in `christian.toml`, and a civil ceremony matches them through the loader's
+# union across all files.
+
+version   = 1
+tradition = "civil"
+title     = "Civil"
+
+[[ritual]]
+id       = 130
+slug     = "declaration"
+title    = "Declaration"
+aliases  = ["legal declaration", "contracting words", "declaratory words"]
+phase    = "day"
+night    = false
+evidence = "the couple facing each other repeating after a registrar, a small room, a desk to one side"
+
+[[ritual]]
+id       = 131
+slug     = "civil_signing"
+title    = "Signing the Register"
+aliases  = ["register", "signing", "schedule"]
+phase    = "day"
+night    = false
+evidence = "a seated pair at a desk with a bound register and two witnesses standing; a registrar in a suit"
+
+[[ritual]]
+id       = 132
+slug     = "reading"
+title    = "Reading"
+aliases  = ["poem", "reading by a friend"]
+phase    = "day"
+night    = false
+evidence = "one person standing at a lectern or beside the couple holding a card or a book, addressing the room"
+
+[[ritual]]
+id          = 133
+slug        = "tea_ceremony"
+title       = "Tea Ceremony"
+aliases     = ["chinese tea ceremony", "serving tea to elders"]
+cloud_label = "tea_ceremony"
+phase       = "day"
+night       = false
+evidence    = "the couple kneeling or bowing while serving tea in small cups to seated elders; red decor"
+
+[[ritual]]
+id       = 134
+slug     = "sand_ceremony"
+title    = "Sand Ceremony"
+aliases  = ["unity sand"]
+phase    = "day"
+night    = false
+evidence = "two vessels of coloured sand poured into a single glass; a table, an officiant, close crop"
+
+[[ritual]]
+id       = 135
+slug     = "jumping_the_broom"
+title    = "Jumping the Broom"
+aliases  = ["broom ceremony"]
+phase    = "day"
+night    = false
+evidence = "a decorated broom on the ground and the couple mid-jump immediately after the pronouncement"
+
+[[ritual]]
+id       = 136
+slug     = "ring_warming"
+title    = "Ring Warming"
+aliases  = ["ring blessing"]
+phase    = "day"
+night    = false
+evidence = "rings passed hand to hand along seated rows before the exchange; many hands, no altar"
+
+[[ritual]]
+id       = 137
+slug     = "vow_renewal"
+title    = "Vow Renewal"
+aliases  = ["renewal of vows", "recommitment"]
+phase    = "post"
+night    = false
+evidence = "a ceremony with children present as participants and no processional; informal staging"

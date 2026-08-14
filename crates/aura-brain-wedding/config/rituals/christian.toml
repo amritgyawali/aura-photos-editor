@@ -1,0 +1,130 @@
+# Christian ritual taxonomy - PHASE-07 section 2.1.
+#
+# See `hindu.toml` for what every field means and for the one rule that
+# matters: `id` is authored, unique across every file, and never reused.
+#
+# Reserved id range for this file: 70 - 99.
+#
+# One tradition file covering Catholic, Orthodox and Protestant practice,
+# because the differences that matter photographically are which rites are
+# PRESENT rather than what they look like: a nuptial mass has a communion and a
+# civil-style church service does not, and both put the couple at an altar with
+# an officiant facing a seated congregation. Where a rite is denominationally
+# specific the `evidence` line says so.
+
+version   = 1
+tradition = "christian"
+title     = "Christian"
+
+[[ritual]]
+id          = 70
+slug        = "rehearsal"
+title       = "Rehearsal"
+aliases     = ["rehearsal dinner", "wedding rehearsal"]
+phase       = "pre"
+night       = true
+evidence    = "the ceremony space in ordinary clothes; the party walking the aisle; an empty congregation"
+
+[[ritual]]
+id          = 71
+slug        = "processional"
+title       = "Processional"
+aliases     = ["the aisle", "entrance", "walk down the aisle"]
+phase       = "day"
+night       = false
+evidence    = "a walk down a central aisle towards an altar, seated congregation on both sides, doors behind"
+
+[[ritual]]
+id          = 72
+slug        = "giving_away"
+title       = "Giving Away"
+aliases     = ["presentation of the bride"]
+phase       = "day"
+night       = false
+evidence    = "a parent handing one partner to the other at the head of the aisle; a brief three-person frame"
+
+[[ritual]]
+id          = 73
+slug        = "vows"
+title       = "Vows"
+aliases     = ["exchange of vows", "declaration"]
+cloud_label = "vows"
+phase       = "day"
+night       = false
+evidence    = "the couple facing each other, hands joined, officiant close behind, congregation still"
+
+[[ritual]]
+id          = 74
+slug        = "ring_exchange"
+title       = "Ring Exchange"
+aliases     = ["rings", "exchange of rings"]
+cloud_label = "ring_exchange"
+phase       = "day"
+night       = false
+evidence    = "hands and a ring; frequently the tightest crop of the whole ceremony"
+
+[[ritual]]
+id          = 75
+slug        = "unity_candle"
+title       = "Unity Candle"
+aliases     = ["unity ceremony", "unity sand", "candle lighting"]
+cloud_label = "unity_candle"
+phase       = "day"
+night       = false
+evidence    = "two tapers lighting one pillar candle, or two vessels of sand poured into one"
+
+[[ritual]]
+id          = 76
+slug        = "communion"
+title       = "Communion"
+aliases     = ["eucharist", "nuptial mass", "holy communion"]
+cloud_label = "communion"
+phase       = "day"
+night       = false
+evidence    = "a chalice and bread at an altar, a priest in vestments, the couple kneeling; Catholic and Orthodox"
+
+[[ritual]]
+id          = 77
+slug        = "crowning"
+title       = "Crowning"
+aliases     = ["stefana", "crowning ceremony"]
+phase       = "day"
+night       = false
+evidence    = "linked crowns held above or placed on the couple's heads; Orthodox, and unmistakable"
+
+[[ritual]]
+id          = 78
+slug        = "pronouncement_kiss"
+title       = "Pronouncement and Kiss"
+aliases     = ["the kiss", "you may kiss"]
+phase       = "day"
+night       = false
+evidence    = "the officiant's arms raised or lowered, the couple kissing, the congregation applauding"
+
+[[ritual]]
+id          = 79
+slug        = "signing"
+title       = "Signing the Register"
+aliases     = ["register", "signing", "marriage certificate"]
+phase       = "day"
+night       = false
+evidence    = "a seated pair with a pen and a bound register, witnesses standing behind, a side table"
+
+[[ritual]]
+id          = 80
+slug        = "recessional"
+title       = "Recessional"
+aliases     = ["exit the aisle", "confetti"]
+phase       = "day"
+night       = false
+evidence    = "the couple walking back down the aisle or out of a door, confetti, applause, motion"
+
+[[ritual]]
+id          = 81
+slug        = "handfasting"
+title       = "Handfasting"
+aliases     = ["tying the knot", "cord ceremony"]
+cloud_label = "handfasting"
+phase       = "day"
+night       = false
+evidence    = "a cord or tartan wrapped around joined hands; Celtic practice, also used in civil ceremonies"

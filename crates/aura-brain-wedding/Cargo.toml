@@ -1,0 +1,33 @@
+[package]
+name         = "aura-brain-wedding"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+description  = "Scenes, rituals and the wedding's ordered story: the scene graph every later threshold is conditioned on"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+aura-cloud   = { path = "../aura-cloud" }
+aura-index   = { path = "../aura-index" }
+aura-infer   = { path = "../aura-infer" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+time         = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+uuid         = { workspace = true }
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build.
+# Lives in `tests/eval/` beside the phase 05 and 06 harnesses rather than in this
+# crate's own `tests/`, because a gate is a claim about the product and not about
+# a crate.
+[[test]]
+name = "scene_eval"
+path = "../../tests/eval/scene_eval.rs"

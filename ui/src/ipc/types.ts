@@ -513,3 +513,139 @@ export type IngestEvent =
   | { kind: 'batch'; rows: ImageRowLite[] }
   | { kind: 'warning'; code: string; message: string }
   | { kind: 'finished'; inserted: number; skipped: number; failed: number; elapsedMs: number };
+
+// ---------------------------------------------------------------------------
+// PHASE-07. The story surface. Generated from
+// `crates/aura-app/src/contract/ipc.rs`; see
+// `docs/adr/ADR-0016-story-ipc-surface.md`.
+// ---------------------------------------------------------------------------
+
+export type StoryOutlineInput = {
+  projectId: string;
+};
+
+export type SceneScoreDto = {
+  scene: string;
+  score: number;
+};
+
+/**
+ * What one photograph is of.
+ *
+ * `attributes` is a list of names rather than a bitfield, and `attributesMeasured`
+ * is beside it because an empty list means "outdoors, no flash, daylight, nobody
+ * around" - a description - while an unmeasured frame is not the same thing.
+ */
+export type SceneDto = {
+  photoId: string;
+  scene: string;
+  sceneTitle: string;
+  sceneConf: number;
+  top3: SceneScoreDto[];
+  attributes: string[];
+  attributesMeasured: boolean;
+  ritual: string | null;
+  ritualConf: number;
+  source: string;
+  modelVer: number;
+};
+
+export type ChapterDto = {
+  segmentId: string;
+  ordinal: number;
+  chapter: string;
+  label: string | null;
+  title: string;
+  startMs: number;
+  endMs: number;
+  durationMinutes: number;
+  dominantScene: string;
+  confidence: number;
+  keyFrame: string;
+  imageCount: number;
+  reasons: string[];
+  userLocked: boolean;
+  needsReview: boolean;
+};
+
+export type StoryOutlineDto = {
+  chapters: ChapterDto[];
+  coverage: number;
+  needsReview: string[];
+  sceneVer: number;
+  taxonomyVer: number;
+};
+
+export type ImageSceneInput = {
+  photoId: string;
+};
+
+export type SetChapterInput = {
+  segmentId: string;
+  chapter: string;
+  label: string | null;
+};
+
+export type MoveBoundaryInput = {
+  segmentId: string;
+  newEndMs: number;
+};
+
+export type SplitChapterInput = {
+  segmentId: string;
+  photoId: string;
+};
+
+export type MergeChaptersInput = {
+  segmentIdA: string;
+  segmentIdB: string;
+};
+
+export type ChapterHandleDto = {
+  id: string;
+};
+
+export type SceneProfileDto = {
+  scene: string;
+  title: string;
+  keeperMin: number;
+  keeperMax: number;
+  maxAcceptableNoise: number;
+  maxAcceptableBlur: number;
+  subjectFocusWeight: number;
+  emotionWeight: number;
+  compositionWeight: number;
+  editingIntent: string;
+  mustCover: boolean;
+  rationale: string;
+};
+
+export type ClassifyScenesInput = {
+  projectId: string;
+};
+
+export type StoryStatusDto = {
+  photos: number;
+  classified: number;
+  coverage: number;
+  chapters: number;
+  needsReview: number;
+  locked: number;
+  penalty: number;
+  gapsOnly: boolean;
+  sceneVer: number;
+  taxonomyVer: number;
+  ritualsKnown: number;
+};
+
+export type StoryEvent =
+  | { kind: 'sceneClassified'; images: number; ms: number; meanConf: number; lowConfCount: number }
+  | { kind: 'storySegmented'; segments: number; boundaryPenalty: number; chapters: number }
+  | {
+      kind: 'storyUserEdit';
+      action: string;
+      segment: string;
+      fromLabel: string | null;
+      toLabel: string | null;
+    }
+  | { kind: 'sceneCloudUsed'; segments: number; calls: number; costUsd: number };

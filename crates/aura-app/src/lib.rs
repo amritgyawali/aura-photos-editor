@@ -37,6 +37,7 @@ pub mod infer_commands;
 pub mod people_commands;
 pub mod preview_commands;
 pub mod state;
+pub mod story_commands;
 
 pub use cloud_commands::{
     check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend, cloud_status,
@@ -64,3 +65,7 @@ pub use preview_commands::{
     set_cache_budget,
 };
 pub use state::AppState;
+pub use story_commands::{
+    classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
+    segment_story, set_chapter, split_chapter, story_outline, story_status,
+};

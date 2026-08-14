@@ -230,6 +230,11 @@ impl Catalog {
             "identity_links",
             "person_boxes",
             "cooccurrence",
+            // PHASE-07.
+            "image_scenes",
+            "segments",
+            "segment_images",
+            "scene_profiles",
         ];
         if !COUNTABLE.contains(&table) {
             return Err(statement_failed(

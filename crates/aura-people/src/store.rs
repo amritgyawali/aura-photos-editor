@@ -1712,6 +1712,60 @@ impl PeopleStore {
         })
     }
 
+    /// Each photograph's coarse scene label, for the co-occurrence graph.
+    ///
+    /// **This is the query that half-closes phase 06's condition C3.** Until phase 07
+    /// shipped, `People::regroup` passed an empty map here and
+    /// `aura_vision::face::roles` reported `scene_starved`, which capped the couple
+    /// decision at `SCENELESS_CONFIDENCE_CEILING` - 0.62 - because with no scene labels
+    /// a bride and her mother are as co-occurrent as a bride and a groom.
+    ///
+    /// Two things about the shape of the answer:
+    ///
+    /// * it is the **coarse** four-word vocabulary, not the 22-class one.
+    ///   `SceneId::role_label` is the mapping and it lives in `aura-core` so this crate
+    ///   does not have to link the classifier to read a label the classifier wrote;
+    /// * frames whose scene says nothing about *who somebody is* - details, venue,
+    ///   candids, the dance floor - are **absent** rather than present with an empty
+    ///   label. A guest at the dance floor is not evidence about the couple, and a map
+    ///   entry saying `dance_floor` would make the graph count it as though it were.
+    ///
+    /// An empty map is still a legitimate answer: a project whose scene pass has not run
+    /// gets the phase 06 behaviour it always had, and `RoleOutcome::scene_starved` says
+    /// so.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the query fails.
+    pub fn scene_labels(&self, project: &ProjectId) -> AuraResult<BTreeMap<PhotoId, String>> {
+        let project_key = project.to_db();
+        self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare("SELECT photo_id, scene FROM image_scenes WHERE project_id = ?1")
+                .map_err(|e| statement_failed("could not read scene labels", &e))?;
+            let mut rows = statement
+                .query(params![project_key])
+                .map_err(|e| statement_failed("could not read scene labels", &e))?;
+            let mut out = BTreeMap::new();
+            while let Some(row) = rows
+                .next()
+                .map_err(|e| statement_failed("could not read a scene row", &e))?
+            {
+                let id: String = row.get(0).unwrap_or_default();
+                let scene: String = row.get(1).unwrap_or_default();
+                let Ok(photo) = PhotoId::from_db(&id) else {
+                    continue;
+                };
+                if let Some(label) =
+                    aura_core::contract::scene::SceneId::from_str_or_unknown(&scene).role_label()
+                {
+                    out.insert(photo, label.to_string());
+                }
+            }
+            Ok(out)
+        })
+    }
+
     /// Refuse two ids that do not belong to the same project.
     ///
     /// # Errors
