@@ -41,6 +41,11 @@ Never load two phase files into one session.
 | Ritual taxonomies (extensible) | `crates/aura-brain-wedding/config/rituals/` |
 | Adding a wedding tradition | `docs/adding-a-tradition.md` |
 | Scene evaluation gates | `tests/eval/scene_eval.rs` + `ml/models/scene/eval_scene.py` |
+| Moment and duplicate decisions | `docs/adr/ADR-0017-burst-grouping-and-duplicate-policy.md` |
+| Grouping thresholds (versioned, PM-owned) | `crates/aura-brain-wedding/config/moment_profiles.toml` |
+| Burst grouping ground truth | `tests/fixtures/labels/bursts_*.json` |
+| Burst evaluation gates | `tests/eval/burst_eval.rs` + `ml/eval/burst_eval.py` |
+| Moments, bursts and duplicates explained | `docs/moments-bursts-and-duplicates.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -178,6 +183,54 @@ Phase 07 half-closes phase 06's condition C3: `PeopleStore::scene_labels` feeds 
 coarse labels into the co-occurrence graph, so `RoleOutcome::scene_starved` is false on a
 classified wedding and `SCENELESS_CONFIDENCE_CEILING` stops capping the couple decision at
 0.62. The other half needs twenty real weddings and a human.
+
+Phase 08 is implemented: `aura-core::contract::moment` (the frozen `Moment`,
+`DuplicateSet`, `DuplicateKind`, `CameraId`, `MomentOutline`, `MomentEdit` and
+`MomentService`), `aura-brain-wedding::moments` (an adaptive per-camera cadence estimator,
+a time-windowed similarity graph with scene-conditioned thresholds and a proximity
+multiplier, deterministic union-find with an over-large re-cluster pass whose size cap is
+a guarantee, the two-tier burst partition, the three-way duplicate conjunction,
+cross-camera merging, the split/merge/lock/undo API and the store), migration 8, ten
+argued-over grouping profiles in editable config, five burst regression patterns with
+labelled ground truth in two formats, the moments IPC surface (ADR-0018) with its stacked
+grid and duplicate review panel, and `aura-cli verify --phase 08` as the gate. Its exit
+report is `docs/progress/PHASE-08-EXIT.md`.
+
+**This phase ships no model** - the first since phase 02 - because grouping is arithmetic
+over phase 05's vectors and phase 01's timestamps. Its section 10.1 gates are therefore
+measurements of *algorithms* rather than of weights, and all of them pass: ARI 1.000 on
+five patterns, duplicate recall and precision 1.000. **But the largest term in the
+grouping score reads the placeholder embedding**, so no number in this phase is a claim
+about a real wedding's pixels. That is condition C1 in the phase 08 exit report, it is a
+Sev 2 trigger, and it closes with phase 05's C10 rather than separately.
+
+Phase 08 found and fixed a defect that affects every real camera file: **EXIF's
+`DateTimeOriginal` has whole-second resolution**, so `photo.timeline_time` alone cannot
+distinguish the fourteen frames of a 10 fps burst. The fraction is in `photo.sub_sec`, and
+`moments::moment::sub_sec_ms` reconstructs it. Every unit test passed and the phase gate
+caught it.
+
+Five rules that phase 08 added and every later phase inherits:
+
+- **`MomentService` is the only way to ask what was shot once.** No phase may keep its own
+  grouping. Two answers to "are these the same shot" is two culling decisions that
+  disagree, and phase 12's coverage guarantee is written against this one.
+- **A grouping is evidence; the deciding phase owns the cull.** Nothing in `moments`
+  rejects, ranks or deletes a frame, and no column, field or command on any surface would
+  let it. `DuplicateSet::keep_hint` is spelled *hint* in the contract, the schema, the
+  wire and the panel.
+- **Three version columns, because they invalidate three different things.** `embed_ver`
+  invalidates every distance and therefore every edge, `group_ver` the graph
+  construction, and `profile_ver` the thresholds those edges were compared against.
+  `AURA-ML-5028` exists so a comparison across any of them never happens silently.
+- **Report coverage, and say what the denominator is.** `MomentOutline::coverage` is
+  measured against **groupable** frames rather than photographs: a frame with no
+  embedding is a phase 05 gap, and reporting it as a phase 08 failure sends somebody
+  looking in the wrong place.
+- **A photographer's grouping is unbeatable, and both sides of a split are locked.**
+  `moments.user_locked = 0` is inside the `DELETE` a re-grouping starts with, and a locked
+  moment's frames are *subtracted from the pass's input* rather than reconciled
+  afterwards.
 
 Five rules that phase 07 added and every later phase inherits:
 
