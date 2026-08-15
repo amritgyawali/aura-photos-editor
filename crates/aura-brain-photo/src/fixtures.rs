@@ -294,15 +294,11 @@ impl Frame {
     /// Reduce a rectangle's edge response by a fraction, without destroying its
     /// structure.
     ///
-    /// A blend between the frame and a one-pixel-blurred copy of it. Acutance is very
-    /// nearly linear in the blend weight at that radius, so `soften(rect, 0.2)` reduces
-    /// the measured acutance of the rectangle by about a fifth.
-    ///
-    /// This is what [`cross_camera_pair`] uses, and the reason it exists rather than a
-    /// second call to [`Frame::blur_rect`]: the fairness fixture has to model a
-    /// *specific* softening - the one a bigger sensor's extra downsample performs, which
-    /// the calibration table records as a ratio - and a blur radius is a much blunter
-    /// instrument than the effect being modelled.
+    /// A blend between the frame and a one-pixel-blurred copy of it. **The relationship
+    /// between the blend weight and the measured acutance is not linear** - the first
+    /// version of this module assumed it was, and the cross-camera fairness gate passed
+    /// at 0.043 in the wrong direction because of it. Use [`Frame::soften_to_ratio`] when
+    /// the *measured* ratio is what matters, which for the fairness fixture it is.
     pub fn soften(&mut self, rect: CropRect, amount: f32) {
         let weight = amount.clamp(0.0, 1.0);
         if weight <= f32::EPSILON {
@@ -323,6 +319,64 @@ impl Frame {
                 }
             }
         }
+    }
+
+    /// Soften a rectangle until its measured acutance is `target` times what it was.
+    ///
+    /// A bisection over the blend weight, measuring with the same function the analyser
+    /// measures with. That is circular for `focus::acutance` itself and **not** circular
+    /// for the thing the fairness gate is about: the question is whether dividing by
+    /// `expected_mtf50` removes a difference of a *known* ratio, and the only way to
+    /// construct a known ratio is to measure it.
+    ///
+    /// Sixteen steps, which brings the weight to within a ten-thousandth. Deterministic:
+    /// the bisection has no randomness and the measurement is exact.
+    pub fn soften_to_ratio(&mut self, rect: CropRect, target: f32) {
+        // Measured the way the analyser measures: `focus::analyse`'s raw subject figure,
+        // which is the eye regions when there are any and the face box when there are
+        // not. Targeting the face box directly would calibrate the fixture against a
+        // number nothing compares - the first version of this function did exactly that,
+        // and the fairness gate moved in the wrong direction by 0.043.
+        let measure = |frame: &Self| -> f32 {
+            let plane =
+                aura_vision::embed::descriptors::luma_plane(&frame.rgb, frame.width, frame.height);
+            let described: Vec<(CropRect, [[f32; 2]; 2], bool)> = frame
+                .faces
+                .iter()
+                .map(|face| (face.bbox, face.eyes, face.has_eyes()))
+                .collect();
+            let regions = crate::integrity::focus::RegionSet::for_face(&described, &[]);
+            let weights = vec![1.0f32; frame.faces.len()];
+            crate::integrity::focus::analyse(
+                &plane,
+                &regions,
+                &weights,
+                &crate::integrity::calibration::CalibrationTable::embedded()
+                    .map_or(FALLBACK_FOR_MEASUREMENT, |table| table.fallback()),
+            )
+            .raw_subject
+        };
+        let before = measure(self);
+        if before <= f32::EPSILON || !(0.0..1.0).contains(&target) {
+            return;
+        }
+
+        let mut low = 0.0f32;
+        let mut high = 1.0f32;
+        let mut best = self.clone();
+        for _ in 0..16 {
+            let weight = f32::midpoint(low, high);
+            let mut candidate = self.clone();
+            candidate.soften(rect, weight);
+            let ratio = measure(&candidate) / before;
+            best = candidate;
+            if ratio > target {
+                low = weight;
+            } else {
+                high = weight;
+            }
+        }
+        *self = best;
     }
 
     /// Push every pixel towards white until a fraction of the frame clips.
@@ -531,12 +585,15 @@ pub fn cross_camera_pair() -> (
 ) {
     let low = Frame::base();
     let mut high = Frame::base();
-    // The shipped table records the a7R IV at 0.27 against the a7 III's 0.34 - a ratio of
-    // 0.794 - so the fixture softens the high-resolution frame by exactly the complement
-    // of that. **The fixture models the effect; the test proves the calibration division
-    // removes it.** A softening chosen to make the test pass would be circular; this one
-    // is read off the same table the analyser divides by.
-    high.soften(FACE_RECT, 1.0 - 0.27 / 0.34);
+    // The shipped table records the a7R IV at 0.27 against the a7 III's 0.34, so the
+    // fixture softens the high-resolution frame until its *measured* acutance is exactly
+    // that ratio of the other's. **The fixture models the effect; the test proves the
+    // calibration division removes it.**
+    //
+    // The ratio is read off the same table the analyser divides by, which is the only way
+    // to construct a difference of a known size - and measuring it rather than assuming a
+    // blend weight produces it is what the first version of this fixture got wrong.
+    high.soften_to_ratio(FACE_RECT, 0.27 / 0.34);
     ((low, "SONY", "ILCE-7M3"), (high, "SONY", "ILCE-7RM4"))
 }
 
@@ -703,6 +760,25 @@ fn blake3_of(values: &[i32; 4]) -> [u8; 16] {
     }
     out
 }
+
+/// A calibration row used only when the embedded table will not load, which is a build
+/// bug rather than a runtime one.
+///
+/// `raw_subject` does not depend on the calibration at all - it is the acutance before
+/// normalisation - so any row produces the same measurement, and this exists so that
+/// `soften_to_ratio` has no failure path.
+const FALLBACK_FOR_MEASUREMENT: crate::integrity::calibration::Calibration =
+    crate::integrity::calibration::Calibration {
+        megapixels: 24.0,
+        expected_mtf50: 0.24,
+        read_noise_e: 3.4,
+        noise_slope: 1.0,
+        highlight_headroom_ev: 1.0,
+        shadow_headroom_ev: 3.5,
+        base_iso: 100,
+        confidence_penalty: 0.15,
+        measured: false,
+    };
 
 /// The subject's three-frequency texture at one pixel.
 ///

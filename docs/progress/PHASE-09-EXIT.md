@@ -63,7 +63,7 @@ Measured by `tests/eval/integrity_eval.rs` (26 tests) and by the phase gate.
 | Exposure recoverable vs lost | >= 0.93 | **1.000** over six cases | authored labels, not expert labels |
 | Noise sigma within 15 % | exact | **met**, four ISO rungs | known sigma by construction |
 | Group closed-eye ratio matches a human count | exact | **met**, 20 combinations | `fixtures::group_frame` |
-| Cross-camera fairness, 24 MP vs 61 MP | <= 0.05 | **met** | `fixtures::cross_camera_pair` |
+| Cross-camera fairness, 24 MP vs 61 MP | <= 0.05 | **0.001** | `fixtures::cross_camera_pair`; **0.073 without the calibration division**, which would fail the gate |
 | Determinism | identical | **met** | two runs, gate and harness |
 | A constant scorer fails the AUC gate | - | **met**, 0.500 | the guard |
 | An inverted scorer scores below a coin toss | - | **met** | the guard |

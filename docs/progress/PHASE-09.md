@@ -16,14 +16,14 @@ One line per task group, in the order section 8 asks for them. The exit report i
 | MLL/PM - eye state and the intent rules | `crates/aura-brain-photo/src/integrity/eyes.rs` | `integrity_eval.rs` | Five classes, two gating tests, and section 6.4's four rules in order. Three are implemented; the tears rule needs phase 10 and is wired through as an always-false input - condition C4. The head emits no intent slot, because every rule depends on something outside the crop. |
 | SRC - flags, reasons and the composite | `crates/aura-brain-photo/src/integrity/{flags,score}.rs` | `integrity_eval.rs` | Twenty-one reason codes, eight of which withdraw a claim. The composite is a weighted **geometric** mean with a floor, so one catastrophic factor cannot be averaged away; section 13's fifth criterion is met by construction rather than by fitting, and asserted across all 23 scenes. |
 | SRC - the pass, the store and the service | `crates/aura-brain-photo/src/integrity/{analyse,store,api}.rs`, `crates/aura-catalog/migrations/0009_integrity.sql` | the gate, `integrity_budgets.rs` | One decode, every measurement. Two tables, two views, three version columns, and a dismissal that is re-applied inside the upsert a re-analysis performs rather than reverted by it. Resumable: the work remaining is a query, so a `calib_ver` bump heals itself. |
-| SFE/MFE - the Integrity card and the chips | `ui/src/components/explain/{IntegrityCard,FilterChips}.tsx`, `ui/src/ipc/{types,client}.ts`, `crates/aura-app/src/{integrity_commands,contract/ipc,state}.rs`, `docs/adr/ADR-0020-*.md` | `IntegrityCard.test.tsx` (29) | Six commands, five of them reads. The card draws "not checked" differently from "clean", shows the good news as prominently as the bad, and its one button promises only what it does. The chips read their names from the backend rather than hard-coding a second copy of `IntegrityFlags::ALL`. |
+| SFE/MFE - the Integrity card and the chips | `ui/src/components/explain/{IntegrityCard,FilterChips}.tsx`, `ui/src/ipc/{types,client}.ts`, `crates/aura-app/src/{integrity_commands,contract/ipc,state}.rs`, `docs/adr/ADR-0020-*.md` | `IntegrityCard.test.tsx` (26) | Six commands, five of them reads. The card draws "not checked" differently from "clean", shows the good news as prominently as the bad, and its one button promises only what it does. The chips read their names from the backend rather than hard-coding a second copy of `IntegrityFlags::ALL`. |
 | QAL/PERF - gates, budgets and the eval harnesses | `crates/aura-cli/src/phase09.rs`, `crates/aura-perf/tests/integrity_budgets.rs`, `perf/budgets.toml`, `tests/eval/integrity_eval.rs`, `ml/models/integrity/eval_integrity.py`, `justfile` | `integrity_eval.rs` (26), `integrity_budgets.rs` (3) | `just phase-09-verify` runs eleven checks and exits 0, with the real models through the real inference service. 128 ms per image against a 220 ms budget; **1,024 bytes per image against a 1 KB budget, met exactly**. The GPU rows are waived with an expiry condition. |
 | DOC - runbooks, ADRs and the reason reference | `docs/runbooks/AURA-ML-503{3,4,5,6,7}.md`, `docs/adr/ADR-001{9},0020-*.md`, `docs/frame-integrity.md`, `docs/progress/PHASE-09*.md`, `CHANGELOG.md`, `CLAUDE.md` | `integrity_contract.rs` (2) | Five new codes, five runbooks, two ADRs, and a reason-code reference in user language whose completeness is **gated**: a code with no sentence on the page fails the build, and a sentence that leaks implementation vocabulary fails too. |
 
-## Six things the harness, the gate and the budget found that review would not have
+## Seven things the harness, the gate and the budget found that review would not have
 
 Recorded because every one was a real defect in code that read correctly, and because
-four of the six were only reachable by measuring something.
+five of the seven were only reachable by measuring something.
 
 1. **The fixture's texture made the blur ladder non-monotonic.** The first version of
    `fixtures::Frame::base` painted a one-pixel checker - the highest frequency an image
@@ -66,7 +66,17 @@ four of the six were only reachable by measuring something.
    sentences and reading the face geometry from `faces` rather than copying it, took the
    figure from 1,855 bytes per image to exactly 1,024.
 
-6. **Phase 08's UI showed `undefined` in every error toast.** `MomentStack.tsx` read
+6. **The cross-camera fairness fixture calibrated itself against the wrong number.**
+   `Frame::soften` blends a rectangle towards a blurred copy, and the first version of the
+   fairness pair assumed acutance was linear in the blend weight. It is not, and the
+   fixture's *face box* acutance is not what the analyser measures anyway - it measures the
+   eye regions. The gate passed at 0.043 with the 61 MP body scoring **higher**, which is
+   the calibration overcorrecting rather than working. `Frame::soften_to_ratio` now
+   bisects until the measured subject acutance is exactly the ratio the shipped table
+   records, and the gate reads 0.001 with the uncalibrated gap at 0.073 - above the
+   threshold, which is what makes it a test of the division rather than of the fixture.
+
+7. **Phase 08's UI showed `undefined` in every error toast.** `MomentStack.tsx` read
    `asIpcError(raised).detail`, and the wire type's field is `message`. Five call sites,
    found by the first TypeScript check after the phase 09 types were added, fixed here
    because it is a one-word change in a file phase 09 otherwise leaves alone.
