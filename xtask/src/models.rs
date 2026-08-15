@@ -306,6 +306,73 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::no_int8(),
             },
         ),
+        // PHASE-10. Two heads, and both of them end in a `Sigmoid` rather than a
+        // `Softmax`. Section 2.1 requires the expression outputs to be "all
+        // continuous, not one-hot" and section 5 spells interactions as a list of
+        // (kind, strength) pairs: a face can be laughing and crying at once, and a
+        // frame can be a hug and tears being wiped. A softmax would make the
+        // classes compete for one unit of probability, which is the modelling
+        // mistake that produces emotionally flat galleries - so it is prevented in
+        // the graph rather than warned about in a comment.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::EXPRESSION_HEAD_MODEL,
+                version: Version::new(1, 0, 0),
+                // `multilabel`, not `multiclass`. The task string is read by
+                // nothing at run time and by a person every time somebody asks
+                // what a model does, and calling eight independent sigmoids a
+                // multiclass head is the one-hot mistake written down.
+                task: "multilabel",
+                class: ModelClass::Embedding,
+                model: fixtures::expression_head(),
+                input: Placeholder::image(fixtures::EXPRESSION_CROP_SIDE),
+                output: BTreeMap::from([(
+                    "expression".to_string(),
+                    vec![1, fixtures::EXPRESSION_CHANNELS],
+                )]),
+                // int8 is forbidden, and the argument is `face_quality`'s
+                // sharpened by one case. Eight independent sigmoids quantised per
+                // tensor lose most of their resolution near 0 and 1, and one of
+                // the eight - `tears` - is read against a 0.85 threshold that
+                // decides whether the product says the word "crying" to a
+                // photographer and whether phase 09 exonerates a closed eye.
+                // Section 12's fourth failure mode is a false tear; this is where
+                // a quantisation choice would cause one.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::INTERACTION_HEAD_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "multilabel",
+                class: ModelClass::Embedding,
+                model: fixtures::interaction_head(),
+                // Four channels: three of colour and one person-prior plane.
+                // Section 6.2's "person boxes as spatial priors", as a plane
+                // rather than as coordinates appended to a vector, because where
+                // the people are is a spatial fact and a convolution is what reads
+                // spatial facts.
+                input: Placeholder::planes(
+                    fixtures::INTERACTION_CHANNELS,
+                    fixtures::INTERACTION_SIDE,
+                ),
+                output: BTreeMap::from([(
+                    "interaction_probs".to_string(),
+                    vec![1, fixtures::INTERACTION_CLASSES],
+                )]),
+                // int8 is allowed, and this is the second head in the product
+                // where it is. Nine coarse pose questions over a 160 px frame -
+                // are two bodies in contact, is a glass raised - are decided far
+                // from any threshold that matters: an interaction at 0.31 and one
+                // at 0.34 both read as "weakly present" and feed one of nine
+                // ranker terms. Nothing here can convict a photograph, and this
+                // head runs once on every frame in the wedding.
+                precision_policy: PrecisionPolicy::permissive(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {
@@ -391,6 +458,22 @@ impl Placeholder {
             layout: "NCHW".to_string(),
             range: "0..1".to_string(),
             colour: "luma".to_string(),
+        }
+    }
+
+    /// The input spec for a square model with `channels` planes at `side` pixels.
+    ///
+    /// PHASE-10's interaction head, which reads three planes of colour plus one of
+    /// person prior. `colour` says `srgb+prior` rather than `srgb`, because a
+    /// manifest that claimed three sRGB channels for a four-channel tensor would be
+    /// documenting the wrong preprocessing - and the preprocessing is the half of a
+    /// model contract that has no code to check it.
+    fn planes(channels: usize, side: usize) -> InputSpec {
+        InputSpec {
+            shape: vec![1, channels, side, side],
+            layout: "NCHW".to_string(),
+            range: "0..1".to_string(),
+            colour: "srgb+prior".to_string(),
         }
     }
 

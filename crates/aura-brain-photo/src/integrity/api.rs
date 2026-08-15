@@ -31,6 +31,7 @@ use std::sync::Arc;
 
 use aura_catalog::Catalog;
 use aura_core::clock::Clock;
+use aura_core::contract::emotion::EmotionService;
 use aura_core::contract::integrity::{
     ImageId, IntegrityFlags, IntegrityOutline, IntegrityResult, IntegrityService,
 };
@@ -211,6 +212,7 @@ pub struct IntegrityPass {
     store: Arc<IntegrityStore>,
     people: Option<Arc<dyn PeopleService>>,
     story: Option<Arc<dyn StoryService>>,
+    emotion: Option<Arc<dyn EmotionService>>,
     clock: Arc<dyn Clock>,
 }
 
@@ -220,6 +222,7 @@ impl fmt::Debug for IntegrityPass {
             .field("calib_ver", &self.analyser.calibration().version())
             .field("people", &self.people.is_some())
             .field("story", &self.story.is_some())
+            .field("emotion", &self.emotion.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -242,6 +245,7 @@ impl IntegrityPass {
             store,
             people: None,
             story: None,
+            emotion: None,
             clock,
         })
     }
@@ -270,6 +274,32 @@ impl IntegrityPass {
     #[must_use]
     pub fn with_story(mut self, story: Arc<dyn StoryService>) -> Self {
         self.story = Some(story);
+        self
+    }
+
+    /// Read whether a frame contains tears through phase 10's frozen service.
+    ///
+    /// Optional, and it is the wire that closes **condition C4 of the phase 09 exit
+    /// report**. Section 6.4's third intent rule - "closed eyes are acceptable when
+    /// tears are detected in Phase 10" - was defined, documented and always false in the
+    /// build phase 09 shipped, because phase 10 did not exist.
+    ///
+    /// The dependency runs through `aura-core`'s frozen `EmotionService` and not through
+    /// `aura-brain-wedding`. That matters structurally rather than stylistically: phase
+    /// 10 reads `IntegrityService` nowhere and phase 09 reads `EmotionService` here, so
+    /// the two crates never depend on each other and the rule each phase wrote - "no
+    /// phase may keep its own blink detector", "no phase may keep its own expression
+    /// model" - cannot become a cycle.
+    ///
+    /// **Ordering.** The emotion pass has to have run before this one for the rule to
+    /// fire. It is a re-analysis rather than a race: a verdict made before the emotion
+    /// pass is a verdict with `tears = false`, which is the phase 09 behaviour, and the
+    /// re-run that follows an emotion pass picks it up because `analysis_ver` decides
+    /// what is pending. Without this call every frame is judged exactly as phase 09
+    /// shipped.
+    #[must_use]
+    pub fn with_emotion(mut self, emotion: Arc<dyn EmotionService>) -> Self {
+        self.emotion = Some(emotion);
         self
     }
 
@@ -546,6 +576,17 @@ impl IntegrityPass {
             .and_then(|people| people.subjects(image).ok())
             .unwrap_or_default();
 
+        // One read per frame through the frozen service, and only when phase 10 has run.
+        // Not a whole-project table like `exif`: a wedding with no emotion pass would pay
+        // for a four-thousand-row read to learn that every answer is false, and a wedding
+        // with one is doing a primary-key lookup that the emotion store has already
+        // indexed.
+        let tears = self
+            .emotion
+            .as_ref()
+            .and_then(|emotion| emotion.of_image(image).ok().flatten())
+            .is_some_and(|reading| reading.has_tears());
+
         FrameContext {
             scene,
             profile,
@@ -553,6 +594,7 @@ impl IntegrityPass {
             couple: couple.to_vec(),
             exif: exif.get(&image).cloned().unwrap_or_default(),
             scene_known: scene_result.is_some(),
+            tears,
         }
     }
 

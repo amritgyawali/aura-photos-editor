@@ -13,6 +13,20 @@ aura-catalog = { path = "../aura-catalog" }
 aura-cloud   = { path = "../aura-cloud" }
 aura-index   = { path = "../aura-index" }
 aura-infer   = { path = "../aura-infer" }
+# PHASE-10. The first pixels this crate has ever opened.
+#
+# Phases 07 and 08 sat entirely on stored numbers - the frozen phase 05 embedding, the
+# descriptors, the timeline - and this crate's own header said so. Phase 10 cannot: an
+# expression is on a face and an interaction is between two bodies, and neither is
+# recoverable from a 512-wide vector that was trained to be scene-discriminative.
+#
+# The cost is honest and it is in `perf/budgets.toml`. What it buys back is that the
+# crops are the ones `aura-vision` already warps for phases 06 and 09, so a wedding that
+# has been scanned for faces pays for one decode and three heads rather than three
+# decodes.
+aura-preview = { path = "../aura-preview" }
+aura-raw     = { path = "../aura-raw" }
+aura-vision  = { path = "../aura-vision" }
 rusqlite     = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }
@@ -36,3 +50,8 @@ path = "../../tests/eval/scene_eval.rs"
 [[test]]
 name = "burst_eval"
 path = "../../tests/eval/burst_eval.rs"
+
+# The section 10.1 gates for PHASE-10, in the same place and for the same reason.
+[[test]]
+name = "emotion_eval"
+path = "../../tests/eval/emotion_eval.rs"

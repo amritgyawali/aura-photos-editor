@@ -1,7 +1,13 @@
-//! The eleven failures this crate can have, and what each one falls back to.
+//! The sixteen failures this crate can have, and what each one falls back to.
 //!
-//! Six are phase 07's, five are phase 08's, and the two halves are the same shape:
-//! everything degrades except a refused config file.
+//! Six are phase 07's, five are phase 08's and five are phase 10's, and all three
+//! groups are the same shape: everything degrades except a refused config file.
+//!
+//! Three phases in one crate now share that skeleton - version drift, a refused config
+//! file, one item that could not be done, a refused edit, and a result the product
+//! will not claim - and the repetition is worth noticing rather than tidying away. A
+//! phase that invents a sixth shape of failure is usually a phase that has not worked
+//! out which of the five it really is.
 //!
 //! Of phase 07's six, five are soft and the sixth is the interesting one.
 //!
@@ -295,6 +301,31 @@ pub fn moment_config_refused(file: &str, key: &str, rule: &str) -> AuraError {
     .with_context("key", key)
 }
 
+// -- PHASE-10 ----------------------------------------------------------------
+//
+// Five again, and for the third time the same five shapes: version drift, a refused
+// config file, one item that could not be done, a refused edit, and a result the
+// product will not claim. Three phases in one crate now share that skeleton, and the
+// repetition is the point - a phase that invents a sixth shape of failure is usually a
+// phase that has not worked out which of the five it really is.
+//
+// `AURA-ML-5039` is the only one that halts, for `AURA-ML-5024`'s and
+// `AURA-ML-5031`'s reason, and here the argument is sharper than for either: a
+// half-loaded `emotion_weights.toml` applies the tradition-aware weights to some scenes
+// and not others, silently, in precisely the direction section 12's first failure mode
+// warns about.
+
+/// Stored emotion scores came from different heads, arithmetic or a weight table.
+pub const ML_EMOTION_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5038");
+/// The emotion weight table was refused.
+pub const ML_EMOTION_CONFIG_REFUSED: ErrorCode = ErrorCode("AURA-ML-5039");
+/// One photograph could not be scored.
+pub const ML_EMOTION_FAILED: ErrorCode = ErrorCode("AURA-ML-5040");
+/// A pairwise preference or a peak-frame choice was refused.
+pub const ML_PREFERENCE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5041");
+/// A moment's peak could not be separated from its neighbours.
+pub const ML_PEAK_UNRESOLVED: ErrorCode = ErrorCode("AURA-ML-5042");
+
 /// One photograph could not be placed in a moment.
 ///
 /// Almost always a frame with no embedding or no timeline time: grouping needs both,
@@ -313,4 +344,124 @@ pub fn moment_failed(photo: &str, why: &str) -> AuraError {
          own. Everything else in this wedding is unaffected.",
     )
     .with_context("photo", photo)
+}
+
+// -- PHASE-10 ----------------------------------------------------------------
+
+/// Stored emotion scores were made under different versions than this build uses.
+///
+/// Degraded rather than fatal: the stored scores keep working - an ordering is still an
+/// ordering - while the project is re-scored in the background.
+///
+/// All three numbers are in the message because a support engineer's first question is
+/// *which* one moved, and the answer changes what has to be redone. A `model_ver` bump
+/// re-runs two heads over every frame; an `analysis_ver` bump re-runs the arithmetic
+/// over stored readings; a `weights_ver` bump only re-scores, which is the cheapest of
+/// the three and by far the most common, because it is what an edit to
+/// `emotion_weights.toml` produces.
+#[must_use]
+pub fn emotion_version_mismatch(
+    stored: (u16, u16, u16),
+    current: (u16, u16, u16),
+    rows: usize,
+) -> AuraError {
+    AuraError::new(
+        ML_EMOTION_VERSION_MISMATCH,
+        Severity::Degraded,
+        Recovery::Fallback,
+        format!(
+            "{rows} emotion rows are model {}/analysis {}/weights {}; this build is model \
+             {}/analysis {}/weights {}",
+            stored.0, stored.1, stored.2, current.0, current.1, current.2
+        ),
+        "AURA has improved how it reads expression and moments, so it is re-scoring this wedding \
+         in the background. Your own choices are kept.",
+    )
+    .with_context("stale_rows", rows.to_string())
+    .with_context("stored_weights_ver", stored.2.to_string())
+    .with_context("current_weights_ver", current.2.to_string())
+}
+
+/// The emotion weight table was refused. Nothing was loaded and nothing was changed.
+///
+/// The one phase 10 code that halts. `emotion_weights.toml` is not only a threshold
+/// table - it is the file that decides whether a composed Hindu ceremony scores like a
+/// smiling Christian one, and a half-loaded one applies the tuned weights to some scenes
+/// and the defaults to others without anybody noticing.
+///
+/// The message names the file, the key and the rule, in the order somebody fixes them.
+#[must_use]
+pub fn emotion_config_refused(file: &str, key: &str, rule: &str) -> AuraError {
+    AuraError::new(
+        ML_EMOTION_CONFIG_REFUSED,
+        Severity::RunBlocking,
+        Recovery::Halt,
+        format!("{file}: `{key}` {rule}"),
+        "AURA could not load the settings that decide what counts as a moment in each part of the \
+         day, so it has not scored anything. Restore the file or reinstall; the runbook explains \
+         what is wrong with it.",
+    )
+    .with_context("file", file)
+    .with_context("key", key)
+}
+
+/// One photograph could not be scored.
+///
+/// Nothing is written for that frame, deliberately: a zero row would look like a
+/// completed reading of a flat photograph, and phase 12 reads a low score as evidence.
+/// A missing row is retried and is counted against coverage.
+#[must_use]
+pub fn emotion_failed(photo: &str, why: &str) -> AuraError {
+    AuraError::new(
+        ML_EMOTION_FAILED,
+        Severity::ItemFailed,
+        Recovery::Retry,
+        format!("{photo}: {why}"),
+        "AURA could not read the expressions in one photograph and has left it unscored rather \
+         than guessing. Everything else in this wedding is unaffected.",
+    )
+    .with_context("photo", photo)
+}
+
+/// A pairwise preference or a peak-frame choice was refused. Nothing was written.
+///
+/// `AskUser` rather than `Retry`, for `moment_edit_refused`'s reason: every refusal here
+/// is a statement about what was asked for - a photograph that is not in that moment,
+/// two frames from different weddings - and repeating it changes nothing.
+#[must_use]
+pub fn preference_refused(action: &str, why: &str) -> AuraError {
+    AuraError::new(
+        ML_PREFERENCE_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        format!("{action} refused: {why}"),
+        "AURA could not record that choice. Nothing was changed.",
+    )
+    .with_context("action", action)
+}
+
+/// A moment's strongest frame could not be separated from its neighbours.
+///
+/// **Usually the correct answer rather than a failure.** Fourteen frames of a bracketed
+/// detail shot genuinely have no apex, and a peak chosen by a rounding error is a peak
+/// phase 29 would build an album spread around.
+///
+/// Warning rather than degraded, and the row is still written with `kind = 'flat'`: a
+/// moment that was examined and had no apex is different from a moment nobody examined,
+/// which is migration 10's sixth property applied to a peak.
+#[must_use]
+pub fn peak_unresolved(moment: &str, frames: usize, margin: f32) -> AuraError {
+    AuraError::new(
+        ML_PEAK_UNRESOLVED,
+        Severity::Warning,
+        Recovery::Fallback,
+        format!(
+            "moment {moment}: {frames} frames, best margin {margin:.3}, below the {:.2} floor",
+            aura_core::contract::emotion::MomentPeak::MIN_MARGIN
+        ),
+        "Several frames of one moment are equally strong, so AURA has not picked a best one. They \
+         are all still there and you can choose.",
+    )
+    .with_context("moment", moment)
+    .with_context("frames", frames.to_string())
 }

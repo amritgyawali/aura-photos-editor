@@ -114,6 +114,9 @@ fn context_for(frame: &Frame, scene: SceneId, make: &str, model: &str, iso: u32)
             megapixels: 24.0,
         },
         scene_known: true,
+        // Phase 10's third intent rule. False by default here; the tests that exercise
+        // the rule set it explicitly, which is what phase 09's condition C4 asked for.
+        tears: false,
     }
 }
 

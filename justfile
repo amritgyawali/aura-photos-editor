@@ -122,6 +122,24 @@ phase-08-verify:
 phase-09-verify:
     cargo run --release --package aura-cli -- verify --phase 09 --work target/phase09-verify
 
+# The phase 10 gate: the migration, the emotion weight table and its cultural
+# inversion, both heads through the real inference service, a wedding's frames
+# read with reasons and face crops, a composed rite frame that is not ranked
+# below a smiling one, a peak found and a flat moment refused, a reaction linked
+# across two cameras and a burst not linked to itself, a photographer's peak
+# choice surviving a re-score, a preference refused across two weddings, a stale
+# weights version healing itself, and two runs that agree. Never touches a
+# network.
+phase-10-verify:
+    cargo run --release --package aura-cli -- verify --phase 10 --work target/phase10-verify
+
+# The emotion metrics, from the Python side. `--self-test` proves the metrics
+# reject a reader that learned nothing; `--fit-ranker` fits the Bradley-Terry
+# coefficients and `--fit-calibration` the per-scene isotonic maps that ship as
+# the identity today.
+emotion-eval:
+    python ml/models/emotion/eval_emotion.py --self-test
+
 # The integrity metrics, from the Python side. `--self-test` proves the metrics
 # reject a scorer that learned nothing; `--fit-calibration` fits the per-scene
 # isotonic maps that ship as the identity today.

@@ -32,6 +32,7 @@ pub mod contract {
     pub mod ipc;
 }
 
+pub mod emotion_commands;
 pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
@@ -48,6 +49,10 @@ pub use cloud_commands::{
 pub use commands::{
     cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
     start_ingest,
+};
+pub use emotion_commands::{
+    emotion_status, image_emotion, moment_peak, prefer_frame, ranked_by_emotion, reactions_of,
+    score_emotion, set_moment_peak,
 };
 pub use index_commands::{
     build_index, embed_project, find_similar, image_descriptors, index_status,

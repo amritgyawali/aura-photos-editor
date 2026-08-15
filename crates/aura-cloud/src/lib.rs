@@ -89,6 +89,7 @@ pub mod fallback;
 pub mod gateway;
 pub mod google;
 pub mod http;
+pub mod moment_significance;
 pub mod openai;
 pub mod payload;
 pub mod provider;
@@ -112,6 +113,9 @@ pub use contract::cloud::{
 pub use couple_hint::{CandidateStats, CoupleHint, CoupleHintInput, CoupleHintOutput, PairStats};
 pub use gateway::{CallContext, CloudAiGateway, CloudPolicy};
 pub use keys::{KeyStore, MemoryKeyStore, OsKeyStore, SecretKey};
+pub use moment_significance::{
+    FrameStats, MomentSignificance, MomentSignificanceInput, MomentSignificanceOutput,
+};
 pub use provider::{
     OfflineTransport, Provider, ProviderClient, ProviderConfig, ProviderKind, Transport,
 };

@@ -2,6 +2,82 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 10 - Expression, emotion and moment ranking
+
+The app finds the moments that matter - genuine smiles, laughter, tears, hugs, kisses,
+reactions and ritual peaks - and ranks every frame by emotional value. Phase 09 decided
+what is *acceptable*; this decides what is *worth delivering*, and the two are separate
+numbers that a later phase combines.
+
+The whole phase is shaped by one risk, and like phase 09's it is not a technical one: an
+emotion model built somewhere else learns that a moment is a big smile, and delivers a
+Hindu ceremony as an empty gallery. So composure is a **positive** reading rather than the
+absence of one, in the four ceremony scenes it is weighted at or above a smile, three
+traditions raise it further, and the file that does all of that is a table a person can
+read with a written reason on every row.
+
+### Added
+
+- **`aura-brain-wedding::emotion`**: eight continuous readings per face from an aligned
+  crop; gaze measured from phase 06's eye landmarks rather than predicted; nine
+  interactions from the whole frame with a person-prior plane; a smoothed peak curve per
+  moment that refuses to name an apex when there is not one; reaction linking across
+  cameras inside a four-second window; and a nine-feature Bradley-Terry ranker whose
+  coefficients are a list somebody can argue with.
+- **Migration 10**: `image_interaction`, `face_expression`, `moment_peak`,
+  `reaction_links`, `emotion_preferences` and two coverage views. 733 bytes per image
+  against a 900-byte budget.
+- **`emotion_weights.toml`**: 22 scene rows, 5 tradition rows, 9 ranker coefficients and 2
+  calibration tables. The loader refuses eight things, including a row with no rationale
+  and a calibration map that would reorder frames.
+- **Two signed models**: `expression_head` (112 px crop, eight sigmoids, int8 forbidden)
+  and `interaction_head` (160 px frame in four planes, nine sigmoids, int8 permitted).
+  Both untrained; both carry cards that say so at the top.
+- **`MomentSignificance`**, the one cloud call this phase may make: six 768 px thumbnails,
+  anonymised role handles, at most 25 calls a wedding, and a validator that refuses a
+  reason containing any of twenty appearance or psychology words.
+- **The Emotion card and the moment browser**: face crops with eight bars each, interaction
+  chips, a three-state peak indicator and a reaction pair viewer. Seven IPC commands, five
+  of them reads.
+- **Five error codes** with runbooks, `AURA-ML-5038` to `AURA-ML-5042`, and two ADRs.
+- **`docs/emotion-and-moments.md`**, whose first section is titled "AURA describes
+  photographs. It does not read minds."
+
+### Changed
+
+- **Phase 09's third eye-intent rule now fires.** `IntegrityPass::with_emotion` fills
+  `IntentInput::tears` through `aura-core`'s frozen trait, so a tearful closed-eye
+  photograph carries `EYES_CLOSED_OK` instead of `EYES_CLOSED`. This closes condition C4 of
+  the phase 09 exit report; `analysis_ver` went from 1 to 2, which makes every stored
+  technical verdict pending so the background pass re-measures.
+- **The 112 px two-point face warp moved into `aura-vision`.** Phase 10's expression head
+  became its second consumer, and two copies of a warp is two crops that drift apart while
+  looking identical. Phase 09's 26 eval gates and 11 calibration tests pass unchanged.
+- `Interaction::from_str` is spelled `from_slug`, because a `from_str` that is not
+  `FromStr` is a method that gets called by accident.
+
+### Not built, deliberately
+
+Final selection is phase 12 and album sequencing is phase 29, so nothing here keeps,
+rejects, delivers or builds a gallery - `EmotionService::ranked` returns an *ordering*, the
+moment browser says "An ordering, not a shortlist" in its own header, and a test asserts no
+label in it says keep, reject, deliver or cull.
+
+Any claim about a person's inner emotional state is out of scope permanently. The twenty
+things this phase can say about a photograph are a closed list, call sites do not write
+sentences, and the cloud task's output has no field a description of somebody could go in.
+
+### Known limits
+
+Both heads are placeholders with the right architecture and no training, so every number in
+section 10.1 is measured against synthetic frames whose answer is painted into the pixels.
+The ranker is fitted on eight authored comparisons rather than ten thousand photographers'
+ones, and four of its nine coefficients are unidentifiable from that data and set by
+argument instead. Gaze is head direction rather than eye direction. The per-scene
+calibration ships as the identity. The four named peak kinds are derived from the scene and
+the interaction rather than trained. All five are in `docs/progress/PHASE-10-EXIT.md`
+section 5, and the first is a Sev 2 trigger.
+
 ## Phase 09 - Frame integrity: focus, motion, exposure, noise and eye state
 
 Every frame gets an honest technical verdict where it matters. Not "is this photograph
