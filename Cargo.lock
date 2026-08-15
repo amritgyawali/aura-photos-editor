@@ -82,6 +82,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-brain-photo"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-infer",
+ "aura-preview",
+ "aura-raw",
+ "aura-vision",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aura-brain-wedding"
 version = "0.1.0"
 dependencies = [
@@ -311,6 +330,7 @@ dependencies = [
 name = "aura-perf"
 version = "0.1.0"
 dependencies = [
+ "aura-brain-photo",
  "aura-brain-wedding",
  "aura-catalog",
  "aura-cloud",

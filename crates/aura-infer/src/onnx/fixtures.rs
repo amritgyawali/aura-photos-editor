@@ -1204,3 +1204,276 @@ pub fn ritual_sample_input(batch: usize) -> Tensor {
         data: samples,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-09. Two heads, and they are shaped by what the classical measures cannot
+// do rather than by what a bigger model could.
+//
+// Section 6.1: "a learned focus head trained on labelled sharp/soft crops handles
+// cases classical measures fail on: shallow depth of field, veil textures,
+// backlit rim light, heavy bokeh." Every one of those is a case where the
+// Laplacian variance is *right about the pixels and wrong about the photograph* -
+// a veil genuinely has less high-frequency energy than a jacket, and a lace
+// pattern genuinely has more than an in-focus cheek. So the head is a classifier
+// over three interpretations rather than a sharpness regressor: a regressor would
+// be asked to output a number the classical measure already produces, and would
+// learn to reproduce its mistakes.
+//
+// Section 6.4 puts the eye head on aligned crops with five classes plus a
+// confidence, and the five classes are the reason it is a model at all. Open
+// against closed is nearly separable with an eyelid-aperture heuristic; open
+// against *looking down* is not, and confusing those two is what destroys the
+// frames a wedding is sold on.
+// ---------------------------------------------------------------------------
+
+/// Name of the phase 09 focus head.
+pub const FOCUS_HEAD_MODEL: &str = "focus_head";
+/// Name of the phase 09 eye-state head.
+pub const EYE_STATE_MODEL: &str = "eye_state";
+
+/// Side of the single-channel crop the focus head reads.
+///
+/// Sixty-four, and small on purpose. The head is asked "is this crop sharp, soft,
+/// or deliberately out of focus", which is a question about the *character* of the
+/// edges rather than about their finest detail - and the classical measures in
+/// `aura_brain_photo::integrity::focus` are already computing the finest detail at
+/// full proxy resolution. A 64 px crop makes the head cheap enough to run on
+/// several regions of every frame inside section 11's 45 ms budget.
+pub const FOCUS_CROP_SIDE: usize = 64;
+
+/// How many interpretations the focus head emits: sharp, soft, bokeh.
+///
+/// **Slot 2 is what stops a shallow-depth-of-field portrait being called soft**,
+/// which is section 13's second acceptance criterion. A two-class head would have
+/// to put creamy background bokeh somewhere, and "soft" is the only place it
+/// could go.
+pub const FOCUS_CLASSES: usize = 3;
+
+/// Side of the aligned crop the eye head reads.
+///
+/// The same 112 px as the recogniser's, deliberately: `aura_vision::face::align`
+/// already produces exactly this crop once per face, and asking for a different
+/// size would mean a second warp per face for no gain.
+pub const EYE_CROP_SIDE: usize = FACE_CROP_SIDE;
+
+/// How many eye states the head emits.
+///
+/// `EyeOpenness::COUNT`, and the slot order **is** `EyeOpenness::ALL`: open,
+/// squint, closed, looking down, occluded. Renumbering that enum relabels a
+/// trained model, which is why the contract says so and this constant repeats it.
+pub const EYE_CLASSES: usize = 5;
+
+/// The focus head.
+///
+/// `crop [N, 1, 64, 64] -> focus_probs [N, 3]`, in the order sharp, soft, bokeh.
+///
+/// Single-channel, because focus is a luminance question: the analyser already has
+/// the luminance plane from `aura_vision::embed::descriptors::luma_plane` and a
+/// three-channel input would triple the first convolution to carry chroma the
+/// question does not use.
+///
+/// The softmax **is** in the graph, by the rule [`face_quality`] states: an
+/// activation belongs in a graph when it applies to every channel of a tensor, and
+/// in the decoder when it does not. Three mutually exclusive interpretations of one
+/// crop qualify.
+#[must_use]
+pub fn focus_head() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_F0C5_9EAD_0001);
+    let side = FOCUS_CROP_SIDE;
+
+    let graph = Graph {
+        name: FOCUS_HEAD_MODEL.to_string(),
+        nodes: vec![
+            // 64 -> 32
+            conv3("stem", &["crop", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 32 -> 16
+            pool2("pool", "stem_relu", "pool_out"),
+            // 16 -> 8
+            conv3("b1", &["pool_out", "b1_w", "b1_b"], &["b1_out"], 2),
+            node("Relu", "b1_act", &["b1_out"], &["b1_relu"]),
+            node("GlobalAveragePool", "gap", &["b1_relu"], &["gap_out"]),
+            with_int(
+                node("Flatten", "flatten", &["gap_out"], &["features"]),
+                "axis",
+                1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "trunk",
+                    &["features", "trunk_w", "trunk_b"],
+                    &["trunk_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "trunk_act", &["trunk_out"], &["trunk_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["trunk_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            with_int(
+                node("Softmax", "norm", &["logits"], &["focus_probs"]),
+                "axis",
+                -1,
+            ),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![16, 1, 3, 3], 0.26),
+            weights.tensor("stem_b", vec![16], 0.05),
+            weights.tensor("b1_w", vec![32, 16, 3, 3], 0.16),
+            weights.tensor("b1_b", vec![32], 0.05),
+            weights.tensor("trunk_w", vec![32, 32], 0.20),
+            weights.tensor("trunk_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![FOCUS_CLASSES, 32], 0.22),
+            weights.tensor("head_b", vec![FOCUS_CLASSES], 0.05),
+        ],
+        inputs: vec![dynamic_batch("crop", &[1, side, side])],
+        outputs: vec![dynamic_batch("focus_probs", &[FOCUS_CLASSES])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The eye-state head.
+///
+/// `crop [N, 3, 112, 112] -> eye_probs [N, 5]`, in `EyeOpenness::ALL` order.
+///
+/// Three-channel, unlike the focus head, and the reason is the class this head is
+/// most likely to get wrong: an eye behind a veil or a pair of sunglasses is an
+/// *occlusion*, and colour is most of what separates it from a closed eyelid.
+///
+/// The head deliberately does **not** emit an "intentional" slot. Whether a closure
+/// is intentional depends on the scene, the partner's eyes and the expression -
+/// none of which is in the crop - so it is decided in
+/// `aura_brain_photo::integrity::eyes` by rules a photographer signed off, and a
+/// model that appeared to answer it would be guessing with authority.
+#[must_use]
+pub fn eye_state() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_E7E5_7A7E_0001);
+    let side = EYE_CROP_SIDE;
+
+    let graph = Graph {
+        name: EYE_STATE_MODEL.to_string(),
+        nodes: vec![
+            // 112 -> 56
+            conv3("stem", &["crop", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 56 -> 28
+            pool2("pool", "stem_relu", "pool_out"),
+            // 28 -> 14
+            conv3("b1", &["pool_out", "b1_w", "b1_b"], &["b1_out"], 2),
+            node("Relu", "b1_act", &["b1_out"], &["b1_relu"]),
+            node("GlobalAveragePool", "gap", &["b1_relu"], &["gap_out"]),
+            with_int(
+                node("Flatten", "flatten", &["gap_out"], &["features"]),
+                "axis",
+                1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "trunk",
+                    &["features", "trunk_w", "trunk_b"],
+                    &["trunk_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "trunk_act", &["trunk_out"], &["trunk_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["trunk_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            with_int(
+                node("Softmax", "norm", &["logits"], &["eye_probs"]),
+                "axis",
+                -1,
+            ),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![16, 3, 3, 3], 0.24),
+            weights.tensor("stem_b", vec![16], 0.05),
+            weights.tensor("b1_w", vec![48, 16, 3, 3], 0.15),
+            weights.tensor("b1_b", vec![48], 0.05),
+            weights.tensor("trunk_w", vec![48, 48], 0.20),
+            weights.tensor("trunk_b", vec![48], 0.05),
+            weights.tensor("head_w", vec![EYE_CLASSES, 48], 0.22),
+            weights.tensor("head_b", vec![EYE_CLASSES], 0.05),
+        ],
+        inputs: vec![dynamic_batch("crop", &[3, side, side])],
+        outputs: vec![dynamic_batch("eye_probs", &[EYE_CLASSES])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// A deterministic batch of focus-head crops, for benchmarks and parity.
+///
+/// Alternating sharp and soft members: odd members are the same edge through a
+/// ramp, so a batching bug that reuses one member's tensor produces identical rows
+/// and is caught immediately.
+#[must_use]
+pub fn focus_sample_input(batch: usize) -> Tensor {
+    let side = FOCUS_CROP_SIDE;
+    let mut samples = Vec::with_capacity(batch * side * side);
+    for image in 0..batch {
+        let soft = image % 2 == 1;
+        let edge = (side / 3 + image) % side;
+        for row in 0..side {
+            for column in 0..side {
+                let value = if soft {
+                    // A four-pixel ramp across the edge, which is what soft is.
+                    let span = 4.0f32;
+                    let distance = column as f32 - edge as f32;
+                    let ramp = ((distance + span) / (2.0 * span)).clamp(0.0, 1.0);
+                    0.15 + 0.70 * ramp
+                } else if column >= edge {
+                    0.85
+                } else {
+                    0.15
+                };
+                // A little row-dependent texture so a global average does not collapse.
+                let texture = if row % 8 == 0 { 0.04 } else { 0.0 };
+                samples.push(value + texture);
+            }
+        }
+    }
+    Tensor {
+        shape: vec![batch, 1, side, side],
+        data: samples,
+    }
+}
+
+/// A deterministic batch of eye-head crops.
+///
+/// Reuses [`face_crop_sample_input`], because the eye head reads exactly the crop
+/// the recogniser reads and a second generator would be a second thing to keep in
+/// step.
+#[must_use]
+pub fn eye_sample_input(batch: usize) -> Tensor {
+    face_crop_sample_input(batch)
+}

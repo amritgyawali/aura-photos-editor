@@ -184,9 +184,18 @@ impl fmt::Display for Role {
 /// One face, as a subject reference.
 ///
 /// Deliberately small: a box, a quality, an identity and the numbers a ranking
-/// decision needs. Not a template, not a crop, not a landmark array. A phase that
-/// ranks subjects has no business holding biometric data, and this is the type that
-/// makes that structural rather than advisory.
+/// decision needs. Not a template, not a crop, and not the five-point landmark array a
+/// recogniser takes. A phase that ranks subjects has no business holding biometric
+/// data, and this is the type that makes that structural rather than advisory.
+///
+/// **PHASE-09 amendment.** [`FaceRef::bbox`] and [`FaceRef::eyes`] were added, and
+/// `docs/adr/ADR-0019-frame-integrity-and-eye-intent.md` section 3 records why. In
+/// short: the type's own doc comment already promised a box and did not carry one, and
+/// phase 09 cannot measure sharpness on an eye region or show a photographer the crop
+/// that caused a penalty without knowing where the face and the eyes are. Two eye
+/// points rather than five landmarks is the whole of the amendment - the nose and the
+/// mouth corners are what a *recogniser* needs, and keeping them out is what keeps the
+/// paragraph above true.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct FaceRef {
@@ -194,6 +203,17 @@ pub struct FaceRef {
     pub face_id: FaceId,
     /// Who it was assigned to, when it was assigned to anybody.
     pub identity_id: Option<IdentityId>,
+    /// Where the face is, normalised to the frame.
+    ///
+    /// The same rectangle type an evidence crop uses, deliberately: the crop phase 09
+    /// shows for a closed-eye penalty *is* this box, expanded for context.
+    pub bbox: crate::contract::integrity::CropRect,
+    /// Left and right eye centres, normalised to the frame, in that order.
+    ///
+    /// `[[0.0, 0.0], [0.0, 0.0]]` when the detector produced no landmarks, which a
+    /// caller must treat as "unknown" rather than "the top-left corner" - the eye
+    /// analysis skips such a face rather than measuring the wrong pixels.
+    pub eyes: [[f32; 2]; 2],
     /// Fraction of the frame the face covers, `0..1`.
     pub area_frac: f32,
     /// How central it is, `0..1`.
@@ -205,6 +225,25 @@ pub struct FaceRef {
     pub quality: f32,
     /// True when this face was good enough to vote on identity.
     pub votes: bool,
+}
+
+impl FaceRef {
+    /// True when the detector produced usable eye positions.
+    ///
+    /// Both points at the origin is the documented "unknown", and it is a real case: a
+    /// face found by the tiled pass at eleven pixels can have landmarks that collapse.
+    /// A caller that measures an eye region without asking this is measuring the frame's
+    /// top-left corner.
+    #[must_use]
+    pub fn has_eyes(&self) -> bool {
+        let flat = [
+            self.eyes[0][0],
+            self.eyes[0][1],
+            self.eyes[1][0],
+            self.eyes[1][1],
+        ];
+        flat.iter().any(|value| *value > f32::EPSILON)
+    }
 }
 
 /// Who matters at this wedding, and by how much.

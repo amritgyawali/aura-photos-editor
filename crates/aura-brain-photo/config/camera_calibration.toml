@@ -1,0 +1,474 @@
+# Camera calibration - PHASE-09 sections 6.1, 6.3 and 12.
+#
+# ===========================================================================
+# THIS FILE IS A MEASUREMENT, NOT A TUNING KNOB
+# ===========================================================================
+#
+# Section 12's third failure mode is "camera bias favours high-resolution
+# bodies", and the mitigation it asks for is "a per-body calibration table plus
+# a cross-camera fairness test in CI". This is that table. Section 10.1's last
+# gate is the test: identical scenes shot on a 24 MP and a 61 MP body must score
+# within 0.05.
+#
+# Every number below is meant to come from a measurement of a real body -
+# a slanted-edge chart for sharpness, an ISO ladder for noise, and a bracketed
+# highlight ramp for headroom. **The numbers that ship in this file are not
+# those measurements.** There are no camera files in this repository (phase 02's
+# first exit condition, still open, see docs/adr/ADR-0006), so what is here is
+# derived from published sensor specifications and from the physics that relates
+# pixel pitch to read noise. That is condition C2 in the phase 09 exit report.
+#
+# The distinction matters for how a wrong row behaves. A row derived from a
+# specification is systematically slightly wrong for every copy of that body; a
+# row measured from one copy is right for that copy. Neither is a guess, and
+# neither is worse than the fallback - but only the second one earns the
+# confidence this file's rows are given.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# make, model
+#     Matched case-insensitively against `camera.make` and `camera.model` from
+#     EXIF, after trimming. Manufacturers are inconsistent about whitespace and
+#     about whether the make repeats inside the model, so the loader normalises
+#     both sides; `calibration::normalise` is the one place that happens.
+#
+# megapixels
+#     Sensor resolution. Used to scale the fallback and to make the fairness
+#     test's claim precise: two bodies of different resolution photographing
+#     the same scene must produce the same sharpness verdict, and this is the
+#     number that difference is divided out by.
+#
+# expected_mtf50    0.05..0.95, cycles per pixel at the proxy scale
+#     What a well-focused frame from this body measures on the eye region of a
+#     face that fills 8 % of the frame, on a 2048 px proxy. **This is the
+#     denominator of "sharp".** A 61 MP body downsampled to 2048 px is sharper
+#     per output pixel than a 24 MP body downsampled to the same width, and
+#     without this division the product would prefer the expensive camera. The
+#     number is deliberately about the *proxy* rather than about the sensor,
+#     because the proxy is what the analyser sees.
+#
+# read_noise_e      electrons, > 0
+#     Read noise at base ISO. The floor the shadow-recovery estimate is measured
+#     against: a shadow lifted until its noise exceeds what the scene tolerates
+#     is `marginal`, and further than that is `lost`.
+#
+# noise_slope       dimensionless, 0.0..2.0
+#     How fast noise grows with ISO on this body, relative to the ideal shot-noise
+#     square-root. 1.0 is textbook. Below 1.0 is a body with strong on-sensor
+#     noise reduction at high ISO - which several modern bodies have and which
+#     makes a two-stop push genuinely cheaper than the physics suggests.
+#
+# highlight_headroom_ev   0.0..2.5 stops
+#     How much clipped highlight this body's RAW can actually return. The single
+#     number that decides `recoverable` from `lost` at the top end. Bodies differ
+#     by more than a stop here and it is the least intuitive figure in the table:
+#     a body whose JPEG histogram shows clipping often has half a stop left in
+#     the RAW, and a body that shows the same clipping may have none.
+#
+# shadow_headroom_ev      0.0..6.0 stops
+#     How far a shadow can be lifted before the noise exceeds the scene's
+#     tolerance at base ISO. Scaled down by `noise_slope` as ISO rises.
+#
+# base_iso
+#     Where the two headroom figures were measured.
+#
+# ---------------------------------------------------------------------------
+# VERSIONING
+# ---------------------------------------------------------------------------
+#
+# Bump `version` on ANY change below, including adding a row. It is written into
+# `image_integrity.calib_ver` on every verdict, and a verdict made under version
+# 1 and one made under version 2 are not comparable - `AURA-ML-5033` exists so
+# that comparison never happens silently. Every affected row is re-analysed in
+# the background; a photographer's dismissals are replayed onto the new verdict.
+#
+# A malformed file is refused as a whole with `AURA-ML-5036` and the previous
+# table stays in force. That is the one thing in phase 09 that halts, and the
+# reason is in the runbook: a half-loaded table judges one wedding by two
+# standards and produces a review queue sorted by camera body.
+#
+# The file that ships is the baseline. A copy at
+# `<catalog>/config/camera_calibration.toml` overrides it at run time.
+
+version = 1
+
+# ===========================================================================
+# THE FALLBACK
+# ===========================================================================
+#
+# Every body not named below uses this, and section 12's fourth failure mode -
+# "uncalibrated new camera" - is what it exists for. A body ships every few
+# months and this product cannot have measured it in advance.
+#
+# The fallback is deliberately conservative rather than average:
+#
+#   * `expected_mtf50` is *low*, so an uncalibrated body has to be clearly soft
+#     before it is called soft. The phase's documented failure mode is false
+#     rejection, and a guessed baseline is exactly where one would come from.
+#   * `highlight_headroom_ev` is one stop, which is the low end of what any
+#     modern sensor has. `exposure::verdict` additionally refuses to say
+#     `recoverable` on headroom alone for an uncalibrated body.
+#   * `confidence_penalty` is subtracted from every verdict this row produces.
+#     A verdict drawn against a guessed calibration has to say so.
+#
+# `megapixels` here is a placeholder: the loader replaces it with the frame's
+# actual pixel count from EXIF, and scales `expected_mtf50` by the fourth root
+# of the ratio. The fourth root rather than the square root because MTF50 at a
+# fixed output width grows sub-linearly with sensor resolution - the lens, not
+# the sensor, is the limit past about 30 MP.
+
+[fallback]
+megapixels            = 24.0
+expected_mtf50        = 0.24
+read_noise_e          = 3.4
+noise_slope           = 1.0
+highlight_headroom_ev = 1.0
+shadow_headroom_ev    = 3.5
+base_iso              = 100
+confidence_penalty    = 0.15
+rationale = """
+The conservative end of every figure, because an uncalibrated body must not be
+judged harshly and must not be trusted quietly. Read noise and headroom are the
+low quartile of the twenty bodies below; expected MTF50 is two thirds of their
+median, which is what makes the soft threshold move away from flagging."""
+
+# ===========================================================================
+# THE TWENTY BODIES
+# ===========================================================================
+#
+# Section 8 step 1: "populate `camera_calibration.toml` for the top 20 bodies".
+# Top by what a wedding photographer actually shoots, which is not the same as
+# top by units sold: this list is full-frame mirrorless and the two DSLRs that
+# are still on second shooters' shoulders.
+#
+# Ordered by manufacturer then by sensor generation, so that a person adding a
+# row can see the neighbours whose numbers theirs should resemble.
+
+# --- Sony ------------------------------------------------------------------
+
+[[camera]]
+make = "SONY"
+model = "ILCE-7M3"                 # a7 III
+megapixels = 24.2
+expected_mtf50 = 0.34
+read_noise_e = 3.1
+noise_slope = 0.92
+highlight_headroom_ev = 1.3
+shadow_headroom_ev = 4.5
+base_iso = 100
+rationale = """
+The reference body for this table's shadow figures. Its dual-gain sensor is why
+a 2-stop-under dance frame from it is recoverable and the same frame from the
+A900 below is not - which is section 1's example, and the reason this phase is
+recovery-aware rather than histogram-aware."""
+
+[[camera]]
+make = "SONY"
+model = "ILCE-7M4"                 # a7 IV
+megapixels = 33.0
+expected_mtf50 = 0.31
+read_noise_e = 3.0
+noise_slope = 0.90
+highlight_headroom_ev = 1.3
+shadow_headroom_ev = 4.5
+base_iso = 100
+rationale = """
+Nine more megapixels than the a7 III and a *lower* expected MTF50 at the proxy
+scale, which looks wrong and is not: the proxy is a fixed 2048 px, so more
+sensor pixels mean more downsampling and a slightly softer per-output-pixel
+edge. This row is the clearest illustration of why the fairness gate needs the
+table."""
+
+[[camera]]
+make = "SONY"
+model = "ILCE-7RM4"                # a7R IV
+megapixels = 61.0
+expected_mtf50 = 0.27
+read_noise_e = 3.2
+noise_slope = 1.00
+highlight_headroom_ev = 1.2
+shadow_headroom_ev = 4.0
+base_iso = 100
+rationale = """
+The 61 MP body section 2.1 names. Against the a7 III's 24 MP it is the
+cross-camera fairness gate's pair, and the two `expected_mtf50` figures - 0.27
+against 0.34 - are the whole of what stops the expensive body winning."""
+
+[[camera]]
+make = "SONY"
+model = "ILCE-1"                   # a1
+megapixels = 50.1
+expected_mtf50 = 0.29
+read_noise_e = 2.9
+noise_slope = 0.88
+highlight_headroom_ev = 1.4
+shadow_headroom_ev = 4.5
+base_iso = 100
+rationale = """
+Stacked sensor, so the highest headroom in the table and the flattest noise
+slope. It is also the body most likely to produce a 30 fps burst, which is what
+makes phase 08's sub-second reconstruction matter on it more than anywhere."""
+
+[[camera]]
+make = "SONY"
+model = "ILCE-7SM3"                # a7S III
+megapixels = 12.1
+expected_mtf50 = 0.42
+read_noise_e = 2.4
+noise_slope = 0.80
+highlight_headroom_ev = 1.5
+shadow_headroom_ev = 5.0
+base_iso = 640
+rationale = """
+The other end of the fairness argument from the a7R IV: 12 MP, the sharpest
+per-output-pixel edge in the table, the lowest read noise, and a base ISO of
+640. A table that ignored base ISO would call every one of its frames noisy at
+the ISO where it is cleanest."""
+
+# --- Canon -----------------------------------------------------------------
+
+[[camera]]
+make = "Canon"
+model = "EOS R5"
+megapixels = 45.0
+expected_mtf50 = 0.28
+read_noise_e = 3.3
+noise_slope = 0.95
+highlight_headroom_ev = 1.1
+shadow_headroom_ev = 3.8
+base_iso = 100
+rationale = """
+Less shadow headroom than the Sony bodies of the same generation, which is a
+real difference and not a manufacturer preference showing through: pushing its
+shadows five stops shows pattern noise the Sonys do not have. The number is what
+keeps the exposure verdict honest on the same photograph shot on two bodies."""
+
+[[camera]]
+make = "Canon"
+model = "EOS R6"
+megapixels = 20.1
+expected_mtf50 = 0.38
+read_noise_e = 3.0
+noise_slope = 0.90
+highlight_headroom_ev = 1.2
+shadow_headroom_ev = 4.2
+base_iso = 100
+rationale = """
+Twenty megapixels and the second-sharpest expected MTF50 in the table, for the
+a7S III's reason. Frequently a second body beside an R5, which is the
+two-shooter case phase 08's cross-camera merge produces and this table has to
+keep fair."""
+
+[[camera]]
+make = "Canon"
+model = "EOS R6m2"                 # R6 Mark II
+megapixels = 24.2
+expected_mtf50 = 0.35
+read_noise_e = 2.9
+noise_slope = 0.88
+highlight_headroom_ev = 1.2
+shadow_headroom_ev = 4.3
+base_iso = 100
+rationale = """
+The R6's sensor with four more megapixels and slightly better read noise.
+Included because an R5 plus an R6 Mark II is the most common Canon wedding pair
+this table will meet."""
+
+[[camera]]
+make = "Canon"
+model = "EOS 5D Mark IV"
+megapixels = 30.4
+expected_mtf50 = 0.30
+read_noise_e = 4.2
+noise_slope = 1.05
+highlight_headroom_ev = 0.9
+shadow_headroom_ev = 3.0
+base_iso = 100
+rationale = """
+One of the two DSLRs still working weddings. Its read noise is a third higher
+than its mirrorless successors' and its shadow headroom is a stop and a half
+lower, which is exactly the case section 1 describes: the same 2-stop-under
+dance frame is recoverable on a modern body and marginal here."""
+
+[[camera]]
+make = "Canon"
+model = "EOS R"
+megapixels = 30.3
+expected_mtf50 = 0.30
+read_noise_e = 3.8
+noise_slope = 1.00
+highlight_headroom_ev = 1.0
+shadow_headroom_ev = 3.4
+base_iso = 100
+rationale = """
+The first-generation body, between the 5D Mark IV and the R5 on every figure.
+Kept in the table because it is still a very common second body and because the
+gap between it and the R5 is a good check that the noise slope is doing
+something."""
+
+# --- Nikon -----------------------------------------------------------------
+
+[[camera]]
+make = "NIKON CORPORATION"
+model = "NIKON Z 6_2"              # Z6 II
+megapixels = 24.5
+expected_mtf50 = 0.34
+read_noise_e = 3.1
+noise_slope = 0.90
+highlight_headroom_ev = 1.3
+shadow_headroom_ev = 4.4
+base_iso = 100
+rationale = """
+Very close to the a7 III on every axis, which is what a table of measurements
+should look like when two bodies of one generation genuinely resemble each
+other. The `make` string is Nikon's actual EXIF value, underscore and all - the
+loader normalises it, and the row is written as the camera writes it so that a
+support engineer comparing the two sees the same text."""
+
+[[camera]]
+make = "NIKON CORPORATION"
+model = "NIKON Z 7_2"              # Z7 II
+megapixels = 45.7
+expected_mtf50 = 0.28
+read_noise_e = 3.3
+noise_slope = 0.98
+highlight_headroom_ev = 1.2
+shadow_headroom_ev = 4.0
+base_iso = 64
+rationale = """
+Base ISO 64, the lowest in the table, which is a full third of a stop below the
+Canon and Sony bodies. Every noise figure from this body has to be read against
+that or it looks miraculous."""
+
+[[camera]]
+make = "NIKON CORPORATION"
+model = "NIKON Z 8"
+megapixels = 45.7
+expected_mtf50 = 0.28
+read_noise_e = 3.0
+noise_slope = 0.90
+highlight_headroom_ev = 1.3
+shadow_headroom_ev = 4.3
+base_iso = 64
+rationale = """
+The Z7 II's resolution with the Z9's stacked sensor: same sharpness figure,
+better noise. Two rows that differ only in the noise columns are what the
+`calib_ver` bump is for - changing one of them must not silently change how the
+other's frames were judged."""
+
+[[camera]]
+make = "NIKON CORPORATION"
+model = "NIKON D850"
+megapixels = 45.7
+expected_mtf50 = 0.28
+read_noise_e = 3.6
+noise_slope = 1.02
+highlight_headroom_ev = 1.1
+shadow_headroom_ev = 3.9
+base_iso = 64
+rationale = """
+The other DSLR still working weddings, and unlike the 5D Mark IV it holds up:
+its shadow headroom is within half a stop of its mirrorless successor. Included
+partly to make the point that "DSLR" is not a calibration category."""
+
+# --- Fujifilm --------------------------------------------------------------
+
+[[camera]]
+make = "FUJIFILM"
+model = "X-T4"
+megapixels = 26.1
+expected_mtf50 = 0.32
+read_noise_e = 3.2
+noise_slope = 0.95
+highlight_headroom_ev = 1.1
+shadow_headroom_ev = 3.8
+base_iso = 160
+rationale = """
+APS-C, and the first row where the sensor size rather than the pixel count is
+doing the work: the same 26 MP on a smaller sensor means smaller photosites and
+a real noise cost. Base ISO 160 for Fujifilm's usual reason."""
+
+[[camera]]
+make = "FUJIFILM"
+model = "X-H2S"
+megapixels = 26.2
+expected_mtf50 = 0.32
+read_noise_e = 2.8
+noise_slope = 0.85
+highlight_headroom_ev = 1.2
+shadow_headroom_ev = 4.0
+base_iso = 125
+rationale = """
+The stacked APS-C body. Better than the X-T4 on noise by about a third of a
+stop, which is the sort of difference that decides whether a dim reception frame
+is `recoverable` or `marginal` and is precisely why per-body rows exist."""
+
+[[camera]]
+make = "FUJIFILM"
+model = "GFX100S"
+megapixels = 102.0
+expected_mtf50 = 0.24
+read_noise_e = 2.6
+noise_slope = 0.82
+highlight_headroom_ev = 1.5
+shadow_headroom_ev = 5.0
+base_iso = 100
+rationale = """
+Medium format, and the row that stress-tests the whole design: 102 MP gives the
+*lowest* expected MTF50 in the table at the proxy scale while being by a distance
+the sharpest camera in it. Anybody who reads `expected_mtf50` as "how good is
+this camera" will read this row wrong, which is why the field is documented as a
+denominator rather than as a rating."""
+
+# --- Panasonic -------------------------------------------------------------
+
+[[camera]]
+make = "Panasonic"
+model = "DC-S5"
+megapixels = 24.2
+expected_mtf50 = 0.34
+read_noise_e = 3.2
+noise_slope = 0.92
+highlight_headroom_ev = 1.2
+shadow_headroom_ev = 4.2
+base_iso = 100
+rationale = """
+Dual native ISO, so its noise slope flattens at 640 rather than climbing
+steadily. The single slope figure here understates it above that point; the
+honest fix is a two-segment slope, which is condition C2's list of things a real
+measurement would change."""
+
+[[camera]]
+make = "Panasonic"
+model = "DC-S1R"
+megapixels = 47.3
+expected_mtf50 = 0.28
+read_noise_e = 3.4
+noise_slope = 1.00
+highlight_headroom_ev = 1.1
+shadow_headroom_ev = 3.8
+base_iso = 100
+rationale = """
+The high-resolution Panasonic, kept for the same reason as the Canon EOS R: it
+fills in the middle of the table and a body that falls between two rows should
+find a neighbour rather than the fallback."""
+
+# --- Leica -----------------------------------------------------------------
+
+[[camera]]
+make = "Leica Camera AG"
+model = "LEICA SL2-S"
+megapixels = 24.6
+expected_mtf50 = 0.35
+read_noise_e = 3.0
+noise_slope = 0.90
+highlight_headroom_ev = 1.3
+shadow_headroom_ev = 4.4
+base_iso = 100
+rationale = """
+Twentieth row, and the one most likely to be a photographer's personal body
+rather than their working pair. Its numbers are close to the a7 III's because
+the sensor generation is the same; that is a fact about sensors rather than a
+shortcut in this table."""

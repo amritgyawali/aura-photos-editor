@@ -40,6 +40,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use aura_core::clock::Clock;
+use aura_core::contract::integrity::CropRect;
 use aura_core::contract::people::{FaceRef, ImageSubjects, PeopleService, Role, SubjectHierarchy};
 use aura_core::{AuraError, AuraResult, FaceId, IdentityId, PhotoId, ProjectId};
 use aura_vision::face::cluster::{self, ClusterConfig, ClusterFace};
@@ -543,6 +544,15 @@ impl People {
                     reference: FaceRef {
                         face_id: face.face_id,
                         identity_id: face.identity_id,
+                        // PHASE-09 amendment (ADR-0019 section 3). The geometry was
+                        // already in the row; only the contract lacked it.
+                        bbox: CropRect {
+                            x: face.bbox.x,
+                            y: face.bbox.y,
+                            w: face.bbox.w,
+                            h: face.bbox.h,
+                        },
+                        eyes: [face.landmarks[0], face.landmarks[1]],
                         area_frac: face.area_frac,
                         centrality: face.centrality,
                         sharpness: face.sharpness,

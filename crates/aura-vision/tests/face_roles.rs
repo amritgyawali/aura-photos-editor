@@ -13,6 +13,7 @@
 
 use std::collections::BTreeMap;
 
+use aura_core::contract::integrity::CropRect;
 use aura_core::contract::people::{FaceRef, Role, SubjectHierarchy};
 use aura_core::{FaceId, IdentityId};
 use aura_vision::face::align::Pose;
@@ -370,6 +371,16 @@ fn face(identity: Option<IdentityId>, area: f32, centrality: f32, sharpness: f32
         reference: FaceRef {
             face_id: FaceId::new(),
             identity_id: identity,
+            // Prominence does not read the geometry; these are here because the
+            // PHASE-09 amendment made them fields rather than because this test needs
+            // them. A centred box of the right area is the honest filler.
+            bbox: CropRect {
+                x: 0.5 - area.sqrt() / 2.0,
+                y: 0.5 - area.sqrt() / 2.0,
+                w: area.sqrt(),
+                h: area.sqrt(),
+            },
+            eyes: [[0.45, 0.45], [0.55, 0.45]],
             area_frac: area,
             centrality,
             sharpness,

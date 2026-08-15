@@ -261,6 +261,54 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::no_int8(),
             },
         ),
+        // PHASE-09. Two heads, and both of them exist for cases where a classical
+        // measurement is right about the pixels and wrong about the photograph.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::FOCUS_HEAD_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "multiclass",
+                class: ModelClass::Embedding,
+                model: fixtures::focus_head(),
+                input: Placeholder::grey(fixtures::FOCUS_CROP_SIDE),
+                output: BTreeMap::from([(
+                    "focus_probs".to_string(),
+                    vec![1, fixtures::FOCUS_CLASSES],
+                )]),
+                // int8 is allowed, and this is the first head in the product where
+                // it is allowed on a softmax. Three classes over a 64 px crop is a
+                // coarse question - sharp, soft, deliberately out of focus - and the
+                // decision it feeds is deliberately asymmetric: `focus::apply_head`
+                // lets the head *withdraw* a softness claim at 0.70 confidence and
+                // never lets it make one. Quantisation noise around a threshold that
+                // can only ever exonerate a photograph costs nothing a photographer
+                // would see, and this head runs on several regions of every frame.
+                precision_policy: PrecisionPolicy::permissive(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::EYE_STATE_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "multiclass",
+                class: ModelClass::Embedding,
+                model: fixtures::eye_state(),
+                input: Placeholder::image(fixtures::EYE_CROP_SIDE),
+                output: BTreeMap::from([(
+                    "eye_probs".to_string(),
+                    vec![1, fixtures::EYE_CLASSES],
+                )]),
+                // int8 is forbidden, and the contrast with the focus head above is
+                // the point. This head *can* convict a photograph: a confident
+                // `closed` on a gating face raises `EYES_CLOSED`, and section 12's
+                // first failure mode is that false rejections destroy trust
+                // instantly. `eyes::ACT_ON_CLOSED` is 0.55, so the decision lives
+                // exactly where per-tensor int8 has least resolution.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {
@@ -332,6 +380,20 @@ impl Placeholder {
             layout: "NCHW".to_string(),
             range: "0..1".to_string(),
             colour: "srgb".to_string(),
+        }
+    }
+
+    /// The input spec for a single-channel image model at `side` pixels.
+    ///
+    /// PHASE-09's focus head. One channel because focus is a luminance question and
+    /// the analyser already holds the luminance plane; a three-channel input would
+    /// triple the first convolution to carry chroma the question does not use.
+    fn grey(side: usize) -> InputSpec {
+        InputSpec {
+            shape: vec![1, 1, side, side],
+            layout: "NCHW".to_string(),
+            range: "0..1".to_string(),
+            colour: "luma".to_string(),
         }
     }
 

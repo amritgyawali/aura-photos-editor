@@ -420,6 +420,109 @@
         "require_fp32": false
       },
       "opset": 13
+    },
+    {
+      "name": "focus_head",
+      "version": "1.0.0",
+      "task": "multiclass",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          1,
+          64,
+          64
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "luma"
+      },
+      "output": {
+        "focus_probs": [
+          1,
+          3
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "focus_head_1.0.0.fp32.onnx",
+          "sha256": "6853d30592388dd85a93e607621cf02ba1ba56840885103318f60c5ad7579f77",
+          "bytes": 24781
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "focus_head_1.0.0.fp16.onnx",
+          "sha256": "238dd1ed730bd0f207352d4dced53016b3b6cbead7b45636d1ed2c7550e8438f",
+          "bytes": 24781
+        },
+        {
+          "ep": "cpu",
+          "precision": "int8",
+          "file": "focus_head_1.0.0.int8.onnx",
+          "sha256": "91eef43b7506f8d57cec9fbd83fa923abc5f433d6cffa0c54e50d66bcb5dc8b4",
+          "bytes": 24781
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/focus_head.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": false,
+        "require_fp32": false
+      },
+      "opset": 13
+    },
+    {
+      "name": "eye_state",
+      "version": "1.0.0",
+      "task": "multiclass",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          3,
+          112,
+          112
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "srgb"
+      },
+      "output": {
+        "eye_probs": [
+          1,
+          5
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "eye_state_1.0.0.fp32.onnx",
+          "sha256": "ff3f2b4e7861f40998461249cb7eabb7335c6772b3649343a803913369939558",
+          "bytes": 40976
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "eye_state_1.0.0.fp16.onnx",
+          "sha256": "bb7dc388c1b0e8c2b66471b22b2ff5acad4d1d14076cee2b3fddb637c8c5102f",
+          "bytes": 40976
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/eye_state.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
     }
   ]
 }
