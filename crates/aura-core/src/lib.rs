@@ -27,6 +27,7 @@ pub mod clock;
 /// Frozen contracts. Changing anything in here requires an ADR.
 pub mod contract {
     pub mod consent;
+    pub mod emotion;
     pub mod error;
     pub mod ids;
     pub mod integrity;
@@ -51,6 +52,10 @@ pub mod paths;
 pub mod progress;
 pub mod redact;
 
+pub use contract::emotion::{
+    EmotionCode, EmotionOutline, EmotionReason, EmotionService, FaceExpression, GazeTarget,
+    ImageEmotion, Interaction, MomentPeak, PeakKind, Preference, ReactionLink,
+};
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
 pub use contract::ids::{
     ContentHash, FaceId, FileId, IdentityId, ImportId, MomentId, PhotoId, ProjectId, RunId,

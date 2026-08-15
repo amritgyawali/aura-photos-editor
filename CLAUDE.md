@@ -50,6 +50,10 @@ Never load two phase files into one session.
 | Camera calibration (versioned, COL-owned) | `crates/aura-brain-photo/config/camera_calibration.toml` |
 | Integrity evaluation gates | `tests/eval/integrity_eval.rs` + `ml/models/integrity/eval_integrity.py` |
 | What the technical marks mean | `docs/frame-integrity.md` |
+| Emotion and moment decisions | `docs/adr/ADR-0021-emotion-taxonomy-and-moment-ranking.md` |
+| Emotion weights (versioned, PM-owned) | `crates/aura-brain-wedding/config/emotion_weights.toml` |
+| Emotion evaluation gates | `tests/eval/emotion_eval.rs` + `ml/models/emotion/eval_emotion.py` |
+| What the emotion marks mean | `docs/emotion-and-moments.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -59,6 +63,10 @@ Never load two phase files into one session.
 - Every crate root carries the lint block, including `#![forbid(unsafe_code)]`.
 - `aura-core` depends on no other workspace crate; a test asserts it.
 - Changing a frozen contract requires an ADR and a re-lock, in that order.
+- **Every phase ends with a commit and a push**, on its own `feat/phase-NN-<slug>` branch,
+  without being asked. Step 9 of the ritual in `docs/plan/CLAUDE.md`. The gate exits 0, the
+  exit report is written, and then it is pushed - because until it is, the whole phase
+  exists on exactly one disk.
 
 ## Building on this machine
 
@@ -249,6 +257,75 @@ catalog full of English cannot be translated), two indexes that served no query 
 removed after being measured, `face_eye_state` is `WITHOUT ROWID` with no `photo_id`, and
 the eye rows read their geometry from `faces` rather than copying it. Together those took
 the figure from 1,855 bytes per image to exactly 1,024 against a 1 KB budget.
+
+Phase 10 is implemented: `aura-core::contract::emotion` (the frozen `GazeTarget`,
+`Interaction`, `FaceExpression`, `EmotionCode`, `EmotionReason`, `PeakKind`, `MomentPeak`,
+`ReactionLink`, `ImageEmotion`, `Preference`, `EmotionOutline` and `EmotionService`),
+`aura-brain-wedding::emotion` (eight continuous readings per face from the aligned crop
+phases 06 and 09 already produce, gaze measured from phase 06's eye landmarks rather than
+predicted, nine interactions from the whole frame with a person-prior *plane*, a smoothed
+peak curve that refuses to name an apex when there is not one, reaction linking across
+cameras inside a four-second window, and a nine-feature Bradley-Terry ranker whose
+coefficients are a list a product manager can argue with), migration 10, 22 scene rows and
+5 tradition rows in editable config, two signed models with cards, the `MomentSignificance`
+cloud task, the emotion IPC surface (ADR-0022) with its Emotion card and moment browser,
+and `aura-cli verify --phase 10` as the gate. Its exit report is
+`docs/progress/PHASE-10-EXIT.md`.
+
+**The two shipped heads are placeholders.** The expression head's eight sigmoids over a
+real face describe a random projection of it, and the interaction head says nothing about
+what two people are doing. Every gate in section 10.1 is measured against synthetic frames
+whose answer is *painted into the pixels* and read back through the real warp, which proves
+the algorithms and says nothing about the weights. That is condition C1 in the phase 10
+exit report and it is a Sev 2 trigger. A second and different gap is condition C2: the
+ranker is fitted on eight authored comparisons rather than the ten thousand photographer
+comparisons section 9 asks for, **four of its nine coefficients are unidentifiable from
+that data** and are set by argument, and section 13's blind agreement study does not exist.
+
+Two mitigations are structural rather than promised: **a missing head is visible rather
+than silent** - `EmotionCode::NoFaces`, a confidence capped at 0.55 and
+`EmotionOutline::face_aware` at zero - and **nothing in this phase can cull**, so an
+untrained head produces a wrong ordering rather than a wrong deletion.
+
+Phase 10 **closes phase 09's condition C4**. `IntegrityPass::with_emotion` fills
+`IntentInput::tears` through `aura-core`'s frozen `EmotionService`, so a tearful
+closed-eye photograph now carries `EYES_CLOSED_OK`. The dependency runs through the trait
+and not through a crate: `aura-brain-photo` and `aura-brain-wedding` depend on each other
+in **neither** direction, which is what keeps "no phase may keep its own blink detector"
+and "no phase may keep its own expression model" from becoming a cycle. Phase 09's
+`ANALYSIS_VER` went 1 → 2 so every stored verdict is re-measured.
+
+Phase 10 also moved the 112 px two-point face warp into `aura-vision` when it became its
+second consumer. Two copies of a warp is two crops that drift apart while looking
+identical; phase 09's 26 eval gates and 11 calibration tests pass unchanged after the move.
+
+Five rules that phase 10 added and every later phase inherits:
+
+- **`EmotionService` is the only way to ask what a photograph is worth.** No phase may keep
+  its own expression model, its own idea of a peak or its own reaction linking. Sixth
+  phase, sixth time: two answers to "which of these six frames is the one" is two galleries
+  that disagree.
+- **A score is evidence; the deciding phase owns the cull - and an *ordering* is still
+  evidence.** This is the hardest version of the rule so far. Phase 09 produced a number
+  that looked like a verdict; this produces a *sorted list*, which is one button away from a
+  shortlist. `MomentBrowser` says "An ordering, not a shortlist" in its own header and a
+  test asserts no label in it says keep, reject, deliver or cull.
+- **Three version columns, and a fourth was deliberately not added.** `model_ver`
+  invalidates every reading, `analysis_ver` the gaze, the peaks and the links, `weights_ver`
+  the score. The ranker's coefficients ship *inside* `emotion_weights.toml` so one number
+  invalidates the score - phase 09's rule read in the direction that removes a column.
+  `AURA-ML-5038` is the sixth version-drift code.
+- **Report coverage, and say what the denominator is.** `EmotionOutline::coverage` is
+  measured against **every photograph**, as phase 09's is. `face_aware` is the second
+  number and it is the one that matters when it is low: seven of the nine ranker features
+  come from faces, so a wedding at 3 % face-aware has been ranked on very nearly nothing.
+- **A weight table is a product decision and needs a written reason per row.** Third config
+  file in `aura-brain-wedding` to enforce it and the one where it matters most:
+  `emotion_weights.toml` is where the product decides that a composed Hindu ceremony is not
+  an empty gallery, and a threshold nobody can explain there is a cultural failure waiting
+  to be shipped. **In the four ceremony scenes composure is weighted at or above a smile**,
+  three traditions raise it further, and two tests plus the gate check it in every scene
+  rather than in the two the phase document names.
 
 Five rules that phase 09 added and every later phase inherits:
 

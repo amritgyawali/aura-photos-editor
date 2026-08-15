@@ -1,0 +1,694 @@
+# Emotion weights - PHASE-10 sections 6.1 and 6.4.
+#
+# ===========================================================================
+# THIS FILE IS A PRODUCT DECISION, AND IT IS THE MOST CONSEQUENTIAL ONE
+# ===========================================================================
+#
+# Section 9 gives `PM` this file by name: "own `emotion_weights.toml`, approve
+# the cultural rules, define the 'no psychological claims' policy". It is not a
+# tuning file that happens to be in config. It is where the product decides
+# **what counts as a moment**, and section 12's first failure mode is what
+# happens when that decision is made by whoever wrote the scoring function:
+#
+#   > Cultural bias toward Western expressiveness.
+#
+# A model trained on "delivered vs rejected" from a Western dataset learns that
+# a moment is a big smile. Run over a Hindu ceremony, where the couple are
+# composed by convention for two hours, it delivers an empty gallery and the
+# photographer concludes the product does not understand their work. That is
+# not a subtle failure and it is not recoverable by an apology.
+#
+# The defence is three things, and all three are in this file:
+#
+#   1. `composed` is a POSITIVE channel with real weight, not a fallback for
+#      "no expression detected".
+#   2. Weights are per scene, so the ceremony is not judged by the dance
+#      floor's standard.
+#   3. Weights are per tradition on top of that, so a Hindu ceremony is not
+#      judged by a Christian one's.
+#
+# Section 10.1's composure-fairness gate measures that it works:
+#
+#   > in ritual/vows fixtures, composed frames are not systematically ranked
+#   > below smiling frames.
+#
+# `tests/eval/emotion_eval.rs` asserts it against every scene in the
+# vocabulary, and it fails if this file is edited in a way that breaks it.
+#
+# ---------------------------------------------------------------------------
+# WHY THE WEIGHTS, THE RANKER AND THE CALIBRATION ARE ONE FILE
+# ---------------------------------------------------------------------------
+#
+# Because all three invalidate exactly the same thing: `emotion_score`, and
+# nothing else. Splitting them into three files would mean three version
+# columns on `image_interaction` that always move together, and phase 09's
+# third inherited rule - "three version columns, because they invalidate three
+# different things" - read in the direction that removes a column rather than
+# adding one. ADR-0021 section 4.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# THE EIGHT CHANNEL WEIGHTS       0..2, and 1.0 is "count this normally"
+#
+#   smile genuineness laughter tears surprise tenderness composed discomfort
+#
+#     They multiply the eight channels of `FaceExpression` before the faces are
+#     combined into one frame-level expression term. `discomfort` is subtracted
+#     rather than added - the weight is its magnitude - and it is the only one
+#     of the eight that can lower a score.
+#
+#     `genuineness` is a MULTIPLIER on `smile` rather than a term of its own,
+#     which is why a posed family portrait can set it near zero without making
+#     every smile in the frame worth nothing. See `[scene.family_portrait]`.
+#
+# THE FOUR TERM WEIGHTS           0..2
+#
+#   interaction   how much a detected hug/kiss/toast is worth here
+#   peak          how much being the strongest frame of its moment is worth
+#   reaction      how much being somebody's reaction is worth
+#   mutual_gaze   how much two people looking at each other is worth
+#
+# TRADITION MULTIPLIERS           0..2, applied ON TOP of the scene weights
+#
+#     Only the three channels that actually differ by tradition are settable:
+#     `smile`, `laughter` and `composed`. Not because the others are the same
+#     everywhere, but because nobody here has evidence about the others, and a
+#     weight invented without evidence is worse than no weight - it looks like
+#     a finding.
+#
+#     The tradition comes from phase 07's ritual head. A wedding with no
+#     tradition detected gets no multipliers, which is the neutral case and not
+#     a Western default: `[default]` is set from the balanced fixture set, not
+#     from the Christian one.
+#
+# THE RANKER                      -8..8 per coefficient
+#
+#     Section 6.4: "fit a Bradley-Terry ranker over model features". A
+#     Bradley-Terry model with a linear utility says
+#
+#         P(a beats b) = sigmoid(u(a) - u(b)),  u(x) = w . f(x)
+#
+#     so the utility IS the score, up to the calibration below, and the nine
+#     coefficients here are that `w`. They come from
+#     `ml/models/emotion/train_ranker.py` fitted on the fixture comparisons -
+#     see "What these numbers are and are not" at the bottom of this file.
+#
+# THE CALIBRATION                 per scene, monotone, optional
+#
+#     Section 6.4's per-scene isotonic regression, which is what makes 0.8 mean
+#     the same thing in a ceremony and on a dance floor - and therefore what
+#     makes `emotion_score` comparable with phase 09's `technical_score` in
+#     phase 12. `x` and `y` must be the same length, both non-decreasing, both
+#     inside 0..1. A missing scene is the identity map.
+#
+# ---------------------------------------------------------------------------
+# VERSIONING
+# ---------------------------------------------------------------------------
+#
+# Bump `version` on ANY change below. It is written into
+# `image_interaction.weights_ver` on every row, and a score made under version 1
+# and one made under version 2 are not comparable - `AURA-ML-5038` exists so
+# that comparison never happens silently. A photographer who chose a moment's
+# peak frame under version 1 keeps it: `moment_peak.user_chosen` outranks every
+# number in this file.
+#
+# Every table below needs a `rationale`. The loader refuses one without it,
+# with `AURA-ML-5039`, for the reason `scene_profiles.toml` and
+# `moment_profiles.toml` both give: a weight nobody can explain is a magic
+# number, and somebody who cannot write a sentence saying why a photographer
+# would agree has not finished deciding it. The friction is the point, and it is
+# worth more here than in either of the other two files.
+#
+# The file that ships is the baseline. A copy at
+# `<catalog>/config/emotion_weights.toml` overrides it at run time.
+
+version = 1
+
+# ===========================================================================
+# THE DEFAULT
+# ===========================================================================
+#
+# Every scene not named below uses this, including `unknown` - which is what a
+# wedding with no scene pass gets for every frame. So the default has to be a
+# defensible way to rank a whole wedding on its own, not a placeholder.
+
+[default]
+rationale = """
+A candid wedding frame is worth delivering when somebody in it is doing \
+something: laughing, crying, holding on to somebody. Laughter is weighted \
+above a smile because a smile is the resting state of a photographed face and \
+a laugh is not. Composure sits at 0.55 rather than at zero because a quiet \
+frame of somebody watching is a photograph, and every version of this table \
+that set it lower produced galleries a photographer described as shouty.
+"""
+smile = 0.85
+genuineness = 0.90
+laughter = 1.15
+tears = 1.10
+surprise = 0.80
+tenderness = 1.00
+composed = 0.55
+discomfort = 0.70
+interaction = 1.00
+peak = 1.00
+reaction = 1.00
+mutual_gaze = 0.90
+
+# ===========================================================================
+# GETTING READY
+# ===========================================================================
+
+[scene.getting_ready_bride]
+rationale = """
+Getting ready is anticipation and small private moments: a mother fastening a \
+button, somebody laughing at nothing. Laughter and tenderness carry it. \
+Interactions are weighted up because the ones that occur here - a hug, tears \
+being wiped - are the whole point of the chapter, and a detected one is rarely \
+a false positive in a small room with four people in it.
+"""
+laughter = 1.25
+tenderness = 1.20
+tears = 1.20
+composed = 0.60
+interaction = 1.20
+
+[scene.getting_ready_groom]
+rationale = """
+The same chapter and the same weights. Split into two scenes by phase 07 \
+because the rooms are different, not because the photography is, and giving \
+them different emotional weights would encode a difference nobody has \
+measured.
+"""
+laughter = 1.25
+tenderness = 1.20
+tears = 1.20
+composed = 0.60
+interaction = 1.20
+
+# ===========================================================================
+# DETAILS AND VENUE - THE SCENES WITH NO FACES IN THEM
+# ===========================================================================
+
+[scene.details]
+rationale = """
+A ring, a shoe, an invitation. There is usually no face at all, and the ranker \
+falls back to the interaction term, which is also usually nothing. That is \
+correct: a detail shot is not competing with a kiss on emotional value, and \
+phase 12's coverage guarantee - not this score - is what keeps the rings in \
+the gallery. Every channel is weighted low so that the handful of detail \
+frames which DO contain a hand or a face are not accidentally promoted above \
+the ceremony.
+"""
+smile = 0.50
+genuineness = 0.50
+laughter = 0.60
+tears = 0.60
+surprise = 0.40
+tenderness = 0.60
+composed = 0.40
+discomfort = 0.40
+interaction = 0.70
+peak = 0.80
+reaction = 0.50
+mutual_gaze = 0.50
+
+[scene.venue]
+rationale = """
+The place without the people. Details' weights, for details' reason. A venue \
+frame that scores 0.1 is not a bad photograph; it is a photograph this \
+particular measurement has nothing to say about.
+"""
+smile = 0.50
+genuineness = 0.50
+laughter = 0.60
+tears = 0.60
+surprise = 0.40
+tenderness = 0.60
+composed = 0.40
+discomfort = 0.40
+interaction = 0.70
+peak = 0.80
+reaction = 0.50
+mutual_gaze = 0.50
+
+# ===========================================================================
+# THE FIRST LOOK
+# ===========================================================================
+
+[scene.first_look]
+rationale = """
+The one staged moment of the day whose entire value is the reaction. Surprise \
+and tears are weighted higher here than anywhere else in the wedding, mutual \
+gaze is at its maximum, and the peak term is high because a first look is \
+short and the frame either side of the right one is visibly wrong.
+"""
+smile = 1.00
+genuineness = 1.20
+laughter = 1.10
+tears = 1.40
+surprise = 1.35
+tenderness = 1.30
+composed = 0.50
+interaction = 1.20
+peak = 1.30
+reaction = 1.30
+mutual_gaze = 1.40
+
+# ===========================================================================
+# THE CEREMONY - WHERE THE CULTURAL ARGUMENT IS
+# ===========================================================================
+#
+# The four scenes below are the reason this file exists. In every one of them,
+# `composed` is weighted AT OR ABOVE `smile`, and that inversion is the product
+# decision. A couple standing still through a forty-minute rite are not
+# emotionless; they are doing the thing the day is about, and a ranker that
+# demoted every frame of it would deliver a wedding with no wedding in it.
+
+[scene.ceremony]
+rationale = """
+Composure outranks a smile here, and that is the inversion this file exists \
+for. A couple at the altar or under the mandap are still, and the frames \
+worth delivering are the ones where the stillness reads as attention rather \
+than as boredom - which is what `composed` measures and what `discomfort` \
+subtracts. Laughter still scores, because a ceremony that makes people laugh \
+is a good ceremony, but it is no longer the thing being looked for.
+"""
+smile = 0.70
+genuineness = 0.60
+laughter = 1.00
+tears = 1.25
+surprise = 0.80
+tenderness = 1.20
+composed = 1.20
+interaction = 1.10
+peak = 1.10
+mutual_gaze = 1.25
+
+[scene.ritual]
+rationale = """
+The strongest composure weight in the table, and the one with the most riding \
+on it. A named rite - saptapadi, kanyadaan, the nikah - is performed with the \
+participants deliberately still and often looking down. A Western-trained \
+expression model reads that as nothing happening. It is the opposite: it is \
+the part of the day the family will look at in thirty years. Smile weight is \
+at its floor for the same reason - a broad smile during a solemn rite is \
+usually somebody in the third row.
+"""
+smile = 0.55
+genuineness = 0.50
+laughter = 0.85
+tears = 1.30
+surprise = 0.70
+tenderness = 1.25
+composed = 1.45
+interaction = 1.25
+peak = 1.15
+mutual_gaze = 1.20
+
+[scene.vows]
+rationale = """
+Section 6.1 names `vows` beside `ritual` as the case where "composed with \
+mutual gaze can outscore a smile", and this row is that sentence as numbers: \
+composure at 1.35 and mutual gaze at its maximum, so a still frame of two \
+people looking at each other beats a wide smile at the camera. Tears are \
+weighted high because this is where they happen.
+"""
+smile = 0.65
+genuineness = 0.60
+laughter = 0.90
+tears = 1.35
+surprise = 0.75
+tenderness = 1.30
+composed = 1.35
+interaction = 1.10
+peak = 1.20
+mutual_gaze = 1.45
+
+[scene.ceremony_entrance]
+rationale = """
+The processional. Faces are visible, moving, and often turned to somebody in \
+the aisle rather than to the lens - so the reaction term is weighted up and \
+the peak term with it, because an entrance has a moment and the frames before \
+it are somebody walking.
+"""
+laughter = 1.15
+tears = 1.20
+tenderness = 1.15
+composed = 0.95
+peak = 1.20
+reaction = 1.25
+
+[scene.rings]
+rationale = """
+The ring exchange is a milestone the interaction head can actually see, so the \
+interaction term carries this scene rather than the faces - which are usually \
+looking down at two hands. Composure is high for that reason: `looking down \
+and still` is what a ring exchange looks like from the front.
+"""
+smile = 0.75
+composed = 1.20
+tenderness = 1.20
+interaction = 1.45
+peak = 1.30
+
+[scene.kiss]
+rationale = """
+The most photographed second of a Western wedding, and the one where the peak \
+term matters most: a kiss has an apex, the frames either side of it are two \
+people approaching and two people separating, and the difference is obvious to \
+everybody except a scorer that ignores the moment. Closed eyes are normal \
+here and cost nothing - phase 09's `EYES_CLOSED_OK` is the mechanism, and this \
+scene is the reason it exists.
+"""
+smile = 0.90
+laughter = 1.00
+tears = 1.25
+tenderness = 1.35
+composed = 0.90
+interaction = 1.50
+peak = 1.45
+reaction = 1.35
+mutual_gaze = 1.10
+
+# ===========================================================================
+# PORTRAITS - WHERE A POSED SMILE IS THE CORRECT ANSWER
+# ===========================================================================
+
+[scene.family_portrait]
+rationale = """
+Genuineness is weighted almost to zero here, and that is deliberate rather \
+than an oversight. A family portrait is SUPPOSED to be posed: everybody is \
+looking at the lens and holding a smile because they were asked to. Penalising \
+that would rank the frame where somebody blinked and laughed above the one the \
+family will hang on a wall. What matters instead is that everybody is doing it \
+at once, which is why `discomfort` keeps a full weight - one uncomfortable \
+face in a row of eleven is what makes a group portrait unusable.
+"""
+smile = 1.20
+genuineness = 0.15
+laughter = 0.95
+composed = 1.05
+discomfort = 1.10
+interaction = 0.70
+peak = 1.15
+mutual_gaze = 0.40
+
+[scene.group_portrait]
+rationale = """
+The family portrait's argument, slightly relaxed: a group of friends is posed \
+but not formal, so a genuine laugh is worth more than it is in a row of \
+grandparents. Genuineness is 0.35 rather than 0.15.
+"""
+smile = 1.15
+genuineness = 0.35
+laughter = 1.10
+composed = 0.90
+discomfort = 1.05
+interaction = 0.85
+peak = 1.10
+mutual_gaze = 0.50
+
+[scene.couple_portrait]
+rationale = """
+Posed, but of two people who are being asked to look at each other rather than \
+at the lens - so mutual gaze and tenderness carry it, and genuineness comes \
+back up because a couple portrait where the smile is held is the one the \
+couple quietly do not choose.
+"""
+smile = 1.00
+genuineness = 0.75
+laughter = 1.15
+tenderness = 1.35
+composed = 1.00
+interaction = 1.20
+mutual_gaze = 1.30
+
+[scene.golden_hour]
+rationale = """
+The couple portrait's weights. Golden hour is a light, not an event, and \
+giving it its own emotional character would be scoring the sunset.
+"""
+smile = 1.00
+genuineness = 0.75
+laughter = 1.15
+tenderness = 1.35
+composed = 1.00
+interaction = 1.20
+mutual_gaze = 1.30
+
+# ===========================================================================
+# THE RECEPTION
+# ===========================================================================
+
+[scene.reception_entrance]
+rationale = """
+Arms up, noise, everybody looking the same way. The group term does most of \
+the work and the peak term matters because an entrance is a few seconds long.
+"""
+smile = 1.10
+laughter = 1.30
+surprise = 1.05
+composed = 0.55
+interaction = 1.35
+peak = 1.30
+reaction = 1.30
+
+[scene.speeches]
+rationale = """
+The one scene where the best frame is usually NOT of the person talking. A \
+speech is a room reacting, so the reaction term is at its maximum in the whole \
+table, and laughter and tears both weigh heavily because a good speech \
+produces both within a minute of each other.
+"""
+smile = 1.05
+laughter = 1.35
+tears = 1.30
+surprise = 1.00
+composed = 0.75
+interaction = 1.10
+peak = 1.00
+reaction = 1.50
+
+[scene.cake]
+rationale = """
+A short scripted moment with a peak in it, photographed by everybody in the \
+room. Laughter and surprise carry it; composure is low because nobody is \
+composed while holding a knife over a cake.
+"""
+smile = 1.10
+laughter = 1.30
+surprise = 1.15
+composed = 0.50
+interaction = 1.25
+peak = 1.35
+
+[scene.first_dance]
+rationale = """
+Two people, in contact, looking at each other, in bad light. Tenderness and \
+mutual gaze carry it, the interaction term is high because a dance hold is \
+the easiest thing in the taxonomy for the head to see, and composure keeps a \
+real weight because a quiet first dance is a first dance.
+"""
+smile = 1.00
+genuineness = 0.85
+laughter = 1.15
+tears = 1.30
+tenderness = 1.40
+composed = 1.00
+interaction = 1.40
+peak = 1.15
+mutual_gaze = 1.40
+
+[scene.dance_floor]
+rationale = """
+Motion, noise and a hundred nearly identical frames. Laughter and surprise \
+carry it; composure is at its floor because a still face on a dance floor is \
+somebody checking their phone. The peak term is weighted DOWN rather than up, \
+against the intuition: a dance floor has no single apex, so a high peak weight \
+would just amplify whichever frame the curve happened to favour.
+"""
+smile = 1.05
+laughter = 1.40
+surprise = 1.15
+tenderness = 0.90
+composed = 0.35
+discomfort = 0.60
+interaction = 1.25
+peak = 0.80
+
+[scene.exit]
+rationale = """
+Sparklers, confetti, a car. Everybody is cheering and nobody is composed. The \
+group and interaction terms carry it, and the peak term is high because an \
+exit is one pass down one aisle.
+"""
+smile = 1.10
+laughter = 1.35
+surprise = 1.10
+composed = 0.45
+interaction = 1.35
+peak = 1.30
+reaction = 1.20
+
+[scene.candid]
+rationale = """
+The default, restated for the scene that most needs it: an unposed frame that \
+phase 07 could not place. Genuineness is weighted up, because in a candid the \
+difference between a caught smile and a held one is the difference between a \
+photograph and a snapshot.
+"""
+genuineness = 1.25
+laughter = 1.20
+tenderness = 1.10
+composed = 0.65
+
+# ===========================================================================
+# TRADITIONS
+# ===========================================================================
+#
+# Multipliers applied on top of the scene weights, and only three channels are
+# settable. See "WHAT EACH FIELD MEANS" above for why the list is short.
+#
+# The tradition comes from phase 07's ritual head. Every slug here must have a
+# taxonomy file in `crates/aura-brain-wedding/config/rituals/`; the loader
+# refuses one that does not, because a weight that can never be selected is a
+# weight nobody will notice is wrong.
+
+[tradition.hindu]
+rationale = """
+A Hindu ceremony runs for hours with the couple seated, often looking down, \
+often with a priest between them and the camera. Composure is multiplied up \
+and smile down, because the frames the family will want are the still ones - \
+and because the alternative is a gallery made entirely of the reception.
+"""
+composed = 1.30
+smile = 0.85
+laughter = 0.95
+
+[tradition.nepali]
+rationale = """
+The same argument as Hindu, applied a little less strongly. Nepali ceremonies \
+in this product's reference set carry more visible interaction between the \
+couple and the family during the rites than the Hindu set does, so composure \
+is multiplied up by less.
+"""
+composed = 1.20
+smile = 0.90
+laughter = 1.00
+
+[tradition.muslim]
+rationale = """
+A nikah is short, seated and quiet, and the celebration around it is not. \
+Composure is multiplied up for the ceremony's sake; laughter is left alone \
+because the walima is as expressive as any reception in the set.
+"""
+composed = 1.25
+smile = 0.90
+laughter = 1.00
+
+[tradition.christian]
+rationale = """
+The tradition the underlying expression research is most biased towards \
+already, so the multipliers are 1.0 and this table exists to say so out loud \
+rather than to change anything. Leaving it out would look like an oversight; \
+leaving it in with ones is a statement that no correction is being applied \
+here and that the correction elsewhere is not a penalty on this tradition.
+"""
+composed = 1.00
+smile = 1.00
+laughter = 1.00
+
+[tradition.civil]
+rationale = """
+A registry-office or courthouse wedding is short, small and usually informal. \
+Composure is multiplied slightly up because the ceremony itself is a few \
+minutes of two people standing still in a small room, which is otherwise the \
+lowest-scoring geometry in the product.
+"""
+composed = 1.10
+smile = 1.00
+laughter = 1.00
+
+# ===========================================================================
+# THE RANKER
+# ===========================================================================
+#
+# Section 6.4's Bradley-Terry utility. Nine features and a bias; the features
+# are documented in `crates/aura-brain-wedding/src/emotion/score.rs` and each
+# is in 0..1 before the coefficient is applied.
+
+[ranker]
+rationale = """
+Five of these nine come from `ml/models/emotion/train_ranker.py --fixtures`, \
+which fits a Bradley-Terry utility on the authored comparison set and \
+reproduces all eight of its preferences. Four do NOT, and saying which is the \
+honest half of this note: `interaction`, `peak`, `reaction` and `mutual_gaze` \
+do not vary between the two frames of any authored comparison, so the fit \
+leaves them at zero - they are unidentifiable from that data rather than \
+unimportant. Those four are set by argument instead: an interaction and a peak \
+are the two structural terms a photographer names first when asked why one \
+frame of a moment beat another, so they sit just under the expression terms, \
+and a reaction and a mutual gaze sit under those because either can be true of \
+a frame nobody would deliver. Ten thousand real comparisons would identify all \
+nine, and that is condition C2. The bias is set so that a frame with nothing in \
+it scores near 0.12 rather than near 0.5 - a wedding in which the median frame \
+scores half a mark is a wedding in which this number carries no information.
+"""
+bias = -2.10
+subject_expression = 3.40
+genuineness = 1.05
+interaction = 1.90
+peak = 1.55
+reaction = 1.20
+mutual_gaze = 0.85
+composure = 1.35
+tears = 1.45
+group = 0.70
+
+# ===========================================================================
+# PER-SCENE CALIBRATION
+# ===========================================================================
+#
+# Section 6.4's isotonic layer, and it ships as the identity everywhere.
+#
+# This is condition C4 of `docs/progress/PHASE-10-EXIT.md`, and it is the same
+# condition phase 09 recorded as its C5 for exactly the same reason: the
+# machinery is real, tested and refuses a non-monotone map, and there is no
+# labelled keeper/reject data in this repository to fit it on.
+# `ml/models/emotion/eval_emotion.py --fit-calibration` fits them with PAVA
+# and prints the knots, against a real export, on the day one exists.
+#
+# The identity is written out rather than omitted so that the shape is visible
+# and a person editing this file can see what a fitted map would look like. A
+# scene with no table here gets the identity anyway.
+
+[calibration.ceremony]
+rationale = "Identity until there is labelled keeper/reject data to fit on. See condition C4."
+x = [0.0, 0.25, 0.5, 0.75, 1.0]
+y = [0.0, 0.25, 0.5, 0.75, 1.0]
+
+[calibration.dance_floor]
+rationale = "Identity until there is labelled keeper/reject data to fit on. See condition C4."
+x = [0.0, 0.25, 0.5, 0.75, 1.0]
+y = [0.0, 0.25, 0.5, 0.75, 1.0]
+
+# ---------------------------------------------------------------------------
+# WHAT THESE NUMBERS ARE AND ARE NOT
+# ---------------------------------------------------------------------------
+#
+# They are a considered product opinion, written down, versioned, and testable.
+# Every scene row above is an argument somebody can disagree with in a sentence.
+#
+# They are NOT fitted to ten thousand photographer comparisons. Section 9 gives
+# `DATA` "10k pairwise photographer comparisons across traditions" and that work
+# has not been done - there is no labelled wedding data in this repository. The
+# ranker coefficients come from the synthetic fixture comparisons, which have a
+# known answer by construction and therefore measure the ALGORITHM rather than
+# taste. That is condition C2 in `docs/progress/PHASE-10-EXIT.md`.
+#
+# The distinction matters for how a wrong row behaves. A number argued from
+# photographic practice and written down is wrong in a way somebody can find and
+# fix; a number fitted to the wrong dataset is wrong in a way that looks like
+# evidence.

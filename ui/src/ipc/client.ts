@@ -2,6 +2,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  EmotionDto,
+  EmotionEvent,
+  EmotionPassDto,
+  EmotionStatusDto,
+  MomentPeakDto,
+  PreferInput,
+  RankedByEmotionDto,
+  RankedInput,
+  ReactionLinkDto,
+  ScoreEmotionInput,
+  SetPeakInput,
   CacheStatsDto,
   DescriptorsDto,
   EmbedProgressDto,
@@ -453,6 +464,75 @@ export const api = {
 
   onIntegrityEvent: (handler: (event: IntegrityEvent) => void): Promise<() => void> =>
     listen<IntegrityEvent>('integrity', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+};
+
+/**
+ * PHASE-10. What a photograph is worth.
+ *
+ * Seven commands. Five read; `preferFrame` and `setMomentPeak` are the
+ * photographer telling the product it is wrong. **None of them keeps, delivers
+ * or builds a gallery** - section 2.2 puts the choosing in phase 12.
+ */
+export const emotion = {
+  /** The panel header: coverage, face-awareness, peaks, links and versions. */
+  emotionStatus: (projectId: string): Promise<EmotionStatusDto> =>
+    invoke<EmotionStatusDto>('emotion_status', { projectId }),
+
+  /**
+   * One photograph's reading.
+   *
+   * `null` means **nobody has looked** - which is not the same as "nothing
+   * happened here", and the card must not draw it that way.
+   */
+  imageEmotion: (photoId: string): Promise<EmotionDto | null> =>
+    invoke<EmotionDto | null>('image_emotion', { photoId }),
+
+  /**
+   * One moment's peak.
+   *
+   * `null` means the moment has not been scored. A moment that *was* scored and
+   * had no apex comes back with `resolved: false`, which is a different and
+   * common answer.
+   */
+  momentPeak: (momentId: string): Promise<MomentPeakDto | null> =>
+    invoke<MomentPeakDto | null>('moment_peak', { momentId }),
+
+  /** Every frame that reacts to this one, earliest first. */
+  reactionsOf: (photoId: string): Promise<ReactionLinkDto[]> =>
+    invoke<ReactionLinkDto[]>('reactions_of', { photoId }),
+
+  /**
+   * A project's frames ordered by emotion score, strongest first.
+   *
+   * **An ordering, not a selection.**
+   */
+  rankedByEmotion: (input: RankedInput): Promise<RankedByEmotionDto[]> =>
+    invoke<RankedByEmotionDto[]>('ranked_by_emotion', { input }),
+
+  /**
+   * "I would deliver this one." Recorded for phase 30's learning loop and
+   * applied to nothing today: a ranker that refitted itself mid-cull would
+   * reorder the grid under the photographer's hands.
+   */
+  preferFrame: (input: PreferInput): Promise<void> => invoke<void>('prefer_frame', { input }),
+
+  /**
+   * "This frame is the one." Unbeatable: a re-analysis re-applies the choice
+   * rather than reverting it.
+   */
+  setMomentPeak: (input: SetPeakInput): Promise<MomentPeakDto> =>
+    invoke<MomentPeakDto>('set_moment_peak', { input }),
+
+  /** Score every frame that has no current reading. Resumable and cancellable. */
+  scoreEmotion: (input: ScoreEmotionInput): Promise<EmotionPassDto> =>
+    invoke<EmotionPassDto>('score_emotion', { input }),
+
+  onEmotionEvent: (handler: (event: EmotionEvent) => void): Promise<() => void> =>
+    listen<EmotionEvent>('emotion', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },

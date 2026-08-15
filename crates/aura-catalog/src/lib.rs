@@ -243,6 +243,12 @@ impl Catalog {
             // PHASE-09.
             "image_integrity",
             "face_eye_state",
+            // PHASE-10.
+            "image_interaction",
+            "face_expression",
+            "moment_peak",
+            "reaction_links",
+            "emotion_preferences",
         ];
         if !COUNTABLE.contains(&table) {
             return Err(statement_failed(

@@ -1477,3 +1477,280 @@ pub fn focus_sample_input(batch: usize) -> Tensor {
 pub fn eye_sample_input(batch: usize) -> Tensor {
     face_crop_sample_input(batch)
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-10. Expression and interaction.
+// ---------------------------------------------------------------------------
+
+/// The expression head's registered name.
+pub const EXPRESSION_HEAD_MODEL: &str = "expression_head";
+/// The interaction head's registered name.
+pub const INTERACTION_HEAD_MODEL: &str = "interaction_head";
+
+/// Side of the aligned crop the expression head reads.
+///
+/// The same 112 px as the recogniser's and the eye head's. `aura_vision::face::align`
+/// already produces exactly this crop once per face, so the third consumer of it costs
+/// no second warp - which is what makes running phases 06, 09 and 10 back to back
+/// nearly free.
+pub const EXPRESSION_CROP_SIDE: usize = FACE_CROP_SIDE;
+
+/// How many continuous channels the expression head emits.
+///
+/// Eight, and the slot order **is** `FaceExpression::channels`: smile, genuineness,
+/// laughter, tears, surprise, tenderness, composed, discomfort. Renumbering that
+/// relabels a trained head, which is why the contract says so and this constant
+/// repeats it.
+pub const EXPRESSION_CHANNELS: usize = 8;
+
+/// Side of the downsampled frame the interaction head reads.
+///
+/// 160 px, and the number is a compromise section 11's 40 ms budget forces. An
+/// interaction is a *pose* question - are two bodies in contact, is an arm raised, are
+/// two heads close - and pose survives downsampling far better than focus does. At
+/// 224 px the head costs three times as much for a distinction nobody has been able to
+/// name.
+pub const INTERACTION_SIDE: usize = 160;
+
+/// Channels the interaction head reads: three of colour and one of person prior.
+///
+/// Section 6.2: "the interaction head operates on the full frame with person boxes as
+/// spatial priors". The fourth channel *is* the prior - a mask painted from phase 06's
+/// face boxes - rather than a set of coordinates appended to a feature vector, because
+/// where the people are is a spatial fact and a convolution is the thing that reads
+/// spatial facts.
+///
+/// A frame with no face pass gets a zero prior plane, which is a real input meaning
+/// "nobody was located" rather than a missing one.
+pub const INTERACTION_CHANNELS: usize = 4;
+
+/// How many interactions the head emits.
+///
+/// `Interaction::COUNT`, and the slot order **is** `Interaction::ALL`.
+pub const INTERACTION_CLASSES: usize = 9;
+
+/// The expression head.
+///
+/// `crop [N, 3, 112, 112] -> expression [N, 8]`, in `FaceExpression::channels` order.
+///
+/// Three-channel, and the reason is the channel most likely to be wrong without colour:
+/// `FaceExpression::tears` is a specular wet cue on the lower lid, and what separates a
+/// tear track from a highlight on cheekbone makeup is its colour rather than its shape.
+///
+/// **The activation is a `Sigmoid`, not a `Softmax`, and that is the whole design.**
+/// Section 2.1 requires the eight outputs to be "all continuous, not one-hot": a face
+/// can be laughing and crying at once, and a wedding is full of faces that are. A
+/// softmax would make the eight compete for one unit of probability and would force the
+/// model to choose - which is exactly the modelling mistake that produces emotionally
+/// flat galleries.
+///
+/// The head deliberately does **not** emit a gaze slot. Where a face is looking is
+/// geometry - phase 06's two eye landmarks against the face box - so it is measured in
+/// `aura_brain_wedding::emotion::gaze` rather than predicted, and a model that appeared
+/// to answer it would be guessing with authority about something that can be computed.
+#[must_use]
+pub fn expression_head() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_E795_5107_0001);
+    let side = EXPRESSION_CROP_SIDE;
+
+    let graph = Graph {
+        name: EXPRESSION_HEAD_MODEL.to_string(),
+        nodes: vec![
+            // 112 -> 56
+            conv3("stem", &["crop", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 56 -> 28
+            pool2("pool", "stem_relu", "pool_out"),
+            // 28 -> 14
+            conv3("b1", &["pool_out", "b1_w", "b1_b"], &["b1_out"], 2),
+            node("Relu", "b1_act", &["b1_out"], &["b1_relu"]),
+            node("GlobalAveragePool", "gap", &["b1_relu"], &["gap_out"]),
+            with_int(
+                node("Flatten", "flatten", &["gap_out"], &["features"]),
+                "axis",
+                1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "trunk",
+                    &["features", "trunk_w", "trunk_b"],
+                    &["trunk_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "trunk_act", &["trunk_out"], &["trunk_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["trunk_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logits"], &["expression"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.23),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("b1_w", vec![48, 24, 3, 3], 0.14),
+            weights.tensor("b1_b", vec![48], 0.05),
+            weights.tensor("trunk_w", vec![48, 48], 0.20),
+            weights.tensor("trunk_b", vec![48], 0.05),
+            weights.tensor("head_w", vec![EXPRESSION_CHANNELS, 48], 0.22),
+            weights.tensor("head_b", vec![EXPRESSION_CHANNELS], 0.05),
+        ],
+        inputs: vec![dynamic_batch("crop", &[3, side, side])],
+        outputs: vec![dynamic_batch("expression", &[EXPRESSION_CHANNELS])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The interaction head.
+///
+/// `frame [N, 4, 160, 160] -> interaction_probs [N, 9]`, in `Interaction::ALL` order.
+///
+/// Four channels; see [`INTERACTION_CHANNELS`]. `Sigmoid` rather than `Softmax` for the
+/// expression head's reason and one more: a frame really can be a hug *and* tears being
+/// wiped, and section 5 spells the field `Vec<(Interaction, f32)>` precisely because the
+/// classes are not exclusive.
+///
+/// One extra convolution block over the expression head, because the receptive field has
+/// to reach across two people rather than across one face. That is what the third stride
+/// buys, and it is why the per-frame cost is dominated by this head rather than by the
+/// batched one.
+#[must_use]
+pub fn interaction_head() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_1073_2AC7_0001);
+    let side = INTERACTION_SIDE;
+
+    let graph = Graph {
+        name: INTERACTION_HEAD_MODEL.to_string(),
+        nodes: vec![
+            // 160 -> 80
+            conv3("stem", &["frame", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 80 -> 40
+            pool2("pool", "stem_relu", "pool_out"),
+            // 40 -> 20
+            conv3("b1", &["pool_out", "b1_w", "b1_b"], &["b1_out"], 2),
+            node("Relu", "b1_act", &["b1_out"], &["b1_relu"]),
+            // 20 -> 10
+            conv3("b2", &["b1_relu", "b2_w", "b2_b"], &["b2_out"], 2),
+            node("Relu", "b2_act", &["b2_out"], &["b2_relu"]),
+            node("GlobalAveragePool", "gap", &["b2_relu"], &["gap_out"]),
+            with_int(
+                node("Flatten", "flatten", &["gap_out"], &["features"]),
+                "axis",
+                1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "trunk",
+                    &["features", "trunk_w", "trunk_b"],
+                    &["trunk_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "trunk_act", &["trunk_out"], &["trunk_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["trunk_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logits"], &["interaction_probs"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![16, INTERACTION_CHANNELS, 3, 3], 0.22),
+            weights.tensor("stem_b", vec![16], 0.05),
+            weights.tensor("b1_w", vec![32, 16, 3, 3], 0.15),
+            weights.tensor("b1_b", vec![32], 0.05),
+            weights.tensor("b2_w", vec![48, 32, 3, 3], 0.13),
+            weights.tensor("b2_b", vec![48], 0.05),
+            weights.tensor("trunk_w", vec![48, 48], 0.20),
+            weights.tensor("trunk_b", vec![48], 0.05),
+            weights.tensor("head_w", vec![INTERACTION_CLASSES, 48], 0.22),
+            weights.tensor("head_b", vec![INTERACTION_CLASSES], 0.05),
+        ],
+        inputs: vec![dynamic_batch("frame", &[INTERACTION_CHANNELS, side, side])],
+        outputs: vec![dynamic_batch("interaction_probs", &[INTERACTION_CLASSES])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// A deterministic batch of expression-head crops.
+///
+/// Reuses [`face_crop_sample_input`], because the expression head reads exactly the crop
+/// the recogniser and the eye head read, and a third generator would be a third thing to
+/// keep in step.
+#[must_use]
+pub fn expression_sample_input(batch: usize) -> Tensor {
+    face_crop_sample_input(batch)
+}
+
+/// A deterministic batch of interaction-head frames.
+///
+/// Three channels of a two-blob scene plus a prior plane that marks where the blobs are.
+/// The blobs move apart as the batch index rises, so a batching bug that reuses one
+/// member's tensor produces identical rows and is caught immediately - and so that a
+/// head which had learned anything at all would produce a falling `hug` strength across
+/// the batch.
+#[must_use]
+pub fn interaction_sample_input(batch: usize) -> Tensor {
+    let side = INTERACTION_SIDE;
+    let half = side as f32 / 2.0;
+    let radius = side as f32 * 0.16;
+    let mut samples = Vec::with_capacity(batch * INTERACTION_CHANNELS * side * side);
+    for image in 0..batch {
+        // Blob centres, drifting apart with the batch index.
+        let spread = side as f32 * (0.10 + 0.06 * image as f32);
+        let left = half - spread;
+        let right = half + spread;
+        for channel in 0..INTERACTION_CHANNELS {
+            for row in 0..side {
+                for column in 0..side {
+                    let y = row as f32 - half;
+                    let dl = ((column as f32 - left).powi(2) + y.powi(2)).sqrt();
+                    let dr = ((column as f32 - right).powi(2) + y.powi(2)).sqrt();
+                    let inside = dl <= radius || dr <= radius;
+                    let value = if channel == 3 {
+                        // The person prior: one where a body is, zero elsewhere.
+                        f32::from(u8::from(inside))
+                    } else if inside {
+                        // A little per-channel tint so a grey-collapsing bug shows up.
+                        0.55 + 0.10 * channel as f32
+                    } else {
+                        0.18
+                    };
+                    samples.push(value);
+                }
+            }
+        }
+    }
+    Tensor {
+        shape: vec![batch, INTERACTION_CHANNELS, side, side],
+        data: samples,
+    }
+}

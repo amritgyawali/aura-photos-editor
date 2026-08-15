@@ -403,3 +403,69 @@ max_ms_per_unit = 220
 # thousand photographs, by `crates/aura-perf/tests/integrity_budgets.rs`.
 [size.integrity_store_per_1000_images]
 max_bytes = 1024000
+
+# ---------------------------------------------------------------------------
+# Phase 10 performance budgets, from PHASE-10 section 11.
+#
+# Section 11's first row - 40 ms per image on a GPU - is **not here**, for the
+# reason phase 09's 45 ms row is not: this build has no GPU backend
+# (docs/adr/ADR-0007-inference-runtime.md), and a budget nothing can measure is
+# a wish rather than an assertion. It is waived with its reason in
+# docs/adr/ADR-0021-emotion-taxonomy-and-moment-ranking.md section 9, and the
+# waiver expires when a GPU backend lands.
+#
+# Its second row - 4,000 images on an RTX 4070 in 160 s - is the same claim about
+# the same absent hardware. What is asserted instead is the processor path, and
+# the per-image row below multiplied by four thousand is printed beside it so a
+# reader can see what a full wedding costs on the machine CI ran on.
+#
+# The third row is the one this phase can most honestly assert: peaks and
+# reaction linking open **no file at all**, so eight seconds is a claim about SQL
+# and arithmetic that holds on any machine.
+# ---------------------------------------------------------------------------
+
+# One image, decoded buffer in, scored reading out. Everything phase 10 adds:
+# one 112 px warp per face, the batched expression call, the 160 px four-plane
+# resample the interaction tensor needs, the interaction call, the gaze geometry,
+# the nine features, the ranker and the reasons.
+#
+# The decode is deliberately excluded - it is phase 02's cost and
+# `preview_budgets` owns it.
+# **The two heads are planted here, and the number is smaller than it looks.**
+# `PlantedInfer` returns a fixed tensor, so what is measured is the arithmetic
+# around the heads rather than the heads themselves - which is where phase 10's
+# per-frame cost actually is, and which is the same arrangement phase 09's
+# `integrity_analyse_image` uses with `NullInfer`. The measured figure on the
+# development machine is **12 ms**; the budget is set at 60 with five times that
+# headroom, because a CI machine is not this one.
+#
+# The end-to-end number, through the real interpreter and the real registry, is
+# printed by `aura-cli verify --phase 10` and recorded in the phase 10 exit
+# report. That is the honest place for it: a budget file that claimed a
+# whole-pipeline figure measured against a stub would be a budget that passes
+# when the runtime regresses.
+[stage.emotion_read_image]
+max_elapsed_ms  = 2400
+max_ms_per_unit = 60
+
+# Section 11: peak detection and reaction linking for a whole wedding in 8 s.
+#
+# Asserted rather than waived, because this row involves no hardware this build
+# does not have: the window scan and the resolver read stored numbers. What could
+# go wrong here is a quadratic scan, and four thousand frames is where that stops
+# being invisible.
+[stage.emotion_link_project]
+max_elapsed_ms  = 8000
+max_ms_per_unit = 8000
+
+# Section 11: 900 B per image.
+#
+# Less than phase 09's kilobyte for a row that carries per-face readings as well,
+# which is why three decisions in migration 10 exist: the eight expression
+# channels are per-mille integers rather than REALs, `face_expression` carries no
+# identity and no timestamp, and `reasons` stores codes rather than sentences.
+#
+# Measured with `PRAGMA page_count` on a real catalog before and after, over a
+# thousand photographs, by `crates/aura-perf/tests/emotion_budgets.rs`.
+[size.emotion_store_per_1000_images]
+max_bytes = 900000

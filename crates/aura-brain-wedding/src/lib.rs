@@ -73,12 +73,18 @@
 //! the boundary is kept structurally: this crate writes four tables and reads three,
 //! and none of them is a decision about a photograph's fate.
 
+pub mod emotion;
 pub mod errors;
 pub mod fixtures;
 pub mod moments;
 pub mod scene;
 pub mod story;
 
+pub use emotion::{
+    Analyser as EmotionAnalyser, Emotion, EmotionPass, EmotionReport, EmotionStore, EmotionWeights,
+    FrameContext as EmotionFrameContext, ANALYSIS_VER as EMOTION_ANALYSIS_VER,
+    MODEL_VER as EMOTION_MODEL_VER,
+};
 pub use moments::{
     GroupReport, MomentProfileRegistry, MomentStore, Moments, PassContext as MomentPassContext,
     GROUP_VER,

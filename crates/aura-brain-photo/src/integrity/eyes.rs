@@ -22,12 +22,20 @@
 //! > speeches_emotional}) OR (mouth-smile strong and head tilted) OR (tears detected in
 //! > Phase 10) OR (both partners' eyes closed simultaneously in a couple frame).
 //!
-//! Three of the four are implemented here. **The tears rule is phase 10's** and this
-//! build cannot evaluate it: [`IntentInput::tears`] exists, is documented, is wired
-//! through, and is always false until phase 10 fills it. That is condition C4 in the
-//! phase 09 exit report, and the degradation is in the safe direction - a missing
-//! exoneration makes a frame *look* more defective, so the failure is visible in a
-//! review queue rather than silent in a delivery.
+//! All four are implemented. **The tears rule is phase 10's**, and it arrives through
+//! [`IntentInput::tears`], which `IntegrityPass::with_emotion` fills from
+//! `EmotionService::of_image`. Phase 09 shipped with that field always false - condition
+//! C4 of its exit report - because phase 10 did not exist; wiring it was the one-line
+//! change that report predicted.
+//!
+//! The dependency runs **through `aura-core`'s frozen trait and not through a crate**.
+//! `aura-brain-photo` still does not depend on `aura-brain-wedding`, in either
+//! direction, which is what keeps phase 09's "no phase may keep its own blink detector"
+//! and phase 10's "no phase may keep its own expression model" from becoming a cycle.
+//!
+//! Without an emotion pass the field is false and the degradation is the one phase 09
+//! documented: a missing exoneration makes a frame *look* more defective, so a tearful
+//! closed-eye photograph reaches a review queue rather than a delivery.
 //!
 //! ## Why the head does not decide intent
 //!
@@ -44,6 +52,7 @@ use aura_core::contract::people::FaceRef;
 use aura_core::{AuraResult, Priority, SceneId};
 use aura_infer::contract::infer::{InferService, ModelRef, TensorView, Version};
 use aura_infer::onnx::fixtures::{EYE_CLASSES, EYE_CROP_SIDE, EYE_STATE_MODEL};
+use aura_vision::face::align;
 
 /// Registry name of the eye-state head.
 pub const EYE_MODEL: &str = EYE_STATE_MODEL;
@@ -128,11 +137,16 @@ pub struct IntentInput {
     /// head with a wide smile is a laugh, and a laugh closes eyes. See
     /// [`laughing_from_geometry`].
     pub laughing: bool,
-    /// True when phase 10 detected tears, for rule 3.
+    /// True when phase 10 read this frame as containing tears, for rule 3.
     ///
-    /// **Always false in this build.** Phase 10 does not exist yet; the field is here so
-    /// that wiring it is a one-line change rather than a redesign, and so that the rule
-    /// it serves is visible in the code a photographer's sign-off covers.
+    /// Filled by `IntegrityPass::with_emotion` from `EmotionService::of_image`, and
+    /// gated on `aura_core::contract::emotion::TEARS_CERTAIN` - which is 0.85 and is the
+    /// same constant phase 10's own reason writer reads, so the product cannot say
+    /// "there are tears here" in one panel and decline to act on them in another.
+    ///
+    /// False when no emotion pass has run. That is the case phase 09 shipped with, and
+    /// it degrades in the safe direction: a missing exoneration makes a frame look more
+    /// defective rather than less.
     pub tears: bool,
     /// True when this face is one of a couple and the other partner's eyes are also
     /// closed, for rule 4.
@@ -494,83 +508,28 @@ pub const CANONICAL_RIGHT_EYE: [f32; 2] = [73.53, 51.50];
 /// before a face reaches here.
 #[must_use]
 pub fn align_from_eyes(rgb: &[u8], width: usize, height: usize, face: &FaceRef) -> Vec<u8> {
-    let side = EYE_CROP_SIDE;
-    let mut out = vec![0u8; side * side * 3];
     if width == 0 || height == 0 || !face.has_eyes() {
-        return out;
+        return vec![0u8; EYE_CROP_SIDE * EYE_CROP_SIDE * 3];
     }
-
-    // Source eye positions in pixels.
-    let sx0 = face.eyes[0][0] * width as f32;
-    let sy0 = face.eyes[0][1] * height as f32;
-    let sx1 = face.eyes[1][0] * width as f32;
-    let sy1 = face.eyes[1][1] * height as f32;
-
-    let from_x = sx1 - sx0;
-    let from_y = sy1 - sy0;
-    let source_span = from_x.hypot(from_y);
-    if source_span <= f32::EPSILON {
-        return out;
-    }
-    let onto_x = CANONICAL_RIGHT_EYE[0] - CANONICAL_LEFT_EYE[0];
-    let onto_y = CANONICAL_RIGHT_EYE[1] - CANONICAL_LEFT_EYE[1];
-    let target_span = onto_x.hypot(onto_y);
-
-    // The inverse transform: for each destination pixel, where in the source it came
-    // from. Inverse rather than forward, because a forward warp leaves holes.
-    let scale = source_span / target_span;
-    let angle = from_y.atan2(from_x) - onto_y.atan2(onto_x);
-    let (sin, cos) = angle.sin_cos();
-    let a = cos * scale;
-    let b = -sin * scale;
-
-    for row in 0..side {
-        for column in 0..side {
-            let dx = column as f32 - CANONICAL_LEFT_EYE[0];
-            let dy = row as f32 - CANONICAL_LEFT_EYE[1];
-            let sx = a.mul_add(dx, b * dy) + sx0;
-            let sy = (-b).mul_add(dx, a * dy) + sy0;
-            let sample = sample_bilinear(rgb, width, height, sx, sy);
-            let base = (row * side + column) * 3;
-            for (channel, value) in sample.into_iter().enumerate() {
-                if let Some(slot) = out.get_mut(base + channel) {
-                    *slot = value;
-                }
-            }
-        }
-    }
-    out
-}
-
-/// Bilinear sample of an interleaved 8-bit sRGB buffer, clamped at the edges.
-///
-/// Bilinear rather than the box filter phase 05 uses elsewhere, and the reason is the
-/// direction of the resample: an aligned face crop is usually an *upscale* of a 90 px
-/// face to 112 px, and a box filter on an upscale is nearest-neighbour with extra steps.
-fn sample_bilinear(rgb: &[u8], width: usize, height: usize, x: f32, y: f32) -> [u8; 3] {
-    let cx = x.clamp(0.0, (width - 1) as f32);
-    let cy = y.clamp(0.0, (height - 1) as f32);
-    let x0 = cx.floor() as usize;
-    let y0 = cy.floor() as usize;
-    let x1 = (x0 + 1).min(width - 1);
-    let y1 = (y0 + 1).min(height - 1);
-    let fx = cx - x0 as f32;
-    let fy = cy - y0 as f32;
-
-    let mut out = [0u8; 3];
-    for (channel, slot) in out.iter_mut().enumerate() {
-        let at = |px: usize, py: usize| -> f32 {
-            f32::from(
-                rgb.get((py * width + px) * 3 + channel)
-                    .copied()
-                    .unwrap_or(0),
-            )
-        };
-        let top = at(x0, y0) + (at(x1, y0) - at(x0, y0)) * fx;
-        let bottom = at(x0, y1) + (at(x1, y1) - at(x0, y1)) * fx;
-        *slot = (top + (bottom - top) * fy).round().clamp(0.0, 255.0) as u8;
-    }
-    out
+    // Normalised landmarks into pixels, then the shared warp. The geometry moved to
+    // `aura_vision::face::align` when phase 10's expression head became the second
+    // consumer of exactly this crop: two copies of a warp is two crops that drift apart
+    // while looking identical, and `aura-brain-photo` and `aura-brain-wedding`
+    // deliberately do not depend on each other, so `aura-vision` is the only place both
+    // can see.
+    align::warp_crop_from_eyes(
+        rgb,
+        width,
+        height,
+        [
+            face.eyes[0][0] * width as f32,
+            face.eyes[0][1] * height as f32,
+        ],
+        [
+            face.eyes[1][0] * width as f32,
+            face.eyes[1][1] * height as f32,
+        ],
+    )
 }
 
 /// Turn one aligned crop into the head's input tensor.
@@ -581,18 +540,5 @@ fn sample_bilinear(rgb: &[u8], width: usize, height: usize, x: f32, y: f32) -> [
 /// drift waiting to happen.
 #[must_use]
 pub fn preprocess_crop(crop: &[u8]) -> Vec<f32> {
-    let side = EYE_CROP_SIDE;
-    let mut out = vec![0.0f32; 3 * side * side];
-    for channel in 0..3 {
-        for row in 0..side {
-            for column in 0..side {
-                let source = (row * side + column) * 3 + channel;
-                let destination = channel * side * side + row * side + column;
-                if let Some(slot) = out.get_mut(destination) {
-                    *slot = f32::from(crop.get(source).copied().unwrap_or(0)) / 255.0;
-                }
-            }
-        }
-    }
-    out
+    align::preprocess_face_crop(crop)
 }

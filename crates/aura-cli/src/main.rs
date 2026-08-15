@@ -23,6 +23,7 @@ mod phase06;
 mod phase07;
 mod phase08;
 mod phase09;
+mod phase10;
 
 pub(crate) const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -49,6 +50,7 @@ fn main() -> ExitCode {
             Some("07") => phase07::verify(&args),
             Some("08") => phase08::verify(&args),
             Some("09") => phase09::verify(&args),
+            Some("10") => phase10::verify(&args),
             _ => cmd_verify(&args),
         },
         Some("infer") => phase03::infer(&args),

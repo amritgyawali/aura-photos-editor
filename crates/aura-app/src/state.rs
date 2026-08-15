@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aura_brain_photo::integrity::{Integrity, IntegrityPass, IntegrityStore};
+use aura_brain_wedding::emotion::{Emotion, EmotionPass, EmotionStore};
 use aura_brain_wedding::moments::{MomentStore, Moments};
 use aura_brain_wedding::scene::classifier::SceneClassifier;
 use aura_brain_wedding::scene::ritual::RitualClassifier;
@@ -235,6 +236,66 @@ impl AppState {
     #[must_use]
     pub fn integrity(&self) -> Arc<Integrity> {
         Arc::new(Integrity::new(self.integrity_store()))
+    }
+
+    /// The emotion store for this catalog. PHASE-10.
+    ///
+    /// Stateless like the moment and integrity stores, and a method for the same reason.
+    #[must_use]
+    pub fn emotion_store(&self) -> Arc<EmotionStore> {
+        Arc::new(EmotionStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `EmotionService` for this catalog. PHASE-10.
+    ///
+    /// Fallible, unlike `integrity()`, because it holds `emotion_weights.toml` - and a
+    /// build whose emotion weights will not parse must not open a project, for the reason
+    /// `Moments::new` gives about grouping thresholds. The difference from phase 09 is
+    /// that phase 09's config is read only by its *pass*, and this one is read by the
+    /// service too: `weights_ver` is compared against every stored row on every outline.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5039` when the weight table will not load.
+    pub fn emotion(&self) -> AuraResult<Arc<Emotion>> {
+        Ok(Arc::new(Emotion::new(self.emotion_store())?))
+    }
+
+    /// The emotion pass for this catalog, wired to phases 06 and 07.
+    ///
+    /// Both services are attached rather than optional, for `integrity_pass`'s reason:
+    /// this pass is already decoding a proxy and running two heads per frame, so one
+    /// `PeopleService` call and one `StoryService` call per frame are lost in the noise.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5039` when the emotion weight table will not load, or whatever building
+    /// the preview service and the inference engine raised.
+    pub fn emotion_pass(&self, project_id: &str) -> AuraResult<EmotionPass> {
+        let pass = EmotionPass::new(
+            self.previews(project_id)?,
+            self.infer_engine()?,
+            self.emotion_store(),
+            Arc::clone(&self.clock),
+        )?;
+        let pass = pass.with_people(self.people());
+        match self.story() {
+            Ok(story) => Ok(pass.with_story(story)),
+            // A wedding with no scene labels is weighted by `[default]`, which is
+            // invariant 7 degraded rather than broken - so a story service that will not
+            // build costs the conditioning and not the pass.
+            Err(err) => {
+                tracing::warn!(
+                    target: "emotion.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be weighted by the default row"
+                );
+                Ok(pass)
+            }
+        }
     }
 
     /// The technical pass for this catalog, wired to phases 06 and 07.

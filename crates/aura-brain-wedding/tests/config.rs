@@ -5,6 +5,7 @@
 //! output slot. Both are enforced by loaders that refuse, and a loader that refuses is
 //! only useful if something proves it refuses - which is what this file is for.
 
+use aura_brain_wedding::emotion::EmotionWeights;
 use aura_brain_wedding::scene::profile::{SceneProfileRegistry, MIN_RATIONALE};
 use aura_brain_wedding::scene::ritual::TRADITIONS;
 use aura_brain_wedding::scene::taxonomy::{Taxonomy, FIRST_ID, SLOT_COUNT};
@@ -503,4 +504,164 @@ fn ritual_none_is_slot_zero() {
     assert!(RitualId::NONE.is_none());
     assert_eq!(RitualId::NONE.get(), 0);
     assert!(!RitualId::new(17).is_none());
+}
+
+// ===========================================================================
+// PHASE-10. The emotion weight table.
+// ===========================================================================
+//
+// The third config file in this crate, and the one with the most riding on it:
+// `emotion_weights.toml` is where the product decides that a composed Hindu ceremony is
+// not an empty gallery. Section 12's first failure mode is cultural bias towards Western
+// expressiveness, and these tests are what stop an edit reintroducing it silently.
+
+#[test]
+fn the_shipped_weights_load() {
+    let weights = EmotionWeights::embedded().expect("the shipped emotion weights load");
+    assert!(weights.version() >= 1, "the table must carry a version");
+    assert!(
+        weights.scene_count() >= 20,
+        "every scene worth arguing about should have a row; found {}",
+        weights.scene_count()
+    );
+    // Five of the head's eight traditions carry a row, and they are exactly the five with
+    // a taxonomy in `config/rituals/`. `sikh` has none, so nobody here has established
+    // what its rites look like or how composed a couple are during them, and a multiplier
+    // invented without that is a guess with a version number. `mixed` and `unclear` are
+    // abstentions. All three fall back to the neutral case.
+    let with_taxonomy = std::fs::read_dir("config/rituals")
+        .expect("the ritual taxonomies are readable")
+        .filter_map(Result::ok)
+        .count();
+    assert_eq!(
+        weights.tradition_count(),
+        with_taxonomy,
+        "every tradition with a taxonomy needs a weight row, and no others"
+    );
+    assert!(
+        with_taxonomy < TRADITIONS.len(),
+        "the head knows more traditions than this product has rites for; that gap is          deliberate and is recorded in the phase 10 exit report"
+    );
+}
+
+#[test]
+fn composure_outranks_a_smile_in_every_ceremony_scene() {
+    // The inversion the file exists for. Not a preference: in these four scenes the
+    // couple are still by convention, and a table that weighted a smile above composure
+    // would deliver a wedding with no wedding in it.
+    let weights = EmotionWeights::embedded().expect("weights load");
+    for scene in [
+        SceneId::Ceremony,
+        SceneId::Ritual,
+        SceneId::Vows,
+        SceneId::Rings,
+    ] {
+        let row = weights.for_scene(scene, None);
+        assert!(
+            row.composed() >= row.smile(),
+            "{scene}: composure {:.2} must not sit below smile {:.2}",
+            row.composed(),
+            row.smile()
+        );
+    }
+}
+
+#[test]
+fn the_tradition_multipliers_move_composure_the_right_way() {
+    let weights = EmotionWeights::embedded().expect("weights load");
+    let base = weights.for_scene(SceneId::Ritual, None).composed();
+    let hindu = weights.for_scene(SceneId::Ritual, Some("hindu")).composed();
+    let christian = weights
+        .for_scene(SceneId::Ritual, Some("christian"))
+        .composed();
+    assert!(
+        hindu >= base,
+        "a Hindu rite must not weight composure below the neutral default"
+    );
+    assert!(
+        (christian - base).abs() < 1e-6,
+        "the Christian multipliers are 1.0 on purpose; they must change nothing"
+    );
+}
+
+#[test]
+fn every_emotion_rationale_is_long_enough_to_be_a_reason() {
+    // The rule with the most friction and the most value, for the third file running.
+    // A loader that refuses is only useful if something proves it refuses.
+    let text = std::fs::read_to_string("config/emotion_weights.toml").expect("read the table");
+    let broken = text.replace(
+        "rationale = \"Identity until there is labelled keeper/reject data to fit on. See condition C4.\"",
+        "rationale = \"short\"",
+    );
+    let refusal = EmotionWeights::parse("emotion_weights.toml", &broken)
+        .expect_err("a rationale under the floor must be refused");
+    assert_eq!(refusal.code.0, "AURA-ML-5039");
+}
+
+#[test]
+fn a_saturating_ranker_coefficient_is_refused() {
+    // Past eight the logistic saturates and every frame in a wedding scores 0.00 or
+    // 1.00: a ranking that carries no information and looks like a working one.
+    let text = std::fs::read_to_string("config/emotion_weights.toml").expect("read the table");
+    let broken = text.replace("subject_expression = 3.40", "subject_expression = 40.0");
+    let refusal = EmotionWeights::parse("emotion_weights.toml", &broken)
+        .expect_err("a saturating coefficient must be refused");
+    assert_eq!(refusal.code.0, "AURA-ML-5039");
+}
+
+#[test]
+fn a_non_monotone_calibration_is_refused() {
+    // A calibration that reorders frames is not a calibration.
+    let text = std::fs::read_to_string("config/emotion_weights.toml").expect("read the table");
+    let broken = text.replacen(
+        "y = [0.0, 0.25, 0.5, 0.75, 1.0]",
+        "y = [0.0, 0.75, 0.5, 0.25, 1.0]",
+        1,
+    );
+    let refusal = EmotionWeights::parse("emotion_weights.toml", &broken)
+        .expect_err("a non-monotone map must be refused");
+    assert_eq!(refusal.code.0, "AURA-ML-5039");
+}
+
+#[test]
+fn a_tradition_with_no_taxonomy_is_refused() {
+    // A weight that can never be selected is a weight nobody will notice is wrong.
+    let text = std::fs::read_to_string("config/emotion_weights.toml").expect("read the table");
+    let broken = text.replace("[tradition.civil]", "[tradition.klingon]");
+    let refusal = EmotionWeights::parse("emotion_weights.toml", &broken)
+        .expect_err("an unknown tradition must be refused");
+    assert_eq!(refusal.code.0, "AURA-ML-5039");
+}
+
+#[test]
+fn a_scene_with_every_channel_at_zero_is_refused() {
+    // A whole scene silently ranked at the floor reads to a photographer as "the product
+    // dislikes this kind of photograph" rather than as a config mistake.
+    let text = std::fs::read_to_string("config/emotion_weights.toml").expect("read the table");
+    let zeroed = "[scene.cake]
+rationale = \"a deliberately broken row for the test\"
+                  smile = 0.0
+genuineness = 0.0
+laughter = 0.0
+tears = 0.0
+                  surprise = 0.0
+tenderness = 0.0
+composed = 0.0
+";
+    let broken = text.replace("[scene.cake]", &format!("{zeroed}[scene.cake_unused]"));
+    let refusal = EmotionWeights::parse("emotion_weights.toml", &broken)
+        .expect_err("an all-zero scene must be refused");
+    assert_eq!(refusal.code.0, "AURA-ML-5039");
+}
+
+#[test]
+fn the_calibration_ships_as_the_identity() {
+    // Condition C4 of the phase 10 exit report, checked rather than asserted in prose.
+    // The machinery is real - `Calibration::new` refuses a non-monotone map, and the test
+    // above proves it - and there is no labelled keeper/reject data here to fit on.
+    let weights = EmotionWeights::embedded().expect("weights load");
+    assert!(
+        weights.calibration_is_identity(),
+        "the shipped isotonic layer is the identity until there is data to fit it on"
+    );
 }

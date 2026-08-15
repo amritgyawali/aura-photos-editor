@@ -131,6 +131,7 @@ fn context_for(frame: &fixtures::Frame) -> FrameContext {
             megapixels: 24.2,
         },
         scene_known: true,
+        tears: false,
     }
 }
 

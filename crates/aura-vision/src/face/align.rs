@@ -455,3 +455,154 @@ pub fn from_json(text: &str) -> Option<Landmarks> {
     }
     Some(out)
 }
+
+// ---------------------------------------------------------------------------
+// The two-point path
+// ---------------------------------------------------------------------------
+
+/// Warp a face into the canonical 112 px crop from **two** eye points in pixels.
+///
+/// **A two-point similarity, not [`alignment_for`]'s five-point one, and the difference
+/// is worth stating.** [`similarity_from_points`] solves a least-squares fit over five
+/// landmarks - two eyes, the nose and two mouth corners - which is more robust to one bad
+/// landmark and is what the *recogniser* needs. Two points is what
+/// `aura_core::FaceRef` carries, because the ADR-0019 amendment deliberately left the
+/// nose and the mouth corners out: they are the half of the landmark set that makes a
+/// face identifiable, and a type that ranks subjects has no business holding them.
+///
+/// Two points determine a similarity transform exactly - scale, rotation and translation -
+/// which is all the alignment an eye-state or an expression question needs: it puts the
+/// eyes on a horizontal line at a known separation, which is precisely the normalisation
+/// that makes a head tilted into a hug comparable with a head held level.
+///
+/// What is lost is robustness to a single mis-detected eye. A face whose landmarks are
+/// wrong produces a crop that is wrong, and any head then answers about the wrong pixels.
+/// The mitigation is `FaceRef::has_eyes` and the quality gate phase 06 already applies.
+///
+/// Lives here rather than in either brain crate because **two phases read it**: phase
+/// 09's eye state and phase 10's expression head take the same 112 px crop of the same
+/// face, and two copies of a warp is two crops that drift apart while looking identical.
+/// `aura-brain-photo` and `aura-brain-wedding` deliberately do not depend on each other,
+/// so this is the only place both can see.
+#[must_use]
+pub fn warp_crop_from_eyes(
+    rgb: &[u8],
+    width: usize,
+    height: usize,
+    left_eye: [f32; 2],
+    right_eye: [f32; 2],
+) -> Vec<u8> {
+    let side = FACE_CROP_SIDE;
+    let mut out = vec![0u8; side * side * 3];
+    if width == 0 || height == 0 {
+        return out;
+    }
+
+    let [sx0, sy0] = left_eye;
+    let [sx1, sy1] = right_eye;
+    let from_x = sx1 - sx0;
+    let from_y = sy1 - sy0;
+    let source_span = from_x.hypot(from_y);
+    if source_span <= f32::EPSILON {
+        return out;
+    }
+
+    let (Some(canonical_left), Some(canonical_right)) =
+        (ARCFACE_REFERENCE.first(), ARCFACE_REFERENCE.get(1))
+    else {
+        return out;
+    };
+    let onto_x = canonical_right[0] - canonical_left[0];
+    let onto_y = canonical_right[1] - canonical_left[1];
+    let target_span = onto_x.hypot(onto_y);
+
+    // The inverse transform: for each destination pixel, where in the source it came
+    // from. Inverse rather than forward, because a forward warp leaves holes.
+    let scale = source_span / target_span;
+    let angle = from_y.atan2(from_x) - onto_y.atan2(onto_x);
+    let (sin, cos) = angle.sin_cos();
+    let a = cos * scale;
+    let b = -sin * scale;
+
+    for row in 0..side {
+        for column in 0..side {
+            let dx = column as f32 - canonical_left[0];
+            let dy = row as f32 - canonical_left[1];
+            let sx = a.mul_add(dx, b * dy) + sx0;
+            let sy = (-b).mul_add(dx, a * dy) + sy0;
+            let sample = sample_bilinear_clamped(rgb, width, height, sx, sy);
+            let base = (row * side + column) * 3;
+            for (channel, value) in sample.into_iter().enumerate() {
+                if let Some(slot) = out.get_mut(base + channel) {
+                    *slot = value;
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Bilinear sample of an interleaved 8-bit sRGB buffer, clamped at the edges.
+///
+/// Bilinear rather than the box filter phase 05 uses elsewhere, and the reason is the
+/// direction of the resample: an aligned face crop is usually an *upscale* of a 90 px
+/// face to 112 px, and a box filter on an upscale is nearest-neighbour with extra steps.
+///
+/// Clamped rather than black outside the frame, unlike [`warp_crop`]. The two-point path
+/// is used on faces that phase 06 has already gated for quality, so an edge face here is
+/// a face whose crop is mostly inside; clamping keeps the eye region readable where a
+/// black border would give the head a hard edge to answer about.
+fn sample_bilinear_clamped(rgb: &[u8], width: usize, height: usize, x: f32, y: f32) -> [u8; 3] {
+    if width == 0 || height == 0 {
+        return [0; 3];
+    }
+    let cx = x.clamp(0.0, (width - 1) as f32);
+    let cy = y.clamp(0.0, (height - 1) as f32);
+    let x0 = cx.floor() as usize;
+    let y0 = cy.floor() as usize;
+    let x1 = (x0 + 1).min(width - 1);
+    let y1 = (y0 + 1).min(height - 1);
+    let fx = cx - x0 as f32;
+    let fy = cy - y0 as f32;
+
+    let mut out = [0u8; 3];
+    for (channel, slot) in out.iter_mut().enumerate() {
+        let at = |px: usize, py: usize| -> f32 {
+            f32::from(
+                rgb.get((py * width + px) * 3 + channel)
+                    .copied()
+                    .unwrap_or(0),
+            )
+        };
+        let top = at(x0, y0) + (at(x1, y0) - at(x0, y0)) * fx;
+        let bottom = at(x0, y1) + (at(x1, y1) - at(x0, y1)) * fx;
+        *slot = (top + (bottom - top) * fy).round().clamp(0.0, 255.0) as u8;
+    }
+    out
+}
+
+/// Turn one aligned 112 px crop into a head's input tensor.
+///
+/// NCHW, `0..1`, sRGB, with nothing subtracted - the same three steps and the same
+/// absence of parameters as `aura_vision::face::embed::preprocess_crop`, because every
+/// manifest that takes this crop declares `range: 0..1`, and a normalisation the
+/// manifest does not describe is drift waiting to happen.
+///
+/// Shared by phases 06, 09 and 10 for [`warp_crop_from_eyes`]'s reason.
+#[must_use]
+pub fn preprocess_face_crop(crop: &[u8]) -> Vec<f32> {
+    let side = FACE_CROP_SIDE;
+    let mut out = vec![0.0f32; 3 * side * side];
+    for channel in 0..3 {
+        for row in 0..side {
+            for column in 0..side {
+                let source = (row * side + column) * 3 + channel;
+                let destination = channel * side * side + row * side + column;
+                if let Some(slot) = out.get_mut(destination) {
+                    *slot = f32::from(crop.get(source).copied().unwrap_or(0)) / 255.0;
+                }
+            }
+        }
+    }
+    out
+}

@@ -592,6 +592,10 @@ fn context_for(frame: &Frame, scene: SceneId, _photo: PhotoId) -> FrameContext {
             megapixels: 24.2,
         },
         scene_known: true,
+        // Phase 10's third intent rule. False here, which is what a wedding with no
+        // emotion pass gets and is exactly what phase 09 shipped with: the gate that
+        // exercises the rule with tears present is `aura-cli verify --phase 10`.
+        tears: false,
     }
 }
 

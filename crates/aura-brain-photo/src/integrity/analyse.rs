@@ -58,7 +58,15 @@ use crate::integrity::score::{self, SceneCalibration};
 /// not a comment. It is written into `image_integrity.analysis_ver`, and two verdicts
 /// made under different values of it are not comparable: `AURA-ML-5033` exists so that
 /// comparison never happens silently.
-pub const ANALYSIS_VER: u16 = 1;
+///
+/// **Two, not one.** Phase 10 wired section 6.4's third intent rule - tears - which
+/// phase 09 shipped defined and always false. A frame judged under version 1 and the same
+/// frame judged under version 2 can differ: a tearful closed-eye photograph that carried
+/// `EYES_CLOSED` now carries `EYES_CLOSED_OK`. That is the change condition C4 of the
+/// phase 09 exit report asked for, and the bump is what makes every stored verdict
+/// pending so the background pass re-measures rather than leaving two vintages side by
+/// side.
+pub const ANALYSIS_VER: u16 = 2;
 
 /// The pixel rung the integrity pass reads.
 ///
@@ -123,6 +131,18 @@ pub struct FrameContext {
     /// things: a classified-as-unknown frame has been looked at and an unclassified one
     /// has not, and only the second should cost the verdict confidence.
     pub scene_known: bool,
+    /// True when phase 10 read this frame as containing tears.
+    ///
+    /// Section 6.4's third intent rule, and **the field phase 09 shipped inert**. It is
+    /// filled by `IntegrityPass::with_emotion` from `EmotionService::of_image`, gated on
+    /// `aura_core::contract::emotion::TEARS_CERTAIN`.
+    ///
+    /// Frame-level rather than per-face, deliberately. A tear on the bride's cheek makes
+    /// the groom's closed eyes in the same frame legible too, because what the rule is
+    /// really about is whether this is *a moment where people have their eyes shut* -
+    /// and requiring the tear and the closure to be on the same face would exonerate
+    /// half of the frames the rule exists for.
+    pub tears: bool,
 }
 
 impl Default for FrameContext {
@@ -140,6 +160,7 @@ impl Default for FrameContext {
             couple: Vec::new(),
             exif: FrameExif::default(),
             scene_known: false,
+            tears: false,
         }
     }
 }
@@ -545,9 +566,10 @@ impl Analyser {
                 IntentInput {
                     scene: context.scene,
                     laughing: eyes::laughing_from_geometry(face),
-                    // Phase 10's rule. Always false here; see this module's `eyes`
-                    // sibling for why the field exists anyway.
-                    tears: false,
+                    // Phase 10's rule, wired. False when no emotion pass has run, which
+                    // is the case phase 09 shipped with and degrades in the safe
+                    // direction.
+                    tears: context.tears,
                     partner_also_closed: both_closed && is_partner,
                 },
             );

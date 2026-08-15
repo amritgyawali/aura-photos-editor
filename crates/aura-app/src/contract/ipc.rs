@@ -2135,3 +2135,346 @@ pub enum IntegrityEvent {
         model: String,
     },
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-10. The emotion surface: what a photograph is worth, why, and what the
+// photographer may say back. Frozen; see
+// `docs/adr/ADR-0022-emotion-ipc-surface.md`.
+//
+// Seven commands. Five are reads, and the two that change anything are both the
+// photographer telling the product it is wrong: `prefer_frame` records a pairwise
+// comparison, and `set_moment_peak` overrides a peak choice.
+//
+// **There is no command here that keeps, delivers, or builds a gallery.**
+// `ranked_by_emotion` comes closest and deliberately stops short: it returns an
+// ordering, which is this phase's headline feature, and section 2.2 puts the
+// choosing in phase 12. An ordering looks even more like a selection than phase
+// 09's score did, which is why the boundary is restated on the types here.
+//
+// **The panel is told which reasons are caveats.** `EmotionReasonDto::caveat` is
+// computed here and sent rather than derived in the interface from a list of
+// slugs. Three of the twenty codes say how much to trust the number rather than
+// what is in the photograph, and a UI that worked that out for itself would work
+// it out wrong exactly once - which is the argument
+// `IntegrityReasonDto::exoneration` already made one phase ago.
+// ---------------------------------------------------------------------------
+
+/// One thing that moved a frame's emotion score.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmotionReasonDto {
+    /// The stable slug. `docs/emotion-and-moments.md` documents every one.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// Positive for something the frame earned, negative for something it cost.
+    ///
+    /// The opposite sign convention from phase 09's, and that is the two phases
+    /// rather than an inconsistency: a technical verdict explains penalties and
+    /// an emotion score explains what it found.
+    pub weight: f32,
+    /// True when this reason is a note about the reading rather than about the
+    /// photograph.
+    pub caveat: bool,
+    /// The face to show. Absent when the reason is about the whole frame.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// One face's expression, as the card lists them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FaceExpressionDto {
+    /// The face phase 06 found.
+    pub face_id: String,
+    /// Who it is, when the identity pass has assigned somebody.
+    pub identity_id: Option<String>,
+    /// The eight continuous channels, in `FaceExpression::channels` order.
+    ///
+    /// An array rather than eight named fields, because the card draws them as
+    /// eight bars in a fixed order and `channelNames` beside it is what names
+    /// them. Eight named fields would make adding a ninth a wire change in three
+    /// places.
+    pub channels: Vec<f32>,
+    /// Where this face is looking: `unknown`, `camera`, `partner`, `officiant`
+    /// or `away`.
+    pub gaze: String,
+    /// How sure the head is about this face, `0..1`.
+    pub confidence: f32,
+    /// True when the tear reading is above the certainty gate.
+    ///
+    /// Sent rather than compared in the UI against a threshold the UI would then
+    /// own. Section 12's fourth failure mode is a false tear, and the constant
+    /// that guards it lives in `aura_core::contract::emotion::TEARS_CERTAIN`.
+    pub reads_as_crying: bool,
+    /// True when the smile reads as held for the camera rather than caught.
+    pub posed_smile: bool,
+    /// The crop to show.
+    pub crop: CropRectDto,
+}
+
+/// One detected interaction.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractionDto {
+    /// The stable slug.
+    pub kind: String,
+    /// The photographer-facing label, for the chip.
+    pub title: String,
+    /// How strongly the head detected it, `0..1`.
+    pub strength: f32,
+    /// True when this is one of the four milestones a client buys a print of.
+    pub milestone: bool,
+}
+
+/// One photograph's emotion reading, for the Emotion card.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmotionDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Every face, in phase 06's detection order.
+    pub faces: Vec<FaceExpressionDto>,
+    /// The names of the eight channels, in `FaceExpressionDto::channels` order.
+    ///
+    /// Sent once per reading rather than hard-coded in the interface, so that the
+    /// order can never drift between the model, the store and the bars a
+    /// photographer looks at.
+    pub channel_names: Vec<String>,
+    /// The interactions detected, strongest first.
+    pub interactions: Vec<InteractionDto>,
+    /// True when two people are looking at each other.
+    pub mutual_gaze: bool,
+    /// Where the frame sits on its moment's curve, `0..1`.
+    pub peak_proximity: f32,
+    /// The frame this one reacts to, when it reacts to one.
+    pub reaction_of: Option<String>,
+    /// The scene-weighted, calibrated composite, `0..1`.
+    ///
+    /// **Not a keep decision.** A frame at 0.22 may be the only photograph of the
+    /// ring exchange, and phase 12 knows that.
+    pub emotion_score: f32,
+    /// How important the moment is to the story, raised only by a cloud answer.
+    pub narrative_weight: f32,
+    /// Which scene the weights were conditioned on.
+    pub scene: String,
+    /// Why, strongest credit first.
+    pub reasons: Vec<EmotionReasonDto>,
+    /// How sure the whole reading is, `0..1`.
+    pub confidence: f32,
+    /// `local`, `cloud` or `user`.
+    pub source: String,
+    /// Which heads produced the readings.
+    pub model_ver: u16,
+    /// Which build's arithmetic produced the derived numbers.
+    pub analysis_ver: u16,
+    /// Which weight and ranker table produced the score.
+    pub weights_ver: u16,
+}
+
+/// One moment's peak, for the browser's indicator.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MomentPeakDto {
+    /// The moment.
+    pub moment_id: String,
+    /// The strongest frame.
+    pub photo_id: String,
+    /// Its zero-based position in the moment.
+    pub index: u32,
+    /// How many frames the moment held when this was computed.
+    pub frames: u32,
+    /// How clearly the peak wins, `0..1`.
+    pub margin: f32,
+    /// `expression`, `kiss_apex`, `tear_release`, `bouquet_in_air`, `ring_slide`
+    /// or `flat`.
+    pub kind: String,
+    /// True when the margin cleared the floor and the kind is not `flat`.
+    ///
+    /// Sent rather than compared in the UI. A moment with no separated peak is a
+    /// common and correct answer, and the indicator has to be able to draw "no
+    /// clear best frame" rather than pointing at a rounding error.
+    pub resolved: bool,
+    /// How sure the choice is, `0..1`.
+    pub confidence: f32,
+    /// Why this frame.
+    pub reasons: Vec<EmotionReasonDto>,
+    /// True when the photographer picked it.
+    pub user_chosen: bool,
+}
+
+/// One reaction link, for the pair viewer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReactionLinkDto {
+    /// The frame something happened in.
+    pub action: String,
+    /// The frame somebody reacted in.
+    pub reaction: String,
+    /// Milliseconds from action to reaction, signed.
+    pub gap_ms: i64,
+    /// How much this adds to the reaction's score, `0..1`.
+    pub bonus: f32,
+    /// How sure the link is, `0..1`.
+    pub confidence: f32,
+    /// Why these two frames.
+    pub reasons: Vec<EmotionReasonDto>,
+}
+
+/// One frame in an emotion ordering.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RankedByEmotionDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Its emotion score, `0..1`.
+    pub emotion_score: f32,
+}
+
+/// What the Emotion panel's header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmotionStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a reading.
+    pub scored: u32,
+    /// Fraction of the project with a reading, `0..1`. Denominator: every photo.
+    pub coverage: f32,
+    /// Fraction of scored frames that carried at least one face, `0..1`.
+    ///
+    /// The second number, and the one that matters most when it is low: seven of
+    /// the nine ranker terms come from faces, so a wedding at 3 % face-aware has
+    /// been ranked on very nearly nothing.
+    pub face_aware: f32,
+    /// Moments in the project.
+    pub moments: u32,
+    /// Moments whose peak separated itself.
+    pub peaked: u32,
+    /// Fraction of moments with a resolved peak, `0..1`.
+    pub peak_rate: f32,
+    /// Reaction links found.
+    pub links: u32,
+    /// How many frames carry each interaction, in `Interaction::ALL` order.
+    pub interaction_counts: Vec<u32>,
+    /// The slugs those counts are in, in the same order.
+    pub interaction_names: Vec<String>,
+    /// Mean emotion score over scored frames.
+    pub mean_score: f32,
+    /// Mean peak margin over resolved peaks.
+    pub mean_margin: f32,
+    /// Pairwise preferences the photographer has recorded.
+    pub preferences: u32,
+    /// Which heads produced the readings. The lowest present.
+    pub model_ver: u16,
+    /// Which build's arithmetic. The lowest present.
+    pub analysis_ver: u16,
+    /// Which weight table. The lowest present.
+    pub weights_ver: u16,
+}
+
+/// Ask for a project's emotion ordering.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RankedInput {
+    /// The wedding.
+    pub project_id: String,
+    /// How many frames to return. Clamped.
+    pub limit: Option<u32>,
+}
+
+/// Record that the photographer would deliver one of two frames.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreferInput {
+    /// The frame they would deliver.
+    pub winner_id: String,
+    /// The frame they would not.
+    pub loser_id: String,
+}
+
+/// Record that the photographer disagrees with a moment's peak frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPeakInput {
+    /// The moment.
+    pub moment_id: String,
+    /// The frame they would lead with.
+    pub photo_id: String,
+}
+
+/// Start a whole-project emotion pass.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScoreEmotionInput {
+    /// The wedding.
+    pub project_id: String,
+    /// A handle `cancel_job` can reach the pass by.
+    pub cancel_id: Option<String>,
+}
+
+/// What one emotion pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmotionPassDto {
+    /// Photographs scored.
+    pub scored: u32,
+    /// Photographs that could not be scored.
+    pub failed: u32,
+    /// Faces read.
+    pub faces: u32,
+    /// Moments whose curve was built.
+    pub moments: u32,
+    /// Moments whose peak separated itself.
+    pub peaked: u32,
+    /// Reaction links written.
+    pub links: u32,
+    /// Mean emotion score over the frames this pass scored.
+    pub mean_score: f32,
+    /// Milliseconds.
+    pub elapsed_ms: u64,
+    /// True when the pass was stopped.
+    pub cancelled: bool,
+}
+
+/// Emotion events pushed to the UI, mirroring section 11's four events.
+///
+/// Typed on both sides and not yet emitted, for the reason `IntegrityEvent`,
+/// `MomentEvent`, `StoryEvent` and `PeopleEvent` are not: the Tauri shell has not
+/// been launched on the development machine, so an emitter would be code nobody
+/// has run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum EmotionEvent {
+    /// `emotion.scored` - a pass finished.
+    EmotionScored {
+        /// Frames scored.
+        images: u64,
+        /// Milliseconds.
+        ms: u64,
+        /// Mean emotion score.
+        mean_score: f32,
+        /// How many frames carry each interaction, in `Interaction::ALL` order.
+        interaction_histogram: Vec<u32>,
+    },
+    /// `emotion.peaks` - the peak counters, once per pass.
+    EmotionPeaks {
+        /// Moments whose curve was built.
+        moments: u64,
+        /// Mean margin over resolved peaks.
+        mean_margin: f32,
+    },
+    /// `emotion.reactions` - the link counters, once per pass.
+    EmotionReactions {
+        /// Links written.
+        links: u64,
+        /// Mean bonus.
+        mean_bonus: f32,
+    },
+    /// `emotion.cloud_used` - the `MomentSignificance` calls a project made.
+    EmotionCloudUsed {
+        /// Calls made.
+        calls: u64,
+        /// What they cost.
+        cost_usd: f32,
+    },
+}

@@ -37,6 +37,7 @@ If a requested change would break an invariant, stop and write an ADR proposing 
 6. **QA gate (QAL + QAIQ + PERF).** Unit + integration + golden-image + perceptual + performance suites must be green on the reference weddings.
 7. **Phase gate (CTO + PM + EM).** All acceptance criteria in section 13 pass, telemetry is live, docs updated, demo recorded. Only then does the next phase start.
 8. **Escalation.** Any blocker older than one working day goes to EM; any invariant conflict goes to CTO; any "we should ship it slightly broken" goes to PM and is written down.
+9. **Land it (EM).** Commit on `feat/phase-NN-<slug>` and **push**, always, as the last action of the phase. Not on request - by default. The gate has exited 0, the exit report is written, and until it is pushed the phase exists on exactly one disk.
 
 ### Branch, commit and PR rules
 
@@ -44,6 +45,11 @@ If a requested change would break an invariant, stop and write an ADR proposing 
 - Conventional Commits (`feat(core): ...`, `fix(ml): ...`, `perf(render): ...`, `test(qa): ...`, `docs: ...`).
 - Every PR states: what changed, which acceptance criterion it advances, benchmark delta, and screenshots or golden-image diffs when pixels change.
 - CI must be green: `fmt`, `clippy -D warnings`, `cargo test`, `pytest`, `vitest`, golden-image diff, benchmark regression guard (<= 5 % slower), model-hash check.
+- **Commit and push at the end of every phase, without being asked.** The last action of a
+  phase is `git push` on its `feat/phase-NN-<slug>` branch, after the gate exits 0 and the
+  exit report is written. A phase that exists only in one machine's working tree is a
+  phase nobody else can review, bisect or roll back to - and the work of a whole phase is
+  too much to hold hostage to one disk. This is step 9 of the ritual below.
 
 ## 4. Definition of Done (every phase)
 

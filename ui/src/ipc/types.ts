@@ -929,3 +929,205 @@ export type IntegrityEvent =
     }
   | { kind: 'integrityEyes'; faces: number; closed: number; closedOk: number; squint: number }
   | { kind: 'integrityCameraUncalibrated'; make: string; model: string };
+
+// ---------------------------------------------------------------------------
+// PHASE-10. The emotion surface: what a photograph is worth, and why.
+//
+// Frozen; see `docs/adr/ADR-0022-emotion-ipc-surface.md`. Seven commands, five of
+// them reads, and the two that change anything are both the photographer telling
+// the product it is wrong.
+//
+// **Nothing here keeps, delivers or builds a gallery.** `rankedByEmotion` returns
+// an ordering, which is this phase's headline feature; section 2.2 puts the
+// choosing in phase 12. An ordering looks even more like a shortlist than phase
+// 09's score did, which is why the boundary is restated on the types.
+// ---------------------------------------------------------------------------
+
+export type EmotionReasonDto = {
+  /** The stable slug. `docs/emotion-and-moments.md` documents every one. */
+  code: string;
+  text: string;
+  /**
+   * Positive for something the frame earned, negative for something it cost.
+   *
+   * The opposite sign convention from `IntegrityReasonDto`, and that is the two
+   * phases rather than an inconsistency: a technical verdict explains penalties
+   * and an emotion score explains what it found.
+   */
+  weight: number;
+  /**
+   * True when this is a note about the reading rather than about the photograph.
+   *
+   * Sent rather than derived from the slug, so the panel and the harness cannot
+   * disagree about which reasons are caveats.
+   */
+  caveat: boolean;
+  evidence?: CropRectDto | null;
+};
+
+export type FaceExpressionDto = {
+  faceId: string;
+  identityId?: string | null;
+  /** The eight continuous channels, in `channelNames` order. */
+  channels: number[];
+  /** `unknown`, `camera`, `partner`, `officiant` or `away`. */
+  gaze: string;
+  confidence: number;
+  /**
+   * True when the tear reading is above the certainty gate.
+   *
+   * Sent rather than compared here against a threshold this file would then own.
+   * Section 12's fourth failure mode is a false tear.
+   */
+  readsAsCrying: boolean;
+  posedSmile: boolean;
+  crop: CropRectDto;
+};
+
+export type InteractionDto = {
+  kind: string;
+  /** The photographer-facing label, for the chip. */
+  title: string;
+  strength: number;
+  /** True for the four milestones a client buys a print of. */
+  milestone: boolean;
+};
+
+export type EmotionDto = {
+  photoId: string;
+  faces: FaceExpressionDto[];
+  /**
+   * The names of the eight channels, in `FaceExpressionDto.channels` order.
+   *
+   * Sent once per reading rather than hard-coded here, so the order can never
+   * drift between the model, the store and the bars a photographer looks at.
+   */
+  channelNames: string[];
+  interactions: InteractionDto[];
+  mutualGaze: boolean;
+  peakProximity: number;
+  reactionOf?: string | null;
+  /**
+   * The scene-weighted, calibrated composite.
+   *
+   * **Not a keep decision.** A frame at 0.22 may be the only photograph of the
+   * ring exchange.
+   */
+  emotionScore: number;
+  narrativeWeight: number;
+  scene: string;
+  reasons: EmotionReasonDto[];
+  confidence: number;
+  /** `local`, `cloud` or `user`. */
+  source: string;
+  modelVer: number;
+  analysisVer: number;
+  weightsVer: number;
+};
+
+export type MomentPeakDto = {
+  momentId: string;
+  photoId: string;
+  index: number;
+  frames: number;
+  margin: number;
+  /** `expression`, `kiss_apex`, `tear_release`, `bouquet_in_air`, `ring_slide` or `flat`. */
+  kind: string;
+  /**
+   * True when the margin cleared the floor and the kind is not `flat`.
+   *
+   * A moment with no separated peak is a common and correct answer - a bracketed
+   * detail shot has no apex - so the indicator draws "no clear best frame" rather
+   * than pointing at a rounding error.
+   */
+  resolved: boolean;
+  confidence: number;
+  reasons: EmotionReasonDto[];
+  userChosen: boolean;
+};
+
+export type ReactionLinkDto = {
+  action: string;
+  reaction: string;
+  /** Signed: negative when the reaction frame is earlier than the action frame. */
+  gapMs: number;
+  bonus: number;
+  confidence: number;
+  reasons: EmotionReasonDto[];
+};
+
+export type RankedByEmotionDto = {
+  photoId: string;
+  emotionScore: number;
+};
+
+export type EmotionStatusDto = {
+  photos: number;
+  scored: number;
+  /** Denominator: every photograph. */
+  coverage: number;
+  /**
+   * Fraction of scored frames that carried at least one face.
+   *
+   * The second number, and the one that matters most when it is low: seven of the
+   * nine ranker terms come from faces.
+   */
+  faceAware: number;
+  moments: number;
+  peaked: number;
+  peakRate: number;
+  links: number;
+  /** How many frames carry each interaction, in `interactionNames` order. */
+  interactionCounts: number[];
+  interactionNames: string[];
+  meanScore: number;
+  meanMargin: number;
+  preferences: number;
+  modelVer: number;
+  analysisVer: number;
+  weightsVer: number;
+};
+
+export type RankedInput = {
+  projectId: string;
+  limit?: number;
+};
+
+export type PreferInput = {
+  winnerId: string;
+  loserId: string;
+};
+
+export type SetPeakInput = {
+  momentId: string;
+  photoId: string;
+};
+
+export type ScoreEmotionInput = {
+  projectId: string;
+  cancelId?: string;
+};
+
+export type EmotionPassDto = {
+  scored: number;
+  failed: number;
+  faces: number;
+  moments: number;
+  peaked: number;
+  links: number;
+  meanScore: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type EmotionEvent =
+  | {
+      kind: 'emotionScored';
+      images: number;
+      ms: number;
+      meanScore: number;
+      interactionHistogram: number[];
+    }
+  | { kind: 'emotionPeaks'; moments: number; meanMargin: number }
+  | { kind: 'emotionReactions'; links: number; meanBonus: number }
+  | { kind: 'emotionCloudUsed'; calls: number; costUsd: number };

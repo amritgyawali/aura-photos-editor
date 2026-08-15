@@ -814,3 +814,48 @@ summary      = "A camera body has no calibration row, so sharpness and noise wer
 user_message = "AURA has not measured this camera model yet, so it is judging sharpness and noise more cautiously on those photographs. They are all still usable."
 runbook      = "docs/runbooks/AURA-ML-5037.md"
 introduced   = "PHASE-09"
+
+[[error]]
+code         = "AURA-ML-5038"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored emotion scores came from different heads, arithmetic or a different weight table"
+user_message = "AURA has improved how it reads expression and moments, so it is re-scoring this wedding in the background. Your own choices are kept."
+runbook      = "docs/runbooks/AURA-ML-5038.md"
+introduced   = "PHASE-10"
+
+[[error]]
+code         = "AURA-ML-5039"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The emotion weight table was refused"
+user_message = "AURA could not load the settings that decide what counts as a moment in each part of the day, so it has not scored anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5039.md"
+introduced   = "PHASE-10"
+
+[[error]]
+code         = "AURA-ML-5040"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be scored for expression or interaction"
+user_message = "AURA could not read the expressions in one photograph and has left it unscored rather than guessing. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5040.md"
+introduced   = "PHASE-10"
+
+[[error]]
+code         = "AURA-ML-5041"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A preference or a peak-frame choice was refused"
+user_message = "AURA could not record that choice. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5041.md"
+introduced   = "PHASE-10"
+
+[[error]]
+code         = "AURA-ML-5042"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A moment's strongest frame could not be separated from its neighbours"
+user_message = "Several frames of one moment are equally strong, so AURA has not picked a best one. They are all still there and you can choose."
+runbook      = "docs/runbooks/AURA-ML-5042.md"
+introduced   = "PHASE-10"
