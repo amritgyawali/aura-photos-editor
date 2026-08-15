@@ -2,6 +2,99 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 08 - Smart burst grouping and duplicate detection
+
+Three thousand loose files become a few hundred moments. From this phase onward the
+product works on **moments** rather than on files, and the difference is not efficiency:
+rejecting a burst is a moment lost, whereas rejecting individual frames is tidying, and
+phase 12's coverage guarantees are written against the first of those.
+
+The first phase since 02 that ships no model. Grouping is arithmetic over phase 05's
+vectors and phase 01's timestamps, which is why three of section 11's four budget rows
+are met by two to three orders of magnitude rather than by a margin.
+
+### Added
+
+- `aura-brain-wedding::moments`: seven modules that turn a timeline into a two-tier
+  structure. A **moment** is one thing that happened; a **burst** is one press-and-hold of
+  the shutter inside it. Fourteen frames of a bouquet toss are one moment, and the six
+  that came off at 10 fps as it left her hand are one burst inside that.
+- An adaptive cadence estimator, per camera. The burst window is
+  `clamp(2.5 x median_interval, 0.7 s, 8 s)` over a rolling 60-second neighbourhood, so
+  a 10 fps burst and a ceremony shot in ones and twos are both handled by the same rule.
+  Two photographers interleaved on one timeline have a combined median of roughly half
+  of either's, which would halve the window for both - so cadence is estimated per body
+  and the merge happens later, where it can be justified rather than inferred from an
+  arithmetic accident.
+- A time-windowed similarity graph, never all pairs. A 4,000-frame wedding has eight
+  million pairs and about sixty thousand candidates, and only the second number gets
+  scored - which is the whole of why 4,000 images group in ten milliseconds against a
+  six-second budget.
+- **Time proximity became evidence rather than only a gate.** Section 2.1 lists it first
+  among the grouping signals and section 6.2's four-term score has no time term at all;
+  without one, a ceremony shot at one frame every eight seconds chains into a single
+  moment for as long as the photographer keeps shooting, because every consecutive pair
+  is inside the eight-second clamp and every consecutive pair looks alike - the altar has
+  not moved. The four documented weights are untouched and their sum is scaled by a
+  proximity factor. ADR-0017 section 3.
+- Scene-conditioned grouping thresholds in `moment_profiles.toml`, a sibling of
+  `scene_profiles.toml` with the same rules: no rationale, no load. Ten scenes are argued
+  over and twelve take the defaults, and the file names which twelve so a reader can see
+  what was actually decided. `dance_floor` groups at 0.60 and `family_portrait` at 0.76,
+  because two consecutive family groups are visually almost identical and are two
+  different deliverables.
+- Duplicate classification as a **conjunction** of three independent tests, not a
+  disjunction: a difference hash within four bits, an embedding distance within 0.03, and
+  the faces in the same places. A hash is blind to a blink, an embedding is blind to a
+  stop of exposure, and the face overlap is blind to everything else - three blind tests
+  that must all agree is a far stronger claim than one confident one, which is what
+  section 10.1's demand for 0.98 recall at 0.95 precision actually asks for.
+- Cross-camera merging on temporal overlap above 60 % and medoid distance under 0.12,
+  measured against the *shorter* of the two spans - a two-second burst inside a
+  forty-second sequence overlaps their union by 5 % and is entirely inside it. The merged
+  moment keeps its per-camera bursts intact, so a bad merge is split back along the line
+  it was joined on.
+- Migration 8: `moments`, `moment_images`, `duplicates` and `moment_edits`, with three
+  version columns because they invalidate three different things.
+- Nine IPC commands, a stacked moments grid and a side-by-side duplicate review panel.
+- Five error codes, `AURA-ML-5028` to `AURA-ML-5032`, each with a runbook.
+
+### Fixed
+
+- **AURA could not see a burst at all on a real camera file.** EXIF's `DateTimeOriginal`
+  has whole-second resolution, so fourteen frames of a 10 fps burst carry one timestamp
+  between them; the fraction lives in `SubSecTimeOriginal`, which phase 01 stores
+  separately in `photo.sub_sec`. Every unit test passed and the phase gate failed.
+  Reconstructing the fraction took grouping accuracy from 0.000 to 1.000 on two of the
+  five regression patterns. It is the most consequential thing found in this phase and no
+  synthetic fixture would ever have exposed it.
+
+### Changed
+
+- `catalog.count` accepts the four new tables.
+- `photo.camera_serial` is now a documented fallback when a `camera` row does not exist
+  yet, so a project part-way through import does not look like a single-body wedding.
+
+### Known limits
+
+- **The embedding underneath is a placeholder** (phase 05 condition C10) and it is the
+  largest term in the grouping score. Every number in this phase is measured against
+  authored ground truth, and none of them is a claim about a real wedding's pixels. This
+  is condition C1 in `docs/progress/PHASE-08-EXIT.md` and it is a Sev 2 trigger.
+- Phase 06's two face signals are not wired in. `PeopleService` has no bulk accessor for
+  either, and adding one is a phase 06 contract change. Every resulting degradation is in
+  the safe direction: a skipped face test makes a near-identical claim *harder*.
+- Extra storage per image is 319 bytes against a 200-byte budget, waived at 340 by PERF
+  and CTO in ADR-0017 section 8. Four schema decisions took it down from 720; the
+  remaining gap is 40-character text ids and the reasons invariant 2 requires.
+- Nobody has looked at a moment stack for a wedding they attended.
+
+### Not built here, deliberately
+
+Choosing the winner of a burst. That is phase 12, and the boundary is structural rather
+than remembered: no `culled` column, no rank, no rejection anywhere on the IPC surface,
+and `keep_hint` spelled *hint* in the contract, the schema, the wire and the panel.
+
 ## Phase 07 - Wedding scene AI and story timeline segmentation
 
 The app reads the wedding as a story. Every photograph gets a scene label, fourteen

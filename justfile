@@ -104,6 +104,21 @@ phase-06-verify:
 phase-07-verify:
     cargo run --release --package aura-cli -- verify --phase 07 --work target/phase07-verify
 
+# The phase 08 gate: the migration, the thresholds, a grouping whose counts
+# reconcile, the five burst patterns measured by ARI, a duplicate set with a
+# confidence, two shooters on one instant, a hand split that survives a
+# re-grouping, an undo, and two runs that agree. Never touches a network and
+# never opens an image file.
+phase-08-verify:
+    cargo run --release --package aura-cli -- verify --phase 08 --work target/phase08-verify
+
+# The burst-grouping metrics, from the Python side. `--self-test` proves the
+# metrics reject both degenerate groupers; `--ablate` prints what each labelled
+# pattern is there to test.
+burst-eval:
+    python ml/eval/burst_eval.py --self-test
+    python ml/eval/burst_eval.py --ablate
+
 # Weight-space parity for every fp32/variant pair, plus the cross-runtime check
 # against onnxruntime when it happens to be installed for Python.
 parity:

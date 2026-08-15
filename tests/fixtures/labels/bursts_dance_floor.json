@@ -1,0 +1,28 @@
+{
+  "schema": "aura.burst-labels.v1",
+  "name": "dance_floor",
+  "description": "Five takes over four minutes on a dance floor, eleven seconds between takes.",
+  "expected_moments": 5,
+  "why": "Section 10.1's 'a 5-minute dance sequence becomes multiple moments'. The room, the light and the crowd are constant for the whole four minutes, so the only structure is the photographer's rhythm: a short burst, a pause, another burst. Eleven seconds is deliberately below the twenty-second hard-gap rule, so the gap alone cannot separate these and the cadence window has to.",
+  "labelled_by": "PHASE-08 section 8 step 9, authored ground truth",
+  "frames": [
+    { "offset_ms": 0, "camera": 1, "moment": 0 },
+    { "offset_ms": 180, "camera": 1, "moment": 0 },
+    { "offset_ms": 360, "camera": 1, "moment": 0 },
+    { "offset_ms": 540, "camera": 1, "moment": 0 },
+    { "offset_ms": 11000, "camera": 1, "moment": 1 },
+    { "offset_ms": 11180, "camera": 1, "moment": 1 },
+    { "offset_ms": 11360, "camera": 1, "moment": 1 },
+    { "offset_ms": 22000, "camera": 1, "moment": 2 },
+    { "offset_ms": 22180, "camera": 1, "moment": 2 },
+    { "offset_ms": 22360, "camera": 1, "moment": 2 },
+    { "offset_ms": 22540, "camera": 1, "moment": 2 },
+    { "offset_ms": 33000, "camera": 1, "moment": 3 },
+    { "offset_ms": 33180, "camera": 1, "moment": 3 },
+    { "offset_ms": 33360, "camera": 1, "moment": 3 },
+    { "offset_ms": 44000, "camera": 1, "moment": 4 },
+    { "offset_ms": 44180, "camera": 1, "moment": 4 },
+    { "offset_ms": 44360, "camera": 1, "moment": 4 },
+    { "offset_ms": 44540, "camera": 1, "moment": 4 }
+  ]
+}

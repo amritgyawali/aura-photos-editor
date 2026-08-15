@@ -235,6 +235,11 @@ impl Catalog {
             "segments",
             "segment_images",
             "scene_profiles",
+            // PHASE-08.
+            "moments",
+            "moment_images",
+            "duplicates",
+            "moment_edits",
         ];
         if !COUNTABLE.contains(&table) {
             return Err(statement_failed(

@@ -75,9 +75,14 @@
 
 pub mod errors;
 pub mod fixtures;
+pub mod moments;
 pub mod scene;
 pub mod story;
 
+pub use moments::{
+    GroupReport, MomentProfileRegistry, MomentStore, Moments, PassContext as MomentPassContext,
+    GROUP_VER,
+};
 pub use scene::classifier::{SceneClassifier, SceneInput, MODEL_VER, PREPROCESS_VER};
 pub use scene::pass::{run as classify_project, PassContext};
 pub use scene::profile::SceneProfileRegistry;

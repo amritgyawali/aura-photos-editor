@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use aura_brain_wedding::moments::{MomentStore, Moments};
 use aura_brain_wedding::scene::classifier::SceneClassifier;
 use aura_brain_wedding::scene::ritual::RitualClassifier;
 use aura_brain_wedding::scene::taxonomy::Taxonomy;
@@ -200,6 +201,191 @@ impl AppState {
             Arc::clone(&self.catalog),
             Arc::clone(&self.clock),
         ))
+    }
+
+    /// The moment store for this catalog. PHASE-08.
+    ///
+    /// Stateless like the story store, and a method for the same reason.
+    #[must_use]
+    pub fn moment_store(&self) -> Arc<MomentStore> {
+        Arc::new(MomentStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The grouping service, built per call.
+    ///
+    /// Not cached, for `story()`'s reason: it holds one parsed config file, parsing it
+    /// is under a millisecond, and caching it would mean an edited
+    /// `moment_profiles.toml` needed a restart.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5031` when the shipped grouping thresholds will not load. Propagated
+    /// rather than substituted: a build whose threshold table is broken must not open a
+    /// project, because every grouping decision would silently change.
+    pub fn moments(&self) -> AuraResult<Arc<Moments>> {
+        Ok(Arc::new(Moments::new(
+            self.moment_store(),
+            Arc::clone(&self.clock),
+        )?))
+    }
+
+    /// The evidence the grouping pass needs from the other phases.
+    ///
+    /// Three of the four closures are filled and one is deliberately not.
+    ///
+    /// **`same_file` is real.** Phase 01 already knows which photographs share a BLAKE3
+    /// digest, and it is one indexed read of `photo_file`. Section 6.3's first duplicate
+    /// class is *reported* here rather than detected here, and this is how it arrives.
+    ///
+    /// **`segment_of` is real** when the wedding has been segmented, and returns `None`
+    /// when it has not - which is why `moments.segment_id` is nullable and why grouping
+    /// does not depend on phase 07 having run.
+    ///
+    /// **The two face closures are left at their documented neutrals**, and that is a
+    /// scoping decision rather than an oversight. Feeding phase 06's
+    /// `subject_focus_score` and face-box overlap in would mean either a `PeopleService`
+    /// call per frame - four thousand queries on a wedding - or this crate recomputing
+    /// them from `faces`, which is exactly the "no phase keeps its own idea of who is in
+    /// a photograph" rule phase 06 wrote. `PeopleService` has no bulk accessor for
+    /// either, and adding one is a phase 06 contract change. Condition **C4** in
+    /// `docs/progress/PHASE-08-EXIT.md`.
+    ///
+    /// The degradation is visible rather than silent: `duplicate::keep_hint` falls
+    /// through to edge energy and the set's reasons say "no face pass has run", and the
+    /// face-overlap test is skipped with the skip recorded in the set's confidence.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the catalog cannot be read.
+    pub fn moment_pass_context(&self) -> AuraResult<aura_brain_wedding::MomentPassContext> {
+        // Which photographs share a content hash. Read once, as a map from photo to a
+        // small group id, so the closure is a pair of lookups rather than a query.
+        let duplicates: BTreeMap<aura_core::PhotoId, u64> = self.catalog.read(|conn| {
+            let mut statement = conn
+                .prepare(
+                    "SELECT photo_id, content_hash FROM photo_file
+                      WHERE role = 'primary' ORDER BY content_hash, photo_id",
+                )
+                .map_err(|e| {
+                    aura_core::errors::db::statement_failed("could not read content hashes", &e)
+                })?;
+            let mut rows = statement.query([]).map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read content hashes", &e)
+            })?;
+            let mut out: BTreeMap<aura_core::PhotoId, u64> = BTreeMap::new();
+            let mut seen: BTreeMap<String, u64> = BTreeMap::new();
+            let mut next = 0u64;
+            while let Some(row) = rows.next().map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read a hash row", &e)
+            })? {
+                let (Ok(photo), Ok(hash)) = (row.get::<_, String>(0), row.get::<_, String>(1))
+                else {
+                    continue;
+                };
+                let Ok(photo) = aura_core::PhotoId::from_db(&photo) else {
+                    continue;
+                };
+                let group = *seen.entry(hash).or_insert_with(|| {
+                    next += 1;
+                    next
+                });
+                out.insert(photo, group);
+            }
+            Ok(out)
+        })?;
+
+        // The chapters, as a sorted list of (start, end, id). A wedding has at most
+        // twenty by construction, so the lookup is a linear scan of a tiny vector.
+        let segments: Vec<(i64, i64, aura_core::SegmentId)> = self.catalog.read(|conn| {
+            let mut statement = conn
+                .prepare("SELECT id, start_ts, end_ts FROM segments ORDER BY start_ts")
+                .map_err(|e| {
+                    aura_core::errors::db::statement_failed("could not read segments", &e)
+                })?;
+            let mut rows = statement.query([]).map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read segments", &e)
+            })?;
+            let mut out = Vec::new();
+            while let Some(row) = rows.next().map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read a segment row", &e)
+            })? {
+                let (Ok(id), Ok(start), Ok(end)) = (
+                    row.get::<_, String>(0),
+                    row.get::<_, i64>(1),
+                    row.get::<_, i64>(2),
+                ) else {
+                    continue;
+                };
+                if let Ok(id) = aura_core::SegmentId::from_db(&id) {
+                    out.push((start, end, id));
+                }
+            }
+            Ok(out)
+        })?;
+
+        Ok(aura_brain_wedding::MomentPassContext::bare(MODEL_VER)
+            .with_same_file(move |left, right| {
+                match (duplicates.get(&left), duplicates.get(&right)) {
+                    (Some(a), Some(b)) => a == b,
+                    _ => false,
+                }
+            })
+            .with_segments(move |when| {
+                segments
+                    .iter()
+                    .find(|(start, end, _)| *start <= when && when <= *end)
+                    .map(|(_, _, id)| *id)
+            }))
+    }
+
+    /// The median inter-frame interval of a project, for the moments header.
+    ///
+    /// Recomputed from `photo.timeline_time` rather than stored, because it is a
+    /// property of the photographs and not of a grouping run - a re-import that adds a
+    /// card changes it without any moment changing.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the query fails.
+    pub fn moment_median_interval(&self, project: &aura_core::ProjectId) -> AuraResult<i64> {
+        let key = project.to_db();
+        self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare(
+                    "SELECT timeline_time FROM photo
+                      WHERE project_id = ?1 AND timeline_time IS NOT NULL
+                      ORDER BY timeline_time",
+                )
+                .map_err(|e| {
+                    aura_core::errors::db::statement_failed("could not read timeline times", &e)
+                })?;
+            let rows = statement
+                .query_map(rusqlite::params![key], |row| row.get::<_, String>(0))
+                .map_err(|e| {
+                    aura_core::errors::db::statement_failed("could not read timeline times", &e)
+                })?;
+            let mut stamps: Vec<i64> = Vec::new();
+            for row in rows.flatten() {
+                if let Some(ms) = aura_index::store::parse_rfc3339_ms(&row) {
+                    stamps.push(ms);
+                }
+            }
+            let mut gaps: Vec<i64> = stamps
+                .windows(2)
+                .filter_map(|pair| match pair {
+                    [first, second] => Some(second - first),
+                    _ => None,
+                })
+                .collect();
+            if gaps.is_empty() {
+                return Ok(0);
+            }
+            gaps.sort_unstable();
+            Ok(gaps.get(gaps.len() / 2).copied().unwrap_or(0))
+        })
     }
 
     /// The story service, built per call.

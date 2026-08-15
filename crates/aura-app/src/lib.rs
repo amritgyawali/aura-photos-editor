@@ -34,6 +34,7 @@ pub mod contract {
 
 pub mod index_commands;
 pub mod infer_commands;
+pub mod moment_commands;
 pub mod people_commands;
 pub mod preview_commands;
 pub mod state;
@@ -53,6 +54,10 @@ pub use index_commands::{
 pub use infer_commands::{
     hardware_plan, infer_stats, list_models, recheck_hardware, set_execution_provider,
     warmup_models,
+};
+pub use moment_commands::{
+    group_moments, list_moments, lock_moment, merge_moments, moment_duplicates, moment_of_image,
+    moment_status, set_keep_hint, split_moment, undo_moment_edit,
 };
 pub use people_commands::{
     erase_biometrics, group_people, identity_cover, identity_timelines, list_identities,

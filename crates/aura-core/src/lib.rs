@@ -29,6 +29,7 @@ pub mod contract {
     pub mod consent;
     pub mod error;
     pub mod ids;
+    pub mod moment;
     pub mod people;
     pub mod priority;
     pub mod scene;
@@ -51,7 +52,11 @@ pub mod redact;
 
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
 pub use contract::ids::{
-    ContentHash, FaceId, FileId, IdentityId, ImportId, PhotoId, ProjectId, RunId, SegmentId,
+    ContentHash, FaceId, FileId, IdentityId, ImportId, MomentId, PhotoId, ProjectId, RunId,
+    SegmentId,
+};
+pub use contract::moment::{
+    CameraId, DuplicateKind, DuplicateSet, Moment, MomentEdit, MomentOutline, MomentService,
 };
 pub use contract::people::{FaceRef, ImageSubjects, PeopleService, Role, SubjectHierarchy};
 pub use contract::priority::Priority;

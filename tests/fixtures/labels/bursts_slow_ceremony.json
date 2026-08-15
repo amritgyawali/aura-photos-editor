@@ -1,0 +1,16 @@
+{
+  "schema": "aura.burst-labels.v1",
+  "name": "slow_ceremony",
+  "description": "Six exposures eight seconds apart, of the same two people at the same altar under the same light.",
+  "expected_moments": 6,
+  "why": "The hard direction. Every frame looks like every other frame, so appearance says one moment and only the cadence says otherwise. A photographer grouping these would call them six separate attempts, because eight seconds is long enough for the vows to have moved on. A grouper that returned one moment here would lose five photographs and never say so.",
+  "labelled_by": "PHASE-08 section 8 step 9, authored ground truth",
+  "frames": [
+    { "offset_ms": 0, "camera": 1, "moment": 0 },
+    { "offset_ms": 8000, "camera": 1, "moment": 1 },
+    { "offset_ms": 16000, "camera": 1, "moment": 2 },
+    { "offset_ms": 24000, "camera": 1, "moment": 3 },
+    { "offset_ms": 32000, "camera": 1, "moment": 4 },
+    { "offset_ms": 40000, "camera": 1, "moment": 5 }
+  ]
+}

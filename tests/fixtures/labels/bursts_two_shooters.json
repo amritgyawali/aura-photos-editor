@@ -1,0 +1,22 @@
+{
+  "schema": "aura.burst-labels.v1",
+  "name": "two_shooters",
+  "description": "Eleven frames of one kiss from two bodies, three hundred milliseconds out of step.",
+  "expected_moments": 1,
+  "expected_bursts": 2,
+  "why": "Section 10.1's 'two cameras shooting the same kiss produce one moment with two sub-groups'. It is one moment because it is one kiss - a photographer delivering this would never call the second shooter's angle a separate event - and two bursts because a burst is a fact about one shutter and neither body knows what the other did. Both halves matter: one moment with one burst would have lost the per-camera structure phase 26 needs, and two moments would have double-counted the kiss in phase 12's coverage.",
+  "labelled_by": "PHASE-08 section 8 step 9, authored ground truth",
+  "frames": [
+    { "offset_ms": 0, "camera": 1, "moment": 0 },
+    { "offset_ms": 250, "camera": 1, "moment": 0 },
+    { "offset_ms": 300, "camera": 2, "moment": 0 },
+    { "offset_ms": 500, "camera": 1, "moment": 0 },
+    { "offset_ms": 580, "camera": 2, "moment": 0 },
+    { "offset_ms": 750, "camera": 1, "moment": 0 },
+    { "offset_ms": 860, "camera": 2, "moment": 0 },
+    { "offset_ms": 1000, "camera": 1, "moment": 0 },
+    { "offset_ms": 1140, "camera": 2, "moment": 0 },
+    { "offset_ms": 1250, "camera": 1, "moment": 0 },
+    { "offset_ms": 1420, "camera": 2, "moment": 0 }
+  ]
+}

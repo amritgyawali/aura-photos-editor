@@ -292,3 +292,72 @@ max_elapsed_ms = 200
 # the number in the file is readable: 400 x 1,000 = 400,000.
 [size.scene_store_per_1000_images]
 max_bytes = 400000
+
+# ---------------------------------------------------------------------------
+# Phase 08 performance budgets, from PHASE-08 section 11.
+#
+# All four rows are here and none is waived, for phase 07's reason one phase
+# on: grouping reads `embeddings`, `descriptors`, `photo`, `faces` and
+# `image_scenes` and opens no image file, so nothing in this phase needs a GPU
+# to be measured honestly. Section 6.2's "never all-pairs" is the design claim,
+# and these are the numbers that hold it to it.
+# ---------------------------------------------------------------------------
+
+# Grouping 4,000 images. Section 11: 6 s.
+#
+# Asserted per unit as well as in total, so the test can measure a few thousand
+# frames instead of four and still fail on a regression. 6 s over 4,000 frames
+# is 1.5 ms each; the schema takes whole milliseconds, so the number here is 1 -
+# the floor rather than the ceiling, which makes this budget STRICTER than
+# section 11 rather than looser. That is the correct direction to round in, and
+# it costs nothing: the measured per-frame cost is dominated by reading a
+# 1,024-byte vector out of SQLite rather than by the candidate sweep.
+[stage.moments_group_image]
+max_elapsed_ms  = 6000
+max_ms_per_unit = 1
+
+# Grouping 12,000 images. Section 11: 25 s.
+#
+# A separate row rather than a scaling of the first, because the phase document
+# states both and because the interesting claim is that the second is roughly
+# three times the first rather than nine times it. The candidate sweep is
+# bounded by `graph::MAX_NEIGHBOURS` per frame, so the whole pass is linear-ish
+# in the frame count; a quadratic regression shows up here and nowhere else.
+[stage.moments_group_large_project]
+max_elapsed_ms = 25000
+
+# The moments view's expand or collapse. Section 11: 60 ms.
+#
+# One indexed read of `v_moment_summary` plus one of `moment_images` for the
+# stack being opened. Measured on the Rust side as the data the UI waits on; the
+# React half is asserted separately in `MomentStack.test.tsx`, which is where a
+# render cost would show up.
+[stage.moments_stack_expand]
+max_elapsed_ms = 60
+
+# Section 11: extra storage per image, 200 bytes. **WAIVED at 340**, by PERF and
+# CTO, in docs/adr/ADR-0017-burst-grouping-and-duplicate-policy.md section 8.
+#
+# The schema was shaped by the 200 rather than merely measured against it:
+# `moment_images` carries no `project_id` (unlike `segment_images` and `faces`), a
+# burst is a column rather than a table, the membership table has exactly one
+# index, and a `variant` duplicate set is not stored at all. Those four decisions
+# took the measured figure from 720 bytes per photograph to 319.
+#
+# The remaining 119 cannot be recovered inside this phase. The measured
+# decomposition on a 1,000-frame project, from `PRAGMA page_count`:
+#
+#   moment_images rows      90 B/image   two prefixed UUIDs and two integers
+#   its unique index        85 B/image   photo_id -> moment_id
+#   moments rows            88 B/image   amortised over 3.3 frames per moment
+#   its three indexes       55 B/image   project+time, segment, locked
+#
+# 175 of the 319 is **text ids at 40 characters each**, which is phase 01's
+# decision and not this phase's to undo, and 46 is `moments.reasons`, which
+# invariant 2 requires. Meeting 200 means breaking one of those two.
+#
+# The waiver is at 340 rather than at 319 so that a project with more duplicate
+# sets than the fixtures produce does not turn a recorded waiver into a red gate;
+# it expires if either phase 01's id format changes or a phase needs the headroom.
+[size.moment_store_per_1000_images]
+max_bytes = 340000
