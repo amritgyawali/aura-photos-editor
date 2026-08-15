@@ -240,6 +240,9 @@ impl Catalog {
             "moment_images",
             "duplicates",
             "moment_edits",
+            // PHASE-09.
+            "image_integrity",
+            "face_eye_state",
         ];
         if !COUNTABLE.contains(&table) {
             return Err(statement_failed(

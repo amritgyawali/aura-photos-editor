@@ -769,3 +769,48 @@ summary      = "One photograph could not be placed in a moment"
 user_message = "AURA could not work out which moment one photograph belongs to and has left it on its own. Everything else in this wedding is unaffected."
 runbook      = "docs/runbooks/AURA-ML-5032.md"
 introduced   = "PHASE-08"
+
+[[error]]
+code         = "AURA-ML-5033"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored technical verdicts came from different heads, arithmetic or a different camera calibration table"
+user_message = "AURA has improved how it judges focus, motion and exposure, so it is re-checking this wedding in the background. Anything you have already reviewed is kept."
+runbook      = "docs/runbooks/AURA-ML-5033.md"
+introduced   = "PHASE-09"
+
+[[error]]
+code         = "AURA-ML-5034"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A technical flag could not be dismissed"
+user_message = "AURA could not change that technical note. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5034.md"
+introduced   = "PHASE-09"
+
+[[error]]
+code         = "AURA-ML-5035"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be checked for focus, motion, exposure or noise"
+user_message = "AURA could not check one photograph for sharpness and exposure, and has left it unmarked rather than guessing. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5035.md"
+introduced   = "PHASE-09"
+
+[[error]]
+code         = "AURA-ML-5036"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The camera calibration table was refused"
+user_message = "AURA could not load the measurements that decide what counts as sharp on your camera, so it has not marked anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5036.md"
+introduced   = "PHASE-09"
+
+[[error]]
+code         = "AURA-ML-5037"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A camera body has no calibration row, so sharpness and noise were normalised by sensor resolution alone"
+user_message = "AURA has not measured this camera model yet, so it is judging sharpness and noise more cautiously on those photographs. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5037.md"
+introduced   = "PHASE-09"

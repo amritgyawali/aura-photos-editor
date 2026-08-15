@@ -1,0 +1,42 @@
+[package]
+name         = "aura-brain-photo"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+description  = "Technical judgement about one frame: is the right subject sharp, is the motion a decision, is the exposure recoverable, and are the important eyes open"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+aura-infer   = { path = "../aura-infer" }
+aura-preview = { path = "../aura-preview" }
+aura-raw     = { path = "../aura-raw" }
+aura-vision  = { path = "../aura-vision" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+uuid         = { workspace = true }
+
+# Deliberately absent: `aura-people`, `aura-index` and `aura-brain-wedding`.
+#
+# Everything this crate needs from phases 06, 07 and 08 it takes through the frozen
+# traits in `aura-core` - `PeopleService`, `StoryService` and `MomentService` - which
+# are the only ways any phase may ask who is in a photograph, what it is of, and what
+# was shot once. Depending on the implementing crates would let a hurried change reach
+# past a service into a store, and the three rules those phases wrote would become
+# things people remember rather than things the dependency graph enforces.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build.
+# Lives in `tests/eval/` beside the phase 05 to 08 harnesses rather than in this
+# crate's own `tests/`, because a gate is a claim about the product and not about a
+# crate.
+[[test]]
+name = "integrity_eval"
+path = "../../tests/eval/integrity_eval.rs"

@@ -281,7 +281,7 @@ export function MomentStack({ projectId }: { projectId: string }): JSX.Element {
       setStatus(header);
       setError(null);
     } catch (raised) {
-      setError(asIpcError(raised).detail);
+      setError(asIpcError(raised).message);
     }
   }, [projectId]);
 
@@ -297,7 +297,7 @@ export function MomentStack({ projectId }: { projectId: string }): JSX.Element {
     try {
       setSets(await api.momentDuplicates(momentId));
     } catch (raised) {
-      setError(asIpcError(raised).detail);
+      setError(asIpcError(raised).message);
     }
   }, []);
 
@@ -310,7 +310,7 @@ export function MomentStack({ projectId }: { projectId: string }): JSX.Element {
         await api.lockMoment({ momentId, locked });
         await refresh();
       } catch (raised) {
-        setError(asIpcError(raised).detail);
+        setError(asIpcError(raised).message);
       }
     },
     [refresh],
@@ -325,7 +325,7 @@ export function MomentStack({ projectId }: { projectId: string }): JSX.Element {
         await api.splitMoment({ momentId, photoId });
         await refresh();
       } catch (raised) {
-        setError(asIpcError(raised).detail);
+        setError(asIpcError(raised).message);
       }
     },
     [refresh],
@@ -339,7 +339,7 @@ export function MomentStack({ projectId }: { projectId: string }): JSX.Element {
       await api.undoMomentEdit(projectId);
       await refresh();
     } catch (raised) {
-      setError(asIpcError(raised).detail);
+      setError(asIpcError(raised).message);
     }
   }, [projectId, refresh]);
 

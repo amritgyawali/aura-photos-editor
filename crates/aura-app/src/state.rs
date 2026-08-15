@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use aura_brain_photo::integrity::{Integrity, IntegrityPass, IntegrityStore};
 use aura_brain_wedding::moments::{MomentStore, Moments};
 use aura_brain_wedding::scene::classifier::SceneClassifier;
 use aura_brain_wedding::scene::ritual::RitualClassifier;
@@ -212,6 +213,65 @@ impl AppState {
             Arc::clone(&self.catalog),
             Arc::clone(&self.clock),
         ))
+    }
+
+    /// The technical-verdict store for this catalog. PHASE-09.
+    ///
+    /// Stateless like the moment store, and a method for the same reason.
+    #[must_use]
+    pub fn integrity_store(&self) -> Arc<IntegrityStore> {
+        Arc::new(IntegrityStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `IntegrityService` for this catalog. PHASE-09.
+    ///
+    /// Infallible, unlike `moments()` and `story()`: it holds no config file. The
+    /// calibration table is loaded by the *pass*, which is the only half that judges
+    /// anything - so a broken table stops new verdicts being made and never stops stored
+    /// ones being read.
+    #[must_use]
+    pub fn integrity(&self) -> Arc<Integrity> {
+        Arc::new(Integrity::new(self.integrity_store()))
+    }
+
+    /// The technical pass for this catalog, wired to phases 06 and 07.
+    ///
+    /// Both services are attached rather than optional here, which is the difference
+    /// between this and phase 08's `PassContext`: the integrity pass is already reading a
+    /// proxy per frame, so one `PeopleService` call and one `StoryService` call per frame
+    /// are lost in the noise of a 130 ms decode-and-measure. Phase 08's pass reads only
+    /// catalog rows, which is why the same two calls were four thousand round trips
+    /// there and are free here.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5036` when the camera calibration table will not load, or whatever
+    /// building the preview service and the inference engine raised.
+    pub fn integrity_pass(&self, project_id: &str) -> AuraResult<IntegrityPass> {
+        let pass = IntegrityPass::new(
+            self.previews(project_id)?,
+            self.infer_engine()?,
+            self.integrity_store(),
+            Arc::clone(&self.clock),
+        )?;
+        let pass = pass.with_people(self.people());
+        match self.story() {
+            Ok(story) => Ok(pass.with_story(story)),
+            // A wedding with no scene labels is judged on the neutral profile, which is
+            // invariant 7 degraded rather than broken - so a story service that will not
+            // build costs the conditioning and not the pass.
+            Err(err) => {
+                tracing::warn!(
+                    target: "integrity.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be judged on the neutral profile"
+                );
+                Ok(pass)
+            }
+        }
     }
 
     /// The grouping service, built per call.

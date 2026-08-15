@@ -2,6 +2,69 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 09 - Frame integrity: focus, motion, exposure, noise and eye state
+
+Every frame gets an honest technical verdict where it matters. Not "is this photograph
+sharp" - a soft background is usually the point - but **is the right subject sharp**, was
+the blur a decision, can the exposure be brought back, how noisy is it for this kind of
+photograph, and are the eyes that matter open.
+
+The whole phase is shaped by one risk, and it is not a technical one: a product that
+throws away a frame it should have kept is a product a photographer stops using. So two of
+the fourteen technical marks describe something *right* with a photograph, eight of the
+twenty-one reason codes withdraw a claim rather than making one, and the learned focus
+head is allowed to exonerate a frame and forbidden from convicting one.
+
+### Added
+
+- `aura-brain-photo`: a new crate, and the first that judges pixels rather than reading
+  rows. Subject-aware sharpness from three classical measures over eye, face, body and
+  background regions; motion intent from a structure tensor, because motion blur is
+  directional and defocus is not; recovery-aware exposure with a specular-highlight
+  exclusion, so a candle flame is a light source and a blown dress is a loss; noise
+  measured in flat regions and expressed against what the scene tolerates; eye state with
+  section 6.4's four intent rules.
+- **A camera calibration table for twenty bodies.** "Sharp" means sharp *for this gear*: a
+  61 MP body and a 24 MP body produce different edge detail in the preview AURA reads, and
+  without the division the more expensive camera would win every comparison. A body with
+  no row is judged more cautiously and the panel says so.
+- **Closed eyes are often the photograph.** A kiss, a prayer, a first look, somebody crying
+  at a toast - `EYES_CLOSED_OK` marks those as right rather than wrong, and only the people
+  a photograph is *about* have their eyes judged at all.
+- Migration 9: `image_integrity` and `face_eye_state`, plus a coverage view and a flag
+  histogram. Nothing in the schema can reject a photograph, and "not checked" is
+  deliberately distinguishable from "clean".
+- Two signed models with cards - `focus_head` and `eye_state` - and the training,
+  evaluation and export scripts in `ml/models/integrity/`.
+- The integrity IPC surface (ADR-0020): six commands, five of which are reads. The
+  Integrity card shows the crop that caused each penalty; the filter chips offer soft,
+  blinked, blown and noisy, and read their names from the backend rather than keeping a
+  second copy of the flag list.
+- `docs/frame-integrity.md`: every mark in the words the product uses, and a build that
+  fails if a reason code is added without one.
+- `aura-cli verify --phase 09`, eleven checks, exit 0.
+
+### Changed
+
+- `FaceRef` gains a bounding box and the two eye landmarks. Phase 09 cannot measure an eye
+  region or show the crop behind a closed-eye mark without them; the nose and mouth
+  corners stay out, which is what keeps that type's promise that it carries nothing a
+  recogniser needs. ADR-0019 section 3.
+- The moments view's error toasts said `undefined`. Five call sites read a field the wire
+  type does not have; fixed here because it was a one-word change.
+
+### Known limitations
+
+- Both learned heads ship **untrained**. Every accuracy figure in this phase is measured
+  against images whose answer was known in advance, which proves the arithmetic and says
+  nothing about photographs.
+- The twenty calibration rows are derived from published specifications rather than
+  measured from bodies, because there are still no camera files in this repository.
+- Clipping is measured on the preview rather than on the RAW histogram.
+- The "there are tears here" intent rule needs phase 10 and is wired through as always
+  false. A tearful closed-eye frame may reach a review queue; it will not reach a delivery
+  decision, because this phase makes none.
+
 ## Phase 08 - Smart burst grouping and duplicate detection
 
 Three thousand loose files become a few hundred moments. From this phase onward the

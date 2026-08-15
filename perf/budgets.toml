@@ -361,3 +361,45 @@ max_elapsed_ms = 60
 # it expires if either phase 01's id format changes or a phase needs the headroom.
 [size.moment_store_per_1000_images]
 max_bytes = 340000
+
+# ---------------------------------------------------------------------------
+# Phase 09 performance budgets, from PHASE-09 section 11.
+#
+# Section 11's first row - 45 ms per image on a GPU - is **not here**, for the
+# reason phase 03's two throughput rows are not: this build has no GPU backend
+# (docs/adr/ADR-0007-inference-runtime.md), and a budget nothing can measure is
+# a wish rather than an assertion. It is waived with its reason in
+# docs/adr/ADR-0019-frame-integrity-and-eye-intent.md section 9, and the waiver
+# expires when a GPU backend lands.
+#
+# Its third row - 4,000 images on an RTX 4070 in 180 s - is the same claim about
+# the same absent hardware. What is asserted instead is the processor path, which
+# is the path this build actually runs, and the per-image row below multiplied by
+# four thousand is printed beside it so a reader can see what a full wedding
+# costs on the machine CI ran on.
+# ---------------------------------------------------------------------------
+
+# One image, decoded buffer in, verdict out. Section 11: 220 ms on the CPU path.
+#
+# Everything phase 09 adds: the luminance plane, four region sharpnesses, two
+# structure tensors, the clipping counts with the specular exclusion, the
+# mixed-light histogram, the noise tiling, one aligned crop per face, the flags,
+# the reasons and the composite. The decode is deliberately excluded - it is
+# phase 02's cost and `preview_budgets` owns it.
+[stage.integrity_analyse_image]
+max_elapsed_ms  = 22000
+max_ms_per_unit = 220
+
+# Section 11: 1 KB per image including per-face eye states.
+#
+# The most generous storage budget in the product, and it is spent almost
+# entirely on one column: `image_integrity.reasons`, a JSON array of at most six
+# objects each carrying an evidence rectangle. That is section 13's last
+# acceptance criterion - the card shows the exact crop that caused each penalty -
+# and it is the difference between a technical verdict a photographer can argue
+# with and one they can only accept or switch off.
+#
+# Measured with `PRAGMA page_count` on a real catalog before and after, over a
+# thousand photographs, by `crates/aura-perf/tests/integrity_budgets.rs`.
+[size.integrity_store_per_1000_images]
+max_bytes = 1024000

@@ -57,6 +57,7 @@ checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 name = "aura-app"
 version = "0.1.0"
 dependencies = [
+ "aura-brain-photo",
  "aura-brain-wedding",
  "aura-cache",
  "aura-catalog",
@@ -77,6 +78,25 @@ dependencies = [
  "serde_json",
  "tempfile",
  "time",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "aura-brain-photo"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-infer",
+ "aura-preview",
+ "aura-raw",
+ "aura-vision",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
  "tracing",
  "uuid",
 ]
@@ -135,6 +155,7 @@ dependencies = [
 name = "aura-cli"
 version = "0.1.0"
 dependencies = [
+ "aura-brain-photo",
  "aura-brain-wedding",
  "aura-cache",
  "aura-catalog",
@@ -311,6 +332,7 @@ dependencies = [
 name = "aura-perf"
 version = "0.1.0"
 dependencies = [
+ "aura-brain-photo",
  "aura-brain-wedding",
  "aura-catalog",
  "aura-cloud",

@@ -26,6 +26,7 @@ aura-cloud   = { path = "../aura-cloud" }
 aura-index   = { path = "../aura-index" }
 aura-people  = { path = "../aura-people" }
 aura-brain-wedding = { path = "../aura-brain-wedding" }
+aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-vision  = { path = "../aura-vision" }
 rusqlite.workspace   = true
 serde.workspace      = true

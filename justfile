@@ -112,6 +112,22 @@ phase-07-verify:
 phase-08-verify:
     cargo run --release --package aura-cli -- verify --phase 08 --work target/phase08-verify
 
+# The phase 09 gate: the migration, the calibration table and its fairness
+# direction, both heads through the real inference service, a wedding's frames
+# scored with reasons and evidence crops, a bokeh portrait that is not soft, a
+# kiss that is exonerated, shake told from a pan, a candle that is not a blown
+# highlight, a photographer's dismissal surviving a re-analysis, the
+# within-moment ranking, a stale calibration version healing itself, and two
+# runs that agree. Never touches a network - nothing in phase 09 can.
+phase-09-verify:
+    cargo run --release --package aura-cli -- verify --phase 09 --work target/phase09-verify
+
+# The integrity metrics, from the Python side. `--self-test` proves the metrics
+# reject a scorer that learned nothing; `--fit-calibration` fits the per-scene
+# isotonic maps that ship as the identity today.
+integrity-eval:
+    python ml/models/integrity/eval_integrity.py --self-test
+
 # The burst-grouping metrics, from the Python side. `--self-test` proves the
 # metrics reject both degenerate groupers; `--ablate` prints what each labelled
 # pattern is there to test.

@@ -34,6 +34,7 @@ pub mod contract {
 
 pub mod index_commands;
 pub mod infer_commands;
+pub mod integrity_commands;
 pub mod moment_commands;
 pub mod people_commands;
 pub mod preview_commands;
@@ -54,6 +55,10 @@ pub use index_commands::{
 pub use infer_commands::{
     hardware_plan, infer_stats, list_models, recheck_hardware, set_execution_provider,
     warmup_models,
+};
+pub use integrity_commands::{
+    analyse_integrity, dismiss_flag, flagged_images, image_integrity, integrity_status,
+    within_moment,
 };
 pub use moment_commands::{
     group_moments, list_moments, lock_moment, merge_moments, moment_duplicates, moment_of_image,

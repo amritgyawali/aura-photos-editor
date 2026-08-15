@@ -83,6 +83,15 @@ import type {
   SetCacheBudgetInput,
   SetCameraLabelInput,
   StartIngestInput,
+  AnalyseIntegrityInput,
+  DismissFlagInput,
+  FlaggedInput,
+  IntegrityDto,
+  IntegrityEvent,
+  IntegrityPassDto,
+  IntegrityStatusDto,
+  RankedFrameDto,
+  WithinMomentInput,
 } from './types';
 
 /** True when the shell is present. Storybook-style dev runs fall back to stubs. */
@@ -396,6 +405,54 @@ export const api = {
 
   onMomentEvent: (handler: (event: MomentEvent) => void): Promise<() => void> =>
     listen<MomentEvent>('moments', (message) => handler(message.payload)).then(
+      (unlisten) => () => {
+        unlisten();
+      },
+    ),
+
+  // -------------------------------------------------------------------------
+  // PHASE-09. Six commands, and exactly one of them changes anything.
+  // -------------------------------------------------------------------------
+
+  /** What the Integrity panel's header shows, including what was not checked. */
+  integrityStatus: (projectId: string): Promise<IntegrityStatusDto> =>
+    invoke<IntegrityStatusDto>('integrity_status', { projectId }),
+
+  /**
+   * One photograph's verdict.
+   *
+   * `null` means **nobody has looked** - which is not the same as "nothing is
+   * wrong", and the card must not draw it that way.
+   */
+  imageIntegrity: (photoId: string): Promise<IntegrityDto | null> =>
+    invoke<IntegrityDto | null>('image_integrity', { photoId }),
+
+  /** The frames carrying any of these marks, worst technical score first. */
+  flaggedImages: (input: FlaggedInput): Promise<string[]> =>
+    invoke<string[]>('flagged_images', { input }),
+
+  /**
+   * One moment's frames ranked by subject sharpness.
+   *
+   * Evidence phase 12 asked for by name. It says which of six frames is
+   * sharpest and nothing about which of them a client sees.
+   */
+  withinMoment: (input: WithinMomentInput): Promise<RankedFrameDto[]> =>
+    invoke<RankedFrameDto[]>('within_moment', { input }),
+
+  /**
+   * "This mark is wrong." Clears one flag and records that the photographer
+   * said so; a re-analysis re-applies the dismissal rather than reverting it.
+   */
+  dismissFlag: (input: DismissFlagInput): Promise<IntegrityDto> =>
+    invoke<IntegrityDto>('dismiss_flag', { input }),
+
+  /** Check every frame that has no current verdict. Resumable and cancellable. */
+  analyseIntegrity: (input: AnalyseIntegrityInput): Promise<IntegrityPassDto> =>
+    invoke<IntegrityPassDto>('analyse_integrity', { input }),
+
+  onIntegrityEvent: (handler: (event: IntegrityEvent) => void): Promise<() => void> =>
+    listen<IntegrityEvent>('integrity', (message) => handler(message.payload)).then(
       (unlisten) => () => {
         unlisten();
       },

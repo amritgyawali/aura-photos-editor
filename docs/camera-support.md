@@ -97,8 +97,26 @@ bumped so cached proxies rebuild.
    `verify_colour`, so the phase gate exercises it.
 6. Update this page and the ADR consequences table.
 
+## Which bodies are calibrated for technical judgement
+
+Separate from decoding, and worth not confusing with it. A body can decode perfectly and
+still have no **calibration** row - the measurements that decide what counts as sharp,
+how much noise to expect at an ISO, and how much clipped highlight can be brought back.
+
+Those live in `crates/aura-brain-photo/config/camera_calibration.toml`, twenty bodies are
+named there, and a body that is not gets a deliberately cautious fallback plus a lowered
+confidence on every verdict. `AURA-ML-5037` is the code, and its runbook explains exactly
+what the fallback costs and how to add a row.
+
+**The twenty shipped rows are derived from published sensor specifications rather than
+measured from bodies**, because there are still no camera files in this repository -
+condition C2 in `progress/PHASE-09-EXIT.md`, blocked by the same missing input as phase
+02's ColorChecker.
+
 ## Related
 
 - Decode backend: [ADR-0004](adr/ADR-0004-raw-decode-backend.md)
+- Frame integrity and camera calibration: [ADR-0019](adr/ADR-0019-frame-integrity-and-eye-intent.md)
+- What the technical marks mean: [frame integrity](frame-integrity.md)
 - Colour pipeline: [ADR-0003](adr/ADR-0003-colour-pipeline.md)
 - Troubleshooting: [previews runbook](runbooks/previews.md)
