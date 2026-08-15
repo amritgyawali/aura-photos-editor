@@ -979,12 +979,7 @@ impl Reason {
 
     /// A reason about one rectangle.
     #[must_use]
-    pub fn at(
-        code: ReasonCode,
-        text: impl Into<String>,
-        weight: f32,
-        evidence: CropRect,
-    ) -> Self {
+    pub fn at(code: ReasonCode, text: impl Into<String>, weight: f32, evidence: CropRect) -> Self {
         Self {
             code,
             text: text.into(),

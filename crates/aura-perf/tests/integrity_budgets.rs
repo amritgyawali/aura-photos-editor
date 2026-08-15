@@ -304,7 +304,13 @@ fn a_verdict_costs_a_photograph_under_a_kilobyte() {
             ..template.clone()
         };
         bare_store
-            .put(&bare_project, &result, &Provenance { uncalibrated: false })
+            .put(
+                &bare_project,
+                &result,
+                &Provenance {
+                    uncalibrated: false,
+                },
+            )
             .unwrap_or_else(|err| panic!("store: {}", err.detail));
     }
     let bare = page_bytes(bare_store.catalog()).saturating_sub(bare_before);
@@ -395,15 +401,15 @@ fn seed_faces(
     catalog
         .writer()
         .transact(move |tx| {
-            for (index, (face, image, project)) in rows.iter().enumerate() {
+            for (face, image, project) in &rows {
                 tx.execute(
                     "INSERT INTO faces (id, image_id, project_id, x, y, w, h, det_score,
                                         quality, blur, occlusion, landmarks_json, area_frac,
                                         centrality, sharpness, model_ver, created_at)
                      VALUES (?1, ?2, ?3, 0.3, 0.3, 0.2, 0.2, 0.9, 0.8, 0.1, 0.0,
                              '[[0.35,0.38],[0.45,0.38],[0.4,0.45],[0.36,0.5],[0.44,0.5]]',
-                             0.04, 0.9, 0.8, ?4, '2026-08-15T00:00:00Z')",
-                    rusqlite::params![face, image, project, 100i64 + index as i64 * 0],
+                             0.04, 0.9, 0.8, 100, '2026-08-15T00:00:00Z')",
+                    rusqlite::params![face, image, project],
                 )
                 .map_err(|e| aura_core::errors::db::statement_failed("face", &e))?;
             }
@@ -449,8 +455,12 @@ fn catalog_with_photos(
                         rusqlite::params![
                             photo,
                             key,
-                            format!("2026-08-15T{:02}:{:02}:{:02}Z",
-                                    index / 3600 % 24, index / 60 % 60, index % 60),
+                            format!(
+                                "2026-08-15T{:02}:{:02}:{:02}Z",
+                                index / 3600 % 24,
+                                index / 60 % 60,
+                                index % 60
+                            ),
                         ],
                     )
                     .map_err(|e| aura_core::errors::db::statement_failed("photo", &e))?;

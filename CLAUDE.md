@@ -46,6 +46,10 @@ Never load two phase files into one session.
 | Burst grouping ground truth | `tests/fixtures/labels/bursts_*.json` |
 | Burst evaluation gates | `tests/eval/burst_eval.rs` + `ml/eval/burst_eval.py` |
 | Moments, bursts and duplicates explained | `docs/moments-bursts-and-duplicates.md` |
+| Frame integrity decisions | `docs/adr/ADR-0019-frame-integrity-and-eye-intent.md` |
+| Camera calibration (versioned, COL-owned) | `crates/aura-brain-photo/config/camera_calibration.toml` |
+| Integrity evaluation gates | `tests/eval/integrity_eval.rs` + `ml/models/integrity/eval_integrity.py` |
+| What the technical marks mean | `docs/frame-integrity.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -209,6 +213,66 @@ Phase 08 found and fixed a defect that affects every real camera file: **EXIF's
 distinguish the fourteen frames of a 10 fps burst. The fraction is in `photo.sub_sec`, and
 `moments::moment::sub_sec_ms` reconstructs it. Every unit test passed and the phase gate
 caught it.
+
+Phase 09 is implemented: `aura-core::contract::integrity` (the frozen `IntegrityFlags`,
+`MotionKind`, `ExposureVerdict`, `EyeOpenness`, `EyeState`, `CropRect`, `ReasonCode`,
+`Reason`, `IntegrityResult`, `IntegrityOutline` and `IntegrityService`), `aura-brain-photo`
+(a camera calibration table for twenty bodies, subject-aware sharpness from three classical
+measures over eye/face/body/background regions, motion intent from a structure tensor and
+EXIF, recovery-aware exposure with a specular-highlight exclusion, flat-region noise
+normalised by ISO and body and expressed against the scene, an eye-state head with section
+6.4's four intent rules, twenty-one reason codes each carrying an evidence crop, a
+scene-weighted **geometric** composite, the store, the resumable pass and the synthetic
+ground truth every gate is measured against), migration 9, two signed models with cards,
+the integrity IPC surface (ADR-0020) with its Integrity card and filter chips, and
+`aura-cli verify --phase 09` as the gate. Its exit report is
+`docs/progress/PHASE-09-EXIT.md`.
+
+**The two shipped heads are placeholders.** The focus head's three-way distribution over a
+real crop describes a random projection of it, and the eye head says nothing about eyelids.
+Every gate in section 10.1 is measured against synthetic frames whose answer is known by
+construction, which proves the algorithms and says nothing about the weights. This is
+condition C1 in the phase 09 exit report and it is a Sev 2 trigger. Two mitigations are
+structural rather than promised: **the focus head can only withdraw a softness claim and
+never make one**, and a missing eye head produces zero gating faces rather than a clean
+verdict.
+
+Phase 09 amended a frozen contract, which had not happened since phase 01: `FaceRef` gained
+`bbox` and the two eye landmarks, because phase 09 cannot measure an eye region or show the
+crop behind a closed-eye mark without them. ADR-0019 section 3 records the argument, and it
+**removes the blocker phase 08's condition C4 named** - wiring phase 08's pass context is
+now a small change rather than a contract change.
+
+Phase 09's budget forced four schema decisions worth remembering: **reasons store their
+code rather than their sentence** (a stored sentence is copy a release can change, and a
+catalog full of English cannot be translated), two indexes that served no query were
+removed after being measured, `face_eye_state` is `WITHOUT ROWID` with no `photo_id`, and
+the eye rows read their geometry from `faces` rather than copying it. Together those took
+the figure from 1,855 bytes per image to exactly 1,024 against a 1 KB budget.
+
+Five rules that phase 09 added and every later phase inherits:
+
+- **`IntegrityService` is the only way to ask whether a frame worked.** No phase may keep
+  its own sharpness measure, its own blink detector or its own idea of what "recoverable"
+  means. Two answers to "is this frame sharp" is two culling decisions that disagree.
+- **A measurement is evidence; the deciding phase owns the cull.** Nothing in
+  `aura-brain-photo` rejects, ranks or orders a frame, and no column, field or command
+  would let it. `technical_score` is the closest this product has come to something that
+  *looks* like a verdict, and section 12's first failure mode is what happens when
+  somebody reads it as one.
+- **Three version columns, because they invalidate three different things.** `model_ver`
+  invalidates the learned sharpness and every eye state, `analysis_ver` the motion kind,
+  the exposure verdict, the noise figure, the flags and the score, and `calib_ver` every
+  *normalised* number. `AURA-ML-5033` exists so a comparison across any of them never
+  happens silently.
+- **Report coverage, and say what the denominator is.** `IntegrityOutline::coverage` is
+  measured against **every photograph** - unlike phase 08's, because a verdict needs only
+  pixels - and `subject_aware` is the second number, because a wedding at 100 % coverage
+  and 2 % subject-aware has been judged on frame-wide sharpness nearly everywhere.
+- **A photographer's dismissal is unbeatable, and it is re-applied rather than excluded.**
+  A locked moment *replaces* the machine's grouping; a dismissed flag does not replace the
+  measurement, so the frame is still re-measured when the calibration table moves and the
+  disagreement is carried onto the new measurement.
 
 Five rules that phase 08 added and every later phase inherits:
 

@@ -222,7 +222,11 @@ impl IntegrityStore {
                             .flatten()
                             .filter(|micros| *micros > 0)
                             .map(|micros| micros as f32 / 1_000_000.0),
-                        focal_mm: row.get::<_, Option<f64>>(5).ok().flatten().map(|v| v as f32),
+                        focal_mm: row
+                            .get::<_, Option<f64>>(5)
+                            .ok()
+                            .flatten()
+                            .map(|v| v as f32),
                         // EXIF's stabilisation tag is not in phase 01's schema. Absent
                         // rather than guessed: `MotionContext::safe_shutter_s` treats
                         // "not stabilised" as the conservative reading, which makes the
@@ -409,9 +413,7 @@ impl IntegrityStore {
                 bg_sharpness: row.get::<_, f64>(1).unwrap_or(0.0) as f32,
                 focus_offset: row.get::<_, f64>(2).unwrap_or(0.0) as f32,
                 relative_sharpness: row.get::<_, f64>(3).unwrap_or(0.5) as f32,
-                motion: MotionKind::from_str_or_none(
-                    &row.get::<_, String>(4).unwrap_or_default(),
-                ),
+                motion: MotionKind::from_str_or_none(&row.get::<_, String>(4).unwrap_or_default()),
                 motion_severity: row.get::<_, f64>(5).unwrap_or(0.0) as f32,
                 exposure: ExposureVerdict::from_str_or_good(
                     &row.get::<_, String>(6).unwrap_or_default(),
@@ -429,9 +431,7 @@ impl IntegrityStore {
                 ),
                 reasons: decode_reasons(&row.get::<_, String>(15).unwrap_or_default()),
                 confidence: row.get::<_, f64>(16).unwrap_or(0.0) as f32,
-                scene: SceneId::from_str_or_unknown(
-                    &row.get::<_, String>(17).unwrap_or_default(),
-                ),
+                scene: SceneId::from_str_or_unknown(&row.get::<_, String>(17).unwrap_or_default()),
                 user_reviewed: row.get::<_, i64>(18).unwrap_or(0) == 1,
                 model_ver: u16::try_from(row.get::<_, i64>(19).unwrap_or(0)).unwrap_or(0),
                 analysis_ver: u16::try_from(row.get::<_, i64>(20).unwrap_or(0)).unwrap_or(0),
@@ -564,8 +564,8 @@ impl IntegrityStore {
                 .map_err(|e| statement_failed("could not read the flag histogram", &e))?
             {
                 for (index, slot) in outline.flag_histogram.iter_mut().enumerate() {
-                    *slot = u32::try_from(row.get::<_, i64>(index).unwrap_or(0).max(0))
-                        .unwrap_or(0);
+                    *slot =
+                        u32::try_from(row.get::<_, i64>(index).unwrap_or(0).max(0)).unwrap_or(0);
                 }
             }
             Ok(outline)
@@ -855,9 +855,7 @@ fn encode_reasons(reasons: &[Reason]) -> String {
                 Some(reason.text.clone())
             },
             weight: reason.weight,
-            evidence: reason
-                .evidence
-                .map(|crop| [crop.x, crop.y, crop.w, crop.h]),
+            evidence: reason.evidence.map(|crop| [crop.x, crop.y, crop.w, crop.h]),
         })
         .collect();
     serde_json::to_string(&stored).unwrap_or_else(|_| "[]".to_string())
@@ -873,9 +871,7 @@ fn decode_reasons(text: &str) -> Vec<Reason> {
             let code = ReasonCode::from_str_or_clean(&reason.code);
             Reason {
                 code,
-                text: reason
-                    .text
-                    .unwrap_or_else(|| code.user_text().to_string()),
+                text: reason.text.unwrap_or_else(|| code.user_text().to_string()),
                 weight: reason.weight,
                 evidence: reason.evidence.map(|values| CropRect {
                     x: values[0],
@@ -967,8 +963,6 @@ struct OwnedEye {
     confidence: f64,
     intentional: i64,
     gates: i64,
-    area_frac: f64,
-    crop: [f64; 4],
 }
 
 impl From<&EyeState> for OwnedEye {
@@ -980,13 +974,6 @@ impl From<&EyeState> for OwnedEye {
             confidence: f64::from(eye.confidence.clamp(0.0, 1.0)),
             intentional: i64::from(eye.intentional),
             gates: i64::from(eye.gates),
-            area_frac: f64::from(eye.area_frac.clamp(0.0, 1.0)),
-            crop: [
-                f64::from(eye.crop.x),
-                f64::from(eye.crop.y),
-                f64::from(eye.crop.w),
-                f64::from(eye.crop.h),
-            ],
         }
     }
 }

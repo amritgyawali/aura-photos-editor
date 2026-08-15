@@ -147,7 +147,11 @@ impl Integrity {
     ///
     /// `AURA-ML-5036` when the embedded calibration table will not load.
     pub fn current_versions() -> Result<(u16, u16, u16), AuraError> {
-        Ok((MODEL_VER, ANALYSIS_VER, CalibrationTable::embedded()?.version()))
+        Ok((
+            MODEL_VER,
+            ANALYSIS_VER,
+            CalibrationTable::embedded()?.version(),
+        ))
     }
 }
 
@@ -564,5 +568,4 @@ impl IntegrityPass {
             .map(|hierarchy| hierarchy.primary)
             .unwrap_or_default()
     }
-
 }

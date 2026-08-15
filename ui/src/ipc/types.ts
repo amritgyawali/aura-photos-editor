@@ -766,3 +766,166 @@ export type MomentEvent =
   | { kind: 'momentsBuilt'; images: number; moments: number; bursts: number; meanSize: number; ms: number }
   | { kind: 'duplicatesFound'; identical: number; nearIdentical: number; variant: number }
   | { kind: 'momentsUserEdit'; action: string; momentSize: number };
+
+// ---------------------------------------------------------------------------
+// PHASE-09. The integrity surface: what is technically wrong with a photograph,
+// where it is wrong, and what the photographer may say back.
+//
+// Frozen alongside `crates/aura-app/src/contract/ipc.rs`; see
+// `docs/adr/ADR-0020-integrity-ipc-surface.md`.
+//
+// **Nothing in these shapes is a decision about delivery.** `technicalScore` is
+// a measurement and `flags` are measurements; a view that sorted a delivery by
+// either would be making phase 12's decision three phases early.
+// ---------------------------------------------------------------------------
+
+/** One rectangle in a photograph, normalised to the frame. */
+export type CropRectDto = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+/** One thing that moved a frame's score, with the pixels that prove it. */
+export type IntegrityReasonDto = {
+  /** The stable slug. `docs/frame-integrity.md` documents every one. */
+  code: string;
+  /** The sentence a photographer reads. */
+  text: string;
+  /** Negative for a penalty, zero or positive for an exoneration. */
+  weight: number;
+  /**
+   * True when this reason withdraws a claim rather than making one.
+   *
+   * Sent by the backend rather than derived here from a list of codes, because
+   * which reasons are the good news is exactly the thing an interface must not
+   * work out for itself.
+   */
+  exoneration: boolean;
+  /** The crop to show, or null when the reason is about the whole frame. */
+  evidence: CropRectDto | null;
+};
+
+/** One face's eyes, as the card lists them. */
+export type EyeStateDto = {
+  faceId: string;
+  identityId: string | null;
+  /** `open`, `squint`, `closed`, `looking_down` or `occluded`. */
+  state: string;
+  confidence: number;
+  /** True when the scene, the expression or the partner justifies a closure. */
+  intentional: boolean;
+  /** True when this face's eyes decide anything about the frame. */
+  gates: boolean;
+  areaFrac: number;
+  crop: CropRectDto;
+};
+
+/** One photograph's technical verdict. */
+export type IntegrityDto = {
+  photoId: string;
+  subjectSharpness: number;
+  bgSharpness: number;
+  /** Negative is front focus, positive is back focus. */
+  focusOffset: number;
+  /** One is the sharpest of its moment; 0.5 means it has no siblings. */
+  relativeSharpness: number;
+  /** `none`, `camera_shake`, `subject_motion` or `intentional`. */
+  motion: string;
+  motionSeverity: number;
+  /** `good`, `recoverable`, `marginal` or `lost`. */
+  exposure: string;
+  clipHi: number;
+  clipLo: number;
+  /** Stops from a correct exposure. Negative is under. */
+  evOffset: number;
+  /** Noise relative to what this scene tolerates. **1.0 is the tolerance.** */
+  noiseSigmaRel: number;
+  closedEyeRatio: number;
+  /** The denominator of the ratio above. Zero of zero is not zero of six. */
+  gatingFaces: number;
+  technicalScore: number;
+  scene: string;
+  /** The set flags, as slugs. */
+  flags: string[];
+  /** True when at least one flag describes a defect. */
+  hasDefect: boolean;
+  reasons: IntegrityReasonDto[];
+  eyes: EyeStateDto[];
+  confidence: number;
+  userReviewed: boolean;
+  modelVer: number;
+  analysisVer: number;
+  calibVer: number;
+};
+
+/** What the Integrity panel's header shows. */
+export type IntegrityStatusDto = {
+  photos: number;
+  scored: number;
+  /** Denominator: **every photograph**, unlike the moments view's. */
+  coverage: number;
+  /** Fraction of scored frames that had a subject to be judged against. */
+  subjectAware: number;
+  reviewed: number;
+  /** How many frames carry each flag, in the same order as `flagNames`. */
+  flagCounts: number[];
+  flagNames: string[];
+  meanScore: number;
+  /** An upper bound: one frame can be soft *and* noisy. */
+  defectiveAtMost: number;
+  uncalibrated: string[];
+  modelVer: number;
+  analysisVer: number;
+  calibVer: number;
+};
+
+export type FlaggedInput = {
+  projectId: string;
+  flags: string[];
+  limit?: number;
+};
+
+export type WithinMomentInput = {
+  momentId: string;
+};
+
+export type RankedFrameDto = {
+  photoId: string;
+  relativeSharpness: number;
+};
+
+export type DismissFlagInput = {
+  photoId: string;
+  /** Exactly one flag slug. */
+  flag: string;
+};
+
+export type AnalyseIntegrityInput = {
+  projectId: string;
+  cancelId?: string;
+};
+
+export type IntegrityPassDto = {
+  scored: number;
+  failed: number;
+  faces: number;
+  closed: number;
+  closedOk: number;
+  meanScore: number;
+  uncalibrated: string[];
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type IntegrityEvent =
+  | {
+      kind: 'integrityScored';
+      images: number;
+      ms: number;
+      meanScore: number;
+      flagHistogram: number[];
+    }
+  | { kind: 'integrityEyes'; faces: number; closed: number; closedOk: number; squint: number }
+  | { kind: 'integrityCameraUncalibrated'; make: string; model: string };

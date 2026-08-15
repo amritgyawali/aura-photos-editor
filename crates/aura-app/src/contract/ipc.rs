@@ -1844,3 +1844,294 @@ pub enum MomentEvent {
         moment_size: u32,
     },
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-09. The integrity surface: what is technically wrong with a photograph,
+// where it is wrong, and what the photographer may say back. Frozen; see
+// `docs/adr/ADR-0020-integrity-ipc-surface.md`.
+//
+// Six commands where phase 08 had nine, and the difference is the point: five of
+// phase 08's changed a grouping and exactly one of these changes anything at all.
+// `dismiss_flag` clears one mark the photographer disagrees with. There is no
+// command on this surface that keeps, rejects, ranks or orders a photograph,
+// because section 2.2 puts every one of those in phase 12 - and this is the
+// surface where that boundary is most tempting to cross.
+// ---------------------------------------------------------------------------
+
+/// One rectangle in a photograph, normalised to the frame.
+///
+/// The wire form of `CropRect`. Four numbers rather than an object with a name,
+/// because the panel does arithmetic with it - it is the zoom target - and a
+/// named object would be four property lookups per frame of an animation.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CropRectDto {
+    /// Left edge, `0..1`.
+    pub x: f32,
+    /// Top edge, `0..1`.
+    pub y: f32,
+    /// Width, `0..1`.
+    pub w: f32,
+    /// Height, `0..1`.
+    pub h: f32,
+}
+
+/// One thing that moved a frame's score, with the pixels that prove it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IntegrityReasonDto {
+    /// The stable slug. `docs/frame-integrity.md` documents every one.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// Negative for a penalty, zero or positive for an exoneration.
+    pub weight: f32,
+    /// True when this reason withdraws a claim rather than making one.
+    ///
+    /// Derived from the code rather than from the weight, and sent rather than
+    /// recomputed in the UI, so that the panel and the eval harness cannot
+    /// disagree about which reasons are the good news.
+    pub exoneration: bool,
+    /// The crop to show. Absent when the reason is about the whole frame.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// One face's eyes, as the card lists them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EyeStateDto {
+    /// The face.
+    pub face_id: String,
+    /// Who it is, when the identity pass has assigned one.
+    pub identity_id: Option<String>,
+    /// `open`, `squint`, `closed`, `looking_down` or `occluded`.
+    pub state: String,
+    /// How sure the head is, `0..1`.
+    pub confidence: f32,
+    /// True when the scene, the expression or the partner justifies a closure.
+    pub intentional: bool,
+    /// True when this face's eyes decide anything about the frame.
+    pub gates: bool,
+    /// Fraction of the frame this face covers.
+    pub area_frac: f32,
+    /// Where to zoom.
+    pub crop: CropRectDto,
+}
+
+/// One photograph's technical verdict.
+///
+/// **Nothing in this shape is a decision about delivery.** `technicalScore` is a
+/// measurement, `flags` are measurements, and a UI that sorted a delivery by
+/// either would be making phase 12's decision three phases early.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IntegrityDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Prominence-weighted subject sharpness, `0..1`.
+    pub subject_sharpness: f32,
+    /// Background sharpness, `0..1`.
+    pub bg_sharpness: f32,
+    /// Where the sharpest plane is, `-1..1`. Negative is front focus.
+    pub focus_offset: f32,
+    /// Where this frame sits among its moment's frames, `0..1`. One is the
+    /// sharpest; `0.5` means it has no siblings.
+    pub relative_sharpness: f32,
+    /// `none`, `camera_shake`, `subject_motion` or `intentional`.
+    pub motion: String,
+    /// How much, `0..1`.
+    pub motion_severity: f32,
+    /// `good`, `recoverable`, `marginal` or `lost`.
+    pub exposure: String,
+    /// Fraction of pixels clipped at the top, speculars excluded.
+    pub clip_hi: f32,
+    /// Fraction crushed at the bottom.
+    pub clip_lo: f32,
+    /// Stops from a correct exposure. Negative is under.
+    pub ev_offset: f32,
+    /// Noise relative to what this scene tolerates. **1.0 is the tolerance.**
+    pub noise_sigma_rel: f32,
+    /// Fraction of the gating subjects whose eyes are closed.
+    pub closed_eye_ratio: f32,
+    /// How many faces gate this frame. The denominator of the ratio above, sent
+    /// beside it because zero over zero and zero over six are different facts.
+    pub gating_faces: u32,
+    /// The scene-weighted composite, `0..1`.
+    pub technical_score: f32,
+    /// Which scene the thresholds were conditioned on.
+    pub scene: String,
+    /// The set flags, as slugs, in `IntegrityFlags::ALL` order.
+    pub flags: Vec<String>,
+    /// True when at least one flag describes a defect.
+    ///
+    /// Sent rather than derived in the UI, because "which of these fourteen are
+    /// defects" is the one question the interface must not answer for itself:
+    /// `intentional_motion` and `eyes_closed_ok` are the phase's whole argument.
+    pub has_defect: bool,
+    /// Why, strongest penalty first.
+    pub reasons: Vec<IntegrityReasonDto>,
+    /// Per-face eye states, in prominence order.
+    pub eyes: Vec<EyeStateDto>,
+    /// How sure the whole verdict is, `0..1`.
+    pub confidence: f32,
+    /// True when the photographer has dismissed a flag on this frame.
+    pub user_reviewed: bool,
+    /// Which learned heads produced it.
+    pub model_ver: u16,
+    /// Which build's arithmetic produced it.
+    pub analysis_ver: u16,
+    /// Which calibration table normalised it.
+    pub calib_ver: u16,
+}
+
+/// What the Integrity panel's header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IntegrityStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a verdict.
+    pub scored: u32,
+    /// Fraction of the project with a verdict, `0..1`. **Denominator: every
+    /// photograph**, unlike the moments view's.
+    pub coverage: f32,
+    /// Fraction of *scored* frames that had a subject to be judged against.
+    ///
+    /// A wedding at 100 % coverage and 2 % subject-aware has been judged on
+    /// frame-wide sharpness nearly everywhere, which is the ordinary global
+    /// measure this phase exists to replace. The header says so.
+    pub subject_aware: f32,
+    /// Frames the photographer has overruled.
+    pub reviewed: u32,
+    /// How many frames carry each flag, in `IntegrityFlags::ALL` order.
+    pub flag_counts: Vec<u32>,
+    /// The flag slugs, in the same order, so the chips do not hard-code them.
+    pub flag_names: Vec<String>,
+    /// Mean technical score over scored frames.
+    pub mean_score: f32,
+    /// An upper bound on the frames carrying a defect: one frame can be soft
+    /// *and* noisy, so the counts overlap and this is a sum of them.
+    pub defective_at_most: u32,
+    /// Camera bodies with no calibration row.
+    pub uncalibrated: Vec<String>,
+    /// Which learned heads produced the numbers. The **lowest** present.
+    pub model_ver: u16,
+    /// Which build's arithmetic produced them.
+    pub analysis_ver: u16,
+    /// Which calibration table normalised them.
+    pub calib_ver: u16,
+}
+
+/// Ask for the frames carrying any of these flags.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlaggedInput {
+    /// The project.
+    pub project_id: String,
+    /// Flag slugs. Any of them matching is a hit.
+    pub flags: Vec<String>,
+    /// How many to return, worst score first.
+    pub limit: Option<u32>,
+}
+
+/// Ask a moment's frames to be ranked by subject sharpness.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithinMomentInput {
+    /// The moment.
+    pub moment_id: String,
+}
+
+/// One frame's place in its moment's sharpness ranking.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RankedFrameDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// One for the sharpest of the moment, zero for the softest.
+    pub relative_sharpness: f32,
+}
+
+/// Tell AURA that one technical mark is wrong.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DismissFlagInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// Exactly one flag slug.
+    pub flag: String,
+}
+
+/// Start a technical pass over a project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyseIntegrityInput {
+    /// The project.
+    pub project_id: String,
+    /// Cancel token id, when the caller wants to be able to stop it.
+    pub cancel_id: Option<String>,
+}
+
+/// What a technical pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IntegrityPassDto {
+    /// Photographs analysed.
+    pub scored: u32,
+    /// Photographs that could not be analysed. Each is logged with a code and
+    /// **no row is written**, so the next pass tries again.
+    pub failed: u32,
+    /// Faces whose eyes were judged.
+    pub faces: u32,
+    /// Faces whose eyes were closed.
+    pub closed: u32,
+    /// Closures the intent rules justified.
+    pub closed_ok: u32,
+    /// Mean technical score over this pass.
+    pub mean_score: f32,
+    /// Bodies with no calibration row.
+    pub uncalibrated: Vec<String>,
+    /// Milliseconds.
+    pub elapsed_ms: u64,
+    /// True when the pass was stopped.
+    pub cancelled: bool,
+}
+
+/// Integrity events pushed to the UI, mirroring section 11's three events.
+///
+/// Typed on both sides and not yet emitted, for the reason `MomentEvent`,
+/// `StoryEvent` and `PeopleEvent` are not: the Tauri shell has not been launched
+/// on the development machine, so an emitter would be code nobody has run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum IntegrityEvent {
+    /// `integrity.scored` - a pass finished.
+    IntegrityScored {
+        /// Frames analysed.
+        images: u64,
+        /// Milliseconds.
+        ms: u64,
+        /// Mean technical score.
+        mean_score: f32,
+        /// How many frames carry each flag, in `IntegrityFlags::ALL` order.
+        flag_histogram: Vec<u32>,
+    },
+    /// `integrity.eyes` - the four eye counters, once per pass.
+    IntegrityEyes {
+        /// Faces judged.
+        faces: u64,
+        /// Eyes closed.
+        closed: u64,
+        /// Closures the intent rules justified.
+        closed_ok: u64,
+        /// Faces squinting.
+        squint: u64,
+    },
+    /// `integrity.camera_uncalibrated` - one body, once per pass.
+    IntegrityCameraUncalibrated {
+        /// The make, as EXIF wrote it.
+        make: String,
+        /// The model.
+        model: String,
+    },
+}

@@ -84,7 +84,11 @@ pub fn tile_sigma(plane: &LumaPlane, x0: usize, y0: usize, side: usize) -> Optio
         return None;
     }
     let at = |x: usize, y: usize| -> f32 {
-        plane.values.get(y * plane.width + x).copied().unwrap_or(0.0)
+        plane
+            .values
+            .get(y * plane.width + x)
+            .copied()
+            .unwrap_or(0.0)
     };
     let mut total = 0.0f64;
     let mut count = 0u32;
@@ -113,7 +117,11 @@ pub fn tile_sigma(plane: &LumaPlane, x0: usize, y0: usize, side: usize) -> Optio
 #[must_use]
 pub fn tile_energy(plane: &LumaPlane, x0: usize, y0: usize, side: usize) -> f32 {
     let at = |x: usize, y: usize| -> f32 {
-        plane.values.get(y * plane.width + x).copied().unwrap_or(0.0)
+        plane
+            .values
+            .get(y * plane.width + x)
+            .copied()
+            .unwrap_or(0.0)
     };
     let mut total = 0.0f64;
     let mut count = 0u32;
@@ -186,10 +194,7 @@ pub fn analyse(
     // contain a hair, a dust spot or a sensor defect would drag a mean up by a third,
     // and the whole point of taking the quietest quarter is to be robust.
     sigmas.sort_by(f32::total_cmp);
-    let sigma = sigmas
-        .get(sigmas.len() / 2)
-        .copied()
-        .unwrap_or_default();
+    let sigma = sigmas.get(sigmas.len() / 2).copied().unwrap_or_default();
 
     NoiseResult {
         sigma,
@@ -218,12 +223,7 @@ pub const BASE_SIGMA_PER_ELECTRON: f32 = 0.003 / 3.4;
 /// expected noise and a `dance_floor` at 0.85 will accept a little over twice it -
 /// which is the ratio a photographer would recognise between those two situations.
 #[must_use]
-pub fn relative(
-    sigma: f32,
-    iso: u32,
-    calibration: &Calibration,
-    scene_tolerance: f32,
-) -> f32 {
+pub fn relative(sigma: f32, iso: u32, calibration: &Calibration, scene_tolerance: f32) -> f32 {
     let expected = calibration.expected_noise_e(iso) * BASE_SIGMA_PER_ELECTRON;
     if expected <= f32::EPSILON {
         return 0.0;

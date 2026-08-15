@@ -121,7 +121,11 @@ pub fn structure_tensor(plane: &LumaPlane, rect: PixelRect) -> Orientation {
     let mut gxy = 0.0f64;
     let mut count = 0u32;
     let at = |x: usize, y: usize| -> f32 {
-        plane.values.get(y * plane.width + x).copied().unwrap_or(0.0)
+        plane
+            .values
+            .get(y * plane.width + x)
+            .copied()
+            .unwrap_or(0.0)
     };
 
     for y in rect.y0..rect.y1.saturating_sub(1) {

@@ -23,9 +23,7 @@
 //! checked". Migration 9's fifth property is that "not checked" is not "clean", and this
 //! is that rule applied to the interface rather than to the schema.
 
-use aura_core::contract::integrity::{
-    CropRect, IntegrityFlags, MotionKind, Reason, ReasonCode,
-};
+use aura_core::contract::integrity::{CropRect, IntegrityFlags, MotionKind, Reason, ReasonCode};
 use aura_core::SceneProfile;
 
 use crate::integrity::calibration::Calibration;
@@ -144,10 +142,7 @@ pub fn decide(evidence: &Evidence<'_>) -> Verdict {
 
     // --- Focus ---------------------------------------------------------------
     let threshold = soft_threshold(evidence.profile);
-    let subject_crop = evidence
-        .eyes
-        .first()
-        .map_or(CropRect::FULL, |eye| eye.crop);
+    let subject_crop = evidence.eyes.first().map_or(CropRect::FULL, |eye| eye.crop);
     if evidence.focus.subject < threshold {
         flags = flags.union(IntegrityFlags::SUBJECT_SOFT);
         // The penalty scales with how far below the threshold it fell, so a frame that
@@ -305,7 +300,12 @@ pub fn decide(evidence: &Evidence<'_>) -> Verdict {
     for eye in evidence.eyes.iter().filter(|eye| eye.gates && eye.closed) {
         if eye.rule.justifies() {
             flags = flags.union(IntegrityFlags::EYES_CLOSED_OK);
-            reasons.push(Reason::at(ReasonCode::EyesClosedOk, eye.rule.text(), 0.0, eye.crop));
+            reasons.push(Reason::at(
+                ReasonCode::EyesClosedOk,
+                eye.rule.text(),
+                0.0,
+                eye.crop,
+            ));
         } else {
             flags = flags.union(IntegrityFlags::EYES_CLOSED);
             reasons.push(Reason::at(

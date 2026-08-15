@@ -45,7 +45,7 @@ use aura_vision::embed::descriptors::{luma_plane, LumaPlane};
 use crate::integrity::calibration::{Calibration, CalibrationTable};
 use crate::integrity::exposure;
 use crate::integrity::eyes::{self, EyeStateModel, IntentInput};
-use crate::integrity::flags::{self, EyeVerdict, Evidence};
+use crate::integrity::flags::{self, Evidence, EyeVerdict};
 use crate::integrity::focus::{self, FocusHead, PixelRect, RegionSet};
 use crate::integrity::motion::{self, MotionContext};
 use crate::integrity::noise;
@@ -155,10 +155,7 @@ impl FrameContext {
     pub const fn expects_motion(&self) -> bool {
         matches!(
             self.scene,
-            SceneId::DanceFloor
-                | SceneId::Exit
-                | SceneId::FirstDance
-                | SceneId::ReceptionEntrance
+            SceneId::DanceFloor | SceneId::Exit | SceneId::FirstDance | SceneId::ReceptionEntrance
         )
     }
 
@@ -309,9 +306,11 @@ impl Analyser {
         // 1. The one derived plane. Everything below reads this or the buffer, never a
         //    file.
         let plane = luma_plane(rgb, width, height);
-        let calibration = self
-            .calibration
-            .get(&context.exif.make, &context.exif.model, context.exif.megapixels);
+        let calibration = self.calibration.get(
+            &context.exif.make,
+            &context.exif.model,
+            context.exif.megapixels,
+        );
 
         // 2. Regions. The subject question and the "is there a subject" question are the
         //    same question, asked once.
@@ -334,8 +333,8 @@ impl Analyser {
         // 4. Focus, learned. One batched call over the subject region, and the head may
         //    only ever withdraw a softness claim - see `focus::HEAD_OVERRULES_AT`.
         let subject_rect = regions.faces.first().copied();
-        if let Some(rect) = subject_rect
-            .and_then(|rect| PixelRect::from_norm(rect, plane.width, plane.height))
+        if let Some(rect) =
+            subject_rect.and_then(|rect| PixelRect::from_norm(rect, plane.width, plane.height))
         {
             let tensor = focus::preprocess_region(&plane, rect);
             // A head that will not run costs an *exoneration*, never a verdict - so it
@@ -523,8 +522,10 @@ impl Analyser {
                 .unwrap_or((aura_core::contract::integrity::EyeOpenness::Open, 0.0));
             per_face.push((*face, state, confidence));
         }
-        let openness: Vec<(FaceRef, aura_core::contract::integrity::EyeOpenness)> =
-            per_face.iter().map(|(face, state, _)| (*face, *state)).collect();
+        let openness: Vec<(FaceRef, aura_core::contract::integrity::EyeOpenness)> = per_face
+            .iter()
+            .map(|(face, state, _)| (*face, *state))
+            .collect();
         let both_closed = eyes::both_partners_closed(&openness, &context.couple);
 
         let mut states = Vec::with_capacity(per_face.len());
@@ -567,10 +568,7 @@ impl Analyser {
         let unjustified = if gating == 0 {
             0.0
         } else {
-            let count = states
-                .iter()
-                .filter(|state| state.is_defect())
-                .count();
+            let count = states.iter().filter(|state| state.is_defect()).count();
             f64::from(u32::try_from(count).unwrap_or(0)) as f32 / f64::from(gating) as f32
         };
         Ok((states, verdicts, ratio, gating, unjustified))

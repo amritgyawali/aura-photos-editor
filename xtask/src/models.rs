@@ -296,10 +296,7 @@ fn generate() -> ExitCode {
                 class: ModelClass::Embedding,
                 model: fixtures::eye_state(),
                 input: Placeholder::image(fixtures::EYE_CROP_SIDE),
-                output: BTreeMap::from([(
-                    "eye_probs".to_string(),
-                    vec![1, fixtures::EYE_CLASSES],
-                )]),
+                output: BTreeMap::from([("eye_probs".to_string(), vec![1, fixtures::EYE_CLASSES])]),
                 // int8 is forbidden, and the contrast with the focus head above is
                 // the point. This head *can* convict a photograph: a confident
                 // `closed` on a gating face raises `EYES_CLOSED`, and section 12's

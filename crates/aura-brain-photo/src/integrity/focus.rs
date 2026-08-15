@@ -138,7 +138,13 @@ pub fn laplacian_variance(plane: &LumaPlane, rect: PixelRect) -> f32 {
     let mut sum = 0.0f64;
     let mut sum_sq = 0.0f64;
     let mut count = 0u32;
-    let at = |x: usize, y: usize| -> f32 { plane.values.get(y * plane.width + x).copied().unwrap_or(0.0) };
+    let at = |x: usize, y: usize| -> f32 {
+        plane
+            .values
+            .get(y * plane.width + x)
+            .copied()
+            .unwrap_or(0.0)
+    };
 
     for y in (rect.y0 + 1)..rect.y1.saturating_sub(1) {
         for x in (rect.x0 + 1)..rect.x1.saturating_sub(1) {
@@ -169,7 +175,13 @@ pub fn laplacian_variance(plane: &LumaPlane, rect: PixelRect) -> f32 {
 pub fn tenengrad(plane: &LumaPlane, rect: PixelRect) -> f32 {
     let mut total = 0.0f64;
     let mut count = 0u32;
-    let at = |x: usize, y: usize| -> f32 { plane.values.get(y * plane.width + x).copied().unwrap_or(0.0) };
+    let at = |x: usize, y: usize| -> f32 {
+        plane
+            .values
+            .get(y * plane.width + x)
+            .copied()
+            .unwrap_or(0.0)
+    };
 
     for y in (rect.y0 + 1)..rect.y1.saturating_sub(1) {
         for x in (rect.x0 + 1)..rect.x1.saturating_sub(1) {
@@ -207,7 +219,13 @@ pub fn acutance(plane: &LumaPlane, rect: PixelRect) -> f32 {
     }
     let mut total = 0.0f64;
     let mut count = 0u32;
-    let at = |x: usize, y: usize| -> f32 { plane.values.get(y * plane.width + x).copied().unwrap_or(0.0) };
+    let at = |x: usize, y: usize| -> f32 {
+        plane
+            .values
+            .get(y * plane.width + x)
+            .copied()
+            .unwrap_or(0.0)
+    };
 
     for y in rect.y0..rect.y1.saturating_sub(1) {
         for x in rect.x0..rect.x1.saturating_sub(1) {
@@ -363,10 +381,7 @@ impl RegionSet {
             }
         }
         let boxes: Vec<CropRect> = faces.iter().map(|(bbox, _, _)| *bbox).collect();
-        let highest = boxes
-            .iter()
-            .map(|face| face.y)
-            .fold(1.0f32, f32::min);
+        let highest = boxes.iter().map(|face| face.y).fold(1.0f32, f32::min);
         let lowest = boxes
             .iter()
             .map(|face| face.y + face.h)
@@ -377,7 +392,7 @@ impl RegionSet {
             bodies: bodies.to_vec(),
             far: band_above(highest),
             near: band_below(lowest),
-            }
+        }
     }
 
     /// The region set for a frame with nothing phase 06 recognised.
@@ -544,9 +559,8 @@ pub fn analyse(
     // foreground and a sharp background cancel into "the subject is fine".
     let offset = focus_offset(raw_subject, far, near);
 
-    let shallow = raw_subject > 0.0
-        && raw_background > 0.0
-        && raw_subject / raw_background >= BOKEH_RATIO;
+    let shallow =
+        raw_subject > 0.0 && raw_background > 0.0 && raw_subject / raw_background >= BOKEH_RATIO;
 
     FocusResult {
         subject: normalise(raw_subject, calibration),
@@ -687,16 +701,16 @@ pub fn preprocess_region(plane: &LumaPlane, rect: PixelRect) -> Vec<f32> {
     let mut cropped = Vec::with_capacity(width * height);
     for y in rect.y0..rect.y1 {
         for x in rect.x0..rect.x1 {
-            cropped.push(plane.values.get(y * plane.width + x).copied().unwrap_or(0.0));
+            cropped.push(
+                plane
+                    .values
+                    .get(y * plane.width + x)
+                    .copied()
+                    .unwrap_or(0.0),
+            );
         }
     }
-    box_resize(
-        &cropped,
-        width,
-        height,
-        FOCUS_CROP_SIDE,
-        FOCUS_CROP_SIDE,
-    )
+    box_resize(&cropped, width, height, FOCUS_CROP_SIDE, FOCUS_CROP_SIDE)
 }
 
 /// The focus head.

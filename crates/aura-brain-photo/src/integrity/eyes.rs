@@ -560,7 +560,11 @@ fn sample_bilinear(rgb: &[u8], width: usize, height: usize, x: f32, y: f32) -> [
     let mut out = [0u8; 3];
     for (channel, slot) in out.iter_mut().enumerate() {
         let at = |px: usize, py: usize| -> f32 {
-            f32::from(rgb.get((py * width + px) * 3 + channel).copied().unwrap_or(0))
+            f32::from(
+                rgb.get((py * width + px) * 3 + channel)
+                    .copied()
+                    .unwrap_or(0),
+            )
         };
         let top = at(x0, y0) + (at(x1, y0) - at(x0, y0)) * fx;
         let bottom = at(x0, y1) + (at(x1, y1) - at(x0, y1)) * fx;

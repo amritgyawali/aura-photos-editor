@@ -361,7 +361,10 @@ fn validate(file: &str, key: &str, body: &Body) -> Result<Calibration, AuraError
         ));
     }
     if !(0.0..=6.0).contains(&body.shadow_headroom_ev) {
-        return Err(refuse("shadow_headroom_ev", "must be between 0.0 and 6.0 stops"));
+        return Err(refuse(
+            "shadow_headroom_ev",
+            "must be between 0.0 and 6.0 stops",
+        ));
     }
     if body.base_iso == 0 {
         return Err(refuse("base_iso", "must be above zero"));

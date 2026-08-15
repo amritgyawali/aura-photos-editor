@@ -24,7 +24,10 @@ fn every_shipped_row_is_a_measurement_and_the_fallback_is_not() {
     let table = CalibrationTable::embedded().expect("embedded");
     for (make, model) in table.bodies() {
         let row = table.get(&make, &model, 24.0);
-        assert!(row.measured, "{make} {model} should have matched its own row");
+        assert!(
+            row.measured,
+            "{make} {model} should have matched its own row"
+        );
         assert!(
             row.confidence_penalty <= f32::EPSILON,
             "{make} {model} is measured, so it must cost no confidence"
@@ -137,7 +140,10 @@ fn a_malformed_table_is_refused_by_key_and_by_rule() {
             refusal.detail
         );
     }
-    assert!(MIN_RATIONALE >= 9);
+    // Three config files, one rule: `scene_profiles`, `moment_profiles` and this one all
+    // refuse a rationale shorter than nine characters. A measurement nobody can explain
+    // is a magic number even when it came off a chart.
+    assert_eq!(MIN_RATIONALE, 9);
 }
 
 #[test]

@@ -144,7 +144,11 @@ pub fn specular_fraction(plane: &LumaPlane) -> f32 {
     let mut clipped = 0u32;
     let mut specular = 0u32;
     let at = |x: usize, y: usize| -> f32 {
-        plane.values.get(y * plane.width + x).copied().unwrap_or(0.0)
+        plane
+            .values
+            .get(y * plane.width + x)
+            .copied()
+            .unwrap_or(0.0)
     };
 
     let mut y = 0;

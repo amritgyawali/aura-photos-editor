@@ -125,7 +125,12 @@ fn analyser() -> Analyser {
 
 fn analyse(frame: &Frame, context: &FrameContext) -> IntegrityResult {
     analyser()
-        .analyse(PhotoId::new(), &buffer_of(frame), context, Priority::AiBatch)
+        .analyse(
+            PhotoId::new(),
+            &buffer_of(frame),
+            context,
+            Priority::AiBatch,
+        )
         .expect("a synthetic frame must analyse")
 }
 
@@ -142,15 +147,10 @@ fn the_blur_ladder_response_is_monotonic() {
     let mut previous = f32::INFINITY;
     let mut normalised = Vec::new();
     for frame in fixtures::blur_ladder() {
-        let plane = aura_vision::embed::descriptors::luma_plane(
-            &frame.rgb,
-            frame.width,
-            frame.height,
-        );
-        let regions = focus::RegionSet::for_face(
-            &[(fixtures::FACE_RECT, frame.faces[0].eyes, true)],
-            &[],
-        );
+        let plane =
+            aura_vision::embed::descriptors::luma_plane(&frame.rgb, frame.width, frame.height);
+        let regions =
+            focus::RegionSet::for_face(&[(fixtures::FACE_RECT, frame.faces[0].eyes, true)], &[]);
         let result = focus::analyse(&plane, &regions, &[1.0], &calibration);
         assert!(
             result.raw_subject < previous,
@@ -175,15 +175,10 @@ fn back_and_front_focus_are_correctly_signed() {
     let calibration = CalibrationTable::embedded().expect("embedded").fallback();
     for (behind, expectation) in [(true, "positive"), (false, "negative")] {
         let frame = fixtures::focus_miss(behind);
-        let plane = aura_vision::embed::descriptors::luma_plane(
-            &frame.rgb,
-            frame.width,
-            frame.height,
-        );
-        let regions = focus::RegionSet::for_face(
-            &[(fixtures::FACE_RECT, frame.faces[0].eyes, true)],
-            &[],
-        );
+        let plane =
+            aura_vision::embed::descriptors::luma_plane(&frame.rgb, frame.width, frame.height);
+        let regions =
+            focus::RegionSet::for_face(&[(fixtures::FACE_RECT, frame.faces[0].eyes, true)], &[]);
         let result = focus::analyse(&plane, &regions, &[1.0], &calibration);
         if behind {
             assert!(
@@ -233,15 +228,10 @@ fn subject_focus_auc_is_measured_on_the_blur_ladder() {
     let calibration = CalibrationTable::embedded().expect("embedded").fallback();
     let mut scored: Vec<(f64, bool)> = Vec::new();
     for frame in fixtures::blur_ladder() {
-        let plane = aura_vision::embed::descriptors::luma_plane(
-            &frame.rgb,
-            frame.width,
-            frame.height,
-        );
-        let regions = focus::RegionSet::for_face(
-            &[(fixtures::FACE_RECT, frame.faces[0].eyes, true)],
-            &[],
-        );
+        let plane =
+            aura_vision::embed::descriptors::luma_plane(&frame.rgb, frame.width, frame.height);
+        let regions =
+            focus::RegionSet::for_face(&[(fixtures::FACE_RECT, frame.faces[0].eyes, true)], &[]);
         let result = focus::analyse(&plane, &regions, &[1.0], &calibration);
         let keeper = frame.truth.subject_blur <= 1;
         let reject = frame.truth.subject_blur >= 4;
@@ -391,8 +381,7 @@ fn exposure_verdicts_agree_with_the_authored_labels() {
         (
             "a correctly exposed frame needs nothing",
             ExposureVerdict::Good,
-            exposure::verdict(exposure::Clipping::default(), 0.1, 100, &modern, 0.5, false)
-                .verdict,
+            exposure::verdict(exposure::Clipping::default(), 0.1, 100, &modern, 0.5, false).verdict,
         ),
         (
             "heavily blown highlights are lost",
@@ -462,10 +451,12 @@ fn exposure_verdicts_agree_with_the_authored_labels() {
 fn a_candle_is_not_a_blown_highlight_and_a_blown_dress_is() {
     // Section 10.1: "candle and sparkler frames not flagged".
     let flame = fixtures::candle();
-    let plane =
-        aura_vision::embed::descriptors::luma_plane(&flame.rgb, flame.width, flame.height);
+    let plane = aura_vision::embed::descriptors::luma_plane(&flame.rgb, flame.width, flame.height);
     let specular = exposure::specular_fraction(&plane);
-    println!("candle: {:.0}% of the clipped pixels are a light source", specular * 100.0);
+    println!(
+        "candle: {:.0}% of the clipped pixels are a light source",
+        specular * 100.0
+    );
     assert!(
         specular > 0.5,
         "a small bright light in a dark room must read as specular"
@@ -482,7 +473,9 @@ fn a_candle_is_not_a_blown_highlight_and_a_blown_dress_is() {
     let candle_context = context_for(&flame, SceneId::Ceremony, "SONY", "ILCE-7M3", 6400);
     let candle_verdict = analyse(&flame, &candle_context);
     assert!(
-        !candle_verdict.flags.contains(IntegrityFlags::HIGHLIGHT_LOST),
+        !candle_verdict
+            .flags
+            .contains(IntegrityFlags::HIGHLIGHT_LOST),
         "a candle frame must not be flagged"
     );
 }
@@ -493,11 +486,8 @@ fn the_noise_estimate_is_within_fifteen_per_cent_of_a_known_sigma() {
     let table = CalibrationTable::embedded().expect("embedded");
     let calibration = table.get("SONY", "ILCE-7M3", 24.2);
     for (frame, iso) in fixtures::iso_ladder() {
-        let plane = aura_vision::embed::descriptors::luma_plane(
-            &frame.rgb,
-            frame.width,
-            frame.height,
-        );
+        let plane =
+            aura_vision::embed::descriptors::luma_plane(&frame.rgb, frame.width, frame.height);
         let measured = noise::analyse(&plane, iso, &calibration, 0.5);
         assert!(measured.measured, "ISO {iso}: no flat tiles were found");
         let error = (f64::from(measured.sigma) - f64::from(frame.truth.sigma)).abs()
@@ -570,10 +560,8 @@ fn blink_f1_is_measured_against_the_reference_reader() {
         }
     }
 
-    let precision = f64::from(true_positive)
-        / f64::from(true_positive + false_positive).max(1.0);
-    let recall =
-        f64::from(true_positive) / f64::from(true_positive + false_negative).max(1.0);
+    let precision = f64::from(true_positive) / f64::from(true_positive + false_positive).max(1.0);
+    let recall = f64::from(true_positive) / f64::from(true_positive + false_negative).max(1.0);
     let f1 = if precision + recall <= 0.0 {
         0.0
     } else {
@@ -689,7 +677,10 @@ fn a_blinking_guest_in_a_crowd_is_not_a_defect() {
         w: 0.05,
         h: 0.05,
     });
-    assert!(eyes::gates(&big, 0.0), "a face filling 9 % of the frame gates");
+    assert!(
+        eyes::gates(&big, 0.0),
+        "a face filling 9 % of the frame gates"
+    );
     assert!(
         !eyes::gates(&tiny, 0.0),
         "a face filling 0.25 % of the frame with no identity does not gate"
@@ -741,9 +732,7 @@ fn the_four_intent_rules_fire_in_the_documented_order() {
         }),
         IntentRule::None
     );
-    println!(
-        "  rule 3 (tears) is wired and unreachable until phase 10 - condition C4"
-    );
+    println!("  rule 3 (tears) is wired and unreachable until phase 10 - condition C4");
 }
 
 // ---------------------------------------------------------------------------
@@ -843,10 +832,10 @@ fn zero_point_eight_means_the_same_thing_in_every_scene() {
 #[test]
 fn the_isotonic_map_refuses_to_go_backwards() {
     // A calibration that is not monotone is not a calibration.
-    assert!(score::Isotonic::from_knots([
-        0.0, 0.2, 0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
-    ])
-    .is_none());
+    assert!(
+        score::Isotonic::from_knots([0.0, 0.2, 0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+            .is_none()
+    );
     let fitted = score::Isotonic::from_knots([
         0.0, 0.05, 0.12, 0.22, 0.35, 0.50, 0.65, 0.78, 0.88, 0.95, 1.0,
     ])
@@ -869,15 +858,10 @@ fn a_twenty_four_and_a_sixty_one_megapixel_body_score_within_five_hundredths() {
         fixtures::cross_camera_pair();
 
     let measure = |frame: &Frame, make: &str, model: &str| -> f32 {
-        let plane = aura_vision::embed::descriptors::luma_plane(
-            &frame.rgb,
-            frame.width,
-            frame.height,
-        );
-        let regions = focus::RegionSet::for_face(
-            &[(fixtures::FACE_RECT, frame.faces[0].eyes, true)],
-            &[],
-        );
+        let plane =
+            aura_vision::embed::descriptors::luma_plane(&frame.rgb, frame.width, frame.height);
+        let regions =
+            focus::RegionSet::for_face(&[(fixtures::FACE_RECT, frame.faces[0].eyes, true)], &[]);
         let calibration = table.get(make, model, 24.0);
         focus::analyse(&plane, &regions, &[1.0], &calibration).subject
     };
@@ -895,20 +879,18 @@ fn a_twenty_four_and_a_sixty_one_megapixel_body_score_within_five_hundredths() {
     // against the *same* row for both, which is what an uncalibrated product does.
     let flat = table.fallback();
     let flat_measure = |frame: &Frame| -> f32 {
-        let plane = aura_vision::embed::descriptors::luma_plane(
-            &frame.rgb,
-            frame.width,
-            frame.height,
-        );
-        let regions = focus::RegionSet::for_face(
-            &[(fixtures::FACE_RECT, frame.faces[0].eyes, true)],
-            &[],
-        );
+        let plane =
+            aura_vision::embed::descriptors::luma_plane(&frame.rgb, frame.width, frame.height);
+        let regions =
+            focus::RegionSet::for_face(&[(fixtures::FACE_RECT, frame.faces[0].eyes, true)], &[]);
         focus::analyse(&plane, &regions, &[1.0], &flat).subject
     };
     let gap = flat_measure(&low_frame) - flat_measure(&high_frame);
     println!("  without per-body calibration the gap would be {gap:.3}");
-    assert!(gap > 0.0, "the fixture must actually be harder for the 61 MP body");
+    assert!(
+        gap > 0.0,
+        "the fixture must actually be harder for the 61 MP body"
+    );
 }
 
 #[test]
@@ -942,7 +924,13 @@ fn an_uncalibrated_body_costs_confidence_and_says_why() {
     );
     let unknown = analyse(
         &frame,
-        &context_for(&frame, SceneId::CouplePortrait, "Hasselblad", "X2D 100C", 400),
+        &context_for(
+            &frame,
+            SceneId::CouplePortrait,
+            "Hasselblad",
+            "X2D 100C",
+            400,
+        ),
     );
     assert!(unknown.confidence < known.confidence);
     assert!(unknown
@@ -993,7 +981,9 @@ fn every_verdict_carries_a_confidence_and_at_least_one_reason() {
         // Every penalty points at pixels. Section 13's last criterion.
         for reason in result.reasons.iter().filter(|reason| reason.is_penalty()) {
             assert!(
-                reason.evidence.is_some() || reason.code.is_exoneration() || is_frame_wide(reason.code),
+                reason.evidence.is_some()
+                    || reason.code.is_exoneration()
+                    || is_frame_wide(reason.code),
                 "{name}: {} is a penalty with nothing to show",
                 reason.code
             );

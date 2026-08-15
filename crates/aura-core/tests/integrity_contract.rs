@@ -13,8 +13,8 @@
 //!    documented failure mode is false rejection.
 
 use aura_core::contract::integrity::{
-    CropRect, ExposureVerdict, EyeOpenness, IntegrityFlags, IntegrityOutline, MotionKind,
-    Reason, ReasonCode,
+    CropRect, ExposureVerdict, EyeOpenness, IntegrityFlags, IntegrityOutline, MotionKind, Reason,
+    ReasonCode,
 };
 
 #[test]
@@ -81,7 +81,10 @@ fn spare_bits_are_dropped_rather_than_believed() {
     // A catalog written by a build that knows a fifteenth flag must still open here,
     // and the flag must read as nothing rather than as some other flag.
     let future = IntegrityFlags::from_bits(0xFFFF_FFFF);
-    assert_eq!(future.count(), u32::try_from(IntegrityFlags::COUNT).unwrap_or(0));
+    assert_eq!(
+        future.count(),
+        u32::try_from(IntegrityFlags::COUNT).unwrap_or(0)
+    );
     assert!(future.contains(IntegrityFlags::MIXED_LIGHT_RISK));
 }
 
@@ -189,4 +192,79 @@ fn the_outline_counts_flags_by_position() {
     assert_eq!(outline.count(IntegrityFlags::EYES_CLOSED_OK), 7);
     // The exoneration is not counted towards the review queue's header.
     assert_eq!(outline.defective_at_most(), 3);
+}
+
+/// Section 9 gives DOC "document every reason code in user language", and this is what
+/// makes that deliverable finishable rather than aspirational: a code with no sentence in
+/// `docs/frame-integrity.md` fails the build.
+///
+/// Matched on the code's *user text* rather than on its slug, because the page is written
+/// for photographers and a page that listed `subject_soft` in a table would be a page
+/// nobody outside this repository could read.
+#[test]
+fn every_reason_code_is_documented_in_user_language() {
+    let page = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/frame-integrity.md"),
+    )
+    .expect("docs/frame-integrity.md");
+
+    // One distinctive phrase per code, taken from its `user_text`. Not the whole
+    // sentence: the page is prose and the contract is a struct, and demanding they match
+    // word for word would make every copy edit a compile error.
+    let phrases = [
+        (ReasonCode::Clean, "Nothing to report"),
+        (
+            ReasonCode::SubjectSoft,
+            "softer than your camera should manage",
+        ),
+        (ReasonCode::BackFocus, "Focus behind"),
+        (ReasonCode::FrontFocus, "Focus short"),
+        (ReasonCode::ShallowDepthOfField, "Deliberate shallow focus"),
+        (ReasonCode::CameraShake, "smeared in one direction"),
+        (ReasonCode::SubjectMotion, "Subject moved"),
+        (ReasonCode::IntentionalMotion, "Deliberate blur"),
+        (ReasonCode::HighlightLost, "Blown"),
+        (ReasonCode::HighlightRecoverable, "Highlights recoverable"),
+        (ReasonCode::SpecularHighlight, "Lights in shot"),
+        (ReasonCode::ShadowLost, "Crushed"),
+        (ReasonCode::HeavyNoise, "Noisy"),
+        (ReasonCode::NoiseWithinScene, "Noise as expected"),
+        (ReasonCode::EyesClosed, "Blinked"),
+        (ReasonCode::EyesClosedOk, "Eyes closed on purpose"),
+        (ReasonCode::Squint, "Squinting"),
+        (ReasonCode::GroupBlink, "Several blinking"),
+        (ReasonCode::NoSubject, "No subject found"),
+        (ReasonCode::MixedLight, "Mixed light"),
+        (ReasonCode::Uncalibrated, "Camera not measured"),
+    ];
+    assert_eq!(
+        phrases.len(),
+        ReasonCode::ALL.len(),
+        "a reason code was added without a line in docs/frame-integrity.md"
+    );
+    for (code, phrase) in phrases {
+        assert!(
+            page.contains(phrase),
+            "{code} is not documented: the page has no `{phrase}`"
+        );
+    }
+}
+
+/// Every code's user text is a sentence a photographer could read.
+///
+/// No slugs, no field names, no numbers with no units. The check is crude on purpose -
+/// it catches the failure that actually happens, which is a developer writing the
+/// implementation's vocabulary into a string the product shows.
+#[test]
+fn the_user_text_is_written_for_a_photographer() {
+    for code in ReasonCode::ALL {
+        let text = code.user_text();
+        assert!(text.len() > 20, "{code}: too short to be a sentence");
+        for banned in ["_", "None", "f32", "0..1", "flag", "sigma", "MTF"] {
+            assert!(
+                !text.contains(banned),
+                "{code} leaks implementation vocabulary: {banned}"
+            );
+        }
+    }
 }

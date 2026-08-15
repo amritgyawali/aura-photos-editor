@@ -109,7 +109,11 @@ impl Frame {
                 // A gentle vertical gradient, so the frame has a median near mid grey and
                 // the exposure analysis has something ordinary to say about it.
                 let gradient = 96.0 + 48.0 * (y as f32 / SIDE as f32);
-                let coarse = if (x / 16 + y / 16) % 2 == 0 { 18.0 } else { -18.0 };
+                let coarse = if (x / 16 + y / 16) % 2 == 0 {
+                    18.0
+                } else {
+                    -18.0
+                };
                 let value = (gradient + coarse).clamp(0.0, 255.0) as u8;
                 write(&mut rgb, x, y, [value, value, value]);
             }
@@ -272,6 +276,21 @@ impl Frame {
         self.truth.sigma = sigma;
     }
 
+    /// Give every face in this frame a distinct id.
+    ///
+    /// Two fixtures built from the same rectangle would otherwise share one, and
+    /// `faces.id` is a primary key. Called by the phase 09 gate once per frame.
+    pub fn salt_faces(&mut self, salt: i32) {
+        let boxes: Vec<CropRect> = self.faces.iter().map(|face| face.bbox).collect();
+        for (index, bbox) in boxes.into_iter().enumerate() {
+            if let Some(slot) = self.faces.get_mut(index) {
+                let offset = i32::try_from(index).unwrap_or(0);
+                slot.face_id =
+                    face_salted(bbox, salt.wrapping_mul(31).wrapping_add(offset)).face_id;
+            }
+        }
+    }
+
     /// Reduce a rectangle's edge response by a fraction, without destroying its
     /// structure.
     ///
@@ -354,9 +373,19 @@ pub fn focus_miss(behind: bool) -> Frame {
     // Blur the band that is *not* the sharp one, so that one band stands out rather than
     // both being equally textured.
     let dull = if behind {
-        CropRect { x: 0.0, y: 0.62, w: 1.0, h: 0.38 }
+        CropRect {
+            x: 0.0,
+            y: 0.62,
+            w: 1.0,
+            h: 0.38,
+        }
     } else {
-        CropRect { x: 0.0, y: 0.0, w: 1.0, h: 0.28 }
+        CropRect {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 0.28,
+        }
     };
     frame.blur_rect(dull, 6);
     frame
@@ -369,8 +398,24 @@ pub fn focus_miss(behind: bool) -> Frame {
 #[must_use]
 pub fn shallow_depth_of_field() -> Frame {
     let mut frame = Frame::base();
-    frame.blur_rect(CropRect { x: 0.0, y: 0.0, w: 1.0, h: 0.28 }, 9);
-    frame.blur_rect(CropRect { x: 0.0, y: 0.62, w: 1.0, h: 0.38 }, 9);
+    frame.blur_rect(
+        CropRect {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 0.28,
+        },
+        9,
+    );
+    frame.blur_rect(
+        CropRect {
+            x: 0.0,
+            y: 0.62,
+            w: 1.0,
+            h: 0.38,
+        },
+        9,
+    );
     frame.truth.background_blur = 9;
     frame
 }
@@ -388,8 +433,24 @@ pub fn camera_shake() -> Frame {
 #[must_use]
 pub fn panned() -> Frame {
     let mut frame = Frame::base();
-    frame.smear_rect(CropRect { x: 0.0, y: 0.0, w: 1.0, h: 0.28 }, 9);
-    frame.smear_rect(CropRect { x: 0.0, y: 0.62, w: 1.0, h: 0.38 }, 9);
+    frame.smear_rect(
+        CropRect {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 0.28,
+        },
+        9,
+    );
+    frame.smear_rect(
+        CropRect {
+            x: 0.0,
+            y: 0.62,
+            w: 1.0,
+            h: 0.38,
+        },
+        9,
+    );
     frame.truth.panned = true;
     frame
 }
@@ -438,7 +499,12 @@ pub fn clipped() -> Frame {
 pub fn candle() -> Frame {
     let mut frame = Frame::base();
     frame.crush_shadows(2.2);
-    let light = CropRect { x: 0.47, y: 0.10, w: 0.06, h: 0.06 };
+    let light = CropRect {
+        x: 0.47,
+        y: 0.10,
+        w: 0.06,
+        h: 0.06,
+    };
     let (x0, y0, x1, y1) = pixels(light, frame.width, frame.height);
     for y in y0..y1 {
         for x in x0..x1 {
@@ -459,7 +525,10 @@ pub fn candle() -> Frame {
 /// Returned as `((frame, make, model), (frame, make, model))` so a test can look both
 /// bodies up in the shipped table.
 #[must_use]
-pub fn cross_camera_pair() -> ((Frame, &'static str, &'static str), (Frame, &'static str, &'static str)) {
+pub fn cross_camera_pair() -> (
+    (Frame, &'static str, &'static str),
+    (Frame, &'static str, &'static str),
+) {
     let low = Frame::base();
     let mut high = Frame::base();
     // The shipped table records the a7R IV at 0.27 against the a7 III's 0.34 - a ratio of
@@ -468,10 +537,7 @@ pub fn cross_camera_pair() -> ((Frame, &'static str, &'static str), (Frame, &'st
     // removes it.** A softening chosen to make the test pass would be circular; this one
     // is read off the same table the analyser divides by.
     high.soften(FACE_RECT, 1.0 - 0.27 / 0.34);
-    (
-        (low, "SONY", "ILCE-7M3"),
-        (high, "SONY", "ILCE-7RM4"),
-    )
+    ((low, "SONY", "ILCE-7M3"), (high, "SONY", "ILCE-7RM4"))
 }
 
 /// A group frame with a known number of closed eyes.
@@ -574,12 +640,24 @@ pub fn marker_level(state: EyeOpenness) -> u8 {
 /// two calls with the same box produce the same id - invariant 4 applied to a fixture.
 #[must_use]
 pub fn face(bbox: CropRect) -> FaceRef {
+    face_salted(bbox, 0)
+}
+
+/// The same, with a salt that makes two frames' identical boxes different faces.
+///
+/// A face id is derived from the geometry, which is what phase 06 does and what makes it
+/// stable across two scans of one photograph. Two *fixtures* with the same subject
+/// rectangle would therefore share a face id - and `faces.id` is a primary key, so
+/// planting both into one catalog fails. The gate salts by frame index; the failure was
+/// found by the gate rather than by review, which is the argument for having one.
+#[must_use]
+pub fn face_salted(bbox: CropRect, salt: i32) -> FaceRef {
     let quantise = |value: f32| (value * 10_000.0).round() as i32;
     let mut hasher = blake3_of(&[
-        quantise(bbox.x),
+        quantise(bbox.x).wrapping_add(salt.wrapping_mul(7_919)),
         quantise(bbox.y),
         quantise(bbox.w),
-        quantise(bbox.h),
+        quantise(bbox.h).wrapping_add(salt),
     ]);
     if let Some(slot) = hasher.get_mut(6) {
         *slot = (*slot & 0x0f) | 0x80;
@@ -635,9 +713,21 @@ fn blake3_of(values: &[i32; 4]) -> [u8; 16] {
 /// two small numbers.
 #[must_use]
 pub fn subject_texture(x: usize, y: usize) -> u8 {
-    let fine: f32 = if (x / 2 + y / 2) % 2 == 0 { 26.0 } else { -26.0 };
-    let mid: f32 = if (x / 4 + y / 4) % 2 == 0 { 20.0 } else { -20.0 };
-    let coarse: f32 = if (x / 8 + y / 8) % 2 == 0 { 14.0 } else { -14.0 };
+    let fine: f32 = if (x / 2 + y / 2).is_multiple_of(2) {
+        26.0
+    } else {
+        -26.0
+    };
+    let mid: f32 = if (x / 4 + y / 4).is_multiple_of(2) {
+        20.0
+    } else {
+        -20.0
+    };
+    let coarse: f32 = if (x / 8 + y / 8).is_multiple_of(2) {
+        14.0
+    } else {
+        -14.0
+    };
     (128.0 + fine + mid + coarse).clamp(0.0, 255.0) as u8
 }
 

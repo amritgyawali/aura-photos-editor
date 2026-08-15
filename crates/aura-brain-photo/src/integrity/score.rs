@@ -158,13 +158,7 @@ impl Weights {
     pub fn for_scene(profile: &SceneProfile) -> Self {
         let focus = profile.subject_focus_weight.clamp(0.05, 0.95);
         let eyes = focus * 0.5;
-        let raw = [
-            focus,
-            eyes,
-            EXPOSURE_WEIGHT,
-            NOISE_WEIGHT,
-            MOTION_WEIGHT,
-        ];
+        let raw = [focus, eyes, EXPOSURE_WEIGHT, NOISE_WEIGHT, MOTION_WEIGHT];
         let total: f32 = raw.iter().sum();
         if total <= f32::EPSILON {
             return Self {
@@ -207,7 +201,8 @@ pub fn sub_scores(
     let focus_score = if threshold <= f32::EPSILON {
         1.0
     } else if focus.subject >= threshold {
-        let above = ((focus.subject - threshold) / (1.0 - threshold).max(f32::EPSILON)).clamp(0.0, 1.0);
+        let above =
+            ((focus.subject - threshold) / (1.0 - threshold).max(f32::EPSILON)).clamp(0.0, 1.0);
         0.6 + 0.4 * above
     } else {
         0.6 * (focus.subject / threshold).clamp(0.0, 1.0)
