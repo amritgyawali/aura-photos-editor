@@ -859,3 +859,48 @@ summary      = "A moment's strongest frame could not be separated from its neigh
 user_message = "Several frames of one moment are equally strong, so AURA has not picked a best one. They are all still there and you can choose."
 runbook      = "docs/runbooks/AURA-ML-5042.md"
 introduced   = "PHASE-10"
+
+[[error]]
+code         = "AURA-ML-5043"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored composition judgements came from different heads, arithmetic or a different rule table"
+user_message = "AURA has improved how it judges framing, so it is re-checking this wedding in the background. Anything you have already reviewed is kept."
+runbook      = "docs/runbooks/AURA-ML-5043.md"
+introduced   = "PHASE-11"
+
+[[error]]
+code         = "AURA-ML-5044"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A composition dismissal was refused"
+user_message = "AURA could not change that framing note. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5044.md"
+introduced   = "PHASE-11"
+
+[[error]]
+code         = "AURA-ML-5045"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph's framing could not be judged"
+user_message = "AURA could not check the framing of one photograph, and has left it unmarked rather than guessing. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5045.md"
+introduced   = "PHASE-11"
+
+[[error]]
+code         = "AURA-ML-5046"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The composition rule table was refused"
+user_message = "AURA could not load the framing rules that decide what counts as well composed, so it has not marked anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5046.md"
+introduced   = "PHASE-11"
+
+[[error]]
+code         = "AURA-ML-5047"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A scene has no composition rule row"
+user_message = "AURA has no framing rules recorded for this kind of photograph yet, so it is judging those ones cautiously against neutral rules. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5047.md"
+introduced   = "PHASE-11"

@@ -1131,3 +1131,145 @@ export type EmotionEvent =
   | { kind: 'emotionPeaks'; moments: number; meanMargin: number }
   | { kind: 'emotionReactions'; links: number; meanBonus: number }
   | { kind: 'emotionCloudUsed'; calls: number; costUsd: number };
+
+// ---------------------------------------------------------------------------
+// PHASE-11. How a photograph is framed, why, and where the evidence is.
+//
+// These shapes mirror `CompositionResult` rather than approximating it in the
+// interface. In particular, the backend says which reasons are exonerations,
+// which cuts are flagged, and whether a crop hint is actionable. The UI does not
+// own second copies of those rules.
+// ---------------------------------------------------------------------------
+
+export type CompositionJointCutDto = {
+  /** `neck`, `shoulder`, `elbow`, `wrist`, `hip`, `knee` or `ankle`. */
+  joint: string;
+  /** `top`, `right`, `bottom` or `left`. */
+  edge: string;
+  /** True when the edge lands on the joint rather than between joints. */
+  atJoint: boolean;
+  /** Scene-conditioned cost, from zero to one. */
+  severity: number;
+  /** The backend's threshold decision; never re-derived here. */
+  flagged: boolean;
+  area: CropRectDto;
+};
+
+export type CompositionReasonDto = {
+  code: string;
+  /** The exact photographer-facing sentence produced by the analyser. */
+  text: string;
+  /** Negative for a penalty; zero or positive for an exoneration. */
+  weight: number;
+  /** True when this reason withdraws a claim rather than making one. */
+  exoneration: boolean;
+  /** Null only for a frame-wide reason. */
+  evidence: CropRectDto | null;
+};
+
+/** A target for phase 23. This phase never applies it. */
+export type CompositionCropHintDto = {
+  region: CropRectDto;
+  safeMargin: number;
+  straightenDeg: number | null;
+  confidence: number;
+  actionable: boolean;
+};
+
+/** Every field in the frozen `CompositionResult`. */
+export type CompositionDto = {
+  photoId: string;
+  /** Degrees off level. Positive is clockwise. */
+  tiltDeg: number;
+  tiltIntentional: boolean;
+  horizonConf: number;
+  /** `none`, `gradient`, `vanishing_lines` or `gravity`. */
+  horizonSource: string;
+  /** Space above the subject as a fraction of frame height. */
+  headroom: number;
+  /** Distance from the nearest rule-of-thirds power point. */
+  thirdsOffset: number;
+  balance: number;
+  negativeSpace: number;
+  jointCuts: CompositionJointCutDto[];
+  headCrop: boolean;
+  edgeIntrusions: CropRectDto[];
+  /** Scene-relative clutter; 1.0 is the scene's tolerance. */
+  clutter: number;
+  brightBlobs: CropRectDto[];
+  headMerge: boolean;
+  colourCompetition: number;
+  aesthetic: number;
+  compositionScore: number;
+  cropSuggestionHint: CompositionCropHintDto | null;
+  scene: string;
+  relativeComposition: number;
+  keypointSubjects: number;
+  flags: string[];
+  /** True when at least one flag is a framing violation. */
+  hasViolation: boolean;
+  reasons: CompositionReasonDto[];
+  confidence: number;
+  userReviewed: boolean;
+  modelVer: number;
+  analysisVer: number;
+  rulesVer: number;
+};
+
+export type CompositionStatusDto = {
+  photos: number;
+  scored: number;
+  /** Denominator: every photograph in the project. */
+  coverage: number;
+  /** Fraction of scored frames whose subjects had keypoints. */
+  keypointAware: number;
+  flagCounts: number[];
+  flagNames: string[];
+  meanScore: number;
+  /** Denominator: frames with a measurable horizon. */
+  meanAbsTilt: number;
+  intentionalRatio: number;
+  hinted: number;
+  reviewed: number;
+  /** An upper bound because one frame may carry several flags. */
+  violatingAtMost: number;
+  unruledScenes: string[];
+  modelVer: number;
+  analysisVer: number;
+  rulesVer: number;
+};
+
+export type FlaggedCompositionInput = {
+  projectId: string;
+  flags: string[];
+  limit?: number;
+};
+
+export type DismissCompositionFlagInput = {
+  photoId: string;
+  /** Exactly one violation flag slug. */
+  flag: string;
+};
+
+export type AnalyseCompositionInput = {
+  projectId: string;
+  cancelId?: string;
+};
+
+export type CompositionPassDto = {
+  scored: number;
+  failed: number;
+  keypointSubjects: number;
+  cut: number;
+  intentionalTilts: number;
+  horizons: number;
+  meanAbsTilt: number;
+  flagCounts: number[];
+  flagNames: string[];
+  meanScore: number;
+  hinted: number;
+  unruledScenes: string[];
+  elapsedMs: number;
+  /** Completed rows remain saved when this is true. */
+  cancelled: boolean;
+};

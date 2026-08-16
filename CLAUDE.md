@@ -54,6 +54,10 @@ Never load two phase files into one session.
 | Emotion weights (versioned, PM-owned) | `crates/aura-brain-wedding/config/emotion_weights.toml` |
 | Emotion evaluation gates | `tests/eval/emotion_eval.rs` + `ml/models/emotion/eval_emotion.py` |
 | What the emotion marks mean | `docs/emotion-and-moments.md` |
+| Composition and aesthetic decisions | `docs/adr/ADR-0023-composition-rules-and-aesthetics.md` |
+| Composition rules (versioned, PM-owned) | `crates/aura-brain-photo/config/composition_rules.toml` |
+| Composition evaluation gates | `tests/eval/composition_eval.rs` + `ml/models/composition/eval_composition.py` |
+| What composition marks mean | `docs/composition-and-framing.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -298,6 +302,39 @@ and "no phase may keep its own expression model" from becoming a cycle. Phase 09
 Phase 10 also moved the 112 px two-point face warp into `aura-vision` when it became its
 second consumer. Two copies of a warp is two crops that drift apart while looking
 identical; phase 09's 26 eval gates and 11 calibration tests pass unchanged after the move.
+
+Phase 11 is implemented conditionally: `aura-core::contract::composition` freezes the
+flags, crop evidence, reason vocabulary, result, coverage and service; `aura-brain-photo`
+measures horizon geometry, joint and limb cuts, headroom, thirds, balance, background edge
+energy, bright regions, head merges and colour competition, then combines them with a
+bounded scene-conditioned aesthetic reading. Migration 11 stores one judgement per photo,
+22 measured scene rows live in editable config, two model artifacts are signed with cards,
+the Composition card renders reasons and normalised evidence overlays, and
+`aura-cli verify --phase 11` is the executable gate. Its exit report is
+`docs/progress/PHASE-11-EXIT.md`.
+
+**Both phase 11 heads are placeholders.** `pose_keypoints` has an architecture fixture
+whose global pooling cannot recover real spatial keypoints, and `aesthetic_head` is an
+untrained deterministic projection. The analyser therefore must not describe their output
+as learned; it exposes the reference aesthetic and an unavailable-head caveat until trained
+provenance exists. The 37 composition evaluation tests use authored synthetic pixels and
+reference geometry. They prove the deterministic arithmetic and regression guards, not
+real-wedding accuracy, photographer agreement, demographic fairness, or model quality.
+That is condition C1 and a Sev 2 trigger.
+
+Four rules that phase 11 adds and every later phase inherits:
+
+- **`CompositionService` is the only way to ask how a frame is composed.** Phase 12 may
+  combine the evidence and phase 23 may act on a hint; neither reimplements horizon or
+  crop auditing.
+- **A crop hint is evidence, never an edit.** Nothing in phase 11 moves a pixel, stores an
+  applied crop, straightens, removes a distraction, or selects a frame.
+- **An absent row is “not checked”, not “clean”.** Missing keypoints, an unknown scene,
+  and an unavailable learned head reduce coverage or confidence and are rendered as
+  caveats rather than quietly converted to favourable evidence.
+- **Scene exceptions are data with reasons.** Intentional tilt, deliberate tight crops,
+  centred details and neutral fallback live in `composition_rules.toml`; changing a band
+  bumps `rules_ver` and re-analyses affected rows.
 
 Five rules that phase 10 added and every later phase inherits:
 

@@ -373,6 +373,70 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::permissive(),
             },
         ),
+        // PHASE-11. Two heads that could hardly be less alike: one reads a person
+        // crop and emits geometry, the other reads twelve numbers and emits taste.
+        // They ship as one pack and move together, which is why
+        // `composition::keypoints::MODEL_VER` is one number - no consumer of a
+        // framing judgement cares which of the two moved, only that the judgements
+        // are not comparable across the move.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::POSE_MODEL,
+                version: Version::new(1, 0, 0),
+                // `keypoints`, not `detection`. The head localises joints inside a
+                // box it is given; it does not find people. Calling it a detector
+                // in the one field a person reads would be documenting a capability
+                // this build does not have - phase 06 finds the faces and
+                // `composition::keypoints::person_box` derives the body.
+                task: "keypoints",
+                class: ModelClass::Embedding,
+                model: fixtures::pose_keypoints(),
+                input: Placeholder::image(fixtures::POSE_CROP_SIDE),
+                output: BTreeMap::from([(
+                    "keypoints".to_string(),
+                    vec![1, fixtures::POSE_OUTPUTS],
+                )]),
+                // int8 is forbidden. The output is a *coordinate*, and the whole
+                // question this phase asks of it is which side of a frame edge that
+                // coordinate falls on. Per-tensor int8 over a 0..1 coordinate is a
+                // quantisation step of about four thousandths of the crop, which at
+                // 192 px is most of a wrist - so the one decision the head exists to
+                // support is the one the quantisation would blur. Section 10.1 asks
+                // for a limb-crop F1 of 0.90.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::AESTHETIC_MODEL,
+                version: Version::new(1, 0, 0),
+                // `ranker`, and the word is chosen against `regression`. It is
+                // trained on pairwise photographer choices and shipped as a
+                // pointwise scorer; the absolute value of its output means nothing
+                // and only the ordering of two outputs does. A manifest that said
+                // `regression` would invite somebody to read 0.62 as "62 % good".
+                task: "ranker",
+                class: ModelClass::Embedding,
+                model: fixtures::aesthetic_head(),
+                // Twelve geometric measures plus a twenty-three-way scene one-hot.
+                // Not pixels: section 6.3 puts the geometry in the input so that the
+                // head learns how much each violation matters rather than
+                // re-deriving a horizon this build already measures to a tenth of a
+                // degree.
+                input: Placeholder::features(fixtures::AESTHETIC_FEATURES),
+                output: BTreeMap::from([("aesthetic".to_string(), vec![1, 1])]),
+                // int8 is allowed, and this is the third head in the product where
+                // it is. `score::AESTHETIC_CAP` bounds what this number can do to a
+                // composite at a quarter, in either direction, whatever any rule
+                // file asks for - so a quantisation error of a few thousandths moves
+                // a composition score by less than a thousandth. Nothing here can
+                // convict a photograph, and the head runs once on every frame in the
+                // wedding.
+                precision_policy: PrecisionPolicy::permissive(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {

@@ -133,6 +133,19 @@ phase-09-verify:
 phase-10-verify:
     cargo run --release --package aura-cli -- verify --phase 10 --work target/phase10-verify
 
+# The phase 11 gate: migration and rule coverage, both composition heads through
+# the real inference service, explainable fixture judgements and crop hints,
+# intentional style and colour-distraction cases, resumable persistence,
+# photographer dismissals, version invalidation, telemetry, determinism and all
+# quantitative geometry/agreement gates. Never touches a network.
+phase-11-verify:
+    cargo run --release --package aura-cli -- verify --phase 11 --work target/phase11-verify
+
+# The composition metrics, from the Python side. `--self-test` proves the metric
+# harness rejects constant predictions before it is trusted with real labels.
+composition-eval:
+    python ml/models/composition/eval_composition.py --self-test
+
 # The emotion metrics, from the Python side. `--self-test` proves the metrics
 # reject a reader that learned nothing; `--fit-ranker` fits the Bradley-Terry
 # coefficients and `--fit-calibration` the per-scene isotonic maps that ship as

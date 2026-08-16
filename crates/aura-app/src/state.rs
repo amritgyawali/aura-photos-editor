@@ -1,9 +1,11 @@
 //! Process-wide state: one open catalog, plus the cancel tokens of running jobs.
 
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use aura_brain_photo::composition::{Composition, CompositionPass, CompositionStore};
 use aura_brain_photo::integrity::{Integrity, IntegrityPass, IntegrityStore};
 use aura_brain_wedding::emotion::{Emotion, EmotionPass, EmotionStore};
 use aura_brain_wedding::moments::{MomentStore, Moments};
@@ -49,6 +51,13 @@ use parking_lot::Mutex;
 /// The version stamped onto rows written through the application layer.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// Process-level operations switch for the phase 11 analysis pass.
+///
+/// Composition is on by default. Set this to `0`, `false`, `off` or `no`
+/// before starting AURA to stop new composition analysis without hiding or
+/// deleting the judgements already stored in the catalog.
+pub const COMPOSITION_ENABLED_ENV: &str = "AURA_COMPOSITION_ENABLED";
+
 /// Everything a command needs. Cheap to clone: the catalog lives behind an `Arc`.
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -84,6 +93,8 @@ pub struct AppState {
     /// per project inside. A catalog that is opened and closed without touching the
     /// People panel never reads a credential store and never derives a key.
     people: Arc<Mutex<PeopleSlot>>,
+    /// Runtime kill switch for new phase 11 analysis.
+    composition_enabled: bool,
 }
 
 /// The lazily-built people state.
@@ -162,6 +173,7 @@ impl AppState {
             key_dir: default_key_dir(),
             indexes: Arc::new(Mutex::new(BTreeMap::new())),
             people: Arc::new(Mutex::new(PeopleSlot::default())),
+            composition_enabled: composition_enabled_from_env(),
         })
     }
 
@@ -181,7 +193,21 @@ impl AppState {
             key_dir: default_key_dir(),
             indexes: Arc::new(Mutex::new(BTreeMap::new())),
             people: Arc::new(Mutex::new(PeopleSlot::default())),
+            composition_enabled: composition_enabled_from_env(),
         }
+    }
+
+    /// Whether new phase 11 composition analysis is allowed in this process.
+    #[must_use]
+    pub const fn composition_enabled(&self) -> bool {
+        self.composition_enabled
+    }
+
+    /// Override the process setting while assembling an embedded shell or test.
+    #[must_use]
+    pub fn with_composition_enabled(mut self, enabled: bool) -> Self {
+        self.composition_enabled = enabled;
+        self
     }
 
     /// The vector store for this catalog.
@@ -292,6 +318,61 @@ impl AppState {
                     target: "emotion.pass",
                     code = %err.code,
                     "no scene service; every frame will be weighted by the default row"
+                );
+                Ok(pass)
+            }
+        }
+    }
+
+    /// The composition store for this catalog. PHASE-11.
+    ///
+    /// Stateless like the integrity and emotion stores. It owns no model and opens
+    /// no preview; those belong to the pass below.
+    #[must_use]
+    pub fn composition_store(&self) -> Arc<CompositionStore> {
+        Arc::new(CompositionStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `CompositionService` for this catalog. PHASE-11.
+    ///
+    /// Stored judgements remain readable even if the installed rule table is
+    /// broken. The service logs version drift through its outline; only a new pass
+    /// needs to parse the rules and therefore may refuse to start.
+    #[must_use]
+    pub fn composition(&self) -> Arc<Composition> {
+        Arc::new(Composition::new(self.composition_store()))
+    }
+
+    /// The composition pass, wired to previews, inference, people and story.
+    ///
+    /// People are attached unconditionally through the phase 06 service: without
+    /// them the crop audit would be absent from every frame. Story is attached when
+    /// its rule tables can be opened; otherwise the pass uses its documented neutral
+    /// row, records `unknown`, and lowers confidence rather than silently applying a
+    /// global threshold.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5046` when the composition rule table cannot load, or whatever
+    /// opening the preview service and inference engine raised.
+    pub fn composition_pass(&self, project_id: &str) -> AuraResult<CompositionPass> {
+        let pass = CompositionPass::new(
+            self.previews(project_id)?,
+            self.infer_engine()?,
+            self.composition_store(),
+            Arc::clone(&self.clock),
+        )?
+        .with_people(self.people());
+        match self.story() {
+            Ok(story) => Ok(pass.with_story(story)),
+            Err(err) => {
+                tracing::warn!(
+                    target: "composition.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be judged on the neutral rule row"
                 );
                 Ok(pass)
             }
@@ -1594,4 +1675,35 @@ fn default_cache_root(catalog_path: &Path) -> PathBuf {
     catalog_path
         .parent()
         .map_or_else(|| PathBuf::from("cache"), |parent| parent.join("cache"))
+}
+
+fn composition_enabled_from_env() -> bool {
+    composition_enabled_value(std::env::var_os(COMPOSITION_ENABLED_ENV).as_deref())
+}
+
+fn composition_enabled_value(value: Option<&OsStr>) -> bool {
+    !value.and_then(OsStr::to_str).is_some_and(|value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "off" | "no"
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsStr;
+
+    use super::composition_enabled_value;
+
+    #[test]
+    fn composition_is_on_unless_the_operator_explicitly_turns_it_off() {
+        assert!(composition_enabled_value(None));
+        assert!(composition_enabled_value(Some(OsStr::new("1"))));
+        assert!(composition_enabled_value(Some(OsStr::new("true"))));
+        assert!(!composition_enabled_value(Some(OsStr::new("0"))));
+        assert!(!composition_enabled_value(Some(OsStr::new(" FALSE "))));
+        assert!(!composition_enabled_value(Some(OsStr::new("off"))));
+        assert!(!composition_enabled_value(Some(OsStr::new("No"))));
+    }
 }

@@ -41,6 +41,89 @@ body {
   min-width: 0;
 }
 
+.workspace {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  min-height: 0;
+}
+
+.photo-browser {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.explain-panel {
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.composition-card__figure {
+  margin: 0;
+}
+
+.composition-card__canvas {
+  background: #101217;
+  min-height: 14rem;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.composition-card__preview,
+.composition-card__preview-placeholder,
+.composition-card__overlay {
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.composition-card__preview {
+  display: block;
+}
+
+.composition-card__preview-placeholder {
+  background: linear-gradient(135deg, #22262e, #2b303a);
+}
+
+.composition-card__overlay {
+  color: #f7d774;
+}
+
+.composition-card__legend {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 6px 0 12px;
+  padding-left: 18px;
+}
+
+.composition-card__measures {
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.composition-card__measures dd {
+  margin: 0;
+}
+
+@media (max-width: 980px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .explain-panel {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    max-height: 45vh;
+  }
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);

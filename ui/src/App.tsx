@@ -8,6 +8,7 @@ import { HardwarePanel } from './components/HardwarePanel';
 import { ImportWizard } from './components/ImportWizard';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
+import { CompositionCard } from './components/explain/CompositionCard';
 import { VirtualGrid } from './components/grid/VirtualGrid';
 import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
@@ -20,6 +21,7 @@ export function App(): JSX.Element {
   const problems = useStore((state) => state.problems);
   const progress = useStore((state) => state.progress);
   const lastError = useStore((state) => state.lastError);
+  const focusedIndex = useStore((state) => state.focusedIndex);
 
   const setProjects = useStore((state) => state.setProjects);
   const setActiveProject = useStore((state) => state.setActiveProject);
@@ -204,6 +206,8 @@ export function App(): JSX.Element {
     [refreshProjects, setActiveProject, setError],
   );
 
+  const focusedPhoto = rows[focusedIndex] ?? null;
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -241,11 +245,22 @@ export function App(): JSX.Element {
           <p className="empty">Create a wedding, then point AURA at your cards.</p>
         ) : (
           <>
-            <VirtualGrid
-              rows={rows}
-              onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)}
-            />
-            <Filmstrip rows={rows} />
+            <div className="workspace">
+              <div className="photo-browser">
+                <VirtualGrid
+                  rows={rows}
+                  onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)}
+                />
+                <Filmstrip rows={rows} />
+              </div>
+              <aside className="explain-panel" aria-label="Explain selected photograph">
+                {focusedPhoto ? (
+                  <CompositionCard photoId={focusedPhoto.id} />
+                ) : (
+                  <p className="empty">Select a photograph to inspect its composition.</p>
+                )}
+              </aside>
+            </div>
           </>
         )}
       </main>

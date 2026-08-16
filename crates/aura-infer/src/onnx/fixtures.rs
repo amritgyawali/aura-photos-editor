@@ -1754,3 +1754,273 @@ pub fn interaction_sample_input(batch: usize) -> Tensor {
         data: samples,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-11. Body keypoints and learned aesthetics.
+// ---------------------------------------------------------------------------
+
+/// The keypoint head's registered name.
+pub const POSE_MODEL: &str = "pose_keypoints";
+/// The aesthetic head's registered name.
+pub const AESTHETIC_MODEL: &str = "aesthetic_head";
+
+/// Side of the person crop the keypoint head reads.
+///
+/// 192 px, and it is the one place in the product where a crop is larger than a face's
+/// 112 px. A wrist is the smallest thing this head has to localise well enough to say
+/// whether the frame cut through it, and at 112 px a wrist in a full-length crop is two
+/// pixels across. Section 10.1 asks for a limb-crop F1 of 0.90; that number is not
+/// reachable from a crop where the joint being tested is smaller than the localisation
+/// error.
+pub const POSE_CROP_SIDE: usize = 192;
+
+/// How many joints the keypoint head emits.
+///
+/// Seventeen, the COCO layout, and the order **is** the decoder's. It is the layout every
+/// open pose model in existence produces, which is the whole argument: this head is a
+/// placeholder, and a placeholder whose output layout matches the models that could
+/// replace it is a placeholder that can be replaced without touching the decoder.
+pub const POSE_JOINTS: usize = 17;
+
+/// Numbers per joint: `x`, `y`, `score`.
+pub const POSE_CHANNELS_PER_JOINT: usize = 3;
+
+/// Width of the keypoint head's output vector.
+pub const POSE_OUTPUTS: usize = POSE_JOINTS * POSE_CHANNELS_PER_JOINT;
+
+/// How many geometric measures the aesthetic head reads.
+///
+/// Twelve, and section 6.3 is explicit about why they are inputs at all: "feature inputs
+/// include the geometric measures, so the model learns *how much* each violation matters
+/// rather than re-deriving geometry." A head that took pixels would spend its capacity
+/// rediscovering the horizon this build already measures to a tenth of a degree.
+pub const AESTHETIC_GEOMETRY: usize = 12;
+
+/// How many scene slots condition it.
+///
+/// `SceneId::ALL.len()`, as a one-hot. Section 2.1 requires the head to be
+/// scene-conditioned - "a `details` flat-lay is judged differently from a
+/// `couple_portrait`" - and a one-hot is the conditioning that cannot leak an ordering
+/// between scenes the way a scalar index would.
+pub const AESTHETIC_SCENES: usize = 23;
+
+/// Width of the aesthetic head's input vector.
+pub const AESTHETIC_FEATURES: usize = AESTHETIC_GEOMETRY + AESTHETIC_SCENES;
+
+/// The body keypoint head.
+///
+/// `person [N, 3, 192, 192] -> keypoints [N, 51]`, seventeen joints of `(x, y, score)` in
+/// COCO order, every value squashed into `0..1` by a `Sigmoid`.
+///
+/// **A vector rather than heatmaps**, which is the one place this placeholder's shape
+/// differs from what a real pose model does. A heatmap head emits `[N, 17, 48, 48]` and an
+/// argmax-plus-refinement decodes it; that is more accurate and it is 39,000 floats per
+/// person rather than 51. The deterministic interpreter phase 03 ships would spend most of
+/// a wedding's compute budget on that decode, and section 11 budgets 30 ms for the *whole*
+/// composition analysis. The decoder in `composition::keypoints` reads a vector, and
+/// swapping in a heatmap model later is a change to that one function.
+///
+/// The coordinates are relative to the person crop, not to the frame. The crop is a
+/// derived box, so a model that emitted frame coordinates would have to be told where its
+/// own input came from.
+#[must_use]
+pub fn pose_keypoints() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_B0DE_1107_0001);
+    let side = POSE_CROP_SIDE;
+
+    let graph = Graph {
+        name: POSE_MODEL.to_string(),
+        nodes: vec![
+            // 192 -> 96
+            conv3("stem", &["person", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 96 -> 48
+            pool2("pool", "stem_relu", "pool_out"),
+            // 48 -> 24
+            conv3("b1", &["pool_out", "b1_w", "b1_b"], &["b1_out"], 2),
+            node("Relu", "b1_act", &["b1_out"], &["b1_relu"]),
+            // 24 -> 12
+            conv3("b2", &["b1_relu", "b2_w", "b2_b"], &["b2_out"], 2),
+            node("Relu", "b2_act", &["b2_out"], &["b2_relu"]),
+            node("GlobalAveragePool", "gap", &["b2_relu"], &["gap_out"]),
+            with_int(
+                node("Flatten", "flatten", &["gap_out"], &["features"]),
+                "axis",
+                1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "trunk",
+                    &["features", "trunk_w", "trunk_b"],
+                    &["trunk_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "trunk_act", &["trunk_out"], &["trunk_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["trunk_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logits"], &["keypoints"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.23),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("b1_w", vec![48, 24, 3, 3], 0.14),
+            weights.tensor("b1_b", vec![48], 0.05),
+            weights.tensor("b2_w", vec![64, 48, 3, 3], 0.12),
+            weights.tensor("b2_b", vec![64], 0.05),
+            weights.tensor("trunk_w", vec![96, 64], 0.18),
+            weights.tensor("trunk_b", vec![96], 0.05),
+            weights.tensor("head_w", vec![POSE_OUTPUTS, 96], 0.20),
+            weights.tensor("head_b", vec![POSE_OUTPUTS], 0.05),
+        ],
+        inputs: vec![dynamic_batch("person", &[3, side, side])],
+        outputs: vec![dynamic_batch("keypoints", &[POSE_OUTPUTS])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The learned aesthetic head.
+///
+/// `features [N, 35] -> aesthetic [N, 1]`, one number in `0..1`.
+///
+/// **It takes measurements, not pixels**, and that is section 6.3's design rather than a
+/// shortcut: the twelve geometric inputs are already computed to a precision no small
+/// convolutional head would reach, and the twenty-three scene slots are the conditioning
+/// section 2.1 requires. What is left for the head to learn is the only thing a
+/// photographer's pairwise choices actually teach - *how much each violation matters in
+/// each kind of photograph* - which is a function over thirty-five numbers and not an
+/// image problem at all.
+///
+/// It is trained as a pairwise ranker and shipped as a pointwise scorer. That is the
+/// standard Bradley-Terry arrangement phase 10's ranker also uses: the loss compares two
+/// frames, the network scores one, and the difference of two scores is what the loss
+/// reads. `ml/models/composition/train_aesthetic.py` is where that is written down.
+#[must_use]
+pub fn aesthetic_head() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_A357_1107_0001);
+
+    let graph = Graph {
+        name: AESTHETIC_MODEL.to_string(),
+        nodes: vec![
+            with_int(
+                node("Gemm", "layer1", &["features", "l1_w", "l1_b"], &["l1_out"]),
+                "transB",
+                1,
+            ),
+            node("Relu", "act1", &["l1_out"], &["l1_relu"]),
+            with_int(
+                node("Gemm", "layer2", &["l1_relu", "l2_w", "l2_b"], &["l2_out"]),
+                "transB",
+                1,
+            ),
+            node("Relu", "act2", &["l2_out"], &["l2_relu"]),
+            with_int(
+                node("Gemm", "head", &["l2_relu", "head_w", "head_b"], &["logit"]),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logit"], &["aesthetic"]),
+        ],
+        initializers: vec![
+            weights.tensor("l1_w", vec![64, AESTHETIC_FEATURES], 0.18),
+            weights.tensor("l1_b", vec![64], 0.05),
+            weights.tensor("l2_w", vec![32, 64], 0.20),
+            weights.tensor("l2_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![1, 32], 0.22),
+            weights.tensor("head_b", vec![1], 0.05),
+        ],
+        inputs: vec![dynamic_batch("features", &[AESTHETIC_FEATURES])],
+        outputs: vec![dynamic_batch("aesthetic", &[1])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// A deterministic batch of person crops for the keypoint head.
+///
+/// A standing figure - head, torso, two legs - drawn as three rectangles and shifted down
+/// the crop as the batch index rises, so that a batching bug which reuses one member's
+/// tensor produces identical rows and is caught immediately. A head that had learned
+/// anything would produce keypoints that slide with the figure.
+#[must_use]
+pub fn pose_sample_input(batch: usize) -> Tensor {
+    let side = POSE_CROP_SIDE;
+    let mut samples = Vec::with_capacity(batch * 3 * side * side);
+    for image in 0..batch {
+        let offset = (image * 6) as f32;
+        for channel in 0..3 {
+            for row in 0..side {
+                for column in 0..side {
+                    let y = row as f32 - offset;
+                    let x = column as f32;
+                    let centre = side as f32 / 2.0;
+                    let head = y > side as f32 * 0.08
+                        && y < side as f32 * 0.22
+                        && (x - centre).abs() < side as f32 * 0.09;
+                    let torso = y >= side as f32 * 0.22
+                        && y < side as f32 * 0.58
+                        && (x - centre).abs() < side as f32 * 0.16;
+                    let legs = y >= side as f32 * 0.58
+                        && y < side as f32 * 0.94
+                        && (x - centre).abs() < side as f32 * 0.13
+                        && (x - centre).abs() > side as f32 * 0.02;
+                    let value = if head || torso || legs {
+                        0.62 + 0.08 * channel as f32
+                    } else {
+                        0.20
+                    };
+                    samples.push(value);
+                }
+            }
+        }
+    }
+    Tensor {
+        shape: vec![batch, 3, side, side],
+        data: samples,
+    }
+}
+
+/// A deterministic batch of aesthetic feature vectors.
+///
+/// The twelve geometric slots ramp with the batch index and the scene one-hot walks across
+/// the twenty-three slots, so a head that ignored its conditioning would produce a flat
+/// column and a head that ignored its measurements would produce a flat row.
+#[must_use]
+pub fn aesthetic_sample_input(batch: usize) -> Tensor {
+    let mut samples = Vec::with_capacity(batch * AESTHETIC_FEATURES);
+    for image in 0..batch {
+        for slot in 0..AESTHETIC_GEOMETRY {
+            let step = (image * AESTHETIC_GEOMETRY + slot) as f32;
+            samples.push((step * 0.037).fract());
+        }
+        let scene = image % AESTHETIC_SCENES;
+        for slot in 0..AESTHETIC_SCENES {
+            samples.push(f32::from(u8::from(slot == scene)));
+        }
+    }
+    Tensor {
+        shape: vec![batch, AESTHETIC_FEATURES],
+        data: samples,
+    }
+}

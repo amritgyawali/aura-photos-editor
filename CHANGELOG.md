@@ -2,6 +2,64 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 11 - Composition and aesthetic AI
+
+Every photograph now carries an explainable framing reading: whether a reliable horizon
+is level, what the edge cuts, how the subject is placed, whether visual weight is balanced,
+and which measured background regions compete for attention. It is evidence for culling
+and geometry phases, not a crop or a selection.
+
+### Added
+
+- **`aura-brain-photo::composition`**: rho-coherent horizon measurement with intentional
+  dutch-angle handling; pose/face-aware headroom and crop auditing; thirds, centre,
+  negative-space and balance measures; background edge energy, bright regions, head merges
+  and colour competition; a bounded aesthetic term; stable reasons, evidence rectangles,
+  crop hints, persistence, dismissal, resume, telemetry, and relative-within-moment score.
+- **Migration 11**: `image_composition`, one review-queue index, coverage and flag views,
+  three provenance versions, compact evidence JSON, and photographer dismissals that
+  survive re-analysis.
+- **`composition_rules.toml`**: a neutral fallback and 22 scene-conditioned rows with
+  rationales, including explicit allowances for centred details, deliberate close crops,
+  and intentional tilt.
+- **Two signed architecture fixtures**, `pose_keypoints` and `aesthetic_head`, with model
+  cards; guarded training/evaluation/export tools in `ml/models/composition/`.
+- **The Composition card and typed IPC surface**: project status, one-photo reading,
+  flagged review queue, one-note dismissal, resumable analysis, and normalised evidence
+  overlays. The card explicitly distinguishes clean, exonerated, unavailable, and
+  unanalysed states.
+- **Five error codes and runbooks**, `AURA-ML-5043` to `AURA-ML-5047`; ADR-0023 for the
+  rules/contract and ADR-0024 for the application boundary.
+- **`aura-cli verify --phase 11`** and a composition performance/storage suite. The
+  algorithm evaluation contains 37 authored synthetic regression tests.
+
+### Changed
+
+- Horizon confidence now requires a coherent line in both angle and offset, preventing a
+  repeated diagonal texture from being called a strong horizon.
+- Neutral or white subjects can still receive a colour-competition reading from saturated
+  background energy, and subject colour is sampled from the dominant head before using a
+  coarser body region.
+- Mid-limb crop severity and unlocated reference poses now agree with the crop gate and
+  placement semantics instead of silently falling just below the flag boundary.
+
+### Not built, deliberately
+
+This phase does not crop, straighten, remove a distraction, keep, reject, or order a
+gallery. Crop hints are advisory data for phase 23. Generic background measurements do
+not claim to recognise an exit sign, bin, mirror, or rubbish; semantic re-validation waits
+for phase 18 and removal belongs to phase 24.
+
+### Known limits
+
+Both checked-in heads are untrained deterministic placeholders, so the analyser does not
+claim their output is learned. All quality numbers are against authored synthetic frames
+or reference geometry, not the three reference weddings or a photographer panel. No GPU
+backend or three-machine CI is available here, so the two GPU budgets retain ADR-0007's
+waiver. Calibration, demographic/cultural slices, the 300-frame perceptual audit, semantic
+background categories, and the real-wedding demo remain explicit conditions in
+`docs/progress/PHASE-11-EXIT.md`; the placeholder-model condition is a Sev 2 trigger.
+
 ## Phase 10 - Expression, emotion and moment ranking
 
 The app finds the moments that matter - genuine smiles, laughter, tears, hugs, kisses,

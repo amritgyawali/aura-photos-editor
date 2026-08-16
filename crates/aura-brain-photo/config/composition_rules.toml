@@ -1,0 +1,632 @@
+# Composition rules - PHASE-11 sections 6.1, 6.2, 10.1 and 12.
+#
+# ===========================================================================
+# THIS FILE IS A PRODUCT DECISION, NOT A MEASUREMENT
+# ===========================================================================
+#
+# Its sibling in this directory, `camera_calibration.toml`, is the opposite: a
+# table of things that could in principle be measured off a chart. Nothing here
+# can be. There is no experiment that establishes how much headroom a Hindu
+# ceremony wants, and a threshold that nobody can explain in a sentence is a
+# threshold that will one day tell a photographer their best frame of the night
+# is badly composed.
+#
+# So every row carries a `rationale`, the loader refuses a row without one
+# (`AURA-ML-5046`), and a test asserts that the twenty-two scene rows are all
+# present. This is the fourth config file in the product to enforce a written
+# reason per row - after `prominence.toml`, `scene_profiles.toml`,
+# `moment_profiles.toml` and `emotion_weights.toml` - and it is the one where
+# the failure it prevents is most visible to a customer, because section 12's
+# first failure mode is "rigid rules punish creative work".
+#
+# ---------------------------------------------------------------------------
+# THE ONE THING TO UNDERSTAND BEFORE CHANGING A NUMBER
+# ---------------------------------------------------------------------------
+#
+# **Nothing in this file rejects, ranks or crops a photograph.** It decides
+# which sentences appear in an Explain panel and how a composition score moves.
+# Section 2.2 puts the cropping in phase 23 and the culling in phase 12, and
+# section 6.3 caps how much the learned aesthetic may move a culling decision at
+# all: taste breaks ties, it does not override substance.
+#
+# The second thing: a *narrow* band is not a *strict* product. A narrow
+# `headroom` band on a `family_portrait` says "this is what a group photograph
+# usually looks like"; it does not say a frame outside it is unusable. The
+# severity of being outside the band is what `headroom_penalty` sets, and that
+# is the number to reach for when the product feels harsh - not the band.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# headroom_min, headroom_max   fraction of frame height, 0.0..0.60
+#     The space above the highest head that this kind of photograph usually
+#     leaves. Below the minimum raises HEADROOM_TIGHT, above the maximum raises
+#     HEADROOM_EXCESSIVE. The two bits are separate because the remedies are
+#     opposite and phase 23 has to know which way to move.
+#
+#     A band of zero width is refused. A band whose minimum is zero says "this
+#     scene never wants headroom", which is true of a `details` flat-lay and of
+#     nothing else.
+#
+# headroom_penalty             0.0..0.40
+#     How much of the composition score being outside the band costs. This is
+#     the strictness knob, not the band.
+#
+# tilt_tolerance_deg           0.1..12.0
+#     Above this the horizon is called tilted. A ceremony frame with a strong
+#     architectural horizon is held to a tighter tolerance than a dance-floor
+#     frame where there is no horizon to be level with in the first place.
+#
+# allows_dutch                 bool
+#     True when a large tilt in this scene reads as a decision. Section 6.1
+#     requires four conditions before a tilt is called intentional - a tilt
+#     above 6 degrees, a centred subject, no strong horizon, and a scene that
+#     expects it - and this is the fourth. It is a *permission*, not a verdict:
+#     a tilted altar frame is still a tilted altar frame.
+#
+# head_crop_allowed            bool
+#     True when cutting into the top of a head is a normal choice here. Section
+#     6.1: "top-of-head crops are only violations outside `couple_portrait`
+#     close-ups where they can be deliberate." A beauty crop in a portrait is
+#     craft; the same crop in a family group is a mistake with eleven witnesses.
+#
+# joint_cut_weight             0.0..1.5
+#     Multiplies the severity of every limb cut in this scene. A dance floor is
+#     a place where limbs leave the frame constantly and a family portrait is a
+#     place where a cut wrist is the reason the photograph is reshot.
+#
+# clutter_tolerance            0.02..0.60
+#     Background edge density this scene carries without complaint. It is the
+#     denominator of `CompositionResult::clutter`, which is why that field is
+#     documented as a *relative* number: the same crowded room is a defect
+#     behind a portrait and the subject of a reception frame.
+#
+# centre_preferred             bool
+#     True when the middle of the frame is the right place for the subject. A
+#     flat-lay, a ring shot and a symmetrical altar are all centred on purpose,
+#     and a rule of thirds applied to them is a rule applied to the wrong
+#     picture. Sets CENTRED rather than OFF_THIRDS.
+#
+# thirds_weight, balance_weight   0.0..1.0
+#     How much placement and balance move the score in this scene. Zero means
+#     "measured and reported, but not scored" - which is the honest setting for
+#     scenes where the photographer had no control over where anybody stood.
+#
+# aesthetic_weight             0.0..0.50
+#     How much the learned head moves the score here. Capped at 0.50 in the
+#     loader, and the global cap in `score::AESTHETIC_CAP` binds underneath
+#     that. Section 6.3: taste breaks ties. The scenes where it is highest are
+#     the ones where a photographer was composing deliberately and slowly.
+#
+# rationale                    at least 9 characters
+#     Why. Refused if absent. This is the field that makes a disagreement about
+#     a threshold a conversation rather than an archaeology exercise.
+#
+# ---------------------------------------------------------------------------
+# VERSIONING
+# ---------------------------------------------------------------------------
+#
+# Bump `version` on ANY change below, including adding a row. It is written into
+# `image_composition.rules_ver` on every judgement, and a judgement made under
+# version 1 and one made under version 2 are not comparable - `AURA-ML-5043`
+# exists so that comparison never happens silently. Every affected row is
+# re-analysed in the background and a photographer's dismissals are replayed
+# onto the new judgement.
+#
+# A malformed file is refused as a whole with `AURA-ML-5046` and the previous
+# table stays in force. That is the second thing in this crate that halts, and
+# the reason is in the runbook: a half-loaded table judges the ceremony against
+# measured bands and the reception against neutral ones.
+#
+# The file that ships is the baseline. A copy at
+# `<catalog>/config/composition_rules.toml` overrides it at run time.
+
+version = 1
+
+# ===========================================================================
+# THE NEUTRAL ROW
+# ===========================================================================
+#
+# Used for `unknown`, and for any scene that reaches this analyser before
+# somebody has written its row. `AURA-ML-5047` is raised when that happens and
+# `CompositionCode::NoRule` appears in the panel, so a wedding judged on neutral
+# bands says so rather than looking like a wedding judged on real ones.
+#
+# Deliberately permissive rather than average. The documented failure mode of
+# this phase is punishing creative work, and an unclassified frame is exactly
+# where a guess would do it: wide headroom band, loose tilt tolerance, low
+# penalties, and an aesthetic weight of zero because a scene-conditioned head
+# has no scene to condition on.
+
+[neutral]
+headroom_min      = 0.02
+headroom_max      = 0.30
+headroom_penalty  = 0.06
+tilt_tolerance_deg = 3.0
+allows_dutch      = true
+head_crop_allowed = true
+joint_cut_weight  = 0.55
+clutter_tolerance = 0.30
+centre_preferred  = false
+thirds_weight     = 0.20
+balance_weight    = 0.20
+aesthetic_weight  = 0.00
+rationale = """
+An unclassified frame has to be judged by something, and the least harmful
+something is a wide band with small penalties. Every permission is granted and
+every weight is low, because the cost of missing a real violation here is one
+absent sentence in a panel and the cost of inventing one is a photographer
+losing confidence in the whole feature."""
+
+# ===========================================================================
+# THE TWENTY-TWO SCENES
+# ===========================================================================
+
+[[scene]]
+id = "getting_ready_bride"
+headroom_min      = 0.03
+headroom_max      = 0.28
+headroom_penalty  = 0.07
+tilt_tolerance_deg = 2.5
+allows_dutch      = false
+head_crop_allowed = true
+joint_cut_weight  = 0.50
+clutter_tolerance = 0.34
+centre_preferred  = false
+thirds_weight     = 0.30
+balance_weight    = 0.25
+aesthetic_weight  = 0.28
+rationale = """
+A hotel room is the most cluttered environment of the day and nobody can move
+the furniture, so the clutter tolerance is high and the balance weight is low.
+Head crops are allowed because getting-ready coverage is full of close detail -
+hands on a veil, a zip, an earring - where the top of a head leaving the frame
+is the frame working."""
+
+[[scene]]
+id = "getting_ready_groom"
+headroom_min      = 0.03
+headroom_max      = 0.28
+headroom_penalty  = 0.07
+tilt_tolerance_deg = 2.5
+allows_dutch      = false
+head_crop_allowed = true
+joint_cut_weight  = 0.50
+clutter_tolerance = 0.34
+centre_preferred  = false
+thirds_weight     = 0.30
+balance_weight    = 0.25
+aesthetic_weight  = 0.28
+rationale = """
+The same room, the same constraints and deliberately the same numbers as the
+bride's row. Two rows rather than one shared row because a product manager must
+be able to move one without moving the other, and because a single row would
+make any future divergence invisible in a diff."""
+
+[[scene]]
+id = "details"
+headroom_min      = 0.00
+headroom_max      = 0.60
+headroom_penalty  = 0.00
+tilt_tolerance_deg = 1.5
+allows_dutch      = false
+head_crop_allowed = true
+joint_cut_weight  = 0.00
+clutter_tolerance = 0.16
+centre_preferred  = true
+thirds_weight     = 0.10
+balance_weight    = 0.45
+aesthetic_weight  = 0.40
+rationale = """
+The flat-lay row, and the one section 2.1 names explicitly: "a `details`
+flat-lay is judged differently from a `couple_portrait`". Headroom is not
+scored at all because there is no head. Limb cuts cost nothing because a hand
+holding a ring is meant to enter the frame. Tilt tolerance is the tightest in
+the file - a flat-lay shot from above is either square to the frame or it is
+wrong - and the centre is the right place for the subject, so a rule of thirds
+here would flag every correct frame. Balance and learned taste carry the score
+instead, which is honest: a flat-lay is almost entirely an arrangement
+decision."""
+
+[[scene]]
+id = "first_look"
+headroom_min      = 0.04
+headroom_max      = 0.26
+headroom_penalty  = 0.09
+tilt_tolerance_deg = 2.5
+allows_dutch      = false
+head_crop_allowed = false
+joint_cut_weight  = 0.75
+clutter_tolerance = 0.26
+centre_preferred  = false
+thirds_weight     = 0.40
+balance_weight    = 0.35
+aesthetic_weight  = 0.32
+rationale = """
+A first look happens once, is planned, and is usually shot at a location the
+photographer chose - so the framing is theirs and the rules can be firmer than
+in a reactive scene. Head crops are not allowed because the reaction is the
+photograph and a cropped forehead removes half of a face at the moment it
+matters."""
+
+[[scene]]
+id = "ceremony_entrance"
+headroom_min      = 0.05
+headroom_max      = 0.32
+headroom_penalty  = 0.05
+tilt_tolerance_deg = 3.0
+allows_dutch      = false
+head_crop_allowed = false
+joint_cut_weight  = 0.45
+clutter_tolerance = 0.40
+centre_preferred  = false
+thirds_weight     = 0.15
+balance_weight    = 0.15
+aesthetic_weight  = 0.12
+rationale = """
+Somebody is walking towards the camera down an aisle lined with guests. The
+photographer controls almost nothing: not the clutter, not the balance, not
+where anybody stands. High clutter tolerance and low placement weights are what
+"do not punish a photographer for the room" looks like as numbers. Headroom
+runs generous at the top because a wide entrance frame wants the ceiling in
+it."""
+
+[[scene]]
+id = "ceremony"
+headroom_min      = 0.06
+headroom_max      = 0.34
+headroom_penalty  = 0.06
+tilt_tolerance_deg = 2.0
+allows_dutch      = false
+head_crop_allowed = false
+joint_cut_weight  = 0.60
+clutter_tolerance = 0.32
+centre_preferred  = false
+thirds_weight     = 0.20
+balance_weight    = 0.30
+aesthetic_weight  = 0.20
+rationale = """
+A ceremony almost always has architecture in it - an altar, a mandap, a row of
+chairs - and architecture is what a tilted frame shows up against, so the tilt
+tolerance is tight. The photographer is usually static and at a distance, which
+is why placement is weighted lower than tilt: they can control whether the
+camera is level and largely cannot control where the couple stand."""
+
+[[scene]]
+id = "ritual"
+headroom_min      = 0.04
+headroom_max      = 0.34
+headroom_penalty  = 0.05
+tilt_tolerance_deg = 2.5
+allows_dutch      = false
+head_crop_allowed = true
+joint_cut_weight  = 0.40
+clutter_tolerance = 0.44
+centre_preferred  = false
+thirds_weight     = 0.15
+balance_weight    = 0.15
+aesthetic_weight  = 0.12
+rationale = """
+The most culturally loaded row in the file, and the one written most cautiously
+on purpose. A rite may be performed at floor level, surrounded by family, with
+priests and props inside the frame and no clear space anywhere - a Hindu havan,
+a Nepali sindoor ceremony, a tea ceremony. Every Western framing convention in
+this file is wrong there. So clutter tolerance is the highest of any scene,
+head crops are permitted, limb cuts are cheap, placement is barely weighted, and
+the learned head is given the least room of any people-scene. A framing rule set
+that produced a review queue full of ritual frames would be a cultural failure
+shipped as a feature, and these numbers are the argument against it."""
+
+[[scene]]
+id = "vows"
+headroom_min      = 0.05
+headroom_max      = 0.30
+headroom_penalty  = 0.07
+tilt_tolerance_deg = 2.0
+allows_dutch      = false
+head_crop_allowed = false
+joint_cut_weight  = 0.60
+clutter_tolerance = 0.30
+centre_preferred  = false
+thirds_weight     = 0.25
+balance_weight    = 0.30
+aesthetic_weight  = 0.22
+rationale = """
+The ceremony row with the head-crop permission withdrawn and the placement
+weight raised. Vows are the part of a ceremony a photographer has usually
+pre-visualised a frame for, so slightly more of the framing is genuinely their
+decision."""
+
+[[scene]]
+id = "rings"
+headroom_min      = 0.00
+headroom_max      = 0.40
+headroom_penalty  = 0.00
+tilt_tolerance_deg = 2.0
+allows_dutch      = false
+head_crop_allowed = true
+joint_cut_weight  = 0.10
+clutter_tolerance = 0.20
+centre_preferred  = true
+thirds_weight     = 0.10
+balance_weight    = 0.40
+aesthetic_weight  = 0.36
+rationale = """
+Hands, not people. Headroom is unscored and limb cuts are almost free because
+the whole photograph is a pair of forearms entering the frame - the exact
+geometry the crop audit would otherwise call four violations. Centred, because
+a ring exchange shot tight is symmetric. The `details` row's argument applied to
+a moment rather than to an object."""
+
+[[scene]]
+id = "kiss"
+headroom_min      = 0.04
+headroom_max      = 0.28
+headroom_penalty  = 0.08
+tilt_tolerance_deg = 2.5
+allows_dutch      = false
+head_crop_allowed = false
+joint_cut_weight  = 0.55
+clutter_tolerance = 0.28
+centre_preferred  = false
+thirds_weight     = 0.30
+balance_weight    = 0.30
+aesthetic_weight  = 0.26
+rationale = """
+One frame from this scene goes in every album, so the bands are firm - but head
+crops stay forbidden rather than being allowed as a beauty crop, because a kiss
+photograph with a cropped crown reads as a mistake to everybody who was
+there."""
+
+[[scene]]
+id = "family_portrait"
+headroom_min      = 0.06
+headroom_max      = 0.22
+headroom_penalty  = 0.14
+tilt_tolerance_deg = 1.5
+allows_dutch      = false
+head_crop_allowed = false
+joint_cut_weight  = 1.20
+clutter_tolerance = 0.20
+centre_preferred  = false
+thirds_weight     = 0.20
+balance_weight    = 0.50
+aesthetic_weight  = 0.24
+rationale = """
+The strictest row in the file, and section 6.1 names it: "a `family_portrait`
+wants more headroom than a `dance_floor` frame". Everything here is the
+photographer's decision - they arranged the group, chose the background, set the
+camera on a tripod and said when. So the headroom band is the narrowest, the
+tilt tolerance the tightest of any people-scene, limb cuts are weighted above
+1.0, and balance carries half the placement score because a lopsided group is
+the one framing error a client notices unprompted."""
+
+[[scene]]
+id = "group_portrait"
+headroom_min      = 0.05
+headroom_max      = 0.24
+headroom_penalty  = 0.12
+tilt_tolerance_deg = 1.8
+allows_dutch      = false
+head_crop_allowed = false
+joint_cut_weight  = 1.10
+clutter_tolerance = 0.24
+centre_preferred  = false
+thirds_weight     = 0.20
+balance_weight    = 0.45
+aesthetic_weight  = 0.24
+rationale = """
+A large group is a family portrait with less control and more people, so every
+number is the family row loosened by about a fifth. Cut limbs at the edge of a
+forty-person line-up are common and are still worth saying, which is why the
+weight stays above 1.0."""
+
+[[scene]]
+id = "couple_portrait"
+headroom_min      = 0.02
+headroom_max      = 0.26
+headroom_penalty  = 0.09
+tilt_tolerance_deg = 2.2
+allows_dutch      = true
+head_crop_allowed = true
+joint_cut_weight  = 0.70
+clutter_tolerance = 0.22
+centre_preferred  = false
+thirds_weight     = 0.45
+balance_weight    = 0.35
+aesthetic_weight  = 0.45
+rationale = """
+Section 6.1 names this scene twice, and both mentions are permissions rather
+than restrictions: top-of-head crops "can be deliberate" here, and a tilt with a
+centred subject reads as style. So this is the one portrait row where both are
+allowed. It also carries the highest aesthetic weight and the highest thirds
+weight in the file, because a couple portrait is the frame a photographer
+composed most deliberately and the one where taste is most of what separates
+two otherwise identical exposures."""
+
+[[scene]]
+id = "golden_hour"
+headroom_min      = 0.03
+headroom_max      = 0.34
+headroom_penalty  = 0.06
+tilt_tolerance_deg = 1.2
+allows_dutch      = true
+head_crop_allowed = true
+joint_cut_weight  = 0.55
+clutter_tolerance = 0.18
+centre_preferred  = false
+thirds_weight     = 0.45
+balance_weight    = 0.40
+aesthetic_weight  = 0.45
+rationale = """
+The tightest tilt tolerance in the file, because golden-hour frames are shot
+outdoors against a real horizon and a real horizon that is one degree off is
+visible to everybody. Everything else is permissive: wide headroom band for sky,
+low clutter tolerance because there rarely is any, and the same high aesthetic
+weight as a couple portrait for the same reason."""
+
+[[scene]]
+id = "reception_entrance"
+headroom_min      = 0.04
+headroom_max      = 0.34
+headroom_penalty  = 0.04
+tilt_tolerance_deg = 4.0
+allows_dutch      = true
+head_crop_allowed = true
+joint_cut_weight  = 0.30
+clutter_tolerance = 0.46
+centre_preferred  = false
+thirds_weight     = 0.10
+balance_weight    = 0.10
+aesthetic_weight  = 0.10
+rationale = """
+People running into a dark room through a corridor of guests holding sparklers.
+The photographer is walking backwards. Loose everything, dutch angles permitted,
+and the second-highest clutter tolerance in the file - the clutter is the
+photograph."""
+
+[[scene]]
+id = "speeches"
+headroom_min      = 0.05
+headroom_max      = 0.30
+headroom_penalty  = 0.05
+tilt_tolerance_deg = 2.5
+allows_dutch      = false
+head_crop_allowed = false
+joint_cut_weight  = 0.50
+clutter_tolerance = 0.36
+centre_preferred  = false
+thirds_weight     = 0.25
+balance_weight    = 0.20
+aesthetic_weight  = 0.18
+rationale = """
+A static speaker at a fixed spot, shot from wherever the photographer can stand
+without blocking a table. Framing is half theirs and half the room's, so every
+number sits near the neutral row with the tilt tolerance tightened - a speech
+frame usually has a straight table edge or a wall in it."""
+
+[[scene]]
+id = "cake"
+headroom_min      = 0.04
+headroom_max      = 0.32
+headroom_penalty  = 0.05
+tilt_tolerance_deg = 2.2
+allows_dutch      = false
+head_crop_allowed = true
+joint_cut_weight  = 0.35
+clutter_tolerance = 0.34
+centre_preferred  = false
+thirds_weight     = 0.20
+balance_weight    = 0.25
+aesthetic_weight  = 0.20
+rationale = """
+Two people, a table and a knife, usually surrounded by a semicircle of phones.
+Head crops are allowed because the tight frame of two hands on a knife is the
+frame that gets used, and limb cuts are cheap for the same reason."""
+
+[[scene]]
+id = "first_dance"
+headroom_min      = 0.03
+headroom_max      = 0.36
+headroom_penalty  = 0.04
+tilt_tolerance_deg = 4.5
+allows_dutch      = true
+head_crop_allowed = true
+joint_cut_weight  = 0.30
+clutter_tolerance = 0.42
+centre_preferred  = false
+thirds_weight     = 0.15
+balance_weight    = 0.15
+aesthetic_weight  = 0.15
+rationale = """
+Moving subjects in a dark room with a spotlight and a crowd behind. Dutch angles
+are permitted, the tilt tolerance is loose, and headroom runs wide at the top
+because a first-dance frame that includes the lighting rig above the couple is a
+frame somebody framed on purpose."""
+
+[[scene]]
+id = "dance_floor"
+headroom_min      = 0.01
+headroom_max      = 0.40
+headroom_penalty  = 0.03
+tilt_tolerance_deg = 6.0
+allows_dutch      = true
+head_crop_allowed = true
+joint_cut_weight  = 0.20
+clutter_tolerance = 0.55
+centre_preferred  = false
+thirds_weight     = 0.05
+balance_weight    = 0.05
+aesthetic_weight  = 0.10
+rationale = """
+Section 6.1's other named scene, and the loosest row in the file by a distance.
+A dance floor frame is a fisheye at knee height with a flash and four people
+half in shot; every rule this phase knows is broken there on purpose. Limb cuts
+cost almost nothing, the tilt tolerance is at the dutch-angle threshold itself,
+placement is effectively unscored, and clutter tolerance is the highest in the
+file. The intent is that a wedding's dance-floor coverage produces almost no
+composition flags at all - and if it starts producing them, that is the signal
+section 12's first failure mode has arrived."""
+
+[[scene]]
+id = "candid"
+headroom_min      = 0.02
+headroom_max      = 0.36
+headroom_penalty  = 0.04
+tilt_tolerance_deg = 4.5
+allows_dutch      = true
+head_crop_allowed = true
+joint_cut_weight  = 0.35
+clutter_tolerance = 0.44
+centre_preferred  = false
+thirds_weight     = 0.15
+balance_weight    = 0.15
+aesthetic_weight  = 0.20
+rationale = """
+Section 6.1 names `candid` alongside `dance_floor` as a scene where a large tilt
+is style rather than error. A candid is by definition a frame the photographer
+had no time to compose, so the bands are wide and the penalties small - but the
+aesthetic weight is higher than the dance floor's, because the candids that end
+up in an album are chosen almost entirely on how they are framed."""
+
+[[scene]]
+id = "venue"
+headroom_min      = 0.00
+headroom_max      = 0.50
+headroom_penalty  = 0.00
+tilt_tolerance_deg = 1.0
+allows_dutch      = false
+head_crop_allowed = true
+joint_cut_weight  = 0.15
+clutter_tolerance = 0.24
+centre_preferred  = false
+thirds_weight     = 0.30
+balance_weight    = 0.45
+aesthetic_weight  = 0.40
+rationale = """
+Architecture, and the only row where the tilt tolerance is one degree. A venue
+frame is the one place in a wedding where converging verticals and a tilted
+horizon are both visible and both fixable, and it is what section 10.1's 0.4
+degree gate is really about. Headroom is unscored because the subject is a room;
+if a person is in it they are scale, not the subject."""
+
+[[scene]]
+id = "exit"
+headroom_min      = 0.02
+headroom_max      = 0.38
+headroom_penalty  = 0.03
+tilt_tolerance_deg = 5.5
+allows_dutch      = true
+head_crop_allowed = true
+joint_cut_weight  = 0.25
+clutter_tolerance = 0.50
+centre_preferred  = false
+thirds_weight     = 0.10
+balance_weight    = 0.10
+aesthetic_weight  = 0.12
+rationale = """
+Sparklers, confetti, a car and everybody moving at once, usually panned. Phase
+09 already treats this scene as one that expects motion; this file treats it as
+one that expects broken framing, for the same reason and with the same
+intent."""
