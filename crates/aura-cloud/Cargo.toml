@@ -5,6 +5,7 @@ edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
 authors.workspace      = true
+publish.workspace      = true
 description  = "The governed cloud AI gateway: the only crate in AURA allowed to open a socket"
 
 [dependencies]

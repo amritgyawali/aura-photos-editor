@@ -5,6 +5,7 @@ edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
 authors.workspace      = true
+publish.workspace      = true
 description = "AURA application layer: typed IPC command surface shared by the desktop shell and the CLI."
 
 [dependencies]
