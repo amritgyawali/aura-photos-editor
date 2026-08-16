@@ -904,3 +904,57 @@ summary      = "A scene has no composition rule row"
 user_message = "AURA has no framing rules recorded for this kind of photograph yet, so it is judging those ones cautiously against neutral rules. They are all still usable."
 runbook      = "docs/runbooks/AURA-ML-5047.md"
 introduced   = "PHASE-11"
+
+[[error]]
+code         = "AURA-ML-5048"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A stored selection was made from different scores, passes, calibration or rules"
+user_message = "AURA has improved how it chooses photographs, so this gallery is being worked out again. Anything you kept or removed by hand is kept."
+runbook      = "docs/runbooks/AURA-ML-5048.md"
+introduced   = "PHASE-12"
+
+[[error]]
+code         = "AURA-ML-5049"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A culling override or a re-selection was refused"
+user_message = "AURA could not change that choice. The gallery is unchanged."
+runbook      = "docs/runbooks/AURA-ML-5049.md"
+introduced   = "PHASE-12"
+
+[[error]]
+code         = "AURA-ML-5050"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "Photographs had no analysis and could not be considered for the gallery"
+user_message = "Some photographs have not been checked yet, so AURA has left them out of this gallery rather than judging them. Run the analysis and choose again to include them."
+runbook      = "docs/runbooks/AURA-ML-5050.md"
+introduced   = "PHASE-12"
+
+[[error]]
+code         = "AURA-ML-5051"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The culling weight table was refused"
+user_message = "AURA could not load the settings that decide which photographs are delivered, so it has not chosen anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5051.md"
+introduced   = "PHASE-12"
+
+[[error]]
+code         = "AURA-ML-5052"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The coverage rule table was refused"
+user_message = "AURA could not load the rules that guarantee the important parts of the day are in the gallery, so it has not chosen anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5052.md"
+introduced   = "PHASE-12"
+
+[[error]]
+code         = "AURA-ML-5053"
+severity     = "warning"
+recovery     = "ask_user"
+summary      = "A must-have part of the wedding has no candidate photographs"
+user_message = "AURA could not find any photographs of one of the moments a wedding gallery normally contains. It has said so rather than filling the gap with something else."
+runbook      = "docs/runbooks/AURA-ML-5053.md"
+introduced   = "PHASE-12"

@@ -15,6 +15,7 @@ members = [
   "crates/aura-people",
   "crates/aura-brain-wedding",
   "crates/aura-brain-photo",
+  "crates/aura-cull",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",

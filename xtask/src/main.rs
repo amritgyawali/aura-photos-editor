@@ -28,6 +28,7 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0009_integrity.sql",
     "crates/aura-catalog/migrations/0010_emotion.sql",
     "crates/aura-catalog/migrations/0011_composition.sql",
+    "crates/aura-catalog/migrations/0012_selection.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

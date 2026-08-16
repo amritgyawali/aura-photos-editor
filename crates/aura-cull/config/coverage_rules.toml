@@ -1,0 +1,451 @@
+# Coverage rules - PHASE-12 sections 2.1, 6.2, 6.3, 6.4 and 12.
+#
+# ===========================================================================
+# THIS FILE IS THE PROMISE. THE OTHER ONE IS ONLY THE PREFERENCE.
+# ===========================================================================
+#
+# `cull_weights.toml` decides what a photograph is *worth*. This file decides
+# what the gallery must *look like* - and the difference is that nothing can
+# overrule this one. Modes read the other file. Sliders read the other file.
+# The coverage guard reads this one, it runs after every pass that reads the
+# other one, and then it runs again after sizing.
+#
+# Section 6.4: "modes shift thresholds and k-values, never the coverage rules -
+# even `Aggressive` cannot drop a must-have." `ModeShift` in the code has three
+# fields and none of them is a rule, so that sentence is a property of the type
+# rather than a promise in a comment.
+#
+# ---------------------------------------------------------------------------
+# THE ONE THING TO UNDERSTAND BEFORE CHANGING A NUMBER
+# ---------------------------------------------------------------------------
+#
+# **`min` is not a target. It is the number below which the product is broken.**
+#
+# A rule at `min = 2` does not mean the gallery gets two frames of the kiss. It
+# usually gets more, from the ordinary passes. It means that if the ordinary
+# passes deliver fewer than two, the guard reaches into the rejected pile and
+# takes the best ones anyway - marking the rule `covered_weak` and writing a
+# warning if the frames it had to take were below the scene's floor.
+#
+# So raising a `min` does not improve a gallery. It only changes what happens on
+# the weddings where that part of the day went badly. Every number here should be
+# read as: "if we end up with fewer than this, something has gone wrong that a
+# photographer must be told about."
+#
+# ---------------------------------------------------------------------------
+# THE RULE THAT SURPRISED EVERYBODY WHO REVIEWED IT
+# ---------------------------------------------------------------------------
+#
+# **A veto excludes a frame from candidacy. It does not exclude it from a
+# guarantee.**
+#
+# If the only photograph of the ring exchange is out of focus, the guard adds it,
+# marks the rule `covered_weak`, and writes a warning naming the veto. A blurred
+# photograph of the rings beats no photograph of the rings, and a product that
+# dropped it silently because a threshold said so is the exact failure section 12
+# opens with.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH BLOCK MEANS
+# ---------------------------------------------------------------------------
+#
+# [[rule]]      the twelve must-haves. Section 6.3's declarative form.
+#   id            one of the twelve frozen slugs. An unknown slug is a *refusal*,
+#                 not a default - `MustHave` is the one vocabulary in this
+#                 product with no `from_str_or_...`, because a typo that
+#                 silently disabled the vows guarantee would be invisible until
+#                 a customer found it.
+#   scenes        phase 07 scene slugs that satisfy the rule.
+#   interactions  phase 10 interaction slugs that satisfy it whatever the scene
+#                 says. This half does most of the work: a ring exchange inside a
+#                 forty-minute `ceremony` segment is labelled `ceremony` at most
+#                 weddings, and a rule matching only the scene would report the
+#                 rings missing almost everywhere.
+#   min           the number below which the product is broken. See above.
+#   prefer        `peak`, `score` or `earliest` - which frame to reach for first
+#                 when the guard has to force-add one.
+#
+# [identity]    section 6.3's per-person minimums. The feature that exists so
+#               that nobody's aunt is missing from the gallery.
+#
+# [[chapter]]   section 6.2's quota bands. `importance` is the term in
+#               `target_c = total x importance_c x sqrt(volume_c) / sum(...)`,
+#               and `min`/`max` clamp the result.
+#
+# [diversity]   section 2.1's "avoid 40 near-identical dance frames".
+#
+# [veto]        section 6.1's hard vetoes, and - more importantly - the list of
+#               scenes in which the closed-eye veto may fire at all.
+
+version = 1
+
+# ===========================================================================
+# THE TWELVE GUARANTEES
+# ===========================================================================
+
+[[rule]]
+id           = "first_look"
+scenes       = ["first_look"]
+interactions = []
+min          = 2
+prefer       = "peak"
+rationale    = """
+Two, because a first look is two photographs and not one: the face of the person
+turning and the face of the person seeing. A single frame of a first look is
+half of the moment. No interaction clause, because the interactions that occur
+here - a hug, tears wiped - occur all day and would match this rule at the
+reception."""
+
+[[rule]]
+id           = "ceremony_entrance"
+scenes       = ["ceremony_entrance"]
+interactions = []
+min          = 1
+prefer       = "earliest"
+rationale    = """
+One, and `earliest` rather than `score`: the photograph that matters is the
+arrival at the door, and by the time the scores are highest the walk is over.
+This is the only rule besides the reception entrance that prefers time over
+quality, and both are rules about an arrival."""
+
+[[rule]]
+id           = "vows"
+scenes       = ["vows"]
+interactions = []
+min          = 2
+prefer       = "peak"
+rationale    = """
+Two, one for each person speaking. A gallery with only the bride's face during
+the vows is a gallery that has made a decision nobody asked it to make. The
+scene list is deliberately narrow - `ceremony` is not here - because a
+forty-minute ceremony would otherwise satisfy the vows rule with a photograph of
+the officiant's shoes."""
+
+[[rule]]
+id           = "rings"
+scenes       = ["rings"]
+interactions = ["ring_exchange"]
+min          = 2
+prefer       = "peak"
+rationale    = """
+Two, because the ring going on and the hands afterwards are both the photograph
+people ask for, and because this is the moment with the highest chance of every
+frame being soft - it is hands, close, in the worst light of the day, usually
+with a long lens wide open. The interaction clause matters more here than
+anywhere: at most weddings the ring exchange is inside a `ceremony` segment and
+never gets its own scene label."""
+
+[[rule]]
+id           = "kiss"
+scenes       = ["kiss"]
+interactions = ["kiss"]
+min          = 2
+prefer       = "peak"
+rationale    = """
+Section 6.3's worked example, at its numbers. Two, for the wide and the tight -
+the wide shows the room reacting and the tight shows the couple, and they are
+different photographs of one second. The closed-eye veto can never fire here:
+`kiss` is refused by the loader if anybody puts it in the posed-scene list."""
+
+[[rule]]
+id           = "family_formals"
+scenes       = ["family_portrait"]
+interactions = []
+min          = 3
+prefer       = "score"
+rationale    = """
+Three, the highest `min` of any point-in-the-day rule, and the reason is that
+family formals are not one moment - they are a list of groups, and a gallery
+with one formal has photographed one family. It prefers `score` rather than
+`peak` because a posed group has no peak worth the word: everybody is standing
+still and the frame to keep is the one where nobody blinked, which is exactly
+what the score already says."""
+
+[[rule]]
+id           = "reception_entrance"
+scenes       = ["reception_entrance"]
+interactions = []
+min          = 1
+prefer       = "earliest"
+rationale    = """
+One, and `earliest` for the ceremony entrance's reason. Kept as a separate rule
+from the ceremony entrance rather than folded into one `entrances` rule, which
+is why this product has twelve must-haves where section 2.1 lists eleven: a
+single rule either of them could satisfy would let a gallery ship with no
+ceremony entrance because the DJ announced the couple at dinner."""
+
+[[rule]]
+id           = "cake"
+scenes       = ["cake"]
+interactions = []
+min          = 1
+prefer       = "peak"
+rationale    = """
+One. A staged moment that everybody photographs and nobody looks at twice - and
+whose absence is noticed anyway, which is the definition of something that needs
+a guarantee rather than a preference. Many weddings have no cake, and `missing`
+is the correct and expected answer for those."""
+
+[[rule]]
+id           = "first_dance"
+scenes       = ["first_dance"]
+interactions = ["dance_hold"]
+min          = 2
+prefer       = "peak"
+rationale    = """
+Two, for the wide of the room and the two faces. The `dance_hold` interaction is
+listed because a first dance in a small venue is often labelled `dance_floor`,
+and losing the first dance to a scene-classification miss is not a failure a
+gallery should be able to have."""
+
+[[rule]]
+id           = "venue_establishing"
+scenes       = ["venue"]
+interactions = []
+min          = 1
+prefer       = "score"
+rationale    = """
+One, and it is here because a culling engine would otherwise never choose it. An
+empty room scores badly on emotion and prominence by construction, and it is the
+frame an album opens on. This is the clearest case in the file of a guarantee
+existing precisely because the arithmetic disagrees with it."""
+
+[[rule]]
+id           = "exit"
+scenes       = ["exit"]
+interactions = []
+min          = 1
+prefer       = "peak"
+rationale    = """
+One. Sparklers, a car, and no light - so the odds that the best frame is also a
+good frame are poor, and `covered_weak` is the honest outcome at many weddings.
+It is a guarantee because it is the last photograph in the album and its absence
+ends the story mid-sentence."""
+
+[[rule]]
+id           = "close_family"
+scenes       = []
+interactions = []
+min          = 1
+prefer       = "score"
+rationale    = """
+The one rule that is about people rather than about a point in the day, so it
+matches no scene and no interaction: its work is done by the `[identity]` block
+below and reported per identity in the coverage report. `min = 1` here means "at
+least one close-family member must be covered at all" - the per-person figure is
+`close_family_min`, which is three."""
+
+# ===========================================================================
+# WHO MUST BE IN THE GALLERY
+# ===========================================================================
+
+[identity]
+close_family_min = 3
+guest_min        = 1
+guest_recurrence = 4
+rationale        = """
+Section 6.3's numbers, and the feature that stops the complaint the whole phase
+document names: "my aunt isn't in the gallery".
+
+Three for close family, because one photograph of somebody is an accident and
+two is a coincidence; three is a record that they were there. One for a
+recurring guest, because a guest wants to exist in the gallery and does not
+expect a portfolio.
+
+Four is the `M` of section 2.1's "every guest appearing more than M times". It is
+the number that separates a guest from a passer-by: somebody the photographer
+caught in four frames across a day was at the wedding, and somebody in one frame
+walked in front of the camera. Lowering it fills the gallery with strangers;
+raising it starts losing people who were genuinely there.
+
+These minimums are satisfied by adding that person's *best* frames, so a person
+covered by this rule is not covered by a bad photograph unless there was only a
+bad photograph - in which case the warning says so."""
+
+# ===========================================================================
+# HOW THE GALLERY IS DIVIDED BETWEEN THE PARTS OF THE DAY
+# ===========================================================================
+#
+# `importance` multiplies each chapter's share in section 6.2's formula:
+#
+#     target_c = round(total x importance_c x sqrt(volume_c) / sum(...))
+#
+# The square root is what stops the chapter with the most frames taking the
+# gallery: four thousand dance-floor frames and two hundred ceremony frames is
+# a ratio of twenty, and its square root is four and a half. `importance` is
+# then the product's opinion on top of that, and `min`/`max` are the guardrails.
+
+[[chapter]]
+id         = "getting_ready"
+importance = 0.95
+min        = 15
+max        = 220
+rationale  = """
+Slightly below par, because the morning is shot heavily and delivered lightly at
+almost every wedding - a photographer with four hundred getting-ready frames
+delivers sixty. The floor of fifteen is what stops a lightly shot groom's
+morning from disappearing entirely under the square-root term."""
+
+[[chapter]]
+id         = "details"
+importance = 0.55
+min        = 8
+max        = 90
+rationale  = """
+The lowest importance in the file and a deliberately small band. Section 6.2:
+"details/venue chapters get small fixed allocations". Details are shot in bulk,
+are near-identical by nature, and nobody has ever wanted more of them - but a
+gallery with none looks unfinished, which is what the floor of eight is for."""
+
+[[chapter]]
+id         = "ceremony"
+importance = 1.35
+min        = 25
+max        = 400
+rationale  = """
+The highest importance except rituals, because the ceremony is the reason for
+the day and is usually shot from two fixed positions with a long lens - which
+means the volume term underestimates it badly. The floor of twenty-five is high
+because a ceremony delivered at fifteen frames reads as an afterthought."""
+
+[[chapter]]
+id         = "rituals"
+importance = 1.40
+min        = 20
+max        = 400
+rationale  = """
+The highest importance in the file, and the row this product would most regret
+getting wrong. A named rite is the part of the day the family looks for first
+and the part a Western-trained model understands least; a wedding with a two-hour
+ritual sequence and a twenty-minute exchange of vows must not come out with a
+gallery weighted the other way. When there is no ritual chapter this row costs
+nothing, so the risk of setting it high is one-sided."""
+
+[[chapter]]
+id         = "portraits"
+importance = 1.15
+min        = 20
+max        = 300
+rationale  = """
+Above par, because these are the photographs the couple bought. Not far above,
+because a portrait session produces three hundred frames of eight setups and the
+gallery does not want three hundred - which is what the couple-portrait floor in
+`cull_weights.toml` is already handling from the other direction."""
+
+[[chapter]]
+id         = "reception"
+importance = 1.00
+min        = 20
+max        = 350
+rationale  = """
+Par. The reception is the longest chapter, is shot at a steady rate, and has the
+most people in it - so the volume term already gives it a large share and it
+needs no thumb on the scale in either direction."""
+
+[[chapter]]
+id         = "dance"
+importance = 0.85
+min        = 15
+max        = 300
+rationale  = """
+Below par on purpose, and it is the row most likely to be argued about. A dance
+floor generates more frames per minute than anything else at a wedding, so
+without this the square-root term still hands it the largest chapter in the
+gallery. Below par here plus `max_keepers = 4` in `cull_weights.toml` is the
+product's compromise: many *different* dance photographs, not many frames of one
+song."""
+
+[[chapter]]
+id         = "exit"
+importance = 1.10
+min        = 5
+max        = 60
+rationale  = """
+Above par with a small band. The exit is five minutes of the day and the last
+page of the album, so it earns more than its volume and cannot be allowed to
+take more than sixty frames of a gallery."""
+
+[[chapter]]
+id         = "other"
+importance = 0.70
+min        = 0
+max        = 150
+rationale  = """
+The chapter phase 07 assigns when it is unsure, so this row is judging genuine
+odds and ends *and* absorbing every segmentation miss. Below par and with a floor
+of zero, because guaranteeing a minimum for a chapter that means "we do not know"
+would guarantee a minimum for a mistake."""
+
+# ===========================================================================
+# HOW MUCH REPETITION THE GALLERY TOLERATES
+# ===========================================================================
+
+[diversity]
+window_ms           = 120000
+per_window          = 8
+per_window_framing  = 5
+per_window_identity = 6
+rationale           = """
+Section 2.1's "avoid 40 near-identical dance frames", as four numbers over a
+two-minute sliding window inside one chapter.
+
+Two minutes rather than thirty seconds because the unit this is defending
+against is roughly a song, a speech or a formal group - not a burst, which phase
+08 already grouped and whose duplicates are already suppressed. Eight frames per
+chapter per two minutes is a rate of one every fifteen seconds, which is
+generous for a delivered gallery and tight enough that forty frames of one song
+is impossible.
+
+`per_window_framing` at five says that of those eight, no more than five may be
+the same wide/medium/tight bucket - so a run of eight identical wide shots
+cannot happen even when they are two minutes apart.
+
+`per_window_identity` at six is deliberately the loosest of the three. The couple
+are supposed to be in most of the photographs; this exists to stop one *guest*
+being in eight consecutive delivered frames, not to ration the bride.
+
+None of these caps can drop a frame a guarantee is holding. The guard runs after
+the diversity pass, and again after sizing."""
+
+# ===========================================================================
+# WHEN A FRAME NEVER REACHES THE ARITHMETIC
+# ===========================================================================
+
+[veto]
+focus_floor  = 0.12
+posed_scenes = [
+  "getting_ready_bride",
+  "getting_ready_groom",
+  "family_portrait",
+  "group_portrait",
+  "couple_portrait",
+  "golden_hour",
+  "cake",
+  "speeches",
+]
+rationale    = """
+Section 6.1's hard vetoes: "subject completely out of focus, primary identity's
+eyes closed without intent in a posed scene, or exposure `lost`". The third needs
+no configuration - phase 09 already says `ExposureVerdict::Lost` - so this block
+configures the other two.
+
+`focus_floor` at 0.12 is deliberately very low. The veto is for "completely out
+of focus", not "softer than average"; softness is what the score is for, and a
+veto that fired at 0.35 would be a threshold pretending to be a fact. The loader
+refuses anything above 0.5 for that reason.
+
+`posed_scenes` is the list of scenes in which a closed-eye veto may fire at all,
+and it is in a file with a rationale beside it rather than in a `matches!` in the
+code because getting it wrong means vetoing the kiss. Everything here is a scene
+where the photographer had time, the subject was looking at the camera, and
+another frame was taken four seconds later.
+
+What is *not* here is the argument. The ceremony, the vows, the rings, the first
+look, the first dance, the rituals, the dance floor, the exit and the candids are
+all absent: closed eyes in those are usually the photograph rather than the
+fault. `kiss` is not merely absent - the loader **refuses the file** if anybody
+adds it.
+
+Note that phase 09 already exonerates a tearful blink through phase 10's tears
+path before this list is ever consulted. This is the second line of that defence,
+not the first."""

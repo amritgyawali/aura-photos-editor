@@ -58,6 +58,11 @@ Never load two phase files into one session.
 | Composition rules (versioned, PM-owned) | `crates/aura-brain-photo/config/composition_rules.toml` |
 | Composition evaluation gates | `tests/eval/composition_eval.rs` + `ml/models/composition/eval_composition.py` |
 | What composition marks mean | `docs/composition-and-framing.md` |
+| Culling, coverage and sizing decisions | `docs/adr/ADR-0025-culling-coverage-and-gallery-sizing.md` |
+| Cull weights (versioned, PM-owned) | `crates/aura-cull/config/cull_weights.toml` |
+| Coverage guarantees (versioned, PM-owned) | `crates/aura-cull/config/coverage_rules.toml` |
+| Culling evaluation gates | `tests/eval/cull_eval.rs` + `ml/eval/cull_agreement.py` |
+| How AURA culls, in the product's own words | `docs/how-aura-culls.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -321,6 +326,73 @@ provenance exists. The 37 composition evaluation tests use authored synthetic pi
 reference geometry. They prove the deterministic arithmetic and regression guards, not
 real-wedding accuracy, photographer agreement, demographic fairness, or model quality.
 That is condition C1 and a Sev 2 trigger.
+
+Phase 12 is implemented conditionally: `aura-core::contract::cull` freezes three autonomy
+modes, twelve must-haves, three coverage states, twenty-four typed reason codes, the keep,
+rejection, coverage-report, outline and service shapes; `aura-cull` fuses four sub-scores as
+a weighted **geometric** mean so no signal can rescue another, applies section 6.1's three
+hard vetoes, picks per-moment winners with a keeper count driven by how much the moment
+varied, allocates chapter quotas with a bounded local search, runs the coverage guard twice,
+enforces three sliding-window diversity caps, and reconciles the gallery to a predicted or
+requested size. Migration 12 stores the run, the keepers, the rejections, the coverage
+report and the photographer's own overrides, 22 scene weight rows and twelve guarantees live
+in editable config, the cull view renders coverage, size, gallery and reasons, and
+`aura-cli verify --phase 12` is the executable gate. Its exit report is
+`docs/progress/PHASE-12-EXIT.md`.
+
+**Every sub-score underneath every decision comes from a placeholder head.** Phase 06's
+detector finds no faces, phase 09's focus head is a random projection, phase 10's expression
+head says nothing about faces, and phase 11's aesthetic head is untrained. The arithmetic in
+this phase is real, measured and tested against four synthetic weddings whose right answer
+is known by construction; the numbers it works on are not yet claims about photographs. That
+is condition C1, it is a Sev 2 trigger, and it closes with phase 05's condition C10 rather
+than separately. Two further gaps: the per-scene isotonic calibration ships as the identity
+map at `calibration_ver = 0` (C2), and the gallery-size regression is authored rather than
+fitted on sixty real delivered galleries (C3).
+
+**The cloud tie-breaker of section 7 was deliberately not built** (C6). Its trigger is two
+candidates within 0.02 `keep_score` of each other, and with four placeholder heads
+underneath, a 0.02 difference is noise rather than a tie - so every call would spend a
+photographer's money asking a vision model to arbitrate between two random projections and
+would then record the answer as though it meant something. Section 7's own offline fallback
+is what ships. Nothing is stubbed for it; adding `CullTieBreak` later touches no frozen
+shape in this phase.
+
+Four rules that phase 12 adds and every later phase inherits:
+
+- **`CullService` is the only way to ask what is being delivered.** Phase 14 edits
+  survivors, phase 27 swaps in runner-ups, phase 29 builds albums out of keepers and phase
+  30 uploads them. Eighth phase, eighth time, and the highest stakes it has had: two answers
+  to "what is in this gallery" is a delivery that does not match the album that does not
+  match the invoice.
+- **A decision is reversible, and nothing on disk moves.** A rejection is a row with reasons
+  and a pointer to what was kept instead. There is no path column, no file operation and no
+  `deleted` flag anywhere in migration 12 or on the IPC surface - because this is the phase
+  where "just move the rejects to a folder" first sounds reasonable.
+- **A guarantee outranks a preference, in that order, always.** Modes, sliders, quotas and
+  diversity caps are preferences; must-haves and identity minimums are guarantees. `modes.rs`
+  cannot see the rule table and `Tuning` has nowhere to put one, so section 10.1's
+  "Aggressive mode still satisfies all coverage rules" is a property of the type system
+  rather than a test result that could drift. The one thing that *can* degrade a guarantee is
+  the photographer removing every candidate by hand, and the report then says so and names
+  the override.
+- **Say what the gallery was chosen *from*.** `CullOutline::coverage` is the fraction of the
+  project that carried a phase 09 verdict, and it is the most consequential denominator in
+  the product: a cull over 60 % of a wedding is a gallery with a four-hour hole in it that
+  looks exactly like a gallery with a decision in it. `AURA-ML-5050` exists so a frame nobody
+  analysed is never rendered as a frame that lost.
+
+Two decisions in this phase are worth remembering because they will be re-argued later.
+**A veto excludes a frame from candidacy and not from a guarantee** - if the only photograph
+of the ring exchange is out of focus the guard adds it, marks the rule `CoveredWeak` and
+names the veto in a warning, because a blurred photograph of the rings beats no photograph
+of the rings. And **`Missing` means nobody shot it**, never that the engine chose not to: a
+rule that could have been satisfied and was not is a bug, and the gate fails on it.
+
+Phase 12 also **closes phase 11's condition C8** - "out-of-focus beauty loses in phase 12",
+which phase 11 could not honestly test because its consumer did not exist. It is now
+`the_focus_veto_is_for_completely_out_of_focus_only` plus the geometric-mean fusion, and the
+weight loader refuses a scene row that weights framing above whether the photograph worked.
 
 Four rules that phase 11 adds and every later phase inherits:
 

@@ -493,3 +493,55 @@ max_ms_per_unit = 500
 # frames, including evidence and crop hints where the analyser emits them.
 [size.composition_store_per_1000_images]
 max_bytes = 800000
+
+# ---------------------------------------------------------------------------
+# Phase 12 performance budgets, from PHASE-12 section 11.
+#
+# Four rows are named there. Two of them - "full analysis + cull of 3,000 images
+# in under 8 minutes on an RTX 4070" and the same on an M3 Pro - are budgets for
+# the *analysis*, which is phases 06 to 11, on hardware this build does not have.
+# They are not asserted here and they are not relabelled as CPU numbers; ADR-0007
+# waives the GPU rows and phases 09, 10 and 11 each carry their own share of the
+# eight minutes. What is left is the part phase 12 actually owns, and both of its
+# rows are asserted below.
+#
+# Phase 12 opens no image file, decodes nothing and runs no model. Every number
+# it fuses was computed by an earlier phase and stored, which is why the passes
+# are budgeted in seconds while the analysis underneath them is budgeted in
+# minutes. That is invariant 3 arriving at its conclusion.
+# ---------------------------------------------------------------------------
+
+# Section 11: the selection passes over 4,000 analysed images, in <= 1.5 s.
+#
+# All six of them: fusion, moment, chapter, coverage, diversity, sizing and
+# coverage again. Measured over the pure engine, which is the honest boundary -
+# the gather in front of it is a catalog read whose cost belongs to SQLite and
+# is guarded by the phase 01 rows.
+[stage.cull_select_4000]
+max_elapsed_ms  = 1500
+max_ms_per_unit = 1500
+
+# Section 11: a slider move re-selects in <= 2 s.
+#
+# The same six passes at a new target, which is why the number is close to the
+# row above rather than a fraction of it. Section 6.4 promises the slider does
+# not re-run the analysis, and it does not; it re-runs the allocation, and the
+# allocation is what this measures.
+[stage.cull_resize_4000]
+max_elapsed_ms  = 2000
+max_ms_per_unit = 2000
+
+# Section 11 sets no per-image storage budget for this phase. This row exists
+# anyway, because the absence of a stated budget is not the absence of a
+# measurement - and a selection is one row per photograph in two tables plus a
+# reason array, which is exactly the shape that grows quietly.
+#
+# 700 B per image, tighter than phase 11's 800 B for a row that carries two
+# tables' worth of decision, and the same three decisions pay for it: a reason
+# stores its code rather than its sentence, the sub-scores are columns rather
+# than JSON, and there is one index per table.
+#
+# Measured with SQLite page accounting before and after a real selection over
+# 1,000 photographs by `crates/aura-perf/tests/cull_budgets.rs`.
+[size.cull_store_per_1000_images]
+max_bytes = 700000

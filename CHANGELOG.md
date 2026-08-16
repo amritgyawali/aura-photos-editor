@@ -2,6 +2,59 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 12 - Autonomous culling engine, story coverage guard and gallery sizing
+
+A wedding becomes a gallery. Every photograph on both sides of the line carries a reason,
+twelve parts of the wedding are guaranteed against every threshold in the product, and
+nothing is deleted: a rejection is a row, and it is one click from being overturned.
+
+### Added
+
+- **`aura-cull`**: score fusion as a weighted geometric mean, so no signal can rescue
+  another; three hard vetoes read off phase 09 measurements rather than re-derived; a
+  moment pass whose keeper count follows how much the moment varied; chapter quotas with a
+  bounded local search that trades a second keeper for an unrepresented moment; the
+  coverage guard, run twice; three sliding-window diversity caps; and a gallery-size model
+  with a reconciliation that adds runner-ups rather than lowering the bar.
+- **Migration 12**: `cull_run`, `selection`, `rejections`, `coverage_report` and
+  `cull_override`, two views, and three provenance versions plus a digest of the two
+  configuration files. The photographer's own keeps and removals live in their own table
+  because a re-selection rebuilds every other one.
+- **`cull_weights.toml`**: 22 scene rows and three mode rows, every one with a written
+  rationale, and a loader that refuses a row weighting framing above whether the photograph
+  worked.
+- **`coverage_rules.toml`**: twelve declarative guarantees, per-identity minimums, nine
+  chapter bands, the diversity caps and the veto policy. An unknown must-have slug is a
+  refusal rather than a default, and a table that lists the kiss as a posed scene - which
+  would let AURA veto it for closed eyes - is refused outright.
+- **The cull view and typed IPC surface**: coverage, gallery, one photograph's decision, run,
+  resize, mode switch and a three-valued override. The three coverage states are rendered as
+  words rather than colours, and an unanalysed photograph offers no override at all.
+- **`docs/how-aura-culls.md`**: what the engine does, what it guarantees, what every reason
+  code means, and the one number to check before delivering.
+- **Gates**: `aura-cli verify --phase 12`, a 24-test harness, a self-testing Python
+  agreement harness, four checked-in keeper label files and two asserted budgets.
+
+### Changed
+
+- `aura-core` gained the frozen `cull` contract; `CullService` is now the only way any
+  phase may ask what is being delivered.
+- The catalog schema version is 12.
+
+### Known limitations
+
+- Every sub-score underneath every decision comes from a placeholder head (phases 06, 09,
+  10 and 11). The arithmetic is real and tested; the numbers it works on are not yet claims
+  about photographs. Condition C1 in `docs/progress/PHASE-12-EXIT.md`, and it closes with
+  phase 05's C10.
+- The per-scene calibration ships as the identity map, and the gallery-size regression is
+  authored rather than trained on real delivered galleries.
+- The blind photographer study of section 13 does not exist; agreement is measured against
+  four synthetic weddings with documented labels.
+- The optional cloud tie-breaker was not built. Its trigger is two scores within 0.02 of
+  each other, and with placeholder heads underneath that is noise rather than a tie - so
+  every call would be a paid question about nothing. Condition C6.
+
 ## Phase 11 - Composition and aesthetic AI
 
 Every photograph now carries an explainable framing reading: whether a reliable horizon

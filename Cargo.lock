@@ -63,6 +63,7 @@ dependencies = [
  "aura-catalog",
  "aura-cloud",
  "aura-core",
+ "aura-cull",
  "aura-index",
  "aura-infer",
  "aura-ingest",
@@ -164,6 +165,7 @@ dependencies = [
  "aura-catalog",
  "aura-cloud",
  "aura-core",
+ "aura-cull",
  "aura-index",
  "aura-infer",
  "aura-ingest",
@@ -218,6 +220,23 @@ dependencies = [
  "tracing",
  "uuid",
  "walkdir",
+]
+
+[[package]]
+name = "aura-cull"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "toml",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -340,6 +359,7 @@ dependencies = [
  "aura-catalog",
  "aura-cloud",
  "aura-core",
+ "aura-cull",
  "aura-index",
  "aura-infer",
  "aura-people",

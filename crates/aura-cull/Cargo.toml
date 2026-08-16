@@ -1,0 +1,49 @@
+[package]
+name         = "aura-cull"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "The decision engine: which photographs are delivered, which are not, why, and the guarantee that the wedding's story survives the answer (phase 12)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+blake3       = { workspace = true }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+time         = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+uuid         = { workspace = true }
+
+# Deliberately absent: `aura-people`, `aura-index`, `aura-vision`, `aura-brain-photo` and
+# `aura-brain-wedding` - which is to say every crate that produced an input to this one.
+#
+# Phase 12 consumes six phases and depends on none of them. Everything it needs it takes
+# through the frozen traits in `aura-core`: `PeopleService`, `StoryService`,
+# `MomentService`, `IntegrityService`, `EmotionService` and `CompositionService`. Those
+# six traits are the only ways any phase may ask who is in a photograph, what it is of,
+# what was shot once, whether it worked, what it is worth and how it is framed - and every
+# one of those phases wrote that rule into its own exit report.
+#
+# The dependency list is where the rule stops being something people remember. A crate
+# that could see `aura_brain_photo::integrity::score` could reach past `IntegrityService`
+# into an implementation detail, and the fifth phase to do that would be the phase where
+# "no phase keeps its own idea of sharpness" quietly became false.
+#
+# `aura-catalog` is here because this crate owns migration 12's five tables. `blake3` is
+# here for one thing only: the determinism hash of section 6.4.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
+# `tests/eval/` beside the phase 05 to 11 harnesses rather than in this crate's own
+# `tests/`, because a gate is a claim about the product and not about a crate.
+[[test]]
+name = "cull_eval"
+path = "../../tests/eval/cull_eval.rs"

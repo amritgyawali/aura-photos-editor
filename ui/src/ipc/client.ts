@@ -3,6 +3,14 @@ import { listen } from '@tauri-apps/api/event';
 
 import type {
   AnalyseCompositionInput,
+  CullPassDto,
+  CullProjectInput,
+  CullStatusDto,
+  DecisionDto,
+  OverrideDecisionInput,
+  ResizeGalleryInput,
+  SelectionDto,
+  SetCullModeInput,
   CompositionDto,
   CompositionPassDto,
   CompositionStatusDto,
@@ -572,4 +580,54 @@ export const composition = {
   /** Judge pending frames. Completed rows survive cancellation and the next run resumes. */
   analyseComposition: (input: AnalyseCompositionInput): Promise<CompositionPassDto> =>
     invoke<CompositionPassDto>('analyse_composition', { input }),
+};
+
+/**
+ * PHASE-12. What is being delivered.
+ *
+ * Seven commands: three reads, three that change the decision, and one that
+ * runs the cull. None of them deletes, moves, exports or uploads a photograph -
+ * phase 14 edits the survivors, phase 27 swaps in runner-ups, phase 29 builds
+ * albums and phase 30 delivers.
+ *
+ * `gallery` returns `null` when the wedding has never been culled. That is
+ * "nobody has decided", not "deliver nothing", and no caller may render the two
+ * the same way.
+ */
+export const cull = {
+  /** Coverage, guarantee counts, overrides, mode and stored versions. */
+  cullStatus: (projectId: string): Promise<CullStatusDto> =>
+    invoke<CullStatusDto>('cull_status', { projectId }),
+
+  /** The stored gallery. Null means nobody has culled this wedding yet. */
+  gallery: (projectId: string): Promise<SelectionDto | null> =>
+    invoke<SelectionDto | null>('gallery', { projectId }),
+
+  /** What was decided about one photograph, in either direction, with reasons. */
+  imageDecision: (photoId: string): Promise<DecisionDto | null> =>
+    invoke<DecisionDto | null>('image_decision', { photoId }),
+
+  /** Run or re-run the cull. Reads stored analysis; opens no image file. */
+  cullProject: (input: CullProjectInput): Promise<CullPassDto> =>
+    invoke<CullPassDto>('cull_project', { input }),
+
+  /**
+   * Move the size slider. The result may exceed the requested target, because
+   * the coverage guard runs last and a guarantee outranks a slider.
+   */
+  resizeGallery: (input: ResizeGalleryInput): Promise<SelectionDto> =>
+    invoke<SelectionDto>('resize_gallery', { input }),
+
+  /** Switch autonomy mode. Cannot drop a must-have, whichever mode is chosen. */
+  setCullMode: (input: SetCullModeInput): Promise<SelectionDto> =>
+    invoke<SelectionDto>('set_cull_mode', { input }),
+
+  /**
+   * Keep or remove one photograph by hand, or withdraw an earlier choice.
+   *
+   * Unbeatable and re-applied onto every fresh selection. A removal can leave a
+   * guarantee short: the coverage report then degrades that rule and says so.
+   */
+  overrideDecision: (input: OverrideDecisionInput): Promise<DecisionDto> =>
+    invoke<DecisionDto>('override_decision', { input }),
 };

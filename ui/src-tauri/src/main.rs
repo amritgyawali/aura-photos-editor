@@ -7,9 +7,10 @@ use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
     AnalyseCompositionInput, CompositionDto, CompositionPassDto, CompositionStatusDto,
-    CreateProjectInput, DismissCompositionFlagInput, FlaggedCompositionInput, ImageRowLite,
-    IpcError, JobHandle, ListImagesInput, ProblemRow, ProjectHandle, ProjectSummary,
-    SetCameraLabelInput, StartIngestInput,
+    CreateProjectInput, CullPassDto, CullProjectInput, CullStatusDto, DecisionDto,
+    DismissCompositionFlagInput, FlaggedCompositionInput, ImageRowLite, IpcError, JobHandle,
+    ListImagesInput, OverrideDecisionInput, ProblemRow, ProjectHandle, ProjectSummary,
+    ResizeGalleryInput, SelectionDto, SetCameraLabelInput, SetCullModeInput, StartIngestInput,
 };
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
@@ -113,6 +114,82 @@ async fn analyse_composition(
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-12. The culling surface. Every one of these reads the catalog and four of
+// them re-run six selection passes over it, so all seven go off the renderer thread
+// for the composition commands' reason. Section 11 budgets two seconds for a slider
+// move, which is two seconds the window must stay alive through.
+
+#[tauri::command]
+async fn cull_status(state: State<'_, AppState>, project_id: String) -> IpcResult<CullStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cull_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn gallery(state: State<'_, AppState>, project_id: String) -> IpcResult<Option<SelectionDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::gallery(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_decision(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<DecisionDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_decision(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cull_project(
+    state: State<'_, AppState>,
+    input: CullProjectInput,
+) -> IpcResult<CullPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cull_project(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn resize_gallery(
+    state: State<'_, AppState>,
+    input: ResizeGalleryInput,
+) -> IpcResult<SelectionDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::resize_gallery(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_cull_mode(
+    state: State<'_, AppState>,
+    input: SetCullModeInput,
+) -> IpcResult<SelectionDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_cull_mode(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn override_decision(
+    state: State<'_, AppState>,
+    input: OverrideDecisionInput,
+) -> IpcResult<DecisionDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::override_decision(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn background_request_failed() -> IpcError {
     IpcError::from(aura_core::errors::db::statement_failed(
         "the background composition task stopped before returning its result",
@@ -178,7 +255,14 @@ fn main() {
             image_composition,
             flagged_composition,
             dismiss_composition_flag,
-            analyse_composition
+            analyse_composition,
+            cull_status,
+            gallery,
+            image_decision,
+            cull_project,
+            resize_gallery,
+            set_cull_mode,
+            override_decision
         ])
         .run(tauri::generate_context!());
 
