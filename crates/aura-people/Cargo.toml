@@ -5,6 +5,7 @@ edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
 authors.workspace      = true
+publish.workspace      = true
 description  = "Identities, the subject hierarchy, and the encrypted per-project biometric store"
 
 [dependencies]

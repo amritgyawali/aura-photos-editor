@@ -30,6 +30,10 @@ edition      = "2021"
 rust-version = "1.88"
 license      = "UNLICENSED"
 authors      = ["AURA"]
+# Nothing here goes to crates.io. Every member inherits this, which is also what
+# lets `cargo deny` treat the workspace as private: an unpublished crate needs no
+# SPDX licence expression and may depend on a sibling by path without a version.
+publish      = false
 
 [workspace.dependencies]
 # Errors and results

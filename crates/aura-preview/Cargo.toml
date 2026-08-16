@@ -5,6 +5,7 @@ edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
 authors.workspace      = true
+publish.workspace      = true
 description  = "The priority-scheduled preview service that fronts the three decode tiers"
 
 [dependencies]

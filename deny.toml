@@ -18,9 +18,28 @@ allow   = [
 ]
 confidence-threshold = 0.9
 
+# One crate, one licence, one reason. `jpeg-encoder` is "(MIT OR Apache-2.0) AND
+# IJG": the MIT half is already allowed, and the IJG half is the Independent JPEG
+# Group licence that every JPEG encoder derived from libjpeg carries. It is
+# FSF-free and permissive; its one obligation is the acknowledgement recorded in
+# THIRD-PARTY-NOTICES.md. Scoped to this crate so a second IJG dependency still
+# fails the gate.
+exceptions = [
+  { crate = "jpeg-encoder", allow = ["IJG"] },
+]
+
+# The workspace crates are `publish = false` and carry the non-SPDX marker
+# "UNLICENSED", so they have no expression to check. Third-party code is
+# unaffected: this ignores private crates only.
+private = { ignore = true }
+
 [bans]
 multiple-versions = "warn"
 wildcards         = "deny"
+# A sibling crate is depended on by path and has no version requirement, which is
+# a wildcard by definition. Allowed for private crates only, so a third-party
+# wildcard is still a failure.
+allow-wildcard-paths = true
 deny = [
   { name = "openssl", reason = "use rustls; no system OpenSSL dependency in a desktop app" },
   { name = "chrono", reason = "use time; chrono's tz handling has repeatedly broken determinism" },

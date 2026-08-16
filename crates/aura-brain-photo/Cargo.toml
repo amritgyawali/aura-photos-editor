@@ -5,6 +5,7 @@ edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
 authors.workspace      = true
+publish.workspace      = true
 description  = "Judgement about one frame: whether it worked (phase 09 - focus, motion, exposure, noise, eyes) and whether it was made (phase 11 - horizon, cropping, placement, background, composition)"
 
 [dependencies]
