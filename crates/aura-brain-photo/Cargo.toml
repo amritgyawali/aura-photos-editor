@@ -5,7 +5,7 @@ edition.workspace      = true
 rust-version.workspace = true
 license.workspace      = true
 authors.workspace      = true
-description  = "Technical judgement about one frame: is the right subject sharp, is the motion a decision, is the exposure recoverable, and are the important eyes open"
+description  = "Judgement about one frame: whether it worked (phase 09 - focus, motion, exposure, noise, eyes) and whether it was made (phase 11 - horizon, cropping, placement, background, composition)"
 
 [dependencies]
 aura-core    = { path = "../aura-core" }
@@ -40,3 +40,8 @@ tempfile     = { workspace = true }
 [[test]]
 name = "integrity_eval"
 path = "../../tests/eval/integrity_eval.rs"
+
+# The phase 11 gates, in the same place and for the same reason.
+[[test]]
+name = "composition_eval"
+path = "../../tests/eval/composition_eval.rs"

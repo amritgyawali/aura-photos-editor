@@ -22,6 +22,7 @@ members = [
   "tools/model-sign",
   "xtask",
 ]
+exclude = ["ui/src-tauri"]
 
 [workspace.package]
 version      = "0.1.0"

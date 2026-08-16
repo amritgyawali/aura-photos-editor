@@ -26,6 +26,7 @@ pub mod clock;
 
 /// Frozen contracts. Changing anything in here requires an ADR.
 pub mod contract {
+    pub mod composition;
     pub mod consent;
     pub mod emotion;
     pub mod error;
@@ -52,6 +53,10 @@ pub mod paths;
 pub mod progress;
 pub mod redact;
 
+pub use contract::composition::{
+    Box2, CompositionCode, CompositionFlags, CompositionOutline, CompositionReason,
+    CompositionResult, CompositionService, CropHint, FrameEdge, HorizonSource, Joint, JointCut,
+};
 pub use contract::emotion::{
     EmotionCode, EmotionOutline, EmotionReason, EmotionService, FaceExpression, GazeTarget,
     ImageEmotion, Interaction, MomentPeak, PeakKind, Preference, ReactionLink,

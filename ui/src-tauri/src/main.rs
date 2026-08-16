@@ -6,8 +6,10 @@
 use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
-    CreateProjectInput, ImageRowLite, IpcError, JobHandle, ListImagesInput, ProblemRow,
-    ProjectHandle, ProjectSummary, SetCameraLabelInput, StartIngestInput,
+    AnalyseCompositionInput, CompositionDto, CompositionPassDto, CompositionStatusDto,
+    CreateProjectInput, DismissCompositionFlagInput, FlaggedCompositionInput, ImageRowLite,
+    IpcError, JobHandle, ListImagesInput, ProblemRow, ProjectHandle, ProjectSummary,
+    SetCameraLabelInput, StartIngestInput,
 };
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
@@ -16,7 +18,10 @@ use tauri::{Manager, State};
 type IpcResult<T> = Result<T, IpcError>;
 
 #[tauri::command]
-fn create_project(state: State<'_, AppState>, input: CreateProjectInput) -> IpcResult<ProjectHandle> {
+fn create_project(
+    state: State<'_, AppState>,
+    input: CreateProjectInput,
+) -> IpcResult<ProjectHandle> {
     aura_app::create_project(&state, input)
 }
 
@@ -48,6 +53,71 @@ fn set_camera_label(state: State<'_, AppState>, input: SetCameraLabelInput) -> I
 #[tauri::command]
 fn list_problems(state: State<'_, AppState>, project_id: String) -> IpcResult<Vec<ProblemRow>> {
     aura_app::list_problems(&state, &project_id)
+}
+
+// Composition can touch SQLite, decode proxies, and run inference. Keep all five commands
+// off the renderer thread; even the small reads share the same boundary so a future query
+// cannot accidentally turn a synchronous command into visible UI jank.
+#[tauri::command]
+async fn composition_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<CompositionStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::composition_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_composition(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<CompositionDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_composition(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn flagged_composition(
+    state: State<'_, AppState>,
+    input: FlaggedCompositionInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::flagged_composition(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn dismiss_composition_flag(
+    state: State<'_, AppState>,
+    input: DismissCompositionFlagInput,
+) -> IpcResult<CompositionDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::dismiss_composition_flag(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn analyse_composition(
+    state: State<'_, AppState>,
+    input: AnalyseCompositionInput,
+) -> IpcResult<CompositionPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::analyse_composition(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+fn background_request_failed() -> IpcError {
+    IpcError::from(aura_core::errors::db::statement_failed(
+        "the background composition task stopped before returning its result",
+        &std::io::Error::other("background task join failed"),
+    ))
 }
 
 fn catalog_path() -> Result<PathBuf, IpcError> {
@@ -103,7 +173,12 @@ fn main() {
             cancel_job,
             list_images,
             set_camera_label,
-            list_problems
+            list_problems,
+            composition_status,
+            image_composition,
+            flagged_composition,
+            dismiss_composition_flag,
+            analyse_composition
         ])
         .run(tauri::generate_context!());
 

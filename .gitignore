@@ -1,4 +1,5 @@
 /target
+/ui/src-tauri/target
 /graphify-out
 /ui/node_modules
 /ui/dist

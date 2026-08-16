@@ -469,3 +469,27 @@ max_ms_per_unit = 8000
 # thousand photographs, by `crates/aura-perf/tests/emotion_budgets.rs`.
 [size.emotion_store_per_1000_images]
 max_bytes = 900000
+
+# ---------------------------------------------------------------------------
+# Phase 11 performance budgets, from PHASE-11 section 11.
+#
+# The <=30 ms per-image row and <=120 s for 4,000 images both name an RTX 4070.
+# This build has no GPU backend (ADR-0007), so neither is relabelled as a CPU
+# assertion. `composition_budgets` measures the processor path, prints the
+# 4,000-image extrapolation and states the waiver on every run. The row below is
+# a regression guardrail for that current path, not a claim that CPU == RTX 4070.
+# It times the current shipping path at the real 2048 px proxy size, including
+# explicit withholding of both untrained heads; direct interpreter execution is
+# covered separately by the phase 11 CLI gate.
+# ---------------------------------------------------------------------------
+
+[stage.composition_analyse_image_cpu]
+max_elapsed_ms  = 6000
+max_ms_per_unit = 500
+
+# Section 11: <=800 B per image. Measured with SQLite page accounting before
+# and after 1,000 judgements cycling through the complete authored fixture
+# corpus: clean, tilted, intentional, cropped, merged, bright and colour-clash
+# frames, including evidence and crop hints where the analyser emits them.
+[size.composition_store_per_1000_images]
+max_bytes = 800000

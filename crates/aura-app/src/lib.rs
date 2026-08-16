@@ -25,6 +25,7 @@
 pub mod biometric_keys;
 pub mod cloud_commands;
 pub mod commands;
+pub mod composition_commands;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.
@@ -49,6 +50,10 @@ pub use cloud_commands::{
 pub use commands::{
     cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
     start_ingest,
+};
+pub use composition_commands::{
+    analyse_composition, composition_status, dismiss_composition_flag, flagged_composition,
+    image_composition,
 };
 pub use emotion_commands::{
     emotion_status, image_emotion, moment_peak, prefer_frame, ranked_by_emotion, reactions_of,

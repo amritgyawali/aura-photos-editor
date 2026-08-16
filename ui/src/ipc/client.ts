@@ -2,6 +2,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  AnalyseCompositionInput,
+  CompositionDto,
+  CompositionPassDto,
+  CompositionStatusDto,
+  DismissCompositionFlagInput,
+  FlaggedCompositionInput,
   EmotionDto,
   EmotionEvent,
   EmotionPassDto,
@@ -537,4 +543,33 @@ export const emotion = {
         unlisten();
       },
     ),
+};
+
+/**
+ * PHASE-11. How a photograph is framed.
+ *
+ * Five commands: three reads, one dismissal and the resumable analysis pass.
+ * None of them applies the crop hint, straightens pixels, or makes a delivery
+ * decision.
+ */
+export const composition = {
+  /** Coverage, keypoint awareness, flags, tilt telemetry and stored versions. */
+  compositionStatus: (projectId: string): Promise<CompositionStatusDto> =>
+    invoke<CompositionStatusDto>('composition_status', { projectId }),
+
+  /** One frame's complete judgement. Null means nobody has analysed it. */
+  imageComposition: (photoId: string): Promise<CompositionDto | null> =>
+    invoke<CompositionDto | null>('image_composition', { photoId }),
+
+  /** A review queue ordered from the lowest composition score upward. */
+  flaggedComposition: (input: FlaggedCompositionInput): Promise<string[]> =>
+    invoke<string[]>('flagged_composition', { input }),
+
+  /** Clear one violation and remember the photographer's disagreement. */
+  dismissCompositionFlag: (input: DismissCompositionFlagInput): Promise<CompositionDto> =>
+    invoke<CompositionDto>('dismiss_composition_flag', { input }),
+
+  /** Judge pending frames. Completed rows survive cancellation and the next run resumes. */
+  analyseComposition: (input: AnalyseCompositionInput): Promise<CompositionPassDto> =>
+    invoke<CompositionPassDto>('analyse_composition', { input }),
 };

@@ -2478,3 +2478,241 @@ pub enum EmotionEvent {
         cost_usd: f32,
     },
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-11. The composition surface: how a photograph is framed, where the
+// evidence is, and what the photographer may say back.
+//
+// Five commands. Three read, one records that a mark is wrong, and one runs the
+// resumable pass. Nothing here crops, straightens, removes a distraction, keeps
+// or rejects a photograph; phases 12, 23 and 24 own those decisions.
+//
+// The DTO deliberately carries the backend's decisions about which flags are
+// violations and which reasons are exonerations. The interface draws those
+// answers; it does not keep a second list of thresholds or reason-code meanings.
+// ---------------------------------------------------------------------------
+
+/// One place where the frame cuts a body.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionJointCutDto {
+    /// `neck`, `shoulder`, `elbow`, `wrist`, `hip`, `knee` or `ankle`.
+    pub joint: String,
+    /// `top`, `right`, `bottom` or `left`.
+    pub edge: String,
+    /// True when the cut lands on the joint rather than between joints.
+    pub at_joint: bool,
+    /// Scene-conditioned cost, `0..1`.
+    pub severity: f32,
+    /// True when the severity clears the backend's flag threshold.
+    pub flagged: bool,
+    /// The pixels that prove the cut.
+    pub area: CropRectDto,
+}
+
+/// One thing that moved the composition score, with the pixels that prove it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionReasonDto {
+    /// Stable reason slug.
+    pub code: String,
+    /// The exact photographer-facing explanation produced by the analyser.
+    pub text: String,
+    /// Negative for a penalty; zero or positive for an exoneration.
+    pub weight: f32,
+    /// True when this reason withdraws a claim rather than making one.
+    pub exoneration: bool,
+    /// The evidence rectangle, absent only for a frame-wide reason.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// The region phase 23 should preserve, without applying a crop here.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionCropHintDto {
+    /// What must remain in frame.
+    pub region: CropRectDto,
+    /// How far the region may safely be tightened on each side.
+    pub safe_margin: f32,
+    /// Rotation phase 23 may apply, absent below the horizon confidence gate.
+    pub straighten_deg: Option<f32>,
+    /// Confidence in the hint, `0..1`.
+    pub confidence: f32,
+    /// True when the hint offers a meaningful crop or straighten operation.
+    pub actionable: bool,
+}
+
+/// Everything phase 11 knows about how one photograph is framed.
+///
+/// Every field in `CompositionResult` crosses this boundary. Besides keeping the
+/// Explain card honest, that makes this DTO the complete read surface for phases
+/// 12 and 23 without letting either reach through the frozen service into SQL.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct CompositionDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Degrees off level. Positive is clockwise.
+    pub tilt_deg: f32,
+    /// True when the tilt reads as a deliberate choice.
+    pub tilt_intentional: bool,
+    /// Confidence in the horizon estimate, `0..1`.
+    pub horizon_conf: f32,
+    /// `none`, `gradient`, `vanishing_lines` or `gravity`.
+    pub horizon_source: String,
+    /// Space above the subject, as a fraction of frame height.
+    pub headroom: f32,
+    /// Distance to the nearest rule-of-thirds power point, `0..1`.
+    pub thirds_offset: f32,
+    /// Visual balance, `0..1`.
+    pub balance: f32,
+    /// Empty-frame fraction, `0..1`.
+    pub negative_space: f32,
+    /// Every detected body cut, worst first.
+    pub joint_cuts: Vec<CompositionJointCutDto>,
+    /// True when a head crop is a violation for this scene.
+    pub head_crop: bool,
+    /// Objects entering from a frame edge.
+    pub edge_intrusions: Vec<CropRectDto>,
+    /// Background clutter relative to the scene tolerance; `1.0` is the limit.
+    pub clutter: f32,
+    /// Bright regions that compete with the subject.
+    pub bright_blobs: Vec<CropRectDto>,
+    /// True when a background structure merges with a head.
+    pub head_merge: bool,
+    /// Background colour competition, `0..1`.
+    pub colour_competition: f32,
+    /// Learned, scene-conditioned aesthetic reading, `0..1`.
+    pub aesthetic: f32,
+    /// Fused composition score, `0..1`.
+    pub composition_score: f32,
+    /// A hint for phase 23. It is never applied by this surface.
+    pub crop_suggestion_hint: Option<CompositionCropHintDto>,
+    /// Scene used to choose rule bands.
+    pub scene: String,
+    /// Position within the moment's composition ranking, `0..1`.
+    pub relative_composition: f32,
+    /// People for whom the crop audit had keypoints.
+    pub keypoint_subjects: u32,
+    /// Set flags, in contract order.
+    pub flags: Vec<String>,
+    /// True when at least one flag describes a framing violation.
+    pub has_violation: bool,
+    /// Exact explanations, strongest penalty first.
+    pub reasons: Vec<CompositionReasonDto>,
+    /// Confidence in the complete judgement, `0..1`.
+    pub confidence: f32,
+    /// True when the photographer has dismissed a mark.
+    pub user_reviewed: bool,
+    /// Learned-head version.
+    pub model_ver: u16,
+    /// Geometry and score-arithmetic version.
+    pub analysis_ver: u16,
+    /// Scene-rule table version.
+    pub rules_ver: u16,
+}
+
+/// What the Composition panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a judgement.
+    pub scored: u32,
+    /// Fraction judged; denominator is every photograph.
+    pub coverage: f32,
+    /// Fraction of scored frames whose subjects had keypoints.
+    pub keypoint_aware: f32,
+    /// How many frames carry each flag, in the same order as `flagNames`.
+    pub flag_counts: Vec<u32>,
+    /// Stable flag slugs.
+    pub flag_names: Vec<String>,
+    /// Mean composition score.
+    pub mean_score: f32,
+    /// Mean absolute tilt among frames with a measurable horizon.
+    pub mean_abs_tilt: f32,
+    /// Fraction of tilted frames read as deliberate.
+    pub intentional_ratio: f32,
+    /// Frames with a crop hint for phase 23.
+    pub hinted: u32,
+    /// Frames whose marks a photographer has overruled.
+    pub reviewed: u32,
+    /// Upper bound on frames with a violation; flag counts overlap.
+    pub violating_at_most: u32,
+    /// Scene slugs judged with the neutral rule row.
+    pub unruled_scenes: Vec<String>,
+    /// Lowest learned-head version present.
+    pub model_ver: u16,
+    /// Lowest analysis version present.
+    pub analysis_ver: u16,
+    /// Lowest rule-table version present.
+    pub rules_ver: u16,
+}
+
+/// Ask for frames carrying any of the named composition flags.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlaggedCompositionInput {
+    /// The project.
+    pub project_id: String,
+    /// Flag slugs. Any matching flag is a hit.
+    pub flags: Vec<String>,
+    /// Maximum rows, clamped by the backend.
+    pub limit: Option<u32>,
+}
+
+/// Tell AURA that one composition mark is wrong.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DismissCompositionFlagInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// Exactly one violation flag slug.
+    pub flag: String,
+}
+
+/// Start a resumable composition pass over a project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyseCompositionInput {
+    /// The project.
+    pub project_id: String,
+    /// Handle that `cancel_job` can signal.
+    pub cancel_id: Option<String>,
+}
+
+/// What one composition pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompositionPassDto {
+    /// Photographs judged.
+    pub scored: u32,
+    /// Photographs that could not be judged; no row was written for them.
+    pub failed: u32,
+    /// Subjects for whom keypoints were available.
+    pub keypoint_subjects: u32,
+    /// Frames with at least one flagged body cut.
+    pub cut: u32,
+    /// Frames whose tilt read as deliberate.
+    pub intentional_tilts: u32,
+    /// Frames with a measurable horizon.
+    pub horizons: u32,
+    /// Mean absolute tilt among those measurable horizons.
+    pub mean_abs_tilt: f32,
+    /// Flag counts in the same order as `flagNames`.
+    pub flag_counts: Vec<u32>,
+    /// Stable flag slugs.
+    pub flag_names: Vec<String>,
+    /// Mean score over this pass.
+    pub mean_score: f32,
+    /// Frames with a crop hint.
+    pub hinted: u32,
+    /// Scenes judged with neutral rules.
+    pub unruled_scenes: Vec<String>,
+    /// Milliseconds for the pass.
+    pub elapsed_ms: u64,
+    /// True when the pass stopped after saving completed rows.
+    pub cancelled: bool,
+}

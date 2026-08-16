@@ -21,9 +21,22 @@
     clippy::cast_sign_loss
 )]
 
-//! Technical judgement about one frame: focus, motion, exposure, noise and eyes.
+//! Judgement about one frame: whether it worked, and whether it was made.
 //!
-//! PHASE-09. The crate answers five questions about every photograph - is the *right*
+//! Two phases live here. **PHASE-09** answers whether a photograph *worked* - focus,
+//! motion, exposure, noise and eyes - and **PHASE-11** answers whether it was *made*:
+//! where the horizon is, what the frame cut, where the subject sits in it and what is
+//! behind them. They share a crate because they share a decode, a proxy rung and a
+//! discipline: both describe a photograph and neither acts on one.
+//!
+//! `composition` adds one rule to the five phase 09 wrote, and it is the same rule in a
+//! new place: **`CompositionService` is the only way to ask how a photograph is framed.**
+//! Phase 23's smart crop optimises toward this objective and phase 29 ranks albums with
+//! it; two answers to "is this well composed" is a crop that fights the gallery it is in.
+//!
+//! The rest of this header is phase 09's.
+//!
+//! ## PHASE-09. The crate answers five questions about every photograph - is the *right*
 //! subject sharp, was the motion a decision, can the exposure be brought back, how noisy
 //! is it, and are the important eyes open - and it answers all five from one decode of
 //! one 2048 px proxy.
@@ -61,10 +74,14 @@
 //! and phase 08 for `MomentService`. Fifth time, same reason: two answers to "is this
 //! frame sharp" is two culling decisions that disagree.
 
+pub mod composition;
 pub mod errors;
 pub mod fixtures;
 pub mod integrity;
 
+pub use composition::{
+    Composition, CompositionPass, CompositionStore, RuleTable, SceneRule, COMPOSITION_LEVEL,
+};
 pub use integrity::{
     Analyser, Calibration, CalibrationTable, FrameContext, FrameExif, Integrity, IntegrityPass,
     IntegrityStore, PassReport, ANALYSIS_VER, INTEGRITY_LEVEL, MODEL_VER,
