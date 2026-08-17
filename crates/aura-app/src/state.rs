@@ -30,6 +30,7 @@ use aura_core::AuraResult;
 use aura_cull::gather::Gatherer;
 use aura_cull::store::CullStore;
 use aura_cull::Cull;
+use aura_explain::{Explain, Ledger};
 use aura_index::hnsw::{HnswIndex, HnswParams};
 use aura_index::snapshot::Snapshot;
 use aura_index::store::{EmbeddingStore, StoredEmbedding};
@@ -440,6 +441,34 @@ impl AppState {
             ),
         }
         Ok(Arc::new(Cull::new(self.cull_store(), Arc::new(gatherer))?))
+    }
+
+    /// The decision ledger for this catalog. PHASE-13.
+    ///
+    /// Stateless like the integrity, emotion, composition and selection stores.
+    #[must_use]
+    pub fn ledger(&self) -> Arc<Ledger> {
+        Arc::new(Ledger::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The explainability service for this catalog. PHASE-13.
+    ///
+    /// Built per call rather than held, like every service above it. The band table is
+    /// parsed on each construction, which costs microseconds and buys the property that an
+    /// installation override takes effect without a restart.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5055` when the autonomy band table will not load. It halts, because a
+    /// product that cannot say what it is allowed to do must not do anything.
+    pub fn explain(&self) -> AuraResult<Arc<Explain>> {
+        Ok(Arc::new(Explain::new(
+            self.ledger(),
+            Arc::clone(&self.clock),
+        )?))
     }
 
     /// The technical pass for this catalog, wired to phases 06 and 07.

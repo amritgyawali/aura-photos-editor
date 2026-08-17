@@ -958,3 +958,57 @@ summary      = "A must-have part of the wedding has no candidate photographs"
 user_message = "AURA could not find any photographs of one of the moments a wedding gallery normally contains. It has said so rather than filling the gap with something else."
 runbook      = "docs/runbooks/AURA-ML-5053.md"
 introduced   = "PHASE-12"
+
+[[error]]
+code         = "AURA-ML-5054"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "A decision was refused because it could not explain itself"
+user_message = "AURA could not record why it did something, so it did not record that it happened either. Nothing has been changed."
+runbook      = "docs/runbooks/AURA-ML-5054.md"
+introduced   = "PHASE-13"
+
+[[error]]
+code         = "AURA-ML-5055"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The autonomy band table was refused"
+user_message = "AURA could not load the settings that decide how much it is allowed to do on its own, so it has stopped rather than guessing. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5055.md"
+introduced   = "PHASE-13"
+
+[[error]]
+code         = "AURA-ML-5056"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A decision could not be replayed"
+user_message = "AURA could not work out that decision again from its record. The decision itself is unchanged."
+runbook      = "docs/runbooks/AURA-ML-5056.md"
+introduced   = "PHASE-13"
+
+[[error]]
+code         = "AURA-ML-5057"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A replayed decision no longer reproduces its stored outcome"
+user_message = "AURA would make a different decision today than the one on record. The record is unchanged and shows what was actually done."
+runbook      = "docs/runbooks/AURA-ML-5057.md"
+introduced   = "PHASE-13"
+
+[[error]]
+code         = "AURA-ML-5058"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A confidence was banded without a fitted calibration"
+user_message = "AURA has not yet learned how often it is right about this kind of decision, so treat its confidence as a rough guide rather than a percentage."
+runbook      = "docs/runbooks/AURA-ML-5058.md"
+introduced   = "PHASE-13"
+
+[[error]]
+code         = "AURA-ML-5059"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A support bundle was refused"
+user_message = "AURA did not create the support file. Nothing has been sent anywhere."
+runbook      = "docs/runbooks/AURA-ML-5059.md"
+introduced   = "PHASE-13"

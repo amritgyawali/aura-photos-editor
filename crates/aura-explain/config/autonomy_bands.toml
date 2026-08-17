@@ -1,0 +1,150 @@
+# How much AURA is allowed to do on its own.
+#
+# PHASE-13 section 6.4. This file is a product decision, owned by the PM role, and it is the
+# most consequential configuration table in the product: it is the only thing standing
+# between a calibrated number and phase 28 acting on a wedding unattended.
+#
+# Every row carries a written reason, exactly as `cull_weights.toml`, `coverage_rules.toml`,
+# `emotion_weights.toml` and `composition_rules.toml` do. A threshold nobody can explain is
+# a threshold nobody can defend to a photographer whose gallery it changed.
+#
+# ## How to read a row
+#
+# Three numbers per decision kind, and they are read downwards:
+#
+#   confidence >= auto_at        -> Auto            (done, no question asked)
+#   confidence >= zero_touch_at  -> AutoZeroTouch   (done only when Zero-Touch is on)
+#   confidence >= suggest_at     -> Suggest         (done, and put in the review queue)
+#   otherwise                    -> RequireReview   (not done; AURA asks)
+#
+# Section 6.4's own bands are 0.98 / 0.90 / 0.75, and `[defaults]` is exactly those numbers.
+# A kind that does not need its own row does not have one.
+#
+# ## Bumping `version`
+#
+# `version` is recorded on every decision this table banded, so a support case can tell a
+# decision made under today's thresholds from one made under last year's. Change any number
+# below and bump it in the same commit.
+
+version = 1
+
+# -----------------------------------------------------------------------------
+# The defaults. Section 6.4's four bands, unchanged.
+# -----------------------------------------------------------------------------
+[defaults]
+auto_at       = 0.98
+zero_touch_at = 0.90
+suggest_at    = 0.75
+reason = """
+Section 6.4's bands, taken literally. They are stated in the phase document as product
+policy rather than derived from data, and this build has no fitted calibration to derive
+anything better from - so copying them exactly is the honest thing to do, and changing them
+would be inventing a number.
+"""
+
+# -----------------------------------------------------------------------------
+# Per-kind overrides. Five kinds have one; the sixth uses the defaults.
+# -----------------------------------------------------------------------------
+
+[[kind]]
+id            = "cull"
+auto_at       = 0.98
+zero_touch_at = 0.90
+suggest_at    = 0.75
+reason = """
+The defaults, and deliberately not stricter. A culling decision is the most reversible thing
+this product does - a rejection is a row, nothing on disk moves, and the size slider undoes a
+whole gallery in one drag - so raising the bar here would put four thousand frames in a
+review queue to protect against a mistake that costs one click to fix. The guarantees that
+actually protect a wedding are phase 12's coverage rules, and they are not a confidence
+threshold.
+"""
+
+[[kind]]
+id            = "edit"
+auto_at       = 0.98
+zero_touch_at = 0.90
+suggest_at    = 0.70
+reason = """
+The review floor is lower than the default, at 0.70, because a develop recipe is a set of
+parameters a photographer can see and drag back. Below 0.70 AURA still asks: a white balance
+it is unsure of is a colour cast across a whole chapter, and that is the one edit failure a
+photographer notices after delivery rather than before.
+"""
+
+[[kind]]
+id            = "retouch"
+auto_at       = 0.995
+zero_touch_at = 0.95
+suggest_at    = 0.85
+reason = """
+Every band is raised, and the top one is raised to a place that is very hard to reach. A
+retouch changes a person's face. Section 11 of the operating manual permanently forbids
+identity-changing operations, and everything that remains legal here - a blemish, a stray
+hair - is still something a photographer must be able to say was not done to their client
+without being asked. `is_irreversible` raises this one band again on top of these numbers.
+"""
+
+[[kind]]
+id            = "qc"
+auto_at       = 0.98
+zero_touch_at = 0.92
+suggest_at    = 0.75
+reason = """
+Zero-Touch is raised slightly, because a QC agent that fixes what it found is a loop with no
+human in it: the thing that decided something was wrong is the thing deciding it is now
+right. Phase 27 owns that argument; this row makes the default position 'show me' rather
+than 'go ahead'.
+"""
+
+[[kind]]
+id            = "export"
+auto_at       = 0.995
+zero_touch_at = 0.95
+suggest_at    = 0.90
+reason = """
+The strictest row in the table, and the only one whose review floor is 0.90. An export is
+the one decision in this product that reaches a client. Everything before it is a row in a
+catalog that somebody can change; this is a file on somebody else's computer, and there is
+no undo for a gallery a couple has already opened.
+"""
+
+# -----------------------------------------------------------------------------
+# Risk multipliers. Section 6.4's two, plus one this build adds and argues for.
+#
+# Each raises the resulting band by one step - Auto becomes AutoZeroTouch, AutoZeroTouch
+# becomes Suggest, Suggest becomes RequireReview - without touching the confidence. That is
+# the important property: a multiplier changes what AURA is allowed to *do* with a number
+# and never the number itself, so nothing here can make the product look more certain than
+# it is.
+# -----------------------------------------------------------------------------
+[risk]
+irreversible_raises = true
+must_have_raises    = true
+uncalibrated_raises = true
+
+reason_irreversible = """
+Section 6.4: "destructive or irreversible actions require a higher band than reversible
+parameter edits." Applied to the three kinds `DecisionKind::is_irreversible` names - retouch,
+album and export - rather than to a list in this file, because a fourth irreversible kind
+must not be able to arrive without somebody editing the enum that says so.
+"""
+
+reason_must_have = """
+Section 6.4: "any decision touching a must-have moment is raised one band, because the cost
+of being wrong is higher." The rings, the vows, the kiss. A wrong decision about a dance
+frame costs a photograph; a wrong decision about the only frame of the ring exchange costs
+the thing the client will ask for first.
+"""
+
+reason_uncalibrated = """
+This one is not in the phase document, and it is here because of what section 6.4's argument
+depends on. The bands are defensible only if 90 % confidence means 90 % correct. Nothing in
+this build has been calibrated - every model is the identity map at version 0 - so every
+number these thresholds are compared against is a raw model output with no evidence about
+how often it is right.
+
+Raising one band while that is true means AURA does slightly less on its own and asks
+slightly more often. Turning it off is a one-word change in this file, and it should be
+turned off in the same release that ships the first fitted calibration - not before.
+"""

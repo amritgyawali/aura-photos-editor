@@ -2,6 +2,66 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 13 - Explain My Edit, confidence calibration and the decision ledger
+
+Every decision the product makes can be opened up - why, how sure, what it looked at - and
+every one of them is written to a ledger that cannot be rewritten. A correction is a new
+entry pointing at the old one, and nothing in the product can update a row that says what
+happened.
+
+### Added
+
+- **`aura-explain`**: the ledger, with append-only semantics the database enforces and a
+  compaction policy that cannot remove a photographer's own decision; a decision builder
+  whose canonical JSON and inputs hash exist so a replay compares the question rather than a
+  rounding difference; isotonic and temperature calibration with ECE, Brier and reliability
+  bins; the autonomy policy; the reason registry; the grounded summariser; the replay port;
+  and the anonymised support bundle.
+- **Migration 13**: `decisions`, `decision_reasons` and `calibration_models`, one trigger
+  that aborts every `UPDATE`, one coverage view and three indexes. `reason_count` is a
+  denormalised column with a CHECK, which is how invariant 2 becomes something SQLite
+  refuses to break.
+- **`autonomy_bands.toml`**: section 6.4's bands verbatim, five per-kind rows each with a
+  written reason, and a loader that refuses a row with no reason or thresholds that do not
+  descend. `irreversible` is read from the enum and never from the file.
+- **`docs/reason-codes.md`**: 93 codes across five vocabularies, generated from the registry
+  so the public reference cannot disagree with the product.
+- **`docs/how-confidence-works.md`**: what the number means, what it does not mean yet, and
+  what AURA is allowed to do at each level.
+- **The Explain panel and typed IPC surface**: eight commands, six tabs, evidence crops, the
+  alternative comparison with both score breakdowns, and a confidence badge that says plainly
+  when nothing has been calibrated.
+- **`aura-cli replay`**: re-derives a stored decision from the catalog as it stands now and
+  says whether the answer moved - and if it did, whether that is an upgrade or a determinism
+  defect.
+- **`ExplainSummary`**: the one cloud call this phase may make. No images, no field a new
+  reason could go in, and a validator that refuses any number absent from the input.
+- **`ml/eval/calibration_report.py`**: the same arithmetic as the Rust side, plus a
+  reliability diagram written as SVG with no plotting dependency.
+- Six error codes, `AURA-ML-5054` to `AURA-ML-5059`, each with a runbook.
+
+### Changed
+
+- `aura-core` freezes `contract::ledger` and gains `DecisionId` in the frozen `ids.rs`,
+  alongside phases 06, 07 and 08's ids. ADR-0027 records the five spellings that differ from
+  the phase document.
+- `contracts.lock` covers `ledger.rs`, `ids.rs`, migration 13, the IPC surface and
+  `ui/src/ipc/types.ts`.
+
+### Known limits
+
+- **Nothing is calibrated.** Every model is the identity map at version 0, the ECE gate is
+  measured against synthetic predictors whose error is authored, and `AURA-ML-5058` says so
+  once per run. While that is true, every decision is raised one band toward review - so
+  nothing in this build acts unattended, and phase 28 cannot ship until a calibration does.
+- **Every decision recorded here was made from placeholder heads**, because phases 06, 09, 10
+  and 11 all ship them. The ledger records those decisions faithfully; none of them is a
+  claim about a photograph.
+- **The cloud summary has a cassette and no live provider.** The paragraph a photographer
+  sees today is the deterministic template, which is correct by construction.
+- **The pixel opt-in of section 2.1 was deliberately not built.** It would be the one code
+  path in the product that can put a photograph into a file which is then emailed.
+
 ## Phase 12 - Autonomous culling engine, story coverage guard and gallery sizing
 
 A wedding becomes a gallery. Every photograph on both sides of the line carries a reason,

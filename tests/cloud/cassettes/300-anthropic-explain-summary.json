@@ -1,0 +1,25 @@
+{
+  "name": "300-anthropic-explain-summary",
+  "note": "PHASE-13's happy path. A grounded ExplainSummary answer for a culling decision: every number in the paragraph - 0.81 and 0.60 - appears in the supplied facts, and no reason is added to the three that were given.",
+  "provider": "anthropic",
+  "matcher": {
+    "url_suffix": "/v1/messages",
+    "body_contains": ["\"model\":\"claude-sonnet-4-5\"", "dcn-explain-summary"]
+  },
+  "status": 200,
+  "headers": [["content-type", "application/json"]],
+  "body": {
+    "id": "msg_cassette_300",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"summary\":\"This frame is in the gallery as the strongest of its moment, which carried the most weight at 0.60. The subject is a little softer than this body should manage, which counted against it without deciding it. AURA has not yet learned how often it is right about this kind of decision, so read the 0.81 as a rough guide.\",\"headline\":\"The strongest frame of this moment\"}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "usage": { "input_tokens": 412, "output_tokens": 96 }
+  }
+}

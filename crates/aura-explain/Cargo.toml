@@ -1,0 +1,48 @@
+[package]
+name         = "aura-explain"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "The decision ledger: why anything happened, how sure it was, what it looked at, and the append-only record that lets somebody ask again a year later (phase 13)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+blake3       = { workspace = true }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+time         = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+
+# Deliberately absent: every crate that makes a decision.
+#
+# `aura-cull` decides galleries today and phases 14, 20, 27, 29 and 30 will decide edits,
+# retouches, tickets, albums and deliveries. None of them is here, and none of them ever
+# will be. This crate takes what it needs through the frozen shapes in `aura-core` -
+# `CullCode`, `ReasonCode`, `EmotionCode`, `CompositionCode` and the four services those
+# phases implement - because the alternative is a ledger that depends on everything, which
+# is the same thing as a ledger nothing can depend on.
+#
+# The direction is the point. A deciding phase depends on `aura-explain` to record what it
+# did; `aura-explain` depends on nobody to know what was done. `replay.rs` is where that
+# rule is load-bearing: re-running a decision needs the engine that made it, so this crate
+# defines the port and the caller - `aura-cli`, `aura-app` - supplies the engine.
+#
+# `aura-catalog` is here because this crate owns migration 13's three tables. `blake3` is
+# here for two things: the inputs hash of section 6.3 and the bundle's identifier
+# anonymisation.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
+# `tests/eval/` beside the phase 05 to 12 harnesses rather than in this crate's own
+# `tests/`, because a gate is a claim about the product and not about a crate.
+[[test]]
+name = "explain_eval"
+path = "../../tests/eval/explain_eval.rs"

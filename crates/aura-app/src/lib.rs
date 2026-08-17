@@ -35,6 +35,7 @@ pub mod contract {
 }
 
 pub mod emotion_commands;
+pub mod explain_commands;
 pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
@@ -63,6 +64,10 @@ pub use cull_commands::{
 pub use emotion_commands::{
     emotion_status, image_emotion, moment_peak, prefer_frame, ranked_by_emotion, reactions_of,
     score_emotion, set_moment_peak,
+};
+pub use explain_commands::{
+    compact_ledger, decision_by_id, decision_history, explain_image, export_support_bundle,
+    ledger_status, record_decisions, review_queue,
 };
 pub use index_commands::{
     build_index, embed_project, find_similar, image_descriptors, index_status,

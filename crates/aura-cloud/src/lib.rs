@@ -85,6 +85,7 @@ pub mod cache;
 pub mod cassette;
 pub mod compat;
 pub mod couple_hint;
+pub mod explain_summary;
 pub mod fallback;
 pub mod gateway;
 pub mod google;
@@ -111,6 +112,7 @@ pub use contract::cloud::{
     CloudError, CloudResult, CloudTask, ImagePart, PromptSpec, Source, Tier, Validate,
 };
 pub use couple_hint::{CandidateStats, CoupleHint, CoupleHintInput, CoupleHintOutput, PairStats};
+pub use explain_summary::{ExplainSummary, ExplainSummaryInput, ExplainSummaryOutput, ReasonFact};
 pub use gateway::{CallContext, CloudAiGateway, CloudPolicy};
 pub use keys::{KeyStore, MemoryKeyStore, OsKeyStore, SecretKey};
 pub use moment_significance::{

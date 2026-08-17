@@ -1436,3 +1436,149 @@ export type CullPassDto = {
   unweightedScenes: string[];
   elapsedMs: number;
 };
+
+/**
+ * PHASE-13. Why anything happened, how sure it was, and what it looked at.
+ *
+ * Every shape below carries the backend's own reading of a code - its severity,
+ * its domain, whether a band was raised - so that no component has to keep a
+ * second copy of a vocabulary that spans five phases. A view that decided for
+ * itself whether `keypoints_unavailable` is bad news would be a view that could
+ * tell a photographer their photograph is badly framed because AURA did not look
+ * at it.
+ */
+
+export type EvidenceCropDto = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+export type ParamDeltaDto = {
+  name: string;
+  value: number;
+};
+
+export type LedgerReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+  /** `credit`, `note`, `caveat` or `fault`. */
+  severity: string;
+  /** `technical`, `emotion`, `composition`, `selection` or `ledger`. */
+  domain: string;
+  /** `none`, `crop`, `frames` or `params`. */
+  evidenceKind: string;
+  crop: EvidenceCropDto | null;
+  frames: string[];
+  params: ParamDeltaDto[];
+};
+
+export type LedgerDecisionDto = {
+  decisionId: string;
+  kind: string;
+  kindTitle: string;
+  subjectKind: string;
+  subjectId: string;
+  rawConfidence: number;
+  calibratedConfidence: number;
+  calibrationVer: number;
+  calibrated: boolean;
+  autonomy: string;
+  autonomyTitle: string;
+  autonomyText: string;
+  needsReview: boolean;
+  source: string;
+  reasons: LedgerReasonDto[];
+  outputsJson: string;
+  /** Hex, because JavaScript cannot hold a u64 exactly. */
+  inputsHash: string;
+  modelVersions: [string, number][];
+  configVersions: [string, number][];
+  ms: number;
+  createdAt: number;
+  supersedes: string | null;
+};
+
+export type ExplainTabDto = {
+  id: string;
+  title: string;
+  available: boolean;
+  /** Why there is nothing here. Rendered instead of an empty tab. */
+  unavailableReason: string | null;
+  reasons: LedgerReasonDto[];
+  score: number | null;
+  confidence: number | null;
+};
+
+export type AlternativeDto = {
+  photoId: string;
+  keepScore: number;
+  technical: number;
+  emotion: number;
+  composition: number;
+  prominence: number;
+  delivered: boolean;
+};
+
+export type ExplainPanelDto = {
+  photoId: string;
+  tabs: ExplainTabDto[];
+  decision: LedgerDecisionDto | null;
+  headline: string | null;
+  summary: string;
+  summaryFromCloud: boolean;
+  alternatives: AlternativeDto[];
+};
+
+export type LedgerStatusDto = {
+  decisions: number;
+  explained: number;
+  explanationCoverage: number;
+  current: number;
+  superseded: number;
+  byKind: number[];
+  kindNames: string[];
+  byAutonomy: number[];
+  autonomyNames: string[];
+  bySource: number[];
+  sourceNames: string[];
+  calibrated: number;
+  calibrationVer: number;
+  evidenced: number;
+  reasons: number;
+  bytes: number;
+};
+
+export type SupportBundleDto = {
+  json: string;
+  decisions: number;
+  anonymised: number;
+  safe: boolean;
+};
+
+export type ReviewQueueInput = {
+  projectId: string;
+  /** `auto`, `auto_zero_touch`, `suggest` or `require_review`. */
+  band?: string | null;
+  limit?: number | null;
+};
+
+export type RecordDecisionsInput = {
+  projectId: string;
+};
+
+export type RecordDecisionsDto = {
+  recorded: number;
+  refused: number;
+  byAutonomy: number[];
+  autonomyNames: string[];
+  uncalibrated: boolean;
+  elapsedMs: number;
+};
+
+export type ExportBundleInput = {
+  projectId: string;
+  limit?: number | null;
+};
