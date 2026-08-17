@@ -122,6 +122,21 @@ typed_id!(SegmentId, "seg");
 // See docs/adr/ADR-0017-burst-grouping-and-duplicate-policy.md section 2.
 typed_id!(MomentId, "mom");
 
+// PHASE-13. Section 5 writes `DecisionId` into the frozen `Decision` shape, so a
+// thing the product decided is an id of the same kind as the nine above.
+//
+// It is the first id in this file that names an *event* rather than a thing: a
+// project, a photograph, a face, a chapter and a moment all exist in the world,
+// and a decision exists only because the product made it. That is exactly why it
+// needs an id of its own. `aura replay <decision_id>` is a support command a
+// photographer reads down a telephone, the ledger is append-only so a correction
+// is a second row pointing at the first, and both of those need something stable
+// to point at. A composite key of (subject, kind, timestamp) would have been the
+// alternative and it fails on the first re-run inside the same millisecond.
+//
+// See docs/adr/ADR-0027-decision-ledger-and-confidence.md section 2.
+typed_id!(DecisionId, "dcn");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

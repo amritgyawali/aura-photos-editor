@@ -33,6 +33,7 @@ pub mod contract {
     pub mod error;
     pub mod ids;
     pub mod integrity;
+    pub mod ledger;
     pub mod moment;
     pub mod people;
     pub mod priority;
@@ -68,12 +69,16 @@ pub use contract::emotion::{
 };
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
 pub use contract::ids::{
-    ContentHash, FaceId, FileId, IdentityId, ImportId, MomentId, PhotoId, ProjectId, RunId,
-    SegmentId,
+    ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MomentId, PhotoId, ProjectId,
+    RunId, SegmentId,
 };
 pub use contract::integrity::{
     CropRect, ExposureVerdict, EyeOpenness, EyeState, IntegrityFlags, IntegrityOutline,
     IntegrityResult, IntegrityService, MotionKind, Reason, ReasonCode,
+};
+pub use contract::ledger::{
+    Autonomy, DecisionKind, DecisionSource, DecisionSubject, Evidence, ExplainService, Explainable,
+    LedgerDecision, LedgerOutline, LedgerReason,
 };
 pub use contract::moment::{
     CameraId, DuplicateKind, DuplicateSet, Moment, MomentEdit, MomentOutline, MomentService,

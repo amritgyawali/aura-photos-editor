@@ -63,6 +63,11 @@ Never load two phase files into one session.
 | Coverage guarantees (versioned, PM-owned) | `crates/aura-cull/config/coverage_rules.toml` |
 | Culling evaluation gates | `tests/eval/cull_eval.rs` + `ml/eval/cull_agreement.py` |
 | How AURA culls, in the product's own words | `docs/how-aura-culls.md` |
+| Ledger, calibration and autonomy decisions | `docs/adr/ADR-0027-decision-ledger-and-confidence.md` |
+| Autonomy bands (versioned, PM-owned) | `crates/aura-explain/config/autonomy_bands.toml` |
+| The public reason-code reference (generated) | `docs/reason-codes.md` |
+| Explainability evaluation gates | `tests/eval/explain_eval.rs` + `ml/eval/calibration_report.py` |
+| How confidence works, in the product's own words | `docs/how-confidence-works.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -357,6 +362,61 @@ photographer's money asking a vision model to arbitrate between two random proje
 would then record the answer as though it meant something. Section 7's own offline fallback
 is what ships. Nothing is stubbed for it; adding `CullTieBreak` later touches no frozen
 shape in this phase.
+
+Phase 13 is implemented conditionally: `aura-core::contract::ledger` freezes the reason, the
+decision, six decision kinds, four subjects, four evidence variants, four autonomy bands,
+three sources, the outline and the service, and `ids.rs` gains `DecisionId`; `aura-explain`
+holds the append-only ledger, the decision builder with its canonical encoding and inputs
+hash, isotonic and temperature calibration with ECE and Brier, the autonomy policy, the
+reason registry, the grounded summariser, the replay port and the anonymised support bundle.
+Migration 13 stores three tables, one trigger and one view, section 6.4's bands live in
+editable config with a written reason per row, `ExplainSummary` is the one cloud call, the
+Explain panel renders six tabs with evidence crops and the alternative comparison, and
+`aura-cli verify --phase 13` is the executable gate. Its exit report is
+`docs/progress/PHASE-13-EXIT.md`.
+
+**Nothing in this build is calibrated.** Every model is the identity map at
+`calibration_ver = 0`; the ECE estimator, the isotonic fitter and the CI gate are all real and
+are all measured against synthetic predictors whose error is authored. While that is true,
+`uncalibrated_raises` moves every decision one band toward review - so **nothing in this build
+acts unattended**, and phase 28 cannot ship until a calibration does. That is condition C2 and
+a Sev 2 trigger. Condition C1 is the other: every decision this ledger records was made from
+placeholder heads, and it closes with phase 05's C10 rather than separately.
+
+Five rules that phase 13 adds and every later phase inherits:
+
+- **`ExplainService` is the only way to record what happened.** Phase 27 writes QC decisions
+  here, phase 28 reads the bands, phase 30's learning loop reads the whole table. Ninth
+  phase, ninth time. Two ledgers is two answers to "what did the product do", and the one
+  thing a support case cannot survive is a product that disagrees with itself about its own
+  history.
+- **A decision that cannot explain itself is not recorded.** Invariant 2 stops being a
+  convention. `AURA-ML-5054` refuses a decision with no reason *and* one citing a code that is
+  not in the shipped registry, and migration 13's `reason_count` CHECK refuses it again.
+  The registry is assembled from phases 09 to 12's own frozen enums, so it cannot go stale
+  and there is no way to write a reason no deciding phase can emit.
+- **The record is append-only, and the database enforces it.** `decisions_no_update` aborts
+  every `UPDATE`; a correction is a new row whose `supersedes` points backwards. The only
+  thing that deletes is a compaction policy that cannot touch a photographer's own decision -
+  and `supersedes` is deliberately not a foreign key, because every referential action SQLite
+  offers is either that forbidden `UPDATE` or a `CASCADE` that would delete the correction.
+- **Confidence is two numbers, and the band is stored.** `raw_confidence` is what the deciding
+  code believed and `calibrated_confidence` is what that belief is worth; storing only one of
+  them makes either the re-calibration unfalsifiable or the band a guess. `Explain::record`
+  **overwrites** whatever band a caller supplied: a deciding phase that could set its own band
+  is a deciding phase that could grant itself permission to act.
+- **Evidence can never be a pixel.** `Evidence` is a crop rectangle, a list of frame ids or a
+  list of named parameter deltas. There is no variant that could hold image bytes, which is
+  what makes "a support bundle contains no pixels" a property of the shape rather than a
+  promise about the exporter - and the bundle replaces every identifier with a handle anyway.
+
+Two decisions in this phase are worth remembering because they will be re-argued later.
+**Phases 09 to 12 were not rewritten to emit the unified model** - `aura_explain::adapt` maps
+their own frozen vocabularies instead, because the property that has to hold is that the
+deciding code owns the reason, and it already did. ADR-0027 section 4 has the argument. And
+**analysis is not a decision**: phases 09, 10 and 11 measure, and recording four hundred
+thousand "this frame is sharp" rows per wedding would be a ledger nobody can search and a size
+budget nobody can meet. Their output reaches the panel as evidence underneath a cull decision.
 
 Four rules that phase 12 adds and every later phase inherits:
 

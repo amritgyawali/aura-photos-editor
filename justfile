@@ -175,6 +175,25 @@ parity:
 previews CATALOG PROJECT LEVEL="thumb":
     cargo run --release --package aura-cli -- previews --catalog {{CATALOG}} --project {{PROJECT}} --level {{LEVEL}}
 
+# The phase 13 gate: migration 13 and its trigger, the band table, the reason
+# registry against all four vocabularies, a real cull recorded end to end, the
+# append-only refusal, a supersession, a compaction, every decision replayed, the
+# grounding check, the bundle scan and three budgets.
+phase-13-verify:
+    cargo run --release --package aura-cli -- verify --phase 13 --work target/phase13-verify
+
+# The calibration metrics, from the Python side. `--self-test` proves the
+# estimator catches an overconfident predictor and that a fit improves held-out
+# ECE; `--outcomes FILE --fit --diagram OUT.svg` reports on real outcomes when
+# there are any.
+calibration-report:
+    python ml/eval/calibration_report.py --self-test
+
+# Regenerate the public reason-code reference from the registry. A phase that
+# adds a code and forgets this fails tests/eval/explain_eval.rs.
+reason-codes:
+    cargo run --package aura-explain --example emit_reason_codes > docs/reason-codes.md
+
 # Re-lock the frozen contracts after an approved ADR.
 relock:
     cargo run --package xtask -- contracts

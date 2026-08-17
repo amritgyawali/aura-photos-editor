@@ -10,7 +10,9 @@ use aura_app::contract::ipc::{
     CreateProjectInput, CullPassDto, CullProjectInput, CullStatusDto, DecisionDto,
     DismissCompositionFlagInput, FlaggedCompositionInput, ImageRowLite, IpcError, JobHandle,
     ListImagesInput, OverrideDecisionInput, ProblemRow, ProjectHandle, ProjectSummary,
-    ResizeGalleryInput, SelectionDto, SetCameraLabelInput, SetCullModeInput, StartIngestInput,
+    ExplainPanelDto, ExportBundleInput, LedgerDecisionDto, LedgerStatusDto, RecordDecisionsDto,
+    RecordDecisionsInput, ResizeGalleryInput, ReviewQueueInput, SelectionDto, SetCameraLabelInput,
+    SetCullModeInput, StartIngestInput, SupportBundleDto,
 };
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
@@ -190,6 +192,97 @@ async fn override_decision(
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-13. The explainability surface. Every one of these reads the catalog -
+// `explain_image` reads four services and the ledger for one photograph - and
+// `record_decisions` writes one row per frame of a whole gallery. All eight go off
+// the renderer thread for the culling commands' reason: section 11 budgets 250 ms
+// for the panel to open, which is 250 ms the window must stay alive through.
+
+#[tauri::command]
+async fn explain_image(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<ExplainPanelDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::explain_image(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn decision_history(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Vec<LedgerDecisionDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::decision_history(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn decision_by_id(
+    state: State<'_, AppState>,
+    decision_id: String,
+) -> IpcResult<Option<LedgerDecisionDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::decision_by_id(&app, &decision_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn ledger_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<LedgerStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::ledger_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn review_queue(
+    state: State<'_, AppState>,
+    input: ReviewQueueInput,
+) -> IpcResult<Vec<LedgerDecisionDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn record_decisions(
+    state: State<'_, AppState>,
+    input: RecordDecisionsInput,
+) -> IpcResult<RecordDecisionsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::record_decisions(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn export_support_bundle(
+    state: State<'_, AppState>,
+    input: ExportBundleInput,
+) -> IpcResult<SupportBundleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::export_support_bundle(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn compact_ledger(state: State<'_, AppState>, project_id: String) -> IpcResult<u32> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::compact_ledger(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn background_request_failed() -> IpcError {
     IpcError::from(aura_core::errors::db::statement_failed(
         "the background composition task stopped before returning its result",
@@ -262,7 +355,15 @@ fn main() {
             cull_project,
             resize_gallery,
             set_cull_mode,
-            override_decision
+            override_decision,
+            explain_image,
+            decision_history,
+            decision_by_id,
+            ledger_status,
+            review_queue,
+            record_decisions,
+            export_support_bundle,
+            compact_ledger
         ])
         .run(tauri::generate_context!());
 

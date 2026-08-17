@@ -3,6 +3,14 @@ import { listen } from '@tauri-apps/api/event';
 
 import type {
   AnalyseCompositionInput,
+  ExplainPanelDto,
+  ExportBundleInput,
+  LedgerDecisionDto,
+  LedgerStatusDto,
+  RecordDecisionsDto,
+  RecordDecisionsInput,
+  ReviewQueueInput,
+  SupportBundleDto,
   CullPassDto,
   CullProjectInput,
   CullStatusDto,
@@ -630,4 +638,57 @@ export const cull = {
    */
   overrideDecision: (input: OverrideDecisionInput): Promise<DecisionDto> =>
     invoke<DecisionDto>('override_decision', { input }),
+};
+
+/**
+ * PHASE-13. The record of what AURA did, and why.
+ *
+ * Eight commands. Six read, `recordDecisions` writes the stored gallery's
+ * decisions into the ledger, and `exportSupportBundle` produces an anonymised
+ * file a photographer can send.
+ *
+ * **Nothing here changes a decision.** A photographer who disagrees with the
+ * panel changes the decision itself through `cull.overrideDecision`, and the
+ * ledger then records a new decision that supersedes the old one. The ledger is
+ * append-only: there is no update and no delete on this surface.
+ */
+export const explain = {
+  /** Everything the Explain panel draws for one photograph. */
+  explainImage: (photoId: string): Promise<ExplainPanelDto> =>
+    invoke<ExplainPanelDto>('explain_image', { photoId }),
+
+  /** Every decision ever recorded about one photograph, newest first. */
+  decisionHistory: (photoId: string): Promise<LedgerDecisionDto[]> =>
+    invoke<LedgerDecisionDto[]>('decision_history', { photoId }),
+
+  /** One decision by its id - what a support case quotes down a telephone. */
+  decisionById: (decisionId: string): Promise<LedgerDecisionDto | null> =>
+    invoke<LedgerDecisionDto | null>('decision_by_id', { decisionId }),
+
+  /** Counts, coverage, calibration version and size for one wedding's ledger. */
+  ledgerStatus: (projectId: string): Promise<LedgerStatusDto> =>
+    invoke<LedgerStatusDto>('ledger_status', { projectId }),
+
+  /** The decisions waiting for a person, newest first. */
+  reviewQueue: (input: ReviewQueueInput): Promise<LedgerDecisionDto[]> =>
+    invoke<LedgerDecisionDto[]>('review_queue', { input }),
+
+  /**
+   * Record the stored gallery's decisions. Append-only, so running it twice
+   * records two rounds of decisions rather than overwriting the first.
+   */
+  recordDecisions: (input: RecordDecisionsInput): Promise<RecordDecisionsDto> =>
+    invoke<RecordDecisionsDto>('record_decisions', { input }),
+
+  /**
+   * An anonymised slice of the ledger. No pixels, no names, no keys - every
+   * identifier is replaced by a handle before the file exists.
+   */
+  exportSupportBundle: (input: ExportBundleInput): Promise<SupportBundleDto> =>
+    invoke<SupportBundleDto>('export_support_bundle', { input }),
+
+  /** Apply the compaction policy. Keeps the newest decision per subject and
+   * every decision the photographer made themselves. */
+  compactLedger: (projectId: string): Promise<number> =>
+    invoke<number>('compact_ledger', { projectId }),
 };

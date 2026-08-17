@@ -444,9 +444,9 @@ fn every_cassette_is_played_by_something() {
         drop(harness.gateway.run(&task, &input, &context!(harness)));
     }
     // The rejected-key and probe cassettes are played by their own tests, the other
-    // three vendors' by the provider-swap test, and the three couple-hint recordings by
-    // `couple_hint.rs` - which is a different task entirely and cannot be driven from
-    // this file's harness. This run covers the Anthropic `SegmentNaming` scenarios only,
+    // three vendors' by the provider-swap test, the three couple-hint recordings by
+    // `couple_hint.rs` and the explain-summary recording by `explain_summary.rs` - each a
+    // different task entirely, none of which can be driven from this file's harness. This run covers the Anthropic `SegmentNaming` scenarios only,
     // so the remaining names are listed explicitly.
     let unplayed = harness.transport.unplayed();
     let expected = [
@@ -458,6 +458,7 @@ fn every_cassette_is_played_by_something() {
         "200-anthropic-couple-hint",
         "205-anthropic-couple-hint-repaired",
         "210-anthropic-couple-hint-described",
+        "300-anthropic-explain-summary",
     ];
     for name in unplayed {
         assert!(

@@ -545,3 +545,45 @@ max_ms_per_unit = 2000
 # 1,000 photographs by `crates/aura-perf/tests/cull_budgets.rs`.
 [size.cull_store_per_1000_images]
 max_bytes = 700000
+
+# ---------------------------------------------------------------------------
+# PHASE-13. The decision ledger.
+#
+# Section 11 names four rows. Three are here; the fourth - "Explain panel open
+# (with crops) <= 250 ms" - is a rendering budget that includes a web view and a
+# preview service, neither of which exists inside a Rust test. What is asserted
+# instead is the read that feeds it, at a tenth of the figure, and the phase 13
+# gate prints the measured panel read so the number is never merely claimed.
+# ---------------------------------------------------------------------------
+
+# Section 11: a ledger write costs <= 0.4 ms amortised.
+#
+# One transaction with two inserts - the decision and its reasons - which is why
+# the two are budgeted together rather than separately: a decision whose reasons
+# failed to write is a decision that was not recorded at all, so there is no
+# intermediate state worth timing.
+[stage.ledger_write_4000]
+max_elapsed_ms  = 1600
+max_ms_per_unit = 1
+
+# Section 11: one decision replays in <= 1 s, which starts with reading it back.
+#
+# 25 ms, not one second: the replay's budget is dominated by re-deriving the
+# decision, and a read that took anywhere near a second would mean the subject
+# index was not being used.
+[stage.ledger_read_one]
+max_elapsed_ms  = 25
+max_ms_per_unit = 25
+
+# Section 11: <= 6 MB of ledger per 1,000 images for a full pipeline.
+#
+# This row is stated per *decision* rather than per image, which is the honest
+# denominator: a cull writes one decision per photograph and the five kinds no
+# phase writes yet will each write more. 6 MB per thousand decisions is therefore
+# the same budget read the strictest way - if every one of the six kinds fills it,
+# the figure holds at one sixth each.
+#
+# Measured with SQLite page accounting before and after recording 1,000 real
+# decisions by `crates/aura-perf/tests/ledger_budgets.rs`.
+[size.ledger_store_per_1000_decisions]
+max_bytes = 6291456

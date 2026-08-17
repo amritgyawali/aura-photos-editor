@@ -3010,3 +3010,301 @@ pub struct CullPassDto {
     /// Milliseconds for the selection passes.
     pub elapsed_ms: u64,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-13. The explainability surface: why anything happened, how sure it was,
+// what it looked at, and the record that lets somebody ask again a year later.
+//
+// Eight commands. Six read, one records the gallery's decisions into the ledger,
+// and one exports a support bundle. Nothing here decides anything: the Explain
+// panel is a reader, and a surface that could change a decision from inside an
+// explanation of it would be a surface where the explanation and the decision
+// could disagree.
+//
+// The DTOs carry the backend's own reading of every code - which severity it is,
+// which domain it came from, whether the band was raised and why - for the reason
+// the culling surface does: a web view that decided for itself whether
+// `keypoints_unavailable` is bad news would be a web view that could tell a
+// photographer their photograph is badly framed because AURA did not look at it.
+// ---------------------------------------------------------------------------
+
+/// A normalised rectangle to show the photographer.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceCropDto {
+    /// Left edge, `0..1`.
+    pub x: f32,
+    /// Top edge, `0..1`.
+    pub y: f32,
+    /// Width, `0..1`.
+    pub w: f32,
+    /// Height, `0..1`.
+    pub h: f32,
+}
+
+/// One named parameter and how far it moved.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParamDeltaDto {
+    /// The parameter's stable name, as the develop engine spells it.
+    pub name: String,
+    /// The delta. Signed, and rendered with its sign.
+    pub value: f32,
+}
+
+/// One reason, with everything the panel needs to draw it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LedgerReasonDto {
+    /// Stable reason slug, documented in `docs/reason-codes.md`.
+    pub code: String,
+    /// The exact sentence the deciding code produced.
+    pub text: String,
+    /// How much it moved the decision. Positive toward it, negative against.
+    pub weight: f32,
+    /// `credit`, `note`, `caveat` or `fault`, as the registry reads the code.
+    pub severity: String,
+    /// Which vocabulary it came from: `technical`, `emotion`, `composition`,
+    /// `selection` or `ledger`.
+    pub domain: String,
+    /// `none`, `crop`, `frames` or `params`.
+    pub evidence_kind: String,
+    /// The region to show, when the evidence is a crop.
+    pub crop: Option<EvidenceCropDto>,
+    /// The photographs to show, when the evidence is frames.
+    pub frames: Vec<String>,
+    /// The parameter deltas, when the evidence is parameters.
+    pub params: Vec<ParamDeltaDto>,
+}
+
+/// One recorded decision.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LedgerDecisionDto {
+    /// The decision's own id. What `aura-cli replay` takes.
+    pub decision_id: String,
+    /// `cull`, `edit`, `retouch`, `qc`, `curate` or `export`.
+    pub kind: String,
+    /// The words the tab shows.
+    pub kind_title: String,
+    /// `image`, `moment`, `segment` or `gallery`.
+    pub subject_kind: String,
+    /// The subject's id.
+    pub subject_id: String,
+    /// What the deciding code believed, `0..1`.
+    pub raw_confidence: f32,
+    /// What that belief is worth after calibration, `0..1`.
+    pub calibrated_confidence: f32,
+    /// Which calibration mapped it. `0` is the unfitted identity map.
+    pub calibration_ver: u16,
+    /// True when a fitted calibration produced the second number.
+    pub calibrated: bool,
+    /// `auto`, `auto_zero_touch`, `suggest` or `require_review`.
+    pub autonomy: String,
+    /// The words the badge shows.
+    pub autonomy_title: String,
+    /// What the band means, in a sentence.
+    pub autonomy_text: String,
+    /// True when a person has to look before anything happens.
+    pub needs_review: bool,
+    /// `local`, `cloud` or `user`.
+    pub source: String,
+    /// Why, strongest first.
+    pub reasons: Vec<LedgerReasonDto>,
+    /// What was decided, as canonical JSON.
+    pub outputs_json: String,
+    /// The hash of the question, as hex.
+    ///
+    /// Text rather than a number, because JavaScript cannot hold a `u64` exactly
+    /// and a support case quoting a rounded hash is a support case about the wrong
+    /// run. The same decision the culling surface made about its own hash.
+    pub inputs_hash: String,
+    /// Every model underneath it, as `[name, version]`.
+    pub model_versions: Vec<(String, u16)>,
+    /// Every config table underneath it, as `[name, version]`.
+    pub config_versions: Vec<(String, u16)>,
+    /// Milliseconds the deciding code took.
+    pub ms: u32,
+    /// When it was recorded, in milliseconds since the epoch.
+    pub created_at: i64,
+    /// The decision this one replaced, when it replaced one.
+    pub supersedes: Option<String>,
+}
+
+/// One tab of the Explain panel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExplainTabDto {
+    /// `selection`, `technical`, `emotion`, `composition`, `edit` or `qc`.
+    pub id: String,
+    /// The words on the tab.
+    pub title: String,
+    /// True when this build has something to show here.
+    pub available: bool,
+    /// Why not, when it is not.
+    ///
+    /// Rendered instead of an empty tab, because a blank panel reads as "nothing
+    /// wrong" and a phase that does not exist yet is not the same thing.
+    pub unavailable_reason: Option<String>,
+    /// The reasons, strongest first.
+    pub reasons: Vec<LedgerReasonDto>,
+    /// The tab's own score, when it has one.
+    pub score: Option<f32>,
+    /// The tab's own confidence, when it has one.
+    pub confidence: Option<f32>,
+}
+
+/// The frame that nearly won, with its score breakdown.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlternativeDto {
+    /// The alternative photograph.
+    pub photo_id: String,
+    /// Its fused keep score, `0..1`.
+    pub keep_score: f32,
+    /// Phase 09's technical score.
+    pub technical: f32,
+    /// Phase 10's emotion score.
+    pub emotion: f32,
+    /// Phase 11's composition score.
+    pub composition: f32,
+    /// Phase 06's prominence-weighted subject presence.
+    pub prominence: f32,
+    /// True when this frame is the one that was delivered.
+    pub delivered: bool,
+}
+
+/// Everything the Explain panel draws for one photograph.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExplainPanelDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The tabs, in a fixed order.
+    pub tabs: Vec<ExplainTabDto>,
+    /// The recorded decision, when one exists.
+    pub decision: Option<LedgerDecisionDto>,
+    /// A short line above the paragraph.
+    pub headline: Option<String>,
+    /// Two to four sentences assembled from the reasons.
+    pub summary: String,
+    /// True when a language model wrote the summary rather than the template.
+    pub summary_from_cloud: bool,
+    /// The delivered frame and the one that nearly won, for side-by-side compare.
+    pub alternatives: Vec<AlternativeDto>,
+}
+
+/// What one wedding's ledger holds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LedgerStatusDto {
+    /// Decisions recorded.
+    pub decisions: u32,
+    /// Decisions carrying at least one reason. The gate is `== decisions`.
+    pub explained: u32,
+    /// Fraction explained, `0..1`.
+    pub explanation_coverage: f32,
+    /// Decisions still in force.
+    pub current: u32,
+    /// Decisions a later one replaced.
+    pub superseded: u32,
+    /// Counts by kind, in the contract's order.
+    pub by_kind: Vec<u32>,
+    /// The kind slugs those counts are in.
+    pub kind_names: Vec<String>,
+    /// Counts by autonomy band, in the contract's order.
+    pub by_autonomy: Vec<u32>,
+    /// The band slugs those counts are in.
+    pub autonomy_names: Vec<String>,
+    /// Counts by source, in the contract's order.
+    pub by_source: Vec<u32>,
+    /// The source slugs those counts are in.
+    pub source_names: Vec<String>,
+    /// Decisions whose confidence went through a fitted calibration.
+    pub calibrated: u32,
+    /// Which calibration set produced them. `0` is the unfitted identity map.
+    pub calibration_ver: u16,
+    /// Reasons carrying something to look at.
+    pub evidenced: u32,
+    /// Reasons in total.
+    pub reasons: u32,
+    /// Bytes the ledger occupies for this project.
+    pub bytes: u64,
+}
+
+/// What a support bundle came out as.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportBundleDto {
+    /// The anonymised document.
+    pub json: String,
+    /// How many decisions it carries.
+    pub decisions: u32,
+    /// How many identifiers were replaced by handles.
+    pub anonymised: u32,
+    /// True when the safety scan found nothing. Always true, and checked anyway.
+    pub safe: bool,
+}
+
+/// Ask for one photograph's explanation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExplainImageInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Ask for a project's review queue.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewQueueInput {
+    /// The project.
+    pub project_id: String,
+    /// `auto`, `auto_zero_touch`, `suggest` or `require_review`.
+    ///
+    /// Absent means every band that needs review, which is what the queue is for.
+    pub band: Option<String>,
+    /// At most this many, newest first.
+    pub limit: Option<u32>,
+}
+
+/// Record the stored gallery's decisions into the ledger.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordDecisionsInput {
+    /// The project.
+    pub project_id: String,
+}
+
+/// What recording a gallery's decisions did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordDecisionsDto {
+    /// Decisions written.
+    pub recorded: u32,
+    /// Decisions refused because they could not explain themselves.
+    ///
+    /// Zero on any healthy project. It is on the wire rather than only in a log
+    /// because a gallery whose reasons went missing is a gallery whose panel will
+    /// be empty, and the photographer should be told once rather than discovering
+    /// it one frame at a time.
+    pub refused: u32,
+    /// Counts by autonomy band, in the contract's order.
+    pub by_autonomy: Vec<u32>,
+    /// The band slugs those counts are in.
+    pub autonomy_names: Vec<String>,
+    /// True when no fitted calibration exists, so every band was raised one step.
+    pub uncalibrated: bool,
+    /// Milliseconds for the whole pass.
+    pub elapsed_ms: u64,
+}
+
+/// Export an anonymised support bundle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportBundleInput {
+    /// The project.
+    pub project_id: String,
+    /// At most this many decisions, newest first.
+    pub limit: Option<u32>,
+}
