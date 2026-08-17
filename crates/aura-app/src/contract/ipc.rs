@@ -2716,3 +2716,297 @@ pub struct CompositionPassDto {
     /// True when the pass stopped after saving completed rows.
     pub cancelled: bool,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-12. The culling surface: what is being delivered, why, and what the
+// photographer may say back.
+//
+// Seven commands. Three read, three change the decision, and one runs the cull.
+// Nothing here deletes, moves, exports or uploads a photograph; phases 14, 27,
+// 29 and 30 own what happens to the gallery afterwards.
+//
+// The DTOs deliberately carry the backend's own answers - which reasons are
+// keeps, which state a guarantee is in, which frame is the alternative - so the
+// interface draws them rather than keeping a second copy of the vocabulary. It
+// is the same boundary the composition surface draws and it matters more here,
+// because a web view that decided for itself what `covered_weak` meant would be
+// a web view that could tell a photographer their gallery was complete when it
+// was not.
+// ---------------------------------------------------------------------------
+
+/// One thing that put a photograph in the gallery, or kept it out.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CullReasonDto {
+    /// Stable reason slug.
+    pub code: String,
+    /// The exact photographer-facing sentence the engine produced.
+    pub text: String,
+    /// Positive keeps, negative rejects.
+    pub weight: f32,
+    /// True when this reason put the photograph in the gallery.
+    pub keep: bool,
+    /// True when it fired before any arithmetic. Section 6.1's hard vetoes.
+    pub veto: bool,
+}
+
+/// One photograph that is in the gallery.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectedDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The moment it came from, absent when it is in none.
+    pub moment_id: Option<String>,
+    /// The fused keep score, `0..1`.
+    pub keep_score: f32,
+    /// Confidence in the decision, `0..1`.
+    pub confidence: f32,
+    /// Why it is here, strongest first.
+    pub reasons: Vec<CullReasonDto>,
+    /// The best alternative from the same moment, when one is not itself delivered.
+    pub runner_up: Option<String>,
+    /// The guarantee holding it here, when one is.
+    pub coverage_role: Option<String>,
+    /// True when a guarantee holds it, so the size slider may not drop it.
+    pub protected: bool,
+}
+
+/// One photograph that is not in the gallery.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RejectedDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The moment it came from, absent when it is in none.
+    pub moment_id: Option<String>,
+    /// The fused keep score, `0..1`. Zero when a veto fired.
+    pub keep_score: f32,
+    /// Why it is not here, strongest first. Never empty.
+    pub reasons: Vec<CullReasonDto>,
+    /// The frame that is in the gallery instead, when there is a specific one.
+    pub kept_instead: Option<String>,
+    /// True when this frame was its moment's peak and lost anyway.
+    pub was_peak: bool,
+    /// True when no arithmetic was involved.
+    pub vetoed: bool,
+}
+
+/// How one guarantee came out.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverageRuleDto {
+    /// The must-have slug.
+    pub rule: String,
+    /// The words the panel shows.
+    pub title: String,
+    /// `covered`, `covered_weak` or `missing`.
+    pub state: String,
+    /// True when the gallery contains the rule's frames, however weakly.
+    pub satisfied: bool,
+}
+
+/// One identity's presence in the gallery.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentityCoverageDto {
+    /// The identity.
+    pub identity_id: String,
+    /// How many gallery photographs they are in.
+    pub frames: u32,
+}
+
+/// One chapter's share of the gallery.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChapterCountDto {
+    /// The chapter slug.
+    pub chapter: String,
+    /// The words the panel shows.
+    pub title: String,
+    /// How many frames were delivered.
+    pub delivered: u32,
+    /// How many were targeted.
+    pub target: u32,
+}
+
+/// What the gallery guarantees, and where it could not.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverageReportDto {
+    /// Every guarantee, in the order of the wedding day.
+    pub must_haves: Vec<CoverageRuleDto>,
+    /// How many gallery photographs each identity appears in, including the zeros.
+    pub identity_coverage: Vec<IdentityCoverageDto>,
+    /// Delivered and targeted counts per chapter.
+    pub chapters: Vec<ChapterCountDto>,
+    /// Everything a photographer should read before delivering.
+    pub warnings: Vec<String>,
+}
+
+/// One complete selection.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectionDto {
+    /// The gallery, in timeline order.
+    pub selected: Vec<SelectedDto>,
+    /// Everything else, in timeline order.
+    pub rejected: Vec<RejectedDto>,
+    /// What the gallery guarantees.
+    pub coverage: CoverageReportDto,
+    /// How many frames were aimed for.
+    pub target_count: u32,
+    /// How many were delivered.
+    pub actual_count: u32,
+    /// `conservative`, `balanced` or `aggressive`.
+    pub mode: String,
+    /// The hash of the inputs and configuration, as a hex string.
+    ///
+    /// Text rather than a number because JavaScript cannot hold a `u64` exactly, and a
+    /// support case quoting a rounded hash would be a support case about the wrong run.
+    pub deterministic_hash: String,
+    /// Lowest model version among the sub-scores underneath.
+    pub model_ver: u16,
+    /// Selection-pass version.
+    pub analysis_ver: u16,
+    /// Per-scene calibration version. `0` is the unfitted identity map.
+    pub calibration_ver: u16,
+}
+
+/// What the culling view's header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CullStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs that carried a technical verdict and could be considered.
+    pub eligible: u32,
+    /// Photographs in the gallery.
+    pub selected: u32,
+    /// Fraction of the project that was eligible; the denominator is every photograph.
+    pub coverage: f32,
+    /// Fraction of eligible frames that also had an emotion reading.
+    pub emotion_aware: f32,
+    /// ...a composition judgement.
+    pub composition_aware: f32,
+    /// ...a moment.
+    pub grouped: f32,
+    /// Guarantees fully covered.
+    pub covered: u32,
+    /// Guarantees covered only by forcing weak frames in.
+    pub covered_weak: u32,
+    /// Guarantees with no candidates at all.
+    pub missing: u32,
+    /// Frames the photographer forced into the gallery.
+    pub user_kept: u32,
+    /// Frames they forced out of it.
+    pub user_rejected: u32,
+    /// The stored mode.
+    pub mode: String,
+    /// The stored determinism hash, as hex.
+    pub deterministic_hash: String,
+    /// Lowest model version present.
+    pub model_ver: u16,
+    /// Selection-pass version.
+    pub analysis_ver: u16,
+    /// Calibration version.
+    pub calibration_ver: u16,
+}
+
+/// What was decided about one photograph.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionDto {
+    /// True when the photograph is in the gallery.
+    pub kept: bool,
+    /// The keeper, when it is one.
+    pub selected: Option<SelectedDto>,
+    /// The rejection, when it is one.
+    pub rejected: Option<RejectedDto>,
+}
+
+/// Run or re-run the cull over a project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CullProjectInput {
+    /// The project.
+    pub project_id: String,
+    /// `conservative`, `balanced` or `aggressive`. Absent keeps the stored mode.
+    pub mode: Option<String>,
+    /// How many frames to aim for. Absent asks the size model to predict one.
+    pub target: Option<u32>,
+    /// Handle that `cancel_job` can signal.
+    pub cancel_id: Option<String>,
+}
+
+/// Move the size slider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResizeGalleryInput {
+    /// The project.
+    pub project_id: String,
+    /// How many frames to aim for.
+    ///
+    /// The result may exceed it: coverage runs last and a guarantee outranks a slider.
+    pub target: u32,
+}
+
+/// Switch autonomy mode.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCullModeInput {
+    /// The project.
+    pub project_id: String,
+    /// `conservative`, `balanced` or `aggressive`.
+    pub mode: String,
+}
+
+/// Keep or remove one photograph by hand.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverrideDecisionInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// `keep`, `reject` or `clear`.
+    ///
+    /// Three values rather than a boolean, because "I have no opinion" is a distinct
+    /// statement from "I want this out", and a nullable boolean is how the two get
+    /// conflated on a wire.
+    pub action: String,
+}
+
+/// What one cull did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CullPassDto {
+    /// Photographs considered.
+    pub photos: u32,
+    /// Photographs eligible.
+    pub eligible: u32,
+    /// Photographs delivered.
+    pub selected: u32,
+    /// Veto counts, in the order of `vetoNames`.
+    pub veto_counts: Vec<u32>,
+    /// Stable veto slugs.
+    pub veto_names: Vec<String>,
+    /// Improving swaps the chapter local search made.
+    pub swaps: u32,
+    /// Frames the coverage guard forced in.
+    pub coverage_added: u32,
+    /// Frames the diversity pass removed.
+    pub diversity_dropped: u32,
+    /// Frames the size reconciliation added.
+    pub size_added: u32,
+    /// ...and removed.
+    pub size_trimmed: u32,
+    /// Moment peaks that were rejected, each saying so.
+    pub peaks_rejected: u32,
+    /// Guarantees that ended weakly covered.
+    pub coverage_weak: u32,
+    /// Guarantees with no candidates.
+    pub coverage_missing: u32,
+    /// Scenes with no weight row.
+    pub unweighted_scenes: Vec<String>,
+    /// Milliseconds for the selection passes.
+    pub elapsed_ms: u64,
+}

@@ -27,6 +27,9 @@ use aura_cloud::{CloudAiGateway, CloudPolicy};
 use aura_core::clock::{Clock, SystemClock};
 use aura_core::progress::CancelToken;
 use aura_core::AuraResult;
+use aura_cull::gather::Gatherer;
+use aura_cull::store::CullStore;
+use aura_cull::Cull;
 use aura_index::hnsw::{HnswIndex, HnswParams};
 use aura_index::snapshot::Snapshot;
 use aura_index::store::{EmbeddingStore, StoredEmbedding};
@@ -377,6 +380,66 @@ impl AppState {
                 Ok(pass)
             }
         }
+    }
+
+    /// The selection store for this catalog. PHASE-12.
+    ///
+    /// Stateless like the integrity, emotion and composition stores.
+    #[must_use]
+    pub fn cull_store(&self) -> Arc<CullStore> {
+        Arc::new(CullStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `CullService` for this catalog. PHASE-12.
+    ///
+    /// Six services are offered to the gatherer and five of them are optional. Phase 09 is
+    /// not: a photograph with no technical verdict is not a photograph this phase may judge,
+    /// and a build that culled without one would be deciding a wedding on emotion and
+    /// framing alone while reporting full coverage.
+    ///
+    /// The other five degrade rather than refuse. A wedding whose phase 10 pass has not run
+    /// is still cullable, with the emotion sub-score neutral, a confidence penalty on every
+    /// decision, and an `emotion_aware` figure in the outline that says how much of the
+    /// fusion was real. That number is the point: it is how a photographer finds out that
+    /// their gallery was chosen on two signals instead of four.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5051` when the weight table will not load and `AURA-ML-5052` when the
+    /// coverage rules will not. Both halt: a gallery chosen without weights is not a
+    /// gallery, and one chosen without guarantees is worse than none.
+    pub fn cull(&self) -> AuraResult<Arc<Cull>> {
+        let mut gatherer = Gatherer::new(Arc::clone(&self.catalog), self.integrity())
+            .with_people(self.people())
+            .with_composition(self.composition());
+        match self.emotion() {
+            Ok(service) => gatherer = gatherer.with_emotion(service),
+            Err(err) => tracing::warn!(
+                target: "cull.gather",
+                code = %err.code,
+                "no emotion service; every frame will be fused on a neutral emotion score"
+            ),
+        }
+        match self.story() {
+            Ok(service) => gatherer = gatherer.with_story(service),
+            Err(err) => tracing::warn!(
+                target: "cull.gather",
+                code = %err.code,
+                "no scene service; every frame will be weighted by the neutral row and                  counted against the `other` chapter"
+            ),
+        }
+        match self.moments() {
+            Ok(service) => gatherer = gatherer.with_moments(service),
+            Err(err) => tracing::warn!(
+                target: "cull.gather",
+                code = %err.code,
+                "no grouping service; every frame will be ranked on its own"
+            ),
+        }
+        Ok(Arc::new(Cull::new(self.cull_store(), Arc::new(gatherer))?))
     }
 
     /// The technical pass for this catalog, wired to phases 06 and 07.

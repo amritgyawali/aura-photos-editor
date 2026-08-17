@@ -28,6 +28,7 @@ pub mod clock;
 pub mod contract {
     pub mod composition;
     pub mod consent;
+    pub mod cull;
     pub mod emotion;
     pub mod error;
     pub mod ids;
@@ -56,6 +57,10 @@ pub mod redact;
 pub use contract::composition::{
     Box2, CompositionCode, CompositionFlags, CompositionOutline, CompositionReason,
     CompositionResult, CompositionService, CropHint, FrameEdge, HorizonSource, Joint, JointCut,
+};
+pub use contract::cull::{
+    Coverage, CoverageReport, CullCode, CullMode, CullOutline, CullReason, CullService, Decision,
+    KeepScore, MustHave, Rejected, Selected, SelectionResult,
 };
 pub use contract::emotion::{
     EmotionCode, EmotionOutline, EmotionReason, EmotionService, FaceExpression, GazeTarget,

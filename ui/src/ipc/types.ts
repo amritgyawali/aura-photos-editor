@@ -1273,3 +1273,166 @@ export type CompositionPassDto = {
   /** Completed rows remain saved when this is true. */
   cancelled: boolean;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-12. What is being delivered, why, and what the photographer may say
+// back.
+//
+// Every meaning on this surface is the backend's. `satisfied`, `protected`,
+// `keep`, `veto` and `vetoed` are booleans the engine computed, not predicates
+// the interface reimplemented - because a web view that decided for itself what
+// `covered_weak` meant would be a web view that could tell a photographer their
+// gallery was complete when it was not.
+//
+// There is deliberately no delete, move, export or upload on this surface.
+// ---------------------------------------------------------------------------
+
+export type CullReasonDto = {
+  code: string;
+  /** The exact sentence the engine produced. Render it; do not rebuild it. */
+  text: string;
+  /** Positive keeps, negative rejects. */
+  weight: number;
+  keep: boolean;
+  /** True when it fired before any arithmetic: section 6.1's hard vetoes. */
+  veto: boolean;
+};
+
+export type SelectedDto = {
+  photoId: string;
+  momentId: string | null;
+  keepScore: number;
+  confidence: number;
+  reasons: CullReasonDto[];
+  /** The best alternative from the same moment that is not itself delivered. */
+  runnerUp: string | null;
+  coverageRole: string | null;
+  /** True when a guarantee holds this frame, so the size slider may not drop it. */
+  protected: boolean;
+};
+
+export type RejectedDto = {
+  photoId: string;
+  momentId: string | null;
+  /** Zero when a veto fired: a veto replaced the score rather than lowering it. */
+  keepScore: number;
+  /** Never empty. Invariant 2, and section 10.1's last criterion. */
+  reasons: CullReasonDto[];
+  keptInstead: string | null;
+  wasPeak: boolean;
+  vetoed: boolean;
+};
+
+export type CoverageRuleDto = {
+  rule: string;
+  title: string;
+  /** `covered`, `covered_weak` or `missing`. */
+  state: string;
+  satisfied: boolean;
+};
+
+export type IdentityCoverageDto = {
+  identityId: string;
+  frames: number;
+};
+
+export type ChapterCountDto = {
+  chapter: string;
+  title: string;
+  delivered: number;
+  target: number;
+};
+
+export type CoverageReportDto = {
+  mustHaves: CoverageRuleDto[];
+  /** Includes the zeros: the zero is the number the panel exists to show. */
+  identityCoverage: IdentityCoverageDto[];
+  chapters: ChapterCountDto[];
+  warnings: string[];
+};
+
+export type SelectionDto = {
+  selected: SelectedDto[];
+  rejected: RejectedDto[];
+  coverage: CoverageReportDto;
+  targetCount: number;
+  /** May exceed `targetCount`: coverage runs last and a guarantee outranks a slider. */
+  actualCount: number;
+  mode: string;
+  /** Hex, because JavaScript cannot hold a 64-bit integer exactly. */
+  deterministicHash: string;
+  modelVer: number;
+  analysisVer: number;
+  /** `0` is the unfitted identity calibration this build ships. */
+  calibrationVer: number;
+};
+
+export type CullStatusDto = {
+  photos: number;
+  eligible: number;
+  selected: number;
+  /** Denominator: every photograph. The most consequential number in this phase. */
+  coverage: number;
+  emotionAware: number;
+  compositionAware: number;
+  grouped: number;
+  covered: number;
+  coveredWeak: number;
+  missing: number;
+  userKept: number;
+  userRejected: number;
+  mode: string;
+  deterministicHash: string;
+  modelVer: number;
+  analysisVer: number;
+  calibrationVer: number;
+};
+
+export type DecisionDto = {
+  kept: boolean;
+  selected: SelectedDto | null;
+  rejected: RejectedDto | null;
+};
+
+export type CullProjectInput = {
+  projectId: string;
+  /** Absent keeps the stored mode. */
+  mode?: string;
+  /** Absent asks the size model to predict one. */
+  target?: number;
+  cancelId?: string;
+};
+
+export type ResizeGalleryInput = {
+  projectId: string;
+  target: number;
+};
+
+export type SetCullModeInput = {
+  projectId: string;
+  mode: string;
+};
+
+export type OverrideDecisionInput = {
+  photoId: string;
+  /** `keep`, `reject` or `clear`. */
+  action: string;
+};
+
+export type CullPassDto = {
+  photos: number;
+  eligible: number;
+  selected: number;
+  vetoCounts: number[];
+  vetoNames: string[];
+  swaps: number;
+  coverageAdded: number;
+  diversityDropped: number;
+  sizeAdded: number;
+  sizeTrimmed: number;
+  peaksRejected: number;
+  coverageWeak: number;
+  coverageMissing: number;
+  unweightedScenes: string[];
+  elapsedMs: number;
+};

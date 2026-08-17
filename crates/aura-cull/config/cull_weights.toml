@@ -1,0 +1,524 @@
+# Culling weights - PHASE-12 sections 6.1, 6.2, 6.4 and 12.
+#
+# ===========================================================================
+# THIS FILE DECIDES WHICH PHOTOGRAPHS A COUPLE EVER SEES
+# ===========================================================================
+#
+# Five config files in this product require a written reason per row. This is
+# the fifth and it is the one where a wrong row is expensive in a way the other
+# four are not. A wrong `prominence.toml` weight makes a face rank oddly. A
+# wrong row here removes photographs from a wedding.
+#
+# So: every row carries a `rationale`, the loader refuses a row without one
+# (`AURA-ML-5051`), the loader refuses the *whole file* rather than half of it,
+# and a test asserts that all twenty-two scenes in the frozen taxonomy have a
+# row. A half-loaded table would cull the ceremony against measured weights and
+# the reception against neutral ones, and the gallery that came out would be
+# thin after dinner - which reads as a product opinion about receptions and
+# nothing at all like a configuration error.
+#
+# ---------------------------------------------------------------------------
+# THE ONE THING TO UNDERSTAND BEFORE CHANGING A NUMBER
+# ---------------------------------------------------------------------------
+#
+# **These are the weights of a geometric mean, not of a sum.**
+#
+#   keep_score = exp( (w_t·ln t + w_e·ln e + w_c·ln c + w_p·ln p) / Σw )
+#
+# Section 6.1 requires that "a catastrophic technical failure cannot be rescued
+# by emotion and vice versa". A weighted sum does not have that property: a
+# frame at technical 0.05 and emotion 0.95 sums to something respectable and
+# multiplies to nothing. Every competitor sums.
+#
+# The consequence for whoever edits this file: **only the ratios matter.**
+# Doubling all four numbers in a row changes nothing. They are written to sum to
+# roughly 1.0 because a table that sums to one is a table a person can read at a
+# glance, not because the code needs it.
+#
+# The second consequence: raising a weight does not make a scene *keep more*.
+# It makes that signal *decide more* within the scene. The knob for keeping more
+# is `floor`, and the knob for keeping more from one moment is `max_keepers`.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# technical      0.0..1.0   phase 09 - is it sharp, exposed, unblurred, eyes open
+# emotion        0.0..1.0   phase 10 - is anything happening, and does it matter
+# composition    0.0..1.0   phase 11 - is it framed like a photograph
+# prominence     0.0..1.0   phase 06 - is the right person in it, and are they the subject
+#
+#     `composition` may never exceed `technical`. The loader refuses a row that
+#     asks for it rather than clamping it, because a product manager who wrote
+#     it meant something and should find out that they cannot have it.
+#     ADR-0023 section 3 decided that taste breaks ties rather than overriding
+#     substance; this is the file where that decision is spent.
+#
+# floor          0.0..0.9
+#     Below this fused score a frame is not delivered unless a coverage
+#     guarantee holds it there. A frame the coverage guard force-adds from below
+#     this line is what makes a must-have `covered_weak` rather than `covered`.
+#     This is the strictness knob. Reach for it, not for the weights, when the
+#     product feels harsh.
+#
+# max_keepers    1..5
+#     The most frames one moment of this scene may contribute, before the mode
+#     adjusts it. The lower end is always one: every moment with an eligible
+#     frame contributes at least one, which is what stops a chapter quota from
+#     deleting a moment entirely. Section 6.2's "up to 3-5".
+#
+# ---------------------------------------------------------------------------
+# THE ARGUMENT THAT SHAPED MOST OF THESE ROWS
+# ---------------------------------------------------------------------------
+#
+# There are three kinds of scene at a wedding and they want three different
+# things from this table.
+#
+#   1. **Scenes where the moment is unrepeatable.** The vows, the rings, the
+#      kiss, the first look, the exit. Emotion leads, the floor is low, and
+#      `max_keepers` is small - because there is one instant and delivering five
+#      frames of it is delivering the same photograph five times.
+#
+#   2. **Scenes where the photograph is the product.** The portraits, golden
+#      hour, the details. Technical and composition lead, the floor is high, and
+#      `max_keepers` is small - a soft couple portrait has no defence, because
+#      another one was taken four seconds later.
+#
+#   3. **Scenes where the variety is the story.** The dance floor, the candids,
+#      the reception. Emotion leads, the floor is *low*, and `max_keepers` is
+#      high - forty guests each want the frame they are in, and a dance floor
+#      culled to two photographs is a reception that did not happen.
+#
+# `prominence` is the fourth column and it is quietly the most opinionated one.
+# It is high wherever "is this a photograph *of somebody*" is the question - the
+# formals, the candids, the reception - and low wherever the subject is an
+# object or a place. It is the column that stops a gallery filling with sharp,
+# well-composed photographs of the back of a stranger's head.
+#
+# ---------------------------------------------------------------------------
+# WHAT THIS FILE CANNOT DO
+# ---------------------------------------------------------------------------
+#
+# It cannot weaken a coverage guarantee. There is no field here for a must-have,
+# an identity minimum or a rule. The guard runs after every pass that reads this
+# file and again after sizing, and section 6.4 requires that even the aggressive
+# mode cannot drop a must-have. `ModeShift` has three fields and none of them is
+# a rule.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# The neutral row, used for a photograph whose scene AURA could not name.
+# ---------------------------------------------------------------------------
+[neutral]
+technical   = 0.40
+emotion     = 0.25
+composition = 0.20
+prominence  = 0.15
+floor       = 0.34
+max_keepers = 2
+rationale   = """
+The documented fallback, and it is deliberately cautious rather than average. A
+frame AURA cannot name is a frame AURA understands least, so the row leans on
+the signal that needs no understanding - whether the photograph worked - and the
+floor sits slightly above the middle of the named rows so that an unclassified
+frame has to be good to get in. Confidence is reduced by 0.08 on every decision
+made here, and the outline lists the scene, so an unnamed wedding is visible
+rather than quietly average."""
+
+# ---------------------------------------------------------------------------
+# GETTING READY. Kind 3: the variety is the story.
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id          = "getting_ready_bride"
+technical   = 0.34
+emotion     = 0.28
+composition = 0.16
+prominence  = 0.22
+floor       = 0.30
+max_keepers = 3
+rationale   = """
+The morning is documentary and the room is small, dark and crowded. Prominence
+is high because half of what is shot here is a stranger's elbow and the frames
+worth keeping are the ones the bride is actually in. The floor is low and three
+keepers are allowed because this chapter is a sequence rather than a set of
+single moments - the dress, the shoes, the mother's face - and culling it to one
+frame per moment produces an album that starts at the ceremony."""
+
+[[scene]]
+id          = "getting_ready_groom"
+technical   = 0.34
+emotion     = 0.28
+composition = 0.16
+prominence  = 0.22
+floor       = 0.30
+max_keepers = 3
+rationale   = """
+Identical to the bride's row and identical on purpose. The two are photographed
+differently at almost every wedding - less time, fewer frames, worse light - and
+weighting them differently would encode that difference as a product decision
+about whose morning matters. If the groom's morning has fewer frames, the
+chapter quota already delivers fewer; the bar to get in should be the same."""
+
+# ---------------------------------------------------------------------------
+# DETAILS AND VENUE. Kind 2: the photograph is the product.
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id          = "details"
+technical   = 0.44
+emotion     = 0.10
+composition = 0.40
+prominence  = 0.06
+floor       = 0.42
+max_keepers = 2
+rationale   = """
+A flat-lay has no expression and no subject, so emotion and prominence are as
+close to nothing as the loader allows - not zero, because a hand entering the
+frame with the rings is a detail shot with a person in it and should not be
+scored as if it were a table. Composition is the highest in the whole file and
+still does not exceed technical: a beautifully arranged flat-lay that is out of
+focus is a photograph nobody delivers. The floor is high because these are
+retakeable and there are usually forty of them."""
+
+[[scene]]
+id          = "venue"
+technical   = 0.46
+emotion     = 0.08
+composition = 0.40
+prominence  = 0.06
+floor       = 0.40
+max_keepers = 1
+rationale   = """
+The empty room, and one frame of it is the establishing shot an album opens on.
+`max_keepers = 1` is the tightest in the file: a second photograph of the same
+empty room from eighteen inches to the left is not a second photograph. The
+coverage guard still guarantees that one frame exists, which is the whole point
+of having a rule for something a culling engine would otherwise never choose."""
+
+# ---------------------------------------------------------------------------
+# THE UNREPEATABLE MOMENTS. Kind 1.
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id          = "first_look"
+technical   = 0.30
+emotion     = 0.40
+composition = 0.14
+prominence  = 0.16
+floor       = 0.24
+max_keepers = 3
+rationale   = """
+The reaction is the photograph and it lasts under two seconds. Emotion leads by
+the largest margin in the file and the floor is the second lowest, because a
+slightly soft frame of the face at the moment of recognition beats a perfect
+frame of the four seconds afterwards - and because there is no retake. Three
+keepers, because the turn, the reaction and the embrace are three different
+photographs of one moment."""
+
+[[scene]]
+id          = "ceremony_entrance"
+technical   = 0.36
+emotion     = 0.30
+composition = 0.18
+prominence  = 0.16
+floor       = 0.30
+max_keepers = 2
+rationale   = """
+The walk in is motion in bad light towards a photographer who cannot move.
+Technical leads slightly because most of what is shot here is unusable and the
+difference between frames is whether the focus landed. Two keepers: the walk and
+the arrival."""
+
+[[scene]]
+id          = "ceremony"
+technical   = 0.38
+emotion     = 0.30
+composition = 0.18
+prominence  = 0.14
+floor       = 0.28
+max_keepers = 2
+rationale   = """
+Long, static, and shot from a fixed position with a long lens - so most frames
+of a ceremony are the same frame. The floor is low because the light usually is,
+and two keepers per moment is enough for a chapter that the coverage rules
+already guarantee separately at the vows, the rings and the kiss."""
+
+[[scene]]
+id          = "ritual"
+technical   = 0.34
+emotion     = 0.30
+composition = 0.16
+prominence  = 0.20
+floor       = 0.26
+max_keepers = 3
+rationale   = """
+A named rite is the part of the day the family will look for first and the part
+a Western-trained culling model understands least. Prominence is high because
+who is performing the rite matters, the floor is the lowest of the ceremony
+scenes because rituals happen in the worst light at the wedding, and three
+keepers are allowed because a rite is a sequence with stages rather than an
+instant. This row is where a wrong number would look like the product not
+valuing somebody's tradition."""
+
+[[scene]]
+id          = "vows"
+technical   = 0.32
+emotion     = 0.38
+composition = 0.14
+prominence  = 0.16
+floor       = 0.24
+max_keepers = 2
+rationale   = """
+Spoken words, faces, and nothing else moving. Emotion leads and the floor is
+among the lowest in the file for the reason section 6.1 gives about hard
+promotions: a photographer who has one usable frame of the vows delivers that
+frame whatever it scores, so the arithmetic should not have to be overruled to
+get there."""
+
+[[scene]]
+id          = "rings"
+technical   = 0.38
+emotion     = 0.28
+composition = 0.18
+prominence  = 0.16
+floor       = 0.26
+max_keepers = 2
+rationale   = """
+Hands, close, in the worst light of the ceremony, and usually with a long lens
+wide open - so technical leads: the difference between the frames of a ring
+exchange is almost always which one the focus landed on. The floor stays low
+because this is a coverage rule and a gallery without it is a gallery missing
+the reason everyone came."""
+
+[[scene]]
+id          = "kiss"
+technical   = 0.32
+emotion     = 0.36
+composition = 0.16
+prominence  = 0.16
+floor       = 0.24
+max_keepers = 2
+rationale   = """
+One instant, no retake, and the frame before and the frame after are both wrong.
+Emotion leads, the floor is low, and two keepers exist for the wide and the
+tight rather than for two attempts at the same frame. Note that closed eyes here
+are correct: the eyes-closed veto never fires in this scene, which is enforced in
+`coverage_rules.toml` and not left to this file."""
+
+# ---------------------------------------------------------------------------
+# THE POSED WORK. Kind 2, plus the formals which are a coverage rule.
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id          = "family_portrait"
+technical   = 0.40
+emotion     = 0.18
+composition = 0.20
+prominence  = 0.22
+floor       = 0.38
+max_keepers = 2
+rationale   = """
+The most reshootable photographs of the day and the ones with the most people to
+get wrong, so the floor is high: a family group with one person blinking is a
+frame nobody delivers when three more were taken. Prominence is high because
+these frames exist to record *who was there*, which is also why the identity
+coverage rule leans on this chapter more than any other."""
+
+[[scene]]
+id          = "group_portrait"
+technical   = 0.40
+emotion     = 0.20
+composition = 0.20
+prominence  = 0.20
+floor       = 0.36
+max_keepers = 2
+rationale   = """
+The same photograph as the family formals with a looser guest list and no
+coverage guarantee behind it, so the floor is a little lower and everything else
+follows the formals. Emotion is slightly higher because a group of friends is
+allowed to be having a better time than a row of relatives."""
+
+[[scene]]
+id          = "couple_portrait"
+technical   = 0.38
+emotion     = 0.24
+composition = 0.24
+prominence  = 0.14
+floor       = 0.40
+max_keepers = 3
+rationale   = """
+The highest floor in the file. These are the photographs the couple bought,
+there are three hundred of them, they were taken deliberately with time to spare
+and there is no excuse for a soft one. Composition is the joint-highest weight
+outside the details rows because framing is most of what separates two otherwise
+identical portraits, and three keepers are allowed because a portrait session
+genuinely produces three different photographs per setup."""
+
+[[scene]]
+id          = "golden_hour"
+technical   = 0.36
+emotion     = 0.24
+composition = 0.26
+prominence  = 0.14
+floor       = 0.38
+max_keepers = 3
+rationale   = """
+A couple portrait with twenty minutes of light and a hard stop. Composition
+edges above the couple-portrait row because the light is doing the work and what
+is left to judge is the frame, and the floor is very slightly lower because
+shooting into a low sun costs contrast that the develop phases recover and that
+phase 09 currently reads as a mild fault."""
+
+# ---------------------------------------------------------------------------
+# THE RECEPTION. Kind 3: the variety is the story.
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id          = "reception_entrance"
+technical   = 0.34
+emotion     = 0.34
+composition = 0.16
+prominence  = 0.16
+floor       = 0.28
+max_keepers = 2
+rationale   = """
+Loud, dark, fast, and over in fifteen seconds. Technical and emotion are equal
+because both fail here constantly and neither should be able to carry a frame on
+its own - which is what the geometric mean already guarantees and what equal
+weights make legible."""
+
+[[scene]]
+id          = "speeches"
+technical   = 0.34
+emotion     = 0.32
+composition = 0.14
+prominence  = 0.20
+floor       = 0.30
+max_keepers = 3
+rationale   = """
+Two photographs per speech and both of them matter: the person speaking and the
+person listening. Three keepers exist for exactly that reason, prominence is
+high because the listening frame is only worth keeping if it is the right
+listener, and composition is low because a speech is shot from wherever the
+photographer can stand."""
+
+[[scene]]
+id          = "cake"
+technical   = 0.38
+emotion     = 0.26
+composition = 0.20
+prominence  = 0.16
+floor       = 0.32
+max_keepers = 2
+rationale   = """
+A staged moment that everyone photographs and nobody looks at twice, so two
+keepers and a middling floor. It is a coverage rule because its absence is
+noticed even though its presence is not, which is the definition of a
+guarantee."""
+
+[[scene]]
+id          = "first_dance"
+technical   = 0.32
+emotion     = 0.34
+composition = 0.18
+prominence  = 0.16
+floor       = 0.26
+max_keepers = 3
+rationale   = """
+Three minutes, one light source, two people turning slowly. Emotion leads and
+the floor is low because the frames are all dark and the good ones are the ones
+where a face is visible at the right instant. Three keepers because a first
+dance genuinely has three photographs in it - the wide of the room, the two
+faces, and whatever happens at the end."""
+
+[[scene]]
+id          = "dance_floor"
+technical   = 0.30
+emotion     = 0.36
+composition = 0.14
+prominence  = 0.20
+floor       = 0.22
+max_keepers = 4
+rationale   = """
+The lowest floor and the second-highest keeper cap in the file, and both are
+deliberate. A dance floor culled to two photographs is a reception that did not
+happen: forty guests were there and each of them wants the frame they are in,
+which is what prominence at 0.20 and `max_keepers = 4` are for. Composition is
+the lowest anywhere because nobody has ever complained that a dance-floor frame
+was off the thirds. The diversity pass, not this row, is what stops forty
+near-identical frames of the same six people."""
+
+[[scene]]
+id          = "candid"
+technical   = 0.34
+emotion     = 0.32
+composition = 0.16
+prominence  = 0.18
+floor       = 0.30
+max_keepers = 3
+rationale   = """
+The scene the classifier reaches for when it is unsure, so this row is doing two
+jobs: judging genuine candids and absorbing everything mislabelled as one. That
+is why it sits close to the neutral row rather than being tuned aggressively -
+tuning this row hard would tune every misclassification with it."""
+
+[[scene]]
+id          = "exit"
+technical   = 0.34
+emotion     = 0.34
+composition = 0.16
+prominence  = 0.16
+floor       = 0.26
+max_keepers = 2
+rationale   = """
+Sparklers, a car, and no light. Technical and emotion equal for the reception
+entrance's reason: both fail constantly here and neither should carry a frame
+alone. It is a coverage rule because it is the last photograph in the album and
+its absence ends the story mid-sentence."""
+
+# ---------------------------------------------------------------------------
+# THE THREE MODES
+# ---------------------------------------------------------------------------
+#
+# A mode has three fields and none of them is a rule. Section 6.4: "modes shift
+# thresholds and k-values, never the coverage rules - even `Aggressive` cannot
+# drop a must-have." `ModeShift` has nowhere to put a guarantee, so that
+# sentence is a property of the type rather than a promise in a comment.
+
+[[mode]]
+id           = "conservative"
+floor_delta  = -0.08
+keeper_delta = 1
+target_scale = 1.20
+rationale    = """
+Keeps more and flags more, and it is the default for a photographer who has not
+chosen. The asymmetry is intentional: an over-full gallery costs ten minutes
+with the slider, and an over-culled one costs a frame nobody can get back. One
+extra keeper per moment and a floor eight points lower is roughly a fifth more
+photographs, which is what `target_scale` also says so that the size prediction
+and the passes agree rather than fighting."""
+
+[[mode]]
+id           = "balanced"
+floor_delta  = 0.0
+keeper_delta = 0
+target_scale = 1.00
+rationale    = """
+The rows above, unmodified. This is the mode the size regression is calibrated
+against and the mode every gate in section 10.1 is measured in, so its shift is
+exactly zero rather than approximately zero."""
+
+[[mode]]
+id           = "aggressive"
+floor_delta  = 0.07
+keeper_delta = -1
+target_scale = 0.80
+rationale    = """
+A tight gallery for a photographer who culls hard by hand and wants the engine to
+match. It raises the floor and takes a keeper off every moment, and it still
+cannot drop a must-have: the coverage guard runs after this shift and again
+after sizing, and section 10.1 tests that aggressive mode satisfies every rule.
+The shift is smaller than conservative's in absolute terms because the failure it
+risks is the expensive one."""
