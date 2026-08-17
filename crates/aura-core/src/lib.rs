@@ -49,6 +49,7 @@ pub mod errors {
     pub mod job;
     pub mod ml;
     pub mod raw;
+    pub mod render;
 }
 
 pub mod paths;

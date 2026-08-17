@@ -27,6 +27,8 @@ aura-cull          = { path = "../aura-cull" }
 aura-explain       = { path = "../aura-explain" }
 aura-people.path   = "../aura-people"
 aura-raw.path      = "../aura-raw"
+aura-recipe        = { path = "../aura-recipe" }
+aura-render        = { path = "../aura-render" }
 aura-vision.path   = "../aura-vision"
 rusqlite.workspace = true
 tempfile.workspace = true

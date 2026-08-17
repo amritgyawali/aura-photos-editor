@@ -13,11 +13,27 @@ is_exempt() {
   esac
 }
 
+# Test code is exempt wherever it lives, not only under tests/.
+#
+# The exemption above matches by path, which was enough while every crate kept its unit
+# tests in an integration file. PHASE-14 has inline  blocks - a
+# rustfmt-idiomatic place for tests of a private function - and those blocks are test code
+# by the same definition the comment above uses. They are also not compiled into the
+# library, so a panic in one cannot reach a photographer.
+#
+# The cut assumes the repository convention that an inline test module is the last thing in
+# a file, which every file in this workspace follows. A  block in the middle
+# of a file would hide the code after it, so if that convention ever changes this function
+# has to become a brace-counting parse rather than a cut.
+strip_inline_tests() {
+  awk "/^#\[cfg\(test\)\]/ { exit } { print }" "$1"
+}
+
 banned_rs='\.unwrap\(\)|\.expect\(|panic!\(|todo!\(|unimplemented!\(|unreachable!\(|process::exit'
 
 while IFS= read -r file; do
   if is_exempt "$file"; then continue; fi
-  if matches=$(grep -nE "$banned_rs" "$file" | grep -v '// ALLOW-BANNED:'); then
+  if matches=$(strip_inline_tests "$file" | grep -nE "$banned_rs" | grep -v '// ALLOW-BANNED:'); then
     echo "BANNED PATTERN in $file"
     echo "$matches"
     fail=1
@@ -29,7 +45,7 @@ det_banned='HashMap::new|HashSet::new|SystemTime::now|Instant::now|rand::random|
 
 while IFS= read -r file; do
   if is_exempt "$file"; then continue; fi
-  if matches=$(grep -nE "$det_banned" "$file" | grep -v '// DETERMINISM:'); then
+  if matches=$(strip_inline_tests "$file" | grep -nE "$det_banned" | grep -v '// DETERMINISM:'); then
     echo "DETERMINISM RISK in $file (add a // DETERMINISM: justification if intentional)"
     echo "$matches"
     fail=1

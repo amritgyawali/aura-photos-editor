@@ -587,3 +587,98 @@ max_ms_per_unit = 25
 # decisions by `crates/aura-perf/tests/ledger_budgets.rs`.
 [size.ledger_store_per_1000_decisions]
 max_bytes = 6291456
+
+# ---------------------------------------------------------------------------
+# PHASE-14. The develop engine.
+#
+# Section 11 names five rows and **four of them name a GPU**: the 2048 px proxy at 60 ms on
+# an RTX 4070 and 110 ms on an M3 Pro, the 45 MP export at 900 ms, and batch export at
+# 1.2 images/s. This build links no wgpu backend (docs/adr/ADR-0029-render-pipeline.md
+# section 4), so none of the four is asserted and none is relabelled as a processor number.
+# They are waived, with an expiry that is the same one ADR-0007 carries: the waiver ends when
+# a GPU backend lands.
+#
+# The fifth row is the one this build actually runs - "full 45 MP render (CPU fallback)
+# <= 6 s" - and it is asserted below, stated per megapixel so a test can measure a smaller
+# frame and still fail on a regression.
+#
+# Two rows section 11 does not state are here as well. The interactive proxy on the
+# processor path, because the develop panel's responsiveness is the phase's headline claim
+# and a budget nobody asserts is a claim nobody can break; and the storage row, because a
+# recipe plus its history is one row per photograph across two tables and that is precisely
+# the shape that grows quietly.
+# ---------------------------------------------------------------------------
+
+# Section 11: a full 45 MP render on the processor fallback, in 6 s.
+#
+# Stated per megapixel - 133 ms - so the suite can time a 4 MP frame and still catch a
+# regression, and so the number does not silently become easier when somebody changes the
+# fixture's size. The full pipeline runs: white balance, the matrix, noise reduction, the
+# whole point-wise grade, clarity, texture, sharpening, the crop and the output transform.
+[stage.render_full_cpu_per_megapixel]
+max_elapsed_ms  = 6000
+max_ms_per_unit = 133
+
+# The interactive proxy at 2048 px, on the processor path.
+#
+# Section 11's 60 ms is an RTX 4070 figure and is waived. This row is its processor
+# counterpart and it is a **regression guardrail rather than a claim of parity**: measured at
+# 210 ms in release on the development machine with the reference grade, budgeted at 450 ms,
+# which leaves room for a slower CI machine and fails on a two-times regression.
+#
+# The gap between 60 and 210 is the honest cost of having no GPU backend, it is printed by
+# `aura-cli verify --phase 14` on every run, and it is condition C1 in the exit report.
+[stage.render_proxy2048_cpu]
+max_elapsed_ms  = 450
+max_ms_per_unit = 450
+
+# Re-rendering the proxy after a slider move, when only a late stage was invalidated.
+#
+# Section 6.3's invalidation rule is what this measures: moving saturation must not re-run
+# white balance, the tone curve or noise reduction. Budgeted at half the full proxy render,
+# because a late-stage re-render that costs the same as a full one means the invalidation is
+# not being used.
+[stage.render_proxy_slider_cpu]
+max_elapsed_ms  = 225
+max_ms_per_unit = 225
+
+# The canonical serialisation and hash of one recipe, which happens on every save, every
+# render-cache lookup and every export. Measured over 1,000 recipes so a sub-millisecond
+# budget is expressible in whole milliseconds.
+[stage.recipe_canonical_1000]
+max_elapsed_ms  = 1000
+max_ms_per_unit = 1
+
+# Section 11 sets no storage budget for this phase. **12 KB per image**, and it is the
+# largest per-image figure in the product by an order of magnitude. The number is set at the
+# measurement rather than the measurement squeezed to a number, and the reason is written
+# here so it can be argued with:
+#
+# The measured decomposition on 1,000 photographs each carrying one automated edit and three
+# manual steps, from `PRAGMA page_count`:
+#
+#   edit_recipes.body        1,412 B/image   the canonical recipe, exactly as hashed
+#   edit_recipes, the rest     380 B/image   two prefixed ids, the hash, provenance columns
+#   edit_history bodies      4,236 B/image   three steps x one complete document
+#   edit_history, the rest     450 B/image   the changed-path array, the label, two stamps
+#   indexes and page slack   ~4,500 B/image  four indexes and SQLite's own overhead
+#
+# **The history bodies are the budget**, and they are a whole document per step on purpose.
+# `aura_recipe::history`'s module documentation has the argument: a chain of deltas is exact
+# only if every delta was computed against the state that actually preceded it, and that
+# stops being true the first time a merge refuses a protected path and the proposal and the
+# result diverge. An undo that is *nearly* right is worse than no undo.
+#
+# Two reductions were considered and rejected. Storing a delta per step and a full document
+# every tenth step would cut this by about half and makes undo depend on replaying a chain -
+# the thing above. Compressing the bodies would cut it by about three quarters and needs a
+# compressor in the dependency tree for a saving that a bounded history already caps.
+#
+# What *does* cap it is the bound: `history::MAX_ENTRIES` is 100 and `RecipeStore::save`
+# trims on write, so the worst case is about 150 KB for a photograph somebody worked hard on
+# - and the typical case is the four steps measured here.
+#
+# Measured with SQLite page accounting before and after by
+# `crates/aura-perf/tests/develop_budgets.rs`.
+[size.develop_store_per_1000_images]
+max_bytes = 12288000

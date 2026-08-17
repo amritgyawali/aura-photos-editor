@@ -77,7 +77,10 @@ fn every_registered_code_is_well_formed_and_has_a_runbook() {
             "ML" => 5000..6000,
             "CLOUD" => 6000..7000,
             "JOB" => 7000..8000,
-            "EXPORT" => 8000..9000,
+            // PHASE-14 renamed the reserved-but-empty `EXPORT` block to `RENDER`: an
+            // export is a render written to a file, and phase 30 will want codes in the
+            // same domain for the same subject. ADR-0029 section 9.
+            "RENDER" => 8000..9000,
             "SEC" => 9000..10000,
             other => panic!("unknown domain {other}"),
         };

@@ -80,6 +80,13 @@ jobs:
       - name: phase 05 verify - embeddings, descriptors, index, snapshot, incremental
         run: cargo run --release --package aura-cli -- verify --phase 05 --work target/phase05-verify
 
+      # PHASE-14. The develop engine. No network, no GPU and no model: the gate is
+      # arithmetic over authored pixels, so it runs anywhere the workspace builds.
+      # It prints what it does not prove - see docs/progress/PHASE-14-EXIT.md
+      # conditions C1 and C2 - and exits non-zero on a real failure.
+      - name: phase 14 verify - recipe, colour, tiling, parity, interchange
+        run: cargo run --release --package aura-cli -- verify --phase 14 --work target/phase14-verify
+
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
     name: ui type-check, tests and build
@@ -151,6 +158,16 @@ jobs:
       # graph recall check builds a thousand-vector index.
       - name: embedding evaluation gates
         run: cargo test --release --package aura-vision --test embedding_eval -- --nocapture
+
+      # PHASE-14 section 10.1, as a test suite. Release, because the tiling identity
+      # renders a 700x540 frame through every spatial stage twice.
+      - name: develop evaluation gates
+        run: cargo test --release --package aura-render --test render_eval -- --nocapture
+
+      # PHASE-14 section 11. Four of its five rows are waived (no GPU backend,
+      # ADR-0029 section 4); what is asserted is the processor path and the store.
+      - name: develop budgets
+        run: cargo test --release --package aura-perf --test develop_budgets -- --nocapture
 
       # Two independent implementations of the metrics have to agree, or neither
       # is trustworthy. The Python half also self-tests without cargo.

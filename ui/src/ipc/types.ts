@@ -1582,3 +1582,152 @@ export type ExportBundleInput = {
   projectId: string;
   limit?: number | null;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-14. The develop surface.
+//
+// Nine commands. The UI may read an edit, change a parameter, walk the history, snapshot,
+// reset, render a proxy and ask what the renderer can do. There is no command here that
+// names a destination, and none that can overwrite a parameter a person set - the second is
+// enforced in `aura_recipe::schema::merge`, not on this wire, so a caller cannot route
+// around it.
+//
+// See docs/adr/ADR-0030-develop-ipc-surface.md.
+// ---------------------------------------------------------------------------
+
+/** One parameter of an edit, as the develop panel renders it. */
+export type DevelopParamDto = {
+  /** The dotted path, e.g. `global.exposure`. The identity of the control. */
+  path: string;
+  /** The current value. A JSON scalar so one shape carries floats and integers. */
+  value: unknown;
+  /** True when a person set this and no automated pass may change it. */
+  protected: boolean;
+  /** Which render stage re-runs when this moves. `null` when it is inert. */
+  stage: string | null;
+};
+
+/** One photograph's edit. */
+export type RecipeDto = {
+  photoId: string;
+  /** The canonical JSON, exactly as hashed and stored. */
+  body: string;
+  recipeHash: string;
+  schema: number;
+  engine: string;
+  /** `ai`, `user`, `qc`, `preset` or `default`. */
+  source: string;
+  confidence: number;
+  decisionId: string | null;
+  userEditedFields: string[];
+  params: DevelopParamDto[];
+};
+
+/** One stage that did not run, and why. */
+export type RenderNoteDto = {
+  stage: string;
+  reason: string;
+  detail: string | null;
+  /** True when this is worth showing the photographer. */
+  isCaveat: boolean;
+};
+
+/** A rendered proxy, ready for a data URL. */
+export type RenderDto = {
+  width: number;
+  height: number;
+  /** Base64 of interleaved 8-bit RGB. There is no path: this phase writes no image file. */
+  rgbBase64: string;
+  colourSpace: string;
+  icc: string;
+  renderHash: string;
+  backend: string;
+  stagesRun: string[];
+  notes: RenderNoteDto[];
+  ms: number;
+};
+
+/** What this machine's renderer can do. */
+export type RenderCapsDto = {
+  backend: string;
+  maxTexture: number;
+  precisionBits: number;
+  maxWorkingBytes: number;
+  engine: string;
+  degradation: string | null;
+  degradationMessage: string | null;
+};
+
+/** One step in a photograph's edit history. */
+export type HistoryEntryDto = {
+  seq: number;
+  atMs: number;
+  source: string;
+  changed: string[];
+  label: string;
+};
+
+/** A photograph's history, as the panel renders it. */
+export type HistoryDto = {
+  photoId: string;
+  entries: HistoryEntryDto[];
+  snapshots: string[];
+  canUndo: boolean;
+  canRedo: boolean;
+  hasAiSuggestion: boolean;
+};
+
+/** How much of a wedding has an edit. The denominator is every photograph. */
+export type DevelopStatusDto = {
+  images: number;
+  withRecipe: number;
+  fromAi: number;
+  fromUser: number;
+  touchedByHand: number;
+  sidecarBehind: number;
+};
+
+export type DevelopImageInput = {
+  photoId: string;
+};
+
+export type SetParamInput = {
+  projectId: string;
+  photoId: string;
+  path: string;
+  value: unknown;
+  label?: string | null;
+};
+
+export type SetParamDto = {
+  recipe: RecipeDto;
+  changed: string[];
+  /** The first stage that has to re-run, or `null` when nothing does. */
+  invalidatedFrom: string | null;
+};
+
+export type RenderImageInput = {
+  photoId: string;
+  /** `proxy2048`, `screen` or `full`. */
+  level?: string | null;
+  screen?: [number, number] | null;
+  /** `srgb`, `adobe_rgb` or `display_p3`. */
+  colourSpace?: string | null;
+  /** `interactive`, `analysis` or `export`. */
+  purpose?: string | null;
+};
+
+export type HistoryStepInput = {
+  projectId: string;
+  photoId: string;
+  /** `undo`, `redo`, `reset_original` or `reset_ai`. */
+  action: string;
+};
+
+export type SnapshotInput = {
+  projectId: string;
+  photoId: string;
+  name: string;
+  /** `take` or `restore`. */
+  action: string;
+};

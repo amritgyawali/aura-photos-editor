@@ -3308,3 +3308,249 @@ pub struct ExportBundleInput {
     /// At most this many decisions, newest first.
     pub limit: Option<u32>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-14. The develop surface: the edit recipe, the renderer and the history.
+//
+// Nine commands, and the boundary is the phase's own. The UI may read a recipe, change a
+// parameter, undo, redo, snapshot, reset, ask for a proxy render and ask what the renderer
+// can do. It may **not** name a destination, ask for a file to be written, or overwrite a
+// parameter a person set - the last of those is refused inside
+// `aura_recipe::schema::merge` rather than on the wire, so a caller cannot route around it.
+//
+// `docs/adr/ADR-0030-develop-ipc-surface.md` records the shape.
+// ---------------------------------------------------------------------------
+
+/// One parameter of an edit, as the develop panel renders it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DevelopParamDto {
+    /// The dotted path, e.g. `global.exposure`. The identity of the control.
+    pub path: String,
+    /// The current value, as a JSON scalar so one shape carries floats and integers.
+    pub value: serde_json::Value,
+    /// True when a person set this and no automated pass may change it.
+    pub protected: bool,
+    /// Which stage re-runs when this moves. `null` when it is inert for rendering.
+    pub stage: Option<String>,
+}
+
+/// One photograph's edit.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecipeDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The canonical JSON. The document itself, exactly as hashed and stored.
+    pub body: String,
+    /// BLAKE3 over `body`.
+    pub recipe_hash: String,
+    /// Schema version.
+    pub schema: u16,
+    /// The engine that wrote it.
+    pub engine: String,
+    /// `ai`, `user`, `qc`, `preset` or `default`.
+    pub source: String,
+    /// Calibrated confidence, `0..1`. Invariant 2.
+    pub confidence: f32,
+    /// The ledger row that decided this, when one did.
+    pub decision_id: Option<String>,
+    /// Dotted paths a person has touched, sorted.
+    pub user_edited_fields: Vec<String>,
+    /// The parameters, flattened for the panel.
+    pub params: Vec<DevelopParamDto>,
+}
+
+/// One stage that did not run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderNoteDto {
+    /// The stage slug.
+    pub stage: String,
+    /// The reason slug.
+    pub reason: String,
+    /// What was being asked for, when naming it helps.
+    pub detail: Option<String>,
+    /// True when this is worth showing the photographer.
+    pub is_caveat: bool,
+}
+
+/// A rendered proxy, ready for an image tag.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderDto {
+    /// Output width.
+    pub width: u32,
+    /// Output height.
+    pub height: u32,
+    /// The pixels, base64 of interleaved 8-bit RGB.
+    ///
+    /// Base64 rather than a path, because there is no path: invariant 1 says the original is
+    /// opened read-only and this phase writes no image file at all. The develop panel turns
+    /// this into a data URL.
+    pub rgb_base64: String,
+    /// `srgb`, `adobe_rgb` or `display_p3`.
+    pub colour_space: String,
+    /// The ICC profile the viewer should assume.
+    pub icc: String,
+    /// The hash of the four inputs that produced this.
+    pub render_hash: String,
+    /// `cpu`, or the accelerator's name.
+    pub backend: String,
+    /// Stages that ran, in order.
+    pub stages_run: Vec<String>,
+    /// Stages that did not, with their reason and detail.
+    pub notes: Vec<RenderNoteDto>,
+    /// Wall-clock milliseconds.
+    pub ms: u32,
+}
+
+/// What this machine's renderer can do.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderCapsDto {
+    /// `cpu` or `wgpu`.
+    pub backend: String,
+    /// Longest edge rendered in one pass before tiling.
+    pub max_texture: u32,
+    /// Bits of mantissa the colour maths carries.
+    pub precision_bits: u8,
+    /// The working-buffer ceiling in bytes.
+    pub max_working_bytes: u64,
+    /// The engine string in every render hash.
+    pub engine: String,
+    /// The degradation this backend runs under, or `null`.
+    pub degradation: Option<String>,
+    /// The photographer-facing sentence for that degradation.
+    pub degradation_message: Option<String>,
+}
+
+/// One step in a photograph's edit history.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryEntryDto {
+    /// Position, from 1.
+    pub seq: u64,
+    /// Milliseconds since the epoch.
+    pub at_ms: i64,
+    /// Who made it.
+    pub source: String,
+    /// The dotted paths it changed.
+    pub changed: Vec<String>,
+    /// A short line for the panel.
+    pub label: String,
+}
+
+/// A photograph's history, as the panel renders it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Steps, oldest first.
+    pub entries: Vec<HistoryEntryDto>,
+    /// Named snapshots.
+    pub snapshots: Vec<String>,
+    /// True when undo would do something.
+    pub can_undo: bool,
+    /// True when redo would do something.
+    pub can_redo: bool,
+    /// True when an automated pass has run, so "reset to AI suggestion" is available.
+    pub has_ai_suggestion: bool,
+}
+
+/// How much of a wedding has an edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DevelopStatusDto {
+    /// Photographs in the project. **The denominator**, and not the delivered gallery.
+    pub images: u32,
+    /// Photographs carrying a recipe.
+    pub with_recipe: u32,
+    /// Recipes an automated pass wrote.
+    pub from_ai: u32,
+    /// Recipes a person wrote.
+    pub from_user: u32,
+    /// Photographs a person has touched at least one parameter of.
+    pub touched_by_hand: u32,
+    /// Photographs whose sidecar on disk is behind the catalog.
+    pub sidecar_behind: u32,
+}
+
+/// Ask for one photograph's edit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DevelopImageInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Change one parameter.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetParamInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// The dotted path.
+    pub path: String,
+    /// The new value.
+    pub value: serde_json::Value,
+    /// A short line for the history panel.
+    pub label: Option<String>,
+}
+
+/// What changing a parameter did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetParamDto {
+    /// The edit after the change.
+    pub recipe: RecipeDto,
+    /// The dotted paths that moved.
+    pub changed: Vec<String>,
+    /// The first stage that has to re-run, or `null` when nothing does.
+    pub invalidated_from: Option<String>,
+}
+
+/// Ask for a render.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderImageInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// `proxy2048`, `screen` or `full`.
+    pub level: Option<String>,
+    /// Width and height for `screen`.
+    pub screen: Option<(u32, u32)>,
+    /// `srgb`, `adobe_rgb` or `display_p3`. Defaults to sRGB.
+    pub colour_space: Option<String>,
+    /// `interactive`, `analysis` or `export`. Defaults to interactive.
+    pub purpose: Option<String>,
+}
+
+/// Walk the history.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryStepInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// `undo`, `redo`, `reset_original` or `reset_ai`.
+    pub action: String,
+}
+
+/// Take or restore a named snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// The photographer's own name for it.
+    pub name: String,
+    /// `take` or `restore`.
+    pub action: String,
+}

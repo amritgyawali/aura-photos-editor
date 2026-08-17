@@ -2,6 +2,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  DevelopImageInput,
+  DevelopStatusDto,
+  HistoryDto,
+  HistoryStepInput,
+  RecipeDto,
+  RenderCapsDto,
+  RenderDto,
+  RenderImageInput,
+  SetParamDto,
+  SetParamInput,
+  SnapshotInput,
   AnalyseCompositionInput,
   ExplainPanelDto,
   ExportBundleInput,
@@ -691,4 +702,44 @@ export const explain = {
    * every decision the photographer made themselves. */
   compactLedger: (projectId: string): Promise<number> =>
     invoke<number>('compact_ledger', { projectId }),
+};
+
+/**
+ * PHASE-14. The develop surface.
+ *
+ * Nine calls. None of them names a destination and none can overwrite a parameter a person
+ * set: `setParam` sends a person's own change, and every automated pass goes through the
+ * same merge in Rust with an automated source and is refused there.
+ */
+export const develop = {
+  /** One photograph's edit, or the camera's own starting point when it has none. */
+  imageRecipe: (input: DevelopImageInput): Promise<RecipeDto> =>
+    invoke<RecipeDto>('image_recipe', { input }),
+
+  /** Change one parameter, as a person. Marks the path protected from then on. */
+  setParam: (input: SetParamInput): Promise<SetParamDto> =>
+    invoke<SetParamDto>('set_param', { input }),
+
+  /** Undo, redo, or one of the two resets. */
+  historyStep: (input: HistoryStepInput): Promise<SetParamDto> =>
+    invoke<SetParamDto>('history_step', { input }),
+
+  /** One photograph's history, its snapshots, and what is available. */
+  imageHistory: (input: DevelopImageInput): Promise<HistoryDto> =>
+    invoke<HistoryDto>('image_history', { input }),
+
+  /** Take or restore a named snapshot. */
+  snapshot: (input: SnapshotInput): Promise<HistoryDto> =>
+    invoke<HistoryDto>('snapshot', { input }),
+
+  /** Render a proxy. The pixels come back inline; there is no file. */
+  renderImage: (input: RenderImageInput): Promise<RenderDto> =>
+    invoke<RenderDto>('render_image', { input }),
+
+  /** What this machine's renderer can do, and what it is running without. */
+  renderCaps: (): Promise<RenderCapsDto> => invoke<RenderCapsDto>('render_caps', {}),
+
+  /** How much of a wedding has an edit. The denominator is every photograph. */
+  developStatus: (projectId: string): Promise<DevelopStatusDto> =>
+    invoke<DevelopStatusDto>('develop_status', { projectId }),
 };
