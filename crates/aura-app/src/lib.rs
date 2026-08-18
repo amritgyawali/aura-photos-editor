@@ -13,6 +13,21 @@
     unreachable_pub,
     rust_2018_idioms
 )]
+// The panic family is banned in library code and is how a test asserts. An inline
+// `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
+// reach a photographer; the lints stay denied everywhere else in the crate. PHASE-14.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+        clippy::disallowed_methods,
+        clippy::uninlined_format_args
+    )
+)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 
@@ -27,6 +42,7 @@ pub mod cloud_commands;
 pub mod commands;
 pub mod composition_commands;
 pub mod cull_commands;
+pub mod develop_commands;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.
@@ -60,6 +76,10 @@ pub use composition_commands::{
 pub use cull_commands::{
     cull_project, cull_status, gallery, image_decision, override_decision, resize_gallery,
     set_cull_mode,
+};
+pub use develop_commands::{
+    develop_status, history_step, image_history, image_recipe, render_caps, render_image,
+    set_param, snapshot,
 };
 pub use emotion_commands::{
     emotion_status, image_emotion, moment_peak, prefer_frame, ranked_by_emotion, reactions_of,

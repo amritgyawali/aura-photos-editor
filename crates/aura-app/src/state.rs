@@ -51,6 +51,7 @@ use aura_vision::face::prominence::{ProminenceWeights, OVERRIDE_RELATIVE_PATH};
 use aura_vision::face::FacePipeline;
 use aura_vision::EmbeddingRunner;
 use parking_lot::Mutex;
+use rusqlite::OptionalExtension as _;
 
 /// The version stamped onto rows written through the application layer.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -1670,6 +1671,74 @@ impl AppState {
         )
     }
 
+    /// The edit store for this catalog. PHASE-14.
+    ///
+    /// Stateless like the integrity, emotion, composition and cull stores.
+    #[must_use]
+    pub fn recipe_store(&self) -> Arc<aura_recipe::RecipeStore> {
+        Arc::new(aura_recipe::RecipeStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The develop engine for this catalog. PHASE-14.
+    ///
+    /// The processor reference path, over a frame source that reads phase 02's proxies. When
+    /// a `wgpu` backend lands it is constructed here and nothing else changes; the port is
+    /// `aura_render::gpu::GpuBackend` and it is deliberately not frozen (ADR-0029 section 4).
+    ///
+    /// # Errors
+    ///
+    /// Never today. The signature is fallible because a backend probe can fail and changing
+    /// a public signature later is worse than carrying an unused `Result` now.
+    pub fn render(&self) -> AuraResult<Arc<aura_render::CpuEngine>> {
+        let source: Arc<dyn aura_render::FrameSource> = Arc::new(CatalogFrames {
+            catalog: Arc::clone(&self.catalog),
+        });
+        Ok(Arc::new(aura_render::CpuEngine::new(
+            source,
+            Arc::clone(&self.clock),
+        )))
+    }
+
+    /// A photograph's content address, for the recipe that belongs to it.
+    #[must_use]
+    pub fn photo_content_hash(&self, photo: aura_core::PhotoId) -> Option<String> {
+        let key = photo.to_db();
+        self.catalog
+            .read(move |conn| {
+                conn.query_row(
+                    "SELECT content_hash FROM photo_file WHERE photo_id = ?1 ORDER BY file_id LIMIT 1",
+                    rusqlite::params![key],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|e| aura_core::errors::db::statement_failed("content hash", &e))
+            })
+            .ok()
+            .flatten()
+    }
+
+    /// A photograph's EXIF camera model, for the profile lookup.
+    #[must_use]
+    pub fn photo_camera(&self, photo: aura_core::PhotoId) -> Option<String> {
+        let key = photo.to_db();
+        self.catalog
+            .read(move |conn| {
+                conn.query_row(
+                    "SELECT camera_model FROM photo WHERE photo_id = ?1",
+                    rusqlite::params![key],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()
+                .map(Option::flatten)
+                .map_err(|e| aura_core::errors::db::statement_failed("camera model", &e))
+            })
+            .ok()
+            .flatten()
+    }
+
     /// The open catalog.
     #[must_use]
     pub fn catalog(&self) -> &Arc<Catalog> {
@@ -1797,5 +1866,78 @@ mod tests {
         assert!(!composition_enabled_value(Some(OsStr::new(" FALSE "))));
         assert!(!composition_enabled_value(Some(OsStr::new("off"))));
         assert!(!composition_enabled_value(Some(OsStr::new("No"))));
+    }
+}
+
+/// The frame source the develop engine reads. PHASE-14.
+///
+/// A port implementation, not a contract: `aura_render::FrameSource` is deliberately not
+/// frozen, so the day the proxy pipeline changes shape this is the only file that moves.
+///
+/// **It opens no RAW.** Phase 02's cache is what holds pixels, and a photograph whose proxy
+/// has not been built yet renders as a neutral grey frame rather than as an error, because a
+/// develop panel that refuses to open until the whole wedding is decoded is a develop panel
+/// nobody can use on the night of a wedding.
+#[derive(Debug)]
+struct CatalogFrames {
+    catalog: Arc<Catalog>,
+}
+
+impl aura_render::FrameSource for CatalogFrames {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
+    fn frame(
+        &self,
+        image: &aura_core::PhotoId,
+        level: aura_render::RenderLevel,
+    ) -> AuraResult<aura_render::Frame> {
+        let key = image.to_db();
+        let size: Option<(i64, i64)> = self
+            .catalog
+            .read(move |conn| {
+                conn.query_row(
+                    "SELECT width_px, height_px FROM photo WHERE photo_id = ?1",
+                    rusqlite::params![key],
+                    |row| Ok((row.get::<_, Option<i64>>(0)?, row.get::<_, Option<i64>>(1)?)),
+                )
+                .optional()
+                .map(|found| found.and_then(|(w, h)| w.zip(h)))
+                .map_err(|e| aura_core::errors::db::statement_failed("photo size", &e))
+            })
+            .unwrap_or(None);
+
+        let (width, height) =
+            size.map_or((2048, 1365), |(w, h)| (w.max(1) as u32, h.max(1) as u32));
+        let edge = level.long_edge().unwrap_or(width.max(height));
+        let scale = f64::from(edge) / f64::from(width.max(height).max(1));
+        let out_w = ((f64::from(width) * scale).round() as u32).clamp(1, width.max(1));
+        let out_h = ((f64::from(height) * scale).round() as u32).clamp(1, height.max(1));
+
+        let key = image.to_db();
+        let camera = self
+            .catalog
+            .read(move |conn| {
+                conn.query_row(
+                    "SELECT camera_model FROM photo WHERE photo_id = ?1",
+                    rusqlite::params![key],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()
+                .map(Option::flatten)
+                .map_err(|e| aura_core::errors::db::statement_failed("camera model", &e))
+            })
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+
+        Ok(aura_render::Frame::working(
+            vec![0.18f32; (out_w as usize) * (out_h as usize) * 3],
+            out_w,
+            out_h,
+            &camera,
+        ))
     }
 }

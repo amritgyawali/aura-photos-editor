@@ -68,6 +68,11 @@ Never load two phase files into one session.
 | The public reason-code reference (generated) | `docs/reason-codes.md` |
 | Explainability evaluation gates | `tests/eval/explain_eval.rs` + `ml/eval/calibration_report.py` |
 | How confidence works, in the product's own words | `docs/how-confidence-works.md` |
+| Render pipeline and determinism decisions | `docs/adr/ADR-0029-render-pipeline.md` |
+| The published edit recipe schema | `docs/recipe-schema-v1.md` |
+| Camera profiles (versioned, COL-owned) | `crates/aura-render/config/camera_profiles.toml` |
+| Develop evaluation gates | `tests/eval/render_eval.rs` |
+| How colour works, in the product's own words | `docs/colour-management.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -382,6 +387,60 @@ are all measured against synthetic predictors whose error is authored. While tha
 acts unattended**, and phase 28 cannot ship until a calibration does. That is condition C2 and
 a Sev 2 trigger. Condition C1 is the other: every decision this ledger records was made from
 placeholder heads, and it closes with phase 05's C10 rather than separately.
+
+Phase 14 is implemented conditionally: `aura-recipe` freezes edit recipe schema v1 and owns
+the canonical form, the hash, the migration framework, the XMP and AURA sidecars, the undo
+history and migration 14's four tables; `aura-render` freezes the render API and executes it -
+highlight recovery before white balance, one linear Rec.2020 working space, 23 stages in one
+ordered array, a tiler whose output is bit-identical to a whole-frame render, and an output
+transform that is the only place tone is baked. Migration 14 stores the recipe, its history,
+its snapshots and what was exported; eight synthetic camera profiles live in editable config;
+the Develop panel renders the protected dot and the caveats; and `aura-cli verify --phase 14`
+is the executable gate. Its exit report is `docs/progress/PHASE-14-EXIT.md`.
+
+**This build links no `wgpu` backend** (ADR-0029 section 4), so four of section 11's five
+performance rows are waived and the interactive budget of 60 ms is not met: the processor
+reference path renders a 2048 px proxy in about 210 ms in release. That is condition C1 and a
+Sev 2 trigger. Condition C2 is the second and it is about colour rather than speed: there are
+no camera files and no photographed ColorChecker in this repository, so the golden suite runs
+over authored synthetic pixels and eight *synthetic* bench profiles. It is a determinism and
+regression gate, not a claim about colour accuracy, and **no later phase may claim a colour
+result that depends on a camera profile being measured until it closes.** Every real camera
+body renders through the neutral reference profile and says so (`AURA-RENDER-8008`).
+
+Five rules that phase 14 adds and every later phase inherits:
+
+- **`RenderService` is the only way to turn a recipe into pixels.** Sixth service of its kind
+  and the first that produces an *output* rather than a judgement. Phases 15 to 17 decide
+  parameters, 18 fills masks, 20 to 22 add operators, 23 adds geometry and 30 exports - none
+  of them keeps its own renderer. Two answers to "what does this photograph look like" is a
+  gallery that does not match the album that does not match the proof.
+- **A parameter a person set is never overwritten, and the merge is where that is true.**
+  `aura_recipe::schema::merge` is the only function in the workspace that writes one recipe
+  into another. There is no argument that disables the protection, no IPC field that routes
+  around it, and `AURA-RENDER-8006` makes every refusal visible rather than silent. The one
+  thing that shortens `user_edited_fields` is a photographer choosing "reset to AI
+  suggestion".
+- **The output transform is the only place tone is baked.** Everything before it lives in
+  linear Rec.2020 and is reversible; `crates/aura-render/tests/colour_discipline.rs` is a grep
+  as a test, so the second module to start encoding fails the build. Invariant 8, enforced by
+  a tool rather than by review.
+- **A render says what it skipped.** `SkipReason` is a closed set and each variant names the
+  phase that fills the gap. An absent mask generator is a sentence in the panel, not a mask
+  that silently did nothing - which is the failure mode a local exposure lift has when nobody
+  is told it did not apply.
+- **A delivered file can be re-created from four values**: the RAW's content hash, the
+  canonical recipe, the engine string and the output spec. All four are stored with every
+  export in `export_renders`, and `AURA-RENDER-8007` says which of the four moved.
+
+Two decisions in this phase are worth remembering because they will be re-argued later.
+**The tiling halo is a sum rather than a maximum** - stages compose, so a pixel committed
+after sharpening needs correct values twelve pixels away *after clarity*, which needs correct
+values forty-eight pixels away in the input; a maximum is right for one spatial stage and
+wrong for two, and the failure is a faint seam that only shows on large exports. And
+**frame-wide statistics are measured once and passed in**: sharpening's normaliser, noise
+reduction's edge keeper and dehaze's floor are properties of the photograph rather than of a
+tile, and `spatial::Stats` exists for that reason alone.
 
 Five rules that phase 13 adds and every later phase inherits:
 

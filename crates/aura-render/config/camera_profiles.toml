@@ -1,0 +1,114 @@
+# Camera colour profiles - the matrices that turn a body's own response into colour.
+#
+# OWNED BY: COL (Colour Scientist). PHASE-14 section 6.1, ADR-0029 section 2.
+#
+# ---------------------------------------------------------------------------
+# WHAT A ROW IS, AND WHAT IT IS NOT
+# ---------------------------------------------------------------------------
+#
+# `xyz_to_camera` is DNG's convention: it maps CIE XYZ **under the stated illuminant** into
+# the camera's own native RGB. The pipeline inverts it, Bradford-adapts to D65 and rotates
+# into linear Rec.2020. That is `aura_raw::colour::working_space::camera_to_working`, and
+# this file supplies its first argument.
+#
+# A row is a **measurement**, not a preference. It comes from a photographed target under a
+# known illuminant, or from a DNG's own ColorMatrix1/ColorMatrix2 tags. It is not a place to
+# express a look: a body that renders "a bit warm" for somebody's taste is corrected with a
+# style profile in phase 17, never here, because a matrix change moves every photograph from
+# that body in every project retroactively.
+#
+# ---------------------------------------------------------------------------
+# WHY THERE ARE NO REAL BODIES IN THIS FILE
+# ---------------------------------------------------------------------------
+#
+# There are no camera files in this repository and no photographed ColorChecker - phase 02's
+# exit conditions, still open, carried forward through ADR-0006. Inventing a matrix for a
+# real body and shipping it would be worse than the neutral fallback: the fallback renders
+# visibly uncalibrated and a wrong matrix renders confidently wrong, which nobody checks.
+#
+# So this table ships the eight synthetic bench bodies `aura_raw::colour::profile` already
+# defines, under the make `AURA`, which cannot be mistaken for a manufacturer. `AURA-RENDER-8008`
+# fires for every real body and the reference profile renders it.
+#
+# ---------------------------------------------------------------------------
+# CHANGING THIS FILE
+# ---------------------------------------------------------------------------
+#
+# Bump `profiles_ver`. Every stored render hash that used a changed row becomes stale, and
+# `aura-cli verify --phase 14` prints how many. A row is added with:
+#
+#   1. the matrix, from a measured target or the body's own DNG tags;
+#   2. the illuminant it was measured under - D50 or D65, and nothing else is accepted;
+#   3. `measured_by`, which is a person, and `note`, which is what they measured.
+#
+# A row with an empty `measured_by` is refused by the loader. That is the one rule in this
+# file that is enforced rather than requested, and it exists because an unattributed matrix
+# is a matrix nobody can ask about in two years.
+
+profiles_ver = 1
+
+# ---------------------------------------------------------------------------
+# The reference profile. Used when a body is not in the table.
+#
+# sRGB primaries under D50, which is the identity-shaped choice: it makes no claim about any
+# sensor, so an image rendered through it looks uncalibrated rather than wrong. That is the
+# correct failure mode for an unknown camera.
+# ---------------------------------------------------------------------------
+[reference]
+illuminant  = "D50"
+xyz_to_camera = [
+  [ 3.1338561, -1.6168667, -0.4906146],
+  [-0.9787684,  1.9161415,  0.0334540],
+  [ 0.0719453, -0.2289914,  1.4052427],
+]
+measured_by = "COL (documented fallback, not a measurement)"
+note = "sRGB primaries under D50. Renders visibly uncalibrated on purpose."
+
+# ---------------------------------------------------------------------------
+# The eight synthetic bench bodies. Exact by construction, which is what makes the
+# cross-body golden suite mean something: eight genuinely different colour responses whose
+# right answer is known, rather than eight guesses about real cameras.
+#
+# Their matrices live in `aura_raw::colour::profile::bundled()` and are not repeated here.
+# This table names them so the loader can report how many bodies it knows about, and so that
+# the day a real body is added it is added *beside* these rather than instead of them.
+# ---------------------------------------------------------------------------
+[[bench]]
+make = "AURA"
+model = "Bench-01"
+note = "cross-talk 0.00 - the base matrix"
+
+[[bench]]
+make = "AURA"
+model = "Bench-02"
+note = "cross-talk +0.05, warm-biased"
+
+[[bench]]
+make = "AURA"
+model = "Bench-03"
+note = "cross-talk -0.05, cool-biased"
+
+[[bench]]
+make = "AURA"
+model = "Bench-04"
+note = "cross-talk +0.10, warm-biased"
+
+[[bench]]
+make = "AURA"
+model = "Bench-05"
+note = "cross-talk -0.10, cool-biased"
+
+[[bench]]
+make = "AURA"
+model = "Bench-06"
+note = "cross-talk +0.15, warm-biased"
+
+[[bench]]
+make = "AURA"
+model = "Bench-07"
+note = "cross-talk -0.15, cool-biased"
+
+[[bench]]
+make = "AURA"
+model = "Bench-08"
+note = "cross-talk +0.20, warm-biased"

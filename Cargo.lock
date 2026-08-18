@@ -73,6 +73,8 @@ dependencies = [
  "aura-people",
  "aura-preview",
  "aura-raw",
+ "aura-recipe",
+ "aura-render",
  "aura-vision",
  "parking_lot",
  "rusqlite",
@@ -177,6 +179,8 @@ dependencies = [
  "aura-perf",
  "aura-preview",
  "aura-raw",
+ "aura-recipe",
+ "aura-render",
  "aura-vision",
  "rusqlite",
  "serde",
@@ -383,6 +387,8 @@ dependencies = [
  "aura-infer",
  "aura-people",
  "aura-raw",
+ "aura-recipe",
+ "aura-render",
  "aura-vision",
  "rusqlite",
  "serde",
@@ -425,6 +431,38 @@ dependencies = [
  "time",
  "tracing",
  "zune-jpeg",
+]
+
+[[package]]
+name = "aura-recipe"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "tracing",
+]
+
+[[package]]
+name = "aura-render"
+version = "0.1.0"
+dependencies = [
+ "aura-core",
+ "aura-raw",
+ "aura-recipe",
+ "blake3",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "toml",
+ "tracing",
 ]
 
 [[package]]

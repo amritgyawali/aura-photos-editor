@@ -1,0 +1,29 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:20128/v1",
+    "ANTHROPIC_AUTH_TOKEN": "sk-ad72283aab046518-4896bc-39e3f4b1",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_MODEL": "claude-pro-and-free"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(docker version *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(xargs -I{} sh -c 'echo === {} ===; cat {}')",
+      "Bash(echo \"exit:$?\")",
+      "Bash(pnpm --version)",
+      "Bash(java -version)",
+      "Bash(./gradlew compileTestJava -p apps/api)",
+      "Bash(./gradlew compileTestJava)",
+      "Bash(./gradlew compileTestJava -x processResources)"
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "dotnet-agent-skills": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/dotnet/skills.git"
+      }
+    }
+  }
+}

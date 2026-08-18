@@ -17,6 +17,8 @@ members = [
   "crates/aura-brain-photo",
   "crates/aura-cull",
   "crates/aura-explain",
+  "crates/aura-recipe",
+  "crates/aura-render",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",
@@ -109,7 +111,10 @@ debug     = true
 # Fast iteration without losing overflow checks
 [profile.dev]
 overflow-checks = true
-debug           = 1
+# line-tables-only keeps file:line in panic backtraces while shedding the bulk of
+# per-binary debuginfo. Across a 23-crate workspace built with --all-targets, that
+# debuginfo is the largest single contributor to target/ size.
+debug           = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 2

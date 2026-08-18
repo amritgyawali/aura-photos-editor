@@ -249,6 +249,11 @@ impl Catalog {
             "moment_peak",
             "reaction_links",
             "emotion_preferences",
+            // PHASE-14.
+            "edit_recipes",
+            "edit_history",
+            "edit_snapshots",
+            "export_renders",
         ];
         if !COUNTABLE.contains(&table) {
             return Err(statement_failed(
