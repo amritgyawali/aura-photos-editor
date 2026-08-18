@@ -333,7 +333,7 @@ pub fn render_caps(state: &AppState) -> IpcResult<RenderCapsDto> {
 // Conversions and helpers.
 // ---------------------------------------------------------------------------
 
-fn recipe_dto(photo_id: &str, recipe: &Recipe) -> RecipeDto {
+pub(crate) fn recipe_dto(photo_id: &str, recipe: &Recipe) -> RecipeDto {
     let protected: Vec<&str> = recipe
         .provenance
         .user_edited_fields
@@ -433,7 +433,7 @@ fn control_label(path: &str) -> String {
     chars
 }
 
-fn load_or_neutral(state: &AppState, photo: PhotoId) -> Result<Recipe, AuraError> {
+pub(crate) fn load_or_neutral(state: &AppState, photo: PhotoId) -> Result<Recipe, AuraError> {
     match state.recipe_store().load(&photo)? {
         Some(recipe) => Ok(recipe),
         None => Ok(recipe_fixtures::neutral(

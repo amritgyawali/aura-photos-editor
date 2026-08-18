@@ -18,6 +18,7 @@ aura-vision  = { path = "../aura-vision" }
 rusqlite     = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }
+time         = { workspace = true }
 toml         = { workspace = true }
 tracing      = { workspace = true }
 uuid         = { workspace = true }
@@ -46,3 +47,8 @@ path = "../../tests/eval/integrity_eval.rs"
 [[test]]
 name = "composition_eval"
 path = "../../tests/eval/composition_eval.rs"
+
+# The phase 15 gates, in the same place and for the same reason.
+[[test]]
+name = "tone_eval"
+path = "../../tests/eval/tone_eval.rs"

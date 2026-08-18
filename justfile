@@ -182,6 +182,19 @@ previews CATALOG PROJECT LEVEL="thumb":
 phase-13-verify:
     cargo run --release --package aura-cli -- verify --phase 13 --work target/phase13-verify
 
+# The phase 14 gate: migration 14, the recipe's canonical form and hash, the merge
+# that protects a photographer's sliders, the stage order, a render on each bench
+# body, the tiling identity, the sidecars and a simulated schema v2.
+phase-14-verify:
+    cargo run --release --package aura-cli -- verify --phase 14 --work target/phase14-verify
+
+# The phase 15 gate: migration 15 and the columns it cannot have, the target table,
+# both models through the real registry, a skin locus accumulating across a
+# synthetic wedding and then bounding the solve, mixed light, preserved colour, the
+# override protection, the anchors phase 25 reads and determinism.
+phase-15-verify:
+    cargo run --release --package aura-cli -- verify --phase 15 --work target/phase15-verify
+
 # The calibration metrics, from the Python side. `--self-test` proves the
 # estimator catches an overconfident predictor and that a fit improves held-out
 # ECE; `--outcomes FILE --fit --diagram OUT.svg` reports on real outcomes when

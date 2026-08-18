@@ -1,0 +1,588 @@
+# Exposure and white-balance targets - PHASE-15 sections 6.1, 6.2 and 9.
+#
+# ===========================================================================
+# THIS FILE IS A PRODUCT DECISION, NOT AN IMPLEMENTATION DETAIL
+# ===========================================================================
+#
+# Section 9 gives PM the task "approve `exposure_targets.toml` and the
+# 'preserve mood' policy with the consultant". This is that file, and it is the
+# sixth in the product to require a written reason on every row.
+#
+# It is also the most visible one. Section 0 calls this phase "the most visible
+# AI decision in the product" and section 1 says photographers judge an editor
+# on exposure and skin colour "in the first ten seconds". A wrong row here does
+# not make one photograph slightly worse; it makes every photograph of one kind
+# wrong in the same direction, which is exactly what somebody notices and
+# exactly what makes them stop trusting the product.
+#
+# Two of the numbers below decide something a rule engine cannot argue its way
+# out of, and they are the ones to read first:
+#
+#   * `mood` decides whether a dark photograph is a mistake or a decision;
+#   * `preserve_coloured_light` decides whether a purple dance floor stays
+#     purple.
+#
+# Section 12's second failure mode is "neutralising creative lighting". Both
+# fields exist so that the answer is a product decision with a name against it
+# rather than a threshold somebody tuned.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# subject_luma_min / subject_luma_max     0.05 .. 0.95, min < max
+#     The band the PROMINENCE-WEIGHTED MEAN LUMINANCE OF THE FACES should land
+#     in, in perceptual (gamma-encoded) units. Section 6.1 gives two of these
+#     numbers directly - "ceremony faces at 45-55 %, dance floor 30-40 %" - and
+#     the rest are set relative to those two.
+#
+#     It is a band about FACES, not about the frame. That is the whole of
+#     section 1's argument: "the bride's face is the anchor, not the mean
+#     luminance of a dark reception hall". A frame with no faces falls back to
+#     the scene-level exposure model and says so.
+#
+# clip_tolerance                          0.0 .. 0.20
+#     How much of the frame this scene will accept becoming NEWLY clipped in
+#     order to reach the band. A family portrait accepts almost none; a
+#     backlit golden-hour frame accepts a quarter of the sky.
+#
+# shadow_lift_scale                       0.4 .. 1.6
+#     Multiplies phase 09's measured shadow headroom for this body. Above one
+#     means this scene will accept a noisier lift than the body's baseline;
+#     below one means it will not. A dance floor is allowed to be noisy and a
+#     family portrait is not, and phase 09 already knows what the noise costs.
+#
+# mood                                    lift | neutral | preserve
+#     What to do when the subject is BELOW the band.
+#       lift      - always bring it into the band. Nothing at a wedding is
+#                   deliberately underexposed in this scene.
+#       neutral   - bring it into the band unless a constraint stops it.
+#       preserve  - a dark frame here is probably a decision. The solver lifts
+#                   only to the bottom of the band and stops, and records
+#                   `mood_preserved`.
+#     This is the field that keeps moody dance floors moody. Section 2.1.
+#
+# preserve_coloured_light                 true | false
+#     True when a saturated non-neutral illuminant in this scene is a creative
+#     choice and must NOT be neutralised. Section 2.1: "a purple dance floor
+#     should stay purple". When true, a saturated light is corrected only far
+#     enough to keep skin inside its measured locus, and the frame carries
+#     `coloured_light_preserved` or `coloured_light_partial`.
+#
+# tungsten_floor_k                        1800 .. 5500
+#     The lowest temperature the recipe may be SET to in this scene.
+#
+#     Setting the recipe's temperature equal to the light's own temperature
+#     neutralises the frame completely; setting it higher leaves warmth behind.
+#     So a floor is an under-correction: when the light is warmer than this
+#     number, the correction stops here and the rest of the warmth is kept. A
+#     ritual lit by fire at 1900 K corrected all the way to neutral is a grey
+#     havan, and a photographer will undo it on every frame.
+#
+# max_correction_k                        200 .. 8000
+#     How far, in kelvin, a solution may move from the camera's own as-shot
+#     value. A bound rather than a target: it is what stops a single confident
+#     but wrong hypothesis taking a frame somewhere no photographer would go.
+#
+# backlight_allowance                     0.0 .. 0.50
+#     Fraction of the frame this scene will let blow out when the subject is
+#     backlit and the exposure is set for their face. Section 6.1's dedicated
+#     backlit rule: "expose for the subject, accept blown background above a
+#     threshold, and note it as intentional".
+#
+# neutral_prior                           0.0 .. 1.0
+#     How much this scene expects to contain a KNOWN NEUTRAL - a white dress,
+#     a tablecloth, printed paper, a shirt. It weights the known-neutral
+#     hypothesis in the illuminant solve. High in getting-ready and at dinner
+#     tables; low on a dance floor, where the brightest thing in the frame is
+#     usually a coloured light and "white patch" is a trap.
+#
+# rationale
+#     Why a photographer would agree. Refused below nine characters -
+#     `AURA-ML-5063` - and expected to say something other than the number.
+#
+# ---------------------------------------------------------------------------
+# VERSIONING
+# ---------------------------------------------------------------------------
+#
+# Bump `version` on ANY change below. It is written into
+# `image_tone_estimate.targets_ver` on every row, and an estimate made under
+# version 1 and one made under version 2 are not comparable - `AURA-ML-5060`
+# exists so that comparison never happens silently. The rows made under the old
+# version become pending by definition and the background pass replaces them.
+#
+# The file that ships is the baseline. A copy at
+# `<catalog>/config/exposure_targets.toml` overrides it at run time; a
+# malformed override falls back to this file with a warning, and a malformed
+# BASELINE halts, because half a table would expose the ceremony against
+# measured bands and the reception against neutral ones.
+
+version = 1
+
+# ===========================================================================
+# THE NEUTRAL ROW
+# ===========================================================================
+#
+# What an unclassified frame, and any scene with no row of its own, is judged
+# against. Deliberately unopinionated and deliberately cautious: `mood` is
+# neutral, coloured light is preserved, and the correction bound is tight.
+# A frame judged here also carries `no_target_row` and loses confidence, so
+# nobody mistakes a neutral decision for a scene-conditioned one.
+
+[neutral]
+subject_luma_min        = 0.42
+subject_luma_max        = 0.55
+clip_tolerance          = 0.010
+shadow_lift_scale       = 1.00
+mood                    = "neutral"
+preserve_coloured_light = true
+tungsten_floor_k        = 3000
+max_correction_k        = 2500
+backlight_allowance     = 0.10
+neutral_prior           = 0.50
+rationale = """
+The substitute for a row nobody has written. It preserves rather than corrects
+in every ambiguous direction, because the cost of leaving a frame alone is that
+a photographer adjusts it, and the cost of confidently changing it is that they
+adjust it back and stop trusting the rest.
+"""
+
+# ===========================================================================
+# GETTING READY
+# ===========================================================================
+
+[[scene]]
+id                      = "getting_ready_bride"
+subject_luma_min        = 0.48
+subject_luma_max        = 0.60
+clip_tolerance          = 0.012
+shadow_lift_scale       = 1.00
+mood                    = "lift"
+preserve_coloured_light = false
+tungsten_floor_k        = 3400
+max_correction_k        = 3000
+backlight_allowance     = 0.18
+neutral_prior           = 0.85
+rationale = """
+The brightest, airiest set of the day and the one place a known neutral is
+almost guaranteed: the dress, the robe and the window light are all in frame.
+The band sits high because these photographs are printed light, and the neutral
+prior is the highest in the file because a white dress under a window is the one
+reliable grey card a wedding contains.
+"""
+
+[[scene]]
+id                      = "getting_ready_groom"
+subject_luma_min        = 0.44
+subject_luma_max        = 0.56
+clip_tolerance          = 0.012
+shadow_lift_scale       = 1.00
+mood                    = "neutral"
+preserve_coloured_light = false
+tungsten_floor_k        = 3200
+max_correction_k        = 3000
+backlight_allowance     = 0.15
+neutral_prior           = 0.70
+rationale = """
+The same room and a darker wardrobe. A shirt is a neutral and a suit is not, so
+the prior is lower than the bride's, and the band is a little lower because
+these frames are usually lit by one lamp rather than by a window.
+"""
+
+[[scene]]
+id                      = "details"
+subject_luma_min        = 0.42
+subject_luma_max        = 0.55
+clip_tolerance          = 0.008
+shadow_lift_scale       = 0.85
+mood                    = "neutral"
+preserve_coloured_light = false
+tungsten_floor_k        = 3400
+max_correction_k        = 2500
+backlight_allowance     = 0.08
+neutral_prior           = 0.90
+rationale = """
+Rings on paper, invitations, flat-lays. There is almost never a face here, so
+this row is mostly a bound on the scene-level model rather than a face band -
+but the neutral prior matters more than in any other scene, because printed card
+and linen are what a known-neutral detector is for.
+"""
+
+# ===========================================================================
+# BEFORE THE CEREMONY
+# ===========================================================================
+
+[[scene]]
+id                      = "first_look"
+subject_luma_min        = 0.45
+subject_luma_max        = 0.57
+clip_tolerance          = 0.015
+shadow_lift_scale       = 1.00
+mood                    = "neutral"
+preserve_coloured_light = false
+tungsten_floor_k        = 3600
+max_correction_k        = 2500
+backlight_allowance     = 0.22
+neutral_prior           = 0.60
+rationale = """
+Usually outdoors and very often backlit on purpose, which is why the backlight
+allowance is nearly a quarter of the frame. The faces carry the moment and the
+background is allowed to go.
+"""
+
+[[scene]]
+id                      = "ceremony_entrance"
+subject_luma_min        = 0.44
+subject_luma_max        = 0.56
+clip_tolerance          = 0.018
+shadow_lift_scale       = 1.10
+mood                    = "neutral"
+preserve_coloured_light = true
+tungsten_floor_k        = 2900
+max_correction_k        = 2800
+backlight_allowance     = 0.25
+neutral_prior           = 0.45
+rationale = """
+The hardest lighting of the day after the reception: a dark aisle, a bright
+doorway and often a spotlight. The clipping tolerance and the backlight
+allowance are both raised because the doorway behind an entering bride is
+supposed to blow.
+"""
+
+# ===========================================================================
+# THE CEREMONY
+# ===========================================================================
+
+[[scene]]
+id                      = "ceremony"
+subject_luma_min        = 0.45
+subject_luma_max        = 0.55
+clip_tolerance          = 0.010
+shadow_lift_scale       = 1.00
+mood                    = "neutral"
+preserve_coloured_light = false
+tungsten_floor_k        = 3000
+max_correction_k        = 2500
+backlight_allowance     = 0.15
+neutral_prior           = 0.55
+rationale = """
+Section 6.1's own worked example, kept exactly: ceremony faces at 45-55 %. This
+is the row every other band in the file is set relative to, and it is the one
+row that should not move without a photographer in the conversation.
+"""
+
+[[scene]]
+id                      = "ritual"
+subject_luma_min        = 0.40
+subject_luma_max        = 0.52
+clip_tolerance          = 0.025
+shadow_lift_scale       = 1.15
+mood                    = "preserve"
+preserve_coloured_light = true
+tungsten_floor_k        = 2400
+max_correction_k        = 2000
+backlight_allowance     = 0.12
+neutral_prior           = 0.35
+rationale = """
+Fire, lamps, diyas and a mandap. The light is warm because it is flame, and a
+solver that corrected it to daylight would turn a havan into a fluorescent
+office. The floor is the lowest in the file outside the dance floor, the mood is
+preserved, and the clipping tolerance is raised because a flame is meant to be
+clipped - phase 09's specular exclusion already knows that and this row agrees
+with it.
+"""
+
+[[scene]]
+id                      = "vows"
+subject_luma_min        = 0.45
+subject_luma_max        = 0.55
+clip_tolerance          = 0.010
+shadow_lift_scale       = 1.00
+mood                    = "neutral"
+preserve_coloured_light = false
+tungsten_floor_k        = 3000
+max_correction_k        = 2500
+backlight_allowance     = 0.15
+neutral_prior           = 0.55
+rationale = """
+The ceremony row, because it is the ceremony. It exists separately so that a
+later release can move the vows without moving the processional, which is a
+distinction photographers make and a classifier can see.
+"""
+
+[[scene]]
+id                      = "rings"
+subject_luma_min        = 0.44
+subject_luma_max        = 0.56
+clip_tolerance          = 0.012
+shadow_lift_scale       = 0.95
+mood                    = "neutral"
+preserve_coloured_light = false
+tungsten_floor_k        = 3000
+max_correction_k        = 2400
+backlight_allowance     = 0.12
+neutral_prior           = 0.60
+rationale = """
+Hands, metal and often a close crop. Metal is specular rather than neutral, so
+the prior is only slightly above the ceremony's - a wedding band is not a grey
+card however white it looks.
+"""
+
+[[scene]]
+id                      = "kiss"
+subject_luma_min        = 0.45
+subject_luma_max        = 0.57
+clip_tolerance          = 0.015
+shadow_lift_scale       = 1.00
+mood                    = "neutral"
+preserve_coloured_light = false
+tungsten_floor_k        = 3000
+max_correction_k        = 2500
+backlight_allowance     = 0.20
+neutral_prior           = 0.50
+rationale = """
+One frame that has to work. The band is a little higher and a little wider than
+the ceremony's because this photograph is usually printed large, and the
+backlight allowance is raised because an outdoor kiss against a bright sky is a
+photograph nobody wants darkened to save the sky.
+"""
+
+# ===========================================================================
+# PORTRAITS
+# ===========================================================================
+
+[[scene]]
+id                      = "family_portrait"
+subject_luma_min        = 0.48
+subject_luma_max        = 0.58
+clip_tolerance          = 0.005
+shadow_lift_scale       = 0.75
+mood                    = "lift"
+preserve_coloured_light = false
+tungsten_floor_k        = 3800
+max_correction_k        = 2200
+backlight_allowance     = 0.08
+neutral_prior           = 0.60
+rationale = """
+The tightest row in the file, in both directions. Twenty faces have to be
+readable and every one of them will be looked at by the person it belongs to,
+so almost no new clipping is accepted and the shadow lift is bounded below the
+body's own headroom. Nothing about a family portrait is moody.
+"""
+
+[[scene]]
+id                      = "group_portrait"
+subject_luma_min        = 0.47
+subject_luma_max        = 0.57
+clip_tolerance          = 0.006
+shadow_lift_scale       = 0.80
+mood                    = "lift"
+preserve_coloured_light = false
+tungsten_floor_k        = 3800
+max_correction_k        = 2200
+backlight_allowance     = 0.10
+neutral_prior           = 0.55
+rationale = """
+The family row with slightly more room, because a bridal party is usually
+outdoors and moves faster. Still a lift scene: a dark group photograph is a
+mistake and never a decision.
+"""
+
+[[scene]]
+id                      = "couple_portrait"
+subject_luma_min        = 0.46
+subject_luma_max        = 0.58
+clip_tolerance          = 0.020
+shadow_lift_scale       = 1.05
+mood                    = "neutral"
+preserve_coloured_light = true
+tungsten_floor_k        = 3200
+max_correction_k        = 2600
+backlight_allowance     = 0.28
+neutral_prior           = 0.50
+rationale = """
+The widest creative latitude of any scene with faces in it. A couple portrait is
+where a photographer shoots into the sun, uses a gel and deliberately
+underexposes for silhouette, so the backlight allowance is the second highest in
+the file and coloured light is preserved.
+"""
+
+[[scene]]
+id                      = "golden_hour"
+subject_luma_min        = 0.40
+subject_luma_max        = 0.54
+clip_tolerance          = 0.030
+shadow_lift_scale       = 1.10
+mood                    = "preserve"
+preserve_coloured_light = true
+tungsten_floor_k        = 4200
+max_correction_k        = 1800
+backlight_allowance     = 0.35
+neutral_prior           = 0.30
+rationale = """
+The scene most damaged by a correct auto-white-balance. Golden hour is warm
+because the sun is low; a solver that removed the warmth would produce a
+technically neutral photograph of a moment that did not look like that. The
+correction bound is the tightest in the file for exactly that reason, the floor
+is high so the frame cannot be pushed into tungsten either, and a third of the
+frame is allowed to blow.
+"""
+
+# ===========================================================================
+# THE RECEPTION
+# ===========================================================================
+
+[[scene]]
+id                      = "reception_entrance"
+subject_luma_min        = 0.38
+subject_luma_max        = 0.50
+clip_tolerance          = 0.030
+shadow_lift_scale       = 1.25
+mood                    = "preserve"
+preserve_coloured_light = true
+tungsten_floor_k        = 2600
+max_correction_k        = 2000
+backlight_allowance     = 0.20
+neutral_prior           = 0.25
+rationale = """
+Uplighters, a spotlight and a dark room. The faces are the only thing that has
+to be right; the room is supposed to look like a room with the lights down. The
+neutral prior is low because the brightest object in the frame is a coloured
+light and a white-patch estimate would follow it.
+"""
+
+[[scene]]
+id                      = "speeches"
+subject_luma_min        = 0.42
+subject_luma_max        = 0.54
+clip_tolerance          = 0.018
+shadow_lift_scale       = 1.15
+mood                    = "neutral"
+preserve_coloured_light = true
+tungsten_floor_k        = 2800
+max_correction_k        = 2400
+backlight_allowance     = 0.15
+neutral_prior           = 0.70
+rationale = """
+Dark room, warm bulbs, and the one reception scene with a reliable neutral in
+frame: the tablecloths. The prior is therefore high even though the light is
+difficult, which is the case this whole hypothesis machinery exists for.
+"""
+
+[[scene]]
+id                      = "cake"
+subject_luma_min        = 0.42
+subject_luma_max        = 0.54
+clip_tolerance          = 0.020
+shadow_lift_scale       = 1.15
+mood                    = "neutral"
+preserve_coloured_light = true
+tungsten_floor_k        = 2800
+max_correction_k        = 2400
+backlight_allowance     = 0.15
+neutral_prior           = 0.75
+rationale = """
+The speeches row with a higher neutral prior, because a white cake under
+tungsten is the single most useful neutral at a reception - and the single
+easiest thing for a naive white-patch estimate to turn grey-blue.
+"""
+
+[[scene]]
+id                      = "first_dance"
+subject_luma_min        = 0.32
+subject_luma_max        = 0.45
+clip_tolerance          = 0.035
+shadow_lift_scale       = 1.30
+mood                    = "preserve"
+preserve_coloured_light = true
+tungsten_floor_k        = 2400
+max_correction_k        = 1600
+backlight_allowance     = 0.25
+neutral_prior           = 0.15
+rationale = """
+Two people in a spotlight in a dark room, usually with a coloured wash behind
+them. Lifting this to a normal exposure destroys the photograph, so the band is
+low and the mood is preserved; the correction bound is nearly the tightest in
+the file because whatever colour the room is, it is the colour the couple danced
+in.
+"""
+
+[[scene]]
+id                      = "dance_floor"
+subject_luma_min        = 0.30
+subject_luma_max        = 0.40
+clip_tolerance          = 0.040
+shadow_lift_scale       = 1.40
+mood                    = "preserve"
+preserve_coloured_light = true
+tungsten_floor_k        = 2400
+max_correction_k        = 1500
+backlight_allowance     = 0.25
+neutral_prior           = 0.10
+rationale = """
+Section 6.1's second worked example, kept exactly: dance floor 30-40 %. It is
+the lowest band, the loosest noise allowance and the tightest correction bound
+in the file, and all three say the same thing - a dance floor is dark, noisy and
+purple on purpose. The lowest neutral prior too: there is nothing white on a
+dance floor that is not being lit by something coloured.
+"""
+
+# ===========================================================================
+# EVERYTHING ELSE
+# ===========================================================================
+
+[[scene]]
+id                      = "candid"
+subject_luma_min        = 0.42
+subject_luma_max        = 0.55
+clip_tolerance          = 0.015
+shadow_lift_scale       = 1.05
+mood                    = "neutral"
+preserve_coloured_light = true
+tungsten_floor_k        = 3000
+max_correction_k        = 2500
+backlight_allowance     = 0.15
+neutral_prior           = 0.45
+rationale = """
+A candid can be anywhere in the day and under any light, which is why this row
+is close to the neutral one. The band is a fraction wider than the ceremony's
+because a candid is rarely the frame the whole gallery is built around.
+"""
+
+[[scene]]
+id                      = "venue"
+subject_luma_min        = 0.40
+subject_luma_max        = 0.55
+clip_tolerance          = 0.025
+shadow_lift_scale       = 0.90
+mood                    = "neutral"
+preserve_coloured_light = true
+tungsten_floor_k        = 2800
+max_correction_k        = 2600
+backlight_allowance     = 0.20
+neutral_prior           = 0.55
+rationale = """
+Empty rooms, architecture and table settings, usually with a window in frame.
+There are rarely faces, so the band is wide and the row mostly bounds the
+scene-level model; the clipping tolerance is raised because a window in an
+interior is always going to blow and darkening the room to save it is wrong.
+"""
+
+[[scene]]
+id                      = "exit"
+subject_luma_min        = 0.36
+subject_luma_max        = 0.50
+clip_tolerance          = 0.045
+shadow_lift_scale       = 1.30
+mood                    = "preserve"
+preserve_coloured_light = true
+tungsten_floor_k        = 2200
+max_correction_k        = 1600
+backlight_allowance     = 0.20
+neutral_prior           = 0.10
+rationale = """
+Sparklers at midnight. The highest clipping tolerance in the file, because every
+sparkler in the frame is clipped and none of them is a defect, and the lowest
+temperature floor, because the only light is flame. A neutral exit photograph is
+a photograph of a car park.
+"""

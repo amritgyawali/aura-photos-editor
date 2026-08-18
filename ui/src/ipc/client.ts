@@ -2,6 +2,16 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  AcceptToneInput,
+  EstimateToneInput,
+  ReferenceFrameDto,
+  ReferenceFramesInput,
+  SetToneOverrideDto,
+  SetToneOverrideInput,
+  ToneDto,
+  TonePassDto,
+  ToneReviewInput,
+  ToneStatusDto,
   DevelopImageInput,
   DevelopStatusDto,
   HistoryDto,
@@ -742,4 +752,41 @@ export const develop = {
   /** How much of a wedding has an edit. The denominator is every photograph. */
   developStatus: (projectId: string): Promise<DevelopStatusDto> =>
     invoke<DevelopStatusDto>('develop_status', { projectId }),
+};
+
+/**
+ * PHASE-15. The exposure and white-balance surface.
+ *
+ * Seven calls. Four read, one runs the pass, and two record what the photographer decided.
+ * None of them returns a skin locus: what a named person's skin looks like stays behind the
+ * service, and the panel gets counts instead (ADR-0032 section 4).
+ */
+export const tone = {
+  /** How much of a wedding has an exposure decision, and how much of it came from a face. */
+  toneStatus: (projectId: string): Promise<ToneStatusDto> =>
+    invoke<ToneStatusDto>('tone_status', { projectId }),
+
+  /** One photograph's decision, or `null` when nobody has estimated it. */
+  imageTone: (photoId: string): Promise<ToneDto | null> =>
+    invoke<ToneDto | null>('image_tone', { photoId }),
+
+  /** The frames whose white balance is worth a look, weakest first. A queue, not a cull. */
+  toneReviewQueue: (input: ToneReviewInput): Promise<string[]> =>
+    invoke<string[]>('tone_review_queue', { input }),
+
+  /** One chapter's anchors, best first. What phase 25 will normalise toward. */
+  referenceFrames: (input: ReferenceFramesInput): Promise<ReferenceFrameDto[]> =>
+    invoke<ReferenceFrameDto[]>('reference_frames', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptTone: (input: AcceptToneInput): Promise<ToneDto> =>
+    invoke<ToneDto>('accept_tone', { input }),
+
+  /** Record what they set instead, and write it into the recipe as a person. */
+  setToneOverride: (input: SetToneOverrideInput): Promise<SetToneOverrideDto> =>
+    invoke<SetToneOverrideDto>('set_tone_override', { input }),
+
+  /** Run the resumable pass, then carry what it decided into the recipes. */
+  estimateTone: (input: EstimateToneInput): Promise<TonePassDto> =>
+    invoke<TonePassDto>('estimate_tone', { input }),
 };

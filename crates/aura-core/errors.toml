@@ -1107,3 +1107,63 @@ summary      = "The processor and accelerator paths disagreed beyond the documen
 user_message = "AURA found that two ways of developing the same photograph gave different results, so it stopped rather than deliver something it cannot reproduce."
 runbook      = "docs/runbooks/AURA-RENDER-8010.md"
 introduced   = "PHASE-14"
+
+# Phase 15. Exposure and white balance, ML 5060-5065. The same five shapes the
+# phase 09 and phase 11 blocks have - version drift, a refused edit, one item
+# that could not be done, a refused config file, and a config file missing a row
+# - plus one that is new in this phase: the skin constraint could not be applied
+# because nobody has been photographed well enough yet.
+
+[[error]]
+code         = "AURA-ML-5060"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored tone estimates came from different heads, arithmetic or targets"
+user_message = "AURA has improved how it sets exposure and colour, so it is re-checking this wedding in the background. Anything you have already adjusted is kept."
+runbook      = "docs/runbooks/AURA-ML-5060.md"
+introduced   = "PHASE-15"
+
+[[error]]
+code         = "AURA-ML-5061"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "An exposure or white-balance override was refused"
+user_message = "AURA could not record that adjustment. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5061.md"
+introduced   = "PHASE-15"
+
+[[error]]
+code         = "AURA-ML-5062"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph's exposure and white balance could not be estimated"
+user_message = "AURA could not work out the exposure and colour for one photograph, and has left it as the camera recorded it. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5062.md"
+introduced   = "PHASE-15"
+
+[[error]]
+code         = "AURA-ML-5063"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The exposure target table was refused"
+user_message = "AURA could not load the settings that decide how bright faces should be, so it has not adjusted anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5063.md"
+introduced   = "PHASE-15"
+
+[[error]]
+code         = "AURA-ML-5064"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A scene has no exposure target row"
+user_message = "AURA has no exposure guidance recorded for this kind of photograph yet, so it is adjusting those ones cautiously. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5064.md"
+introduced   = "PHASE-15"
+
+[[error]]
+code         = "AURA-ML-5065"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "No skin reference was available, so the colour was set without one"
+user_message = "AURA has not seen enough well-lit photographs of these people to know what their skin should look like, so it set the colour from the light alone. Those frames are worth a look."
+runbook      = "docs/runbooks/AURA-ML-5065.md"
+introduced   = "PHASE-15"

@@ -7,6 +7,8 @@ use std::sync::Arc;
 
 use aura_brain_photo::composition::{Composition, CompositionPass, CompositionStore};
 use aura_brain_photo::integrity::{Integrity, IntegrityPass, IntegrityStore};
+use aura_brain_photo::tone::api::FrameExif;
+use aura_brain_photo::tone::{AsShot, Tone, TonePass, ToneStore};
 use aura_brain_wedding::emotion::{Emotion, EmotionPass, EmotionStore};
 use aura_brain_wedding::moments::{MomentStore, Moments};
 use aura_brain_wedding::scene::classifier::SceneClassifier;
@@ -1669,6 +1671,136 @@ impl AppState {
             || PathBuf::from("hardware"),
             |parent| parent.join("hardware"),
         )
+    }
+
+    /// The tone store for this catalog. PHASE-15.
+    ///
+    /// Stateless like the integrity, emotion, composition and cull stores. It owns no model
+    /// and opens no preview; those belong to the pass below.
+    #[must_use]
+    pub fn tone_store(&self) -> Arc<ToneStore> {
+        Arc::new(ToneStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `ToneService` for this catalog. PHASE-15.
+    ///
+    /// Stored estimates stay readable even when the installed target table is broken. The
+    /// service reports version drift through its outline; only a new pass has to parse the
+    /// bands and may therefore refuse to start.
+    #[must_use]
+    pub fn tone(&self) -> Arc<Tone> {
+        Arc::new(Tone::new(self.tone_store()))
+    }
+
+    /// The exposure and white-balance pass, wired to previews, inference, people, story and
+    /// the catalog's own EXIF. PHASE-15.
+    ///
+    /// People are attached unconditionally: without them **every frame becomes faceless**, no
+    /// exposure is anchored on a subject, no locus is ever built and section 1's whole
+    /// improvement is gone. Story is attached when its tables open; without it every frame is
+    /// estimated against the neutral target row, which is invariant 7 degraded rather than
+    /// broken.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5063` when the exposure target table will not load, `AURA-ML-5036` when the
+    /// camera calibration table will not, or whatever opening the preview service and the
+    /// inference engine raised.
+    pub fn tone_pass(&self, project_id: &str) -> AuraResult<TonePass> {
+        let pass = TonePass::new(
+            self.previews(project_id)?,
+            self.infer_engine()?,
+            self.tone_store(),
+            Arc::clone(&self.clock),
+        )?
+        .with_people(self.people())
+        .with_exif(self.frame_exif(project_id)?);
+        match self.story() {
+            Ok(story) => Ok(pass.with_story(story)),
+            Err(err) => {
+                tracing::warn!(
+                    target: "tone.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be exposed against the neutral band"
+                );
+                Ok(pass)
+            }
+        }
+    }
+
+    /// What EXIF said about every frame in a project, for the tone pass. PHASE-15.
+    ///
+    /// Read from the catalog rather than from the files: phase 01 owns EXIF, it is already in
+    /// `photo`, and opening an original to re-read a camera tag would break invariant 1's
+    /// spirit and the pass's time budget at once. A photograph whose EXIF said nothing gets a
+    /// default row, and `AsShot` degrades to D65 - which is one hypothesis among five rather
+    /// than an answer, so an absent tag costs a little confidence and nothing else.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the photographs cannot be read.
+    pub fn frame_exif(
+        &self,
+        project_id: &str,
+    ) -> AuraResult<BTreeMap<aura_core::PhotoId, FrameExif>> {
+        let project = aura_core::ProjectId::from_db(project_id)
+            .map_err(|_| {
+                aura_core::errors::db::statement_failed(
+                    format!("not a project id: {project_id}"),
+                    &std::io::Error::from(std::io::ErrorKind::InvalidInput),
+                )
+            })?
+            .to_db();
+        self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare(
+                    "SELECT photo_id, camera_make, camera_model, iso, width_px, height_px,                             flash_fired                        FROM photo WHERE project_id = ?1 ORDER BY photo_id",
+                )
+                .map_err(|e| {
+                    aura_core::errors::db::statement_failed("could not read exif", &e)
+                })?;
+            let mut rows = statement.query([&project]).map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read exif", &e)
+            })?;
+            let mut out = BTreeMap::new();
+            while let Some(row) = rows.next().map_err(|e| {
+                aura_core::errors::db::statement_failed("could not read an exif row", &e)
+            })? {
+                let Ok(id) = row.get::<_, String>(0) else {
+                    continue;
+                };
+                let Ok(photo) = aura_core::PhotoId::from_db(&id) else {
+                    continue;
+                };
+                let width = row.get::<_, i64>(4).unwrap_or(0).max(0);
+                let height = row.get::<_, i64>(5).unwrap_or(0).max(0);
+                #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+                let megapixels = ((width as f64) * (height as f64) / 1_000_000.0) as f32;
+                out.insert(
+                    photo,
+                    FrameExif {
+                        make: row.get::<_, String>(1).unwrap_or_default(),
+                        model: row.get::<_, String>(2).unwrap_or_default(),
+                        iso: u32::try_from(row.get::<_, i64>(3).unwrap_or(0).max(0)).unwrap_or(0),
+                        megapixels,
+                        // The camera's own temperature is not a column in `photo`, and the
+                        // `exif` key-value table stores whatever the file happened to call
+                        // the tag. `AsShot::uv` answers D65 when it does not know, which is
+                        // the honest fallback: one weak hypothesis among five rather than a
+                        // wrong answer among four.
+                        as_shot: AsShot {
+                            temperature_k: 0.0,
+                            tint: 0.0,
+                            flash_fired: row.get::<_, i64>(6).unwrap_or(0) == 1,
+                        },
+                    },
+                );
+            }
+            Ok(out)
+        })
     }
 
     /// The edit store for this catalog. PHASE-14.

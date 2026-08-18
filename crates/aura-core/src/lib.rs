@@ -38,6 +38,7 @@ pub mod contract {
     pub mod people;
     pub mod priority;
     pub mod scene;
+    pub mod tone;
 }
 
 /// Named error constructors, one module per domain in the code registry.
@@ -89,4 +90,8 @@ pub use contract::priority::Priority;
 pub use contract::scene::{
     AttrFlags, ChapterId, EditIntent, RitualId, SceneId, SceneProfile, SceneResult, SceneScore,
     Segment, Source, StoryOutline, StoryService,
+};
+pub use contract::tone::{
+    HypothesisSource, Illuminant, IlluminantKind, ReferenceFrame, SkinLocus, ToneAlternative,
+    ToneCode, ToneEstimate, ToneOutline, ToneOverride, ToneReason, ToneService,
 };

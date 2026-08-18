@@ -3554,3 +3554,309 @@ pub struct SnapshotInput {
     /// `take` or `restore`.
     pub action: String,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-15. Exposure and white balance.
+// ---------------------------------------------------------------------------
+
+/// One light the solver found in a frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IlluminantDto {
+    /// `daylight`, `tungsten`, `fluorescent`, `led`, `flash`, `candle`, `shade`,
+    /// `cloudy`, `mixed_discharge`, `coloured` or `unknown`.
+    pub kind: String,
+    /// Correlated colour temperature in kelvin, derived from the chromaticity.
+    pub cct_k: f32,
+    /// Green-magenta tint, derived from the chromaticity.
+    pub tint: f32,
+    /// How much of the frame this light accounts for, `0..1`.
+    pub weight: f32,
+    /// How far off neutral the light itself is, `0..1`.
+    pub chroma: f32,
+    /// Which generator proposed it: `camera_as_shot`, `grey_world`, `white_patch`,
+    /// `learned` or `known_neutral`.
+    pub source: String,
+    /// Where it dominates, or `null` for a light that fills the frame.
+    pub region: Option<CropRectDto>,
+}
+
+/// A runner-up white balance and what it cost.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToneAlternativeDto {
+    /// The exposure it would have been applied on top of, in stops.
+    pub exposure_ev: f32,
+    /// Colour temperature in kelvin.
+    pub temperature_k: f32,
+    /// Green-magenta tint.
+    pub tint: f32,
+    /// What the solve scored it at. Lower is better.
+    pub cost: f32,
+    /// Why it lost, as a stable reason code.
+    pub why: String,
+}
+
+/// One thing that moved an exposure or a white balance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToneReasonDto {
+    /// Stable reason code.
+    pub code: String,
+    /// The sentence, rendered from the code and the numbers the catalog stored.
+    pub text: String,
+    /// How much confidence it cost. Negative is doubt.
+    pub weight: f32,
+    /// The pixels behind it, when the reason is about a region.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// One photograph's exposure and white-balance decision.
+///
+/// Seven bits rather than one enum, for the frozen contract's reason: `mixedLight`,
+/// `backlit` and `colouredLight` are properties of the *light*, `faceAnchored` is a property
+/// of the decision, and `userEdited`, `reviewed` and `needsReview` are three different
+/// answers about a person. Collapsing any of them together would make a panel guess.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct ToneDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Exposure offset in stops. Positive brightens.
+    pub exposure_ev: f32,
+    /// How sure the exposure is, `0..1`.
+    pub exposure_conf: f32,
+    /// Colour temperature in kelvin.
+    pub temperature_k: f32,
+    /// Green-magenta tint. Positive is magenta.
+    pub tint: f32,
+    /// How sure the white balance is, `0..1`.
+    pub wb_conf: f32,
+    /// The geometric mean of the two confidences, which is what the ledger records.
+    pub confidence: f32,
+    /// Every light found, strongest weight first.
+    pub illuminants: Vec<IlluminantDto>,
+    /// True when two lights disagree spatially and phase 18 should correct locally.
+    pub mixed_light: bool,
+    /// Index into `illuminants` of the light governing the subject, or `null`.
+    pub dominant_on_subject: Option<u32>,
+    /// Prominence-weighted face luminance before the exposure moved, `0..1`.
+    pub subject_luma_before: f32,
+    /// Where this scene wants that luminance, `0..1`.
+    pub subject_luma_target: f32,
+    /// Estimated residual skin error in dE00, against the identities' own loci.
+    pub skin_de00_estimate: f32,
+    /// Runner-up colour answers, best first.
+    pub alternatives: Vec<ToneAlternativeDto>,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<ToneReasonDto>,
+    /// The scene the bands came from.
+    pub scene: String,
+    /// True when a face anchored the exposure. The bit section 1's argument turns on.
+    pub face_anchored: bool,
+    /// True when the frame was read as backlit and exposed for the subject anyway.
+    pub backlit: bool,
+    /// True when a saturated light was preserved rather than corrected.
+    pub coloured_light: bool,
+    /// Fraction of the frame this exposure newly clips.
+    pub clipping_added: f32,
+    /// Identities in frame that had a usable skin locus.
+    pub constrained_identities: u32,
+    /// True when the photographer set these values by hand.
+    ///
+    /// The three numbers above stay AURA's own. What the photographer set is in the three
+    /// fields below, and keeping both is what lets the panel show a disagreement rather than
+    /// a replacement.
+    pub user_edited: bool,
+    /// The exposure the photographer set, when they set one.
+    pub user_exposure_ev: Option<f32>,
+    /// The temperature the photographer set, when they set one.
+    pub user_temperature_k: Option<f32>,
+    /// The tint the photographer set, when they set one.
+    pub user_tint: Option<f32>,
+    /// True when the photographer has looked at this frame in the review queue.
+    pub reviewed: bool,
+    /// True when this frame belongs in the low-confidence queue.
+    pub needs_review: bool,
+    /// Which heads produced the prediction.
+    pub model_ver: u32,
+    /// Which build's arithmetic produced the solve.
+    pub analysis_ver: u32,
+    /// Which target table the bands came from.
+    pub targets_ver: u32,
+}
+
+/// What a project's tone pass covered and found.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToneStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with an estimate.
+    pub estimated: u32,
+    /// Fraction estimated; the denominator is every photograph.
+    pub coverage: f32,
+    /// Fraction of estimated frames whose exposure was anchored on a face.
+    pub face_anchored: f32,
+    /// Fraction of estimated frames whose white balance was bounded by a skin locus.
+    pub skin_constrained: f32,
+    /// Frames marked for phase 18's local correction.
+    pub mixed_light: u32,
+    /// Frames where a saturated light was preserved.
+    pub coloured_light: u32,
+    /// Frames below the review threshold that nobody has looked at.
+    pub needs_review: u32,
+    /// Frames the photographer set by hand.
+    pub user_edited: u32,
+    /// Mean exposure offset over estimated frames, in stops.
+    pub mean_ev: f32,
+    /// Mean colour temperature over estimated frames, in kelvin.
+    pub mean_cct: f32,
+    /// How many frames carry each illuminant kind as their dominant light.
+    pub illuminant_counts: Vec<u32>,
+    /// Stable illuminant slugs, in the same order.
+    pub illuminant_names: Vec<String>,
+    /// Segments with enough anchors for phase 25.
+    pub segments_anchored: u32,
+    /// Segments in the project's story.
+    pub segments: u32,
+    /// Identities with a usable skin locus.
+    pub loci: u32,
+    /// Scenes that had no target row and were estimated against neutral bands.
+    pub untargeted_scenes: Vec<String>,
+    /// Which heads produced the numbers.
+    pub model_ver: u32,
+    /// Which build's arithmetic produced them.
+    pub analysis_ver: u32,
+    /// Which target table the bands came from.
+    pub targets_ver: u32,
+}
+
+/// Start a resumable exposure and white-balance pass over a project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EstimateToneInput {
+    /// The project.
+    pub project_id: String,
+    /// Handle that `cancel_job` can signal.
+    pub cancel_id: Option<String>,
+}
+
+/// What one tone pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TonePassDto {
+    /// Photographs estimated.
+    pub estimated: u32,
+    /// Photographs that could not be estimated; no row was written for them.
+    pub failed: u32,
+    /// Frames whose exposure was anchored on a face.
+    pub face_anchored: u32,
+    /// Frames marked mixed-light.
+    pub mixed_light: u32,
+    /// Frames where a saturated light was preserved.
+    pub coloured_light: u32,
+    /// Frames below the review threshold.
+    pub low_confidence: u32,
+    /// Identities that ended the pass with a usable skin locus.
+    pub loci: u32,
+    /// Segments that ended the pass with enough anchors.
+    pub segments_anchored: u32,
+    /// Mean exposure offset over this pass, in stops.
+    pub mean_ev: f32,
+    /// Mean colour temperature over this pass, in kelvin.
+    pub mean_cct: f32,
+    /// Scenes estimated against neutral bands.
+    pub untargeted_scenes: Vec<String>,
+    /// Recipes written through the merge.
+    pub recipes_written: u32,
+    /// Recipes the merge refused to touch because a person had set the field.
+    pub recipes_protected: u32,
+    /// Milliseconds for the pass.
+    pub elapsed_ms: u64,
+    /// True when the pass stopped early because it was cancelled.
+    pub cancelled: bool,
+}
+
+/// Ask for the frames whose white balance is worth a photographer's attention.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToneReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many to return. Defaults to 200, capped at 5,000.
+    pub limit: Option<u32>,
+}
+
+/// Record that the photographer has looked at one estimate and agrees.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptToneInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Record what the photographer set instead, and write it into the recipe.
+///
+/// Every field is optional and independent: somebody who corrects only the temperature has
+/// not made a claim about the exposure, and an override carrying all three would silently
+/// freeze the two they did not touch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetToneOverrideInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// Exposure offset in stops.
+    pub exposure_ev: Option<f32>,
+    /// Colour temperature in kelvin.
+    pub temperature_k: Option<f32>,
+    /// Green-magenta tint.
+    pub tint: Option<f32>,
+}
+
+/// What recording an override did, on both sides.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetToneOverrideDto {
+    /// The estimate after the override, with `userEdited` set.
+    pub estimate: ToneDto,
+    /// The edit after the merge.
+    pub recipe: RecipeDto,
+    /// The dotted paths that moved.
+    pub changed: Vec<String>,
+    /// The dotted paths a person now owns.
+    pub protected: Vec<String>,
+}
+
+/// One of a segment's anchors for gallery consistency.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceFrameDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The chapter it anchors.
+    pub segment_id: String,
+    /// Its place in the segment's ordering, zero first.
+    pub rank: u32,
+    /// The white-balance confidence that got it chosen.
+    pub wb_conf: f32,
+    /// Its solved temperature, which is what phase 25 normalises toward.
+    pub temperature_k: f32,
+    /// Its solved tint.
+    pub tint: f32,
+    /// Its subject luminance after the exposure moved, `0..1`.
+    pub subject_luma: f32,
+    /// How good an anchor it is, `0..1`.
+    pub quality: f32,
+}
+
+/// Ask for one chapter's anchors.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceFramesInput {
+    /// The chapter.
+    pub segment_id: String,
+}
