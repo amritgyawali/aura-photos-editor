@@ -2,6 +2,65 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 15 - Exposure AI and White Balance AI (mixed lighting mastery)
+
+The first phase that decides what a photograph should look like. Exposure is set for the
+faces in the frame rather than for its average brightness, colour is worked out from four
+kinds of evidence at once and then checked against what each person's skin actually looks
+like in this wedding, a frame lit by two different lights says so instead of being badly
+corrected as though it were lit by one, and a purple dance floor stays purple.
+
+### Added
+
+- **`aura-core::contract::tone`**: the frozen `ToneEstimate`, `Illuminant`, `SkinLocus`,
+  `ToneAlternative`, `ToneReason`, `ReferenceFrame`, `ToneOutline`, `ToneOverride` and
+  `ToneService`. **There is no field anywhere in it for an ideal skin value**, which is the
+  phase's central design decision rather than a courtesy - see `docs/skin-fairness.md`.
+- **`aura-brain-photo::tone`**: twelve modules. Per-scene exposure targets, one statistics
+  pass, known-neutral detection, per-identity skin locus accumulation, four illuminant
+  hypothesis generators, skin- and neutral-scored hypothesis selection, a constrained solve
+  that walks from "leave the light alone" to "remove it completely" and stops at the first
+  point every person in frame is plausible again, an exposure clamp against clipping and
+  shadow noise, per-chapter reference frames for phase 25, the store and the resumable pass.
+- **Migration 15**: `image_tone_estimate`, `identity_skin_locus`, `segment_reference_frames`
+  and `v_tone_coverage`. There is no skin-target column and nowhere to put one; the phase
+  gate scans the schema for one on every run.
+- **`exposure_targets.toml`**: 22 scene rows with a written reason each, including which
+  scenes treat a saturated light as a creative choice rather than a fault.
+- **Two signed models with cards**: `white_balance` (a chromaticity from a 64 px *linear*
+  thumbnail - not a temperature, because most reception lighting is nowhere near the
+  Planckian locus) and `exposure_scene` (the faceless frames). int8 is forbidden on both.
+- **Seven IPC commands** (ADR-0032), the Basic panel with two confidences, the protected dot,
+  the mixed-light indicator and reset-to-AI, and a per-scene review queue that accepts a
+  whole scene in one action.
+- **`docs/mixed-lighting.md`** and **`docs/skin-fairness.md`**: what the marks mean and what
+  has not been proven, in the product's own words.
+- **`aura-cli verify --phase 15`**, 22 evaluation gates and two performance budgets.
+
+### Fixed
+
+- The white-balance confidence penalised hypotheses that **agreed** with each other, reading
+  the cost gap between the top two candidates as evidence. Two independent estimators landing
+  on the same chromaticity is the strongest evidence available and scored as "undecided", so
+  every frame fell below the skin-sample threshold, no locus was ever built, and the skin
+  constraint bound on nothing - silently. Replaced with an agreement term over the two
+  answers' chromaticity distance.
+- Migration 15's foreign keys named `identities(identity_id)` and `segments(segment_id)`;
+  both tables key on `id`. Every locus and reference-frame write failed.
+- An override was written to three columns that nothing read, so a photographer's own
+  exposure and colour could not be recovered through the service.
+- Stored floats were rounded in `f32` and widened to `f64`, so `0.263` serialised as
+  `0.263000011444091796875` and the three evidence documents cost half the per-image budget
+  in noise.
+
+### Known limits
+
+Both learned heads are untrained placeholders and **neither is consulted**; every figure this
+phase reports is about the solver, measured on synthetic frames whose illuminant and subject
+luminance were painted in. The fairness gate measures five reflectances, not five people.
+Section 11's 600 B storage row is not met - the measurement is 806.9 B, recorded with its
+decomposition in `perf/budgets.toml`. See `docs/progress/PHASE-15-EXIT.md` section 8.
+
 ## Phase 13 - Explain My Edit, confidence calibration and the decision ledger
 
 Every decision the product makes can be opened up - why, how sure, what it looked at - and

@@ -306,3 +306,158 @@ pub fn scene_unruled(scene: &str) -> AuraError {
     )
     .with_context("scene", scene)
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-15. Exposure and white balance.
+// ---------------------------------------------------------------------------
+
+/// Stored estimates came from different heads, different arithmetic or a different target
+/// table.
+pub const ML_TONE_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5060");
+/// A tone override or acceptance was refused.
+pub const ML_TONE_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5061");
+/// One photograph's exposure and white balance could not be estimated.
+pub const ML_TONE_FAILED: ErrorCode = ErrorCode("AURA-ML-5062");
+/// The exposure target table was refused.
+pub const ML_TARGETS_REFUSED: ErrorCode = ErrorCode("AURA-ML-5063");
+/// A scene has no exposure target row.
+pub const ML_SCENE_UNTARGETED: ErrorCode = ErrorCode("AURA-ML-5064");
+/// No skin locus was usable, so the solve ran without the skin constraint.
+pub const ML_SKIN_LOCUS_UNAVAILABLE: ErrorCode = ErrorCode("AURA-ML-5065");
+
+/// Stored rows disagree with the running build about a version.
+///
+/// Degraded rather than fatal, exactly as `AURA-ML-5033` and `AURA-ML-5043` are. All three
+/// numbers are in the message because the support engineer's first question is *which* one
+/// moved, and here the answer changes the cost by two orders of magnitude: a `targets_ver`
+/// bump re-compares measurements that already exist, whereas an `analysis_ver` bump re-reads
+/// four thousand proxies.
+#[must_use]
+pub fn tone_version_mismatch(
+    stored: (u16, u16, u16),
+    current: (u16, u16, u16),
+    rows: usize,
+) -> AuraError {
+    AuraError::new(
+        ML_TONE_VERSION_MISMATCH,
+        Severity::Degraded,
+        Recovery::Fallback,
+        format!(
+            "{rows} estimates are model {}/analysis {}/targets {}; this build is model \
+             {}/analysis {}/targets {}",
+            stored.0, stored.1, stored.2, current.0, current.1, current.2
+        ),
+        "AURA has improved how it sets exposure and colour, so it is re-checking this wedding \
+         in the background. Anything you have already adjusted is kept.",
+    )
+    .with_context("stale_rows", rows.to_string())
+    .with_context("stored_model_ver", stored.0.to_string())
+    .with_context("stored_analysis_ver", stored.1.to_string())
+    .with_context("stored_targets_ver", stored.2.to_string())
+}
+
+/// An override was refused. Nothing was recorded and nothing was rendered.
+///
+/// `ask_user` rather than a retry, for `AURA-ML-5034`'s reason: every refusal case is
+/// answered by re-reading the estimate and redrawing the panel.
+#[must_use]
+pub fn tone_edit_refused(what: &str, why: &str) -> AuraError {
+    AuraError::new(
+        ML_TONE_EDIT_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        format!("{what}: {why}"),
+        "AURA could not record that adjustment. Nothing was changed.",
+    )
+    .with_context("target", what)
+}
+
+/// One photograph could not be estimated. The pass continues.
+///
+/// **No row is written**, which is the whole point of the code and the rule `AURA-ML-5035`
+/// and `AURA-ML-5045` both state. A frame stored with a neutral estimate would read to
+/// phases 16, 17, 25 and 27 as "AURA decided this photograph needed nothing", and all four
+/// act on that. The absence of a row means nobody looked.
+#[must_use]
+pub fn tone_failed(photo: &str, detail: &str) -> AuraError {
+    AuraError::new(
+        ML_TONE_FAILED,
+        Severity::ItemFailed,
+        Recovery::Retry,
+        format!("{photo}: {detail}"),
+        "AURA could not work out the exposure and colour for one photograph, and has left it \
+         as the camera recorded it. Everything else in this wedding is unaffected.",
+    )
+    .with_context("photo", photo)
+}
+
+/// The exposure target table was refused. Nothing was loaded and nothing was changed.
+///
+/// **This halts**, and it is the third code in this crate that does. The argument is
+/// `AURA-ML-5036`'s and `AURA-ML-5046`'s with the stakes raised: a half-loaded target table
+/// exposes the ceremony against measured bands and the reception against neutral ones, and
+/// the result is a gallery whose brightness changes at a chapter boundary. Exposure is the
+/// most visible decision in the product, so the most visible failure mode belongs to it.
+///
+/// The message names the file, the key and the rule, in that order, because that is the
+/// order somebody fixes them in.
+#[must_use]
+pub fn targets_refused(file: &str, key: &str, rule: &str) -> AuraError {
+    AuraError::new(
+        ML_TARGETS_REFUSED,
+        Severity::RunBlocking,
+        Recovery::Halt,
+        format!("{file}: `{key}` {rule}"),
+        "AURA could not load the settings that decide how bright faces should be, so it has \
+         not adjusted anything. Restore the file or reinstall.",
+    )
+    .with_context("file", file)
+    .with_context("key", key)
+}
+
+/// A scene with no target row. The neutral band was used and the estimate says so.
+///
+/// Warning rather than degraded, and the counterpart of `AURA-ML-5047` rather than of
+/// `AURA-ML-5037`: the substitute is a *neutral* band rather than a cautious one, so the
+/// wedding is fully estimated and the confidence drops by a fixed amount.
+#[must_use]
+pub fn scene_untargeted(scene: &str) -> AuraError {
+    AuraError::new(
+        ML_SCENE_UNTARGETED,
+        Severity::Warning,
+        Recovery::Fallback,
+        format!("no exposure target row for `{scene}`; the neutral band was used"),
+        "AURA has no exposure guidance recorded for this kind of photograph yet, so it is \
+         adjusting those ones cautiously. They are all still usable.",
+    )
+    .with_context("scene", scene)
+}
+
+/// No identity had enough evidence for a skin locus, so the solve ran without one.
+///
+/// The one code in this block with no counterpart in phases 09 or 11, and the one worth
+/// reading twice. Sections 6.2 and 6.3 both hang off a per-identity skin locus - it scores
+/// the hypotheses and it is a hard constraint on the solve - and a locus below
+/// `MIN_LOCUS_SAMPLES` frames does neither. A weak locus is *worse* than none, because it
+/// looks like evidence, so the code fires rather than the constraint loosening quietly.
+///
+/// It is expected rather than exceptional in this build: phase 06's detector is a
+/// placeholder and finds no faces, so every wedding raises it. That is why the message
+/// points at the review queue rather than at a fix.
+#[must_use]
+pub fn skin_locus_unavailable(project: &str, identities: usize) -> AuraError {
+    AuraError::new(
+        ML_SKIN_LOCUS_UNAVAILABLE,
+        Severity::Warning,
+        Recovery::Fallback,
+        format!(
+            "no usable skin locus in project {project}; {identities} identities were seen and \
+             none reached the sample floor, so white balance was solved from the light alone"
+        ),
+        "AURA has not yet seen enough well-lit photographs of the people here to know what \
+         their skin should look like, so it has set the colour from the light alone. Those \
+         photographs are worth a look.",
+    )
+    .with_context("project", project)
+    .with_context("identities", identities.to_string())
+}

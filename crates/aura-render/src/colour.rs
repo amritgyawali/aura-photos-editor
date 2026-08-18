@@ -91,32 +91,13 @@ pub fn recover_highlights(rgb: [f32; 3], clip: [f32; 3], strength: f32) -> [f32;
 
 /// Chromaticity of a black body or daylight illuminant at `kelvin`.
 ///
-/// Kang et al. (2002), the piecewise cubic approximation every raw converter uses, valid
-/// from 1667 K to 25000 K. Outside that range the endpoints are held, which is what the
-/// recipe's own clamp already guarantees.
-#[must_use]
-pub fn cct_to_xy(kelvin: f32) -> (f32, f32) {
-    let t = f64::from(kelvin.clamp(1667.0, 25_000.0));
-    let inv = 1.0e9 / (t * t * t);
-    let inv2 = 1.0e6 / (t * t);
-    let inv1 = 1.0e3 / t;
-
-    let x = if t < 4000.0 {
-        -0.266_123_9 * inv - 0.234_358_9 * inv2 + 0.877_695_6 * inv1 + 0.179_910
-    } else {
-        -3.025_846_9 * inv + 2.107_037_9 * inv2 + 0.222_634_7 * inv1 + 0.240_390
-    };
-
-    let y = if t < 2222.0 {
-        -1.106_381_4 * x * x * x - 1.348_110_2 * x * x + 2.185_558_3 * x - 0.202_196_8
-    } else if t < 4000.0 {
-        -0.954_947_6 * x * x * x - 1.374_185_9 * x * x + 2.091_370_1 * x - 0.167_488_7
-    } else {
-        3.081_758_0 * x * x * x - 5.873_386_7 * x * x + 3.751_130_0 * x - 0.370_014_8
-    };
-
-    (x as f32, y as f32)
-}
+/// **Moved to `aura_raw::colour::illuminant` in phase 15** and re-exported here, because
+/// phase 15's white-balance solver became its second consumer. Phase 10's rule, applied to a
+/// colour transform rather than to a warp: two copies of the Planckian locus are two renders
+/// that drift apart while looking identical, and the drift would show up as a temperature
+/// slider that means one thing in the develop panel and another in the tone estimate behind
+/// it. Every caller in this crate goes through this name, so nothing above had to change.
+pub use aura_raw::colour::illuminant::cct_to_xy;
 
 /// The white-balance multipliers a temperature and tint imply, in the working space.
 ///

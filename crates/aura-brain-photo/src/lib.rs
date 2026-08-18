@@ -78,6 +78,7 @@ pub mod composition;
 pub mod errors;
 pub mod fixtures;
 pub mod integrity;
+pub mod tone;
 
 pub use composition::{
     Composition, CompositionPass, CompositionStore, RuleTable, SceneRule, COMPOSITION_LEVEL,
@@ -85,4 +86,7 @@ pub use composition::{
 pub use integrity::{
     Analyser, Calibration, CalibrationTable, FrameContext, FrameExif, Integrity, IntegrityPass,
     IntegrityStore, PassReport, ANALYSIS_VER, INTEGRITY_LEVEL, MODEL_VER,
+};
+pub use tone::{
+    AsShot, LocusBuilder, Mood, SceneTarget, TargetTable, Tone, TonePass, ToneStore, TONE_LEVEL,
 };

@@ -1731,3 +1731,174 @@ export type SnapshotInput = {
   /** `take` or `restore`. */
   action: string;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-15. Exposure and white balance.
+// ---------------------------------------------------------------------------
+
+/** One light the solver found in a frame. */
+export type IlluminantDto = {
+  /** `daylight`, `tungsten`, `fluorescent`, `led`, `flash`, `candle`, `shade`,
+   * `cloudy`, `mixed_discharge`, `coloured` or `unknown`. */
+  kind: string;
+  cctK: number;
+  tint: number;
+  /** How much of the frame this light accounts for, `0..1`. */
+  weight: number;
+  /** How far off neutral the light itself is, `0..1`. */
+  chroma: number;
+  /** `camera_as_shot`, `grey_world`, `white_patch`, `learned` or `known_neutral`. */
+  source: string;
+  /** Where it dominates, or `null` for a light that fills the frame. */
+  region: CropRectDto | null;
+};
+
+/** A runner-up white balance and what it cost. */
+export type ToneAlternativeDto = {
+  exposureEv: number;
+  temperatureK: number;
+  tint: number;
+  /** Lower is better. The winner's cost is the floor. */
+  cost: number;
+  why: string;
+};
+
+/** One thing that moved an exposure or a white balance. */
+export type ToneReasonDto = {
+  code: string;
+  text: string;
+  /** Negative is doubt. */
+  weight: number;
+  evidence: CropRectDto | null;
+};
+
+/** One photograph's exposure and white-balance decision. */
+export type ToneDto = {
+  photoId: string;
+  exposureEv: number;
+  exposureConf: number;
+  temperatureK: number;
+  tint: number;
+  wbConf: number;
+  /** The geometric mean of the two confidences. */
+  confidence: number;
+  illuminants: IlluminantDto[];
+  mixedLight: boolean;
+  dominantOnSubject: number | null;
+  subjectLumaBefore: number;
+  subjectLumaTarget: number;
+  skinDe00Estimate: number;
+  alternatives: ToneAlternativeDto[];
+  reasons: ToneReasonDto[];
+  scene: string;
+  /** True when a face anchored the exposure. */
+  faceAnchored: boolean;
+  backlit: boolean;
+  colouredLight: boolean;
+  clippingAdded: number;
+  constrainedIdentities: number;
+  /** True when the photographer set these by hand. The three numbers above stay AURA's own. */
+  userEdited: boolean;
+  userExposureEv: number | null;
+  userTemperatureK: number | null;
+  userTint: number | null;
+  reviewed: boolean;
+  needsReview: boolean;
+  modelVer: number;
+  analysisVer: number;
+  targetsVer: number;
+};
+
+/** What a project's tone pass covered and found. */
+export type ToneStatusDto = {
+  photos: number;
+  estimated: number;
+  /** Fraction estimated; the denominator is every photograph. */
+  coverage: number;
+  /** Fraction of estimated frames whose exposure was anchored on a face. */
+  faceAnchored: number;
+  /** Fraction whose white balance was bounded by a skin locus. */
+  skinConstrained: number;
+  mixedLight: number;
+  colouredLight: number;
+  needsReview: number;
+  userEdited: number;
+  meanEv: number;
+  meanCct: number;
+  illuminantCounts: number[];
+  illuminantNames: string[];
+  segmentsAnchored: number;
+  segments: number;
+  loci: number;
+  untargetedScenes: string[];
+  modelVer: number;
+  analysisVer: number;
+  targetsVer: number;
+};
+
+export type EstimateToneInput = {
+  projectId: string;
+  cancelId?: string | null;
+};
+
+/** What one tone pass did. */
+export type TonePassDto = {
+  estimated: number;
+  failed: number;
+  faceAnchored: number;
+  mixedLight: number;
+  colouredLight: number;
+  lowConfidence: number;
+  loci: number;
+  segmentsAnchored: number;
+  meanEv: number;
+  meanCct: number;
+  untargetedScenes: string[];
+  recipesWritten: number;
+  /** Paths the merge refused because a person had set them. */
+  recipesProtected: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type ToneReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+export type AcceptToneInput = {
+  photoId: string;
+};
+
+export type SetToneOverrideInput = {
+  projectId: string;
+  photoId: string;
+  exposureEv?: number | null;
+  temperatureK?: number | null;
+  tint?: number | null;
+};
+
+/** What recording an override did, on both sides. */
+export type SetToneOverrideDto = {
+  estimate: ToneDto;
+  recipe: RecipeDto;
+  changed: string[];
+  /** The dotted paths a person now owns. */
+  protected: string[];
+};
+
+/** One of a segment's anchors for gallery consistency. */
+export type ReferenceFrameDto = {
+  photoId: string;
+  segmentId: string;
+  rank: number;
+  wbConf: number;
+  temperatureK: number;
+  tint: number;
+  subjectLuma: number;
+  quality: number;
+};
+
+export type ReferenceFramesInput = {
+  segmentId: string;
+};

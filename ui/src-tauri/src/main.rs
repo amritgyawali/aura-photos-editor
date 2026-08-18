@@ -14,6 +14,10 @@ use aura_app::contract::ipc::{
     RecordDecisionsInput, ResizeGalleryInput, ReviewQueueInput, SelectionDto, SetCameraLabelInput,
     SetCullModeInput, StartIngestInput, SupportBundleDto,
 };
+use aura_app::contract::ipc::{
+    AcceptToneInput, EstimateToneInput, ReferenceFrameDto, ReferenceFramesInput,
+    SetToneOverrideDto, SetToneOverrideInput, ToneDto, TonePassDto, ToneReviewInput, ToneStatusDto,
+};
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
 use tauri::{Manager, State};
@@ -283,6 +287,78 @@ async fn compact_ledger(state: State<'_, AppState>, project_id: String) -> IpcRe
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-15. Every tone command can touch SQLite, and `estimate_tone` decodes proxies and
+// runs two heads over a whole wedding. All seven go off the renderer thread for the reason
+// the composition block above gives: a small read that grows into a join later must not be
+// able to turn into visible jank without anybody noticing.
+#[tauri::command]
+async fn tone_status(state: State<'_, AppState>, project_id: String) -> IpcResult<ToneStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::tone_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_tone(state: State<'_, AppState>, photo_id: String) -> IpcResult<Option<ToneDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_tone(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn tone_review_queue(
+    state: State<'_, AppState>,
+    input: ToneReviewInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::tone_review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn reference_frames(
+    state: State<'_, AppState>,
+    input: ReferenceFramesInput,
+) -> IpcResult<Vec<ReferenceFrameDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::reference_frames(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn accept_tone(state: State<'_, AppState>, input: AcceptToneInput) -> IpcResult<ToneDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::accept_tone(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_tone_override(
+    state: State<'_, AppState>,
+    input: SetToneOverrideInput,
+) -> IpcResult<SetToneOverrideDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_tone_override(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn estimate_tone(
+    state: State<'_, AppState>,
+    input: EstimateToneInput,
+) -> IpcResult<TonePassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::estimate_tone(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn background_request_failed() -> IpcError {
     IpcError::from(aura_core::errors::db::statement_failed(
         "the background composition task stopped before returning its result",
@@ -363,7 +439,14 @@ fn main() {
             review_queue,
             record_decisions,
             export_support_bundle,
-            compact_ledger
+            compact_ledger,
+            tone_status,
+            image_tone,
+            tone_review_queue,
+            reference_frames,
+            accept_tone,
+            set_tone_override,
+            estimate_tone
         ])
         .run(tauri::generate_context!());
 

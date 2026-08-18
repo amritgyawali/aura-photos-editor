@@ -2024,3 +2024,256 @@ pub fn aesthetic_sample_input(batch: usize) -> Tensor {
         data: samples,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-15. Exposure and white balance.
+//
+// Two heads whose shapes say what section 6 asks of them. The white-balance head reads
+// pixels, because the colour of a light is a property of the whole frame that no summary
+// statistic captures - grey-world and white-patch *are* the summary statistics, and
+// section 6.2 lists the learned predictor beside them precisely because they fail on the
+// frames a wedding is full of. The exposure head reads measurements, because section 6.1
+// only asks it about frames with no faces in them, where the question is "what does a
+// photograph of this kind of scene usually want" and not "what is in this photograph".
+// ---------------------------------------------------------------------------
+
+/// The learned white-balance head's registered name.
+pub const WHITE_BALANCE_MODEL: &str = "white_balance";
+/// The faceless exposure head's registered name.
+pub const EXPOSURE_SCENE_MODEL: &str = "exposure_scene";
+
+/// Side of the square thumbnail the white-balance head reads.
+///
+/// 64 px. Illuminant estimation is a low-frequency problem - the answer is a global
+/// chromaticity, and every published learned estimator downsamples hard before its first
+/// convolution - so a larger input would spend the whole of section 11's 25 ms budget
+/// carrying detail the question does not use.
+pub const WB_INPUT_SIDE: usize = 64;
+
+/// How many numbers the white-balance head emits.
+///
+/// Two: a chromaticity in CIE 1976 `u'v'`. **Not a temperature and a tint**, and the choice
+/// is the one `aura_raw::colour::illuminant` documents: a temperature is a projection onto
+/// the Planckian locus, most reception lighting is nowhere near that locus, and a head
+/// trained to emit kelvin would be trained to discard the very error it exists to measure.
+pub const WB_OUTPUTS: usize = 2;
+
+/// How many luminance and histogram features the faceless exposure head reads.
+///
+/// Twelve: the frame's median and mean, four percentiles, the centre and border means, the
+/// clipped and crushed fractions, and two shape terms. Every one of them is already
+/// computed by `tone::stats`, so the head costs nothing but a matrix multiply.
+pub const EXPOSURE_FEATURES: usize = 12;
+
+/// How many scene slots condition the faceless exposure head.
+///
+/// `SceneId::ALL.len()`, as a one-hot, for `AESTHETIC_SCENES`' reason: invariant 7 makes
+/// the exposure target a function of the scene, and a one-hot cannot leak an ordering
+/// between scenes the way a scalar index would.
+pub const EXPOSURE_SCENES: usize = 23;
+
+/// Width of the faceless exposure head's input vector.
+pub const EXPOSURE_INPUT_DIM: usize = EXPOSURE_FEATURES + EXPOSURE_SCENES;
+
+/// The learned illuminant predictor.
+///
+/// `thumb [N, 3, 64, 64] -> illuminant_uv [N, 2]`, a chromaticity in CIE 1976 `u'v'`.
+///
+/// The input is **linear**, not gamma-encoded, which is unusual for a small convolutional
+/// head and is invariant 8 rather than a preference: an illuminant estimate is a statement
+/// about a ratio of channel energies, and a transfer curve applied before the first
+/// convolution makes that ratio depend on brightness.
+/// `tone::stats::FrameStats::thumbnail` is the only thing that builds this tensor.
+///
+/// The output is squashed by a `Sigmoid` and rescaled by the decoder rather than emitted
+/// raw. `u'` spans roughly 0.15 to 0.32 and `v'` roughly 0.44 to 0.53 across every
+/// illuminant a wedding can contain, so a bounded output is a head that cannot propose a
+/// chromaticity outside the diagram - which a linear output trained on a small dataset
+/// certainly would.
+#[must_use]
+pub fn white_balance() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_C010_1507_0001);
+    let side = WB_INPUT_SIDE;
+
+    let graph = Graph {
+        name: WHITE_BALANCE_MODEL.to_string(),
+        nodes: vec![
+            // 64 -> 32
+            conv3("stem", &["thumb", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 32 -> 16
+            conv3("b1", &["stem_relu", "b1_w", "b1_b"], &["b1_out"], 2),
+            node("Relu", "b1_act", &["b1_out"], &["b1_relu"]),
+            // 16 -> 8
+            pool2("pool", "b1_relu", "pool_out"),
+            // 8 -> 4
+            conv3("b2", &["pool_out", "b2_w", "b2_b"], &["b2_out"], 2),
+            node("Relu", "b2_act", &["b2_out"], &["b2_relu"]),
+            node("GlobalAveragePool", "gap", &["b2_relu"], &["gap_out"]),
+            with_int(
+                node("Flatten", "flatten", &["gap_out"], &["features"]),
+                "axis",
+                1,
+            ),
+            with_int(
+                node(
+                    "Gemm",
+                    "trunk",
+                    &["features", "trunk_w", "trunk_b"],
+                    &["trunk_out"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Relu", "trunk_act", &["trunk_out"], &["trunk_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["trunk_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logits"], &["illuminant_uv"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![16, 3, 3, 3], 0.24),
+            weights.tensor("stem_b", vec![16], 0.05),
+            weights.tensor("b1_w", vec![32, 16, 3, 3], 0.18),
+            weights.tensor("b1_b", vec![32], 0.05),
+            weights.tensor("b2_w", vec![48, 32, 3, 3], 0.15),
+            weights.tensor("b2_b", vec![48], 0.05),
+            weights.tensor("trunk_w", vec![64, 48], 0.20),
+            weights.tensor("trunk_b", vec![64], 0.05),
+            weights.tensor("head_w", vec![WB_OUTPUTS, 64], 0.22),
+            weights.tensor("head_b", vec![WB_OUTPUTS], 0.05),
+        ],
+        inputs: vec![dynamic_batch("thumb", &[3, side, side])],
+        outputs: vec![dynamic_batch("illuminant_uv", &[WB_OUTPUTS])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The faceless scene exposure model.
+///
+/// `features [N, 35] -> exposure [N, 1]`, one number in `0..1` that the decoder maps onto
+/// stops.
+///
+/// Section 6.1's third bullet: "when no face is present (details, venue), fall back to a
+/// learned scene-level exposure model trained on expert edits of the same scene class". It
+/// is the smallest head in the product and it should be: what it has to learn is a
+/// conditional mean over twenty-three scene classes with twelve covariates, which is a
+/// table and not an image problem.
+///
+/// The `Sigmoid` bounds it and the decoder maps `0..1` onto plus or minus
+/// `tone::exposure::MAX_MOVE_EV`. An unbounded regression head trained on a few thousand
+/// expert edits will occasionally emit six stops, and six stops applied to a venue
+/// photograph is a white rectangle.
+#[must_use]
+pub fn exposure_scene() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_E5E0_1507_0001);
+
+    let graph = Graph {
+        name: EXPOSURE_SCENE_MODEL.to_string(),
+        nodes: vec![
+            with_int(
+                node("Gemm", "layer1", &["features", "l1_w", "l1_b"], &["l1_out"]),
+                "transB",
+                1,
+            ),
+            node("Relu", "act1", &["l1_out"], &["l1_relu"]),
+            with_int(
+                node("Gemm", "layer2", &["l1_relu", "l2_w", "l2_b"], &["l2_out"]),
+                "transB",
+                1,
+            ),
+            node("Relu", "act2", &["l2_out"], &["l2_relu"]),
+            with_int(
+                node("Gemm", "head", &["l2_relu", "head_w", "head_b"], &["logit"]),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logit"], &["exposure"]),
+        ],
+        initializers: vec![
+            weights.tensor("l1_w", vec![48, EXPOSURE_INPUT_DIM], 0.19),
+            weights.tensor("l1_b", vec![48], 0.05),
+            weights.tensor("l2_w", vec![24, 48], 0.21),
+            weights.tensor("l2_b", vec![24], 0.05),
+            weights.tensor("head_w", vec![1, 24], 0.23),
+            weights.tensor("head_b", vec![1], 0.05),
+        ],
+        inputs: vec![dynamic_batch("features", &[EXPOSURE_INPUT_DIM])],
+        outputs: vec![dynamic_batch("exposure", &[1])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// A deterministic batch of linear thumbnails for the white-balance head.
+///
+/// Each member is a gently ramped field with a different channel balance, walking from warm
+/// to cool across the batch, so a batching bug that reuses one member's tensor produces
+/// identical rows and is caught immediately. A head that had learned anything would produce
+/// a chromaticity that slides with the balance.
+#[must_use]
+pub fn white_balance_sample_input(batch: usize) -> Tensor {
+    let side = WB_INPUT_SIDE;
+    let mut samples = Vec::with_capacity(batch * 3 * side * side);
+    for image in 0..batch {
+        let warmth = image as f32 / batch.max(1) as f32;
+        let channels = [0.55 - 0.25 * warmth, 0.45, 0.20 + 0.30 * warmth];
+        for channel in 0..3 {
+            let level = channels.get(channel).copied().unwrap_or(0.4);
+            for row in 0..side {
+                for column in 0..side {
+                    // A gradient rather than a flat field: a perfectly flat input makes
+                    // every spatial weight irrelevant and would hide a stride bug.
+                    let ramp = (row + column) as f32 / (side * 2) as f32;
+                    samples.push((level * (0.85 + 0.30 * ramp)).clamp(0.0, 1.0));
+                }
+            }
+        }
+    }
+    Tensor {
+        shape: vec![batch, 3, side, side],
+        data: samples,
+    }
+}
+
+/// A deterministic batch of faceless exposure feature vectors.
+///
+/// The twelve measurement slots ramp with the batch index and the scene one-hot walks
+/// across the twenty-three slots, so a head that ignored its conditioning would produce a
+/// flat column and a head that ignored its measurements would produce a flat row.
+#[must_use]
+pub fn exposure_sample_input(batch: usize) -> Tensor {
+    let mut samples = Vec::with_capacity(batch * EXPOSURE_INPUT_DIM);
+    for image in 0..batch {
+        for slot in 0..EXPOSURE_FEATURES {
+            let step = (image * EXPOSURE_FEATURES + slot) as f32;
+            samples.push((step * 0.041).fract());
+        }
+        let scene = image % EXPOSURE_SCENES;
+        for slot in 0..EXPOSURE_SCENES {
+            samples.push(f32::from(u8::from(slot == scene)));
+        }
+    }
+    Tensor {
+        shape: vec![batch, EXPOSURE_INPUT_DIM],
+        data: samples,
+    }
+}

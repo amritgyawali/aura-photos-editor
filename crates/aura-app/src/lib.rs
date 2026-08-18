@@ -60,6 +60,7 @@ pub mod people_commands;
 pub mod preview_commands;
 pub mod state;
 pub mod story_commands;
+pub mod tone_commands;
 
 pub use cloud_commands::{
     check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend, cloud_status,
@@ -118,4 +119,8 @@ pub use state::AppState;
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
     segment_story, set_chapter, split_chapter, story_outline, story_status,
+};
+pub use tone_commands::{
+    accept_tone, estimate_tone, image_tone, reference_frames, set_tone_override, tone_review_queue,
+    tone_status,
 };

@@ -437,6 +437,72 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::permissive(),
             },
         ),
+        // PHASE-15. Two heads, and the pair is the clearest illustration in the
+        // product of "put the question in the input". One reads pixels because the
+        // colour of a light is not recoverable from any summary of them; the other
+        // reads a summary because what it has to learn is a conditional mean over
+        // scene classes, and giving it pixels would make it spend its capacity
+        // rediscovering a median this build already computes exactly.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::WHITE_BALANCE_MODEL,
+                version: Version::new(1, 0, 0),
+                // `regression`, and the word is chosen against `multiclass`. The
+                // output is a point in a continuous chromaticity plane; a manifest
+                // that said `multiclass` would invite somebody to read the two
+                // numbers as a two-way softmax, which they emphatically are not.
+                task: "regression",
+                class: ModelClass::Embedding,
+                model: fixtures::white_balance(),
+                // `colour` says `linear_srgb` rather than `srgb`, and the
+                // distinction is invariant 8 rather than pedantry: an illuminant
+                // estimate is a statement about a ratio of channel energies, and a
+                // transfer curve applied before the first convolution makes that
+                // ratio depend on brightness. A manifest that claimed `srgb` would
+                // document the wrong preprocessing, which is the half of a model
+                // contract that has no code to check it.
+                input: InputSpec {
+                    shape: vec![1, 3, fixtures::WB_INPUT_SIDE, fixtures::WB_INPUT_SIDE],
+                    layout: "NCHW".to_string(),
+                    range: "0..1".to_string(),
+                    colour: "linear_srgb".to_string(),
+                },
+                output: BTreeMap::from([(
+                    "illuminant_uv".to_string(),
+                    vec![1, fixtures::WB_OUTPUTS],
+                )]),
+                // int8 is forbidden, and this is the sharpest case for it in the
+                // product. The output is a chromaticity, and section 10.1's gate is
+                // 200 K - which near daylight is about 0.004 in `u'v'`, on an axis
+                // whose whole useful span is about 0.17. Per-tensor int8 quantises
+                // that span into steps of roughly 0.0013, so three quantisation
+                // steps is the entire tolerance the phase is measured against.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::EXPOSURE_SCENE_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "regression",
+                class: ModelClass::Embedding,
+                model: fixtures::exposure_scene(),
+                input: Placeholder::features(fixtures::EXPOSURE_INPUT_DIM),
+                output: BTreeMap::from([("exposure".to_string(), vec![1, 1])]),
+                // int8 is forbidden, for a version of the same argument. One
+                // sigmoid mapped onto six stops means a quantisation step of about
+                // 0.024 stops - which is comfortably inside section 10.1's 0.15 EV
+                // tolerance, so the reason is not the tolerance. It is that this
+                // head decides the exposure of every faceless frame in the wedding:
+                // the details, the venue, the flat-lays. A systematic bias of two
+                // hundredths of a stop across four hundred frames is a visible step
+                // between the chapters that have faces in them and the ones that do
+                // not, and gallery consistency is what phase 25 is then asked to fix.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {

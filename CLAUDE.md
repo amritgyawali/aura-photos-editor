@@ -73,6 +73,11 @@ Never load two phase files into one session.
 | Camera profiles (versioned, COL-owned) | `crates/aura-render/config/camera_profiles.toml` |
 | Develop evaluation gates | `tests/eval/render_eval.rs` |
 | How colour works, in the product's own words | `docs/colour-management.md` |
+| Exposure and white-balance decisions | `docs/adr/ADR-0031-exposure-white-balance-and-skin.md` |
+| Exposure targets (versioned, PM-owned) | `crates/aura-brain-photo/config/exposure_targets.toml` |
+| Tone evaluation gates | `tests/eval/tone_eval.rs` + `ml/models/tone/eval_tone.py` |
+| What the lighting marks mean, in the product's own words | `docs/mixed-lighting.md` |
+| The skin fairness statement | `docs/skin-fairness.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -441,6 +446,53 @@ wrong for two, and the failure is a faint seam that only shows on large exports.
 **frame-wide statistics are measured once and passed in**: sharpening's normaliser, noise
 reduction's edge keeper and dehaze's floor are properties of the photograph rather than of a
 tile, and `spatial::Stats` exists for that reason alone.
+
+Phase 15 is implemented conditionally: `aura-core::contract::tone` freezes the estimate, the
+illuminant, the skin locus, the alternatives, the reasons, the reference frame, the outline, the
+override and `ToneService`; `aura-brain-photo::tone` measures the pixels once, finds the known
+neutrals, accumulates **each person's own** skin locus across the wedding, generates four
+illuminant hypotheses, scores every one of them against that locus and against the neutrals,
+walks a twenty-step correction from "leave the light alone" to "remove it completely" and stops
+at the first point everybody in frame is plausible again, then moves the exposure onto the
+scene's face-luminance band and clamps it against clipping and phase 09's shadow budget.
+Migration 15 stores the estimate, the loci and each chapter's anchors; 22 argued-over scene rows
+live in editable config; two models are signed with cards; seven IPC commands (ADR-0032) feed a
+Basic panel and a per-scene review queue; and `aura-cli verify --phase 15` is the executable
+gate. Its exit report is `docs/progress/PHASE-15-EXIT.md`.
+
+**Both shipped heads are placeholders and neither is consulted.** `WB_HEAD_TRAINED` and
+`EXPOSURE_HEAD_TRAINED` are false, so the learned illuminant hypothesis is never generated and
+the faceless exposure path records `ExposureUnavailable` rather than inventing a number. Every
+gate in section 10.1 is measured against synthetic frames whose illuminant, subject luminance and
+skin reflectance were **painted into the pixels** and read back through the real pipeline, which
+proves the arithmetic and says nothing about a photograph. That is condition C1 and a Sev 2
+trigger. Condition C2 is the second and it is the one to be careful about: the fairness gate is
+measured on five *reflectances*, not five people, so it proves the mechanism is per-identity and
+proves nothing about a real person. `docs/skin-fairness.md` says so in the product's own words.
+
+Two rules that phase 15 adds and every later phase inherits:
+
+- **`ToneService` is the only way to ask what colour the light was.** Eleventh service of its
+  kind. Phase 16 grades on top of these values, 17 shifts them, 18 corrects locally against them,
+  25 normalises a gallery toward them, 26 matches two cameras with them and 27 checks them. Two
+  answers to "what temperature was this room" is an album that does not match the gallery.
+- **A skin target is measured, never assumed - and the schema cannot express an alternative.**
+  There is no ideal-skin constant in `aura-core`, in migration 15, in `exposure_targets.toml` or
+  anywhere in the code path. A fixed target is how an editor lightens dark skin while believing it
+  is correcting a cast; the defence is that nothing here has a constant it could compare a person
+  against, and the phase gate scans the schema for one on every run. The Monk-scale buckets the
+  evaluation needs live in `tests/eval` and never reach the catalog.
+
+Three decisions in phase 15 are worth remembering because they will be re-argued. **The
+white-balance confidence is built on agreement between the top two answers, not on the cost gap
+between them** - it was built on the gap first, and that scored two independent estimators
+landing on the same chromaticity as "undecided", which put every frame below the skin-sample
+threshold and left the hard constraint binding on nothing, silently, while every unit test
+passed. **The correction is a linear scan rather than a bisection**, because with two people
+whose loci differ the satisfying set is not an interval. And **a row with `user_edited = 1` still
+carries AURA's own numbers**, which is what lets the review queue show a disagreement and phase
+30's learning loop read one - and it only works because `ToneStore::override_of` exists beside the
+frozen service to read the other side.
 
 Five rules that phase 13 adds and every later phase inherits:
 
