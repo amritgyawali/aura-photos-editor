@@ -102,6 +102,7 @@ pub mod fixtures;
 pub mod golden;
 pub mod gpu;
 pub mod graph;
+pub mod local;
 pub mod output;
 pub mod parity;
 pub mod profiles;

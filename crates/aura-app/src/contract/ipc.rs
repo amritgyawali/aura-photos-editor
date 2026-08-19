@@ -3860,3 +3860,308 @@ pub struct ReferenceFramesInput {
     /// The chapter.
     pub segment_id: String,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-19. Local light sculpting.
+// ---------------------------------------------------------------------------
+
+/// One face, and what the light on it was moved by.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FaceLightDto {
+    /// Whose face, when phase 06 knows. `null` for the guests nobody has named.
+    pub identity_id: Option<String>,
+    /// Exposure inside the face mask, in stops.
+    pub exposure_ev: f32,
+    /// Shadow lift inside the face mask.
+    pub shadows: i32,
+    /// Highlight restraint. Never positive.
+    pub highlights: i32,
+    /// The face's mean luminance before, `0..1`.
+    pub luma_before: f32,
+    /// Where the scene's band wanted it, `0..1`.
+    pub luma_target: f32,
+    /// Where it ended up, `0..1`.
+    pub luma_after: f32,
+    /// The largest lift this frame's noise would have tolerated, in stops.
+    ///
+    /// **The number the panel shows when a lift stopped short.** "AURA lifted her face 0.4 EV
+    /// and would have lifted it 0.9" is a sentence; "+0.4" is a number somebody argues with.
+    pub noise_cap_ev: f32,
+    /// The mask confidence and edge quality this face's move was scaled by, `0..1`.
+    pub mask_scale: f32,
+}
+
+/// One shaping move, as a retoucher would name it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShapingZoneDto {
+    /// The zone's stable slug, e.g. `under_eye`.
+    pub zone: String,
+    /// Centre in frame coordinates, `0..1`.
+    pub cx: f32,
+    /// Centre in frame coordinates, `0..1`.
+    pub cy: f32,
+    /// Radius as a fraction of the frame's longer side.
+    pub radius: f32,
+    /// Gain in stops. Positive lifts, negative deepens.
+    pub gain_ev: f32,
+}
+
+/// One reason the local work came out the way it did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalReasonDto {
+    /// The stable slug.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// How much this moved the confidence. Negative for a doubt.
+    pub weight: f32,
+    /// Which operation it is about, or `null` for a reason about the whole plan.
+    pub operation: Option<String>,
+    /// True when the code withdraws a claim rather than making one.
+    ///
+    /// On the wire rather than derived in the panel, because fourteen of the thirty codes are
+    /// withdrawals and a panel that grouped them by parsing the slug would get
+    /// `mask_unavailable` wrong.
+    pub withdrawal: bool,
+    /// The pixels to show, when there are any more specific than the whole frame.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// Everything phase 19 decided about the light inside one photograph.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct LocalPlanDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The strength each operation ran at, `0..1`, in priority order.
+    pub strengths: Vec<f32>,
+    /// The operations' stable slugs, in the same order.
+    ///
+    /// Sent rather than hard-coded in the panel, so adding an operation is one change rather
+    /// than two that can disagree.
+    pub operations: Vec<String>,
+    /// What each face was moved by.
+    pub faces: Vec<FaceLightDto>,
+    /// Clarity on the subject.
+    pub subject_clarity: i32,
+    /// Texture on the subject.
+    pub subject_texture: i32,
+    /// Contrast on the subject.
+    pub subject_contrast: i32,
+    /// Exposure on the background, in stops. Zero or negative.
+    pub background_ev: f32,
+    /// Saturation on the background. Zero or negative.
+    pub background_saturation: i32,
+    /// The measured background/subject luminance ratio that triggered the pair.
+    pub competition_ratio: f32,
+    /// The measured background chroma energy.
+    pub chroma_energy: f32,
+    /// The frame's mean luminance before the paired operations, `0..1`.
+    pub mean_luma_before: f32,
+    /// And after. The two must agree within three per cent, which is section 10.1's own
+    /// acceptance criterion and is why both are on the wire rather than their difference.
+    pub mean_luma_after: f32,
+    /// How many specular regions were reduced.
+    pub shine_regions: u32,
+    /// The luminance reduction applied to them, in stops. Zero or negative.
+    pub shine_ev: f32,
+    /// Where they were.
+    pub shine_boxes: Vec<CropRectDto>,
+    /// The shaping moves, by face ordinal.
+    pub shaping: Vec<Vec<ShapingZoneDto>>,
+    /// The largest luminance difference between two faces after lighting.
+    pub face_spread: f32,
+    /// True when everybody in this frame ended up consistently lit.
+    pub group_fair: bool,
+    /// How much of the allowed perceptual change was spent, `0..1`.
+    pub budget_used: f32,
+    /// Operations that were reduced or skipped, as `operation` and `maskKind` pairs.
+    pub gated: Vec<GateDto>,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<LocalReasonDto>,
+    /// How much the plan trusts itself, `0..1`.
+    pub confidence: f32,
+    /// The scene it was decided under.
+    pub scene: String,
+    /// True when a photographer set the strengths by hand.
+    pub user_edited: bool,
+    /// True when a photographer has looked at this plan and agreed.
+    pub reviewed: bool,
+    /// True when it is below the review threshold and nobody has looked.
+    pub needs_review: bool,
+    /// Which learned head produced the targets.
+    pub model_ver: u32,
+    /// Which build's arithmetic produced the decisions.
+    pub analysis_ver: u32,
+    /// Which policy file the strengths came from.
+    pub policy_ver: u32,
+    /// Which build's derivation turns zones into grids.
+    pub shaping_ver: u32,
+}
+
+/// One operation that did not run at full strength, and the mask that stopped it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GateDto {
+    /// The operation's stable slug.
+    pub operation: String,
+    /// The mask kind that was missing or weak.
+    pub mask_kind: String,
+}
+
+/// What a project's local light pass covered and found.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a plan.
+    pub planned: u32,
+    /// Fraction planned; the denominator is every photograph.
+    pub coverage: f32,
+    /// Fraction of planned frames where at least one operation actually ran.
+    ///
+    /// **The number that matters when it is low.** Because the work is meant to be invisible,
+    /// a wedding at 100 % coverage and 4 % acted-on looks exactly like a wedding that was
+    /// worked on.
+    pub acted_on: f32,
+    /// Fraction of planned frames where every mask an operation wanted arrived.
+    pub mask_covered: f32,
+    /// How many frames each operation ran on, in priority order.
+    pub op_counts: Vec<u32>,
+    /// The operations' stable slugs, in the same order.
+    pub op_names: Vec<String>,
+    /// How many operations each mask kind gated.
+    pub gated_counts: Vec<u32>,
+    /// The mask kinds' stable slugs, in the same order.
+    pub gated_names: Vec<String>,
+    /// Mean fraction of the per-image allowance spent.
+    pub mean_budget_used: f32,
+    /// Frames where shine was reduced.
+    pub shine_reduced: u32,
+    /// Mean shine reduction over those frames, in stops.
+    pub mean_shine_ev: f32,
+    /// Frames where faces were solved jointly.
+    pub group_solved: u32,
+    /// Frames below the review threshold that nobody has looked at.
+    pub needs_review: u32,
+    /// Frames the photographer set by hand.
+    pub user_edited: u32,
+    /// Scenes that had no policy row and were shaped against the neutral strengths.
+    pub unpolicied_scenes: Vec<String>,
+    /// Which learned head produced the targets.
+    pub model_ver: u32,
+    /// Which build's arithmetic produced the decisions.
+    pub analysis_ver: u32,
+    /// Which policy file the strengths came from.
+    pub policy_ver: u32,
+    /// Which build's derivation turns zones into grids.
+    pub shaping_ver: u32,
+}
+
+/// Start a resumable local light pass over a project's selected photographs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SculptLocalInput {
+    /// The project.
+    pub project_id: String,
+    /// The photographs to plan.
+    ///
+    /// Empty means every photograph with no current plan. **The list is the normal path**:
+    /// invariant 3, and section 11's own budget is written about a thousand selected images
+    /// rather than about a wedding.
+    #[serde(default)]
+    pub photo_ids: Vec<String>,
+    /// Handle that `cancel_job` can signal.
+    pub cancel_id: Option<String>,
+}
+
+/// What one local light pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalPassDto {
+    /// Photographs planned.
+    pub planned: u32,
+    /// Photographs that could not be planned; no row was written for them.
+    pub failed: u32,
+    /// Photographs where at least one operation ran.
+    pub acted_on: u32,
+    /// How many frames each operation ran on, in priority order.
+    pub op_counts: Vec<u32>,
+    /// How many operations were gated over the whole pass.
+    pub gated: u32,
+    /// Frames where every mask an operation wanted arrived.
+    pub fully_masked: u32,
+    /// Frames where faces were solved jointly.
+    pub group_solved: u32,
+    /// Frames where shine was reduced.
+    pub shine_reduced: u32,
+    /// Frames below the review threshold.
+    pub low_confidence: u32,
+    /// Mean fraction of the allowance spent.
+    pub mean_budget_used: f32,
+    /// Scenes planned against the neutral row.
+    pub unpolicied_scenes: Vec<String>,
+    /// Recipes written through the merge.
+    pub recipes_written: u32,
+    /// Recipes the merge refused to touch because a person had set the field.
+    pub recipes_protected: u32,
+    /// Milliseconds for the pass.
+    pub elapsed_ms: u64,
+    /// True when the pass stopped early because it was cancelled.
+    pub cancelled: bool,
+}
+
+/// Ask for the frames whose local work is worth a photographer's attention.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many to return. Defaults to 200, capped at 5,000.
+    pub limit: Option<u32>,
+}
+
+/// Record that the photographer has looked at one plan and agrees.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptLocalInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Record what the photographer set instead, and write it into the recipe.
+///
+/// Every strength is optional and independent: somebody who turned the shaping off has not
+/// made a claim about the face lighting, and an override carrying all six would silently
+/// freeze the five they did not touch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetLocalStrengthInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// The operation's stable slug.
+    pub operation: String,
+    /// The strength, `0..1`.
+    pub strength: f32,
+}
+
+/// What recording a strength override did, on both sides.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetLocalStrengthDto {
+    /// The plan after the override, with `userEdited` set.
+    pub plan: LocalPlanDto,
+    /// The edit after the merge.
+    pub recipe: RecipeDto,
+    /// The dotted paths that moved.
+    pub changed: Vec<String>,
+    /// The dotted paths a person now owns.
+    pub protected: Vec<String>,
+}

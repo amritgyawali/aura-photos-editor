@@ -2,6 +2,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  AcceptLocalInput,
+  LocalPassDto,
+  LocalPlanDto,
+  LocalReviewInput,
+  LocalStatusDto,
+  SculptLocalInput,
+  SetLocalStrengthDto,
+  SetLocalStrengthInput,
   AcceptToneInput,
   EstimateToneInput,
   ReferenceFrameDto,
@@ -789,4 +797,44 @@ export const tone = {
   /** Run the resumable pass, then carry what it decided into the recipes. */
   estimateTone: (input: EstimateToneInput): Promise<TonePassDto> =>
     invoke<TonePassDto>('estimate_tone', { input }),
+};
+
+/**
+ * PHASE-19. Local light sculpting.
+ *
+ * Six calls. Three read, one runs the pass, and two record what the photographer decided.
+ * None of them returns a mask: phase 18 owns masks, phase 19 reads them, and nothing on this
+ * surface can return an alpha, a matte or a grid (ADR-0034 section 4). What the panel gets
+ * instead is the reasons' own evidence rectangles and the shaping zones by name.
+ */
+export const local = {
+  /** How much of a wedding has a local light plan, and how much of it actually did anything. */
+  localStatus: (projectId: string): Promise<LocalStatusDto> =>
+    invoke<LocalStatusDto>('local_status', { projectId }),
+
+  /** One photograph's plan, or `null` when nobody has planned it. */
+  imageLocal: (photoId: string): Promise<LocalPlanDto | null> =>
+    invoke<LocalPlanDto | null>('image_local', { photoId }),
+
+  /** The frames whose local work is worth a look, weakest first. A queue, not a cull. */
+  localReviewQueue: (input: LocalReviewInput): Promise<string[]> =>
+    invoke<string[]>('local_review_queue', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptLocal: (input: AcceptLocalInput): Promise<LocalPlanDto> =>
+    invoke<LocalPlanDto>('accept_local', { input }),
+
+  /** Record one operation's own strength, and write it into the recipe as a person. */
+  setLocalStrength: (input: SetLocalStrengthInput): Promise<SetLocalStrengthDto> =>
+    invoke<SetLocalStrengthDto>('set_local_strength', { input }),
+
+  /**
+   * Run the resumable pass over the selected photographs, then carry what it decided into
+   * the recipes.
+   *
+   * `photoIds` is the normal path: invariant 3, and section 11's own budget is written about
+   * a thousand selected images rather than about a wedding.
+   */
+  sculptLocal: (input: SculptLocalInput): Promise<LocalPassDto> =>
+    invoke<LocalPassDto>('sculpt_local', { input }),
 };
