@@ -503,6 +503,32 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::no_int8(),
             },
         ),
+        // PHASE-16. One head, and it is the smallest table-shaped model in the
+        // product: a conditional mean over twenty-three scene classes with
+        // eleven covariates. It is registered, signed and carded, and
+        // `colour::tone::TONE_HEAD_TRAINED` is false so nothing consults it -
+        // ADR-0033 decision 5 records why that is a decision rather than a
+        // fallback.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::TONE_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "regression",
+                class: ModelClass::Embedding,
+                model: fixtures::tone_model(),
+                input: Placeholder::features(fixtures::TONE_INPUT_DIM),
+                output: BTreeMap::from([("tone".to_string(), vec![1, fixtures::TONE_OUTPUTS])]),
+                // int8 is forbidden. Five sigmoids mapped onto the recipe's
+                // ranges means a quantisation step of about 0.4 units of
+                // contrast, which is invisible on one frame - and that is not
+                // the reason. It is that a systematic bias of half a unit
+                // across four thousand frames is a gallery that is uniformly
+                // slightly flatter than the album, and phase 25 is then asked
+                // to reconcile two things that were never the same.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {

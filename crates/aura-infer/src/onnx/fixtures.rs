@@ -2277,3 +2277,126 @@ pub fn exposure_sample_input(batch: usize) -> Tensor {
         data: samples,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-16. The tone head.
+// ---------------------------------------------------------------------------
+
+/// The tone model's registered name.
+pub const TONE_MODEL: &str = "tone_model";
+
+/// How many measurements the tone head reads.
+///
+/// Eleven: five histogram percentiles, the dynamic range, the subject's spread and median,
+/// the clipped and crushed fractions, and the normalised shadow headroom. Every one of them
+/// is already computed by `tone::stats` and `colour::analyse`, so the head costs nothing but
+/// a matrix multiply - PHASE-16 section 6.1 asks for "a small MLP over features: histogram
+/// percentiles, subject luminance, scene class, dynamic range, flash flag, noise level" and
+/// this is that list with the flash flag folded into the scene conditioning.
+pub const TONE_FEATURES: usize = 11;
+
+/// How many scene slots condition the tone head.
+///
+/// `SceneId::ALL.len()`, as a one-hot, for `EXPOSURE_SCENES`' reason: invariant 7 makes every
+/// grading intent a function of the scene, and a one-hot cannot leak an ordering between
+/// scenes the way a scalar index would.
+pub const TONE_SCENES: usize = 23;
+
+/// Width of the tone head's input vector.
+pub const TONE_INPUT_DIM: usize = TONE_FEATURES + TONE_SCENES;
+
+/// How many numbers the tone head emits.
+///
+/// Five: contrast, highlights, shadows, whites and blacks. **Not a curve**, and the choice is
+/// the one ADR-0033 decision 2 records: a curve is solved from a target under three
+/// constraints and a head that emitted control points would be a head that could emit
+/// non-monotone ones.
+pub const TONE_OUTPUTS: usize = 5;
+
+/// The learned tone predictor.
+///
+/// `features [N, 34] -> tone [N, 5]`, five numbers in `0..1` that the decoder maps onto the
+/// recipe's units.
+///
+/// It is the second-smallest head in the product and it should be: what it has to learn is a
+/// conditional mean over twenty-three scene classes with eleven covariates, which is a table
+/// and not an image problem. Giving it pixels would make it spend its capacity rediscovering
+/// percentiles this build already computes exactly.
+///
+/// Every output is squashed by a `Sigmoid` and rescaled by the decoder. An unbounded
+/// regression head trained on a few thousand expert edits will occasionally emit a contrast
+/// of 300, and a contrast of 300 applied to a ceremony is a photograph nobody delivered.
+#[must_use]
+pub fn tone_model() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_70E0_1607_0001);
+
+    let graph = Graph {
+        name: TONE_MODEL.to_string(),
+        nodes: vec![
+            with_int(
+                node("Gemm", "layer1", &["features", "l1_w", "l1_b"], &["l1_out"]),
+                "transB",
+                1,
+            ),
+            node("Relu", "act1", &["l1_out"], &["l1_relu"]),
+            with_int(
+                node("Gemm", "layer2", &["l1_relu", "l2_w", "l2_b"], &["l2_out"]),
+                "transB",
+                1,
+            ),
+            node("Relu", "act2", &["l2_out"], &["l2_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["l2_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logits"], &["tone"]),
+        ],
+        initializers: vec![
+            weights.tensor("l1_w", vec![64, TONE_INPUT_DIM], 0.18),
+            weights.tensor("l1_b", vec![64], 0.05),
+            weights.tensor("l2_w", vec![32, 64], 0.20),
+            weights.tensor("l2_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![TONE_OUTPUTS, 32], 0.22),
+            weights.tensor("head_b", vec![TONE_OUTPUTS], 0.05),
+        ],
+        inputs: vec![dynamic_batch("features", &[TONE_INPUT_DIM])],
+        outputs: vec![dynamic_batch("tone", &[TONE_OUTPUTS])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// A deterministic batch of tone feature vectors.
+///
+/// The eleven measurement slots ramp with the batch index and the scene one-hot walks across
+/// the twenty-three slots, so a head that ignored its conditioning would produce a flat column
+/// and a head that ignored its measurements would produce a flat row.
+#[must_use]
+pub fn tone_sample_input(batch: usize) -> Tensor {
+    let mut samples = Vec::with_capacity(batch * TONE_INPUT_DIM);
+    for image in 0..batch {
+        for slot in 0..TONE_FEATURES {
+            let step = (image * TONE_FEATURES + slot) as f32;
+            samples.push((step * 0.037).fract());
+        }
+        let scene = image % TONE_SCENES;
+        for slot in 0..TONE_SCENES {
+            samples.push(f32::from(u8::from(slot == scene)));
+        }
+    }
+    Tensor {
+        shape: vec![batch, TONE_INPUT_DIM],
+        data: samples,
+    }
+}

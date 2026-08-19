@@ -1167,3 +1167,65 @@ summary      = "No skin reference was available, so the colour was set without o
 user_message = "AURA has not seen enough well-lit photographs of these people to know what their skin should look like, so it set the colour from the light alone. Those frames are worth a look."
 runbook      = "docs/runbooks/AURA-ML-5065.md"
 introduced   = "PHASE-15"
+
+# Phase 16. Tone curves, HSL and skin protection, ML 5066-5071. The same five
+# shapes the phase 09, 11 and 15 blocks have - a refused artefact, version drift,
+# a refused edit, one item that could not be done, a refused config file and a
+# config file missing a row - with one difference worth reading: `AURA-ML-5069`
+# is the only code in the product that fires because a GUARANTEE could not be
+# met. It is a warning rather than a failure, because the frame is still
+# delivered: what was withdrawn is the grading, not the photograph.
+
+[[error]]
+code         = "AURA-ML-5066"
+severity     = "item_failed"
+recovery     = "fallback"
+summary      = "A tone curve was refused because its control points are not monotone"
+user_message = "AURA worked out a tone curve it could not use safely, so it left this photograph's curve alone. Nothing else about the edit changed."
+runbook      = "docs/runbooks/AURA-ML-5066.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5067"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A tone, curve or HSL override was refused"
+user_message = "AURA could not record that adjustment. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5067.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5068"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be graded"
+user_message = "AURA could not work out the contrast and colour for one photograph, and has left it as the camera recorded it. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5068.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5069"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The skin protection ceilings could not be met, so the colour adjustments were withdrawn"
+user_message = "AURA could not find a colour adjustment for this photograph that left everybody's skin exactly where it was, so it made none. The photograph is otherwise fully edited."
+runbook      = "docs/runbooks/AURA-ML-5069.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5070"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The tone intent table was refused"
+user_message = "AURA could not load the settings that decide how much contrast each kind of photograph wants, so it has not graded anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5070.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5071"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored grades came from different heads, arithmetic or intents"
+user_message = "AURA has improved how it grades, so it is re-checking this wedding in the background. Anything you have already adjusted is kept."
+runbook      = "docs/runbooks/AURA-ML-5071.md"
+introduced   = "PHASE-16"

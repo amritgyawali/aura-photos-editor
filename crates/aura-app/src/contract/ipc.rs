@@ -3860,3 +3860,357 @@ pub struct ReferenceFramesInput {
     /// The chapter.
     pub segment_id: String,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-16. Tone curves, HSL and skin protection.
+// ---------------------------------------------------------------------------
+
+/// One control point of a tone curve, in the recipe's 0-255 units.
+///
+/// A pair rather than an object, because that is what the recipe stores and a second spelling
+/// of the same two numbers is a second thing to keep in step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurvePointDto {
+    /// Input level, `0..=255`.
+    pub x: u16,
+    /// Output level, `0..=255`.
+    pub y: u16,
+}
+
+/// One hue band's shift, in the recipe's units.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HslShiftDto {
+    /// Which band: `red`, `orange`, `yellow`, `green`, `aqua`, `blue`, `purple` or `magenta`.
+    pub band: String,
+    /// Hue rotation within the band, `-100..100`.
+    pub h: f32,
+    /// Saturation within the band.
+    pub s: f32,
+    /// Luminance within the band.
+    pub l: f32,
+}
+
+/// What was found of one kind of content in one frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BandReadingDto {
+    /// `greenery`, `sky`, `dress`, `wood`, `decor` or `skin`.
+    pub band: String,
+    /// The fraction of the frame it covers, `0..1`.
+    pub area: f32,
+    /// Its mean hue, in degrees.
+    pub hue_deg: f32,
+    /// Its mean saturation, `0..1`.
+    pub saturation: f32,
+    /// Its mean luminance, `0..1`.
+    pub luma: f32,
+    /// How sure the inference is, `0..1`.
+    ///
+    /// On the wire rather than hidden behind the adjustment, because "AURA saw greenery and
+    /// was not sure enough to touch it" and "AURA saw no greenery" are different sentences and
+    /// only one of them is about this photograph.
+    pub confidence: f32,
+}
+
+/// What grading actually did to the skin in one frame.
+///
+/// `measured` false is **not** a perfect score. A frame with nobody in it has no skin to
+/// protect and no measurement to report, and a panel that rendered the two the same way would
+/// turn a coverage gap into a guarantee.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkinGuardDto {
+    /// The fraction of the frame the skin mask covers, `0..1`.
+    pub mask_area: f32,
+    /// The largest hue rotation any sampled skin region suffered, in degrees.
+    pub max_hue_shift_deg: f32,
+    /// The largest relative chroma change.
+    pub max_chroma_change: f32,
+    /// What every colour operation was scaled by inside the mask, `0..1`.
+    pub attenuation: f32,
+    /// How many times the grade was re-solved to meet the ceilings.
+    pub resolves: u32,
+    /// True when there was skin to measure and it was measured.
+    pub measured: bool,
+    /// True when both ceilings were met.
+    pub within_ceilings: bool,
+}
+
+/// One thing that moved a grade.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourReasonDto {
+    /// Stable reason code.
+    pub code: String,
+    /// The sentence, rendered from the code and the numbers the catalog stored.
+    pub text: String,
+    /// How much confidence it cost. Negative is doubt.
+    pub weight: f32,
+    /// The pixels behind it, when the reason is about a region.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// A complete alternative grade.
+///
+/// **Whole parameter sets, never deltas.** Every one has been through the clipping guard and
+/// the skin guard, which is what makes the switcher safe rather than only fast.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourVariantDto {
+    /// `flatter`, `punchier` or `warmer`.
+    pub kind: String,
+    /// Contrast, `-100..100`.
+    pub contrast: f32,
+    /// Highlight recovery.
+    pub highlights: f32,
+    /// Shadow lift.
+    pub shadows: f32,
+    /// White point.
+    pub whites: f32,
+    /// Black point.
+    pub blacks: f32,
+    /// Vibrance.
+    pub vibrance: f32,
+    /// Flat saturation.
+    pub saturation: f32,
+    /// Its own curve.
+    pub curve: Vec<CurvePointDto>,
+    /// Its own eight bands.
+    pub hsl: Vec<HslShiftDto>,
+    /// Its skin guard report. Every variant is guarded.
+    pub skin_guard: SkinGuardDto,
+}
+
+/// One photograph's tone and colour decision.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct ColourDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Contrast, `-100..100`.
+    pub contrast: f32,
+    /// Highlight recovery. Negative pulls highlights down.
+    pub highlights: f32,
+    /// Shadow lift. Positive opens shadows.
+    pub shadows: f32,
+    /// White point.
+    pub whites: f32,
+    /// Black point.
+    pub blacks: f32,
+    /// Vibrance.
+    pub vibrance: f32,
+    /// Flat saturation.
+    pub saturation: f32,
+    /// The fitted point curve, monotone by construction.
+    pub curve: Vec<CurvePointDto>,
+    /// The eight bands, in the recipe's order.
+    pub hsl: Vec<HslShiftDto>,
+    /// What the content pass read.
+    pub bands: Vec<BandReadingDto>,
+    /// What grading did to the skin, measured.
+    pub skin_guard: SkinGuardDto,
+    /// Highlight clipping before the grade, as a fraction of the frame.
+    pub clipping_before: f32,
+    /// Highlight clipping after it.
+    pub clipping_after: f32,
+    /// How much new highlight clipping the grade added.
+    pub clipping_added: f32,
+    /// Complete alternatives, at most three.
+    pub alternatives: Vec<ColourVariantDto>,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<ColourReasonDto>,
+    /// How sure the grade is, `0..1`.
+    pub confidence: f32,
+    /// The total adjustment magnitude, `0..1`. Lower is subtler.
+    pub subtlety: f32,
+    /// The scene the intents came from.
+    pub scene: String,
+    /// True when there was skin in the frame and the guarantee was checked on it.
+    pub skin_measured: bool,
+    /// True when the photographer set these values by hand.
+    pub user_edited: bool,
+    /// True when the photographer has looked at this frame.
+    pub reviewed: bool,
+    /// True when this frame belongs in the review queue.
+    pub needs_review: bool,
+    /// Which learned head produced the prediction.
+    pub model_ver: u32,
+    /// Which build's arithmetic produced the solve.
+    pub analysis_ver: u32,
+    /// Which intent table the targets came from.
+    pub intent_ver: u32,
+}
+
+/// What the Develop panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a stored grade.
+    pub decided: u32,
+    /// `decided / photos`.
+    pub coverage: f64,
+    /// Photographs where there was skin to protect and it was measured.
+    pub skin_measured: u32,
+    /// Photographs where the skin guard had to intervene.
+    pub skin_guard_triggered: u32,
+    /// Photographs where the clipping guard re-solved.
+    pub clip_guard_resolved: u32,
+    /// Photographs whose grade was capped by the subtlety ceiling.
+    pub subtlety_capped: u32,
+    /// Photographs below the review threshold.
+    pub needs_review: u32,
+    /// Photographs the photographer has set by hand.
+    pub user_edited: u32,
+    /// Mean contrast over graded frames.
+    pub mean_contrast: f32,
+    /// Mean shadow lift over graded frames.
+    pub mean_shadow_lift: f32,
+    /// Mean subtlety over graded frames.
+    pub mean_subtlety: f32,
+    /// The largest skin hue shift anywhere in the project, in degrees.
+    ///
+    /// **The one number that falsifies this phase's headline guarantee.** On the wire rather
+    /// than derived, so a support engineer can ask for it directly.
+    pub worst_skin_hue_shift: f32,
+    /// True when every stored grade met the ceilings.
+    pub guarantee_held: bool,
+    /// Scenes graded against the neutral intent row.
+    pub untargeted_scenes: Vec<String>,
+    /// The lowest model version present.
+    pub model_ver: u32,
+    /// The lowest analysis version present.
+    pub analysis_ver: u32,
+    /// The lowest intent-table version present.
+    pub intent_ver: u32,
+}
+
+/// Run the resumable grading pass.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EstimateColourInput {
+    /// The project.
+    pub project_id: String,
+    /// A token the UI can cancel with.
+    pub cancel_id: Option<String>,
+}
+
+/// What one grading pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourPassDto {
+    /// Photographs graded.
+    pub decided: u32,
+    /// Photographs that could not be graded.
+    pub failed: u32,
+    /// Frames where the guarantee was actually checked.
+    pub skin_measured: u32,
+    /// Frames where the skin guard had to intervene.
+    pub skin_guard_triggered: u32,
+    /// Frames where every colour operation was withdrawn to keep skin where it was.
+    pub skin_guard_withdrew: u32,
+    /// Frames where the clipping guard re-solved.
+    pub clip_guard_resolved: u32,
+    /// Frames whose grade was scaled back by the subtlety cap.
+    pub subtlety_capped: u32,
+    /// Frames below the review threshold.
+    pub low_confidence: u32,
+    /// Mean contrast.
+    pub mean_contrast: f32,
+    /// Mean shadow lift.
+    pub mean_shadow_lift: f32,
+    /// Mean subtlety.
+    pub mean_subtlety: f32,
+    /// The worst skin hue shift in the run, in degrees.
+    pub worst_skin_hue_shift: f32,
+    /// Scenes graded against the neutral intent row.
+    pub untargeted_scenes: Vec<String>,
+    /// Recipes the pass wrote.
+    pub recipes_written: u32,
+    /// Recipe paths the merge refused because a person already owned them.
+    pub recipes_protected: u32,
+    /// Wall clock.
+    pub elapsed_ms: u64,
+    /// True when the pass was cancelled.
+    pub cancelled: bool,
+}
+
+/// Ask for the frames whose grade is worth a photographer's attention.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many, at most.
+    pub limit: Option<u32>,
+}
+
+/// Record that the photographer has looked at one grade and agrees.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptColourInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Promote one stored alternative to the primary grade.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectVariantInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// `flatter`, `punchier` or `warmer`.
+    pub kind: String,
+}
+
+/// Record what the photographer set instead, and write it into the recipe.
+///
+/// Every field is optional and independent: somebody who reduced the contrast has not made a
+/// claim about the greenery. The curve and the HSL block are whole-or-nothing, because a curve
+/// is not a set of independent numbers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetColourOverrideInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// Contrast.
+    pub contrast: Option<f32>,
+    /// Highlight recovery.
+    pub highlights: Option<f32>,
+    /// Shadow lift.
+    pub shadows: Option<f32>,
+    /// White point.
+    pub whites: Option<f32>,
+    /// Black point.
+    pub blacks: Option<f32>,
+    /// Vibrance.
+    pub vibrance: Option<f32>,
+    /// Flat saturation.
+    pub saturation: Option<f32>,
+    /// The whole curve, or nothing.
+    pub curve: Option<Vec<CurvePointDto>>,
+    /// The whole HSL block, or nothing.
+    pub hsl: Option<Vec<HslShiftDto>>,
+}
+
+/// What recording a colour override did, on both sides.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetColourOverrideDto {
+    /// The decision after the override, with `userEdited` set.
+    pub decision: ColourDto,
+    /// The edit after the merge.
+    pub recipe: RecipeDto,
+    /// The dotted paths that moved.
+    pub changed: Vec<String>,
+    /// The dotted paths a person now owns.
+    pub protected: Vec<String>,
+}

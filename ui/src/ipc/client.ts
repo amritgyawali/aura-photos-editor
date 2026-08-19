@@ -2,6 +2,15 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  AcceptColourInput,
+  ColourDto,
+  ColourPassDto,
+  ColourReviewInput,
+  ColourStatusDto,
+  EstimateColourInput,
+  SelectVariantInput,
+  SetColourOverrideDto,
+  SetColourOverrideInput,
   AcceptToneInput,
   EstimateToneInput,
   ReferenceFrameDto,
@@ -789,4 +798,47 @@ export const tone = {
   /** Run the resumable pass, then carry what it decided into the recipes. */
   estimateTone: (input: EstimateToneInput): Promise<TonePassDto> =>
     invoke<TonePassDto>('estimate_tone', { input }),
+};
+
+/**
+ * PHASE-16. Tone curves, HSL and skin protection.
+ *
+ * Seven commands. Three read, one runs the pass, three record what the photographer decided.
+ *
+ * Nothing here can reach a white balance: phase 15 owns the temperature and the tint, and the
+ * "warmer" alternative is a shift of the warm hue bands rather than a change of light.
+ */
+export const colour = {
+  /** How much of a wedding has a grade, and how much of the skin guarantee was checked. */
+  colourStatus: (projectId: string): Promise<ColourStatusDto> =>
+    invoke<ColourStatusDto>('colour_status', { projectId }),
+
+  /** One photograph's grade, or `null` when nobody has graded it. */
+  imageColour: (photoId: string): Promise<ColourDto | null> =>
+    invoke<ColourDto | null>('image_colour', { photoId }),
+
+  /** The frames whose grade is worth a look, weakest first. A queue, not a cull. */
+  colourReviewQueue: (input: ColourReviewInput): Promise<string[]> =>
+    invoke<string[]>('colour_review_queue', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptColour: (input: AcceptColourInput): Promise<ColourDto> =>
+    invoke<ColourDto>('accept_colour', { input }),
+
+  /** Record what they set instead, and write it into the recipe as a person. */
+  setColourOverride: (input: SetColourOverrideInput): Promise<SetColourOverrideDto> =>
+    invoke<SetColourOverrideDto>('set_colour_override', { input }),
+
+  /**
+   * Promote one stored alternative to the primary grade.
+   *
+   * Safe because every variant has already been through the clipping guard and the skin
+   * guard, so the promoted set is one somebody checked.
+   */
+  selectColourVariant: (input: SelectVariantInput): Promise<SetColourOverrideDto> =>
+    invoke<SetColourOverrideDto>('select_colour_variant', { input }),
+
+  /** Run the resumable pass, then carry what it decided into the recipes. */
+  estimateColour: (input: EstimateColourInput): Promise<ColourPassDto> =>
+    invoke<ColourPassDto>('estimate_colour', { input }),
 };

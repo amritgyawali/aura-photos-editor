@@ -26,6 +26,7 @@ pub mod clock;
 
 /// Frozen contracts. Changing anything in here requires an ADR.
 pub mod contract {
+    pub mod colour;
     pub mod composition;
     pub mod consent;
     pub mod cull;
@@ -57,6 +58,11 @@ pub mod paths;
 pub mod progress;
 pub mod redact;
 
+pub use contract::colour::{
+    BandReading, ColourCode, ColourDecision, ColourOutline, ColourOverride, ColourReason,
+    ColourService, ColourVariant, ContentBand, CurvePoint, HslAdjustments, HslBand, HslShift,
+    SkinGuardReport, ToneCurve, VariantKind,
+};
 pub use contract::composition::{
     Box2, CompositionCode, CompositionFlags, CompositionOutline, CompositionReason,
     CompositionResult, CompositionService, CropHint, FrameEdge, HorizonSource, Joint, JointCut,

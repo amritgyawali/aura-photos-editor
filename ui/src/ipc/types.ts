@@ -1902,3 +1902,223 @@ export type ReferenceFrameDto = {
 export type ReferenceFramesInput = {
   segmentId: string;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-16. Tone curves, HSL and skin protection.
+// ---------------------------------------------------------------------------
+
+/**
+ * One control point of a tone curve, in the recipe's 0-255 units.
+ *
+ * A curve is always monotone: `x` strictly increases, `y` never decreases, and the first and
+ * last points sit at 0 and 255. The backend refuses to build one that is not, so a panel does
+ * not have to check - but a curve editor that lets a photographer drag a point **does**, and
+ * `setColourOverride` will refuse a set that breaks the rule rather than clamping it.
+ */
+export type CurvePointDto = {
+  x: number;
+  y: number;
+};
+
+/** One hue band's shift, in the recipe's units. */
+export type HslShiftDto = {
+  /** `red`, `orange`, `yellow`, `green`, `aqua`, `blue`, `purple` or `magenta`. */
+  band: string;
+  h: number;
+  s: number;
+  l: number;
+};
+
+/** What was found of one kind of content in one frame. */
+export type BandReadingDto = {
+  /** `greenery`, `sky`, `dress`, `wood`, `decor` or `skin`. */
+  band: string;
+  area: number;
+  hueDeg: number;
+  saturation: number;
+  luma: number;
+  /**
+   * How sure the inference is, `0..1`.
+   *
+   * The bands are inferred from colour statistics rather than segmented, so a low confidence
+   * is a real answer and the panel should say so: "AURA saw greenery and was not sure enough
+   * to touch it" and "AURA saw no greenery" are different sentences.
+   */
+  confidence: number;
+};
+
+/**
+ * What grading actually did to the skin in one frame.
+ *
+ * `measured` false is **not** a perfect score. A frame with nobody in it has no skin to
+ * protect and no measurement to report, and rendering the two the same way would turn a
+ * coverage gap into a guarantee.
+ */
+export type SkinGuardDto = {
+  maskArea: number;
+  maxHueShiftDeg: number;
+  maxChromaChange: number;
+  attenuation: number;
+  resolves: number;
+  measured: boolean;
+  withinCeilings: boolean;
+};
+
+/** One thing that moved a grade. */
+export type ColourReasonDto = {
+  code: string;
+  text: string;
+  /** How much confidence it cost. Negative is doubt. */
+  weight: number;
+  evidence?: CropRectDto | null;
+};
+
+/**
+ * A complete alternative grade.
+ *
+ * Whole parameter sets, never deltas: every one has been through the clipping guard and the
+ * skin guard, which is what makes switching safe rather than only fast.
+ */
+export type ColourVariantDto = {
+  /** `flatter`, `punchier` or `warmer`. */
+  kind: string;
+  contrast: number;
+  highlights: number;
+  shadows: number;
+  whites: number;
+  blacks: number;
+  vibrance: number;
+  saturation: number;
+  curve: CurvePointDto[];
+  hsl: HslShiftDto[];
+  skinGuard: SkinGuardDto;
+};
+
+/** One photograph's tone and colour decision. */
+export type ColourDto = {
+  photoId: string;
+  contrast: number;
+  highlights: number;
+  shadows: number;
+  whites: number;
+  blacks: number;
+  vibrance: number;
+  saturation: number;
+  curve: CurvePointDto[];
+  /** All eight bands, in the recipe's order, including the neutral ones. */
+  hsl: HslShiftDto[];
+  bands: BandReadingDto[];
+  skinGuard: SkinGuardDto;
+  clippingBefore: number;
+  clippingAfter: number;
+  clippingAdded: number;
+  alternatives: ColourVariantDto[];
+  reasons: ColourReasonDto[];
+  confidence: number;
+  /** The total adjustment magnitude, `0..1`. Lower is subtler. */
+  subtlety: number;
+  scene: string;
+  /** True when there was skin in the frame and the guarantee was checked on it. */
+  skinMeasured: boolean;
+  userEdited: boolean;
+  reviewed: boolean;
+  needsReview: boolean;
+  modelVer: number;
+  analysisVer: number;
+  intentVer: number;
+};
+
+/** What the Develop panel's project header shows. */
+export type ColourStatusDto = {
+  photos: number;
+  decided: number;
+  coverage: number;
+  skinMeasured: number;
+  skinGuardTriggered: number;
+  clipGuardResolved: number;
+  subtletyCapped: number;
+  needsReview: number;
+  userEdited: number;
+  meanContrast: number;
+  meanShadowLift: number;
+  meanSubtlety: number;
+  /** The one number that falsifies this phase's headline guarantee. */
+  worstSkinHueShift: number;
+  guaranteeHeld: boolean;
+  untargetedScenes: string[];
+  modelVer: number;
+  analysisVer: number;
+  intentVer: number;
+};
+
+export type EstimateColourInput = {
+  projectId: string;
+  cancelId?: string | null;
+};
+
+/** What one grading pass did. */
+export type ColourPassDto = {
+  decided: number;
+  failed: number;
+  skinMeasured: number;
+  skinGuardTriggered: number;
+  skinGuardWithdrew: number;
+  clipGuardResolved: number;
+  subtletyCapped: number;
+  lowConfidence: number;
+  meanContrast: number;
+  meanShadowLift: number;
+  meanSubtlety: number;
+  worstSkinHueShift: number;
+  untargetedScenes: string[];
+  recipesWritten: number;
+  recipesProtected: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type ColourReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+export type AcceptColourInput = {
+  photoId: string;
+};
+
+/** Promote one stored alternative to the primary grade. */
+export type SelectVariantInput = {
+  projectId: string;
+  photoId: string;
+  /** `flatter`, `punchier` or `warmer`. */
+  kind: string;
+};
+
+/**
+ * Record what the photographer set instead.
+ *
+ * Every field is optional and independent. The curve and the HSL block are whole-or-nothing,
+ * because a curve is not a set of independent numbers.
+ */
+export type SetColourOverrideInput = {
+  projectId: string;
+  photoId: string;
+  contrast?: number | null;
+  highlights?: number | null;
+  shadows?: number | null;
+  whites?: number | null;
+  blacks?: number | null;
+  vibrance?: number | null;
+  saturation?: number | null;
+  curve?: CurvePointDto[] | null;
+  hsl?: HslShiftDto[] | null;
+};
+
+/** What recording a colour override did, on both sides. */
+export type SetColourOverrideDto = {
+  decision: ColourDto;
+  recipe: RecipeDto;
+  changed: string[];
+  /** The dotted paths a person now owns. */
+  protected: string[];
+};

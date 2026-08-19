@@ -5,6 +5,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use aura_brain_photo::colour::api::FrameExif as ColourExif;
+use aura_brain_photo::colour::{Colour, ColourPass, ColourStore};
 use aura_brain_photo::composition::{Composition, CompositionPass, CompositionStore};
 use aura_brain_photo::integrity::{Integrity, IntegrityPass, IntegrityStore};
 use aura_brain_photo::tone::api::FrameExif;
@@ -1729,6 +1731,96 @@ impl AppState {
                 Ok(pass)
             }
         }
+    }
+
+    /// The colour store for this catalog. PHASE-16.
+    ///
+    /// Stateless like every store since phase 09. It owns no model and opens no preview;
+    /// those belong to the pass below.
+    #[must_use]
+    pub fn colour_store(&self) -> Arc<ColourStore> {
+        Arc::new(ColourStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `ColourService` for this catalog. PHASE-16.
+    ///
+    /// Stored grades stay readable even when the installed intent table is broken. The service
+    /// reports version drift through its outline; only a new pass has to parse the intents and
+    /// may therefore refuse to start.
+    #[must_use]
+    pub fn colour(&self) -> Arc<Colour> {
+        Arc::new(Colour::new(self.colour_store()))
+    }
+
+    /// The tone-curve, HSL and skin-protection pass, wired to previews, inference, people,
+    /// story and the catalog's own EXIF. PHASE-16.
+    ///
+    /// People are attached unconditionally, and the degradation without them is the one worth
+    /// reading: **every frame becomes faceless**, so the subject contrast is measured over the
+    /// centre of the frame instead of over anybody's face, no skin is sampled, and section
+    /// 6.3's guarantee is not checked on a single photograph. `ColourOutline::skin_measured`
+    /// reports zero and the panel says so, rather than the product claiming a guarantee it did
+    /// not verify.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5070` when the tone intent table will not load, `AURA-ML-5036` when the camera
+    /// calibration table will not, or whatever opening the preview service and the inference
+    /// engine raised.
+    pub fn colour_pass(&self, project_id: &str) -> AuraResult<ColourPass> {
+        let pass = ColourPass::new(
+            self.previews(project_id)?,
+            self.infer_engine()?,
+            self.colour_store(),
+            Arc::clone(&self.clock),
+        )?
+        .with_people(self.people())
+        .with_exif(self.colour_exif(project_id)?);
+        match self.story() {
+            Ok(story) => Ok(pass.with_story(story)),
+            Err(err) => {
+                tracing::warn!(
+                    target: "colour.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be graded against the neutral intent"
+                );
+                Ok(pass)
+            }
+        }
+    }
+
+    /// What EXIF said about every frame, for the colour pass. PHASE-16.
+    ///
+    /// The same rows phase 15's `frame_exif` reads, in phase 16's own shape. It reads *fewer*
+    /// fields - a grade needs the body and the ISO for phase 09's shadow headroom and nothing
+    /// about the camera's white balance - and re-projecting rather than sharing one struct is
+    /// what keeps a later change to phase 15's needs from silently changing phase 16's input.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the photographs cannot be read.
+    pub fn colour_exif(
+        &self,
+        project_id: &str,
+    ) -> AuraResult<BTreeMap<aura_core::PhotoId, ColourExif>> {
+        Ok(self
+            .frame_exif(project_id)?
+            .into_iter()
+            .map(|(id, exif)| {
+                (
+                    id,
+                    ColourExif {
+                        make: exif.make,
+                        model: exif.model,
+                        iso: exif.iso,
+                        megapixels: exif.megapixels,
+                    },
+                )
+            })
+            .collect())
     }
 
     /// What EXIF said about every frame in a project, for the tone pass. PHASE-15.

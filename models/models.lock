@@ -821,6 +821,52 @@
         "require_fp32": false
       },
       "opset": 13
+    },
+    {
+      "name": "tone_model",
+      "version": "1.0.0",
+      "task": "regression",
+      "class": "embedding",
+      "input": {
+        "shape": [
+          1,
+          34
+        ],
+        "layout": "NC",
+        "range": "unbounded",
+        "colour": "none"
+      },
+      "output": {
+        "tone": [
+          1,
+          5
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "tone_model_1.0.0.fp32.onnx",
+          "sha256": "6dfd1de78c339f354ba6d7ca1dfedd8721602f9f26b7de2d9758732ed6b197ea",
+          "bytes": 18429
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "tone_model_1.0.0.fp16.onnx",
+          "sha256": "fca118dc2d55ca0dd9a882fa7ffa52a65e3c68fe74fb1c1b8ef79eec3857c931",
+          "bytes": 18429
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/tone_model.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
     }
   ]
 }

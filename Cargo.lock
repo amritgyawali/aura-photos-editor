@@ -95,6 +95,8 @@ dependencies = [
  "aura-infer",
  "aura-preview",
  "aura-raw",
+ "aura-recipe",
+ "aura-render",
  "aura-vision",
  "rusqlite",
  "serde",

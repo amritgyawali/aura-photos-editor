@@ -31,6 +31,11 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0012_selection.sql",
     "crates/aura-catalog/migrations/0013_ledger.sql",
     "crates/aura-catalog/migrations/0014_develop.sql",
+    // PHASE-16 added these two. Migration 15 was omitted when it shipped - an oversight
+    // rather than a decision, since CLAUDE.md has listed every migration as a frozen contract
+    // since phase 01 - and the fix belongs with the phase that noticed it.
+    "crates/aura-catalog/migrations/0015_tone.sql",
+    "crates/aura-catalog/migrations/0016_colour.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

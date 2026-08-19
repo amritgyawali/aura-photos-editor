@@ -18,6 +18,11 @@ use aura_app::contract::ipc::{
     AcceptToneInput, EstimateToneInput, ReferenceFrameDto, ReferenceFramesInput,
     SetToneOverrideDto, SetToneOverrideInput, ToneDto, TonePassDto, ToneReviewInput, ToneStatusDto,
 };
+// PHASE-16.
+use aura_app::contract::ipc::{
+    AcceptColourInput, ColourDto, ColourPassDto, ColourReviewInput, ColourStatusDto,
+    EstimateColourInput, SelectVariantInput, SetColourOverrideDto, SetColourOverrideInput,
+};
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
 use tauri::{Manager, State};
@@ -359,6 +364,86 @@ async fn estimate_tone(
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-16. Every colour command can touch SQLite, and `estimate_colour` decodes proxies and
+// grades a whole wedding. All seven go off the renderer thread for the reason the phase 15
+// block above gives.
+#[tauri::command]
+async fn colour_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<ColourStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::colour_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_colour(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<ColourDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_colour(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn colour_review_queue(
+    state: State<'_, AppState>,
+    input: ColourReviewInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::colour_review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn accept_colour(
+    state: State<'_, AppState>,
+    input: AcceptColourInput,
+) -> IpcResult<ColourDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::accept_colour(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_colour_override(
+    state: State<'_, AppState>,
+    input: SetColourOverrideInput,
+) -> IpcResult<SetColourOverrideDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_colour_override(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn select_colour_variant(
+    state: State<'_, AppState>,
+    input: SelectVariantInput,
+) -> IpcResult<SetColourOverrideDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::select_colour_variant(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn estimate_colour(
+    state: State<'_, AppState>,
+    input: EstimateColourInput,
+) -> IpcResult<ColourPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::estimate_colour(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn background_request_failed() -> IpcError {
     IpcError::from(aura_core::errors::db::statement_failed(
         "the background composition task stopped before returning its result",
@@ -446,7 +531,14 @@ fn main() {
             reference_frames,
             accept_tone,
             set_tone_override,
-            estimate_tone
+            estimate_tone,
+            colour_status,
+            image_colour,
+            colour_review_queue,
+            accept_colour,
+            set_colour_override,
+            select_colour_variant,
+            estimate_colour
         ])
         .run(tauri::generate_context!());
 

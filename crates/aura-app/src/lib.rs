@@ -39,6 +39,7 @@
 
 pub mod biometric_keys;
 pub mod cloud_commands;
+pub mod colour_commands;
 pub mod commands;
 pub mod composition_commands;
 pub mod cull_commands;
@@ -65,6 +66,10 @@ pub mod tone_commands;
 pub use cloud_commands::{
     check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend, cloud_status,
     purge_cloud_cache, set_ai_key, set_cloud_budget, set_cloud_privacy,
+};
+pub use colour_commands::{
+    accept_colour, colour_review_queue, colour_status, estimate_colour, image_colour,
+    select_colour_variant, set_colour_override,
 };
 pub use commands::{
     cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,

@@ -78,6 +78,10 @@ Never load two phase files into one session.
 | Tone evaluation gates | `tests/eval/tone_eval.rs` + `ml/models/tone/eval_tone.py` |
 | What the lighting marks mean, in the product's own words | `docs/mixed-lighting.md` |
 | The skin fairness statement | `docs/skin-fairness.md` |
+| Tone, curve and HSL decisions | `docs/adr/ADR-0033-tone-curves-hsl-and-skin-protection.md` |
+| Tone intents (versioned, PM-owned) | `crates/aura-brain-photo/config/tone_intent.toml` |
+| Colour evaluation gates | `tests/eval/colour_eval.rs` + `ml/models/colour/eval_colour.py` |
+| What AURA changes about how a photograph looks | `docs/tone-and-colour.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -493,6 +497,71 @@ whose loci differ the satisfying set is not an interval. And **a row with `user_
 carries AURA's own numbers**, which is what lets the review queue show a disagreement and phase
 30's learning loop read one - and it only works because `ToneStore::override_of` exists beside the
 frozen service to read the other side.
+
+Phase 16 is implemented conditionally: `aura-core::contract::colour` freezes the decision, the
+monotone curve, the eight bands, the content readings, the skin guard report, the three
+variants, twenty-nine reasons, the outline, the override and `ColourService`;
+`aura-brain-photo::colour` solves the five tone parameters from the histogram and phase 09's
+noise headroom, fits a curve to the scene's subject-contrast intent under three constraints,
+reads what is in the frame from its colours, forms a harmony objective, expresses it in the
+recipe's eight bands, bounds the whole grade with a clipping guard and a subtlety cap, and
+then **measures what it did to the people in the frame and re-solves until they have not
+moved**. Migration 16 stores one decision per photograph; 22 argued-over scene rows live in
+editable config; one model is signed with a card; seven IPC commands (ADR-0034) feed a Tone
+panel, a curve editor and an HSL panel; and `aura-cli verify --phase 16` is the executable
+gate. Its exit report is `docs/progress/PHASE-16-EXIT.md`.
+
+**The shipped tone head is a placeholder and is never consulted.** `TONE_HEAD_TRAINED` is
+false, so `Analyser::tone_hint` returns `None` and no frame in this build is graded by a random
+projection. What ships is a deterministic solver, and that is a decision rather than a
+fallback: a random projection blended at any weight is a random contribution at that weight,
+and it would be indistinguishable in the panel from a learned one. Every gate in section 10.1
+is measured against synthetic frames whose foliage hue, dress luminance and subject contrast
+were **painted into the pixels** and read back through the real pipeline, which proves the
+arithmetic and says nothing about a photograph. That is condition C1 and a Sev 2 trigger.
+Condition C2 is the second and it is the one to be careful about: the fairness gate is measured
+on five *reflectances*, not five people. `docs/skin-fairness.md` says so in the product's own
+words, and `docs/tone-and-colour.md` is the rest of the phase in the same voice.
+
+Two rules that phase 16 adds and every later phase inherits:
+
+- **`ColourService` is the only way to ask how a photograph should be graded.** Twelfth service
+  of its kind. Phase 17 shifts these values toward one photographer's style, 18 grades locally
+  on top of them, 25 normalises a gallery of them, 27 checks them and 29 builds albums from
+  them. Two answers to "how much contrast does this frame want" is an album that does not match
+  the gallery.
+- **A guarantee is measured, not asserted.** Section 6.3 promises skin never shifts measurably;
+  `colour::skin_guard` grades this frame's own skin pixels **through the real renderer**,
+  measures the hue and chroma they actually moved, and re-solves - or withdraws the colour
+  operations entirely - until they are inside the ceilings. The measurement is stored on the
+  row, so "skin never shifts" is `SELECT MAX(skin_hue_shift)` rather than a sentence in a
+  document. A product that could only assert it would have no way to find out it had stopped
+  being true.
+
+Four decisions in phase 16 are worth remembering because they will be re-argued. **The skin
+guarantee is a post-condition with a re-solve, not an attenuation factor** - every product that
+has shipped orange skin applied the factor to a parameter while making the promise about a
+pixel, and between them sit a curve that moves chroma without touching a band and a vibrance
+operator that is not linear in what it touches. **Its baseline is the frame's own skin after
+the tone half**, because chroma scales with lightness and measuring against the raw pixel makes
+every correctly brightened frame a violation. **Monotonicity is a property of the control
+points rather than of an evaluator** - the renderer's Fritsch-Carlson interpolation is monotone
+exactly when its points are, so `ToneCurve::new` refusing a bad set is the whole guarantee, and
+the interpolation moved into `aura_raw::colour::curve` when the fitter became its second
+consumer. And **the curve fitter bounds its gain rather than clamping its nodes**: clamping a
+node that wanted to sit above white produced a flat top, which is a posterised band and new
+clipping in one move.
+
+Phase 16 also makes `aura-brain-photo` depend on `aura-render`, which is new and is the
+consequence of the guarantee being a post-condition: the guard measures what the *renderer*
+does to a skin pixel rather than what a copy of it would do. `aura-recipe` arrives
+transitively, and `crates/aura-brain-photo/tests/no_recipe_writes.rs` is a grep as a test that
+fails the build if this crate ever calls `schema::merge` - writing a recipe is phase 14's rule
+and stays in `aura-app`.
+
+Phase 16 corrected a phase 15 oversight: **migrations 15 and 16 are now in `contracts.lock`**.
+`docs/plan/CLAUDE.md` has listed every migration as a frozen contract since phase 01, and 15
+had been omitted from `EXTRA_CONTRACTS` when it shipped.
 
 Five rules that phase 13 adds and every later phase inherits:
 
