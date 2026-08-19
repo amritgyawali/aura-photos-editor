@@ -71,7 +71,13 @@ use crate::tone::wb::{Constraint, Constraints};
 /// the way the confidence is combined. It is written into
 /// `image_tone_estimate.analysis_ver`, and two estimates made under different values of it
 /// are not comparable: `AURA-ML-5060` exists so that comparison never happens silently.
-pub const ANALYSIS_VER: u16 = 1;
+///
+/// 1 -> 2: the preserve-mood policy stopped keying on whichever hypothesis won the cost race
+/// and started asking the frame's own reading of the room (`illuminant::ambient`), and the
+/// correction between two lights moved from an interpolation in kelvin to one in `u'v'`.
+/// Both change the temperature and tint written on a coloured-light frame, so every stored
+/// estimate is re-measured. Condition C5 in `docs/progress/PHASE-15-EXIT.md`.
+pub const ANALYSIS_VER: u16 = 2;
 
 /// The pixel rung the tone pass reads.
 ///

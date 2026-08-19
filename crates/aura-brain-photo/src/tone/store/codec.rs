@@ -49,9 +49,9 @@ pub const ALTERNATIVE_FIELDS: [&str; 4] = ["temperature_k", "tint", "cost", "why
 
 /// How many `u'v'` units one tint unit is.
 ///
-/// The inverse of the conversion `illuminant::describe` applies, kept here so that a stored
-/// chromaticity and a displayed tint are two views of one number rather than two numbers.
-const TINT_PER_UV: f32 = 0.004_5;
+/// Re-exported from `illuminant` rather than repeated, so that a stored chromaticity and a
+/// displayed tint stay two views of one number rather than two numbers that agree today.
+use crate::tone::illuminant::TINT_PER_UV;
 
 /// Round a float to three decimals, as an `f64` for serde.
 ///

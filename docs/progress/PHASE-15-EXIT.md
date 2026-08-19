@@ -40,13 +40,14 @@ low-confidence frames by scene and accepts a whole scene in one action.
 | Exposure and WB set automatically with reasons and confidence | **met** - every frame, two confidences, up to six typed reasons |
 | Faces correctly exposed in dark receptions without flattening the mood | **met on fixtures** - `mood_preserved` aims at the bottom of the band rather than its middle |
 | Skin colour believable across skin tones, measured and published | **measured on synthetic reflectances** (mean 0.110 dE00, spread 0.159); published in `docs/skin-fairness.md`. **Not measured on photographs** - C1 |
-| Coloured stage lighting survives editing | **met** - 106 % of a coloured light's cast survives across the fixture set. The *flag* does not always set - C5 |
+| Coloured stage lighting survives editing | **met** - 106 % of a coloured light's cast survives across the fixture set, and 3 of 5 frames now say so. The flag's remaining gap is a threshold rather than a mechanism - C5 |
 | Mixed-light frames flagged rather than badly corrected | **met** - 8 frames marked, both regions stored, `idx_tone_mixed` is phase 18's query |
 | Every segment has reference frames ready | **met** - 5 anchors from 43 candidates; a chapter with too few gets none rather than bad ones |
 
 ## 3. What the section 10.1 gates measured
 
-`cargo test -p aura-brain-photo --test tone_eval` - 22 gates, all green.
+`cargo test -p aura-brain-photo --test tone_eval` - 24 gates, all green. (22 at the phase
+gate; C5's two regression tests are the 23rd and 24th.)
 
 | Gate | Threshold | Measured |
 |---|---|---|
@@ -93,7 +94,9 @@ pipeline. That proves the arithmetic. It is not evidence about a photograph.
 6. **Local-first.** No cloud call in this phase, as section 7 requires.
 7. **Scene-conditioned everything.** 22 scene rows; a scene with no row is recorded and reported.
 8. **Colour discipline.** The solve is in CIE 1976 `u'v'`, never in kelvin - a distance in kelvin
-   is not a distance in colour.
+   is not a distance in colour. This was asserted before it was true: the preserve-mood
+   correction interpolated a temperature until C5 was worked, and
+   `the_correction_between_two_lights_is_walked_in_chromaticity` is what now holds it.
 9. **No silent failure.** Six codes, `AURA-ML-5060` to `5065`, each with a runbook.
 
 ## 7. Rollback
@@ -137,16 +140,60 @@ costs something the phase document asks for. At the measured figure a 4,000-imag
 about 3.2 MB, against about 48 MB for phase 14's recipes. **PERF + CTO waiver, recorded here as
 section 14 of the phase document requires.**
 
-**C5 - A coloured light is kept, but not always labelled.** Once a skin locus binds, the purple
-dance floor is still preserved - 106 % of its cast survives - but `ToneEstimate::coloured_light`
-is not set, because the preserve-mood branch is gated on the *chosen hypothesis* being saturated
-and the skin-anchored winner is not. The consequences are reporting rather than pixels: the panel
-does not tell the photographer the light was kept on purpose, and `ToneOutline::coloured_light`
-under-counts. The gate measures the surviving cast rather than the flag, so the behaviour is
-guarded; the label needs a small change in `solve::correct` and an `ANALYSIS_VER` bump.
+**C5 - A coloured light is kept, and now mostly labelled. Closed as a mechanism; open as a
+threshold.** `ANALYSIS_VER` 1 -> 2.
+
+The original defect was that the preserve-mood branch keyed on the *chosen hypothesis* being
+saturated, and the winner changes with how much of the wedding has been analysed: white-patch
+reads the purple wash at a chroma of about 0.063 before any skin loci exist, and the
+skin-anchored answer reads the same wash at about 0.041 after. One room, one light, two
+readings on opposite sides of `SATURATED_ABOVE` - so a project's first dance-floor frame was
+labelled and its four-hundredth was not.
+
+Two changes close that. `illuminant::ambient` asks the two generators that measure the light
+*falling on the frame* rather than the one that best explained the subject, so the answer stops
+depending on project progress; and the correction between two lights now walks in `u'v'` rather
+than in kelvin. The second was found by the first: a coloured light is off the Planckian locus
+by definition, so interpolating its *temperature* walked every candidate back onto the locus,
+none of them ever satisfied a skin constraint the wash had pushed off it, and the scan fell
+through to the full correction while recording `SkinLocusConstrained` - the code that means the
+mood was lost - on frames whose mood was in fact kept. That was invariant 8 being violated in
+the one place it was load-bearing, and section 11's own "the solve is in CIE 1976 `u'v'`, never
+in kelvin" was not true of this function.
+
+The ambient witness is deliberately narrower than the chosen one: it fires only on a scene phase
+07 marked `STAGE`, and only when the light's *kind* classifies as intentional. Both generators it
+reads are the two confounded by a strongly coloured **surface**, and the red mandap clears twice
+the saturation threshold on its own - without the scene-attribute test it preserved a red cast on
+all five ritual frames and cost four of them the white-balance gate. That number is measured, not
+argued: it is why the guard is there.
+
+Measured on the fixture wedding: coloured-light frames labelled went from **0 of 5 to 3 of 5**,
+white balance held at **42/46 (0.913)**, the surviving cast held at **106 %**, skin dE00 and its
+spread did not move, and determinism holds.
+`the_coloured_light_note_does_not_depend_on_how_much_of_the_wedding_is_analysed` and
+`the_correction_between_two_lights_is_walked_in_chromaticity` are the two regression tests.
+
+**What remains open, and why it was not tuned away.** The other two of the five stay unlabelled
+because the fixture's own light sits at a duv of **0.0406**, below `Illuminant::SATURATED_ABOVE`
+of 0.055 - so by the product's current definition that wash is not saturated enough to be a
+creative choice, and the frames that *do* label only clear the bar because white-patch
+over-reads them. Lowering the constant, or making it scene-conditioned as invariant 7 would
+argue for, is a change to a frozen contract and needs an ADR. It also needs a photograph: tuning
+a perceptual threshold until a synthetic fixture flags would be fitting the number to a duv
+somebody picked when writing the fixture, which is condition C1's failure mode exactly. It waits
+for real camera files.
 
 **C6 - The three-OS CI matrix does not exist.** Phase 02's condition, inherited for the fifth
 time. Determinism is asserted within one build on one machine.
+
+It stopped being theoretical during this phase's completion pass. Phase 08's
+`the_label_files_and_the_rust_fixtures_agree` located its ground-truth files by string-editing
+the *Windows* spelling of a path suffix out of `CARGO_MANIFEST_DIR`; on a Linux runner the
+`replace` matched nothing, the test looked for `crates/aura-brain-wedding/tests/fixtures/labels/`
+and the phase 08 gate failed. It is fixed - it now joins its way up from the crate root as every
+other fixture path in the workspace already did - but a green suite on one operating system is
+exactly the assurance this condition says the product does not have, and this is what that costs.
 
 **C7 - No demo recording.** Section 14 asks for the feature running on a real 3,000-image
 wedding. There is no such wedding here.
@@ -190,9 +237,16 @@ contribution threshold, so no skin sample was ever taken, so no locus was ever b
 that cannot bootstrap the mechanism it gates is worse than none, because it fails invisibly and
 looks careful.
 
-**The correction is a linear scan rather than a bisection.** With two people whose loci differ,
-the set of corrections that satisfies both is not an interval. A bisection returns an arbitrary
-point in it; a scan returns the first, which is the least correction that works.
+**The correction is a linear scan rather than a bisection, and it walks in `u'v'`.** With two
+people whose loci differ, the set of corrections that satisfies both is not an interval. A
+bisection returns an arbitrary point in it; a scan returns the first, which is the least
+correction that works. The *space* half was got wrong first and is the more interesting error:
+the scan interpolated a colour temperature, which walks along the Planckian locus, which is the
+one path guaranteed to miss an off-locus light - so the mechanism built to preserve a coloured
+light could not land on any coloured light. It failed silently, into a reason code that said the
+opposite of what had happened, and every test passed. Two of the four decisions on this list are
+now the same lesson: a mechanism that cannot reach the case it exists for is worse than an absent
+one, because it reports.
 
 **The store keeps both answers.** A row with `user_edited = 1` still carries AURA's own numbers.
 That is what lets the review queue show a disagreement and phase 30's learning loop read one - and

@@ -289,6 +289,34 @@ pub fn classify(uv: [f32; 2], attrs: AttrFlags, from_flash: bool) -> IlluminantK
     IlluminantKind::Daylight
 }
 
+/// How many `u'v'` units one tint unit is.
+///
+/// Chosen so that a fluorescent tube's typical +0.02 in `u'v'` lands near +4 tint - the unit
+/// section 10.1's gate is written in - and so that the slider's +/-150 range spans everything
+/// a wedding can contain.
+///
+/// One constant rather than a literal at each site: [`describe`] divides by it, [`uv_of`]
+/// multiplies by it and `store::codec` reads it back, and a tint that means one thing in the
+/// solve and another in the panel is a bug nobody would see until a photographer compared two
+/// screens.
+pub const TINT_PER_UV: f32 = 0.004_5;
+
+/// The chromaticity a kelvin-and-tint pair names. The inverse of [`describe`].
+///
+/// Needed because the correction in [`super::solve::correct`] walks *between* two lights, and
+/// one of its endpoints - the camera's own as-shot value - arrives as the pair a photographer
+/// sets rather than as a chromaticity. Interpolating the pair directly is what invariant 8
+/// forbids: a distance in kelvin is not a distance in colour, and on an off-locus light it is
+/// not even in the right direction.
+///
+/// The offset is taken along `v'`, which is the axis [`duv`] takes its sign from, so a
+/// chromaticity built here reads back through [`describe`] with the tint it was given.
+#[must_use]
+pub fn uv_of(kelvin: f32, tint: f32) -> [f32; 2] {
+    let locus = cct_to_uv(kelvin);
+    [locus[0], locus[1] + tint * TINT_PER_UV]
+}
+
 /// Turn a chromaticity into the recorded shape.
 #[must_use]
 pub fn describe(
@@ -303,17 +331,68 @@ pub fn describe(
     Illuminant {
         kind: classify(uv, attrs, from_flash),
         cct_k: cct_from_uv(uv),
-        // The recipe's tint units. The divisor of 0.0045 is chosen so that a fluorescent
-        // tube's typical +0.02 in `u'v'` lands near +4 tint - the unit section 10.1's gate
-        // is written in - and so that the slider's +/-150 range spans everything a wedding
-        // can contain.
-        tint: (duv(uv) / 0.004_5).clamp(-150.0, 150.0),
+        // The recipe's tint units. See `TINT_PER_UV` for the divisor's reason.
+        tint: (duv(uv) / TINT_PER_UV).clamp(-150.0, 150.0),
         uv,
         weight: weight.clamp(0.0, 1.0),
         region,
         source,
         chroma,
     }
+}
+
+/// The frame's own reading of the light in the room, whichever hypothesis won.
+///
+/// ## Why this exists
+///
+/// [`super::solve::choose`] picks the chromaticity that best explains the *subject*, and
+/// that is the right answer for the correction. It is the wrong witness for "what kind of
+/// light is this room lit by", because the winner changes with the evidence available on
+/// that frame while the room does not.
+///
+/// The purple dance floor is where that bites. With no skin locus yet, white-patch wins and
+/// reads the wash at a chroma of about 0.063 - above [`Illuminant::SATURATED_ABOVE`], so
+/// [`classify`] calls it `Stage` and the preserve-mood policy engages. Once the wedding has
+/// accumulated loci, the skin-anchored hypothesis wins the same frame at about 0.041, below
+/// the threshold, so the identical room classifies as `Led` and the policy silently does not
+/// engage. The cast survives either way - the correction is anchored on skin and barely
+/// moves - but on the second path nothing *says* the light was kept on purpose, so the panel
+/// cannot tell the photographer and [`aura_core::contract::tone::ToneOutline::coloured_light`]
+/// under-counts. That was condition C5 in the phase 15 exit report.
+///
+/// ## What it reads
+///
+/// Only the two generators that measure the light *falling on the frame*: grey-world and
+/// white-patch. The skin and known-neutral hypotheses are anchored to a subject, so their
+/// chromaticity is a statement about that subject and not about the room; the camera's
+/// as-shot value is the body's own guess rather than a measurement; and the learned head is
+/// untrained in this build and never generated. The most saturated of the two is taken,
+/// because a wash that one of them reads as strongly coloured is a wash.
+///
+/// ## The red mandap, and why this does not fire on it
+///
+/// Both generators this reads are confounded by a strongly coloured *surface* - that is the
+/// failure mode listed in this module's own table - and a red canopy over a ceremony is
+/// exactly such a surface. Nothing new guards against it here, because [`classify`] already
+/// does: a saturated reading is `Stage` only when phase 07 marked the scene `STAGE`, or when
+/// the chroma is twice the threshold. A mandap is neither, so it classifies as a warm light
+/// and [`Illuminant::should_preserve`] stays false. The scene attribute is doing the work,
+/// which is the same division of labour [`classify`] documents: phase 07 owns whether this
+/// is a stage, and this module owns what colour the light is.
+#[must_use]
+pub fn ambient(hypotheses: &[Hypothesis], attrs: AttrFlags) -> Option<Illuminant> {
+    hypotheses
+        .iter()
+        .filter(|hypothesis| {
+            matches!(
+                hypothesis.source,
+                HypothesisSource::GreyWorld | HypothesisSource::WhitePatch
+            )
+        })
+        .map(|hypothesis| describe(hypothesis.uv, hypothesis.source, 0.0, None, attrs))
+        // `total_cmp` rather than `partial_cmp`: a NaN chroma would silently drop the
+        // candidate from a `partial_cmp` sort and take the coloured-light note with it.
+        .max_by(|left, right| left.chroma.total_cmp(&right.chroma))
 }
 
 /// What [`detect_mixed`] found.
