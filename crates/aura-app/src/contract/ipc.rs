@@ -4548,3 +4548,213 @@ pub struct StyleStatusDto {
     /// Which build's fitter produced the active profile.
     pub analysis_ver: u32,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-18. Local mask AI: the regions every later phase edits inside.
+// ---------------------------------------------------------------------------
+
+/// What the mask panel's project header shows.
+///
+/// **`selected` and `masked` are two numbers rather than a ratio**, and this is the first
+/// status shape in the product where that matters. The denominator is *selected* frames, not
+/// every photograph: a mask over a rejected frame is not a gap, it is a frame nobody asked
+/// about. A photographer looking at a project where the cull has not run sees `selected: 0`
+/// rather than a coverage figure computed against a denominator that does not exist.
+/// See `docs/adr/ADR-0038-mask-ipc-surface.md` decision 5.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskStatusDto {
+    /// Frames the cull kept.
+    pub selected: u64,
+    /// How many of those carry masks at the current versions.
+    pub masked: u64,
+    /// How many masks exist in total.
+    pub masks: u64,
+    /// How many of those a photographer has edited by hand.
+    pub user_edited: u64,
+    /// How many are below the aggressive floor.
+    pub low_quality: u64,
+    /// Mean class confidence, weighted by area.
+    pub mean_confidence: f32,
+    /// Mean edge quality, weighted by area.
+    pub mean_edge_quality: f32,
+    /// Total stored bytes for this project.
+    pub payload_bytes: u64,
+    /// Mean stored bytes per masked frame. What the 180 KB budget bounds.
+    pub bytes_per_image: f32,
+    /// The model set the stored masks were produced under.
+    pub model_ver: u32,
+    /// The analysis version the stored masks were produced under.
+    pub analysis_ver: u32,
+    /// False in this build. The learned segmentation head is registered and never consulted.
+    pub head_trained: bool,
+}
+
+/// One reason a region is the way it is, with the sentence the panel renders.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskReasonDto {
+    /// The stable code from the frozen `MaskReason` vocabulary.
+    pub code: String,
+    /// One sentence, in the product's own voice.
+    pub text: String,
+}
+
+/// One region of one photograph.
+///
+/// **`confidence` and `edgeQuality` are never collapsed into one number.** They fail
+/// independently and are fixed by different things - a photographer can re-brush a boundary and
+/// cannot re-brush a class - so the panel shows two bars and names which of the two is limiting.
+/// ADR-0038 decision 2.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskDto {
+    /// Prefixed mask id.
+    pub id: String,
+    /// Prefixed photo id.
+    pub image_id: String,
+    /// The class slug, from the frozen twenty.
+    pub kind: String,
+    /// Which person, when the region belongs to one. Absent is a real answer.
+    pub identity_id: Option<String>,
+    /// The identity's display name, when there is one.
+    pub identity_name: Option<String>,
+    /// `rle` or `alpha8`.
+    pub form: String,
+    /// The stored plane's width.
+    pub width: u32,
+    /// The stored plane's height.
+    pub height: u32,
+    /// Stored bytes.
+    pub bytes: u64,
+    /// Edge softness applied on top of the payload.
+    pub feather: f32,
+    /// How sure the class assignment is.
+    pub confidence: f32,
+    /// How well determined the boundary is.
+    pub edge_quality: f32,
+    /// The word for the boundary: `matted`, `soft`, `binary` or `unknown`.
+    pub edge: String,
+    /// The strength ceiling phases 19 to 24 multiply by.
+    ///
+    /// Computed once, in Rust, and sent. The panel could derive it from the two quality numbers
+    /// and must not: two implementations of a gating rule is two answers to "may this mask carry
+    /// skin smoothing". ADR-0038 decision 3.
+    pub allowance: f32,
+    /// False when this mask may not carry skin smoothing or generative cleanup.
+    pub allows_aggressive: bool,
+    /// Why the region is the way it is. Never empty.
+    pub reasons: Vec<MaskReasonDto>,
+    /// True when a photographer brushed it. Automation never regenerates one of these.
+    pub user_edited: bool,
+    /// The model set this mask was produced under.
+    pub model_ver: u32,
+}
+
+/// A region as a plane the panel can draw.
+///
+/// Quarter-resolution eight-bit alpha, base64, capped at `OVERLAY_MAX_EDGE` on the long edge.
+/// The panel draws over a preview that is itself a proxy, so a full-resolution plane is detail
+/// nobody can see costing bytes everybody pays - and the brush wants the alpha values
+/// themselves rather than an image of them. ADR-0038 decision 1.
+///
+/// **There is no field here that could hold a photograph.** This is derived geometry about a
+/// region; the pixels of the frame reach the panel through the preview surface and nowhere else.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskOverlayDto {
+    /// Prefixed mask id.
+    pub id: String,
+    /// Plane width.
+    pub width: u32,
+    /// Plane height.
+    pub height: u32,
+    /// `width * height` alpha bytes, base64.
+    pub alpha_base64: String,
+    /// Which render level it was resolved at.
+    pub level: String,
+}
+
+/// Ask for a photograph's regions, producing any that are missing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnsureMasksInput {
+    /// The project the photograph is in.
+    ///
+    /// Needed because producing a region reads pixels, and the preview cache is opened per
+    /// project. Every other command on this surface is a query over one table and takes no
+    /// project, which is the difference this field makes visible.
+    pub project_id: String,
+    /// The photograph.
+    pub image_id: String,
+    /// Which classes. Empty means all twenty.
+    #[serde(default)]
+    pub kinds: Vec<String>,
+}
+
+/// One step of a mask composition.
+///
+/// A whole edit arrives as one command with an explicit op rather than as a stream of brush
+/// points: a per-point command would be a command per animation frame, which breaks the 50 ms
+/// rule by volume rather than by latency, and it would make undo a replay of two hundred rows.
+/// ADR-0038 decision 4.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskOpDto {
+    /// `source`, `plane`, `union`, `intersect`, `subtract`, `invert`, `feather`, `grow` or
+    /// `shrink`.
+    pub op: String,
+    /// The mask this step pushes, for `source`.
+    #[serde(default)]
+    pub mask_id: Option<String>,
+    /// A stroke plane, for `plane`: `width`, `height` and base64 alpha.
+    #[serde(default)]
+    pub width: Option<u32>,
+    /// The stroke plane's height.
+    #[serde(default)]
+    pub height: Option<u32>,
+    /// The stroke plane's alpha bytes, base64.
+    #[serde(default)]
+    pub alpha_base64: Option<String>,
+    /// The amount, for `feather`.
+    #[serde(default)]
+    pub amount: Option<f32>,
+    /// The radius in analysis pixels, for `grow` and `shrink`.
+    #[serde(default)]
+    pub radius: Option<u32>,
+}
+
+/// Apply a composition to one of a photograph's regions and keep the result.
+///
+/// Sets `userEdited`, and there is no argument here that clears it. The one thing that clears it
+/// is `regenerate_mask`, which is a separate deliberate act. ADR-0037 decision 7.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditMaskInput {
+    /// The mask being edited.
+    pub mask_id: String,
+    /// The program, in postfix order.
+    pub ops: Vec<MaskOpDto>,
+    /// The feather to store with the result.
+    #[serde(default)]
+    pub feather: Option<f32>,
+}
+
+/// What one operation may do through one region.
+///
+/// The shape phases 19 to 24 read before they apply anything. It is on this surface as well so
+/// the panel can say *why* an operation is unavailable rather than only that it is.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskAllowanceDto {
+    /// Prefixed mask id.
+    pub mask_id: String,
+    /// The operation asked about.
+    pub operation: String,
+    /// The strength ceiling. Multiply by it; do not compare against it.
+    pub ceiling: f32,
+    /// False when the operation is refused outright.
+    pub permitted: bool,
+    /// Why the ceiling is below one. Empty when nothing is limiting.
+    pub reasons: Vec<MaskReasonDto>,
+}

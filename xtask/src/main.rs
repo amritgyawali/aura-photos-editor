@@ -38,6 +38,13 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0016_colour.sql",
     // PHASE-17.
     "crates/aura-catalog/migrations/0017_style.sql",
+    // PHASE-18. The migration, and the two shaders: `mask_upsample.wgsl` and
+    // `mask_composite.wgsl` are the GPU half of a boundary the reference path also draws, and a
+    // shader that drifts while no device can run it is a seam nobody finds until one arrives.
+    // `shader_parity.rs` holds them to the reference; this holds them to a review.
+    "crates/aura-catalog/migrations/0018_masks.sql",
+    "crates/aura-render/shaders/mask_upsample.wgsl",
+    "crates/aura-render/shaders/mask_composite.wgsl",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

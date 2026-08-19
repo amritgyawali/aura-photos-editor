@@ -13,6 +13,10 @@ disallowed-names = ["foo", "bar", "baz", "tmp", "data", "thing"]
 doc-valid-idents = [
   "AURA", "OpenAI", "DirectML", "TensorRT", "CoreML", "DPAPI", "LibRaw",
   "LiteLLM", "vLLM", "GiB", "MiB", "..",
+  # PHASE-18. Standard terms in segmentation and matting, spelled this way in the
+  # literature and in the phase document, and named on nearly every page of the mask
+  # engine and its model cards.
+  "IoU", "mIoU", "LEB128", "SSIM",
 ]
 
 # Ban the APIs that break determinism or panic silently

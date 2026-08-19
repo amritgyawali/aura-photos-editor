@@ -213,6 +213,31 @@ phase-16-verify:
 phase-17-verify:
     cargo run --release --package aura-cli -- verify --phase 17 --work target/phase17-verify
 
+# The phase 18 gate: migration 18 and the two things it cannot hold - a skin
+# colour and a photograph - both heads proven untrained and unconsulted, the
+# twenty-class vocabulary and its storage split, the mIoU gates over five painted
+# reflectances, a faceless frame that invents nobody, two adjacent people whose
+# skin masks do not bleed, the 180 KB budget, the algebra, the quality gate that
+# blocks skin smoothing and still carries a tone move, the store with a hand edit
+# surviving a regeneration, determinism, and the proof that this crate still
+# writes no biometric.
+phase-18-verify:
+    cargo run --release --package aura-cli -- verify --phase 18 --work target/phase18-verify
+
+# The mask metrics, from the Python side. `train_seg.py --self-test` fits the
+# same weighted objective the real loop does and proves the class weighting
+# changes what is learned and the per-class gate can fail;
+# `train_matting.py --self-test` proves the composite and gradient terms both do
+# something and that returning the coarse mask scores worse than an honest fit;
+# `eval_mask.py --self-test` proves every metric can fail, including the halo
+# measure that catches what mIoU averages away; `export.py --check` verifies both
+# graph contracts without PyTorch.
+mask-report:
+    python ml/models/mask/train_seg.py --self-test
+    python ml/models/mask/train_matting.py --self-test
+    python ml/models/mask/eval_mask.py --self-test
+    python ml/models/mask/export.py --check
+
 # The style metrics, from the Python side. `train_residual.py --self-test` fits the
 # same synthetic archives the Rust harness does and asserts the same properties;
 # `eval_style.py --self-test` proves every metric can fail; `export.py --check`

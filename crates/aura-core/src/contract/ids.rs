@@ -159,6 +159,25 @@ typed_id!(DecisionId, "dcn");
 // See docs/adr/ADR-0035-style-learning-and-personal-profiles.md section "Decision 8".
 typed_id!(ProfileId, "prf");
 
+// PHASE-18. Section 5 writes `MaskId` into the frozen `Mask` shape, so a region of a
+// photograph is an id of the same kind as the eleven above.
+//
+// It is the first id in this file that names a *part of* something rather than a whole
+// thing. A project, a photograph, a face and a chapter are all things you can point at; a
+// mask is a claim about which pixels of a photograph are her hair. That is exactly why it
+// needs an id: a composition refers to its operands, a brush stroke refers to what it edits,
+// a recipe's local parameter block refers to the region it applies inside, and all three of
+// those need something stable to point at that survives a re-analysis.
+//
+// One and not two, and the alternative was real: a `MaskSetId` for "every mask of one
+// photograph" would have made the store's primary key one column instead of two. It is not
+// here because a mask set is not a thing that can be edited, locked, referred to or
+// regenerated independently - `(image_id, kind, identity)` names it completely, and phase 08
+// made the same argument about a burst.
+//
+// See docs/adr/ADR-0037-semantic-masks-matting-and-quality-gating.md decision 1.
+typed_id!(MaskId, "msk");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

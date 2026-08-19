@@ -1289,3 +1289,66 @@ summary      = "A profile was learned with a different render engine or fitter"
 user_message = "This style profile was learned with an older version of AURA's editing engine, so it is being applied cautiously. Re-training it on the same weddings will restore full accuracy."
 runbook      = "docs/runbooks/AURA-ML-5077.md"
 introduced   = "PHASE-17"
+
+# Phase 18. Local mask AI, ML 5078-5083. The same five shapes the phase 09, 11,
+# 15, 16 and 17 blocks have - one item that could not be done, a refused run, a
+# warning about a case the product handled coarsely, a refused edit and version
+# drift - plus one that is new: `AURA-ML-5081` is the first code in the product
+# that constrains what a *later* phase may do. Every warning before it was about
+# a decision AURA had already made; this one is about a decision phases 19 to 24
+# have not made yet, and it is how a badly determined boundary stops a retouch
+# from happening through it.
+
+[[error]]
+code         = "AURA-ML-5078"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be masked"
+user_message = "AURA could not work out the regions in one photograph, so it left that one unmasked. Everything else in the selection is still being done."
+runbook      = "docs/runbooks/AURA-ML-5078.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5079"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "A masking run was refused"
+user_message = "AURA has nothing selected to work on, so it has not made any masks. Cull the wedding first, or choose the photographs you want."
+runbook      = "docs/runbooks/AURA-ML-5079.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5080"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A mask payload exceeded its storage budget and was stored more coarsely"
+user_message = "One region in this photograph was unusually broken up, so AURA stored it a little more coarsely to keep the catalog small."
+runbook      = "docs/runbooks/AURA-ML-5080.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5081"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A mask's quality limits what may be done with it"
+user_message = "AURA is not confident about the edge of this region, so it will make smaller changes there than usual and will not smooth skin inside it."
+runbook      = "docs/runbooks/AURA-ML-5081.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5082"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A mask edit was refused"
+user_message = "AURA could not apply that change to the mask. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5082.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5083"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored masks came from a different model set or a different analysis"
+user_message = "AURA has improved how it finds regions in a photograph, so it is redoing them in the background. Any mask you have edited by hand is kept exactly as it is."
+runbook      = "docs/runbooks/AURA-ML-5083.md"
+introduced   = "PHASE-18"

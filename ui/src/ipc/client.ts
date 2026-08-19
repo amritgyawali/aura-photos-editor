@@ -172,6 +172,12 @@ import type {
   StyleStatusDto,
   TrainProfileDto,
   TrainProfileInput,
+  EditMaskInput,
+  EnsureMasksInput,
+  MaskAllowanceDto,
+  MaskDto,
+  MaskOverlayDto,
+  MaskStatusDto,
 } from './types';
 
 /** True when the shell is present. Storybook-style dev runs fall back to stubs. */
@@ -917,3 +923,49 @@ export const style = {
     invoke<StyleStatusDto>('set_project_profile', { input }),
 };
 
+
+// ---------------------------------------------------------------------------
+// PHASE-18. Local mask AI.
+//
+// Eight commands and no ninth. There is no `applyMask` here: section 2.2 of the phase document
+// puts every *use* of a mask in phases 19 to 24, and what this surface hands out is a region and
+// a strength ceiling.
+// ---------------------------------------------------------------------------
+
+export const maskApi = {
+  /** What the mask panel's project header shows. Two numbers, never a ratio. */
+  maskStatus: (projectId: string): Promise<MaskStatusDto> =>
+    invoke<MaskStatusDto>('mask_status', { projectId }),
+
+  /**
+   * Every region stored for one photograph, in the frozen class order.
+   *
+   * An empty list means nobody has masked this frame yet. It is not the same as a frame with no
+   * regions in it, and the panel renders the two differently.
+   */
+  imageMasks: (imageId: string): Promise<MaskDto[]> =>
+    invoke<MaskDto[]>('image_masks', { imageId }),
+
+  /** Produce the named regions if they are not already stored. Idempotent. */
+  ensureMasks: (input: EnsureMasksInput): Promise<MaskDto[]> =>
+    invoke<MaskDto[]>('ensure_masks', { input }),
+
+  /** One region as a plane to draw over a preview. Quarter resolution, capped. */
+  maskOverlay: (maskId: string): Promise<MaskOverlayDto> =>
+    invoke<MaskOverlayDto>('mask_overlay', { maskId }),
+
+  /** What one operation may do through one region, and why it may not do more. */
+  maskAllowance: (maskId: string, operation: string): Promise<MaskAllowanceDto> =>
+    invoke<MaskAllowanceDto>('mask_allowance', { maskId, operation }),
+
+  /** Apply a composition and keep the result as the photographer's own. Sets `userEdited`. */
+  editMask: (input: EditMaskInput): Promise<MaskDto> =>
+    invoke<MaskDto>('edit_mask', { input }),
+
+  /** Drop a photographer's edit so the next pass regenerates the region. */
+  regenerateMask: (maskId: string): Promise<boolean> =>
+    invoke<boolean>('regenerate_mask', { maskId }),
+
+  /** The twenty class slugs, in the frozen iteration order. */
+  maskKinds: (): Promise<string[]> => invoke<string[]>('mask_kinds', {}),
+};

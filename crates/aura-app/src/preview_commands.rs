@@ -186,6 +186,53 @@ pub fn preview_problems(state: &AppState, project_id: &str) -> IpcResult<Vec<(St
         .collect())
 }
 
+/// The inverse. PHASE-18 needs it: a brush stroke arrives from the panel as a base64 alpha
+/// plane, and a surface that could only encode would have to take the stroke as a JSON array of
+/// numbers - which is four times the bytes and a parse per pixel.
+///
+/// Returns `None` on anything that is not valid standard base64, rather than a best effort:
+/// a stroke decoded from a truncated payload is a region a photographer did not draw.
+#[must_use]
+pub fn from_base64(text: &str) -> Option<Vec<u8>> {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    let value = |c: u8| -> Option<u32> {
+        ALPHABET
+            .iter()
+            .position(|byte| *byte == c)
+            .and_then(|index| u32::try_from(index).ok())
+    };
+
+    let bytes: Vec<u8> = text.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
+    if !bytes.len().is_multiple_of(4) {
+        return None;
+    }
+
+    let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
+    for chunk in bytes.chunks(4) {
+        let mut acc = 0_u32;
+        let mut keep = 3_usize;
+        for (index, byte) in chunk.iter().enumerate() {
+            if *byte == b'=' {
+                // Padding is only legal in the last two positions, and each `=` removes one
+                // output byte. Anything else is a payload that was cut somewhere it should not
+                // have been.
+                if index < 2 {
+                    return None;
+                }
+                keep -= 1;
+                acc <<= 6;
+                continue;
+            }
+            acc = (acc << 6) | value(*byte)?;
+        }
+        for shift in 0..keep {
+            out.push(((acc >> (16 - shift * 8)) & 0xFF) as u8);
+        }
+    }
+    Some(out)
+}
+
 /// Standard base64, written here rather than pulled in as a dependency: it is
 /// twenty lines, it has no configuration, and a supply-chain review of a crate
 /// that does this much is not a good use of anyone's afternoon.

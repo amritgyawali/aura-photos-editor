@@ -2319,3 +2319,149 @@ export type StyleStatusDto = {
   bucketRatio: number;
   analysisVer: number;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-18. Local mask AI: the regions every later phase edits inside.
+// ---------------------------------------------------------------------------
+
+/**
+ * What the mask panel's project header shows.
+ *
+ * **`selected` and `masked` are two numbers rather than a ratio**, and this is the first status
+ * shape in the product where that matters. The denominator is *selected* frames, not every
+ * photograph: a mask over a rejected frame is not a gap, it is a frame nobody asked about. A
+ * project where the cull has not run sends `selected: 0` rather than a coverage figure computed
+ * against a denominator that does not exist.
+ */
+export type MaskStatusDto = {
+  selected: number;
+  masked: number;
+  masks: number;
+  userEdited: number;
+  lowQuality: number;
+  meanConfidence: number;
+  meanEdgeQuality: number;
+  payloadBytes: number;
+  /** Mean stored bytes per masked frame. What the 180 KB budget bounds. */
+  bytesPerImage: number;
+  modelVer: number;
+  analysisVer: number;
+  /** False in this build. The learned segmentation head is registered and never consulted. */
+  headTrained: boolean;
+};
+
+/** One reason a region is the way it is, with the sentence the panel renders. */
+export type MaskReasonDto = {
+  code: string;
+  text: string;
+};
+
+/**
+ * One region of one photograph.
+ *
+ * `confidence` and `edgeQuality` are never collapsed into one number: they fail independently
+ * and are fixed by different things, so the panel shows two bars and names which of the two is
+ * limiting what may be done.
+ */
+export type MaskDto = {
+  id: string;
+  imageId: string;
+  /** The class slug, from the frozen twenty. */
+  kind: string;
+  identityId: string | null;
+  identityName: string | null;
+  /** `rle` or `alpha8`. */
+  form: string;
+  width: number;
+  height: number;
+  bytes: number;
+  feather: number;
+  confidence: number;
+  edgeQuality: number;
+  /** `matted`, `soft`, `binary` or `unknown`. */
+  edge: string;
+  /**
+   * The strength ceiling phases 19 to 24 multiply by.
+   *
+   * Computed in Rust and sent. The panel could derive it from the two quality numbers and must
+   * not: two implementations of a gating rule is two answers to "may this mask carry skin
+   * smoothing", and the one written here is the one nobody tests against a fixture.
+   */
+  allowance: number;
+  allowsAggressive: boolean;
+  reasons: MaskReasonDto[];
+  userEdited: boolean;
+  modelVer: number;
+};
+
+/**
+ * A region as a plane the panel can draw.
+ *
+ * Quarter-resolution eight-bit alpha, base64, capped on the long edge. **There is no field here
+ * that could hold a photograph** - this is derived geometry about a region, and the pixels of
+ * the frame reach the panel through the preview surface and nowhere else.
+ */
+export type MaskOverlayDto = {
+  id: string;
+  width: number;
+  height: number;
+  alphaBase64: string;
+  level: string;
+};
+
+/** Ask for a photograph's regions, producing any that are missing. */
+export type EnsureMasksInput = {
+  /**
+   * The project the photograph is in.
+   *
+   * Needed because producing a region reads pixels, and the preview cache is opened per project.
+   * Every other command on this surface is a query over one table and takes no project.
+   */
+  projectId: string;
+  imageId: string;
+  /** Which classes. Empty means all twenty. */
+  kinds?: string[];
+};
+
+/**
+ * One step of a mask composition, in postfix order.
+ *
+ * A whole edit arrives as one command rather than as a stream of brush points: a per-point
+ * command would be a command per animation frame, and it would make undo a replay of two
+ * hundred rows.
+ */
+export type MaskOpDto = {
+  /**
+   * `source`, `plane`, `union`, `intersect`, `subtract`, `invert`, `feather`, `grow` or
+   * `shrink`.
+   */
+  op: string;
+  maskId?: string | null;
+  width?: number | null;
+  height?: number | null;
+  alphaBase64?: string | null;
+  amount?: number | null;
+  radius?: number | null;
+};
+
+/**
+ * Apply a composition to one region and keep the result.
+ *
+ * Sets `userEdited`, and there is no argument here that clears it. The one thing that clears it
+ * is `regenerateMask`, which is a separate deliberate act.
+ */
+export type EditMaskInput = {
+  maskId: string;
+  ops: MaskOpDto[];
+  feather?: number | null;
+};
+
+/** What one operation may do through one region. */
+export type MaskAllowanceDto = {
+  maskId: string;
+  operation: string;
+  /** Multiply by it; do not compare against it. */
+  ceiling: number;
+  permitted: boolean;
+  reasons: MaskReasonDto[];
+};

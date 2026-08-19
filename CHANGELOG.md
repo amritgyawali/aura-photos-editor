@@ -2,6 +2,91 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 18 - Local Mask AI: automatic semantic masking
+
+Every photograph you keep is split into the twenty regions the rest of the product edits inside:
+skin, face, eyes, teeth, hair, clothing, dress, subject, background, sky, greenery and the rest -
+tied to the people in the frame, feathered at the edges, and editable by hand. Each region says
+two things about itself, how sure AURA is what it *is* and how well it could find its *boundary*,
+and those two numbers decide how far any later change through it may go.
+
+### Added
+
+- **`aura-vision::contract::mask`**: the frozen `Mask`, `MaskKind` (twenty), `Storage`,
+  `MaskPayload`, `EdgeQuality`, `MaskReason`, `MaskOp`, `GpuMask`, `MaskOutline` and
+  `MaskService`; `aura-core::contract::ids` gains `MaskId`. The contract lives in `aura-vision`
+  rather than `aura-core` because `RenderLevel` is in the frozen `upload_gpu` signature and
+  `aura-core` depends on no workspace crate - the precedent `SimilarityIndex` and `RenderService`
+  set.
+- **`aura-vision::mask`**: eleven modules. A twenty-class segmenter seeded by phase 06's faces
+  and grown by colour through connected regions; a salient-subject pass bounded by the person
+  boxes; a trimap whose band is a fraction of the region's own size; a guided-filter matte solved
+  in closed form inside that band, which reports how much of the boundary the photograph could
+  actually determine; identity scoping by *containment* rather than IoU; seven algebra operations;
+  a quality gate; a run-length and quarter-resolution-alpha codec; the store; and the resumable
+  lazy pass over the frames the cull kept.
+- **Migration 18**: `masks`, `mask_gate` and `v_mask_coverage`. No column that could hold a
+  photograph, no column that could hold a skin colour, and the gate scans for both on every run.
+- **Two shaders**: `mask_upsample.wgsl` and `mask_composite.wgsl`. Nothing executes them - no
+  `wgpu` backend is linked - and `shader_parity.rs` and `colour_discipline.rs` hold both to the
+  reference so they cannot drift while no device can notice.
+- **Six error codes**, `AURA-ML-5078` to `AURA-ML-5083`, with runbooks. `AURA-ML-5081` is the
+  first code in the product that constrains what a *later* phase may do.
+- **The mask IPC surface** (ADR-0038): eight commands, nine shapes, and no `apply_mask`. The
+  overlay crosses the wire as a capped quarter-resolution alpha plane; there is no field on the
+  surface that could hold a photograph.
+- **`MaskPanel.tsx`**: two quality bars rather than one, a sentence naming which of the two is
+  limiting, a feather slider that means the same softness at every zoom, refine edge, and reset
+  to AURA's version.
+- **Two signed models with cards** - `semantic_segment` and `alpha_matting` - and four Python
+  scripts whose self-tests prove every metric can *fail*, including a halo measure that catches
+  what mIoU averages away.
+- **`docs/masks.md`**: what the regions are and what the two numbers mean, in the product's own
+  voice.
+- **`aura-cli verify --phase 18`** and `just phase-18-verify`, `just mask-report`.
+
+### Changed
+
+- **`aura-vision` gained `aura-catalog`.** Section 4 of the phase document puts the mask store in
+  this crate, so phase 06's sentence - "this crate has no catalog dependency, so it *cannot*
+  write a face template" - stopped being true. `crates/aura-vision/tests/no_template_writes.rs`
+  replaces it, and the phase gate runs the same grep. Third grep-as-a-test in the repository.
+- `crates/aura-render/src/shaders.rs`: `every_shader_declares_the_frame_uniform` widened from a
+  literal `struct Frame` to "a uniform block carrying a width and a height", because the two mask
+  shaders take two grids and a block called `Frame` would have had to mean one of them.
+- `crates/aura-app/src/style_commands.rs`: phase 17's "this surface cannot return a pixel" grep
+  is now bounded at the phase 18 marker. It scanned to the end of `ipc.rs` and would have failed
+  on a mask overlay, which is derived geometry about a region rather than a photograph.
+
+### Fixed
+
+- **The mask resampler manufactured a halo.** `Plane::resize_bilinear` read zero outside the
+  plane, darkening the outermost half-pixel of every upsampled region - a one-pixel dark rim
+  around every mask at every render level, produced by the code that delivers a boundary rather
+  than by the code that finds it. `Plane::at_clamped` is the fix.
+- **`INSERT OR REPLACE` would have destroyed a hand-edited mask through a constraint.** The
+  `DELETE ... WHERE user_edited = 0` was not enough on its own: `masks` has
+  `UNIQUE (image_id, kind, identity_id)`, and an `INSERT OR REPLACE` deletes the row it conflicts
+  with. `MaskStore::put` now reads the edited coordinates first and skips them entirely.
+
+### Known limitations
+
+- **Both shipped heads are placeholders and neither is consulted.** `SEG_HEAD_TRAINED` and
+  `MATTING_HEAD_TRAINED` are `false`; regions are measured from the photograph rather than
+  predicted. Every gate is measured on synthetic frames whose regions were painted into the
+  pixels. Condition C1 of the phase 18 exit report, and a Sev 2 trigger.
+- **The 100 % zoom artefact audit did not happen.** There are no photographs to audit; the halo
+  metric exists and has never been run on data. Condition C2, and the criterion most likely to be
+  wrong in a way nothing here would catch.
+- **The 120 ms budget is not met**, because it is written against a GPU and no `wgpu` backend is
+  linked. The storage budget - the failure mode section 12 names - is met with a factor of six in
+  hand at 29 KB per frame against 180 KB. Condition C3.
+- **The render graph still cannot evaluate a semantic mask on its own.**
+  `SkipReason::MaskGeneratorAbsent` stays reachable; wiring the resolved planes into the graph is
+  phase 19's first task and changes no shape frozen here. Condition C4.
+- Clothing versus dress has no colorimetric signature: a red lehenga comes back as clothing, at a
+  lower confidence than any other class, which is a region that works rather than one that lied.
+
 ## Phase 17 - Style Learning: scene-conditional personal AI profiles ("Teach My AI")
 
 Point AURA at weddings you have already edited and it learns your look - not as one style,

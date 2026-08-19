@@ -544,6 +544,15 @@ mod tests {
         let start = source
             .find("// PHASE-17. Style learning")
             .unwrap_or(source.len());
+        // Bounded at the next phase's block. PHASE-18 added a mask overlay that carries a
+        // base64 alpha plane - derived geometry about a region rather than a photograph - and an
+        // unbounded scan would fail on it while claiming to be about style profiles. The check
+        // is about *this* block, and it has to say which block it is about.
+        let end = source
+            .get(start..)
+            .and_then(|rest| rest.find("// PHASE-18. Local mask AI"))
+            .map_or(source.len(), |at| start + at);
+        let source = source.get(..end).unwrap_or(source);
         // Comments are stripped first: the block *says* it carries no pixels, and a scan that
         // read its own explanation would fail on the sentence that describes the guarantee.
         let block: String = source

@@ -78,8 +78,8 @@ pub use contract::emotion::{
 };
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
 pub use contract::ids::{
-    ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MomentId, PhotoId, ProfileId,
-    ProjectId, RunId, SegmentId,
+    ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MaskId, MomentId, PhotoId,
+    ProfileId, ProjectId, RunId, SegmentId,
 };
 pub use contract::integrity::{
     CropRect, ExposureVerdict, EyeOpenness, EyeState, IntegrityFlags, IntegrityOutline,

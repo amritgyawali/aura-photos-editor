@@ -529,6 +529,74 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::no_int8(),
             },
         ),
+        // PHASE-18. Two heads, and neither is consulted anywhere in this build:
+        // `segment::SEG_HEAD_TRAINED` and `matting::MATTING_HEAD_TRAINED` are both
+        // false, so no photograph is segmented by a random projection.
+        // ADR-0037 decision 2 records why that is a decision rather than a
+        // fallback, and it matters more here than in phases 15 and 16 for one
+        // reason: a wrong tone parameter shows up in the histogram, and a wrong
+        // class label on the pixels behind somebody's ear shows up only after
+        // phase 20 has smoothed them.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::SEGMENT_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "segmentation",
+                class: ModelClass::Segmentation,
+                model: fixtures::semantic_segment(),
+                input: Placeholder::linear_image(fixtures::SEGMENT_INPUT_SIDE),
+                output: BTreeMap::from([(
+                    "logits".to_string(),
+                    vec![
+                        1,
+                        fixtures::SEGMENT_CLASSES,
+                        fixtures::SEGMENT_HEAD_SIDE,
+                        fixtures::SEGMENT_HEAD_SIDE,
+                    ],
+                )]),
+                // int8 is forbidden, and the reason is not the class decision - an
+                // argmax over twenty logits survives quantisation comfortably. It is
+                // the *margin* between the top two, which is what
+                // `Mask::confidence` is built from and what decides whether a region
+                // may carry skin smoothing. Per-tensor int8 quantises a logit range
+                // of about six into steps of 0.05, and a systematic shift of that
+                // size across a gallery moves masks across `AGGRESSIVE_FLOOR` in
+                // one direction or the other - which is a retouch that happens on
+                // some frames and not others, for a reason nobody can see.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::MATTING_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "matting",
+                class: ModelClass::Segmentation,
+                model: fixtures::alpha_matting(),
+                input: Placeholder::trimap_patch(
+                    fixtures::MATTING_CHANNELS,
+                    fixtures::MATTING_PATCH_SIDE,
+                ),
+                output: BTreeMap::from([(
+                    "alpha".to_string(),
+                    vec![
+                        1,
+                        1,
+                        fixtures::MATTING_OUTPUT_SIDE,
+                        fixtures::MATTING_OUTPUT_SIDE,
+                    ],
+                )]),
+                // int8 is forbidden, and this is the sharpest case for it in the
+                // product after phase 15's white balance. The output *is* the
+                // boundary: an alpha quantised into 256 steps is fine, and a
+                // per-tensor int8 quantisation of the activations that produce it
+                // is not - it lands as banding along a soft edge, which at 100 %
+                // zoom on a veil is exactly the artefact section 10.1 audits for.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {
@@ -630,6 +698,38 @@ impl Placeholder {
             layout: "NCHW".to_string(),
             range: "0..1".to_string(),
             colour: "srgb+prior".to_string(),
+        }
+    }
+
+    /// The input spec for a square image model at `side` pixels in linear light.
+    ///
+    /// PHASE-18's segmentation head. `linear_srgb` rather than `srgb`, for the reason phase
+    /// 15's white-balance head gives: every decision this network makes is about a ratio of
+    /// channel energies - is this pixel the same colour as that face, is this region flatter
+    /// than the scene - and a transfer curve applied before the first convolution makes those
+    /// ratios depend on brightness. A manifest that claimed `srgb` would document the wrong
+    /// preprocessing, which is the half of a model contract that has no code to check it.
+    fn linear_image(side: usize) -> InputSpec {
+        InputSpec {
+            shape: vec![1, 3, side, side],
+            layout: "NCHW".to_string(),
+            range: "0..1".to_string(),
+            colour: "linear_srgb".to_string(),
+        }
+    }
+
+    /// The input spec for PHASE-18's matting head: three colour planes and a trimap.
+    ///
+    /// `colour` says `linear_srgb+trimap` rather than `linear_srgb`, because the fourth channel
+    /// is not colour and a manifest that claimed four colour planes would be documenting a
+    /// normalisation nobody performs on it. Phase 10's `planes` makes the same distinction for
+    /// its person prior.
+    fn trimap_patch(channels: usize, side: usize) -> InputSpec {
+        InputSpec {
+            shape: vec![1, channels, side, side],
+            layout: "NCHW".to_string(),
+            range: "0..1".to_string(),
+            colour: "linear_srgb+trimap".to_string(),
         }
     }
 

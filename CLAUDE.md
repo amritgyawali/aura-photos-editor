@@ -85,6 +85,9 @@ Never load two phase files into one session.
 | Style learning and personal profiles | `docs/adr/ADR-0035-style-learning-and-personal-profiles.md` |
 | Style evaluation gates | `tests/eval/style_eval.rs` + `ml/models/style/eval_style.py` |
 | How Teach My AI works, in the product's own words | `docs/style-profiles.md` |
+| Semantic masks, matting and quality gating | `docs/adr/ADR-0037-semantic-masks-matting-and-quality-gating.md` |
+| Mask evaluation gates | `tests/eval/mask_eval.rs` + `ml/models/mask/eval_mask.py` |
+| What a region means, in the product's own words | `docs/masks.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -630,6 +633,94 @@ writes a row, because here the failure *is* the evidence a photographer needs. A
 half styles the solved answer rather than the target band**: shifting the band is cleaner on
 paper and makes a style profile change what "correctly exposed" means, which is phase 15's
 decision and not this phase's.
+
+Phase 18 is implemented conditionally: `aura-vision::contract::mask` freezes the twenty-class
+vocabulary, the two payload forms, the region, the edge word, twelve reasons, the algebra, the
+resolved plane, the outline and `MaskService`, and `ids.rs` gains `MaskId`; `aura-vision::mask`
+measures. `segment.rs` finds twenty classes from geometry and colour seeded by phase 06's boxes
+and landmarks, `subject.rs` composes the person classes and bounds them by the person boxes,
+`trimap.rs` erodes and dilates into a band that is a fraction of the region's own size,
+`matting.rs` solves alpha inside that band with a guided filter in closed form and reports how
+much of the boundary the photograph could actually determine, `instance.rs` assigns components to
+identities by containment and leaves the ambiguous ones unassigned, `algebra.rs` is the seven
+operations the brush and phases 19 to 24 both go through, `quality.rs` turns the two quality
+numbers into a strength ceiling for five named operations, `store.rs` is the codec and migration
+18, and `api.rs` is the frozen service and the resumable lazy pass. Migration 18 stores one row
+per region and one per gated operation; two shaders are held to the reference by
+`shader_parity.rs`; two models are signed with cards; eight IPC commands (ADR-0038) feed a mask
+panel; and `aura-cli verify --phase 18` is the executable gate. Its exit report is
+`docs/progress/PHASE-18-EXIT.md`.
+
+**Both shipped heads are placeholders and neither is consulted.** `SEG_HEAD_TRAINED` and
+`MATTING_HEAD_TRAINED` are false, so no photograph in this build is segmented by a random
+projection. What ships is measurement, and the matting half of it is not a compromise: a guided
+filter in closed form is a real matting algorithm whose failure mode is a slightly soft edge
+rather than a confidently wrong one, and the interpreter has no `Resize` and no `ConvTranspose`
+to run a network with anyway. Every gate in section 10.1 is measured against synthetic frames
+whose regions were **painted into the pixels** and read back through the real pipeline, which
+proves the arithmetic and says nothing about a wedding photograph. That is condition C1 and a Sev
+2 trigger. Condition C2 is the second and it is the one to be careful about: **the 100 % zoom
+artefact audit did not happen**, the halo metric exists and has never been run on data, and a
+mask can pass every mIoU gate in the exit report and still show a rim a photographer sees
+immediately.
+
+Six rules that phase 18 adds and every later phase inherits:
+
+- **`MaskService` is the only way to ask what is where in a photograph.** Fourteenth service of
+  its kind, and the rule matters more here than in any of the thirteen: phases 19 to 24 each edit
+  a region, and two answers to "where is her face" is a gallery where the light sculpting and the
+  retouching disagree about the same pixels. That reads as neither, and it is unfixable
+  afterwards because nothing records which answer each stage used.
+- **A region says how much may be done with it, and a later phase multiplies.** `Mask::allowance`
+  is the **geometric** mean of two independent uncertainties and `quality::allowance` is the one
+  place a gating decision is made. This is the first time a phase has constrained what a *later*
+  phase may do, and it exists because a wrong mask is **silent**: a wrong exposure looks wrong,
+  and a face mask that includes the wall behind somebody's ear looks fine until phase 20
+  brightens it.
+- **Two quality numbers, never one.** Confidence is how sure the class is and edge quality is how
+  well determined the boundary is; they fail independently and are fixed by different things, and
+  a photographer can re-brush a boundary and cannot re-brush a class. Collapsing them loses which
+  of the two somebody is looking at.
+- **The coverage denominator is *selected* frames, and both numbers are on the wire.** Every
+  outline since phase 09 has counted against every photograph and this one does not: a mask over
+  a rejected frame is not a gap, it is a frame nobody asked about. Phase 08's rule - say what the
+  denominator is - is the one being followed.
+- **A photographer's region is never regenerated, and it takes two statements to guarantee it.**
+  `user_edited = 0` inside the `DELETE`, *and* the edited coordinates skipped on re-insert. The
+  first alone is what phases 06, 08 and 09 needed; here it was not enough, because
+  `INSERT OR REPLACE` deletes the row it conflicts with and `masks` has a unique key on
+  `(image_id, kind, identity_id)`.
+- **Nothing in this phase moves a pixel.** Sixth phase running. `MaskService` produces regions,
+  phases 19 to 24 consume them, and there is no `apply_mask` anywhere on the IPC surface.
+  `SkipReason::MaskGeneratorAbsent` therefore stays reachable - wiring the resolved planes into
+  the render graph is phase 19's first task and changes no shape frozen here.
+
+Three decisions in phase 18 are worth remembering because they will be re-argued. **The frozen
+contract is in `aura-vision` rather than in `aura-core`**, because section 5 freezes
+`upload_gpu(&self, mask: &Mask, level: RenderLevel)` and `aura-core` depends on no workspace
+crate - the rule was never "contracts live in `aura-core`" but "a contract lives in the crate
+that owns the kind of thing it describes", which is why `SimilarityIndex` and `RenderService` are
+where they are. **Instance scoping is containment rather than intersection-over-union**: a face
+is a small ellipse inside a large body box, so an IoU floor leaves every face in the wedding
+unassigned while looking like a careful threshold. And **the trimap band is narrow rather than
+generous** - it started at twelve per cent of the region's size and was halved after measuring
+what a wide band does when the boundary is not soft, because a band is a licence for the matte to
+decide and a wide one hands it forty pixels of wall to be wrong about.
+
+Phase 18 also **makes `aura-vision` depend on `aura-catalog`**, which retires a sentence phase 06
+wrote twice: "this crate has no catalog dependency, so it *cannot* write a face template". Section
+4 of the phase document puts the mask store here, so the claim became a rule.
+`crates/aura-vision/tests/no_template_writes.rs` is what replaces it and the phase gate runs the
+same grep - the third grep-as-a-test in the repository, after `colour_discipline.rs` and
+`no_recipe_writes.rs`. It is a weaker guarantee than the one it replaces and the exit report says
+so.
+
+Phase 18 found and fixed two defects of the kind that ship silently. **The resampler manufactured
+a halo**: `Plane::resize_bilinear` read zero outside the plane, darkening the outermost half-pixel
+of every upsampled region, which is a one-pixel dark rim around every mask at every render level
+produced by the code that *delivers* a boundary rather than the code that finds it. And **an
+`INSERT OR REPLACE` would have destroyed a hand-edited mask through a constraint** rather than
+through a statement anybody was reading. The phase gate caught the second on its first run.
 
 Phase 17 corrected two earlier oversights: **`contracts.lock` carried a stale digest for
 `crates/aura-core/src/contract/colour.rs`**, so `cargo xtask contracts --check` would have failed

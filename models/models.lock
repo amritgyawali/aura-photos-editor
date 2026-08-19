@@ -867,6 +867,106 @@
         "require_fp32": false
       },
       "opset": 13
+    },
+    {
+      "name": "semantic_segment",
+      "version": "1.0.0",
+      "task": "segmentation",
+      "class": "segmentation",
+      "input": {
+        "shape": [
+          1,
+          3,
+          768,
+          768
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "linear_srgb"
+      },
+      "output": {
+        "logits": [
+          1,
+          20,
+          48,
+          48
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "semantic_segment_1.0.0.fp32.onnx",
+          "sha256": "7e9715843c97fa2a4e2f150c31ae4fb4bc4660b081d9481be23b40ad0be2f102",
+          "bytes": 309249
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "semantic_segment_1.0.0.fp16.onnx",
+          "sha256": "589d4a10b71765e5d66a8a273366bc25de845d7f47629e08d63d642720bd614c",
+          "bytes": 309249
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/semantic_segment.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
+    },
+    {
+      "name": "alpha_matting",
+      "version": "1.0.0",
+      "task": "matting",
+      "class": "segmentation",
+      "input": {
+        "shape": [
+          1,
+          4,
+          128,
+          128
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "linear_srgb+trimap"
+      },
+      "output": {
+        "alpha": [
+          1,
+          1,
+          32,
+          32
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "alpha_matting_1.0.0.fp32.onnx",
+          "sha256": "769dad15de67a9504f4fa2e53b9af30086c823521b43a860dbc89119725d800b",
+          "bytes": 32213
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "alpha_matting_1.0.0.fp16.onnx",
+          "sha256": "8e180aa4ed7dc5c93431940861cb6974a5d9d0a8d8522e2c943b8dd04d0b7918",
+          "bytes": 32213
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/alpha_matting.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
     }
   ]
 }

@@ -55,6 +55,9 @@ use aura_style::{Style, StyleStore};
 use aura_vision::embed::model::{MODEL_VER, PREPROCESS_VER};
 use aura_vision::face::prominence::{ProminenceWeights, OVERRIDE_RELATIVE_PATH};
 use aura_vision::face::FacePipeline;
+use aura_vision::mask::api::{FrameSource, Masks};
+use aura_vision::mask::store::MaskStore;
+use aura_vision::mask::MaskFrame;
 use aura_vision::EmbeddingRunner;
 use parking_lot::Mutex;
 use rusqlite::OptionalExtension as _;
@@ -1804,6 +1807,57 @@ impl AppState {
     }
 
     // -----------------------------------------------------------------
+    // PHASE-18. Local mask AI.
+    // -----------------------------------------------------------------
+
+    /// Migration 18's tables.
+    #[must_use]
+    pub fn mask_store(&self) -> Arc<MaskStore> {
+        Arc::new(MaskStore::new(Arc::clone(&self.catalog)))
+    }
+
+    /// A `MaskService` that reads, composes and resolves, and does not produce.
+    ///
+    /// What six of the eight mask commands need. It opens no preview cache, which is why it
+    /// takes no project: "what regions does this photograph have" is a query over one table.
+    #[must_use]
+    pub fn masks(&self) -> Arc<Masks> {
+        Arc::new(Masks::read_only(MaskStore::new(Arc::clone(&self.catalog))))
+    }
+
+    /// A `MaskService` that can also produce regions, reading the project's 2048 px proxies.
+    ///
+    /// The proxy is the rung phase 06 reads and for the same reason: a guest's face is eleven
+    /// pixels tall on a thumbnail, and a skin seed sampled from eleven pixels is a colour nobody
+    /// measured.
+    ///
+    /// # Errors
+    ///
+    /// Whatever opening the project's preview cache returns.
+    pub fn masks_for(&self, project_id: &str) -> AuraResult<Arc<Masks>> {
+        let previews = self.previews(project_id)?;
+        Ok(Arc::new(Masks::new(
+            MaskStore::new(Arc::clone(&self.catalog)),
+            Arc::new(ProxyFrames { previews }),
+        )))
+    }
+
+    /// An identity's display name, for the mask panel.
+    ///
+    /// `None` rather than a placeholder when the identity has no name: "the bride's skin" and
+    /// "somebody's skin" are different sentences, and a panel that filled the gap with an id
+    /// would be showing a photographer a UUID.
+    #[must_use]
+    pub fn identity_name(&self, identity: aura_core::IdentityId) -> Option<String> {
+        let store = self.people_store();
+        let project = store.project_of_identity(identity).ok().flatten()?;
+        let rows = store.load_identities(&project).ok()?;
+        rows.into_iter()
+            .find(|row| row.identity_id == identity)
+            .and_then(|row| row.label)
+    }
+
+    // -----------------------------------------------------------------
     // PHASE-17. Style learning.
     // -----------------------------------------------------------------
 
@@ -2209,5 +2263,38 @@ impl aura_render::FrameSource for CatalogFrames {
             out_h,
             &camera,
         ))
+    }
+}
+
+/// The 2048 px proxy, as `aura-vision`'s mask pass wants it.
+///
+/// A thin adapter rather than a dependency inside `aura-vision`: the masking engine takes a
+/// `FrameSource` port so a test can run the whole pass over painted fixtures without a catalog,
+/// a cache or a RAW file - which is what makes section 10.1's gates measurable at all in a
+/// repository with no camera files in it. This is the one implementation that reads real pixels.
+#[derive(Clone)]
+struct ProxyFrames {
+    previews: Arc<Previews>,
+}
+
+impl std::fmt::Debug for ProxyFrames {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ProxyFrames")
+    }
+}
+
+impl FrameSource for ProxyFrames {
+    fn frame(&self, image: aura_core::PhotoId) -> AuraResult<MaskFrame> {
+        use aura_preview::contract::service::{PreviewService, Priority};
+
+        let buffer = self
+            .previews
+            .get(image, aura_vision::mask::MASK_LEVEL, Priority::AiBatch)?;
+        MaskFrame::from_buffer(&buffer).ok_or_else(|| {
+            aura_vision::mask::errors::mask_failed(
+                &image.to_db(),
+                "the proxy is tiled or truncated",
+            )
+        })
     }
 }
