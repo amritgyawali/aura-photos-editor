@@ -1,0 +1,538 @@
+# Local light sculpting policy - PHASE-19 sections 6.4 and 9.
+#
+# ===========================================================================
+# THIS FILE IS A PRODUCT DECISION, NOT AN IMPLEMENTATION DETAIL
+# ===========================================================================
+#
+# Section 9 gives PM the task "approve `local_light.toml` per-scene policy and
+# default strengths". This is that file, and it is the seventh in the product
+# to require a written reason on every row.
+#
+# It is also the quietest one. Every other policy table in AURA decides
+# something a photographer can see a number for - a luminance band, a keeper
+# count, a confidence threshold. This one decides how much of a photograph the
+# product is allowed to change *without anybody being able to tell*. Section 0
+# calls the risk "Medium-High - subtlety is the whole point", and the way a
+# phase like this fails is not that one row is wrong; it is that every row is a
+# little too high and the whole gallery quietly starts to look processed.
+#
+# So the rule for editing this file is the opposite of the usual one: a row
+# that is too gentle costs a photographer thirty seconds with a slider, and a
+# row that is too strong costs them their trust in every frame they did not
+# check.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# face_light                    0.0 .. 1.0
+#     How strongly faces in this scene are lifted toward the phase 15 band.
+#     One is the full solved move; zero switches the operation off for this
+#     scene entirely. This is the highest-priority operation and the last one
+#     the governor gives up - see `LocalOp::PRIORITY`.
+#
+# subject_enhance               0.0 .. 1.0
+#     Clarity, texture and micro-contrast on the subject. NEVER applied alone:
+#     the solver pairs it with a proportional background reduction so the
+#     frame's mean luminance stays where it was. A scene may set this to zero
+#     and still balance its backgrounds.
+#
+# background_balance            0.0 .. 1.0
+#     How strongly a competing background is calmed. Only ever fires when a
+#     measured trigger is crossed - a luminance ratio, a chroma energy or a
+#     bright blob phase 11 already found - so a high number here does not mean
+#     every frame is touched.
+#
+# shine_control                 0.0 .. 1.0
+#     Specular sheen reduction. A LUMINANCE operation only; there is no
+#     smoothing anywhere in this phase and the type system cannot express one.
+#     Highest in the scenes where makeup, heat and flash meet.
+#
+# dodge_burn_low                0.0 .. 1.0
+#     Low-frequency form shaping - cheekbones, jaw, under-eye. The classic
+#     retoucher moves. This is the operation that most obviously reads as
+#     "edited" when it is too strong, and it is the FIRST thing the governor
+#     gives up when the budget runs out.
+#
+# dodge_burn_mid                0.0 .. 1.0
+#     Mid-frequency evening of blotchy tonal patches. Bounded so the measured
+#     mid-band energy moves by less than MID_BAND_TOLERANCE, which is what
+#     makes it the honest alternative to skin blur rather than a soft version
+#     of it. Phase 20 goes further, under stricter texture protection.
+#
+# budget                        0.10 .. 1.0
+#     The fraction of the per-image perceptual allowance (PERCEPTUAL_BUDGET)
+#     this scene may spend across ALL operations. This is the field that stops
+#     six individually defensible adjustments adding up to a photograph that
+#     looks processed. A scene with a low budget still runs every operation;
+#     it just runs out sooner, and says so with `budget_exhausted`.
+#
+# max_face_lift_ev              0.0 .. 1.20
+#     A ceiling on the face lift for this scene, in stops, BEFORE the dynamic
+#     noise cap is consulted. The noise cap is almost always tighter; this
+#     exists for the scenes where a big lift would be technically fine and
+#     artistically wrong - a candle-lit ritual is the case it was written for.
+#
+# rationale
+#     Why a photographer would agree. Refused below nine characters -
+#     `AURA-ML-5069` - and expected to say something other than the numbers.
+#
+# ---------------------------------------------------------------------------
+# VERSIONING
+# ---------------------------------------------------------------------------
+#
+# Bump `version` on ANY change below. It is written into
+# `local_light_plan.policy_ver` on every row, and a plan made under version 1
+# and one made under version 2 are not comparable - `AURA-ML-5066` exists so
+# that comparison never happens silently. The rows made under the old version
+# become pending by definition and the background pass replaces them, except
+# the ones a photographer owns.
+#
+# The file that ships is the baseline. A copy at
+# `<catalog>/config/local_light.toml` overrides it at run time; a malformed
+# override falls back to this file with a warning, and a malformed BASELINE
+# halts, because half a table would shape the ceremony against measured
+# strengths and the reception against nothing.
+
+version = 1
+
+# ===========================================================================
+# THE NEUTRAL ROW
+# ===========================================================================
+#
+# What an unclassified frame, and any scene with no row of its own, is judged
+# against. Deliberately the gentlest row in the file: shaping is off entirely,
+# the budget is a third, and the face lift is capped well below the ceiling.
+# A frame judged here also carries `scene_strength_limited` and loses
+# confidence, so nobody mistakes a neutral decision for a scene-conditioned
+# one.
+
+[neutral]
+face_light         = 0.55
+subject_enhance    = 0.25
+background_balance = 0.35
+shine_control      = 0.40
+dodge_burn_low     = 0.00
+dodge_burn_mid     = 0.00
+budget             = 0.35
+max_face_lift_ev   = 0.55
+rationale = """
+The substitute for a row nobody has written. Form shaping is switched off
+rather than turned down, because shaping a face AURA cannot name the scene of
+is the one operation here with no defensible default - and the cost of not
+shaping a photograph is that it looks like the photograph, which is a cost this
+phase is happy to pay.
+"""
+
+# ===========================================================================
+# GETTING READY
+# ===========================================================================
+
+[[scene]]
+id                 = "getting_ready_bride"
+face_light         = 0.85
+subject_enhance    = 0.45
+background_balance = 0.70
+shine_control      = 0.80
+dodge_burn_low     = 0.45
+dodge_burn_mid     = 0.50
+budget             = 0.80
+max_face_lift_ev   = 0.95
+rationale = """
+A window on one side and a hotel room on the other: the highest
+background/subject luminance ratios of the day happen here, and they are the
+textbook case for a paired lift and reduction. Shine is high because this is
+where makeup is being applied under warm bulbs, and the mid-frequency evening
+is one of the two highest in the file because getting-ready light is
+directional and blotchy by nature.
+"""
+
+[[scene]]
+id                 = "getting_ready_groom"
+face_light         = 0.85
+subject_enhance    = 0.45
+background_balance = 0.65
+shine_control      = 0.70
+dodge_burn_low     = 0.40
+dodge_burn_mid     = 0.40
+budget             = 0.75
+max_face_lift_ev   = 0.95
+rationale = """
+The same room, usually one lamp instead of a window, and usually no makeup.
+Everything is a notch below the bride's row for that reason rather than for any
+other, and the shine number is the only one that differs by more than a notch.
+"""
+
+[[scene]]
+id                 = "details"
+face_light         = 0.00
+subject_enhance    = 0.35
+background_balance = 0.45
+shine_control      = 0.00
+dodge_burn_low     = 0.00
+dodge_burn_mid     = 0.00
+budget             = 0.30
+max_face_lift_ev   = 0.00
+rationale = """
+There is nobody in these photographs. Face lighting, shine and shaping are all
+switched off structurally rather than left to a mask that would find nothing,
+and what remains is a small amount of separation between the rings and the
+tablecloth. A flat-lay that has been dodged and burned is a flat-lay somebody
+has noticed.
+"""
+
+# ===========================================================================
+# THE FIRST LOOK AND THE ENTRANCE
+# ===========================================================================
+
+[[scene]]
+id                 = "first_look"
+face_light         = 0.90
+subject_enhance    = 0.55
+background_balance = 0.75
+shine_control      = 0.60
+dodge_burn_low     = 0.35
+dodge_burn_mid     = 0.35
+budget             = 0.85
+max_face_lift_ev   = 1.00
+rationale = """
+Two people reacting, usually outdoors, usually backlit because that is how
+every photographer shoots a first look. The background balance is high because
+a blown doorway or a sunlit lawn behind them is the standard problem; the
+shaping is deliberately modest because these are reaction frames and a shaped
+reaction is a posed one.
+"""
+
+[[scene]]
+id                 = "ceremony_entrance"
+face_light         = 0.85
+subject_enhance    = 0.45
+background_balance = 0.70
+shine_control      = 0.50
+dodge_burn_low     = 0.25
+dodge_burn_mid     = 0.30
+budget             = 0.75
+max_face_lift_ev   = 0.95
+rationale = """
+Somebody walking from a bright doorway into a dark room, or the reverse. The
+face is almost always the wrong brightness and the background is almost always
+the reason, which is exactly the pair this phase was built for.
+"""
+
+# ===========================================================================
+# THE CEREMONY
+# ===========================================================================
+#
+# Four scenes where the product's hand must be lightest. These are the frames
+# that go in the album and the frames a family looks at for forty years, and
+# the failure mode is not that they are under-edited - it is that somebody
+# notices they were edited at all.
+
+[[scene]]
+id                 = "ceremony"
+face_light         = 0.85
+subject_enhance    = 0.30
+background_balance = 0.55
+shine_control      = 0.45
+dodge_burn_low     = 0.20
+dodge_burn_mid     = 0.25
+budget             = 0.65
+max_face_lift_ev   = 0.90
+rationale = """
+Faces under a mandap, a chuppah or a church window are the single most common
+lighting problem at a wedding, so the lift is high. Everything else is low:
+the ceremony is a room a photographer chose to shoot in, and calming its
+background is one step from re-lighting somebody's wedding.
+"""
+
+[[scene]]
+id                 = "ritual"
+face_light         = 0.80
+subject_enhance    = 0.25
+background_balance = 0.40
+shine_control      = 0.40
+dodge_burn_low     = 0.15
+dodge_burn_mid     = 0.20
+budget             = 0.55
+max_face_lift_ev   = 0.70
+rationale = """
+The row with the tightest face-lift ceiling in the file, and the reason is fire.
+A havan, a diya, a unity candle and a lamp-lighting are all scenes where the
+darkness IS the photograph, and a face lifted a full stop out of a firelit
+ritual is a photograph of a room rather than of a rite. Phase 15 has already
+set the exposure for these frames against a scene band that knows it; this row
+is what stops phase 19 undoing that locally.
+"""
+
+[[scene]]
+id                 = "vows"
+face_light         = 0.90
+subject_enhance    = 0.30
+background_balance = 0.55
+shine_control      = 0.45
+dodge_burn_low     = 0.20
+dodge_burn_mid     = 0.25
+budget             = 0.65
+max_face_lift_ev   = 0.95
+rationale = """
+The ceremony row with a higher lift. Vows are photographed close and the faces
+carry the whole frame, so a face in shadow here costs more than anywhere else
+in the day - and there is nothing else in the frame worth adjusting.
+"""
+
+[[scene]]
+id                 = "rings"
+face_light         = 0.75
+subject_enhance    = 0.45
+background_balance = 0.50
+shine_control      = 0.35
+dodge_burn_low     = 0.10
+dodge_burn_mid     = 0.15
+budget             = 0.60
+max_face_lift_ev   = 0.85
+rationale = """
+Hands rather than faces. The subject separation matters more than usual because
+the subject is small and the background is a crowd; the shaping is nearly off
+because there is rarely a face large enough in frame to shape.
+"""
+
+[[scene]]
+id                 = "kiss"
+face_light         = 0.90
+subject_enhance    = 0.35
+background_balance = 0.65
+shine_control      = 0.45
+dodge_burn_low     = 0.20
+dodge_burn_mid     = 0.25
+budget             = 0.70
+max_face_lift_ev   = 0.95
+rationale = """
+One frame that has to work, usually against whatever was behind the altar. The
+background number is above the rest of the ceremony block for that reason
+alone: a bright window behind a kiss is the frame a photographer would fix by
+hand, every time.
+"""
+
+# ===========================================================================
+# PORTRAITS
+# ===========================================================================
+#
+# Where this phase does the most, and section 6.4 says so: "family_portrait
+# gets the full treatment". These are posed, the subject is unambiguous, the
+# masks are at their best and the photographer's own intent is closest to what
+# a retoucher would do.
+
+[[scene]]
+id                 = "family_portrait"
+face_light         = 1.00
+subject_enhance    = 0.60
+background_balance = 0.80
+shine_control      = 0.85
+dodge_burn_low     = 0.55
+dodge_burn_mid     = 0.60
+budget             = 1.00
+max_face_lift_ev   = 1.10
+rationale = """
+Section 6.4's own example of the full treatment, and the scene the group
+fairness rule exists for. Twelve people in a row under one flash end up
+measurably differently lit, and a family formal where grandmother is half a
+stop darker than everybody else is the single most complained-about frame in
+wedding delivery. Everything here is high because everything here is solvable.
+"""
+
+[[scene]]
+id                 = "group_portrait"
+face_light         = 1.00
+subject_enhance    = 0.55
+background_balance = 0.75
+shine_control      = 0.80
+dodge_burn_low     = 0.45
+dodge_burn_mid     = 0.50
+budget             = 0.95
+max_face_lift_ev   = 1.10
+rationale = """
+The family row with slightly less shaping. A group of friends is looser, more
+often lit by whatever was there, and the faces are smaller in frame - which is
+where per-face form shaping stops being worth its budget.
+"""
+
+[[scene]]
+id                 = "couple_portrait"
+face_light         = 0.95
+subject_enhance    = 0.65
+background_balance = 0.85
+shine_control      = 0.80
+dodge_burn_low     = 0.60
+dodge_burn_mid     = 0.60
+budget             = 1.00
+max_face_lift_ev   = 1.10
+rationale = """
+The highest subject/background numbers in the file. Two people posed against a
+venue is the frame where making the subject visually dominant is not an
+enhancement but the entire brief, and it is also the frame with the largest
+faces, which is where low-frequency shaping has enough resolution to be worth
+doing at all.
+"""
+
+[[scene]]
+id                 = "golden_hour"
+face_light         = 0.90
+subject_enhance    = 0.55
+background_balance = 0.60
+shine_control      = 0.70
+dodge_burn_low     = 0.45
+dodge_burn_mid     = 0.45
+budget             = 0.85
+max_face_lift_ev   = 1.00
+rationale = """
+Backlit almost by definition, so the face lift is high and the background
+reduction is deliberately NOT: the blown sky behind a golden-hour couple is the
+photograph, and calming it is how a warm frame becomes a grey one. Phase 15's
+backlight allowance already accepted that sky; this row agrees with it.
+"""
+
+# ===========================================================================
+# THE RECEPTION
+# ===========================================================================
+
+[[scene]]
+id                 = "reception_entrance"
+face_light         = 0.80
+subject_enhance    = 0.40
+background_balance = 0.55
+shine_control      = 0.60
+dodge_burn_low     = 0.20
+dodge_burn_mid     = 0.25
+budget             = 0.65
+max_face_lift_ev   = 0.90
+rationale = """
+Motion, flash and a dark room. The lift is what matters and the rest is
+mostly gated by masks that a moving subject makes unreliable anyway - which is
+the mechanism doing the right thing rather than a policy choice.
+"""
+
+[[scene]]
+id                 = "speeches"
+face_light         = 0.85
+subject_enhance    = 0.40
+background_balance = 0.60
+shine_control      = 0.75
+dodge_burn_low     = 0.30
+dodge_burn_mid     = 0.35
+budget             = 0.70
+max_face_lift_ev   = 0.95
+rationale = """
+One person lit by a spotlight or a bare flash, in a room three stops darker.
+The shine number is among the highest in the file because a spotlight on a
+forehead at a reception is the most reliable hot spot at a wedding, and the
+background balance is what stops the speaker floating in a black void.
+"""
+
+[[scene]]
+id                 = "cake"
+face_light         = 0.75
+subject_enhance    = 0.45
+background_balance = 0.60
+shine_control      = 0.55
+dodge_burn_low     = 0.20
+dodge_burn_mid     = 0.25
+budget             = 0.60
+max_face_lift_ev   = 0.85
+rationale = """
+A white object under a spotlight with two people behind it. The subject
+separation is the useful operation here; the face lift is moderate because the
+faces are usually looking down and the cake is usually the brightest thing in
+the frame whatever anybody does about it.
+"""
+
+[[scene]]
+id                 = "first_dance"
+face_light         = 0.75
+subject_enhance    = 0.35
+background_balance = 0.35
+shine_control      = 0.40
+dodge_burn_low     = 0.10
+dodge_burn_mid     = 0.15
+budget             = 0.45
+max_face_lift_ev   = 0.70
+rationale = """
+Deliberately dark, deliberately coloured, and a scene where phase 15 has
+already decided to preserve the mood rather than correct it. This row agrees:
+the lift is enough to keep faces readable and no more, and the background is
+very nearly left alone because the background is a room somebody paid a
+lighting designer for.
+"""
+
+[[scene]]
+id                 = "dance_floor"
+face_light         = 0.55
+subject_enhance    = 0.20
+background_balance = 0.20
+shine_control      = 0.30
+dodge_burn_low     = 0.00
+dodge_burn_mid     = 0.05
+budget             = 0.30
+max_face_lift_ev   = 0.55
+rationale = """
+Section 6.4's own example of minimal shaping - "motion, mood" - and the lowest
+budget of any populated scene. Form shaping is off entirely: a dance-floor face
+is moving, half-lit and usually motion-blurred by choice, and shaping the form
+of a blurred face produces a smear with structure in it. What survives is a
+gentle lift so faces do not disappear into the dark, which is the one thing a
+photographer would have done by hand.
+"""
+
+# ===========================================================================
+# EVERYTHING ELSE
+# ===========================================================================
+
+[[scene]]
+id                 = "candid"
+face_light         = 0.80
+subject_enhance    = 0.40
+background_balance = 0.55
+shine_control      = 0.55
+dodge_burn_low     = 0.20
+dodge_burn_mid     = 0.25
+budget             = 0.65
+max_face_lift_ev   = 0.90
+rationale = """
+The largest scene in most weddings by frame count, and therefore the row whose
+errors compound fastest. Set close to the middle of the file on purpose: a
+candid is unposed, so the confident operations - lifting a face, calming a
+window - are safe, and the ones that assume a subject held still are not.
+"""
+
+[[scene]]
+id                 = "venue"
+face_light         = 0.30
+subject_enhance    = 0.30
+background_balance = 0.30
+shine_control      = 0.00
+dodge_burn_low     = 0.00
+dodge_burn_mid     = 0.00
+budget             = 0.30
+max_face_lift_ev   = 0.40
+rationale = """
+A room, usually empty, usually shot to show the room. Nothing in this phase
+improves an architectural frame and several things in it could ruin one, so
+the row is close to off. The small face-lighting number exists only for the
+staff and guests who wander into a venue frame.
+"""
+
+[[scene]]
+id                 = "exit"
+face_light         = 0.80
+subject_enhance    = 0.35
+background_balance = 0.45
+shine_control      = 0.45
+dodge_burn_low     = 0.10
+dodge_burn_mid     = 0.15
+budget             = 0.55
+max_face_lift_ev   = 0.85
+rationale = """
+Sparklers, car headlights and a dark car park. Every measured trigger in this
+phase fires on a sparkler exit and almost none of them should, so the budget is
+low and the background number is well under what the measurements would ask
+for: the bright things in an exit frame are the point of it.
+"""

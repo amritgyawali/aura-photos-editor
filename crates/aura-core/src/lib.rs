@@ -34,6 +34,7 @@ pub mod contract {
     pub mod ids;
     pub mod integrity;
     pub mod ledger;
+    pub mod local;
     pub mod moment;
     pub mod people;
     pub mod priority;
@@ -81,6 +82,11 @@ pub use contract::integrity::{
 pub use contract::ledger::{
     Autonomy, DecisionKind, DecisionSource, DecisionSubject, Evidence, ExplainService, Explainable,
     LedgerDecision, LedgerOutline, LedgerReason,
+};
+pub use contract::local::{
+    BackgroundBalanceDelta, DodgeBurnMaps, FaceLightDelta, FaceShaping, FaceZone, LocalCode,
+    LocalLightPlan, LocalOp, LocalOutline, LocalOverride, LocalReason, LocalService, MaskField,
+    MaskKind, ShapingZone, ShineReduction, SubjectEnhanceDelta,
 };
 pub use contract::moment::{
     CameraId, DuplicateKind, DuplicateSet, Moment, MomentEdit, MomentOutline, MomentService,

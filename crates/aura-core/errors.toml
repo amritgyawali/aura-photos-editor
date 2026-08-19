@@ -1167,3 +1167,64 @@ summary      = "No skin reference was available, so the colour was set without o
 user_message = "AURA has not seen enough well-lit photographs of these people to know what their skin should look like, so it set the colour from the light alone. Those frames are worth a look."
 runbook      = "docs/runbooks/AURA-ML-5065.md"
 introduced   = "PHASE-15"
+
+# Phase 19. Local light sculpting, ML 5066-5071. The same five shapes the phase
+# 09, 11 and 15 blocks have - version drift, a refused edit, one item that could
+# not be done, a refused config file, and a config file missing a row - plus one
+# that is new in this phase and is the phase's own honesty: a mask this phase
+# does not own was unusable, so an operation was scaled down or given up rather
+# than run against a guess.
+
+[[error]]
+code         = "AURA-ML-5066"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored local light plans came from different heads, arithmetic, policy or shaping"
+user_message = "AURA has improved how it shapes light inside a photograph, so it is re-checking this wedding in the background. Anything you have already adjusted is kept."
+runbook      = "docs/runbooks/AURA-ML-5066.md"
+introduced   = "PHASE-19"
+
+[[error]]
+code         = "AURA-ML-5067"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A local light strength override was refused"
+user_message = "AURA could not record that adjustment. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5067.md"
+introduced   = "PHASE-19"
+
+[[error]]
+code         = "AURA-ML-5068"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph's local light could not be planned"
+user_message = "AURA could not work out the local light adjustments for one photograph, and has left it with the overall settings only. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5068.md"
+introduced   = "PHASE-19"
+
+[[error]]
+code         = "AURA-ML-5069"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The local light policy table was refused"
+user_message = "AURA could not load the settings that decide how much local shaping each kind of photograph gets, so it has not made any local adjustments. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5069.md"
+introduced   = "PHASE-19"
+
+[[error]]
+code         = "AURA-ML-5070"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A scene has no local light policy row"
+user_message = "AURA has no local shaping guidance recorded for this kind of photograph yet, so it is treating those ones very gently. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5070.md"
+introduced   = "PHASE-19"
+
+[[error]]
+code         = "AURA-ML-5071"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A mask was unusable, so a local operation was scaled down or skipped"
+user_message = "AURA is not sure enough where the subject ends and the background begins in some photographs, so it made gentler local adjustments there - or none at all. Nothing has been damaged."
+runbook      = "docs/runbooks/AURA-ML-5071.md"
+introduced   = "PHASE-19"

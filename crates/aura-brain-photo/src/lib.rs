@@ -20,6 +20,23 @@
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
+// The panic family and slice indexing are banned in library code and are how a test asserts.
+// An inline `#[cfg(test)]` module is not compiled into the library at all, so nothing it does
+// can reach a photographer; the lints stay denied everywhere else in the crate. The same
+// exemption `aura-app` took in PHASE-14, taken here in PHASE-19 for the same reason: the
+// local light modules are arithmetic, their tests are dense in `deltas[0]` and
+// `expect("acts")`, and rewriting each of those into a `let ... else` makes the assertion
+// harder to read than the property it is checking.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp
+    )
+)]
 
 //! Judgement about one frame: whether it worked, and whether it was made.
 //!
@@ -78,6 +95,7 @@ pub mod composition;
 pub mod errors;
 pub mod fixtures;
 pub mod integrity;
+pub mod local;
 pub mod tone;
 
 pub use composition::{
@@ -86,6 +104,9 @@ pub use composition::{
 pub use integrity::{
     Analyser, Calibration, CalibrationTable, FrameContext, FrameExif, Integrity, IntegrityPass,
     IntegrityStore, PassReport, ANALYSIS_VER, INTEGRITY_LEVEL, MODEL_VER,
+};
+pub use local::{
+    Local, LocalPass, LocalStore, PolicyTable, ScenePolicy, LOCAL_LEVEL, SHAPING_VER,
 };
 pub use tone::{
     AsShot, LocusBuilder, Mood, SceneTarget, TargetTable, Tone, TonePass, ToneStore, TONE_LEVEL,
