@@ -213,6 +213,29 @@ fn solved_wedding() -> Vec<(Frame, ToneEstimate)> {
         .collect()
 }
 
+/// The loci a whole wedding fits, for a test that needs "after the wedding has been seen".
+///
+/// The expensive half of [`solved_wedding`] without the second pass, so a test that only
+/// needs the loci does not solve fifty-one frames twice.
+fn loci_from_wedding() -> BTreeMap<IdentityId, SkinLocus> {
+    let mut builder = LocusBuilder::new();
+    for frame in wedding() {
+        let outcome = analyser()
+            .analyse(
+                PhotoId::new(),
+                &buffer_of(&frame),
+                &context_of(&frame),
+                &BTreeMap::new(),
+                Priority::AiBatch,
+            )
+            .expect("the fixture is an 8-bit sRGB buffer");
+        for (identity, sample) in outcome.samples {
+            builder.add(identity, sample);
+        }
+    }
+    builder.finish(ANALYSIS_VER)
+}
+
 /// Where a subject luminance lands after an exposure offset is applied.
 ///
 /// Through the same two conversions the solver uses, in the same direction, so the gate
@@ -570,6 +593,72 @@ fn a_purple_dance_floor_stays_purple() {
             ToneCode::ColouredLightPreserved | ToneCode::ColouredLightPartial
         )),
         "the decision to keep it is recorded"
+    );
+}
+
+#[test]
+fn the_coloured_light_note_does_not_depend_on_how_much_of_the_wedding_is_analysed() {
+    // **Condition C5's regression test.** The same dance floor, solved twice: once as a
+    // project's first frame with no skin loci yet, and once after the wedding has taught the
+    // solver what everybody's skin looks like. It is one room under one light, so the note
+    // saying the light was kept on purpose has to read the same both times.
+    //
+    // It did not. `solve::correct` asked whether the *winning* hypothesis was saturated, and
+    // the winner changes with the evidence available: white-patch early, reading the wash at
+    // a chroma above `SATURATED_ABOVE`, and the skin-anchored answer later, reading the same
+    // wash below it. So the first frame of a project was labelled and the four-hundredth was
+    // not, `ToneOutline::coloured_light` under-counted, and the panel stopped telling the
+    // photographer the mood had been preserved on purpose - while the pixels, which are
+    // anchored on skin either way, barely moved. A reporting bug that looked like nothing.
+    let frame = fixtures::purple_dance_floor(2);
+
+    let cold = estimate(&frame);
+    let warm = estimate_with(&frame, &loci_from_wedding());
+
+    assert!(
+        cold.coloured_light,
+        "the first frame of the project reads the wash as a choice"
+    );
+    assert_eq!(
+        cold.coloured_light, warm.coloured_light,
+        "the same room was labelled {} with no loci and {} with them",
+        cold.coloured_light, warm.coloured_light
+    );
+    for estimate in [&cold, &warm] {
+        assert!(
+            estimate.reasons.iter().any(|reason| matches!(
+                reason.code,
+                ToneCode::ColouredLightPreserved | ToneCode::ColouredLightPartial
+            )),
+            "the decision to keep it is recorded either way"
+        );
+    }
+}
+
+#[test]
+fn the_correction_between_two_lights_is_walked_in_chromaticity() {
+    // Invariant 8, at the one place it is load-bearing rather than tidy. The scan in
+    // `solve::correct` walks from the camera's own value toward the measured light and stops
+    // at the first point everybody in frame is plausible; walking it in *kelvin* moves along
+    // the Planckian locus, which throws the tint away at every step.
+    //
+    // A coloured light is off the locus by definition, so on the dance floor every one of the
+    // twenty candidates landed back on it, none of them satisfied a skin constraint the wash
+    // had pushed off it, and the scan fell through to the full correction on every frame -
+    // recording `SkinLocusConstrained`, the code that means the mood was lost, on frames whose
+    // mood was in fact kept. The two spellings are what separates them.
+    let frame = fixtures::purple_dance_floor(2);
+    let estimate = estimate_with(&frame, &loci_from_wedding());
+
+    let codes: Vec<ToneCode> = estimate.reasons.iter().map(|reason| reason.code).collect();
+    assert!(
+        codes.contains(&ToneCode::ColouredLightPreserved)
+            || codes.contains(&ToneCode::ColouredLightPartial),
+        "the scan landed and said so: {codes:?}"
+    );
+    assert!(
+        !codes.contains(&ToneCode::SkinLocusConstrained),
+        "the scan found a correction everybody tolerates, so nothing was sacrificed: {codes:?}"
     );
 }
 

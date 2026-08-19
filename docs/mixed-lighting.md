@@ -114,8 +114,14 @@ every row.
 
 The opposite trap is a red canopy over a Hindu ceremony, or a room with red walls. That is a
 *surface* that is red, not a light. Neutralising it would drain the ceremony; treating it as a
-cast would leave everybody orange. AURA separates the two by looking at how the light behaves
-across the whole frame rather than at how red the picture is.
+cast would leave everybody orange.
+
+AURA separates the two with two things at once: how far the light sits from the colours real
+light actually comes in — a tungsten bulb is very warm and entirely ordinary, a purple wash is
+barely warm and entirely deliberate — and whether the scene was recognised as a staged one in
+the first place. A red mandap is a ceremony, not a stage, so its red reads as a surface no
+matter how strongly the room measures red. That second half matters: the measurements that see
+"red" cannot themselves tell a red light from a red wall, and the scene is what does.
 
 ## Backlit frames
 

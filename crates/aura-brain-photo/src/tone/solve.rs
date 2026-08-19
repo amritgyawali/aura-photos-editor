@@ -37,7 +37,7 @@ use aura_core::contract::tone::{
     HypothesisSource, Illuminant, ToneAlternative, ToneCode, KELVIN_RANGE, TINT_RANGE,
 };
 use aura_core::AttrFlags;
-use aura_raw::colour::illuminant::{cct_from_uv, cct_to_uv, uv_distance};
+use aura_raw::colour::illuminant::{cct_from_uv, uv_distance};
 
 use crate::tone::illuminant::{self, AsShot, Hypothesis, MixedLight};
 use crate::tone::neutrals::NeutralPatch;
@@ -246,7 +246,43 @@ pub fn correct(
     let mut chosen_tint = full_tint;
 
     // --- the preserve-mood policy -------------------------------------------------------
-    if primary.should_preserve() && target.preserve_coloured_light {
+    //
+    // The witness is the room rather than the winner. `primary` describes whichever
+    // hypothesis best explained the *subject*, and on a coloured dance floor that is
+    // white-patch before the wedding has any skin loci and the skin-anchored answer after -
+    // two readings of one wash, on opposite sides of `SATURATED_ABOVE`, which made the same
+    // room classify as `Stage` early in a project and `Led` later. `illuminant::ambient` asks
+    // the two generators that measure the light falling on the frame, so the answer stops
+    // depending on how much of the wedding has been analysed. Either witness is enough:
+    // dropping the `primary` test would lose the frames where the coloured light *is* the
+    // chosen one, which is every faceless frame on the same dance floor.
+    //
+    // The ambient witness is held to two tests the chosen one is not, and both are about the
+    // same hazard: the two generators `ambient` reads are exactly the two this module's table
+    // lists as confounded by a strongly coloured *surface*, so on a red mandap or a green
+    // marquee they report a saturated chromaticity for a room that is lit neutrally.
+    //
+    // First, the scene must be one phase 07 marked `STAGE`. `classify` will otherwise still
+    // reach `Stage` on its own evidence, at twice the saturation threshold - which is a sound
+    // fallback for a chromaticity somebody chose as the answer and an unsound one for a
+    // reading taken off a wall. The mandap fixture clears twice the threshold, so this is not
+    // a hypothetical: without the attribute test it preserved a red cast on all five ritual
+    // frames and cost four of them the white-balance gate.
+    //
+    // Second, the light's *kind* must be intentional, where the chosen hypothesis is held to
+    // `should_preserve`. That one also accepts raw saturation, which is the same leak by a
+    // shorter route.
+    //
+    // What is left is a witness that can only say "the room phase 07 called a stage is lit by
+    // something a long way off the locus", which is the claim actually being made.
+    let ambient = if attrs.contains(AttrFlags::STAGE) {
+        illuminant::ambient(hypotheses, attrs)
+    } else {
+        None
+    };
+    let light_is_a_choice =
+        primary.should_preserve() || ambient.is_some_and(|light| light.kind.is_intentional());
+    if light_is_a_choice && target.preserve_coloured_light {
         coloured_light = true;
         if constraints.is_empty() {
             // Nothing to protect, so nothing to compromise. The light stays as it was and
@@ -262,12 +298,29 @@ pub fn correct(
             // Section 6.2's compromise: "correct only enough to keep skin within its
             // plausible locus". Walk from leaving it alone toward removing it entirely and
             // stop at the first point where every prominent person is plausible again.
+            //
+            // **The walk is in `u'v'`, not in kelvin.** Invariant 8, and here it is load-
+            // bearing rather than tidy: a coloured light is by definition off the Planckian
+            // locus, and interpolating its temperature walks *along* the locus and throws
+            // the tint away at every step. On the purple dance floor that put every one of
+            // the twenty candidates back on the locus, so none of them ever satisfied a skin
+            // constraint the wash had pushed off it, so the scan always fell through to the
+            // full correction below. The endpoints are chromaticities and the line between
+            // them is a straight one in the plane the constraint is written in.
+            let rest_uv = if as_shot.is_known() {
+                illuminant::uv_of(as_shot.temperature_k, as_shot.tint)
+            } else {
+                light_uv
+            };
             let mut landed = None;
             for step in 0..=CORRECTION_STEPS {
                 let t = step as f32 / CORRECTION_STEPS as f32;
-                let kelvin = rest_k + (full_k - rest_k) * t;
-                if !constraints.rejects(cct_to_uv(kelvin)) {
-                    landed = Some((t, kelvin));
+                let uv = [
+                    rest_uv[0] + (light_uv[0] - rest_uv[0]) * t,
+                    rest_uv[1] + (light_uv[1] - rest_uv[1]) * t,
+                ];
+                if !constraints.rejects(uv) {
+                    landed = Some((t, uv));
                     break;
                 }
             }
@@ -281,9 +334,19 @@ pub fn correct(
                     };
                     reasons.push(codec::plain(ToneCode::ColouredLightPreserved, 0.0));
                 }
-                Some((t, kelvin)) => {
-                    chosen_k = kelvin;
-                    chosen_tint = full_tint * t;
+                Some((_, uv)) => {
+                    // Read the landing point back through the one conversion, so the pair
+                    // written into the recipe is the pair `describe` would report for the
+                    // chromaticity that actually satisfied everybody.
+                    let landing = illuminant::describe(
+                        uv,
+                        chosen.hypothesis.source,
+                        1.0,
+                        chosen.hypothesis.region,
+                        attrs,
+                    );
+                    chosen_k = landing.cct_k;
+                    chosen_tint = landing.tint;
                     reasons.push(codec::plain(ToneCode::ColouredLightPartial, -0.03));
                 }
                 None => {

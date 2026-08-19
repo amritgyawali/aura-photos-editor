@@ -52,6 +52,19 @@ corrected as though it were lit by one, and a purple dance floor stays purple.
 - Stored floats were rounded in `f32` and widened to `f64`, so `0.263` serialised as
   `0.263000011444091796875` and the three evidence documents cost half the per-image budget
   in noise.
+- The note saying a coloured light had been kept on purpose depended on how much of the
+  wedding had been analysed. It keyed on whichever illuminant hypothesis won, and the winner
+  changes as a project accumulates skin loci - so a project's first dance-floor frame was
+  labelled and its four-hundredth was not, while the pixels barely differed. It now reads the
+  light falling on the frame, which does not change.
+- The correction between two lights interpolated a **colour temperature**, which walks along
+  the Planckian locus. A coloured light is off that locus by definition, so the mechanism
+  built to preserve one could not land on one: it exhausted its twenty candidates, corrected
+  fully, and recorded the reason code meaning the mood had been sacrificed on frames whose
+  mood was kept. It walks in `u'v'` now, as invariant 8 already said it did.
+- Phase 08's burst-label agreement test found its ground truth by editing the *Windows*
+  spelling of a path out of `CARGO_MANIFEST_DIR`; on Linux and macOS it looked in a directory
+  that does not exist and the phase 08 gate failed.
 
 ### Known limits
 
@@ -59,7 +72,10 @@ Both learned heads are untrained placeholders and **neither is consulted**; ever
 phase reports is about the solver, measured on synthetic frames whose illuminant and subject
 luminance were painted in. The fairness gate measures five reflectances, not five people.
 Section 11's 600 B storage row is not met - the measurement is 806.9 B, recorded with its
-decomposition in `perf/budgets.toml`. See `docs/progress/PHASE-15-EXIT.md` section 8.
+decomposition in `perf/budgets.toml`. Two of five coloured-light frames still go unlabelled
+because the fixture's own light sits below `Illuminant::SATURATED_ABOVE`; moving that constant
+is a frozen-contract change that wants a photograph rather than a synthetic fixture. See
+`docs/progress/PHASE-15-EXIT.md` section 8.
 
 ## Phase 13 - Explain My Edit, confidence calibration and the decision ledger
 
