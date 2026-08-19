@@ -54,14 +54,23 @@ const SHAPING_UNIT_EV: f32 = 0.005;
 // Section 6.1, applied. The exposure term is flat inside the mask; the shadow term is weighted
 // by the luminosity mask so shadows move and highlights do not; the highlight term is weighted
 // by the opposite curve and is never positive.
+//
+// BOTH WEIGHTS READ THE INPUT PIXEL. Evaluating them on the partially-edited value reads
+// naturally and is wrong: the weight then grows with the matte at the same time as the term it
+// scales does, so the highlight restraint grows quadratically while the lift grows linearly,
+// and past about half alpha the restraint overtakes. A bright pixel then receives more lift at
+// the mask's edge than at its centre - which is a bright rim just inside the boundary, made by
+// arithmetic that looked conservative. The processor reference has the same shape and
+// `tests/eval/local_eval.rs` gates it.
 fn apply_face_light(rgb: vec3<f32>, alpha: f32) -> vec3<f32> {
     let a = alpha * local_params.mask_scale;
     if (a <= 0.0) { return rgb; }
-    var out = rgb * exp2(local_params.face_exposure * a);
-    let shadow_ev = (local_params.face_shadows / SHADOWS_PER_EV) * luminosity_weight(out) * a;
-    out = out * exp2(shadow_ev);
-    let highlight_ev = (local_params.face_highlights / HIGHLIGHTS_PER_EV) * highlight_weight(out) * a;
-    return out * exp2(min(highlight_ev, 0.0));
+    let shadow_share = luminosity_weight(rgb);
+    let highlight_share = highlight_weight(rgb);
+    var ev = local_params.face_exposure;
+    ev = ev + (local_params.face_shadows / SHADOWS_PER_EV) * shadow_share;
+    ev = ev + min((local_params.face_highlights / HIGHLIGHTS_PER_EV) * highlight_share, 0.0);
+    return rgb * exp2(ev * a);
 }
 
 // Section 6.2's subject half. Local contrast around a blurred neighbourhood, which is what

@@ -99,22 +99,35 @@ fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
 /// The exposure term is flat inside the mask; the shadow term is weighted by the luminosity
 /// mask so shadows move and highlights do not; the highlight term is weighted by the opposite
 /// curve and is clamped so it can never brighten.
+///
+/// ## Both weights read the *input* pixel, and that is load-bearing
+///
+/// The first version evaluated each weight on the partially-edited value - the shadow weight
+/// after the exposure had moved, the highlight weight after both. It reads naturally and it is
+/// wrong, because the weight then grows with `alpha` at the same time as the term it scales
+/// does: the restraint grows quadratically while the lift grows linearly, and past about half
+/// alpha the restraint overtakes.
+///
+/// The symptom is the thing this whole phase exists to avoid. A bright pixel received *more*
+/// lift at the mask's edge than at its centre, which is the exact shape of a bright rim just
+/// inside the boundary - a halo, produced by arithmetic that looked conservative.
+/// `tests/eval/local_eval.rs` caught it, and the fix is that a luminosity mask is a function
+/// of the *original* tone, evaluated once, so the whole edit is linear in the matte.
 #[must_use]
 pub fn apply_face_light(rgb: [f32; 3], params: &MaskParams, alpha: f32) -> [f32; 3] {
     if alpha <= 0.0 {
         return rgb;
     }
-    let mut out = scale(rgb, params.exposure.unwrap_or(0.0).mul_add(alpha, 0.0).exp2());
+    let shadow_share = luminosity_weight(rgb);
+    let highlight_share = highlight_weight(rgb);
+    let mut ev = params.exposure.unwrap_or(0.0);
     if let Some(shadows) = params.shadows {
-        let ev = (f32::from(shadows) / SHADOWS_PER_EV) * luminosity_weight(out) * alpha;
-        out = scale(out, ev.exp2());
+        ev += (f32::from(shadows) / SHADOWS_PER_EV) * shadow_share;
     }
     if let Some(highlights) = params.highlights {
-        let ev = ((f32::from(highlights) / HIGHLIGHTS_PER_EV) * highlight_weight(out) * alpha)
-            .min(0.0);
-        out = scale(out, ev.exp2());
+        ev += ((f32::from(highlights) / HIGHLIGHTS_PER_EV) * highlight_share).min(0.0);
     }
-    out
+    scale(rgb, (ev * alpha).exp2())
 }
 
 /// The background half: a luminance reduction and a move toward the pixel's own grey.
@@ -223,6 +236,34 @@ mod tests {
             dark_ratio > bright_ratio * 1.5,
             "the lift was flat: {dark_ratio} against {bright_ratio}"
         );
+    }
+
+    #[test]
+    fn the_edit_is_linear_in_the_matte() {
+        // The property that makes a rim impossible, and the one a partially-edited weight
+        // broke. However bright the pixel, the edit must grow with the matte and never peak
+        // part-way through the falloff.
+        let params = MaskParams {
+            exposure: Some(0.45),
+            shadows: Some(40),
+            highlights: Some(-12),
+            ..MaskParams::default()
+        };
+        for linear in [0.02f32, 0.08, 0.18, 0.42, 0.80] {
+            let pixel = grey(linear);
+            let full = (luma(apply_face_light(pixel, &params, 1.0)) - luma(pixel)).abs();
+            let mut previous = 0.0f32;
+            for step in 0..=100 {
+                let alpha = step as f32 / 100.0;
+                let edit = (luma(apply_face_light(pixel, &params, alpha)) - luma(pixel)).abs();
+                assert!(
+                    edit <= full + 1e-5,
+                    "at {linear} the edit peaked at alpha {alpha}: {edit} against {full}"
+                );
+                assert!(edit >= previous - 1e-5, "the edit weakened at alpha {alpha}");
+                previous = edit;
+            }
+        }
     }
 
     #[test]

@@ -188,12 +188,39 @@ pub const MAX_SHAPED_FACES: usize = 4;
 /// feeds [`LocalService::needs_review`] rather than gating anything.
 pub const REVIEW_BELOW: f32 = 0.50;
 
-/// The edge-gradient ratio above which a transition reads as a halo.
+/// The luminance gradient below which a reversal is noise rather than a halo.
 ///
-/// Section 10.1's automated halo test. Measured as the ratio of the gradient magnitude
-/// across a mask boundary after the local work to the same gradient before it; a mask that
-/// multiplies an edge by more than this has drawn an outline rather than blended one.
-pub const HALO_GRADIENT_RATIO: f32 = 1.25;
+/// Section 10.1 asks for "an automated edge-gradient test finding no artefact". Three
+/// readings were tried before this one and it is worth writing down why each is wrong,
+/// because somebody will try them again:
+///
+/// * **The before/after gradient ratio** fails because *every* local brightening increases the
+///   step at its own boundary - that is what "local" means. A face lifted half a stop out of a
+///   dark reception has a larger step against the room than it did, whether the mask was
+///   feathered beautifully or cut out with scissors. It measures the edit's size.
+/// * **Peak-over-mean gradient** fails because a hard edge puts its whole transition into one
+///   sample, so its peak and its mean are the same number and it scores perfectly.
+/// * **The transition width of the difference image** fails because when a mask's edge
+///   coincides with a *content* edge - which is exactly what a good subject matte does - the
+///   difference image steps there no matter how wide the feather is, because the same lift on
+///   skin and on the wall behind it are different sizes.
+///
+/// What a halo actually is, is a **rim**: a bright or dark ring beside the subject that was
+/// not in the photograph. In profile that is a *gradient reversal* - the luminance turns back
+/// on itself where it did not before. So the measurement walks the boundary and looks for a
+/// sample where the edit made the gradient change sign, and this constant is the magnitude
+/// below which such a change is quantisation noise rather than a ring.
+///
+/// Four thousandths of a luminance unit is about one 8-bit code value, which is the smallest
+/// thing that can honestly be called a gradient at all.
+pub const HALO_REVERSAL_FLOOR: f32 = 0.004;
+
+/// The smallest luminance change that counts as an edit for the halo measurement.
+///
+/// Half a per cent. Below this the difference image is quantisation noise and asking whether
+/// it has a rim in it is meaningless - which is not a soft answer, it is the reason a frame
+/// nothing happened to must be excluded from a test about how things happen.
+pub const HALO_MIN_CHANGE: f32 = 0.005;
 
 // ---------------------------------------------------------------------------
 // Masks, as an input

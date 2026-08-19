@@ -35,6 +35,14 @@ uuid         = { workspace = true }
 [dev-dependencies]
 tempfile     = { workspace = true }
 
+# PHASE-19 only, and only in the evaluation harness. `tests/eval/local_eval.rs` measures the
+# halo gate by applying a plan through the render reference, and it holds the decision side's
+# split constants to the render side's. The library itself depends on neither: `aura-recipe`
+# and `aura-render` are downstream of this crate, and a dependency in the other direction
+# would let a decision reach a pixel without going through `schema::merge`.
+aura-recipe  = { path = "../aura-recipe" }
+aura-render  = { path = "../aura-render" }
+
 # The section 10.1 gates, run as an ordinary test so a red gate is a red build.
 # Lives in `tests/eval/` beside the phase 05 to 08 harnesses rather than in this
 # crate's own `tests/`, because a gate is a claim about the product and not about a
@@ -52,3 +60,8 @@ path = "../../tests/eval/composition_eval.rs"
 [[test]]
 name = "tone_eval"
 path = "../../tests/eval/tone_eval.rs"
+
+# The phase 19 gates, in the same place and for the same reason.
+[[test]]
+name = "local_eval"
+path = "../../tests/eval/local_eval.rs"

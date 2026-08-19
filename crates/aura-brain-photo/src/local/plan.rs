@@ -526,9 +526,15 @@ impl Analyser {
         let mut notes = Vec::new();
         let low_scale = at(scale, LocalOp::DodgeBurnLow);
         let mid_scale = at(scale, LocalOp::DodgeBurnMid);
-        if policy.declines(LocalOp::DodgeBurnLow) && policy.declines(LocalOp::DodgeBurnMid) {
+        // The reason keys on the *low* band, because form shaping is the operation section
+        // 6.4 names when it says a dance floor gets minimal shaping. A scene can decline the
+        // shaping and still even out a blotch, and a photographer looking at such a frame
+        // needs to be told the first part rather than left to infer it from the second.
+        if policy.declines(LocalOp::DodgeBurnLow) {
             notes.push(LocalReason::plain(LocalCode::SceneDeclinesShaping, 0.0));
-            return (None, notes);
+            if policy.declines(LocalOp::DodgeBurnMid) {
+                return (None, notes);
+            }
         }
         if low_scale <= 0.0 && mid_scale <= 0.0 {
             return (None, notes);
