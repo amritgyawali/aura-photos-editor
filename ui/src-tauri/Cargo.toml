@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 aura-app     = { path = "../../crates/aura-app" }
 aura-core    = { path = "../../crates/aura-core" }
+aura-style   = { path = "../../crates/aura-style" }
 tauri        = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 serde        = { version = "1", features = ["derive"] }

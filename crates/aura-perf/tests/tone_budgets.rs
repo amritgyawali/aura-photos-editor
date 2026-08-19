@@ -256,6 +256,8 @@ fn context_of(frame: &Frame) -> FrameContext {
         subjects: frame.subjects.clone(),
         as_shot: frame.as_shot,
         shadow_headroom_ev: 2.0,
+        // PHASE-17. No style profile: this budget measures phase 15's own solve.
+        style: None,
     }
 }
 

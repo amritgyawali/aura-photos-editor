@@ -32,6 +32,7 @@ aura-cull          = { path = "../aura-cull" }
 aura-explain       = { path = "../aura-explain" }
 aura-recipe        = { path = "../aura-recipe" }
 aura-render        = { path = "../aura-render" }
+aura-style         = { path = "../aura-style" }
 aura-vision  = { path = "../aura-vision" }
 rusqlite.workspace   = true
 serde.workspace      = true

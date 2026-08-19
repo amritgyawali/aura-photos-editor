@@ -1229,3 +1229,63 @@ summary      = "Stored grades came from different heads, arithmetic or intents"
 user_message = "AURA has improved how it grades, so it is re-checking this wedding in the background. Anything you have already adjusted is kept."
 runbook      = "docs/runbooks/AURA-ML-5071.md"
 introduced   = "PHASE-16"
+
+# Phase 17. Style learning, ML 5072-5077. The same five shapes the phase 09, 11,
+# 15 and 16 blocks have - one item that could not be done, a refused run, a
+# warning about a sparse case, a refused edit and version drift - plus one that
+# is new: `AURA-ML-5076` is the first code in the product that refuses an
+# artefact a photographer chose to import, rather than one AURA shipped.
+
+[[error]]
+code         = "AURA-ML-5072"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One archive pair could not be matched, read or fitted"
+user_message = "AURA could not learn from one of your finished photographs, so it left that one out. Everything else in the archive is still being used."
+runbook      = "docs/runbooks/AURA-ML-5072.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5073"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "A style training run was refused"
+user_message = "AURA could not find enough matching originals and finished photographs in that folder to learn anything, so it has not made a profile. Check that both are there and try again."
+runbook      = "docs/runbooks/AURA-ML-5073.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5074"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A style bucket had too few pairs and borrowed from its parent"
+user_message = "AURA has not seen enough of your photographs of this kind in this light, so it is using your overall look for them. The profile report says which weddings would help."
+runbook      = "docs/runbooks/AURA-ML-5074.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5075"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A profile could not be adopted or selected"
+user_message = "AURA could not switch to that style profile. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5075.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5076"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A style profile bundle was refused"
+user_message = "That style profile file has been altered since it was signed, or it is not a style profile, so AURA did not open it. Ask whoever sent it for a fresh copy."
+runbook      = "docs/runbooks/AURA-ML-5076.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5077"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A profile was learned with a different render engine or fitter"
+user_message = "This style profile was learned with an older version of AURA's editing engine, so it is being applied cautiously. Re-training it on the same weddings will restore full accuracy."
+runbook      = "docs/runbooks/AURA-ML-5077.md"
+introduced   = "PHASE-17"

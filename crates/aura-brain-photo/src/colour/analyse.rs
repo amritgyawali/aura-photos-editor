@@ -36,6 +36,7 @@ use aura_core::contract::colour::{
     HslShift, ImageId, SkinGuardReport, ToneCurve, VariantKind,
 };
 use aura_core::contract::people::ImageSubjects;
+use aura_core::contract::style::StyleAdvice;
 use aura_core::{AttrFlags, AuraResult, Priority, SceneId};
 use aura_infer::contract::infer::{InferRequest, InferService, ModelRef, TensorView, Version};
 use aura_infer::onnx::fixtures::{TONE_INPUT_DIM, TONE_MODEL, TONE_OUTPUTS, TONE_SCENES};
@@ -50,6 +51,7 @@ use crate::colour::harmony;
 use crate::colour::hsl::{self, Solved as HslSolved};
 use crate::colour::intent::{IntentTable, SceneIntent, UNTARGETED_CONFIDENCE_PENALTY};
 use crate::colour::skin_guard::{self, Grade, SkinSamples};
+use crate::colour::style;
 use crate::colour::tone::{self, Measurements, ToneParams, TONE_HEAD_TRAINED};
 use crate::tone::stats::{self, FrameStats};
 
@@ -60,7 +62,11 @@ use crate::tone::stats::{self, FrameStats};
 /// written into `image_colour_decision.analysis_ver`, and two decisions made under different
 /// values of it are not comparable: `AURA-ML-5071` exists so that comparison never happens
 /// silently.
-pub const ANALYSIS_VER: u16 = 1;
+///
+/// **1 -> 2 in PHASE-17.** A grade solved without a style profile and a grade solved with one
+/// are not the same measurement, so every stored row is re-graded when a profile is adopted.
+/// The pass heals itself: `ColourStore::pending` is keyed on this column.
+pub const ANALYSIS_VER: u16 = 2;
 
 /// The pixel rung the colour pass reads.
 ///
@@ -112,6 +118,16 @@ pub struct FrameContext {
     /// Taken rather than recomputed. `IntegrityService` owns what a lift costs in noise, and
     /// a second answer to "how far can this body be pushed" is two grades that disagree.
     pub shadow_headroom_ev: f32,
+    /// PHASE-17. What this photographer's own look says about this frame.
+    ///
+    /// Resolved by the caller through `StyleService` - the same shape phases 07, 06 and 09
+    /// arrive through - so this crate still takes no dependency on `aura-style`. `None` is a
+    /// project with no profile and is not an error: the grade is then exactly what phase 16
+    /// decided on its own, which is the whole safety property of a residual design.
+    ///
+    /// It is applied to the **solved** grade and before both guards, so a personal style that
+    /// would move somebody's skin is a personal style the guard withdraws. ADR-0035 decision 1.
+    pub style: Option<StyleAdvice>,
 }
 
 /// What one frame's analysis produced.
@@ -388,10 +404,19 @@ impl Analyser {
             .clamp(0.0, 1.0);
         let colour = hsl::solve(&plan, &intent, mean_saturation);
 
-        let proposed = Grade {
+        let baseline_grade = Grade {
             tone: solved_tone.params,
             curve: fitted.curve.clone(),
             colour,
+        };
+
+        // 5b. PHASE-17. The photographer's own lean, on top of what phase 16 solved and
+        //     **before** both guards. ADR-0035 decision 1: a style applied after the guards is
+        //     a parameter set nobody measured, delivered under a sentence that says somebody
+        //     did - and that sentence is section 6.3's skin guarantee.
+        let proposed = match &context.style {
+            Some(advice) if !advice.delta.is_neutral() => style::apply(&baseline_grade, advice),
+            _ => baseline_grade.clone(),
         };
 
         // 6. The subtlety cap and the clipping guard, then the skin guard.

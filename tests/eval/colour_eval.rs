@@ -104,6 +104,10 @@ fn context_of(frame: &Frame) -> FrameContext {
         // a measurement, because what this harness tests is the grade and phase 09 owns the
         // headroom; a fixture that varied it would be testing phase 09.
         shadow_headroom_ev: 2.0,
+        // PHASE-17. No style profile: this harness measures phase 16's own solver, and a
+        // personal lean on top of it would make every gate here a measurement of two phases at
+        // once. `tests/eval/style_eval.rs` is where the shift is measured.
+        style: None,
     }
 }
 

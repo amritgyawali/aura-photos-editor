@@ -75,7 +75,9 @@ dependencies = [
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-style",
  "aura-vision",
+ "blake3",
  "parking_lot",
  "rusqlite",
  "serde",
@@ -184,6 +186,7 @@ dependencies = [
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-style",
  "aura-vision",
  "rusqlite",
  "serde",
@@ -466,6 +469,28 @@ dependencies = [
  "time",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "aura-style"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-raw",
+ "aura-recipe",
+ "aura-render",
+ "blake3",
+ "ed25519-dalek",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "time",
+ "tracing",
+ "uuid",
+ "walkdir",
 ]
 
 [[package]]

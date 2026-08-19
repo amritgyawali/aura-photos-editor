@@ -4214,3 +4214,337 @@ pub struct SetColourOverrideDto {
     /// The dotted paths a person now owns.
     pub protected: Vec<String>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-17. Style learning: scene-conditional personal AI profiles.
+// ---------------------------------------------------------------------------
+
+/// One leaf of the style tree, as the matrix draws it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleBucketDto {
+    /// `group/lighting`, the catalog's own key.
+    pub key: String,
+    /// `preparation`, `details`, `ceremony`, `portraits`, `reception`, `dance`, `candid` or
+    /// `other`.
+    pub group: String,
+    /// `unknown`, `daylight`, `golden_hour`, `shade`, `overcast`, `tungsten`, `artificial`,
+    /// `flash`, `candle` or `stage`.
+    pub lighting: String,
+    /// What the matrix calls it.
+    pub title: String,
+    /// How many of the photographer's own pairs landed here.
+    pub samples: u32,
+    /// How many were held out and used to measure the fit.
+    pub held_out: u32,
+    /// The measured style-match error in dE00, or `null` when nothing was held out.
+    ///
+    /// **Never zero for "not measured".** A bucket trained on eleven pairs and evaluated on
+    /// none has no measurement, and zero would render as a perfect match - which is the one
+    /// thing a report about accuracy must not do where it knows least. ADR-0036 decision 2.
+    pub match_de00: Option<f32>,
+    /// Which level of the tree answers here: `bucket`, `group`, `global` or `factory`.
+    pub level: String,
+    /// True when this leaf has too few pairs to be trusted on its own.
+    pub weak: bool,
+}
+
+/// One profile, as the list shows it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleProfileDto {
+    /// The profile.
+    pub profile_id: String,
+    /// What the photographer calls it.
+    pub name: String,
+    /// Which training produced it.
+    pub version: u32,
+    /// `candidate`, `adopted` or `retired`.
+    pub status: String,
+    /// How many pairs it was trained on.
+    pub trained_pairs: u32,
+    /// Its strength, `0..1`, for the meter section 12 asks for instead of a ready state.
+    pub strength: f32,
+    /// The measured style-match error over every held-out pair, in dE00.
+    pub overall_de00: f32,
+    /// How many leaves carry the photographer's own evidence.
+    pub taught_buckets: u32,
+    /// True when it has enough evidence for AURA to be confident.
+    pub usable: bool,
+    /// The render engine it was fitted against.
+    pub engine_ver: String,
+    /// When, in milliseconds since the Unix epoch.
+    pub trained_at: i64,
+}
+
+/// The honest report a photographer reads before adopting.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileReportDto {
+    /// Which profile.
+    pub profile: StyleProfileDto,
+    /// Every populated leaf, in matrix order.
+    pub per_bucket: Vec<StyleBucketDto>,
+    /// The leaves the photographer should add weddings for, worst first.
+    pub weak_buckets: Vec<String>,
+    /// What to add next, as a sentence generated from the actual gap.
+    pub recommendation: String,
+    /// How many pairs the fit accepted.
+    pub accepted_pairs: u32,
+    /// How many it rejected. **On the wire beside the acceptance**, because a report that
+    /// showed only the accepted count could claim a hundred percent on any archive.
+    pub rejected_pairs: u32,
+    /// The fraction that survived the residual check, `0..1`.
+    pub acceptance: f32,
+    /// True when the overall figure met section 10.1's ceiling.
+    pub met_ceiling: bool,
+}
+
+/// Point the scanner at folders of the photographer's own work.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanArchiveInput {
+    /// The profile name to scan for. Versions of one look share a name.
+    pub name: String,
+    /// Absolute paths to the folders, one per wedding.
+    ///
+    /// Paths **in**, and nothing but names out: `StylePairDto` carries two file names and a
+    /// verdict. ADR-0036 decision 1.
+    pub roots: Vec<String>,
+}
+
+/// What one archive scan found, before anything is fitted.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanArchiveDto {
+    /// Camera originals found.
+    pub originals: u32,
+    /// Delivered finals found.
+    pub finals: u32,
+    /// Pairs the matcher made.
+    pub matched: u32,
+    /// Originals with no final. Usually a culled frame, which is normal.
+    pub unmatched_originals: u32,
+    /// Finals with no original. **The one worth reporting**: it means the RAWs are missing, on
+    /// another disk, or in a format this build does not decode.
+    pub unmatched_finals: u32,
+    /// How many pairs each strategy found, by slug.
+    pub by_method: Vec<(String, u32)>,
+    /// The weakest strategy any pair needed, which is how much to trust the whole pairing.
+    pub weakest_method: String,
+    /// True when there are enough pairs for a training run to produce anything.
+    pub enough: bool,
+}
+
+/// One original-and-final pair, as the report lists it.
+///
+/// **No pixels.** There is no field here that could hold image bytes, which is what makes
+/// "AURA never uploads your archive" a property of the shape rather than a promise about the
+/// code.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StylePairDto {
+    /// The original's file name, without its directory.
+    pub original: String,
+    /// The final's file name.
+    pub final_image: String,
+    /// `content_hash`, `filename_stem`, `capture_time`, `perceptual` or `unmatched`.
+    pub matched_by: String,
+    /// `xmp`, `fitted` or `none`.
+    pub extracted_from: String,
+    /// Which leaf it landed in.
+    pub bucket: String,
+    /// What the fit could not explain, in dE00.
+    pub residual_de00: f32,
+    /// True when it was used.
+    pub accepted: bool,
+    /// The reason code when it was not.
+    pub rejection: Option<String>,
+}
+
+/// Train a profile from whatever the scan already stored.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainProfileInput {
+    /// The profile name.
+    pub name: String,
+    /// A token the UI can cancel with.
+    pub cancel_id: Option<String>,
+}
+
+/// What one training run did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainProfileDto {
+    /// The profile it produced, at `candidate`. **Adoption is a separate command.**
+    pub profile: Option<StyleProfileDto>,
+    /// Pairs the matcher found.
+    pub matched: u32,
+    /// Pairs the fit accepted.
+    pub accepted: u32,
+    /// Pairs it rejected, each stored with a reason.
+    pub rejected: u32,
+    /// Pairs already fitted at this version and skipped. Invariant 5, on the wire.
+    pub reused: u32,
+    /// Pairs whose parameters came from a sidecar rather than from a fit.
+    pub from_xmp: u32,
+    /// Leaves the tree populated.
+    pub buckets: u32,
+    /// The measured style-match error, in dE00.
+    pub overall_de00: f32,
+    /// The same figure for the unstyled baseline, so the improvement is visible rather than
+    /// asserted.
+    pub baseline_de00: f32,
+    /// Wall clock.
+    pub elapsed_ms: u64,
+    /// True when the run was cancelled.
+    pub cancelled: bool,
+}
+
+/// Adopt one profile: it becomes what the product edits with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdoptProfileInput {
+    /// The profile.
+    pub profile_id: String,
+}
+
+/// One thing that moved, or did not move, a styled edit.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleReasonDto {
+    /// Stable reason code.
+    pub code: String,
+    /// The sentence.
+    pub text: String,
+    /// How much confidence it cost. Negative is doubt.
+    pub weight: f32,
+}
+
+/// One leaf's three answers, for the side-by-side before adoption.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleComparisonDto {
+    /// Which leaf.
+    pub bucket: String,
+    /// What the matrix calls it.
+    pub title: String,
+    /// The exposure, temperature, contrast and vibrance the baseline would use.
+    ///
+    /// Four numbers rather than a whole parameter set, because the comparison is a *summary*
+    /// and the develop surface already owns showing a recipe. A panel that drew a whole set
+    /// here would be a second Develop panel that could drift from the first.
+    pub baseline: Vec<f32>,
+    /// What the currently adopted profile would use, or empty when there is none.
+    pub current: Vec<f32>,
+    /// What the candidate would use.
+    pub candidate: Vec<f32>,
+    /// Which level of the tree the candidate answered from.
+    pub level: String,
+    /// How sure the candidate is.
+    pub confidence: f32,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<StyleReasonDto>,
+}
+
+/// Ask for the side-by-side of the baseline, the adopted profile and a candidate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareProfilesInput {
+    /// The project the comparison is for.
+    pub project_id: String,
+    /// The candidate.
+    pub candidate_id: String,
+    /// How many leaves, at most.
+    pub limit: Option<u32>,
+}
+
+/// Write a signed, portable profile to a file the photographer names.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportProfileInput {
+    /// The profile.
+    pub profile_id: String,
+    /// Where to write it.
+    pub path: String,
+}
+
+/// What exporting a profile produced.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportProfileDto {
+    /// Where it was written.
+    pub path: String,
+    /// How many bytes.
+    pub bytes: u64,
+    /// The signing key's fingerprint, in groups of four.
+    pub fingerprint: String,
+}
+
+/// Read a signed profile bundle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportProfileInput {
+    /// The `.auraprofile` file.
+    pub path: String,
+}
+
+/// What importing a profile produced.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportProfileDto {
+    /// The profile that was read, at `candidate` whatever it said about itself.
+    pub profile: StyleProfileDto,
+    /// The signing key's fingerprint.
+    pub fingerprint: String,
+    /// True when the document is unchanged since it was signed.
+    ///
+    /// **Not called `verified`.** With the public key inside the bundle, this proves integrity
+    /// and not provenance: there is no key distribution in this product and nothing to check a
+    /// key against. ADR-0035 decision 8, and `ProfileReport.tsx` never renders the word.
+    pub unchanged_since_signing: bool,
+}
+
+/// Which profile a project, and optionally one chapter of it, uses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetProjectProfileInput {
+    /// The project.
+    pub project_id: String,
+    /// One of phase 07's nine chapter slugs, or `null` for the project default.
+    pub chapter: Option<String>,
+    /// The profile, or `null` to clear the selection.
+    pub profile_id: Option<String>,
+}
+
+/// What the style panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleStatusDto {
+    /// Profiles in the catalog, adopted and candidate.
+    pub profiles: u32,
+    /// The profile this project uses, when one is selected.
+    pub active: Option<String>,
+    /// What it is called.
+    pub active_name: String,
+    /// Which version.
+    pub active_version: u32,
+    /// How many pairs it was trained on.
+    pub trained_pairs: u32,
+    /// Its strength, `0..1`.
+    pub strength: f32,
+    /// Its measured style-match error, in dE00.
+    pub overall_de00: f32,
+    /// Which chapters have an override, by slug.
+    pub chapter_overrides: Vec<String>,
+    /// How many of this project's leaves resolve at each level, by slug.
+    ///
+    /// **The number that matters when it is skewed.** A wedding whose frames all resolve at
+    /// `global` has had its scene conditioning do nothing, which is the quiet version of "one
+    /// global style" - the exact thing this phase exists to beat.
+    pub level_counts: Vec<(String, u32)>,
+    /// The fraction that resolved at their own leaf, `0..1`.
+    pub bucket_ratio: f64,
+    /// Which build's fitter produced the active profile.
+    pub analysis_ver: u32,
+}

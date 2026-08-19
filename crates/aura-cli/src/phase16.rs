@@ -779,6 +779,9 @@ fn context_of(frame: &Frame) -> FrameContext {
         attrs: frame.attrs,
         subjects: frame.subjects.clone(),
         shadow_headroom_ev: 2.0,
+        // PHASE-17. No style profile: this gate measures phase 15 and phase 16 on their own,
+        // and a personal lean on top would make every number here about two phases.
+        style: None,
     }
 }
 

@@ -69,6 +69,7 @@ pub mod hsl;
 pub mod intent;
 pub mod skin_guard;
 pub mod store;
+pub mod style;
 pub mod tone;
 
 pub use analyse::{Analyser, FrameContext, FrameOutcome, ANALYSIS_VER, COLOUR_LEVEL, MODEL_VER};

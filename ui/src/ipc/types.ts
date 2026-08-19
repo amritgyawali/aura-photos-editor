@@ -2122,3 +2122,200 @@ export type SetColourOverrideDto = {
   /** The dotted paths a person now owns. */
   protected: string[];
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-17. Style learning: scene-conditional personal AI profiles.
+// ---------------------------------------------------------------------------
+
+/** One leaf of the style tree, as the matrix draws it. */
+export type StyleBucketDto = {
+  /** `group/lighting`, the catalog's own key. */
+  key: string;
+  group: string;
+  lighting: string;
+  title: string;
+  samples: number;
+  heldOut: number;
+  /**
+   * The measured style-match error in dE00, or `null` when nothing was held out.
+   *
+   * **Never zero for "not measured".** A bucket trained on eleven pairs and evaluated on none
+   * has no measurement, and zero would render as a perfect match - which is the one thing a
+   * report about accuracy must not do where it knows least.
+   */
+  matchDe00: number | null;
+  /** `bucket`, `group`, `global` or `factory`. */
+  level: string;
+  weak: boolean;
+};
+
+/** One profile, as the list shows it. */
+export type StyleProfileDto = {
+  profileId: string;
+  name: string;
+  version: number;
+  /** `candidate`, `adopted` or `retired`. */
+  status: string;
+  trainedPairs: number;
+  /** `0..1`, for the meter section 12 asks for instead of a ready state. */
+  strength: number;
+  overallDe00: number;
+  taughtBuckets: number;
+  usable: boolean;
+  engineVer: string;
+  trainedAt: number;
+};
+
+/** The honest report a photographer reads before adopting. */
+export type ProfileReportDto = {
+  profile: StyleProfileDto;
+  perBucket: StyleBucketDto[];
+  weakBuckets: string[];
+  recommendation: string;
+  acceptedPairs: number;
+  /** On the wire beside the acceptance, so a report cannot claim a hundred percent. */
+  rejectedPairs: number;
+  acceptance: number;
+  metCeiling: boolean;
+};
+
+/** Point the scanner at folders of the photographer's own work. */
+export type ScanArchiveInput = {
+  name: string;
+  /** Paths in, and nothing but names out. */
+  roots: string[];
+};
+
+/** What one archive scan found, before anything is fitted. */
+export type ScanArchiveDto = {
+  originals: number;
+  finals: number;
+  matched: number;
+  unmatchedOriginals: number;
+  /** The one worth reporting: the RAWs are missing, elsewhere, or undecodable. */
+  unmatchedFinals: number;
+  byMethod: [string, number][];
+  weakestMethod: string;
+  enough: boolean;
+};
+
+/** One original-and-final pair. **No pixels.** */
+export type StylePairDto = {
+  original: string;
+  finalImage: string;
+  matchedBy: string;
+  extractedFrom: string;
+  bucket: string;
+  residualDe00: number;
+  accepted: boolean;
+  rejection: string | null;
+};
+
+export type TrainProfileInput = {
+  name: string;
+  cancelId?: string | null;
+};
+
+/** What one training run did. The profile it produced is a **candidate**. */
+export type TrainProfileDto = {
+  profile: StyleProfileDto | null;
+  matched: number;
+  accepted: number;
+  rejected: number;
+  reused: number;
+  fromXmp: number;
+  buckets: number;
+  overallDe00: number;
+  /** The same figure for the unstyled baseline, so the improvement is visible. */
+  baselineDe00: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type AdoptProfileInput = {
+  profileId: string;
+};
+
+export type StyleReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+};
+
+/** One leaf's three answers, for the side-by-side before adoption. */
+export type StyleComparisonDto = {
+  bucket: string;
+  title: string;
+  /** Exposure, temperature, contrast and vibrance. */
+  baseline: number[];
+  current: number[];
+  candidate: number[];
+  level: string;
+  confidence: number;
+  reasons: StyleReasonDto[];
+};
+
+export type CompareProfilesInput = {
+  projectId: string;
+  candidateId: string;
+  limit?: number | null;
+};
+
+export type ExportProfileInput = {
+  profileId: string;
+  path: string;
+};
+
+export type ExportProfileDto = {
+  path: string;
+  bytes: number;
+  fingerprint: string;
+};
+
+export type ImportProfileInput = {
+  path: string;
+};
+
+/** What importing a profile produced. */
+export type ImportProfileDto = {
+  profile: StyleProfileDto;
+  fingerprint: string;
+  /**
+   * True when the document is unchanged since it was signed.
+   *
+   * **Not `verified`.** With the public key inside the bundle this proves integrity and not
+   * provenance: there is no key distribution in this product and nothing to check a key
+   * against. The panel says "unchanged since signing" and never says "verified".
+   */
+  unchangedSinceSigning: boolean;
+};
+
+export type SetProjectProfileInput = {
+  projectId: string;
+  /** One of phase 07's nine chapter slugs, or `null` for the project default. */
+  chapter?: string | null;
+  /** The profile, or `null` to clear the selection. */
+  profileId?: string | null;
+};
+
+/** What the style panel's project header shows. */
+export type StyleStatusDto = {
+  profiles: number;
+  active: string | null;
+  activeName: string;
+  activeVersion: number;
+  trainedPairs: number;
+  strength: number;
+  overallDe00: number;
+  chapterOverrides: string[];
+  /**
+   * How many leaves resolve at each level.
+   *
+   * The number that matters when it is skewed: a wedding whose frames all resolve at `global`
+   * has had its scene conditioning do nothing, which is the quiet version of "one global
+   * style" - the exact thing this phase exists to beat.
+   */
+  levelCounts: [string, number][];
+  bucketRatio: number;
+  analysisVer: number;
+};

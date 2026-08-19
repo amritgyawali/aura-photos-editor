@@ -785,6 +785,9 @@ fn analyse(
         subjects: frame.subjects.clone(),
         as_shot: frame.as_shot,
         shadow_headroom_ev: 2.0,
+        // PHASE-17. No style profile: this gate measures phase 15 and phase 16 on their own,
+        // and a personal lean on top would make every number here about two phases.
+        style: None,
     };
     analyser.analyse(PhotoId::new(), &buffer, &context, loci, Priority::AiBatch)
 }

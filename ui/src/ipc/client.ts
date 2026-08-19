@@ -155,6 +155,23 @@ import type {
   IntegrityStatusDto,
   RankedFrameDto,
   WithinMomentInput,
+  // PHASE-17.
+  AdoptProfileInput,
+  CompareProfilesInput,
+  ExportProfileDto,
+  ExportProfileInput,
+  ImportProfileDto,
+  ImportProfileInput,
+  ProfileReportDto,
+  ScanArchiveDto,
+  ScanArchiveInput,
+  SetProjectProfileInput,
+  StyleComparisonDto,
+  StylePairDto,
+  StyleProfileDto,
+  StyleStatusDto,
+  TrainProfileDto,
+  TrainProfileInput,
 } from './types';
 
 /** True when the shell is present. Storybook-style dev runs fall back to stubs. */
@@ -842,3 +859,61 @@ export const colour = {
   estimateColour: (input: EstimateColourInput): Promise<ColourPassDto> =>
     invoke<ColourPassDto>('estimate_colour', { input }),
 };
+
+/**
+ * PHASE-17. Style learning: scene-conditional personal AI profiles.
+ *
+ * Eleven commands. Four read, two look at an archive, two move a profile through its
+ * lifecycle, two carry it between machines, and one chooses which profile a project uses.
+ *
+ * **Nothing here returns imagery.** Paths go in and names, numbers and verdicts come out,
+ * which is what makes "AURA never uploads your archive" a property of the shapes rather than a
+ * promise about the code.
+ */
+export const style = {
+
+  /** What this project knows about style. */
+  styleStatus: (projectId: string): Promise<StyleStatusDto> =>
+    invoke<StyleStatusDto>('style_status', { projectId }),
+
+  /** Every profile, newest first. */
+  listProfiles: (): Promise<StyleProfileDto[]> =>
+    invoke<StyleProfileDto[]>('list_profiles', {}),
+
+  /** One profile's honest report, or `null` when nobody has trained it. */
+  profileReport: (profileId: string): Promise<ProfileReportDto | null> =>
+    invoke<ProfileReportDto | null>('profile_report', { profileId }),
+
+  /** The pairs behind one profile - accepted **and** rejected. */
+  profilePairs: (name: string, limit?: number): Promise<StylePairDto[]> =>
+    invoke<StylePairDto[]>('profile_pairs', { name, limit: limit ?? null }),
+
+  /** Look at what is in a folder, before anything is fitted. Opens nothing. */
+  scanArchive: (input: ScanArchiveInput): Promise<ScanArchiveDto> =>
+    invoke<ScanArchiveDto>('scan_archive', { input }),
+
+  /** Train a profile. The result is a **candidate**; adoption is a separate act. */
+  trainProfile: (input: TrainProfileInput): Promise<TrainProfileDto> =>
+    invoke<TrainProfileDto>('train_profile', { input }),
+
+  /** Adopt one profile: it becomes what the product edits with. */
+  adoptProfile: (input: AdoptProfileInput): Promise<StyleProfileDto> =>
+    invoke<StyleProfileDto>('adopt_profile', { input }),
+
+  /** The side-by-side of the baseline, the adopted profile and a candidate. No pixels. */
+  compareProfiles: (input: CompareProfilesInput): Promise<StyleComparisonDto[]> =>
+    invoke<StyleComparisonDto[]>('compare_profiles', { input }),
+
+  /** Write a signed, portable profile. */
+  exportProfile: (input: ExportProfileInput): Promise<ExportProfileDto> =>
+    invoke<ExportProfileDto>('export_profile', { input }),
+
+  /** Read a signed profile bundle. A tampered one is refused with `AURA-ML-5076`. */
+  importProfile: (input: ImportProfileInput): Promise<ImportProfileDto> =>
+    invoke<ImportProfileDto>('import_profile', { input }),
+
+  /** Choose which profile a project, or one chapter of it, uses. */
+  setProjectProfile: (input: SetProjectProfileInput): Promise<StyleStatusDto> =>
+    invoke<StyleStatusDto>('set_project_profile', { input }),
+};
+

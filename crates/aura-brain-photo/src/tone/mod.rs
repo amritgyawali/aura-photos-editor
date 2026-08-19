@@ -63,6 +63,7 @@ pub mod skin_locus;
 pub mod solve;
 pub mod stats;
 pub mod store;
+pub mod style;
 pub mod targets;
 pub mod wb;
 

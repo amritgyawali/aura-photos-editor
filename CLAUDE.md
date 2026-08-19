@@ -82,6 +82,9 @@ Never load two phase files into one session.
 | Tone intents (versioned, PM-owned) | `crates/aura-brain-photo/config/tone_intent.toml` |
 | Colour evaluation gates | `tests/eval/colour_eval.rs` + `ml/models/colour/eval_colour.py` |
 | What AURA changes about how a photograph looks | `docs/tone-and-colour.md` |
+| Style learning and personal profiles | `docs/adr/ADR-0035-style-learning-and-personal-profiles.md` |
+| Style evaluation gates | `tests/eval/style_eval.rs` + `ml/models/style/eval_style.py` |
+| How Teach My AI works, in the product's own words | `docs/style-profiles.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -562,6 +565,77 @@ and stays in `aura-app`.
 Phase 16 corrected a phase 15 oversight: **migrations 15 and 16 are now in `contracts.lock`**.
 `docs/plan/CLAUDE.md` has listed every migration as a frozen contract since phase 01, and 15
 had been omitted from `EXTRA_CONTRACTS` when it shipped.
+
+Phase 17 is implemented conditionally: `aura-core::contract::style` freezes the profile, the
+delta, the curve shift, the skin lean, the eight scene groups, the ten kinds of light, the
+eighty-leaf bucket, the bucket model, the diagnostics, the four fallback levels, the four
+matching methods, the two extraction sources, the pair, the query, the advice, the outline,
+twenty reasons and `StyleService`, and `ids.rs` gains `ProfileId`; `aura-style` learns.
+`pairs.rs` matches an original to a final by content hash, by filename stem, by capture time
+and perceptually, and **refuses an ambiguous match** rather than guessing. `extract.rs` reads
+an XMP exactly when there is one and otherwise hands the pair to `fit.rs`, which reproduces the
+delivered photograph by coordinate descent over twelve parameters **through phase 14's real
+renderer** and rejects what it cannot explain, so the model learns a global look rather than
+somebody's unmodelled dodging. `bucket.rs` sorts each pair into one of eighty leaves.
+`tree.rs` fits ridge regressions with Huber reweighting, shrinks each level toward its parent
+by `n / (n + k)`, and caps what any one wedding may contribute. `diagnostics.rs` measures the
+result on held-out pairs *against the baseline as well as against the ceiling* and writes one
+sentence about what to shoot next. `infer.rs` resolves a leaf through bucket, group, global and
+factory and **always answers**. `profile.rs` versions, signs and refuses; `store.rs` owns
+migration 17 and `api.rs` is the frozen service and the resumable walk. Migration 17 stores
+four tables and a coverage view; two small modules in `aura-brain-photo` apply the shift; eleven
+IPC commands (ADR-0036) feed a Teach My AI wizard, a profile report, a bucket matrix and an A/B
+comparison; and `aura-cli verify --phase 17` is the executable gate. Its exit report is
+`docs/progress/PHASE-17-EXIT.md`.
+
+**This phase ships no model** - the second since phase 08, and for a different reason. There is
+nothing to train: the fit has a closed form, and what is missing is not weights but *weddings*.
+Section 9's DATA task asks for consented archives from five photographers across traditions and
+there are none in this repository, so every number in this phase is measured on synthetic
+archives whose look was chosen, applied to authored plates through the real renderer and
+recovered. That proves the matcher, the fitter, the bucketing, the regression, the shrinkage,
+the archive cap, the bundle and the store; it is not evidence that a photographer would
+recognise their own work. That is condition C1 in the phase 17 exit report and it is a Sev 2
+trigger. The other Sev 2 is C4: the baseline a training run is a residual *from* is supplied by
+the caller, and the desktop shell has only a neutral one, so until an archive can be imported as
+a project and run through phases 15 and 16 first, a learned delta is an absolute edit wearing a
+residual's shape.
+
+Three rules that phase 17 adds and every later phase inherits:
+
+- **`StyleService` is the only way to ask what a photographer's own look is.** Thirteenth
+  service of its kind. Phase 25 normalises a gallery toward these values, 26 matches a second
+  shooter to them, 27 checks them, 28 acts on them unattended and 30's learning loop updates
+  them. No phase may keep its own style profile or its own bucket vocabulary.
+- **A style is a residual, and the baseline is never re-derived.** An empty profile produces
+  exactly what phases 15 and 16 decided, so there is no state of this system in which switching
+  the feature on makes a photograph worse than switching it off - and `gate_4b` asserts it. Any
+  later phase that finds itself computing an absolute from a profile has misunderstood the shape.
+- **The shift happens before the guards, and every guard re-runs after it.** Phase 16 wrote this
+  rule before this phase existed and this phase implemented it: the style moves the *solved*
+  parameters, and then phase 15's clipping bound, phase 15's skin-locus constraint, phase 16's
+  clipping guard and phase 16's skin guard all decide how much of the move survives. A personal
+  style that would move somebody's skin is a personal style the guard withdraws.
+
+Four decisions in phase 17 are worth remembering because they will be re-argued. **The archive
+cap is `w = cap * rest / (1 - cap)` and not `cap / share`** - scaling one archive's weight by its
+share of the total leaves it *above* the cap, because shrinking the weight also shrinks the total
+it is a share of, and the first implementation measured 48 % influence against a documented 35 %
+while reading as correct. **The regression's slopes are fitted and then discarded**: a slope
+fitted on eleven samples spanning ISO 1600 to 4000 is not identified at ISO 400, which is exactly
+the frame it would be applied to, so the slopes keep confounds out of the intercept and the
+intercept is what ships - which is also what makes inference three map lookups and an addition.
+**A rejected pair is written rather than dropped**, the only place in the product where a failure
+writes a row, because here the failure *is* the evidence a photographer needs. And **the tone
+half styles the solved answer rather than the target band**: shifting the band is cleaner on
+paper and makes a style profile change what "correctly exposed" means, which is phase 15's
+decision and not this phase's.
+
+Phase 17 corrected two earlier oversights: **`contracts.lock` carried a stale digest for
+`crates/aura-core/src/contract/colour.rs`**, so `cargo xtask contracts --check` would have failed
+on `main` - phase 16 re-locked before a final edit to the contract - and **the justfile had no
+`phase-16-verify` recipe**, so the only way to run that gate was to remember the argument. It
+also filled in the CHANGELOG entries phases 14 and 16 never wrote.
 
 Five rules that phase 13 adds and every later phase inherits:
 

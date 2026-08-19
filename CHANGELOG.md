@@ -2,6 +2,130 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 17 - Style Learning: scene-conditional personal AI profiles ("Teach My AI")
+
+Point AURA at weddings you have already edited and it learns your look - not as one style,
+but as a tree of eighty leaves, one per scene and kind of light. What it learns is a
+*residual*: the difference between what phases 15 and 16 decided and what you actually did,
+so an empty profile changes nothing and a taught one moves the answer rather than replacing
+it. The report leads with a measured error per leaf and names the one wedding worth adding
+next.
+
+### Added
+
+- **`aura-core::contract::style`**: the frozen `StyleProfile`, `StyleDelta`, `CurveShift`,
+  `SkinBias`, `SceneGroup`, `LightingBucket`, `StyleBucket`, `BucketModel`,
+  `ProfileDiagnostics`, `FallbackLevel`, `MatchMethod`, `ExtractSource`, `StylePair`,
+  `StyleQuery`, `StyleAdvice`, `StyleOutline`, twenty reason codes and `StyleService`;
+  `ids.rs` gains `ProfileId`. **There is no field anywhere in it for a skin colour**, for
+  the third phase running.
+- **`aura-style`**: thirteen modules. Four pair-matching strategies with a refusal for an
+  ambiguous match; XMP parameters read exactly when they exist; a coordinate-descent fitter
+  that reproduces a delivered JPEG over twelve parameters **through the real renderer** and
+  rejects what it cannot explain; eighty-leaf bucketing; ridge regression with Huber
+  reweighting, James-Stein shrinkage toward the parent and a cap on what one wedding may
+  contribute; held-out diagnostics measured against the baseline as well as against the
+  ceiling; hierarchical inference that always answers; versioning, adoption and a signed
+  `.auraprofile` bundle; the store and the resumable pass.
+- **Migration 17**: `profiles`, `profile_buckets`, `style_pairs`, `project_style` and
+  `v_style_coverage`. No skin colour anywhere in it, and the two skin *lean* columns carry
+  CHECKs below phase 16's own ceilings; the phase gate scans the schema for both on every run.
+- **`aura-brain-photo::{tone,colour}::style`**: the shift lands on the **solved** parameters
+  and before every guard, so phase 15's clipping bound and skin-locus constraint and phase
+  16's clipping guard and skin guard all re-run on the styled answer. Both `ANALYSIS_VER`s
+  1 -> 2.
+- **Eleven IPC commands** (ADR-0036) and four panels: a Teach My AI wizard that shows what a
+  folder contains before anything is fitted, a profile report that leads with a measurement
+  rather than a ready state, a bucket matrix that distinguishes a taught leaf from a borrowed
+  one, and an A/B comparison in numbers.
+- **`docs/style-profiles.md`**: how style learning works, what it needs, and what the
+  signature does and does not prove, in the product's own words.
+- **`aura-cli verify --phase 17`**, 19 evaluation gates, three Python self-tests and
+  `tests/no_network.rs` - a grep as a test that fails the build if this crate ever gains a
+  way to reach a network.
+
+### Fixed
+
+- The archive cap scaled one wedding's weight by `cap / share`, which leaves it **above** the
+  cap: shrinking a weight also shrinks the total it is a share of. The measured influence was
+  48 % against a documented 35 %, which is the worst kind of defect - the guarantee reads
+  correct and measures wrong. Now `w = cap * rest / (1 - cap)`, and `gate_5` is what found it.
+- The regression's slopes were applied at inference. A slope fitted on eleven samples spanning
+  ISO 1600 to 4000 is not identified at ISO 400, and the frame it would be applied to is
+  exactly the ISO 400 one. The slopes now do the job they are good at - keeping a confound out
+  of the intercept - and the intercept is what ships.
+- `strength()` read an unevaluated profile's `overall_de00` of zero as an accuracy of zero
+  rather than as an absence, so a profile trained ten seconds ago showed "nothing learned".
+- `contracts.lock` carried a stale digest for `crates/aura-core/src/contract/colour.rs`, so
+  `cargo xtask contracts --check` would have failed on `main`. Phase 16 re-locked before a
+  final edit to the contract.
+- The justfile had no `phase-16-verify` recipe, so the only way to run that gate was to
+  remember the argument.
+
+### Known limits
+
+**There are no photographers' archives in this repository**, so no number in this phase is
+about a photograph: every figure is measured on synthetic archives whose look was chosen,
+applied through the real renderer and recovered. This is a different gap from every
+placeholder-weights condition before it - this phase ships real code waiting for real
+*weddings* rather than real *weights*, and the fit has a closed form, so nothing needs
+training. The bundle signature proves integrity and not provenance, and the panel never says
+"verified". The desktop shell has no archive-import flow yet, so `train_profile` refuses with
+`AURA-ML-5073` rather than quietly succeeding, and both consuming passes resolve style at
+`LightingBucket::Unknown` - which is recorded on every decision rather than hidden. See
+`docs/progress/PHASE-17-EXIT.md` section 8.
+
+## Phase 16 - Tone AI, adaptive curves, HSL AI and skin-tone protection
+
+What a photograph should look like, decided per scene: the five tone parameters solved from
+the histogram and the subject's own spread, a monotone curve fitted to the contrast this kind
+of photograph wants, and the eight hue bands moved according to what is actually in the frame.
+Then the promise that costs the most to keep - **the grade is rendered, the skin pixels are
+measured, and the whole thing is solved again until nobody's colour has moved.**
+
+### Added
+
+- **`aura-core::contract::colour`**: the frozen `ColourDecision`, `ToneCurve`,
+  `HslAdjustments`, `HslBand`, `SkinGuardReport`, `ColourVariant`, `ContentBand`,
+  `BandReading`, 29 reason codes, `ColourOutline`, `ColourOverride` and `ColourService`.
+  Monotonicity is structural: `ToneCurve::new` is the only constructor and it refuses a set of
+  control points that is not monotone, so no solver, override or stored document can produce a
+  posterised or inverted curve. **There is no field anywhere in it for an ideal skin colour.**
+- **`aura-brain-photo::colour`**: thirteen modules. The tone solver, the curve fitter under
+  three constraints, the content reader, the harmony objective, the HSL expression of it, a
+  clipping guard, a subtlety cap, and the skin guard - which grades this frame's own skin
+  **through the real renderer**, measures the hue and chroma it actually moved, and re-solves
+  or withdraws until both are inside their ceilings.
+- **Migration 16**: `image_colour_decision` and `v_colour_coverage`. No skin-target column and
+  nowhere to put one; the gate scans both the schema and the config file on every run.
+- **`tone_intent.toml`**: 22 argued-over scene rows with a written reason each.
+- **One signed model with a card** (`tone_head`), and it is **never consulted** - see below.
+- **Seven IPC commands** (ADR-0034), a Tone panel that reports the guarantee as a measurement,
+  a curve editor that draws AURA's curve over the identity with the renderer's own
+  interpolation, and an HSL panel with the protected-skin indicator.
+- **`docs/tone-and-colour.md`**: what AURA changes about how a photograph looks, in the
+  product's own words.
+- **`aura-cli verify --phase 16`** and 27 evaluation gates, six of which exist to prove the
+  harness can fail.
+
+### Fixed
+
+- Migrations 15 and 16 were both absent from `contracts.lock`. `docs/plan/CLAUDE.md` has listed
+  every migration as a frozen contract since phase 01, and 15 had been omitted when it shipped.
+- The curve fitter clamped a node that wanted to sit above white, which produced a flat top -
+  a posterised band and new clipping in one move. It bounds its gain instead.
+
+### Known limits
+
+The tone head is an untrained placeholder and **is never consulted**: a random projection
+blended at any weight is a random contribution at that weight, and it would be
+indistinguishable in the panel from a learned one. What ships is a deterministic solver, and
+every gate is measured on synthetic frames whose foliage hue, dress luminance and subject
+contrast were painted in. The fairness gate measures five reflectances, not five people.
+Generating the three alternatives costs about 3x against a 15 % budget, and the content bands
+are inferred from colour statistics rather than segmented - which is on every adjusted frame as
+`ContentInferred` and closes with phase 18. See `docs/progress/PHASE-16-EXIT.md` section 8.
+
 ## Phase 15 - Exposure AI and White Balance AI (mixed lighting mastery)
 
 The first phase that decides what a photograph should look like. Exposure is set for the
@@ -60,6 +184,44 @@ phase reports is about the solver, measured on synthetic frames whose illuminant
 luminance were painted in. The fairness gate measures five reflectances, not five people.
 Section 11's 600 B storage row is not met - the measurement is 806.9 B, recorded with its
 decomposition in `perf/budgets.toml`. See `docs/progress/PHASE-15-EXIT.md` section 8.
+
+## Phase 14 - Non-destructive edit recipe and the develop engine
+
+The first phase that produces pixels rather than a judgement. An edit is a JSON document with
+a canonical form and a hash; a render is 23 stages in one ordered array over linear Rec.2020;
+and a delivered file can be re-created from four values - the RAW's content hash, the recipe,
+the engine string and the output spec.
+
+### Added
+
+- **`aura-recipe`**: edit recipe schema v1 frozen field for field, the canonical form and its
+  hash, the migration framework and its never-remove-a-field rule, XMP and AURA sidecars
+  written atomically with a backup, undo/redo with snapshots, and **the merge** - the one
+  function in the workspace that writes one recipe into another, and therefore the only place
+  a parameter a person set can be protected.
+- **`aura-render`**: highlight recovery before white balance, one linear Rec.2020 working
+  space, a Fritsch-Carlson curve that cannot overshoot, the neighbourhood stages with the
+  frame-wide statistics they are forbidden to measure themselves, a tiler whose output is
+  bit-identical to a whole-frame render, the WGSL sources and the parity harness, and an
+  output transform that is **the only place tone is baked**.
+- **Migration 14**: `edit_recipes`, `edit_history`, `edit_snapshots`, `export_renders` and
+  `v_develop_coverage`. There is no path column and no `deleted` flag anywhere in it.
+- **Eight synthetic camera profiles**, nine IPC commands (ADR-0030) and a Develop panel that
+  renders the protected dot, the caveats in plain words and the engine that drew the frame.
+- **`docs/recipe-schema-v1.md`** and **`docs/colour-management.md`**.
+- **`aura-cli verify --phase 14`**, the golden suite and
+  `crates/aura-render/tests/colour_discipline.rs` - a grep as a test, so the second module to
+  start encoding fails the build.
+
+### Known limits
+
+**This build links no `wgpu` backend** (ADR-0029 section 4), so four of the five performance
+rows are waived and the interactive budget of 60 ms is not met: the reference path renders a
+2048 px proxy in about 210 ms in release. There are no camera files and no photographed
+ColorChecker here, so the golden suite runs over authored synthetic pixels and eight
+*synthetic* bench profiles - a determinism and regression gate, not a claim about colour
+accuracy. Every real camera body renders through the neutral reference profile and says so
+(`AURA-RENDER-8008`). See `docs/progress/PHASE-14-EXIT.md` section 8.
 
 ## Phase 13 - Explain My Edit, confidence calibration and the decision ledger
 

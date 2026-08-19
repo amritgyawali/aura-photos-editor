@@ -195,6 +195,33 @@ phase-14-verify:
 phase-15-verify:
     cargo run --release --package aura-cli -- verify --phase 15 --work target/phase15-verify
 
+# The phase 16 gate: migration 16 and the columns it cannot have, the intent table,
+# the tone solver, the curve fitter under all three constraints, the harmony
+# objective, both guards, the skin guarantee measured through the real renderer,
+# the store, the override protection and determinism.
+#
+# Absent until phase 17 noticed. The gate has existed since phase 16 shipped and
+# had no recipe here, so the only way to run it was to remember the argument.
+phase-16-verify:
+    cargo run --release --package aura-cli -- verify --phase 16 --work target/phase16-verify
+
+# The phase 17 gate: migration 17 and the skin colour it cannot hold, all four
+# pair-matching strategies and both refusals, the recipe fitter against a real
+# render of a known look, the eighty-leaf tree, the shrinkage floor, the archive
+# cap, the delta bounds, the store round trip, the signed bundle and its refusals,
+# and the proof that this crate can reach no network.
+phase-17-verify:
+    cargo run --release --package aura-cli -- verify --phase 17 --work target/phase17-verify
+
+# The style metrics, from the Python side. `train_residual.py --self-test` fits the
+# same synthetic archives the Rust harness does and asserts the same properties;
+# `eval_style.py --self-test` proves every metric can fail; `export.py --check`
+# verifies that this phase still ships no model.
+style-report:
+    python ml/models/style/train_residual.py --self-test
+    python ml/models/style/eval_style.py --self-test
+    python ml/models/style/export.py --check
+
 # The calibration metrics, from the Python side. `--self-test` proves the
 # estimator catches an overconfident predictor and that a fit improves held-out
 # ECE; `--outcomes FILE --fit --diagram OUT.svg` reports on real outcomes when

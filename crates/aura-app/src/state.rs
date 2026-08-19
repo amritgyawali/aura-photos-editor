@@ -50,6 +50,8 @@ use aura_people::store::PeopleStore;
 use aura_people::vault::BiometricKeyStore;
 use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
+use aura_style::profile::Identity;
+use aura_style::{Style, StyleStore};
 use aura_vision::embed::model::{MODEL_VER, PREPROCESS_VER};
 use aura_vision::face::prominence::{ProminenceWeights, OVERRIDE_RELATIVE_PATH};
 use aura_vision::face::FacePipeline;
@@ -1779,6 +1781,15 @@ impl AppState {
         )?
         .with_people(self.people())
         .with_exif(self.colour_exif(project_id)?);
+        // PHASE-17. The photographer's own look, applied to the solved grade and **before**
+        // both of phase 16's guards, so the skin guarantee is measured on what is actually
+        // delivered. Attached unconditionally: with no profile selected for this project the
+        // service answers `StyleAdvice::none` and every frame is graded exactly as phase 16
+        // decided on its own.
+        let pass = match aura_core::ProjectId::from_db(project_id) {
+            Ok(project) => pass.with_style(self.style(), project),
+            Err(_) => pass,
+        };
         match self.story() {
             Ok(story) => Ok(pass.with_story(story)),
             Err(err) => {
@@ -1790,6 +1801,41 @@ impl AppState {
                 Ok(pass)
             }
         }
+    }
+
+    // -----------------------------------------------------------------
+    // PHASE-17. Style learning.
+    // -----------------------------------------------------------------
+
+    /// Migration 17's tables.
+    #[must_use]
+    pub fn style_store(&self) -> Arc<StyleStore> {
+        Arc::new(StyleStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `StyleService` for this catalog. PHASE-17.
+    #[must_use]
+    pub fn style(&self) -> Arc<Style> {
+        Arc::new(Style::new(self.style_store()))
+    }
+
+    /// The signing identity this installation exports profiles with.
+    ///
+    /// Derived from the catalog's own path rather than stored, which is a **deliberate
+    /// limitation and not a design**: a key derived from something a reader can see proves the
+    /// bundle has not changed since it was signed and proves nothing about who signed it, which
+    /// is exactly what ADR-0035 decision 8 says the signature is worth. When this product grows
+    /// a place to keep secrets for a studio - the same place phase 04 keeps a cloud API key -
+    /// this becomes a lookup and the bundle format does not move.
+    #[must_use]
+    pub fn style_identity(&self) -> Identity {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"aura-style-profile-key-v1");
+        hasher.update(self.catalog.path().to_string_lossy().as_bytes());
+        Identity::from_seed(*hasher.finalize().as_bytes())
     }
 
     /// What EXIF said about every frame, for the colour pass. PHASE-16.

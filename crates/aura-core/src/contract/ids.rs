@@ -137,6 +137,28 @@ typed_id!(MomentId, "mom");
 // See docs/adr/ADR-0027-decision-ledger-and-confidence.md section 2.
 typed_id!(DecisionId, "dcn");
 
+// PHASE-17. Section 5 writes `ProfileId` into the frozen `StyleProfile` shape, so a
+// photographer's learned look is an id of the same kind as the ten above.
+//
+// It is the first id in this file that names something a person *makes* rather than
+// something the product finds or records. A project, a photograph and a face exist in
+// the world; a decision exists because the product made it; a profile exists because a
+// photographer pointed AURA at four weddings and pressed a button.
+//
+// One and not two, though the alternative was real: a `BucketId` for the eighty leaves
+// would have made `profile_buckets` a two-column key. It is not here because a bucket is
+// a *coordinate* and not a row - `(SceneGroup, LightingBucket)` names it completely, the
+// pair is closed in code, and an id for it would be an id nothing could be looked up by
+// that the coordinate could not. The same argument phase 08 made about a burst.
+//
+// A profile also has a *version*, and the version is deliberately not part of this id:
+// `aura-style` keeps every version of a name so that a gallery delivered under version 3
+// still reproduces after version 4 is adopted, and each of them is its own row with its
+// own `ProfileId`. Two profiles that share a name are two profiles.
+//
+// See docs/adr/ADR-0035-style-learning-and-personal-profiles.md section "Decision 8".
+typed_id!(ProfileId, "prf");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

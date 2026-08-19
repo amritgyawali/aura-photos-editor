@@ -61,6 +61,7 @@ pub mod people_commands;
 pub mod preview_commands;
 pub mod state;
 pub mod story_commands;
+pub mod style_commands;
 pub mod tone_commands;
 
 pub use cloud_commands::{
@@ -124,6 +125,10 @@ pub use state::AppState;
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
     segment_story, set_chapter, split_chapter, story_outline, story_status,
+};
+pub use style_commands::{
+    adopt_profile, compare_profiles, export_profile, import_profile, list_profiles, profile_pairs,
+    profile_report, scan_archive, set_project_profile, style_status, train_profile,
 };
 pub use tone_commands::{
     accept_tone, estimate_tone, image_tone, reference_frames, set_tone_override, tone_review_queue,

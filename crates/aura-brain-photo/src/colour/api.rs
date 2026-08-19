@@ -37,6 +37,7 @@ use aura_core::contract::colour::{
 };
 use aura_core::contract::people::{ImageSubjects, PeopleService};
 use aura_core::contract::scene::StoryService;
+use aura_core::contract::style::{StyleAdvice, StyleQuery, StyleService};
 use aura_core::progress::{CancelToken, ProgressSink, ProgressUpdate};
 use aura_core::{AttrFlags, AuraError, AuraResult, PhotoId, Priority, ProjectId, SceneId};
 use aura_infer::contract::infer::InferService;
@@ -282,6 +283,8 @@ pub struct ColourPass {
     calibration: CalibrationTable,
     people: Option<Arc<dyn PeopleService>>,
     story: Option<Arc<dyn StoryService>>,
+    style: Option<Arc<dyn StyleService>>,
+    project: Option<ProjectId>,
     exif: BTreeMap<PhotoId, FrameExif>,
     clock: Arc<dyn Clock>,
 }
@@ -292,6 +295,7 @@ impl fmt::Debug for ColourPass {
             .field("intent_ver", &self.analyser.intents().version())
             .field("people", &self.people.is_some())
             .field("story", &self.story.is_some())
+            .field("style", &self.style.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -316,6 +320,8 @@ impl ColourPass {
             calibration: CalibrationTable::embedded()?,
             people: None,
             story: None,
+            style: None,
+            project: None,
             exif: BTreeMap::new(),
             clock,
         })
@@ -342,6 +348,24 @@ impl ColourPass {
     #[must_use]
     pub fn with_story(mut self, story: Arc<dyn StoryService>) -> Self {
         self.story = Some(story);
+        self
+    }
+
+    /// Read the photographer's own look through phase 17's frozen service.
+    ///
+    /// Optional, and the degradation is the whole safety property of a residual design:
+    /// **without it every frame is graded exactly as phase 16 decided on its own.** There is no
+    /// state of this system in which a missing profile makes a photograph worse than switching
+    /// the feature off would.
+    ///
+    /// The advice is applied to the solved grade and **before** the clipping guard and the skin
+    /// guard, so a personal style that would move somebody's skin is a personal style the guard
+    /// withdraws. ADR-0035 decision 1, and phase 16's exit report wrote the rule before this
+    /// phase existed.
+    #[must_use]
+    pub fn with_style(mut self, style: Arc<dyn StyleService>, project: ProjectId) -> Self {
+        self.style = Some(style);
+        self.project = Some(project);
         self
     }
 
@@ -625,6 +649,40 @@ impl ColourPass {
             attrs,
             subjects,
             shadow_headroom_ev: calibration.shadow_headroom_at(exif.iso),
+            style: self.style_for(scene),
+        }
+    }
+
+    /// What the photographer's own look says about a frame of this kind.
+    ///
+    /// A failure of the style service is a **warning and a neutral answer**, never a failed
+    /// frame: the grade phase 16 decided is a complete, guarded, deliverable answer and losing
+    /// the personal lean on it is a degradation rather than a defect. Invariant 9's fallback
+    /// path, and the same shape `subjects_of` and the scene lookup above already have.
+    fn style_for(&self, scene: SceneId) -> Option<StyleAdvice> {
+        let (style, project) = (self.style.as_ref()?, self.project?);
+        let query = StyleQuery {
+            project: Some(project),
+            scene,
+            // The lighting axis comes from phase 15's stored estimate, which this pass does not
+            // hold. Until it does, every frame buckets as `LightingBucket::Unknown` and the
+            // resolution falls back to the scene group - which is a real and honest degradation
+            // and is exactly what `FallbackLevel::Group` is for. Wiring `ToneService` in here is
+            // a small change and it belongs with whichever phase needs the light rather than
+            // with the one that added the hook.
+            ..StyleQuery::default()
+        };
+        match style.advise(&query) {
+            Ok(advice) => Some(advice),
+            Err(err) => {
+                tracing::warn!(
+                    target: "colour.context",
+                    service = "style",
+                    code = %err.code,
+                    "the style service failed; this frame was graded without a personal look"
+                );
+                None
+            }
         }
     }
 

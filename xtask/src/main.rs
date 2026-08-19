@@ -36,6 +36,8 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // since phase 01 - and the fix belongs with the phase that noticed it.
     "crates/aura-catalog/migrations/0015_tone.sql",
     "crates/aura-catalog/migrations/0016_colour.sql",
+    // PHASE-17.
+    "crates/aura-catalog/migrations/0017_style.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];
