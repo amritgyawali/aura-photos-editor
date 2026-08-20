@@ -31,7 +31,7 @@
 //! phase 25.
 
 use aura_core::contract::local::{
-    LocalCode, LocalLightPlan, LocalOp, LocalOverride, LocalReason, LocalService, MaskKind,
+    LocalLightPlan, LocalOp, LocalOverride, LocalReason, LocalService, MaskKind,
 };
 use aura_core::progress::{CancelToken, NullProgress};
 use aura_core::{PhotoId, Priority, ProjectId};
@@ -512,19 +512,10 @@ fn bad_id(kind: &str, id: &str) -> IpcError {
     ))
 }
 
-/// The reason code a plan carries when nothing could run.
-///
-/// Exposed so a caller can tell "phase 18 is not installed" from "there was nothing to do"
-/// without parsing sentences.
-#[must_use]
-pub const fn gated_code() -> LocalCode {
-    LocalCode::MaskUnavailable
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aura_core::contract::local::{FaceLightDelta, LocalReason};
+    use aura_core::contract::local::{FaceLightDelta, LocalCode, LocalReason};
     use aura_core::SceneId;
     use aura_recipe::fixtures as recipe_fixtures;
 

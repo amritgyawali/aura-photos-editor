@@ -195,6 +195,21 @@ phase-14-verify:
 phase-15-verify:
     cargo run --release --package aura-cli -- verify --phase 15 --work target/phase15-verify
 
+# The phase 19 gate: migration 16 and the mask and blur columns it cannot have, the
+# policy table's two argued-over rows, the seven fixtures lit, paired, shaped and
+# de-shined, what happens when phase 18 is not installed, the governor's priority
+# order, the override protection and determinism. It prints what it does not prove
+# at the end of every run - see docs/progress/PHASE-19-EXIT.md conditions C1 to C3.
+phase-19-verify:
+    cargo run --release --package aura-cli -- verify --phase 19 --work target/phase19-verify
+
+# The phase 19 gates and budgets, from the Python side. Neither script can run on
+# real data here - there is no corpus of expert edits - so both self-test against a
+# synthetic answer known by construction.
+local-light-eval:
+    python ml/models/local/train_light_targets.py --self-test
+    python ml/models/local/eval_local.py --self-test
+
 # The calibration metrics, from the Python side. `--self-test` proves the
 # estimator catches an overconfident predictor and that a fit improves held-out
 # ECE; `--outcomes FILE --fit --diagram OUT.svg` reports on real outcomes when
