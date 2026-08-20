@@ -14,6 +14,15 @@ aura-catalog = { path = "../aura-catalog" }
 aura-infer   = { path = "../aura-infer" }
 aura-preview = { path = "../aura-preview" }
 aura-raw     = { path = "../aura-raw" }
+# PHASE-16. `aura-render` is here so that the skin guard measures what the RENDERER does to a
+# skin pixel rather than what a copy of the renderer would do. Section 6.3's guarantee is a
+# post-condition on pixels; a second implementation of the grading operators would make it a
+# statement about a model of the renderer, which is exactly the gap the post-condition exists
+# to close. `aura-recipe` arrives with it, and `tests/no_recipe_writes.rs` is a grep that
+# fails the build if this crate ever calls `schema::merge` - writing a recipe is phase 14's
+# rule and stays in `aura-app`.
+aura-render  = { path = "../aura-render" }
+aura-recipe  = { path = "../aura-recipe" }
 aura-vision  = { path = "../aura-vision" }
 rusqlite     = { workspace = true }
 serde        = { workspace = true }
@@ -60,6 +69,11 @@ path = "../../tests/eval/composition_eval.rs"
 [[test]]
 name = "tone_eval"
 path = "../../tests/eval/tone_eval.rs"
+
+# The phase 16 gates, in the same place and for the same reason.
+[[test]]
+name = "colour_eval"
+path = "../../tests/eval/colour_eval.rs"
 
 # The phase 19 gates, in the same place and for the same reason.
 [[test]]

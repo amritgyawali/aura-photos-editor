@@ -26,6 +26,7 @@ pub mod clock;
 
 /// Frozen contracts. Changing anything in here requires an ADR.
 pub mod contract {
+    pub mod colour;
     pub mod composition;
     pub mod consent;
     pub mod cull;
@@ -39,6 +40,7 @@ pub mod contract {
     pub mod people;
     pub mod priority;
     pub mod scene;
+    pub mod style;
     pub mod tone;
 }
 
@@ -58,6 +60,11 @@ pub mod paths;
 pub mod progress;
 pub mod redact;
 
+pub use contract::colour::{
+    BandReading, ColourCode, ColourDecision, ColourOutline, ColourOverride, ColourReason,
+    ColourService, ColourVariant, ContentBand, CurvePoint, HslAdjustments, HslBand, HslShift,
+    SkinGuardReport, ToneCurve, VariantKind,
+};
 pub use contract::composition::{
     Box2, CompositionCode, CompositionFlags, CompositionOutline, CompositionReason,
     CompositionResult, CompositionService, CropHint, FrameEdge, HorizonSource, Joint, JointCut,
@@ -72,8 +79,8 @@ pub use contract::emotion::{
 };
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
 pub use contract::ids::{
-    ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MomentId, PhotoId, ProjectId,
-    RunId, SegmentId,
+    ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MaskId, MomentId, PhotoId,
+    ProfileId, ProjectId, RunId, SegmentId,
 };
 pub use contract::integrity::{
     CropRect, ExposureVerdict, EyeOpenness, EyeState, IntegrityFlags, IntegrityOutline,
@@ -96,6 +103,12 @@ pub use contract::priority::Priority;
 pub use contract::scene::{
     AttrFlags, ChapterId, EditIntent, RitualId, SceneId, SceneProfile, SceneResult, SceneScore,
     Segment, Source, StoryOutline, StoryService,
+};
+pub use contract::style::{
+    BucketDiagnostic, BucketModel, CurveShift, ExtractSource, FallbackLevel, LightingBucket,
+    MatchMethod, ProfileDiagnostics, ProfileStatus, SceneGroup, SkinBias, StyleAdvice, StyleBucket,
+    StyleCode, StyleDelta, StyleOutline, StylePair, StyleProfile, StyleQuery, StyleReason,
+    StyleService,
 };
 pub use contract::tone::{
     HypothesisSource, Illuminant, IlluminantKind, ReferenceFrame, SkinLocus, ToneAlternative,

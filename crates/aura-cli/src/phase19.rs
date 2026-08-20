@@ -461,8 +461,9 @@ pub fn verify(args: &[String]) -> ExitCode {
     println!("WHAT THIS GATE DOES NOT PROVE");
     println!("  * that any edit is invisible. Section 10.1's expert subtlety study over 400");
     println!("    frames does not exist in this repository (condition C3).");
-    println!("  * that the masks are real. Phase 18 has not shipped, so every mask above was");
-    println!("    built by the fixtures and is perfect by construction (condition C1).");
+    println!("  * that the masks are real. Phase 18 ships a MaskService, but nothing wires it");
+    println!("    into LocalPass::with_masks yet, so every mask above was built by the");
+    println!("    fixtures and is perfect by construction (condition C1).");
     if TARGET_HEAD_TRAINED {
         println!("  * the learned targets are marked trained; re-read condition C2.");
     } else {

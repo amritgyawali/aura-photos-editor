@@ -39,6 +39,7 @@
 
 pub mod biometric_keys;
 pub mod cloud_commands;
+pub mod colour_commands;
 pub mod commands;
 pub mod composition_commands;
 pub mod cull_commands;
@@ -56,16 +57,22 @@ pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
 pub mod local_commands;
+pub mod mask_commands;
 pub mod moment_commands;
 pub mod people_commands;
 pub mod preview_commands;
 pub mod state;
 pub mod story_commands;
+pub mod style_commands;
 pub mod tone_commands;
 
 pub use cloud_commands::{
     check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend, cloud_status,
     purge_cloud_cache, set_ai_key, set_cloud_budget, set_cloud_privacy,
+};
+pub use colour_commands::{
+    accept_colour, colour_review_queue, colour_status, estimate_colour, image_colour,
+    select_colour_variant, set_colour_override,
 };
 pub use commands::{
     cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
@@ -105,6 +112,10 @@ pub use integrity_commands::{
 pub use local_commands::{
     accept_local, image_local, local_review_queue, local_status, sculpt_local, set_local_strength,
 };
+pub use mask_commands::{
+    edit_mask, ensure_masks, image_masks, mask_allowance, mask_kinds, mask_overlay, mask_status,
+    regenerate_mask,
+};
 pub use moment_commands::{
     group_moments, list_moments, lock_moment, merge_moments, moment_duplicates, moment_of_image,
     moment_status, set_keep_hint, split_moment, undo_moment_edit,
@@ -123,6 +134,10 @@ pub use state::AppState;
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
     segment_story, set_chapter, split_chapter, story_outline, story_status,
+};
+pub use style_commands::{
+    adopt_profile, compare_profiles, export_profile, import_profile, list_profiles, profile_pairs,
+    profile_report, scan_archive, set_project_profile, style_status, train_profile,
 };
 pub use tone_commands::{
     accept_tone, estimate_tone, image_tone, reference_frames, set_tone_override, tone_review_queue,

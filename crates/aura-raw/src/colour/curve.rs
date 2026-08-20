@@ -168,3 +168,170 @@ pub fn quantise_u8(value: f32) -> u8 {
     }
     (value * 255.0 + 0.5) as u8
 }
+
+// ---------------------------------------------------------------------------
+// Monotone piecewise-cubic interpolation. PHASE-16.
+// ---------------------------------------------------------------------------
+
+/// Fritsch-Carlson tangents for a set of control points.
+///
+/// The interpolation every raw converter uses for a tone curve, because it is the one that
+/// cannot overshoot: an unconstrained cubic spline through four user-placed points can dip
+/// below its own control points and produce a band of inverted contrast that looks exactly
+/// like a bug in the renderer.
+///
+/// **It has one property that phase 16 is built on**: given control points that are
+/// non-decreasing in `y`, the resulting curve is monotone everywhere. So monotonicity of a
+/// rendered curve is exactly monotonicity of its control points, which is what lets
+/// `aura_core::contract::colour::ToneCurve` make the guarantee structural and carry no
+/// evaluator of its own. ADR-0033 decision 2.
+///
+/// It lives here rather than in `aura-render` because it has two consumers - the renderer's
+/// LUT builder and phase 16's curve fitter - and two copies of an interpolation is two curves
+/// that drift apart while looking identical. Phase 10 moved the face warp into `aura-vision`
+/// for the same reason. The arithmetic is unchanged from `aura_render::tonemap::CurveLut`'s
+/// own, in the same order, so no pixel moved when it was extracted.
+#[must_use]
+pub fn monotone_tangents(xs: &[f32], ys: &[f32]) -> Vec<f32> {
+    let n = xs.len().min(ys.len());
+    if n < 2 {
+        return vec![0.0; n];
+    }
+    let mut secant = vec![0.0f32; n - 1];
+    for i in 0..n - 1 {
+        let dx = xs.get(i + 1).copied().unwrap_or(1.0) - xs.get(i).copied().unwrap_or(0.0);
+        let dy = ys.get(i + 1).copied().unwrap_or(1.0) - ys.get(i).copied().unwrap_or(0.0);
+        if let Some(slot) = secant.get_mut(i) {
+            *slot = if dx.abs() < 1e-9 { 0.0 } else { dy / dx };
+        }
+    }
+    let mut tangent = vec![0.0f32; n];
+    if let Some(first) = secant.first().copied() {
+        if let Some(slot) = tangent.first_mut() {
+            *slot = first;
+        }
+    }
+    if let Some(last) = secant.last().copied() {
+        if let Some(slot) = tangent.last_mut() {
+            *slot = last;
+        }
+    }
+    for i in 1..n - 1 {
+        let a = secant.get(i - 1).copied().unwrap_or(0.0);
+        let b = secant.get(i).copied().unwrap_or(0.0);
+        if let Some(slot) = tangent.get_mut(i) {
+            *slot = if a * b <= 0.0 {
+                0.0
+            } else {
+                f32::midpoint(a, b)
+            };
+        }
+    }
+    for i in 0..n - 1 {
+        let s = secant.get(i).copied().unwrap_or(0.0);
+        if s.abs() < 1e-9 {
+            if let Some(slot) = tangent.get_mut(i) {
+                *slot = 0.0;
+            }
+            if let Some(slot) = tangent.get_mut(i + 1) {
+                *slot = 0.0;
+            }
+            continue;
+        }
+        let a = tangent.get(i).copied().unwrap_or(0.0) / s;
+        let b = tangent.get(i + 1).copied().unwrap_or(0.0) / s;
+        let norm = a.hypot(b);
+        if norm > 3.0 {
+            let scale = 3.0 / norm;
+            if let Some(slot) = tangent.get_mut(i) {
+                *slot = scale * a * s;
+            }
+            if let Some(slot) = tangent.get_mut(i + 1) {
+                *slot = scale * b * s;
+            }
+        }
+    }
+    tangent
+}
+
+/// Evaluate the monotone cubic through `xs`, `ys` with the tangents
+/// [`monotone_tangents`] produced.
+///
+/// Outside the control range the endpoint value is held, which is what a point curve means:
+/// the curve is defined on `0..1` of its own domain and the caller decides what happens to a
+/// scene-referred value above it.
+#[must_use]
+#[allow(clippy::many_single_char_names)]
+pub fn pchip(xs: &[f32], ys: &[f32], tangent: &[f32], x: f32) -> f32 {
+    let n = xs.len();
+    if x <= xs.first().copied().unwrap_or(0.0) {
+        return ys.first().copied().unwrap_or(0.0);
+    }
+    if x >= xs.last().copied().unwrap_or(1.0) {
+        return ys.last().copied().unwrap_or(1.0);
+    }
+    let mut i = 0usize;
+    while i + 1 < n && xs.get(i + 1).copied().unwrap_or(1.0) < x {
+        i += 1;
+    }
+    let x0 = xs.get(i).copied().unwrap_or(0.0);
+    let x1 = xs.get(i + 1).copied().unwrap_or(1.0);
+    let y0 = ys.get(i).copied().unwrap_or(0.0);
+    let y1 = ys.get(i + 1).copied().unwrap_or(1.0);
+    let m0 = tangent.get(i).copied().unwrap_or(0.0);
+    let m1 = tangent.get(i + 1).copied().unwrap_or(0.0);
+    let h = (x1 - x0).max(1e-9);
+    let t = (x - x0) / h;
+    let t2 = t * t;
+    let t3 = t2 * t;
+    (2.0 * t3 - 3.0 * t2 + 1.0) * y0
+        + (t3 - 2.0 * t2 + t) * h * m0
+        + (-2.0 * t3 + 3.0 * t2) * y1
+        + (t3 - t2) * h * m1
+}
+
+#[cfg(test)]
+mod pchip_tests {
+    use super::{monotone_tangents, pchip};
+
+    #[test]
+    fn monotone_points_give_a_monotone_curve() {
+        // The property phase 16's whole curve guarantee rests on. An S-curve with a toe and
+        // a shoulder, sampled at 4,096 steps: no step may go backwards.
+        let xs = [0.0, 0.25, 0.5, 0.75, 1.0];
+        let ys = [0.0, 0.18, 0.5, 0.82, 1.0];
+        let tangent = monotone_tangents(&xs, &ys);
+        let mut previous = f32::NEG_INFINITY;
+        for step in 0..=4096 {
+            let x = step as f32 / 4096.0;
+            let y = pchip(&xs, &ys, &tangent, x);
+            assert!(y >= previous - 1e-6, "the curve went backwards at x = {x}");
+            previous = y;
+        }
+    }
+
+    #[test]
+    fn a_flat_segment_stays_flat_rather_than_overshooting() {
+        // Fritsch-Carlson zeroes both tangents around a zero secant. Without that an
+        // ordinary spline overshoots and a flat band develops contrast that is not there.
+        let xs = [0.0, 0.4, 0.6, 1.0];
+        let ys = [0.0, 0.5, 0.5, 1.0];
+        let tangent = monotone_tangents(&xs, &ys);
+        for step in 0..=100 {
+            let x = 0.4 + (step as f32 / 100.0) * 0.2;
+            let y = pchip(&xs, &ys, &tangent, x);
+            assert!((y - 0.5).abs() < 1e-5, "flat segment moved to {y} at {x}");
+        }
+    }
+
+    #[test]
+    fn the_identity_is_the_identity() {
+        let xs = [0.0, 1.0];
+        let ys = [0.0, 1.0];
+        let tangent = monotone_tangents(&xs, &ys);
+        for step in 0..=100 {
+            let x = step as f32 / 100.0;
+            assert!((pchip(&xs, &ys, &tangent, x) - x).abs() < 1e-6);
+        }
+    }
+}

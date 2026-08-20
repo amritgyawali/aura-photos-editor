@@ -51,6 +51,13 @@
 //! Phase 23's smart crop optimises toward this objective and phase 29 ranks albums with
 //! it; two answers to "is this well composed" is a crop that fights the gallery it is in.
 //!
+//! `colour` adds the fourth phase to this crate - PHASE-16, tone curves, HSL and skin
+//! protection - and it is the first of the four that produces something other than a
+//! judgement. Phases 09 and 11 describe a photograph; phase 15 says what colour the light
+//! was; phase 16 says what the photograph should look like. It shares the crate because it
+//! shares the decode, the proxy rung and phase 09's own noise estimate, which is the bound on
+//! how far its shadows may be opened.
+//!
 //! The rest of this header is phase 09's.
 //!
 //! ## PHASE-09. The crate answers five questions about every photograph - is the *right*
@@ -91,6 +98,7 @@
 //! and phase 08 for `MomentService`. Fifth time, same reason: two answers to "is this
 //! frame sharp" is two culling decisions that disagree.
 
+pub mod colour;
 pub mod composition;
 pub mod errors;
 pub mod fixtures;
@@ -98,6 +106,9 @@ pub mod integrity;
 pub mod local;
 pub mod tone;
 
+pub use colour::{
+    Colour, ColourPass, ColourStore, Grade, IntentTable, SceneIntent, ToneParams, COLOUR_LEVEL,
+};
 pub use composition::{
     Composition, CompositionPass, CompositionStore, RuleTable, SceneRule, COMPOSITION_LEVEL,
 };

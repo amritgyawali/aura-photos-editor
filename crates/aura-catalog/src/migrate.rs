@@ -63,6 +63,9 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         include_str!("../migrations/0014_develop.sql"),
     ),
     (15, "tone", include_str!("../migrations/0015_tone.sql")),
+    (16, "colour", include_str!("../migrations/0016_colour.sql")),
+    (17, "style", include_str!("../migrations/0017_style.sql")),
+    (18, "masks", include_str!("../migrations/0018_masks.sql")),
     (
         19,
         "local_light",

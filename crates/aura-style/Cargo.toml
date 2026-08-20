@@ -1,0 +1,57 @@
+[package]
+name         = "aura-style"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Personal AI profiles: what one photographer's own look is, learned from weddings they already delivered, conditioned on scene and light (phase 17)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# The fit reproduces a delivered final by rendering candidate recipes through the REAL
+# renderer, exactly as phase 16's skin guard measures skin through it. A second implementation
+# of the develop pipeline here would make every fitted parameter a statement about a model of
+# the renderer rather than about the renderer, and the whole point of the fit is that the
+# parameters it recovers are ones `RenderService` will honour.
+aura-render  = { path = "../aura-render" }
+aura-recipe  = { path = "../aura-recipe" }
+# `xmp::read` for the exact path, `colour::de2000` for the loss, and `codec::decode_jpeg` for
+# reading a photographer's delivered final.
+aura-raw     = { path = "../aura-raw" }
+blake3       = { workspace = true }
+ed25519-dalek = { workspace = true }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+sha2         = { workspace = true }
+time         = { workspace = true }
+tracing      = { workspace = true }
+uuid         = { workspace = true }
+walkdir      = { workspace = true }
+
+# Deliberately absent: `aura-cloud`, and every brain crate.
+#
+# `aura-cloud` is absent because PHASE-17 section 7 says there is no cloud call in this phase
+# and section 9 gives SEC one task - "ensure archives are never uploaded". A dependency that
+# does not exist cannot be used by a hurried change, so the guarantee is a property of this
+# file rather than of anybody's memory. `tests/no_network.rs` fails the build if it ever
+# appears.
+#
+# `aura-brain-photo` and `aura-brain-wedding` are absent for the reason every crate since 09
+# has kept them out: everything this crate needs from phases 07, 15 and 16 it takes through the
+# frozen traits in `aura-core`. The direction of the dependency between this crate and phase 16
+# is the *other* way round - `ColourPass` holds an `Arc<dyn StyleService>` - and it runs through
+# `aura-core` so that neither crate can reach past the other's service into its store.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. In
+# `tests/eval/` beside every harness since phase 05, because a gate is a claim about the
+# product and not about a crate.
+[[test]]
+name = "style_eval"
+path = "../../tests/eval/style_eval.rs"

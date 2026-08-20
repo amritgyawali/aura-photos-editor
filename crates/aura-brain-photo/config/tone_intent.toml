@@ -1,0 +1,631 @@
+# Tone and colour intents - PHASE-16 sections 6.1, 6.2 and 9.
+#
+# ===========================================================================
+# THIS FILE IS A PRODUCT DECISION, NOT AN IMPLEMENTATION DETAIL
+# ===========================================================================
+#
+# Section 9 gives PM the task "approve `tone_intent.toml` per scene with the
+# consultant". This is that file, and it is the seventh in the product to
+# require a written reason on every row.
+#
+# Phase 15's `exposure_targets.toml` decides how BRIGHT a photograph should be.
+# This one decides what it should LOOK like, which is a softer question and a
+# more dangerous one: there is no experiment that establishes how much contrast
+# a Hindu ceremony wants. There is a convention, it differs between
+# photographers, and section 12's fourth failure mode is "HSL fights the
+# photographer's taste". Phase 17 is where a photographer's own answer replaces
+# these; until then these are the product's opinion and they need a name
+# against them.
+#
+# Two of the numbers below are the ones to read first, because they are the two
+# that decide whether the product looks professional or looks filtered:
+#
+#   * `subject_contrast` is what the curve is FITTED to hit. It is a target for
+#     the separation between the light and dark halves of the subject, not a
+#     slider value, and it is the whole of "adaptive tone curve" in one number.
+#   * `subtlety_cap` is the ceiling on the WHOLE grade. Section 12's first
+#     failure mode is over-graded HDR-looking results, and this is the number
+#     that makes "professional edits are subtle" enforceable rather than hoped
+#     for.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# contrast                                -100 .. 100
+#     The scene's baseline contrast in the recipe's own units. The solver
+#     starts here and moves toward what the histogram says the frame needs, so
+#     this is an intent rather than a value: a frame that is already contrasty
+#     ends up below it and a flat one above.
+#
+# subject_contrast                        0.05 .. 0.60
+#     The target for the interquartile luminance spread of the SUBJECT region -
+#     the faces when there are faces, the centre-weighted frame when there are
+#     not - after the curve. This is what `curve::fit` solves for, and it is
+#     measured on the subject rather than on the frame for phase 15's reason: a
+#     dark reception hall with a well-lit bride is not a low-contrast
+#     photograph.
+#
+# shadow_lift                             -100 .. 100
+#     How far this scene wants its shadows opened, before the noise guard. The
+#     guard reads phase 09's sigma estimate and can only REDUCE this, never
+#     raise it: a scene cannot ask for a lift the sensor will not carry.
+#
+# highlight_recovery                      -100 .. 100
+#     Negative pulls highlights down. A dress in sunlight and a window behind a
+#     ceremony are the two cases that need it, and both are scenes rather than
+#     frames, which is why the number is here.
+#
+# vibrance / saturation                   -100 .. 100
+#     Vibrance weights away from already-saturated colours and saturation does
+#     not. Every row prefers vibrance, and most rows leave saturation at zero:
+#     flat saturation is what makes a sari look like a screenshot.
+#
+# clip_tolerance                          0.0 .. 0.20
+#     How much of the frame this scene will accept becoming NEWLY clipped as a
+#     result of the grade. The clipping guard re-solves anything above it, and
+#     `CLIP_CEILING` is the floor no scene may exceed.
+#
+# greenery_hue_deg                        90 .. 160
+#     Where this scene wants foliage to sit on the wheel. Outdoor foliage is
+#     usually recorded too yellow-green, around 95-105 degrees; pulling it to
+#     the target is the single most-noticed colour correction at an outdoor
+#     wedding. Section 6.2 names it as the classic wedding problem.
+#
+# greenery_saturation                     0.0 .. 1.0
+#     Where this scene wants foliage's saturation. Below what a camera records,
+#     always: green is the colour a sensor most over-saturates and the colour a
+#     viewer least wants saturated behind a person.
+#
+# sky_saturation                          0.0 .. 1.0
+#     The same, for sky. Above what a camera records in most scenes, because a
+#     slightly deeper sky is what a photographer does by hand.
+#
+# distractor_ceiling                      0.0 .. 1.0
+#     How saturated a non-subject colour may be before the harmony solver tames
+#     it. Section 2.1's fluorescent green exit sign. A LOW ceiling means this
+#     scene tames aggressively; a high one means it leaves the room alone.
+#
+# max_band_shift                          0.0 .. 50.0
+#     The largest adjustment any single HSL band may receive in this scene, in
+#     recipe units. It is the second half of the subtlety defence and it is
+#     per-band rather than total, because a solver that can move one band forty
+#     units can recolour a dress.
+#
+# subtlety_cap                            0.05 .. 1.0
+#     The ceiling on the root-mean-square of every normalised parameter this
+#     phase sets. Above it the whole grade is scaled back and the frame carries
+#     `subtlety_capped`. `SUBTLETY_CEILING` is the value no scene may exceed.
+#
+# rationale                               at least 9 characters
+#     Why. A grading decision nobody can explain is one nobody can argue with.
+#
+# ---------------------------------------------------------------------------
+# WHAT IS NOT IN THIS FILE, AND CANNOT BE ADDED
+# ---------------------------------------------------------------------------
+#
+# There is no skin target. Not a hue, not a saturation, not a luminance, not a
+# bucket. `ContentBand::Skin` is reported and never adjusted, and the guarantee
+# in section 6.3 is measured against THIS FRAME'S OWN SKIN BEFORE THE GRADE
+# rather than against anything written down here. A file with an ideal-skin row
+# is how an editor lightens dark skin while believing it is following a
+# convention, and the phase gate scans this file for one on every run.
+
+version = 1
+
+# ===========================================================================
+# THE NEUTRAL ROW
+# ===========================================================================
+#
+# What an unclassified frame, and any scene with no row of its own, is graded
+# against. Deliberately timid in every direction: a small contrast intent, no
+# saturation, a tight band cap and a low subtlety ceiling. A frame graded here
+# also carries `no_intent_row` and loses confidence, so nobody mistakes a
+# cautious grade for a scene-conditioned one.
+
+[neutral]
+contrast            = 8
+subject_contrast    = 0.26
+shadow_lift         = 8
+highlight_recovery  = -10
+vibrance            = 6
+saturation          = 0
+clip_tolerance      = 0.008
+greenery_hue_deg    = 120
+greenery_saturation = 0.42
+sky_saturation      = 0.46
+distractor_ceiling  = 0.80
+max_band_shift      = 8
+subtlety_cap        = 0.22
+rationale = """
+The substitute for a row nobody has written. Every number is the timid end of
+its range, because the cost of under-grading a frame is that a photographer
+adds contrast, and the cost of over-grading it is that they undo the whole
+edit and stop trusting the rest of the gallery.
+"""
+
+# ===========================================================================
+# THE 22 SCENES
+# ===========================================================================
+
+[[scene]]
+id                  = "getting_ready_bride"
+contrast            = 6
+subject_contrast    = 0.24
+shadow_lift         = 14
+highlight_recovery  = -18
+vibrance            = 8
+saturation          = 0
+clip_tolerance      = 0.006
+greenery_hue_deg    = 122
+greenery_saturation = 0.38
+sky_saturation      = 0.40
+distractor_ceiling  = 0.72
+max_band_shift      = 10
+subtlety_cap        = 0.20
+rationale = """
+The airiest set of the day and the one nobody wants contrasty. The dress is the
+subject and it is the thing a curve destroys first, so the highlight recovery is
+the strongest of any row and the contrast intent is nearly the weakest. The
+distractor ceiling is low because a getting-ready room is full of saturated
+clutter that nobody looked at while shooting.
+"""
+
+[[scene]]
+id                  = "getting_ready_groom"
+contrast            = 12
+subject_contrast    = 0.28
+shadow_lift         = 10
+highlight_recovery  = -12
+vibrance            = 6
+saturation          = 0
+clip_tolerance      = 0.008
+greenery_hue_deg    = 122
+greenery_saturation = 0.38
+sky_saturation      = 0.42
+distractor_ceiling  = 0.75
+max_band_shift      = 10
+subtlety_cap        = 0.22
+rationale = """
+The same room and a darker wardrobe. A suit carries more contrast than a dress
+and there is no white texture to protect, so both numbers move up. This is the
+convention rather than a measurement, and it is the row a photographer with a
+flatter style will change first.
+"""
+
+[[scene]]
+id                  = "details"
+contrast            = 16
+subject_contrast    = 0.32
+shadow_lift         = 6
+highlight_recovery  = -14
+vibrance            = 12
+saturation          = 0
+clip_tolerance      = 0.004
+greenery_hue_deg    = 118
+greenery_saturation = 0.40
+sky_saturation      = 0.44
+distractor_ceiling  = 0.85
+max_band_shift      = 14
+subtlety_cap        = 0.28
+rationale = """
+Rings, invitations, shoes, flowers. The one scene where the SUBJECT is the
+colour, so vibrance and the band cap are both high and the distractor ceiling is
+permissive - there is nothing to distract from. The clipping tolerance is the
+tightest in the file because a blown highlight on a ring is the whole photograph.
+"""
+
+[[scene]]
+id                  = "first_look"
+contrast            = 12
+subject_contrast    = 0.29
+shadow_lift         = 12
+highlight_recovery  = -14
+vibrance            = 8
+saturation          = 0
+clip_tolerance      = 0.010
+greenery_hue_deg    = 124
+greenery_saturation = 0.36
+sky_saturation      = 0.48
+distractor_ceiling  = 0.68
+max_band_shift      = 10
+subtlety_cap        = 0.22
+rationale = """
+Two people and a reaction, usually outdoors and usually backlit. The distractor
+ceiling is the second lowest in the file: everything that is not those two faces
+is competing with the moment the photograph exists for.
+"""
+
+[[scene]]
+id                  = "ceremony_entrance"
+contrast            = 14
+subject_contrast    = 0.30
+shadow_lift         = 14
+highlight_recovery  = -16
+vibrance            = 8
+saturation          = 0
+clip_tolerance      = 0.012
+greenery_hue_deg    = 124
+greenery_saturation = 0.38
+sky_saturation      = 0.46
+distractor_ceiling  = 0.72
+max_band_shift      = 10
+subtlety_cap        = 0.24
+rationale = """
+A person walking toward a camera, often from a dark aisle into a bright
+doorway. The shadow lift is high and the highlight recovery is strong because
+the frame is nearly always a wide dynamic range; the contrast intent stays
+moderate so recovering both ends does not flatten the result.
+"""
+
+[[scene]]
+id                  = "ceremony"
+contrast            = 12
+subject_contrast    = 0.28
+shadow_lift         = 16
+highlight_recovery  = -16
+vibrance            = 6
+saturation          = 0
+clip_tolerance      = 0.010
+greenery_hue_deg    = 126
+greenery_saturation = 0.36
+sky_saturation      = 0.44
+distractor_ceiling  = 0.70
+max_band_shift      = 8
+subtlety_cap        = 0.20
+rationale = """
+The photographs the couple keeps. Every number here is conservative on purpose:
+a ceremony frame that looks graded is the single most damaging thing this phase
+can produce, and the band cap is low so that a saturated mandap or a stained
+window cannot pull the whole frame's colour around.
+"""
+
+[[scene]]
+id                  = "ritual"
+contrast            = 10
+subject_contrast    = 0.27
+shadow_lift         = 18
+highlight_recovery  = -14
+vibrance            = 4
+saturation          = 0
+clip_tolerance      = 0.014
+greenery_hue_deg    = 126
+greenery_saturation = 0.36
+sky_saturation      = 0.44
+distractor_ceiling  = 0.92
+max_band_shift      = 6
+subtlety_cap        = 0.18
+rationale = """
+The most culturally loaded row in the file and the most restrained. A havan, a
+tea ceremony and a chuppah are all defined by their own saturated colours, so
+the distractor ceiling is the highest here - almost nothing is a distraction -
+and the band cap is the lowest. Vibrance is nearly off: a ritual that has been
+made more colourful is a ritual somebody has editorialised.
+"""
+
+[[scene]]
+id                  = "vows"
+contrast            = 12
+subject_contrast    = 0.28
+shadow_lift         = 14
+highlight_recovery  = -14
+vibrance            = 6
+saturation          = 0
+clip_tolerance      = 0.010
+greenery_hue_deg    = 126
+greenery_saturation = 0.36
+sky_saturation      = 0.44
+distractor_ceiling  = 0.68
+max_band_shift      = 8
+subtlety_cap        = 0.20
+rationale = """
+Two faces and nothing else that matters. The lowest distractor ceiling in the
+file, jointly with the kiss: an exit sign behind a vow is the exact case section
+2.1 names, and this is the scene where taming it is most obviously right.
+"""
+
+[[scene]]
+id                  = "rings"
+contrast            = 16
+subject_contrast    = 0.32
+shadow_lift         = 8
+highlight_recovery  = -18
+vibrance            = 10
+saturation          = 0
+clip_tolerance      = 0.004
+greenery_hue_deg    = 124
+greenery_saturation = 0.38
+sky_saturation      = 0.44
+distractor_ceiling  = 0.82
+max_band_shift      = 12
+subtlety_cap        = 0.26
+rationale = """
+Hands, metal and a shallow depth of field. Metal is specular, so the highlight
+recovery matches the dress rows and the clipping tolerance matches details: the
+photograph is about a highlight, and clipping it is losing the subject.
+"""
+
+[[scene]]
+id                  = "kiss"
+contrast            = 14
+subject_contrast    = 0.29
+shadow_lift         = 12
+highlight_recovery  = -14
+vibrance            = 6
+saturation          = 0
+clip_tolerance      = 0.012
+greenery_hue_deg    = 126
+greenery_saturation = 0.36
+sky_saturation      = 0.46
+distractor_ceiling  = 0.68
+max_band_shift      = 8
+subtlety_cap        = 0.20
+rationale = """
+One frame the whole day is built around, usually with a crowd behind it. The
+distractor ceiling matches the vows for the same reason and the contrast intent
+is a little higher, because the frame is usually wide and needs separation
+between the couple and the guests.
+"""
+
+[[scene]]
+id                  = "family_portrait"
+contrast            = 10
+subject_contrast    = 0.26
+shadow_lift         = 10
+highlight_recovery  = -12
+vibrance            = 4
+saturation          = 0
+clip_tolerance      = 0.004
+greenery_hue_deg    = 128
+greenery_saturation = 0.34
+sky_saturation      = 0.42
+distractor_ceiling  = 0.70
+max_band_shift      = 6
+subtlety_cap        = 0.16
+rationale = """
+The lowest subtlety cap in the file. A family portrait is the photograph most
+likely to be printed, most likely to contain six different skin tones and least
+likely to survive a fashionable grade. Everything here is small on purpose, and
+the band cap is the second lowest so that nobody's clothing pulls the frame.
+"""
+
+[[scene]]
+id                  = "group_portrait"
+contrast            = 12
+subject_contrast    = 0.27
+shadow_lift         = 10
+highlight_recovery  = -12
+vibrance            = 6
+saturation          = 0
+clip_tolerance      = 0.006
+greenery_hue_deg    = 128
+greenery_saturation = 0.34
+sky_saturation      = 0.44
+distractor_ceiling  = 0.74
+max_band_shift      = 8
+subtlety_cap        = 0.18
+rationale = """
+A family portrait with more people and less formality. The numbers track it
+closely; the small increases are because a group shot is usually wider and
+carries more background that wants separating from the faces.
+"""
+
+[[scene]]
+id                  = "couple_portrait"
+contrast            = 18
+subject_contrast    = 0.33
+shadow_lift         = 12
+highlight_recovery  = -16
+vibrance            = 10
+saturation          = 0
+clip_tolerance      = 0.014
+greenery_hue_deg    = 128
+greenery_saturation = 0.34
+sky_saturation      = 0.50
+distractor_ceiling  = 0.66
+max_band_shift      = 12
+subtlety_cap        = 0.30
+rationale = """
+The most graded row in the file and the one photographers expect to look
+produced. High contrast, a deep sky, tamed greenery and the lowest distractor
+ceiling of all: a couple portrait is the frame where everything except the two
+of them is background, and it is where an editor's style is judged.
+"""
+
+[[scene]]
+id                  = "golden_hour"
+contrast            = 14
+subject_contrast    = 0.30
+shadow_lift         = 16
+highlight_recovery  = -22
+vibrance            = 8
+saturation          = 0
+clip_tolerance      = 0.030
+greenery_hue_deg    = 130
+greenery_saturation = 0.32
+sky_saturation      = 0.52
+distractor_ceiling  = 0.78
+max_band_shift      = 12
+subtlety_cap        = 0.28
+rationale = """
+The strongest highlight recovery and the most permissive clipping tolerance in
+the file, and the two are not a contradiction: the sun itself is IN these frames
+and clipping it is correct, while the halo around it is where the recoverable
+detail is. The sky target is the deepest anywhere, because this is the scene the
+sky is the reason for.
+"""
+
+[[scene]]
+id                  = "reception_entrance"
+contrast            = 16
+subject_contrast    = 0.31
+shadow_lift         = 18
+highlight_recovery  = -12
+vibrance            = 8
+saturation          = 0
+clip_tolerance      = 0.016
+greenery_hue_deg    = 124
+greenery_saturation = 0.38
+sky_saturation      = 0.44
+distractor_ceiling  = 0.88
+max_band_shift      = 10
+subtlety_cap        = 0.26
+rationale = """
+Doors, spotlights and a room that has been decorated on purpose. The distractor
+ceiling is high because the saturated uplighting IS the decor somebody paid for,
+and the shadow lift is high because the room is dark and the couple is not.
+"""
+
+[[scene]]
+id                  = "speeches"
+contrast            = 14
+subject_contrast    = 0.29
+shadow_lift         = 20
+highlight_recovery  = -10
+vibrance            = 6
+saturation          = 0
+clip_tolerance      = 0.014
+greenery_hue_deg    = 124
+greenery_saturation = 0.38
+sky_saturation      = 0.44
+distractor_ceiling  = 0.82
+max_band_shift      = 8
+subtlety_cap        = 0.22
+rationale = """
+One lit face in a dark room, with a table of reactions behind it. The highest
+shadow lift in the file - the reactions are the second subject and they live in
+the shadows - held back by the noise guard on every high-ISO body.
+"""
+
+[[scene]]
+id                  = "cake"
+contrast            = 14
+subject_contrast    = 0.30
+shadow_lift         = 14
+highlight_recovery  = -18
+vibrance            = 8
+saturation          = 0
+clip_tolerance      = 0.006
+greenery_hue_deg    = 124
+greenery_saturation = 0.38
+sky_saturation      = 0.44
+distractor_ceiling  = 0.84
+max_band_shift      = 10
+subtlety_cap        = 0.24
+rationale = """
+A white object in a dark room, which is the hardest highlight case at a wedding
+after the dress. The recovery is strong and the clipping tolerance is tight for
+the same reason it is on details: the texture of the icing is the photograph.
+"""
+
+[[scene]]
+id                  = "first_dance"
+contrast            = 16
+subject_contrast    = 0.30
+shadow_lift         = 14
+highlight_recovery  = -8
+vibrance            = 4
+saturation          = 0
+clip_tolerance      = 0.020
+greenery_hue_deg    = 124
+greenery_saturation = 0.38
+sky_saturation      = 0.44
+distractor_ceiling  = 0.94
+max_band_shift      = 6
+subtlety_cap        = 0.20
+rationale = """
+Saturated stage lighting on two people, deliberately. The distractor ceiling is
+the second highest in the file and the band cap the joint lowest, which together
+say the same thing: the colour of this room is a decision somebody made and this
+phase does not get to argue with it. Phase 15 already decided not to neutralise
+the light; this row makes sure the grade does not do it by another route.
+"""
+
+[[scene]]
+id                  = "dance_floor"
+contrast            = 20
+subject_contrast    = 0.34
+shadow_lift         = 10
+highlight_recovery  = -6
+vibrance            = 2
+saturation          = 0
+clip_tolerance      = 0.035
+greenery_hue_deg    = 124
+greenery_saturation = 0.38
+sky_saturation      = 0.44
+distractor_ceiling  = 0.96
+max_band_shift      = 6
+subtlety_cap        = 0.26
+rationale = """
+The most permissive clipping tolerance and the highest distractor ceiling. A
+dance floor is supposed to be hard, contrasty and full of blown lights; the
+shadow lift is deliberately LOWER than the reception rows because a dance floor
+whose shadows have been opened is a dance floor with the mood removed - the
+grading counterpart of phase 15's preserve-mood policy.
+"""
+
+[[scene]]
+id                  = "candid"
+contrast            = 12
+subject_contrast    = 0.28
+shadow_lift         = 12
+highlight_recovery  = -12
+vibrance            = 6
+saturation          = 0
+clip_tolerance      = 0.010
+greenery_hue_deg    = 126
+greenery_saturation = 0.36
+sky_saturation      = 0.46
+distractor_ceiling  = 0.78
+max_band_shift      = 8
+subtlety_cap        = 0.22
+rationale = """
+The largest scene by frame count and therefore the most consequential average.
+Everything is close to the neutral row on purpose: a candid could be any of the
+other twenty-one scenes, and the grade that is right for all of them is a small
+one.
+"""
+
+[[scene]]
+id                  = "venue"
+contrast            = 16
+subject_contrast    = 0.31
+shadow_lift         = 12
+highlight_recovery  = -16
+vibrance            = 10
+saturation          = 0
+clip_tolerance      = 0.010
+greenery_hue_deg    = 120
+greenery_saturation = 0.40
+sky_saturation      = 0.50
+distractor_ceiling  = 0.90
+max_band_shift      = 14
+subtlety_cap        = 0.30
+rationale = """
+Architecture and empty rooms, usually with no people in them at all. The band
+cap is the joint highest because there is no skin to endanger, the vibrance is
+high because a venue photograph is a brochure photograph, and the distractor
+ceiling is high because in an empty room nothing is competing with a subject.
+"""
+
+[[scene]]
+id                  = "exit"
+contrast            = 18
+subject_contrast    = 0.32
+shadow_lift         = 16
+highlight_recovery  = -8
+vibrance            = 8
+saturation          = 0
+clip_tolerance      = 0.028
+greenery_hue_deg    = 124
+greenery_saturation = 0.38
+sky_saturation      = 0.46
+distractor_ceiling  = 0.90
+max_band_shift      = 8
+subtlety_cap        = 0.26
+rationale = """
+Sparklers, confetti and a dark car park. The clipping tolerance is high because
+a sparkler is a clipped highlight by definition and re-solving for it would
+darken every face in the frame; the distractor ceiling is high because the
+saturated points of light are the photograph.
+"""

@@ -55,13 +55,16 @@ use aura_raw::colour::illuminant::{linear_srgb_to_uv, uv_distance};
 use aura_raw::contract::pixels::{PixelBuffer, PixelLevel};
 use aura_vision::embed::descriptors::{luma_plane, LumaPlane};
 
-use crate::tone::exposure::{self, Bounds, MAX_MOVE_EV};
+use aura_core::contract::style::StyleAdvice;
+
+use crate::tone::exposure::{self, Bounds, Solution, MAX_MOVE_EV};
 use crate::tone::illuminant::{self as lights, AsShot, MixedLight};
 use crate::tone::neutrals;
 use crate::tone::skin_locus::{self, Sample};
 use crate::tone::solve;
 use crate::tone::stats::{self, FrameStats, SkinPatch};
 use crate::tone::store::codec::{self, Explained};
+use crate::tone::style;
 use crate::tone::targets::{SceneTarget, TargetTable};
 use crate::tone::wb::{Constraint, Constraints};
 
@@ -72,12 +75,22 @@ use crate::tone::wb::{Constraint, Constraints};
 /// `image_tone_estimate.analysis_ver`, and two estimates made under different values of it
 /// are not comparable: `AURA-ML-5060` exists so that comparison never happens silently.
 ///
-/// 1 -> 2: the preserve-mood policy stopped keying on whichever hypothesis won the cost race
-/// and started asking the frame's own reading of the room (`illuminant::ambient`), and the
-/// correction between two lights moved from an interpolation in kelvin to one in `u'v'`.
-/// Both change the temperature and tint written on a coloured-light frame, so every stored
-/// estimate is re-measured. Condition C5 in `docs/progress/PHASE-15-EXIT.md`.
-pub const ANALYSIS_VER: u16 = 2;
+/// 1 -> 2 (PHASE-15 follow-up): the preserve-mood policy stopped keying on whichever
+/// hypothesis won the cost race and started asking the frame's own reading of the room
+/// (`illuminant::ambient`), and the correction between two lights moved from an
+/// interpolation in kelvin to one in `u'v'`. Both change the temperature and tint written
+/// on a coloured-light frame. Condition C5 in `docs/progress/PHASE-15-EXIT.md`.
+///
+/// 2 -> 3 (PHASE-17): an estimate solved without a style profile and one solved with a
+/// personal lean applied before the clipping bound and the skin-locus constraint are not
+/// the same measurement. `ToneStore::pending` is keyed on this column, so adopting a
+/// profile re-measures the wedding rather than leaving two generations of estimate side by
+/// side.
+///
+/// The two changes above were developed on separate branches and each landed on 2; a build
+/// carrying both is a third measurement and says so, because an estimate written by either
+/// parent is stale here and comparing it silently is what `AURA-ML-5060` exists to prevent.
+pub const ANALYSIS_VER: u16 = 3;
 
 /// The pixel rung the tone pass reads.
 ///
@@ -153,6 +166,17 @@ pub struct FrameContext {
     /// a second answer to "how far can this body be pushed" is two exposure decisions that
     /// disagree.
     pub shadow_headroom_ev: f32,
+    /// PHASE-17. What this photographer's own look says about this frame.
+    ///
+    /// Resolved by the caller through `StyleService`, so this crate still takes no dependency
+    /// on `aura-style`. `None` is a project with no profile and is not an error: the estimate
+    /// is then exactly what phase 15 decided on its own.
+    ///
+    /// The shift is applied to the **solved** exposure and white balance and then phase 15's
+    /// own clipping bound and skin-locus constraint re-run on it, so a personal warmth that
+    /// would make somebody's skin implausible is a personal warmth the constraint walks back.
+    /// ADR-0035 decision 1.
+    pub style: Option<StyleAdvice>,
 }
 
 impl FrameContext {
@@ -548,6 +572,38 @@ impl Analyser {
             self.scene_exposure_hint(&stats, &plane, context.scene, prio)
         };
         let solved = exposure::solve(subject, &stats, bounds, scene_ev);
+
+        // PHASE-17. The photographer's own lean, on top of what phase 15 solved and **before**
+        // both of phase 15's guarantees are re-checked. `style::apply` re-runs the same
+        // clipping bound `exposure::solve` used and the same `Constraints::rejects` the white
+        // balance solve used, so a style can be withdrawn by either of them.
+        let styled = context.style.as_ref().map(|advice| {
+            style::apply(
+                advice,
+                style::Solved {
+                    exposure_ev: solved.ev,
+                    temperature_k: wb.temperature_k,
+                    tint: wb.tint,
+                },
+                &stats,
+                target,
+                &constraints,
+                backlit,
+            )
+        });
+        let solved = match &styled {
+            Some(applied) => Solution {
+                ev: applied.exposure_ev,
+                clipping_added: applied.clipping_added,
+                ..solved
+            },
+            None => solved,
+        };
+        if let Some(applied) = &styled {
+            wb.temperature_k = applied.temperature_k;
+            wb.tint = applied.tint;
+            wb.reasons.extend(applied.reasons.clone());
+        }
 
         // The alternatives carry the exposure the frame actually got: a runner-up is a
         // different *colour* answer applied on top of the same exposure, and section 5's

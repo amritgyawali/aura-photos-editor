@@ -3,7 +3,29 @@
 **Branch:** `claude/phase-19-84iyxx` · **Gate:** `aura-cli verify --phase 19` exits 0 ·
 **Status:** implemented **conditionally**, on the five conditions in section 8.
 
-## 0. Read this first: the phase this one consumes has not shipped
+## 0a. What changed when this branch was merged into `main`
+
+Everything in section 0 below describes the branch **as it was written**, on top of phase 15.
+By the time it merged, `main` carried phases 16, 17 and 18, and three things about the report
+moved:
+
+* **The numbers this phase claimed are renumbered.** Phase 19 had taken migration 16, error
+  codes `AURA-ML-5066` to `5071`, and ADR-0033 and ADR-0034 - all of which `main` had since
+  given to tone curves, style learning and semantic masks. They are now migration **19**,
+  `AURA-ML-5084` to **5089**, and **ADR-0039** and **ADR-0040**. `APP_SCHEMA_VERSION` is 19 and
+  the migration's rollback note names schema 18 as the floor it returns to. Nothing about the
+  behaviour changed; every reference in this report reads with the new numbers.
+* **C4 is half closed.** Phases 16 and 17 exist now, so the two skipped dependencies are one.
+  This phase still reads phase 15's per-scene luminance bands directly rather than phase 16's
+  refined ones, and still does not read a phase 17 style profile - but both are now
+  *connections that could be made* rather than phases that do not exist.
+* **C1 changed its reason and not its status.** Phase 18 ships `MaskService`, but
+  `AppState::local_pass` does not call `LocalPass::with_masks`, so on a merged build every
+  operation is still gated and `LocalOutline::mask_covered` still reads zero. The gap is now a
+  wiring task rather than a missing phase, and it is the one piece of phase 19 the merge does
+  not carry. Everything C1 says about what may not be claimed still holds.
+
+## 0. Read this first: the phase this one consumes had not shipped when this was written
 
 This repository is at phase 15. Phase 19 depends on phases 15, 16 and 18, and **16, 17 and 18
 do not exist here.**
@@ -167,11 +189,13 @@ structural: the types cannot express them and the gate scans the schema for them
 
 Five, and the first three are Sev 2 triggers.
 
-**C1 - phase 18 has not shipped, so every mask is a fixture's.** *(Sev 2.)* Every operation in
-this phase is gated on a real build, `mask_covered` reads zero, and every quality gate was
-measured against a perfect synthetic matte. **No later phase may claim a local-light quality
-result until phase 18 lands and the gates are re-measured against real mattes.** This closes
-with phase 18 rather than separately.
+**C1 - every mask is a fixture's.** *(Sev 2.)* Every operation in this phase is gated on a real
+build, `mask_covered` reads zero, and every quality gate was measured against a perfect
+synthetic matte. When this was written the reason was that phase 18 did not exist; after the
+merge (section 0a) phase 18 ships `MaskService` and nothing calls `LocalPass::with_masks`, so
+the reason is a missing connection and the consequence is identical. **No later phase may claim
+a local-light quality result until the pass reads real mattes and the gates are re-measured
+against them.**
 
 **C2 - the learned targets are untrained and are never consulted.** *(Sev 2.)* Section 8 step 1
 asks for targets extracted from expert difference maps and there is no corpus of expert edits
@@ -185,12 +209,14 @@ gives QAIQ four hundred frames to hunt haloes in. Neither exists here and no ari
 substitutes for either. **The headline KPI of this phase is unmeasured.** Closes when a QAIQ
 audit set and a reviewer panel exist.
 
-**C4 - phases 16 and 17 were skipped.** The phase document lists 15, 16 and 18 as dependencies.
+**C4 - phases 16 and 17 are not read.** The phase document lists 15, 16 and 18 as dependencies.
 Phase 16's tone curves would have refined the per-scene luminance bands this phase lifts faces
-toward, and phase 17's personal style would have shifted them per photographer. Neither is
-read, so the dependency degrades rather than breaks - but **a photographer's own style does not
-reach this phase's decisions**, and it should. Closes when 16 and 17 ship and this phase's band
-source is re-pointed.
+toward, and phase 17's personal style would have shifted them per photographer. When this was
+written neither phase existed; after the merge (section 0a) both do, and neither is read - so
+the condition has stopped being about missing phases and started being about an unmade
+connection. The dependency still degrades rather than breaks, but **a photographer's own style
+still does not reach this phase's decisions**, and it should. Closes when this phase's band
+source is re-pointed at phase 16 and its solved parameters are passed through phase 17's lean.
 
 **C5 - the group-fairness guarantee is weaker than section 10.1's words.** Section 10.1 asks
 for an absolute spread threshold; what is guaranteed is that the threshold is reached whenever

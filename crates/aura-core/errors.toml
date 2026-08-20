@@ -1168,7 +1168,192 @@ user_message = "AURA has not seen enough well-lit photographs of these people to
 runbook      = "docs/runbooks/AURA-ML-5065.md"
 introduced   = "PHASE-15"
 
-# Phase 19. Local light sculpting, ML 5066-5071. The same five shapes the phase
+# Phase 16. Tone curves, HSL and skin protection, ML 5066-5071. The same five
+# shapes the phase 09, 11 and 15 blocks have - a refused artefact, version drift,
+# a refused edit, one item that could not be done, a refused config file and a
+# config file missing a row - with one difference worth reading: `AURA-ML-5069`
+# is the only code in the product that fires because a GUARANTEE could not be
+# met. It is a warning rather than a failure, because the frame is still
+# delivered: what was withdrawn is the grading, not the photograph.
+
+[[error]]
+code         = "AURA-ML-5066"
+severity     = "item_failed"
+recovery     = "fallback"
+summary      = "A tone curve was refused because its control points are not monotone"
+user_message = "AURA worked out a tone curve it could not use safely, so it left this photograph's curve alone. Nothing else about the edit changed."
+runbook      = "docs/runbooks/AURA-ML-5066.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5067"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A tone, curve or HSL override was refused"
+user_message = "AURA could not record that adjustment. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5067.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5068"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be graded"
+user_message = "AURA could not work out the contrast and colour for one photograph, and has left it as the camera recorded it. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5068.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5069"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The skin protection ceilings could not be met, so the colour adjustments were withdrawn"
+user_message = "AURA could not find a colour adjustment for this photograph that left everybody's skin exactly where it was, so it made none. The photograph is otherwise fully edited."
+runbook      = "docs/runbooks/AURA-ML-5069.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5070"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The tone intent table was refused"
+user_message = "AURA could not load the settings that decide how much contrast each kind of photograph wants, so it has not graded anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5070.md"
+introduced   = "PHASE-16"
+
+[[error]]
+code         = "AURA-ML-5071"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored grades came from different heads, arithmetic or intents"
+user_message = "AURA has improved how it grades, so it is re-checking this wedding in the background. Anything you have already adjusted is kept."
+runbook      = "docs/runbooks/AURA-ML-5071.md"
+introduced   = "PHASE-16"
+
+# Phase 17. Style learning, ML 5072-5077. The same five shapes the phase 09, 11,
+# 15 and 16 blocks have - one item that could not be done, a refused run, a
+# warning about a sparse case, a refused edit and version drift - plus one that
+# is new: `AURA-ML-5076` is the first code in the product that refuses an
+# artefact a photographer chose to import, rather than one AURA shipped.
+
+[[error]]
+code         = "AURA-ML-5072"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One archive pair could not be matched, read or fitted"
+user_message = "AURA could not learn from one of your finished photographs, so it left that one out. Everything else in the archive is still being used."
+runbook      = "docs/runbooks/AURA-ML-5072.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5073"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "A style training run was refused"
+user_message = "AURA could not find enough matching originals and finished photographs in that folder to learn anything, so it has not made a profile. Check that both are there and try again."
+runbook      = "docs/runbooks/AURA-ML-5073.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5074"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A style bucket had too few pairs and borrowed from its parent"
+user_message = "AURA has not seen enough of your photographs of this kind in this light, so it is using your overall look for them. The profile report says which weddings would help."
+runbook      = "docs/runbooks/AURA-ML-5074.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5075"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A profile could not be adopted or selected"
+user_message = "AURA could not switch to that style profile. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5075.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5076"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A style profile bundle was refused"
+user_message = "That style profile file has been altered since it was signed, or it is not a style profile, so AURA did not open it. Ask whoever sent it for a fresh copy."
+runbook      = "docs/runbooks/AURA-ML-5076.md"
+introduced   = "PHASE-17"
+
+[[error]]
+code         = "AURA-ML-5077"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A profile was learned with a different render engine or fitter"
+user_message = "This style profile was learned with an older version of AURA's editing engine, so it is being applied cautiously. Re-training it on the same weddings will restore full accuracy."
+runbook      = "docs/runbooks/AURA-ML-5077.md"
+introduced   = "PHASE-17"
+
+# Phase 18. Local mask AI, ML 5078-5083. The same five shapes the phase 09, 11,
+# 15, 16 and 17 blocks have - one item that could not be done, a refused run, a
+# warning about a case the product handled coarsely, a refused edit and version
+# drift - plus one that is new: `AURA-ML-5081` is the first code in the product
+# that constrains what a *later* phase may do. Every warning before it was about
+# a decision AURA had already made; this one is about a decision phases 19 to 24
+# have not made yet, and it is how a badly determined boundary stops a retouch
+# from happening through it.
+
+[[error]]
+code         = "AURA-ML-5078"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be masked"
+user_message = "AURA could not work out the regions in one photograph, so it left that one unmasked. Everything else in the selection is still being done."
+runbook      = "docs/runbooks/AURA-ML-5078.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5079"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "A masking run was refused"
+user_message = "AURA has nothing selected to work on, so it has not made any masks. Cull the wedding first, or choose the photographs you want."
+runbook      = "docs/runbooks/AURA-ML-5079.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5080"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A mask payload exceeded its storage budget and was stored more coarsely"
+user_message = "One region in this photograph was unusually broken up, so AURA stored it a little more coarsely to keep the catalog small."
+runbook      = "docs/runbooks/AURA-ML-5080.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5081"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A mask's quality limits what may be done with it"
+user_message = "AURA is not confident about the edge of this region, so it will make smaller changes there than usual and will not smooth skin inside it."
+runbook      = "docs/runbooks/AURA-ML-5081.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5082"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A mask edit was refused"
+user_message = "AURA could not apply that change to the mask. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5082.md"
+introduced   = "PHASE-18"
+
+[[error]]
+code         = "AURA-ML-5083"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored masks came from a different model set or a different analysis"
+user_message = "AURA has improved how it finds regions in a photograph, so it is redoing them in the background. Any mask you have edited by hand is kept exactly as it is."
+runbook      = "docs/runbooks/AURA-ML-5083.md"
+introduced   = "PHASE-18"
+
+# Phase 19. Local light sculpting, ML 5084-5089. The same five shapes the phase
 # 09, 11 and 15 blocks have - version drift, a refused edit, one item that could
 # not be done, a refused config file, and a config file missing a row - plus one
 # that is new in this phase and is the phase's own honesty: a mask this phase

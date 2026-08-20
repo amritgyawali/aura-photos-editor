@@ -5,6 +5,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use aura_brain_photo::colour::api::FrameExif as ColourExif;
+use aura_brain_photo::colour::{Colour, ColourPass, ColourStore};
 use aura_brain_photo::composition::{Composition, CompositionPass, CompositionStore};
 use aura_brain_photo::integrity::{Integrity, IntegrityPass, IntegrityStore};
 use aura_brain_photo::local::{Local, LocalPass, LocalStore};
@@ -49,9 +51,14 @@ use aura_people::store::PeopleStore;
 use aura_people::vault::BiometricKeyStore;
 use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
+use aura_style::profile::Identity;
+use aura_style::{Style, StyleStore};
 use aura_vision::embed::model::{MODEL_VER, PREPROCESS_VER};
 use aura_vision::face::prominence::{ProminenceWeights, OVERRIDE_RELATIVE_PATH};
 use aura_vision::face::FacePipeline;
+use aura_vision::mask::api::{FrameSource, Masks};
+use aura_vision::mask::store::MaskStore;
+use aura_vision::mask::MaskFrame;
 use aura_vision::EmbeddingRunner;
 use parking_lot::Mutex;
 use rusqlite::OptionalExtension as _;
@@ -1788,6 +1795,191 @@ impl AppState {
         }
     }
 
+    /// The colour store for this catalog. PHASE-16.
+    ///
+    /// Stateless like every store since phase 09. It owns no model and opens no preview;
+    /// those belong to the pass below.
+    #[must_use]
+    pub fn colour_store(&self) -> Arc<ColourStore> {
+        Arc::new(ColourStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `ColourService` for this catalog. PHASE-16.
+    ///
+    /// Stored grades stay readable even when the installed intent table is broken. The service
+    /// reports version drift through its outline; only a new pass has to parse the intents and
+    /// may therefore refuse to start.
+    #[must_use]
+    pub fn colour(&self) -> Arc<Colour> {
+        Arc::new(Colour::new(self.colour_store()))
+    }
+
+    /// The tone-curve, HSL and skin-protection pass, wired to previews, inference, people,
+    /// story and the catalog's own EXIF. PHASE-16.
+    ///
+    /// People are attached unconditionally, and the degradation without them is the one worth
+    /// reading: **every frame becomes faceless**, so the subject contrast is measured over the
+    /// centre of the frame instead of over anybody's face, no skin is sampled, and section
+    /// 6.3's guarantee is not checked on a single photograph. `ColourOutline::skin_measured`
+    /// reports zero and the panel says so, rather than the product claiming a guarantee it did
+    /// not verify.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5070` when the tone intent table will not load, `AURA-ML-5036` when the camera
+    /// calibration table will not, or whatever opening the preview service and the inference
+    /// engine raised.
+    pub fn colour_pass(&self, project_id: &str) -> AuraResult<ColourPass> {
+        let pass = ColourPass::new(
+            self.previews(project_id)?,
+            self.infer_engine()?,
+            self.colour_store(),
+            Arc::clone(&self.clock),
+        )?
+        .with_people(self.people())
+        .with_exif(self.colour_exif(project_id)?);
+        // PHASE-17. The photographer's own look, applied to the solved grade and **before**
+        // both of phase 16's guards, so the skin guarantee is measured on what is actually
+        // delivered. Attached unconditionally: with no profile selected for this project the
+        // service answers `StyleAdvice::none` and every frame is graded exactly as phase 16
+        // decided on its own.
+        let pass = match aura_core::ProjectId::from_db(project_id) {
+            Ok(project) => pass.with_style(self.style(), project),
+            Err(_) => pass,
+        };
+        match self.story() {
+            Ok(story) => Ok(pass.with_story(story)),
+            Err(err) => {
+                tracing::warn!(
+                    target: "colour.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be graded against the neutral intent"
+                );
+                Ok(pass)
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // PHASE-18. Local mask AI.
+    // -----------------------------------------------------------------
+
+    /// Migration 18's tables.
+    #[must_use]
+    pub fn mask_store(&self) -> Arc<MaskStore> {
+        Arc::new(MaskStore::new(Arc::clone(&self.catalog)))
+    }
+
+    /// A `MaskService` that reads, composes and resolves, and does not produce.
+    ///
+    /// What six of the eight mask commands need. It opens no preview cache, which is why it
+    /// takes no project: "what regions does this photograph have" is a query over one table.
+    #[must_use]
+    pub fn masks(&self) -> Arc<Masks> {
+        Arc::new(Masks::read_only(MaskStore::new(Arc::clone(&self.catalog))))
+    }
+
+    /// A `MaskService` that can also produce regions, reading the project's 2048 px proxies.
+    ///
+    /// The proxy is the rung phase 06 reads and for the same reason: a guest's face is eleven
+    /// pixels tall on a thumbnail, and a skin seed sampled from eleven pixels is a colour nobody
+    /// measured.
+    ///
+    /// # Errors
+    ///
+    /// Whatever opening the project's preview cache returns.
+    pub fn masks_for(&self, project_id: &str) -> AuraResult<Arc<Masks>> {
+        let previews = self.previews(project_id)?;
+        Ok(Arc::new(Masks::new(
+            MaskStore::new(Arc::clone(&self.catalog)),
+            Arc::new(ProxyFrames { previews }),
+        )))
+    }
+
+    /// An identity's display name, for the mask panel.
+    ///
+    /// `None` rather than a placeholder when the identity has no name: "the bride's skin" and
+    /// "somebody's skin" are different sentences, and a panel that filled the gap with an id
+    /// would be showing a photographer a UUID.
+    #[must_use]
+    pub fn identity_name(&self, identity: aura_core::IdentityId) -> Option<String> {
+        let store = self.people_store();
+        let project = store.project_of_identity(identity).ok().flatten()?;
+        let rows = store.load_identities(&project).ok()?;
+        rows.into_iter()
+            .find(|row| row.identity_id == identity)
+            .and_then(|row| row.label)
+    }
+
+    // -----------------------------------------------------------------
+    // PHASE-17. Style learning.
+    // -----------------------------------------------------------------
+
+    /// Migration 17's tables.
+    #[must_use]
+    pub fn style_store(&self) -> Arc<StyleStore> {
+        Arc::new(StyleStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `StyleService` for this catalog. PHASE-17.
+    #[must_use]
+    pub fn style(&self) -> Arc<Style> {
+        Arc::new(Style::new(self.style_store()))
+    }
+
+    /// The signing identity this installation exports profiles with.
+    ///
+    /// Derived from the catalog's own path rather than stored, which is a **deliberate
+    /// limitation and not a design**: a key derived from something a reader can see proves the
+    /// bundle has not changed since it was signed and proves nothing about who signed it, which
+    /// is exactly what ADR-0035 decision 8 says the signature is worth. When this product grows
+    /// a place to keep secrets for a studio - the same place phase 04 keeps a cloud API key -
+    /// this becomes a lookup and the bundle format does not move.
+    #[must_use]
+    pub fn style_identity(&self) -> Identity {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"aura-style-profile-key-v1");
+        hasher.update(self.catalog.path().to_string_lossy().as_bytes());
+        Identity::from_seed(*hasher.finalize().as_bytes())
+    }
+
+    /// What EXIF said about every frame, for the colour pass. PHASE-16.
+    ///
+    /// The same rows phase 15's `frame_exif` reads, in phase 16's own shape. It reads *fewer*
+    /// fields - a grade needs the body and the ISO for phase 09's shadow headroom and nothing
+    /// about the camera's white balance - and re-projecting rather than sharing one struct is
+    /// what keeps a later change to phase 15's needs from silently changing phase 16's input.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the photographs cannot be read.
+    pub fn colour_exif(
+        &self,
+        project_id: &str,
+    ) -> AuraResult<BTreeMap<aura_core::PhotoId, ColourExif>> {
+        Ok(self
+            .frame_exif(project_id)?
+            .into_iter()
+            .map(|(id, exif)| {
+                (
+                    id,
+                    ColourExif {
+                        make: exif.make,
+                        model: exif.model,
+                        iso: exif.iso,
+                        megapixels: exif.megapixels,
+                    },
+                )
+            })
+            .collect())
+    }
+
     /// What EXIF said about every frame in a project, for the tone pass. PHASE-15.
     ///
     /// Read from the catalog rather than from the files: phase 01 owns EXIF, it is already in
@@ -2128,5 +2320,38 @@ impl aura_render::FrameSource for CatalogFrames {
             out_h,
             &camera,
         ))
+    }
+}
+
+/// The 2048 px proxy, as `aura-vision`'s mask pass wants it.
+///
+/// A thin adapter rather than a dependency inside `aura-vision`: the masking engine takes a
+/// `FrameSource` port so a test can run the whole pass over painted fixtures without a catalog,
+/// a cache or a RAW file - which is what makes section 10.1's gates measurable at all in a
+/// repository with no camera files in it. This is the one implementation that reads real pixels.
+#[derive(Clone)]
+struct ProxyFrames {
+    previews: Arc<Previews>,
+}
+
+impl std::fmt::Debug for ProxyFrames {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ProxyFrames")
+    }
+}
+
+impl FrameSource for ProxyFrames {
+    fn frame(&self, image: aura_core::PhotoId) -> AuraResult<MaskFrame> {
+        use aura_preview::contract::service::{PreviewService, Priority};
+
+        let buffer = self
+            .previews
+            .get(image, aura_vision::mask::MASK_LEVEL, Priority::AiBatch)?;
+        MaskFrame::from_buffer(&buffer).ok_or_else(|| {
+            aura_vision::mask::errors::mask_failed(
+                &image.to_db(),
+                "the proxy is tiled or truncated",
+            )
+        })
     }
 }
