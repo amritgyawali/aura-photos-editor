@@ -1,0 +1,58 @@
+[package]
+name         = "aura-retouch"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Portrait retouch: temporary marks removed, permanent features protected, and a measured guarantee that the skin keeps its own texture (phase 20)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# The texture guarantee is a post-condition, so it is measured by running the plan through the
+# REAL renderer - phase 16 precedent, where the skin guard grades this frame own skin through
+# `aura-render` rather than through a copy of it. A second implementation of patch synthesis in
+# this crate would make the stored `band_ratio` a statement about a model of the renderer.
+aura-render  = { path = "../aura-render" }
+# `contract::pixels` for the proxy buffer and `colour::curve::srgb_decode` for the one
+# conversion this crate makes. Phase 02 owns colour; this crate retouches inside the space
+# phase 02 defined.
+aura-raw     = { path = "../aura-raw" }
+# The pass reads proxies through phase 02 frozen `PreviewService`, exactly as phases 06 to 19
+# do. Nothing here opens a file: invariant 1 as a property of the dependency list.
+aura-preview = { path = "../aura-preview" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+time         = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+uuid         = { workspace = true }
+
+# Deliberately absent: `aura-cloud`, `aura-recipe`, and every brain crate.
+#
+# `aura-cloud` is absent because PHASE-20 section 7 is one sentence - "no cloud AI call in this
+# phase" - and section 9 gives SEC one task, "confirm no face crops leave the device for
+# retouching". A dependency that does not exist cannot be used by a hurried change, so the
+# guarantee is a property of this file rather than of anybody memory. `tests/no_network.rs`
+# fails the build if it ever appears.
+#
+# `aura-recipe` is absent because writing a recipe is phase 14 rule and lives in `aura-app`.
+# This crate decides; `aura_recipe::schema::merge` is the only function in the workspace that
+# writes one recipe into another, and `tests/no_recipe_writes.rs` is the grep that keeps this
+# crate away from it - the fourth grep-as-a-test in the repository.
+#
+# The brain crates are absent for the reason every crate since phase 09 has kept them out:
+# everything this crate needs from phases 06, 07, 09, 18 and 19 arrives through the frozen
+# traits in `aura-core`.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. In `tests/eval/`
+# beside every harness since phase 05, because a gate is a claim about the product and not about
+# a crate.
+[[test]]
+name = "retouch_eval"
+path = "../../tests/eval/retouch_eval.rs"

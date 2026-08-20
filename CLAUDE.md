@@ -92,6 +92,10 @@ Never load two phase files into one session.
 | Local light policy (versioned, PM-owned) | `crates/aura-brain-photo/config/local_light.toml` |
 | Local light evaluation gates | `tests/eval/local_eval.rs` + `ml/models/local/eval_local.py` |
 | What the local light adjustments do, in the product's own words | `docs/local-light.md` |
+| Portrait retouch decisions | `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` |
+| Retouch presets and per-scene limits (versioned, PM-owned) | `crates/aura-retouch/config/retouch_presets.toml` |
+| Retouch evaluation gates | `tests/eval/retouch_eval.rs` + `ml/models/retouch/eval_retouch.py` |
+| What AURA does to skin, in the product's own words | `docs/retouch.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -828,6 +832,80 @@ where one person is two stops down under a doorway cannot be evened without eith
 plan the frame or darkening everybody else. What is guaranteed instead is about the *edit*:
 reach the threshold whenever the caps allow, and never make a group less even than you found
 it. ADR-0039 section 6, and `docs/local-light.md` says the same thing in the product's voice.
+
+Phase 20 is implemented conditionally: `aura-core::contract::retouch` freezes the four
+operations, the two inpainting methods, the two bands an operator may name, the four presets, the
+six protected kinds and their three sources, the protected feature, the texture report,
+twenty-six reason codes, the plan, the outline, the override and `RetouchService`;
+`aura-retouch` decides. `presets.rs` loads a table whose texture floors the *code* bounds rather
+than the file, `strength.rs` computes one gallery-constant number per person from four gallery
+statistics, `blemish.rs` finds marks by band-passing luminance **and** the red share of the
+chromaticity one sign at a time, `permanent.rs` projects every mark onto the eye-to-eye axis and
+calls a mark permanent only when it appears on four frames across forty-five minutes,
+`undereye.rs` and `evening.rs` measure against the skin around them and are capped by the
+contract, `texture_guard.rs` runs the plan through the real renderer, re-solves at three quarters
+strength up to three times and **withdraws the retouch entirely** rather than shipping one that
+failed its floor, `ops.rs` is one frame in and one plan out, `store.rs` owns migration 20 and
+`api.rs` is the frozen service and the resumable walk. Migration 20 stores four tables, one view
+and two triggers; `aura-render` gains `bands` and `retouch` plus three shaders held to them;
+two models are signed with cards; eight IPC commands (ADR-0042) feed a Retouch panel; and
+`aura-cli verify --phase 20` is the executable gate. Its exit report is
+`docs/progress/PHASE-20-EXIT.md`.
+
+**Both shipped heads are placeholders and neither is consulted, and this time that is not the
+whole story.** `BLEMISH_HEAD_TRAINED` and `PERMANENT_HEAD_TRAINED` are false, and unlike phases
+15, 16 and 18 - which refuse to consult a placeholder and fall back on a reference *model* - this
+phase would have nothing underneath if it did the same, so what ships is a **measurement**: a
+difference-of-Gaussians with a colour test, whose failure mode is finding fewer marks rather than
+confidently wrong ones. ADR-0041 section 7 records the argument. Every gate in section 10.1 is
+measured against synthetic faces whose marks were painted into the pixels and read back through
+the real detector, the real operators and the real renderer, which proves the arithmetic and says
+nothing about a wedding photograph. That is condition C1 and a Sev 2 trigger; it closes with
+phase 05's C10 and with the `with_masks` wiring. Condition C2 is the second Sev 2 and it is the
+one to be careful about: **there is no per-skin-tone parity study**, the mechanism is
+tone-relative by construction and `docs/skin-fairness.md` says so, and no per-bucket number is
+published or should be inferred.
+
+Four rules that phase 20 adds and every later phase inherits:
+
+- **`RetouchService` is the only way to ask what was done to somebody's skin.** Sixteenth service
+  of its kind. Phase 21 retouches hair, teeth, eyes and clothing and must not re-smooth what this
+  phase smoothed; phase 25 normalises a gallery of these decisions; phase 27 has to be able to
+  say why a face looks worked on. Two answers to "what did we do to her skin" is a delivery in
+  which the album and the gallery disagree about somebody's face.
+- **A protected feature is a veto, not a discount - and one kind of it is absolute.** The
+  candidate is dropped before strength, preset or guard is consulted, because "inpainted a
+  little" on a mole is a smudged mole. `ProtectedKind::is_absolute` is true for a tattoo, and the
+  refusal lives in the type, in `RetouchService::set_protection` and in a database trigger,
+  because section 10.1 gates tattoo removal at **zero** rather than at a small number and a
+  promise enforced in one layer lasts until somebody writes a second caller.
+- **A guarantee about a pixel is enforced on the pixel.** Phase 16 wrote this for skin colour and
+  this phase inherits it for skin texture: the guard applies the plan through the *renderer* and
+  divides the band energies, rather than bounding a parameter and hoping. When it cannot reach the
+  floor it withdraws the whole plan - a frame that ships unretouched is a much smaller failure
+  than a frame that ships plastic, and a floor that can be exceeded once is not a floor.
+- **A decision about a person is a gallery constant.** Strength is one stored number per identity
+  per project; the frame decides which operations run, never how strong they are. Section 6.4's
+  four inputs are read as gallery statistics, which is what makes section 10.1's five-per-cent
+  consistency gate come out at zero. Any later phase that finds itself computing a per-frame
+  strength for a person has re-created the failure this rule exists to prevent.
+
+Three things phase 20 got wrong first, all found by its own tests, all worth generalising:
+
+**Transplanting the original high band puts the mark back.** Section 6.2's words are "blend only
+the low/mid bands while transplanting the original high band back", and read literally that heals
+about a third of a spot: the *edge* of a mark is high-frequency content of the mark rather than of
+the skin. Both halves have to come from the donor, with its texture rescaled to the energy of the
+ring around the mark. The unit test that caught it was written before the code was right.
+
+**A luminance-only detector misses the most common blemish on a wedding face.** An inflamed spot
+is often no brighter or darker than the skin it sits on - it is redder. Any detector for a
+*coloured* defect has to band-pass colour.
+
+**A plain mean over a detected component reads a strong mark as a weak one.** A component includes
+the falloff as well as the core, and a falloff sample is half skin - so painting the fixture spot
+brighter made its temporary probability go *down*. Weight a region's reading by how far each
+sample departs from the background it sits on.
 
 Five rules that phase 13 adds and every later phase inherits:
 

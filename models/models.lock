@@ -967,6 +967,104 @@
         "require_fp32": false
       },
       "opset": 13
+    },
+    {
+      "name": "blemish_detector",
+      "version": "1.0.0",
+      "task": "detection",
+      "class": "retouch",
+      "input": {
+        "shape": [
+          1,
+          3,
+          256,
+          256
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "linear_srgb"
+      },
+      "output": {
+        "anomalies": [
+          1,
+          2,
+          32,
+          32
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "blemish_detector_1.0.0.fp32.onnx",
+          "sha256": "71089dca134fb5a487fcf4994eadf0cf71596f440ca0df74fbdcf69564cfdad4",
+          "bytes": 156687
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "blemish_detector_1.0.0.fp16.onnx",
+          "sha256": "e5449f8d7a65873740cd6acbec8413ff6763d29dc85ad929a40edf41da69a8a7",
+          "bytes": 156687
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/blemish_detector.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
+    },
+    {
+      "name": "permanent_features",
+      "version": "1.0.0",
+      "task": "classification",
+      "class": "retouch",
+      "input": {
+        "shape": [
+          1,
+          3,
+          64,
+          64
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "linear_srgb"
+      },
+      "output": {
+        "kinds": [
+          1,
+          6
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "permanent_features_1.0.0.fp32.onnx",
+          "sha256": "110bda744da12e484f8a2d4135b6bbae788eeb2d3135d5e09381912a9b41d45e",
+          "bytes": 31973
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "permanent_features_1.0.0.fp16.onnx",
+          "sha256": "30ebdb9190fdb1e4344caf21e07d098792e352a4412e37bcf7a274d59cde679d",
+          "bytes": 31973
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/permanent_features.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
     }
   ]
 }

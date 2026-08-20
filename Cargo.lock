@@ -75,6 +75,7 @@ dependencies = [
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-retouch",
  "aura-style",
  "aura-vision",
  "blake3",
@@ -186,6 +187,7 @@ dependencies = [
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-retouch",
  "aura-style",
  "aura-vision",
  "rusqlite",
@@ -395,6 +397,7 @@ dependencies = [
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-retouch",
  "aura-vision",
  "rusqlite",
  "serde",
@@ -469,6 +472,24 @@ dependencies = [
  "time",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "aura-retouch"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "aura-render",
+ "rusqlite",
+ "serde",
+ "tempfile",
+ "time",
+ "toml",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

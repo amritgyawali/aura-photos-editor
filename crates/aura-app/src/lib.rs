@@ -61,6 +61,7 @@ pub mod mask_commands;
 pub mod moment_commands;
 pub mod people_commands;
 pub mod preview_commands;
+pub mod retouch_commands;
 pub mod state;
 pub mod story_commands;
 pub mod style_commands;
@@ -129,6 +130,10 @@ pub use preview_commands::base64;
 pub use preview_commands::{
     cancel_previews, get_preview, prefetch_previews, preview_problems, preview_stats, purge_cache,
     set_cache_budget,
+};
+pub use retouch_commands::{
+    accept_retouch, image_retouch, protected_features, retouch_pass, retouch_review_queue,
+    retouch_status, set_protection, set_retouch,
 };
 pub use state::AppState;
 pub use story_commands::{

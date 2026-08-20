@@ -1413,3 +1413,65 @@ summary      = "A mask was unusable, so a local operation was scaled down or ski
 user_message = "AURA is not sure enough where the subject ends and the background begins in some photographs, so it made gentler local adjustments there - or none at all. Nothing has been damaged."
 runbook      = "docs/runbooks/AURA-ML-5089.md"
 introduced   = "PHASE-19"
+
+# Phase 20. Portrait retouch, ML 5090-5095. The same five shapes phases 09, 11,
+# 15 and 19 use - version drift, a refused edit, one item that could not be
+# done, a refused config file and a config file missing a row - plus one that is
+# this phase's own: the texture guarantee could not be met, so a retouch was
+# made gentler or withdrawn entirely. That last one is not a failure to fix; it
+# is the mechanism working, and it is registered so a photographer can find out
+# it happened rather than wondering why one frame looks different.
+
+[[error]]
+code         = "AURA-ML-5090"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored retouch plans came from different heads, arithmetic or presets"
+user_message = "AURA has improved how it retouches skin, so it is re-checking this wedding in the background. Anything you have already adjusted is kept."
+runbook      = "docs/runbooks/AURA-ML-5090.md"
+introduced   = "PHASE-20"
+
+[[error]]
+code         = "AURA-ML-5091"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A retouch override or a protected-feature change was refused"
+user_message = "AURA could not record that change. Nothing was changed. Tattoos are always kept and cannot be turned off."
+runbook      = "docs/runbooks/AURA-ML-5091.md"
+introduced   = "PHASE-20"
+
+[[error]]
+code         = "AURA-ML-5092"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph's skin could not be retouched"
+user_message = "AURA could not work out the skin retouching for one photograph, and has left that photograph untouched. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5092.md"
+introduced   = "PHASE-20"
+
+[[error]]
+code         = "AURA-ML-5093"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The retouch preset table was refused"
+user_message = "AURA could not load the settings that decide how much retouching each kind of photograph gets, so it has not retouched anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5093.md"
+introduced   = "PHASE-20"
+
+[[error]]
+code         = "AURA-ML-5094"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A scene has no retouch preset row"
+user_message = "AURA has no retouching guidance recorded for this kind of photograph yet, so it is treating those ones very gently. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5094.md"
+introduced   = "PHASE-20"
+
+[[error]]
+code         = "AURA-ML-5095"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The texture guarantee forced a gentler retouch, or withdrew one"
+user_message = "AURA used gentler retouching on some photographs, or none at all, so that skin kept its own texture. Nothing has been damaged."
+runbook      = "docs/runbooks/AURA-ML-5095.md"
+introduced   = "PHASE-20"

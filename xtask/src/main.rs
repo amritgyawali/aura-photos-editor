@@ -47,6 +47,14 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-render/shaders/mask_composite.wgsl",
     // PHASE-19.
     "crates/aura-catalog/migrations/0019_local_light.sql",
+    // PHASE-20. The migration, and the three shaders. `retouch_apply.wgsl` carries the stage
+    // entry point phase 14 left as a pass-through in `spatial.wgsl`, and the other two are
+    // libraries it calls; a shader that drifts while no device can run it is a retouch that
+    // differs from the preview a photographer approved, on the day a backend first runs.
+    "crates/aura-catalog/migrations/0020_retouch.sql",
+    "crates/aura-render/shaders/freq_bands.wgsl",
+    "crates/aura-render/shaders/inpaint_patch.wgsl",
+    "crates/aura-render/shaders/retouch_apply.wgsl",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

@@ -2638,3 +2638,198 @@ export type SetLocalStrengthDto = {
   /** The dotted paths a person now owns. */
   protected: string[];
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-20. Portrait retouch.
+// ---------------------------------------------------------------------------
+
+/** One thing that was done to somebody's skin. */
+export type RetouchOpDto = {
+  /** `blemish`, `under_eye`, `tone_evening` or `shine_reduce`. */
+  kind: string;
+  strength: number;
+  /** Present for a blemish; absent for the operations that act through a mask or a region. */
+  area?: CropRectDto | null;
+  /** `patch` or `learned`, for a blemish. */
+  method?: string | null;
+  identityId?: string | null;
+  /** Bounded at 0.25 stops by the contract. */
+  lumaEv: number;
+  /** Bounded at 0.12 by the contract. */
+  chroma: number;
+};
+
+/**
+ * Something about a person AURA will not remove.
+ *
+ * `area` is **face-normalised**: the origin sits between the eyes, x runs along the eye-to-eye
+ * line and the unit is the inter-ocular distance, so `x` and `y` may be negative. That is what
+ * lets one row protect the same mole in four hundred photographs.
+ */
+export type ProtectedFeatureDto = {
+  identityId: string;
+  /** `mole`, `freckle`, `birthmark`, `scar`, `tattoo` or `dimple`. */
+  kind: string;
+  area: CropRectDto;
+  confidence: number;
+  /** `cross_frame`, `classifier` or `user`, in ascending order of authority. */
+  source: string;
+  frames: number;
+  spanMinutes: number;
+  firstSeenPhoto: string;
+  /** True when nothing may clear it. A tattoo is rendered without a control, not with a disabled one. */
+  absolute: boolean;
+};
+
+/** What the retouch did to the skin's own texture, measured through the renderer. */
+export type TextureReportDto = {
+  /** High-band skin energy after over the same energy before. One is a retouch that cost nothing. */
+  bandRatio: number;
+  floor: number;
+  passed: boolean;
+  /** Below 256 the ratio is arithmetic rather than evidence, and the panel says so. */
+  measuredOn: number;
+  resolves: number;
+  /** True when the retouch was withdrawn because the floor could not be met. */
+  withdrawn: boolean;
+};
+
+/** One reason the retouch came out the way it did. */
+export type RetouchReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+  /** Half the codes in this phase are withdrawals, which is why the panel groups by this. */
+  withdrawal: boolean;
+  evidence?: CropRectDto | null;
+};
+
+/** One person's gallery-wide retouch strength. */
+export type IdentityStrengthDto = {
+  identityId: string;
+  strength: number;
+};
+
+/** Everything phase 20 decided about one photograph's skin. */
+export type RetouchPlanDto = {
+  photoId: string;
+  ops: RetouchOpDto[];
+  identityStrengths: IdentityStrengthDto[];
+  protected: ProtectedFeatureDto[];
+  texture: TextureReportDto;
+  /** `off`, `light`, `natural` or `polished`. */
+  preset: string;
+  reasons: RetouchReasonDto[];
+  confidence: number;
+  scene: string;
+  /** Phase 19's shared allowance, not a second one. */
+  budgetUsed: number;
+  userEdited: boolean;
+  reviewed: boolean;
+  needsReview: boolean;
+  modelVer: number;
+  analysisVer: number;
+  presetVer: number;
+};
+
+/** What a project's retouch pass covered and found. */
+export type RetouchStatusDto = {
+  photos: number;
+  planned: number;
+  coverage: number;
+  actedOn: number;
+  maskCovered: number;
+  blemishesRemoved: number;
+  /** The answer to "why is that mark still there". */
+  anomaliesLeft: number;
+  protectedCounts: number[];
+  protectedKinds: string[];
+  textureResolved: number;
+  textureWithdrawn: number;
+  meanBandRatio: number;
+  meanStrength: number;
+  /** Zero while strength is a gallery constant. */
+  maxIdentitySpread: number;
+  presetCounts: number[];
+  presetNames: string[];
+  needsReview: number;
+  userEdited: number;
+  unpresetScenes: string[];
+  modelVer: number;
+  analysisVer: number;
+  presetVer: number;
+};
+
+/** What one retouch pass did. */
+export type RetouchPassDto = {
+  planned: number;
+  failed: number;
+  actedOn: number;
+  maskCovered: number;
+  blemishes: number;
+  textureResolved: number;
+  textureWithdrawn: number;
+  protected: number;
+  lowConfidence: number;
+  meanBandRatio: number;
+  unpresetScenes: string[];
+  recipesWritten: number;
+  recipesProtected: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type RetouchPassInput = {
+  projectId: string;
+  photoIds?: string[];
+  /** `off`, `light`, `natural` or `polished`. Absent means Natural. */
+  preset?: string | null;
+  cancelId?: string | null;
+};
+
+export type RetouchReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+export type AcceptRetouchInput = {
+  photoId: string;
+};
+
+/**
+ * Record what the photographer set instead.
+ *
+ * A strength is **gallery-wide**: setting one person's strength on one frame and not on the rest
+ * is how a gallery ends up with a bride whose skin changes character between the ceremony and the
+ * reception.
+ */
+export type SetRetouchInput = {
+  projectId: string;
+  photoId: string;
+  preset?: string | null;
+  identityId?: string | null;
+  strength?: number | null;
+};
+
+export type SetRetouchDto = {
+  plan: RetouchPlanDto;
+  recipe: RecipeDto;
+  changed: string[];
+  /** The dotted paths a person now owns. */
+  protected: string[];
+};
+
+/**
+ * Add or clear one protected feature.
+ *
+ * `area` arrives in **frame** coordinates, as the panel drew it, and the backend projects it onto
+ * the face. Clearing an absolute feature - a tattoo - is refused with `AURA-ML-5091`.
+ */
+export type SetProtectionInput = {
+  projectId: string;
+  identityId: string;
+  photoId: string;
+  kind: string;
+  area: CropRectDto;
+  protect: boolean;
+};

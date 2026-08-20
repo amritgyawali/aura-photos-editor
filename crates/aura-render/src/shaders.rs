@@ -51,8 +51,27 @@ pub const FREQ_SEP: &str = include_str!("../shaders/freq_sep.wgsl");
 /// PHASE-19. Applying a local light plan.
 pub const LOCAL_APPLY: &str = include_str!("../shaders/local_apply.wgsl");
 
+/// PHASE-20. Three-band frequency separation, of which the third is measured rather than moved.
+///
+/// A **library**, like [`LUMINOSITY_MASK`]. Phase 19 `freq_sep.wgsl` returns two bands and
+/// cannot reach the third by construction; this one returns all three, because the texture
+/// guarantee is a ratio of high-band energies and a band nobody can measure is a guarantee
+/// nobody can enforce.
+pub const FREQ_BANDS: &str = include_str!("../shaders/freq_bands.wgsl");
+
+/// PHASE-20. Patch synthesis: one temporary mark removed, with the texture of the skin kept.
+pub const INPAINT_PATCH: &str = include_str!("../shaders/inpaint_patch.wgsl");
+
+/// PHASE-20. The retouch stage: under-eye correction and tone evening through a skin mask.
+///
+/// This carries `stage_retouch`. Phase 14 left a pass-through of that name in `spatial.wgsl` so
+/// that `every_stage_has_an_entry_point` could pass before an operator existed; phase 20
+/// retired it, because two entry points with one name and one of them doing nothing is the
+/// drift this test exists to catch.
+pub const RETOUCH_APPLY: &str = include_str!("../shaders/retouch_apply.wgsl");
+
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 9] = [
+pub const SOURCES: [(&str, &str); 12] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
@@ -62,6 +81,9 @@ pub const SOURCES: [(&str, &str); 9] = [
     ("luminosity_mask.wgsl", LUMINOSITY_MASK),
     ("freq_sep.wgsl", FREQ_SEP),
     ("local_apply.wgsl", LOCAL_APPLY),
+    ("freq_bands.wgsl", FREQ_BANDS),
+    ("inpaint_patch.wgsl", INPAINT_PATCH),
+    ("retouch_apply.wgsl", RETOUCH_APPLY),
 ];
 
 /// The entry point name for a stage. `exposure` becomes `stage_exposure`.
@@ -115,6 +137,41 @@ pub fn shared_constants() -> Vec<(&'static str, String)> {
         (
             "HIGHLIGHTS_PER_EV",
             format!("{:.1}", crate::local::HIGHLIGHTS_PER_EV),
+        ),
+        // PHASE-20. The six constants the retouch operators share with the processor
+        // reference in `crate::retouch`. Two of them decide whether a mark is removed at all -
+        // the donor search radius and the transplant boundary - and the other four decide how
+        // far an under-eye correction and a tone evening may go. A shader that drifted from
+        // any of them would retouch a wedding differently from the preview the photographer
+        // approved, and would do it on the day a backend first ran.
+        (
+            "DONOR_DISTANCE",
+            format!("{:.2}", crate::retouch::DONOR_DISTANCE),
+        ),
+        (
+            "DONOR_MAX_DELTA",
+            format!("{:.2}", crate::retouch::DONOR_MAX_DELTA),
+        ),
+        (
+            "TRANSPLANT_FRACTION",
+            format!("{:.2}", crate::retouch::TRANSPLANT_FRACTION),
+        ),
+        (
+            "PATCH_FEATHER",
+            format!("{:.2}", crate::retouch::PATCH_FEATHER),
+        ),
+        (
+            "UNDEREYE_DROP",
+            format!("{:.2}", crate::retouch::UNDEREYE_DROP),
+        ),
+        (
+            "UNDEREYE_WIDTH",
+            format!("{:.2}", crate::retouch::UNDEREYE_WIDTH),
+        ),
+        ("SHADOW_SPAN", format!("{:.2}", crate::retouch::SHADOW_SPAN)),
+        (
+            "MAX_EVENING_MID",
+            format!("{:.2}", aura_core::contract::retouch::MAX_EVENING_MID),
         ),
         (
             "SHAPING_UNIT_EV",

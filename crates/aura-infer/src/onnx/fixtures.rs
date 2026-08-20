@@ -2566,3 +2566,154 @@ pub fn alpha_matting() -> OnnxModel {
         graph,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-20. Blemish detection and permanent-feature classification.
+// ---------------------------------------------------------------------------
+
+/// The blemish detector registered name.
+pub const BLEMISH_MODEL: &str = "blemish_detector";
+
+/// The permanent-feature classifier registered name.
+pub const PERMANENT_MODEL: &str = "permanent_features";
+
+/// The face crop side both heads read.
+///
+/// 256 px. A face crop rather than a frame: everything in phase 20 happens inside a face, and a
+/// network that read the whole photograph would spend most of its arithmetic on a reception hall
+/// to find a spot on somebody chin.
+pub const RETOUCH_INPUT_SIDE: usize = 256;
+
+/// How much the detector reduces its input.
+///
+/// Eight. A blemish is a few pixels across on a 256 px face crop, so the grid has to stay fine:
+/// a stride of sixteen would put two marks on one cheek in the same cell, and the whole point of
+/// the head is to say *where*.
+pub const RETOUCH_STRIDE: usize = 8;
+
+/// The detection grid side.
+pub const RETOUCH_HEAD_SIDE: usize = RETOUCH_INPUT_SIDE / RETOUCH_STRIDE;
+
+/// What the detector emits per cell: objectness, and how temporary the mark looks.
+///
+/// Two rather than one, and the second is the interesting one. A detector that only located
+/// anomalies would hand every mole on every face to a remover; the temporary channel is what
+/// section 6.1 calls the classification stage, and it is trained against a label a person wrote.
+pub const RETOUCH_CHANNELS: usize = 2;
+
+/// How many kinds the permanent-feature classifier separates.
+///
+/// Six, the `ProtectedKind` vocabulary: mole, freckle, birthmark, scar, tattoo, dimple. The
+/// vocabulary is in `aura-core` and the head predicts all of it, because a kind the head has
+/// never been trained to see is a kind nothing downstream can protect specifically - and one of
+/// the six is the one this product will never alter under any setting.
+pub const PERMANENT_CLASSES: usize = 6;
+
+/// The patch side the permanent-feature classifier reads.
+///
+/// 64 px around one candidate. A patch rather than the face, because the question it answers is
+/// about one mark: is this a pimple or a beauty mark.
+pub const PERMANENT_PATCH_SIDE: usize = 64;
+
+/// The blemish detector: a 256 px face crop in, a 32x32 grid of two channels out.
+///
+/// `crop [N, 3, 256, 256] -> anomalies [N, 2, 32, 32]`
+///
+/// **Untrained in this build**, and `aura_retouch::ops::BLEMISH_HEAD_TRAINED` is false, so it is
+/// never consulted: what runs is the measured detector in `aura_retouch::blemish`. ADR-0041
+/// section 7 records why this phase ships a measurement underneath its placeholder rather than
+/// refusing to detect anything, which is what phases 15, 16 and 18 do.
+///
+/// No sigmoid in the graph. Both channels are logits and the calibration that turns them into
+/// the probabilities `TEMPORARY_FLOOR` is compared against belongs to phase 13, which owns
+/// calibration - a squash baked into the graph would make the head look calibrated when it is
+/// not.
+#[must_use]
+pub fn blemish_detector() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_2005_B1E1_0001);
+    let side = RETOUCH_INPUT_SIDE;
+
+    let graph = Graph {
+        name: BLEMISH_MODEL.to_string(),
+        nodes: vec![
+            // 256 -> 128
+            conv3("stem", &["crop", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 128 -> 64
+            pool2("pool1", "stem_relu", "pool1_out"),
+            conv3("c1", &["pool1_out", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            // 64 -> 32. Stride 8 from here on.
+            pool2("pool2", "c1_relu", "pool2_out"),
+            conv3("c2", &["pool2_out", "c2_w", "c2_b"], &["c2_out"], 1),
+            node("Relu", "c2_act", &["c2_out"], &["trunk"]),
+            conv1("head", &["trunk", "head_w", "head_b"], &["anomalies"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.25),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("c1_w", vec![48, 24, 3, 3], 0.15),
+            weights.tensor("c1_b", vec![48], 0.05),
+            weights.tensor("c2_w", vec![64, 48, 3, 3], 0.11),
+            weights.tensor("c2_b", vec![64], 0.05),
+            weights.tensor("head_w", vec![RETOUCH_CHANNELS, 64, 1, 1], 0.09),
+            weights.tensor("head_b", vec![RETOUCH_CHANNELS], 0.02),
+        ],
+        inputs: vec![dynamic_batch("crop", &[3, side, side])],
+        outputs: vec![dynamic_batch(
+            "anomalies",
+            &[RETOUCH_CHANNELS, RETOUCH_HEAD_SIDE, RETOUCH_HEAD_SIDE],
+        )],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The permanent-feature classifier: a 64 px patch in, six class logits out.
+///
+/// `patch [N, 3, 64, 64] -> kinds [N, 6]`
+///
+/// **Untrained in this build**, and `aura_retouch::ops::PERMANENT_HEAD_TRAINED` is false. What
+/// decides permanence here instead is cross-frame evidence - the same mark at the same place on
+/// the same face across hours - which is section 6.1 own mechanism and does not need a network.
+#[must_use]
+pub fn permanent_features() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_2005_9E12_0002);
+    let side = PERMANENT_PATCH_SIDE;
+
+    let graph = Graph {
+        name: PERMANENT_MODEL.to_string(),
+        nodes: vec![
+            conv3("stem", &["patch", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            pool2("pool", "stem_relu", "pool_out"),
+            conv3("c1", &["pool_out", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            node("GlobalAveragePool", "squeeze", &["c1_relu"], &["pooled"]),
+            node("Flatten", "flatten", &["pooled"], &["flat"]),
+            node("Gemm", "head", &["flat", "head_w", "head_b"], &["kinds"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.26),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("c1_w", vec![32, 24, 3, 3], 0.14),
+            weights.tensor("c1_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![PERMANENT_CLASSES, 32], 0.12),
+            weights.tensor("head_b", vec![PERMANENT_CLASSES], 0.02),
+        ],
+        inputs: vec![dynamic_batch("patch", &[3, side, side])],
+        outputs: vec![dynamic_batch("kinds", &[PERMANENT_CLASSES])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}

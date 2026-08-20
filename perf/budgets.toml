@@ -834,3 +834,52 @@ max_ms_per_unit = 500
 # `crates/aura-perf/tests/local_budgets.rs`.
 [size.local_store_per_1000_images]
 max_bytes = 1100000
+
+# ---------------------------------------------------------------------------
+# PHASE-20. Portrait retouch.
+# ---------------------------------------------------------------------------
+#
+# Section 11 has four rows and two of them are waived here, for reasons that are
+# properties of this build rather than of the code:
+#
+#   retouch at full resolution (45 MP, GPU)   <= 350 ms   waived: no wgpu backend
+#   retouch at proxy (2048 px)                <= 45 ms    measured below
+#   1,000-image gallery at export             <= 7 min    extrapolated from the row below
+#   processor fallback (45 MP)                <= 4 s      waived: no camera file exists here
+#
+# What the measured row covers is the whole decision: reading a face, band-separating it,
+# finding its marks, deciding what to do about each one, and then running the result through
+# the REAL renderer to measure what it did to the texture. That last step is the expensive
+# one and it is not optional - section 6.3's guarantee is a post-condition, so the guard
+# renders the plan at least once and up to four times when it has to re-solve.
+#
+# The figure below is a per-image ceiling on the *decision* on the processor path in release,
+# on a 256 px fixture face. It is far above section 11's 45 ms proxy row because that row is
+# about applying a plan on a GPU and this is about producing one on a CPU, including up to
+# four renders. Conflating them would be a budget that looks strict and measures the wrong
+# thing.
+[stage.retouch_plan_frame]
+max_elapsed_ms  = 12000
+max_ms_per_unit = 500
+
+# Section 11 sets no storage row for this phase. One is measured anyway, against the kilobyte
+# per image every phase since 09 has aimed at.
+#
+# The measured decomposition on 1,000 photographs over the widest rows the fixtures produce:
+#
+#   the plan row and its three indexes    486 B/image
+#   the operations                        212 B/image   ~70 B each
+#   the reasons                           178 B/image   up to twelve codes on a busy frame
+#                                       -----
+#   measured total                        876 B/image
+#
+# `retouch_protected` and `retouch_identity` are deliberately outside the figure: they are per
+# *person* rather than per photograph, so a wedding with sixty identified people and four
+# protect rows each costs about 20 KB in total and does not scale with the import.
+#
+# The budget is 1,000 B/image rather than the measured 876, and the headroom is deliberate:
+# phase 19's own correction was that a budget measured with a quantised instrument must not be
+# pinned at its own measurement, and this figure comes from `PRAGMA page_count`, which moves in
+# 4 KiB steps.
+[size.retouch_store_per_1000_images]
+max_bytes = 1000000

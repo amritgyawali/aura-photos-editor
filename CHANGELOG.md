@@ -2,6 +2,77 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 20 - Portrait Retouch AI (blemishes, protected features, texture protection)
+
+The first phase that changes what a person's skin looks like, and the one with the least room
+for error: a slightly over-strong grade is a photograph somebody adjusts, and a removed mole is a
+photograph of somebody else.
+
+Temporary marks are removed by borrowing skin from a couple of millimetres away - the same person
+under the same light - and putting that skin's own texture back on top. Dark circles are lifted a
+quarter of a stop at most, measured against the cheek beside them rather than against a target.
+Blotchy patches are calmed by moving one band of detail while the band that holds the pores comes
+back untouched.
+
+Everything that is the person stays. Freckles, moles, birthmarks, scars and dimples are found,
+listed with their evidence, and vetoed out of the candidate list before any strength is
+consulted - a veto rather than a discount, because a partly inpainted mole is a smudged one.
+**Tattoos can never be unprotected**, by any setting, and the refusal lives in the type, in the
+service and in a database trigger.
+
+The headline claim is a measurement rather than a promise. Every photograph carries the ratio of
+its skin's fine-detail energy after the retouch to the same energy before it, measured by running
+the plan through the real renderer. Below the preset's floor the strength is reduced and measured
+again; if three attempts do not reach it, **the retouch is withdrawn and the frame ships
+unretouched**.
+
+**Both shipped heads are untrained and neither is consulted, phase 06 finds no faces, and no skin
+mask reaches this pass** - so on this build nothing is retouched on a real photograph. That is
+conditions C1 to C3 of `docs/progress/PHASE-20-EXIT.md`.
+
+### Added
+
+- **`aura-core::contract::retouch`**: the frozen `RetouchOp`, `RetouchPlan`, `ProtectedFeature`,
+  `ProtectedKind` and its absolute member, `TextureReport`, `RetouchPreset`, `FreqBand` -
+  which has no `High` variant, so no operator can name the band that holds the pores -
+  twenty-six reason codes, `RetouchOutline`, `RetouchOverride` and `RetouchService`. There is no
+  field anywhere in it for reshaping, lightening or swapping a face.
+- **`aura-retouch`**: eleven modules. A measured detector that reads colour as well as luminance,
+  cross-frame permanence in face-normalised coordinates, a capped under-eye correction,
+  mid-band evening that cannot reach a pore, the texture guard with its re-solve and withdrawal,
+  one gallery-constant strength per person, and the store.
+- **`aura-render::bands` and `aura_render::retouch`**: the three-band separation, moved out of
+  phase 19 for its second consumer, and the processor reference for the retouch stage. Three new
+  WGSL files, and the phase 14 pass-through `stage_retouch` retired from `spatial.wgsl`.
+- **Migration 20**: `retouch_plan`, `retouch_identity`, `retouch_protected`, `retouch_op` and
+  `v_retouch_coverage`. The first table in this product whose rows a photographer creates
+  directly and whose subject is a person, plus two triggers that abort any attempt to delete a
+  protected tattoo.
+- **Two signed models with cards** - `blemish_detector` and `permanent_features` - both untrained
+  and neither consulted, and four Python scripts that self-test without PyTorch.
+- **Eight IPC commands** (ADR-0042) and a retouch panel that shows what was left alone as
+  prominently as what was done.
+- **Six error codes** `AURA-ML-5090` to `5095`, with runbooks. One of them,
+  `AURA-ML-5095`, is registered so the texture guard is *visible* when it fires rather than
+  because anything is wrong.
+- **`docs/retouch.md`**, the product's own account, including every one of the twenty-six reason
+  sentences - which two gates assert.
+
+### Changed
+
+- `Capabilities::retouch_operators` still ships false: the operator exists and is tested, and
+  nothing wires a phase 18 matte into the render graph yet.
+- `perf/budgets.toml` gains `retouch_plan_frame` (57.6 ms per image measured, including at least
+  one full render) and `retouch_store_per_1000_images` (659 B per image measured against 1,000).
+- `contracts.lock` gains migration 20 and the three new shaders.
+
+### Known gaps
+
+- No per-skin-tone parity study and no blind expert comparison. Both are named in the eval
+  harness so a missing gate cannot look like a passing one. Conditions C2 and C4.
+- The desktop shell does not build in this repository - `ui/src-tauri` needs an icon that is not
+  checked in - so the eight new commands are not compile-checked here. Condition C5, pre-existing.
+
 ## Phase 19 - Local Light Sculpting (face lighting, subject enhancement, dodge and burn)
 
 The first phase that moves light *inside* a photograph rather than across all of it. Faces

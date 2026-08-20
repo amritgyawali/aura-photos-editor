@@ -31,7 +31,7 @@ use aura_cloud::provider::{
 use aura_cloud::{CloudAiGateway, CloudPolicy};
 use aura_core::clock::{Clock, SystemClock};
 use aura_core::progress::CancelToken;
-use aura_core::AuraResult;
+use aura_core::{AuraResult, PhotoId, ProjectId};
 use aura_cull::gather::Gatherer;
 use aura_cull::store::CullStore;
 use aura_cull::Cull;
@@ -51,6 +51,7 @@ use aura_people::store::PeopleStore;
 use aura_people::vault::BiometricKeyStore;
 use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
+use aura_retouch::{Retouch, RetouchPass, RetouchStore};
 use aura_style::profile::Identity;
 use aura_style::{Style, StyleStore};
 use aura_vision::embed::model::{MODEL_VER, PREPROCESS_VER};
@@ -1731,6 +1732,96 @@ impl AppState {
                     target: "local.pass",
                     code = %err.code,
                     "no scene service; every frame will be shaped against the neutral policy row"
+                );
+            }
+        }
+        Ok(pass)
+    }
+
+    /// Which project a photograph belongs to.
+    ///
+    /// PHASE-20 needs it because `RetouchService` is project-scoped - the gallery-wide
+    /// strengths and the protect set are properties of a person within a wedding - while the
+    /// panel asks about one photograph at a time.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the catalog cannot be read, and the same code when the photograph is
+    /// not in it: a caller asking about a photograph this catalog has never seen is a caller
+    /// with a stale id, and answering with a project it guessed would be worse.
+    pub fn project_of(&self, photo: PhotoId) -> AuraResult<ProjectId> {
+        let key = photo.to_db();
+        let found = self.catalog.read(move |conn| {
+            let row: Result<String, rusqlite::Error> = conn.query_row(
+                "SELECT project_id FROM photo WHERE photo_id = ?1",
+                rusqlite::params![key],
+                |row| row.get(0),
+            );
+            Ok(row.ok())
+        })?;
+        found
+            .and_then(|text| ProjectId::from_db(&text).ok())
+            .ok_or_else(|| {
+                aura_core::errors::db::statement_failed(
+                    "that photograph is not in this catalog",
+                    &rusqlite::Error::QueryReturnedNoRows,
+                )
+            })
+    }
+
+    /// The retouch store for this catalog. PHASE-20.
+    ///
+    /// Stateless like every decision store since phase 09. It owns no model and opens no
+    /// preview; those belong to the pass below.
+    #[must_use]
+    pub fn retouch_store(&self) -> Arc<RetouchStore> {
+        Arc::new(RetouchStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `RetouchService` for this catalog. PHASE-20.
+    ///
+    /// Project-scoped, unlike the thirteen services before it, because two of its frozen methods
+    /// are about a *person across a project* rather than about a photograph - the gallery-wide
+    /// strengths and the protect set - and a service that had to be handed a project on every
+    /// call would let a caller mix two weddings in one answer.
+    #[must_use]
+    pub fn retouch(&self, project: &ProjectId) -> Arc<Retouch> {
+        Arc::new(Retouch::new(self.retouch_store(), *project))
+    }
+
+    /// The retouch pass, wired to previews, people and story. PHASE-20.
+    ///
+    /// **No mask service is attached, because none reaches this port.** Phase 18 owns masks and
+    /// `RetouchPass::with_masks` is the input port; nothing here fills it, so every operation is
+    /// withdrawn and every plan says `mask_unavailable`. That is condition C1 of the phase 20
+    /// exit report and it is visible in `RetouchOutline::mask_covered` rather than hidden.
+    ///
+    /// Phase 19 evened faces are not attached either, for the same kind of reason: the local
+    /// plans exist, and the join that would carry them is a query this pass does not yet make.
+    /// The consequence is conservative - a face may be evened twice - and it is recorded rather
+    /// than silent.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5093` when the retouch preset table will not load, or whatever opening the
+    /// preview service raised.
+    pub fn retouch_pass(&self, project_id: &str) -> AuraResult<RetouchPass> {
+        let mut pass = RetouchPass::new(
+            self.previews(project_id)?,
+            self.retouch_store(),
+            Arc::clone(&self.clock),
+        )?
+        .with_people(self.people());
+        match self.story() {
+            Ok(story) => pass = pass.with_story(story),
+            Err(err) => {
+                tracing::warn!(
+                    target: "retouch.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be retouched against the neutral preset row"
                 );
             }
         }

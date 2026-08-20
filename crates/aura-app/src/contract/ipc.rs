@@ -5063,3 +5063,344 @@ pub struct SetLocalStrengthDto {
     /// The dotted paths a person now owns.
     pub protected: Vec<String>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-20. Portrait retouch.
+// ---------------------------------------------------------------------------
+
+/// One thing that was done to somebody skin.
+///
+/// The rectangle is present for a blemish and absent for the two operations that act through a
+/// mask or a landmark region, which is a real answer rather than a missing one: the panel draws
+/// a marker for a blemish and highlights a region for the others.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetouchOpDto {
+    /// The operator name: `blemish`, `under_eye`, `tone_evening` or `shine_reduce`.
+    pub kind: String,
+    /// How strongly it ran, `0..1`.
+    pub strength: f32,
+    /// Where it acted, when it names a rectangle.
+    pub area: Option<CropRectDto>,
+    /// How a blemish was removed: `patch` or `learned`.
+    pub method: Option<String>,
+    /// Whose face, when the operation names a person.
+    pub identity_id: Option<String>,
+    /// Luminance lift in stops, for an under-eye correction. Bounded at 0.25.
+    pub luma_ev: f32,
+    /// Chroma separation reduction, for the same. Bounded at 0.12.
+    pub chroma: f32,
+}
+
+/// Something about a person this product will not remove.
+///
+/// The rectangle is in **face-normalised** coordinates - origin between the eyes, x along the
+/// eye-to-eye line, unit the inter-ocular distance - which is what lets one row protect the same
+/// mole in four hundred photographs. A panel drawing it on a specific frame projects it through
+/// that frame own landmarks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProtectedFeatureDto {
+    /// Whose face.
+    pub identity_id: String,
+    /// `mole`, `freckle`, `birthmark`, `scar`, `tattoo` or `dimple`.
+    pub kind: String,
+    /// Where on that face, face-normalised. `x` and `y` may be negative.
+    pub area: CropRectDto,
+    /// How sure the product is, `0..1`. One when a photographer said so.
+    pub confidence: f32,
+    /// `cross_frame`, `classifier` or `user`, in ascending order of authority.
+    pub source: String,
+    /// How many frames it was measured on.
+    pub frames: u32,
+    /// The span those frames covered, in minutes.
+    pub span_minutes: f32,
+    /// The first photograph it was seen on, for the evidence crop.
+    pub first_seen_photo: String,
+    /// True when nothing may clear it.
+    ///
+    /// On the wire rather than derived from the kind in the panel, because the consequence is a
+    /// control that must not be rendered as a toggle: a tattoo is always protected and the UI
+    /// has to be able to say so without knowing the vocabulary.
+    pub absolute: bool,
+}
+
+/// What the retouch did to the texture of the skin, measured through the renderer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextureReportDto {
+    /// High-band skin energy after the retouch over the same energy before it.
+    pub band_ratio: f32,
+    /// The floor this frame was held to.
+    pub floor: f32,
+    /// True when the stored plan is inside the floor.
+    pub passed: bool,
+    /// How many skin samples the ratio was measured over.
+    ///
+    /// The panel shows the ratio to three decimal places only when this is large enough to mean
+    /// something. A number measured over eleven samples is arithmetic rather than evidence.
+    pub measured_on: u32,
+    /// How many times the solver gave up strength to reach the floor.
+    pub resolves: u8,
+    /// True when the retouch was withdrawn entirely because the floor could not be met.
+    pub withdrawn: bool,
+}
+
+/// One reason the retouch came out the way it did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetouchReasonDto {
+    /// The stable slug.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// How much this moved the confidence. Negative for a doubt.
+    pub weight: f32,
+    /// True when the code withdraws a claim rather than making one.
+    ///
+    /// **Half the codes in this phase are withdrawals**, which is the highest proportion in the
+    /// product, so the panel groups by this rather than by parsing the slug.
+    pub withdrawal: bool,
+    /// The pixels to show, when there are any more specific than the whole frame.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// Everything phase 20 decided about one photograph skin.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct RetouchPlanDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// What was done.
+    pub ops: Vec<RetouchOpDto>,
+    /// The gallery-constant strength for each identity in this frame.
+    pub identity_strengths: Vec<IdentityStrengthDto>,
+    /// What must not be removed from the people in this frame.
+    pub protected: Vec<ProtectedFeatureDto>,
+    /// What it cost the texture.
+    pub texture: TextureReportDto,
+    /// `off`, `light`, `natural` or `polished`.
+    pub preset: String,
+    /// Why. Never empty.
+    pub reasons: Vec<RetouchReasonDto>,
+    /// How much the plan trusts itself, `0..1`.
+    pub confidence: f32,
+    /// The scene it was decided under.
+    pub scene: String,
+    /// How much of the shared per-image allowance it spent, `0..1`.
+    ///
+    /// **Phase 19 allowance, not a second one.** Six local operations and a retouch that each
+    /// stay inside their own budget still add up to a photograph that looks worked on.
+    pub budget_used: f32,
+    /// True when a photographer changed the preset or a strength by hand.
+    pub user_edited: bool,
+    /// True when a photographer has looked at this plan and agreed.
+    pub reviewed: bool,
+    /// True when the frame is worth a photographer attention.
+    pub needs_review: bool,
+    /// Which learned heads produced the detections.
+    pub model_ver: u32,
+    /// Which build arithmetic produced the decisions.
+    pub analysis_ver: u32,
+    /// Which preset file the strengths came from.
+    pub preset_ver: u32,
+}
+
+/// One person gallery-wide retouch strength.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IdentityStrengthDto {
+    /// Who.
+    pub identity_id: String,
+    /// What every frame in this wedding retouches them at, `0..1`.
+    pub strength: f32,
+}
+
+/// What the retouch panel project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetouchStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a plan.
+    pub planned: u32,
+    /// Fraction planned; the denominator is every photograph.
+    pub coverage: f32,
+    /// Fraction of planned frames where at least one operation ran.
+    pub acted_on: f32,
+    /// Fraction of planned frames whose skin mask arrived.
+    pub mask_covered: f32,
+    /// Blemishes removed across the project.
+    pub blemishes_removed: u32,
+    /// Anomalies deliberately left alone.
+    ///
+    /// **The number a photographer asks about**, because it is the answer to "why is that mark
+    /// still there". A retoucher that only reported what it removed would look like one that
+    /// missed things.
+    pub anomalies_left: u32,
+    /// How many features are protected, by kind.
+    pub protected_counts: Vec<u32>,
+    /// The kinds stable slugs, in the same order.
+    pub protected_kinds: Vec<String>,
+    /// Frames where the texture guard reduced a strength.
+    pub texture_resolved: u32,
+    /// Frames where it withdrew the retouch entirely.
+    pub texture_withdrawn: u32,
+    /// Mean band ratio over the frames that were retouched.
+    pub mean_band_ratio: f32,
+    /// Mean gallery-constant strength over the people in the project.
+    pub mean_strength: f32,
+    /// The largest spread of one identity strength across the gallery.
+    ///
+    /// Zero by construction while strength is a gallery constant, and on the wire anyway so a
+    /// change that made it per-frame would be visible in the product rather than only in a diff.
+    pub max_identity_spread: f32,
+    /// How many frames each preset was used on.
+    pub preset_counts: Vec<u32>,
+    /// The presets stable slugs, in the same order.
+    pub preset_names: Vec<String>,
+    /// Frames nobody has reviewed that are below the review threshold.
+    pub needs_review: u32,
+    /// Frames a photographer has set by hand.
+    pub user_edited: u32,
+    /// Scenes with no preset row.
+    pub unpreset_scenes: Vec<String>,
+    /// Which learned heads produced the detections.
+    pub model_ver: u32,
+    /// Which build arithmetic produced the decisions.
+    pub analysis_ver: u32,
+    /// Which preset file the strengths came from.
+    pub preset_ver: u32,
+}
+
+/// What one retouch pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetouchPassDto {
+    /// Photographs planned.
+    pub planned: u32,
+    /// Photographs that could not be planned.
+    pub failed: u32,
+    /// Photographs where at least one operation ran.
+    pub acted_on: u32,
+    /// Photographs where a skin mask arrived.
+    pub mask_covered: u32,
+    /// Blemishes removed.
+    pub blemishes: u32,
+    /// Frames where the texture guard reduced a strength.
+    pub texture_resolved: u32,
+    /// Frames where it withdrew the retouch.
+    pub texture_withdrawn: u32,
+    /// Features protected by cross-frame evidence.
+    pub protected: u32,
+    /// Frames below the review threshold.
+    pub low_confidence: u32,
+    /// Mean band ratio over the frames that were retouched.
+    pub mean_band_ratio: f32,
+    /// Scenes planned against the neutral row.
+    pub unpreset_scenes: Vec<String>,
+    /// Recipes written.
+    pub recipes_written: u32,
+    /// Recipes left alone because a photographer had taken them over.
+    pub recipes_protected: u32,
+    /// Milliseconds for the pass.
+    pub elapsed_ms: u64,
+    /// True when the pass stopped early because it was cancelled.
+    pub cancelled: bool,
+}
+
+/// Run the resumable retouch pass.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetouchPassInput {
+    /// The project.
+    pub project_id: String,
+    /// The photographs to plan. Empty means everything that is not planned at these versions.
+    #[serde(default)]
+    pub photo_ids: Vec<String>,
+    /// The preset to run under. Absent means the default, which is Natural.
+    #[serde(default)]
+    pub preset: Option<String>,
+    /// A cancel handle.
+    #[serde(default)]
+    pub cancel_id: Option<String>,
+}
+
+/// Ask for the frames whose retouch is worth a photographer attention.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetouchReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many at most.
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Record that the photographer has looked at one plan and agrees.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptRetouchInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Record what the photographer set instead.
+///
+/// Both fields optional and independent. **A strength is gallery-wide**: setting one person
+/// strength on one frame and not on the rest is how a gallery ends up with a bride whose skin
+/// changes character between the ceremony and the reception.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetRetouchInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// The preset for this photograph.
+    #[serde(default)]
+    pub preset: Option<String>,
+    /// A person, when setting their gallery-wide strength.
+    #[serde(default)]
+    pub identity_id: Option<String>,
+    /// Their strength, `0..1`.
+    #[serde(default)]
+    pub strength: Option<f32>,
+}
+
+/// What recording a retouch override did, on both sides.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetRetouchDto {
+    /// The stored plan, after the override.
+    pub plan: RetouchPlanDto,
+    /// The recipe, after the merge.
+    pub recipe: RecipeDto,
+    /// Which recipe fields changed.
+    pub changed: Vec<String>,
+    /// Which fields the merge refused to touch because a person owns them.
+    pub protected: Vec<String>,
+}
+
+/// Add or clear one protected feature.
+///
+/// `protect = false` clears a feature. **It cannot clear an absolute one**: a tattoo is always
+/// protected, `AURA-ML-5091` says so, and the panel renders it without a control rather than
+/// with a disabled one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetProtectionInput {
+    /// The project.
+    pub project_id: String,
+    /// Whose face.
+    pub identity_id: String,
+    /// The photograph the rectangle was drawn on, which is how it becomes face-normalised.
+    pub photo_id: String,
+    /// `mole`, `freckle`, `birthmark`, `scar`, `tattoo` or `dimple`.
+    pub kind: String,
+    /// The region, in **frame** coordinates as the panel drew it.
+    pub area: CropRectDto,
+    /// True to protect, false to clear.
+    pub protect: bool,
+}

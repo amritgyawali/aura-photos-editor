@@ -67,6 +67,8 @@
 //! | [`parity`] | The harness that compares an accelerator with the reference. |
 //! | [`shaders`] | The WGSL sources, checked against the reference by a test. |
 //! | [`golden`] | Digests and dE2000, for the regression gate. |
+//! | [`bands`] | Three-band frequency separation. PHASE-20 moved it here for its second consumer. |
+//! | [`retouch`] | The processor reference for the retouch stage. PHASE-20. |
 //!
 //! # The three rules this crate exists to keep
 //!
@@ -95,6 +97,7 @@ pub mod contract {
     pub mod render;
 }
 
+pub mod bands;
 pub mod colour;
 pub mod cpu;
 pub mod errors;
@@ -106,6 +109,7 @@ pub mod local;
 pub mod output;
 pub mod parity;
 pub mod profiles;
+pub mod retouch;
 pub mod shaders;
 pub mod spatial;
 pub mod tiles;

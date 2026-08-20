@@ -39,6 +39,7 @@ pub mod contract {
     pub mod moment;
     pub mod people;
     pub mod priority;
+    pub mod retouch;
     pub mod scene;
     pub mod style;
     pub mod tone;
@@ -100,6 +101,11 @@ pub use contract::moment::{
 };
 pub use contract::people::{FaceRef, ImageSubjects, PeopleService, Role, SubjectHierarchy};
 pub use contract::priority::Priority;
+pub use contract::retouch::{
+    FreqBand, InpaintMethod, ProtectedFeature, ProtectedKind, ProtectedSource, RetouchCode,
+    RetouchOp, RetouchOutline, RetouchOverride, RetouchPlan, RetouchPreset, RetouchReason,
+    RetouchService, TextureReport,
+};
 pub use contract::scene::{
     AttrFlags, ChapterId, EditIntent, RitualId, SceneId, SceneProfile, SceneResult, SceneScore,
     Segment, Source, StoryOutline, StoryService,

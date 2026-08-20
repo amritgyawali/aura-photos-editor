@@ -1,5 +1,7 @@
 /target
 /ui/src-tauri/target
+# Tauri writes its capability schemas here on every build. Generated, not authored.
+/ui/src-tauri/gen
 /graphify-out
 /ui/node_modules
 /ui/dist

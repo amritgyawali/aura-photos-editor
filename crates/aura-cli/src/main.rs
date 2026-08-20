@@ -33,6 +33,7 @@ mod phase16;
 mod phase17;
 mod phase18;
 mod phase19;
+mod phase20;
 mod replay;
 
 pub(crate) const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -70,6 +71,7 @@ fn main() -> ExitCode {
             Some("17") => phase17::verify(&args),
             Some("18") => phase18::verify(&args),
             Some("19") => phase19::verify(&args),
+            Some("20") => phase20::verify(&args),
             _ => cmd_verify(&args),
         },
         Some("replay") => replay::run(&args),

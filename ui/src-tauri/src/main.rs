@@ -35,6 +35,11 @@ use aura_app::contract::ipc::{
     AcceptLocalInput, LocalPassDto, LocalPlanDto, LocalReviewInput, LocalStatusDto,
     SculptLocalInput, SetLocalStrengthDto, SetLocalStrengthInput,
 };
+// PHASE-20.
+use aura_app::contract::ipc::{
+    AcceptRetouchInput, ProtectedFeatureDto, RetouchPassDto, RetouchPassInput, RetouchPlanDto,
+    RetouchReviewInput, RetouchStatusDto, SetProtectionInput, SetRetouchDto, SetRetouchInput,
+};
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
 use tauri::{Manager, State};
@@ -661,6 +666,100 @@ async fn set_local_strength(
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-20. The retouch surface. `retouch_pass` decodes proxies, separates frequency bands and
+// runs every plan through the renderer to measure what it did to the texture, so it goes off the
+// renderer thread with the rest.
+#[tauri::command]
+async fn retouch_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<RetouchStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::retouch_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_retouch(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<RetouchPlanDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_retouch(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn protected_features(
+    state: State<'_, AppState>,
+    project_id: String,
+    identity_id: String,
+) -> IpcResult<Vec<ProtectedFeatureDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::protected_features(&app, &project_id, &identity_id)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn retouch_review_queue(
+    state: State<'_, AppState>,
+    input: RetouchReviewInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::retouch_review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn accept_retouch(
+    state: State<'_, AppState>,
+    input: AcceptRetouchInput,
+) -> IpcResult<RetouchPlanDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::accept_retouch(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_retouch(
+    state: State<'_, AppState>,
+    input: SetRetouchInput,
+) -> IpcResult<SetRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_retouch(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_protection(
+    state: State<'_, AppState>,
+    input: SetProtectionInput,
+) -> IpcResult<Vec<ProtectedFeatureDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_protection(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn retouch_pass(
+    state: State<'_, AppState>,
+    input: RetouchPassInput,
+) -> IpcResult<RetouchPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::retouch_pass(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn sculpt_local(
     state: State<'_, AppState>,
@@ -770,7 +869,15 @@ async fn sculpt_local(
             local_review_queue,
             accept_local,
             set_local_strength,
-            sculpt_local
+            sculpt_local,
+            retouch_status,
+            image_retouch,
+            protected_features,
+            retouch_review_queue,
+            accept_retouch,
+            set_retouch,
+            set_protection,
+            retouch_pass
         ])
         .run(tauri::generate_context!());
 

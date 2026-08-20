@@ -128,6 +128,10 @@ fn each_stage_entry_point_is_in_the_file_its_subject_belongs_to() {
             | Stage::Hsl
             | Stage::Vibrance
             | Stage::Monochrome => "tone.wgsl",
+            // PHASE-20. The retouch operators are their own file, and the pass-through phase 14
+            // left in `spatial.wgsl` is gone. A stage whose entry point sits beside the sharpen
+            // kernel is a stage nobody finds when they go looking for the retoucher.
+            Stage::Retouch => "retouch_apply.wgsl",
             _ => "spatial.wgsl",
         };
         assert_eq!(file, expected, "{} is in the wrong file", stage.as_str());

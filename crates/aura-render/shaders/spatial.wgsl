@@ -244,12 +244,12 @@ fn stage_masks(@builtin(global_invocation_id) id: vec3<u32>) {
 // rather than scheduling either, so these entry points exist to keep the stage table
 // exhaustive and to be filled in without touching the graph.
 // ---------------------------------------------------------------------------
-@compute @workgroup_size(64)
-fn stage_retouch(@builtin(global_invocation_id) id: vec3<u32>) {
-    let index = id.x;
-    if (index >= frame.width * frame.height) { return; }
-    store(index, load(index));
-}
+// PHASE-20 moved `stage_retouch` into `retouch_apply.wgsl`, where the operators live. What
+// stood here was phase 14 pass-through: a stage that copied its input so that
+// `every_stage_has_an_entry_point` would pass while nothing could retouch. Leaving it would
+// mean two entry points with the same name and one of them doing nothing, which is exactly the
+// drift `shader_parity.rs` exists to catch.
+
 
 @compute @workgroup_size(64)
 fn stage_restoration(@builtin(global_invocation_id) id: vec3<u32>) {

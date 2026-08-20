@@ -110,6 +110,8 @@ dependencies = [
  "aura-catalog",
  "aura-cloud",
  "aura-core",
+ "aura-cull",
+ "aura-explain",
  "aura-index",
  "aura-infer",
  "aura-ingest",
@@ -118,7 +120,12 @@ dependencies = [
  "aura-people",
  "aura-preview",
  "aura-raw",
+ "aura-recipe",
+ "aura-render",
+ "aura-retouch",
+ "aura-style",
  "aura-vision",
+ "blake3",
  "parking_lot",
  "rusqlite",
  "serde",
@@ -137,10 +144,13 @@ dependencies = [
  "aura-infer",
  "aura-preview",
  "aura-raw",
+ "aura-recipe",
+ "aura-render",
  "aura-vision",
  "rusqlite",
  "serde",
  "serde_json",
+ "time",
  "toml 0.8.2",
  "tracing",
  "uuid",
@@ -228,11 +238,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-cull"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "time",
+ "toml 0.8.2",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aura-desktop"
 version = "0.1.0"
 dependencies = [
  "aura-app",
  "aura-core",
+ "aura-style",
  "serde",
  "serde_json",
  "tauri",
@@ -240,6 +267,21 @@ dependencies = [
  "tauri-plugin-dialog",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "aura-explain"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "time",
+ "toml 0.8.2",
+ "tracing",
 ]
 
 [[package]]
@@ -370,17 +412,90 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-recipe"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "time",
+ "tracing",
+]
+
+[[package]]
+name = "aura-render"
+version = "0.1.0"
+dependencies = [
+ "aura-core",
+ "aura-raw",
+ "aura-recipe",
+ "blake3",
+ "rayon",
+ "serde",
+ "serde_json",
+ "time",
+ "toml 0.8.2",
+ "tracing",
+]
+
+[[package]]
+name = "aura-retouch"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "aura-render",
+ "rusqlite",
+ "serde",
+ "time",
+ "toml 0.8.2",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "aura-style"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-raw",
+ "aura-recipe",
+ "aura-render",
+ "blake3",
+ "ed25519-dalek",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "time",
+ "tracing",
+ "uuid",
+ "walkdir",
+]
+
+[[package]]
 name = "aura-vision"
 version = "0.1.0"
 dependencies = [
+ "aura-catalog",
  "aura-core",
  "aura-index",
  "aura-infer",
  "aura-preview",
  "aura-raw",
+ "aura-render",
  "blake3",
  "rayon",
+ "rusqlite",
  "serde",
+ "serde_json",
+ "time",
  "toml 0.8.2",
  "tracing",
  "uuid",

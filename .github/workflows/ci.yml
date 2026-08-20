@@ -211,6 +211,21 @@ jobs:
       - name: local light budgets
         run: cargo test --release --package aura-perf --test local_budgets -- --test-threads=1 --nocapture
 
+      # PHASE-20. The assembly proof: migration 20, the preset floor the code owns
+      # rather than the file, the detector, the protect veto, the texture guard and
+      # a tattoo that neither the service nor the database will delete.
+      - name: phase 20 gate
+        run: cargo run --release --package aura-cli -- verify --phase 20 --work target/phase20-verify
+
+      - name: retouch evaluation gates
+        run: cargo test --release --package aura-retouch --test retouch_eval -- --nocapture
+
+      # PHASE-20 section 11. Two of its four rows are waived - no GPU backend and no
+      # 45 MP frame in this repository - so what is asserted is the decision on the
+      # processor path and the store.
+      - name: retouch budgets
+        run: cargo test --release --package aura-perf --test retouch_budgets -- --test-threads=1 --nocapture
+
       # Two independent implementations of the metrics have to agree, or neither
       # is trustworthy. The Python half also self-tests without cargo.
       - name: python evaluation self-tests
@@ -221,3 +236,7 @@ jobs:
           python ml/models/embed/export.py --placeholder --verify models
           python ml/models/local/train_light_targets.py --self-test
           python ml/models/local/eval_local.py --self-test
+          python ml/models/retouch/train_blemish.py --self-test
+          python ml/models/retouch/train_permanent.py --self-test
+          python ml/models/retouch/eval_retouch.py --self-test
+          python ml/models/retouch/export.py --verify models

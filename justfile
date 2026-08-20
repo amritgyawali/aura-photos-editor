@@ -262,6 +262,24 @@ local-light-eval:
     python ml/models/local/train_light_targets.py --self-test
     python ml/models/local/eval_local.py --self-test
 
+# The phase 20 gate: migration 20, the preset table and the floor bound the code owns rather
+# than the file, the detector, the protect veto, the texture guard and its withdrawal, the
+# store, a photographer's preset surviving a re-analysis, and a tattoo that neither the service
+# nor the database will delete. It prints what it does not prove at the end of every run - see
+# docs/progress/PHASE-20-EXIT.md conditions C1 to C4.
+phase-20-verify:
+    cargo run --release --package aura-cli -- verify --phase 20 --work target/phase20-verify
+
+# The phase 20 gates, from the Python side. Neither training script can run on real data here -
+# there is no labelled blemish corpus - so all four self-test against a synthetic answer known
+# by construction, and `export.py --verify` checks that the two registered heads agree with the
+# shapes the code expects.
+retouch-eval:
+    python ml/models/retouch/train_blemish.py --self-test
+    python ml/models/retouch/train_permanent.py --self-test
+    python ml/models/retouch/eval_retouch.py --self-test
+    python ml/models/retouch/export.py --verify models
+
 # The calibration metrics, from the Python side. `--self-test` proves the
 # estimator catches an overconfident predictor and that a fit improves held-out
 # ECE; `--outcomes FILE --fit --diagram OUT.svg` reports on real outcomes when

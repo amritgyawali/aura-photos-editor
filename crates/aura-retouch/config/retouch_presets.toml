@@ -1,0 +1,278 @@
+# How much retouching each kind of photograph and each kind of person gets.
+#
+# PHASE-20 section 4 asks for this file and section 9 gives PM two tasks: "own the retouch
+# ethics policy and preset definitions" and "approve default = Natural". Both are decisions
+# rather than measurements, so **every row carries a written reason** - the rule phases 07, 10,
+# 12, 15, 16 and 19 all enforce, and the one that matters most here. A retouch threshold nobody
+# can explain is a product quietly deciding how somebody should look.
+#
+# WHAT IS AND IS NOT IN THIS FILE
+#
+# The texture floors are here and they are BOUNDED BY THE CODE. `PresetTable::parse` refuses a
+# floor below `RetouchPreset::floor()` for its preset - 0.90 for Light and Natural, 0.80 for
+# Polished, never lower for anything. Section 6.3 says "never below 0.80 even in Polished", the
+# product repeats it in `docs/retouch.md`, and a claim a text file can retract is not a claim.
+#
+# There is no skin-tone target here, no ideal under-eye colour and no ideal skin luminance. Both
+# halves of every correction in this phase are measured against the skin around them, which is
+# phase 15 rule and the reason `docs/skin-fairness.md` can say what it says.
+#
+# BUMP `version` ON ANY CHANGE. It is written into `retouch_plan.preset_ver`, and a plan made
+# under one table is not comparable with a plan made under another - `AURA-ML-5090` exists so
+# that comparison never happens silently.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# The four presets. `off` is a preset rather than a missing row, because a frame the
+# photographer switched retouching off on and a frame that found nothing to do are two
+# different answers and the coverage report has to tell them apart.
+# ---------------------------------------------------------------------------
+
+[preset.off]
+base_strength = 0.0
+texture_floor = 1.0
+blemish       = 0.0
+undereye      = 0.0
+evening       = 0.0
+reason = """
+The kill switch hard rule 8 requires. Nothing is detected, nothing is planned and the plan says
+so with `head_untrained` rather than with an empty row, because a photograph nobody retouched
+and a photograph the photographer excluded look identical in a report otherwise.
+"""
+
+[preset.light]
+base_strength = 0.45
+texture_floor = 0.94
+blemish       = 1.0
+undereye      = 0.35
+evening       = 0.25
+reason = """
+Blemishes and very little else. The floor is above the phase minimum on purpose: somebody who
+picks Light has said they want the frame to look untouched, so the guard should withdraw sooner
+here than anywhere else. Under-eye and evening run at about a third, which on most frames is
+below what a photographer can see at 100 per cent.
+"""
+
+[preset.natural]
+base_strength = 0.70
+texture_floor = 0.90
+blemish       = 1.0
+undereye      = 0.80
+evening       = 0.65
+reason = """
+The default, approved by PM per section 9. It is the setting the phase headline KPI is measured
+at and the one the blind study is run against: temporary marks gone, dark circles lifted enough
+that nobody comments on them, blotchy patches calmed, pores untouched. The floor is section 6.3
+own 0.90.
+"""
+
+[preset.polished]
+base_strength = 0.90
+texture_floor = 0.84
+blemish       = 1.0
+undereye      = 1.0
+evening       = 0.90
+reason = """
+The most this product will do. The floor is 0.84 rather than 0.80 - the phase absolute bound is
+a bound, not a target, and leaving four points of headroom means a Polished frame that reaches
+its floor has still kept the great majority of its texture. Somebody who wants more than this is
+asking for a different product.
+"""
+
+# ---------------------------------------------------------------------------
+# Per-role weight. Section 6.4: "a full-frame portrait of the bride gets the most careful
+# treatment, a background guest almost none". Role is a GALLERY CONSTANT, which is why the
+# strength model can use it - see ADR-0041 section 6.
+# ---------------------------------------------------------------------------
+
+[role]
+bride           = 1.00
+groom           = 1.00
+couple          = 1.00
+family_close    = 0.80
+family_extended = 0.60
+vip             = 0.70
+guest           = 0.45
+vendor          = 0.20
+child           = 0.30
+unknown         = 0.35
+reason = """
+The couple are the subject of the wedding and are looked at closest, so they get the full
+strength of whatever preset is chosen. A guest at 0.45 is retouched visibly less, and a vendor
+at 0.20 essentially not at all - they are in the frame rather than of it.
+
+Children are deliberately LOW rather than high. A child skin has almost nothing a retoucher
+should remove, and the failure mode of retouching one is that they stop looking like a child.
+
+`unknown` sits just below `guest`: on a build with no face recognition every person in every
+photograph lands here, so it has to be a setting that is safe when applied to the bride by
+mistake.
+"""
+
+# ---------------------------------------------------------------------------
+# Per-scene limits. These decide WHICH OPERATIONS RUN and how far they may go on a frame -
+# never how strong the person own strength is. A `limit` of 0.0 means this kind of photograph
+# is not retouched at all.
+# ---------------------------------------------------------------------------
+
+[scene.neutral]
+limit          = 0.35
+allow_undereye = false
+allow_evening  = false
+reason = """
+The fallback for a scene with no row and for `unknown`. Deliberately the most conservative row
+in the table: an unfamiliar kind of photograph gets less retouching rather than the average
+amount, because the cost of under-retouching is a frame somebody adjusts and the cost of
+over-retouching is a frame somebody client notices.
+"""
+
+[scene.getting_ready_bride]
+limit          = 1.00
+allow_undereye = true
+allow_evening  = true
+reason = "Close, deliberate portraits under makeup lighting. The most retouched scene in a wedding, and the one clients look at longest."
+
+[scene.getting_ready_groom]
+limit          = 0.90
+allow_undereye = true
+allow_evening  = true
+reason = "The same kind of frame with the same closeness. Slightly lower only because the light is usually harder and the guard has less headroom."
+
+[scene.details]
+limit          = 0.00
+allow_undereye = false
+allow_evening  = false
+reason = "Rings, shoes, invitations. There is no skin in these frames, and a retoucher that runs on one is a retoucher finding marks in a bouquet."
+
+[scene.first_look]
+limit          = 0.95
+allow_undereye = true
+allow_evening  = true
+reason = "Two faces, close, and often the frame that opens the gallery. Full care, and tears are common - which is why the under-eye correction is measured against the skin around the eye rather than applied flat."
+
+[scene.ceremony_entrance]
+limit          = 0.70
+allow_undereye = true
+allow_evening  = true
+reason = "Faces at a middle distance, usually moving. Enough care that the frames stand beside the portraits, not so much that motion blur is being retouched."
+
+[scene.ceremony]
+limit          = 0.65
+allow_undereye = true
+allow_evening  = true
+reason = "The longest run of frames in the day and the ones most often delivered in a set. Consistency matters more than depth here: a strength that varies across the set is more visible than a strength that is slightly low."
+
+[scene.ritual]
+limit          = 0.60
+allow_undereye = true
+allow_evening  = false
+reason = """
+Lower than `ceremony` and evening is off. A ritual frame frequently carries turmeric, sindoor,
+mehndi, ash or paint on the skin, and mid-frequency evening is exactly the operation that would
+calm those into a smooth patch. They are not blotches; they are the reason the photograph exists.
+"""
+
+[scene.vows]
+limit          = 0.75
+allow_undereye = true
+allow_evening  = true
+reason = "Close, still and emotional. Retouched like a portrait, with the same caution about tears as `first_look`."
+
+[scene.rings]
+limit          = 0.30
+allow_undereye = false
+allow_evening  = false
+reason = "Mostly hands. Hand skin is not face skin - knuckles, veins and tendons are structure rather than blotches - so the limit is low and only blemish removal runs."
+
+[scene.kiss]
+limit          = 0.80
+allow_undereye = true
+allow_evening  = true
+reason = "A hero frame that gets printed large. Full portrait care."
+
+[scene.family_portrait]
+limit          = 0.85
+allow_undereye = true
+allow_evening  = true
+reason = """
+Posed, static and printed. Every face in the frame is a subject, which is the case where
+per-identity consistency pays for itself: a grandmother and a bride in one frame are retouched
+at their own strengths rather than at the frame own.
+"""
+
+[scene.group_portrait]
+limit          = 0.55
+allow_undereye = true
+allow_evening  = false
+reason = "Faces are small and there are many of them. Blemish removal and a light under-eye lift are worth it; evening across thirty faces spends time on pixels nobody will look at closely."
+
+[scene.couple_portrait]
+limit          = 1.00
+allow_undereye = true
+allow_evening  = true
+reason = "The most looked-at photographs in the gallery, taken deliberately, usually in good light. Full care."
+
+[scene.golden_hour]
+limit          = 0.90
+allow_undereye = true
+allow_evening  = true
+reason = "Portrait care, with a note: low-angle warm light produces real texture across the face, and the texture guard does most of the restraining here rather than this row."
+
+[scene.reception_entrance]
+limit          = 0.55
+allow_undereye = true
+allow_evening  = false
+reason = "Moving subjects, mixed light, faces at a distance. Blemishes and a little under-eye work."
+
+[scene.speeches]
+limit          = 0.60
+allow_undereye = true
+allow_evening  = true
+reason = "Faces are still and often close, and a speech runs long enough that the same person appears in many frames - so consistency across them is what a viewer notices."
+
+[scene.cake]
+limit          = 0.50
+allow_undereye = true
+allow_evening  = false
+reason = "Two faces at a middle distance with a bright object between them. Moderate."
+
+[scene.first_dance]
+limit          = 0.70
+allow_undereye = true
+allow_evening  = true
+reason = "Close, dark, often the second most printed frame of the day. Care, with the noise of a dark room making the guard the binding constraint."
+
+[scene.dance_floor]
+limit          = 0.25
+allow_undereye = false
+allow_evening  = false
+reason = """
+Section 6.4 own example of the frame that gets almost nothing. Faces are small, moving and lit
+by whatever the DJ chose; there is nothing here a retoucher should be doing and a great deal of
+grain that an under-eye lift would find.
+"""
+
+[scene.candid]
+limit          = 0.45
+allow_undereye = true
+allow_evening  = false
+reason = "A wide range of frames under one label. Middling, and the under-eye correction stays because a candid of the couple is a frame somebody will enlarge."
+
+[scene.venue]
+limit          = 0.00
+allow_undereye = false
+allow_evening  = false
+reason = "Rooms and buildings. No skin, no retouch."
+
+[scene.exit]
+limit          = 0.50
+allow_undereye = true
+allow_evening  = false
+reason = "Sparklers, confetti and movement, usually at night. Moderate, and evening is off because confetti on a cheek is not a blotch."
+
+[scene.unknown]
+limit          = 0.35
+allow_undereye = false
+allow_evening  = false
+reason = "The same as neutral, and named explicitly so a classified-as-unknown frame and an unclassified frame are treated identically rather than by accident."

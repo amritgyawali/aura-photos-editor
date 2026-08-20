@@ -597,6 +597,60 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::no_int8(),
             },
         ),
+        // PHASE-20. Two heads, and neither is consulted anywhere in this build:
+        // `ops::BLEMISH_HEAD_TRAINED` and `ops::PERMANENT_HEAD_TRAINED` are both
+        // false. Unlike phases 15, 16 and 18, what runs instead is not a
+        // reference *model* but a measurement - a difference-of-Gaussians with a
+        // colour test - because a retoucher that consulted nothing and had
+        // nothing underneath would find no marks at all. ADR-0041 section 7.
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::BLEMISH_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "detection",
+                class: ModelClass::Retouch,
+                model: fixtures::blemish_detector(),
+                input: Placeholder::linear_image(fixtures::RETOUCH_INPUT_SIDE),
+                output: BTreeMap::from([(
+                    "anomalies".to_string(),
+                    vec![
+                        1,
+                        fixtures::RETOUCH_CHANNELS,
+                        fixtures::RETOUCH_HEAD_SIDE,
+                        fixtures::RETOUCH_HEAD_SIDE,
+                    ],
+                )]),
+                // int8 is forbidden, and here it is the *second* channel that
+                // decides it. The objectness channel would survive quantisation;
+                // the temporary channel is what separates a pimple from a beauty
+                // mark, and a systematic shift of a few hundredths in it moves
+                // marks across `TEMPORARY_FLOOR` - which is a mole removed from
+                // one photograph of somebody and not from the next.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::PERMANENT_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "classification",
+                class: ModelClass::Retouch,
+                model: fixtures::permanent_features(),
+                input: Placeholder::linear_image(fixtures::PERMANENT_PATCH_SIDE),
+                output: BTreeMap::from([(
+                    "kinds".to_string(),
+                    vec![1, fixtures::PERMANENT_CLASSES],
+                )]),
+                // int8 is forbidden for the sharpest reason in the product: one
+                // of the six classes is `tattoo`, and section 10.1 gates tattoo
+                // removal at zero per cent. A quantisation that shifts the
+                // boundary between `tattoo` and `birthmark` by a fraction of a
+                // logit is a promise this product makes and cannot keep.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {
