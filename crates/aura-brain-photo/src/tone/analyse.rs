@@ -74,12 +74,23 @@ use crate::tone::wb::{Constraint, Constraints};
 /// the way the confidence is combined. It is written into
 /// `image_tone_estimate.analysis_ver`, and two estimates made under different values of it
 /// are not comparable: `AURA-ML-5060` exists so that comparison never happens silently.
-pub const ANALYSIS_VER: u16 = 2;
-
-// **1 -> 2 in PHASE-17.** An estimate solved without a style profile and one solved with a
-// personal lean applied before the clipping bound and the skin-locus constraint are not the
-// same measurement. `ToneStore::pending` is keyed on this column, so adopting a profile
-// re-measures the wedding rather than leaving two generations of estimate side by side.
+///
+/// 1 -> 2 (PHASE-15 follow-up): the preserve-mood policy stopped keying on whichever
+/// hypothesis won the cost race and started asking the frame's own reading of the room
+/// (`illuminant::ambient`), and the correction between two lights moved from an
+/// interpolation in kelvin to one in `u'v'`. Both change the temperature and tint written
+/// on a coloured-light frame. Condition C5 in `docs/progress/PHASE-15-EXIT.md`.
+///
+/// 2 -> 3 (PHASE-17): an estimate solved without a style profile and one solved with a
+/// personal lean applied before the clipping bound and the skin-locus constraint are not
+/// the same measurement. `ToneStore::pending` is keyed on this column, so adopting a
+/// profile re-measures the wedding rather than leaving two generations of estimate side by
+/// side.
+///
+/// The two changes above were developed on separate branches and each landed on 2; a build
+/// carrying both is a third measurement and says so, because an estimate written by either
+/// parent is stale here and comparing it silently is what `AURA-ML-5060` exists to prevent.
+pub const ANALYSIS_VER: u16 = 3;
 
 /// The pixel rung the tone pass reads.
 ///

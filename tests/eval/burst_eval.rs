@@ -533,12 +533,17 @@ fn the_label_files_and_the_rust_fixtures_agree() {
     // what stops them drifting. A fixture edited in one place and not the other fails
     // here rather than silently splitting the two gates.
     for truth in bursts::all() {
-        let path = format!(
-            "{}/tests/fixtures/labels/bursts_{}.json",
-            env!("CARGO_MANIFEST_DIR").replace("\\crates\\aura-brain-wedding", ""),
-            truth.name
-        );
-        let text = std::fs::read_to_string(&path)
+        // Up two from the crate root rather than a string edit on the manifest path: this
+        // file is compiled from `crates/aura-brain-wedding`, and a `replace` of the
+        // Windows spelling of that suffix silently does nothing on a Linux or macOS
+        // runner - which is the three-OS matrix condition finding a bug the moment it is
+        // honoured. Every other fixture path in the workspace already joins its way up.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("tests/fixtures/labels")
+            .join(format!("bursts_{}.json", truth.name));
+        let path = path.display();
+        let text = std::fs::read_to_string(path.to_string())
             .unwrap_or_else(|err| panic!("cannot read {path}: {err}"));
         let parsed: serde_json::Value =
             serde_json::from_str(&text).unwrap_or_else(|err| panic!("{path} is not JSON: {err}"));

@@ -493,16 +493,26 @@ Two rules that phase 15 adds and every later phase inherits:
   against, and the phase gate scans the schema for one on every run. The Monk-scale buckets the
   evaluation needs live in `tests/eval` and never reach the catalog.
 
-Three decisions in phase 15 are worth remembering because they will be re-argued. **The
+Four decisions in phase 15 are worth remembering because they will be re-argued. **The
 white-balance confidence is built on agreement between the top two answers, not on the cost gap
 between them** - it was built on the gap first, and that scored two independent estimators
 landing on the same chromaticity as "undecided", which put every frame below the skin-sample
 threshold and left the hard constraint binding on nothing, silently, while every unit test
-passed. **The correction is a linear scan rather than a bisection**, because with two people
-whose loci differ the satisfying set is not an interval. And **a row with `user_edited = 1` still
+passed. **The correction is a linear scan rather than a bisection, and it walks in `u'v'`** -
+the set is not an interval when two people's loci differ, so a bisection returns an arbitrary
+member of it; and the *space* was got wrong first, interpolating a colour temperature, which
+walks along the Planckian locus and so could never reach the off-locus light the branch existed
+to preserve. And **a row with `user_edited = 1` still
 carries AURA's own numbers**, which is what lets the review queue show a disagreement and phase
 30's learning loop read one - and it only works because `ToneStore::override_of` exists beside the
 frozen service to read the other side.
+
+The fourth is the one to generalise: **ask the room, not the winner.** Anything that describes
+the *scene* - what kind of light this is, whether it was a choice - must not be derived from
+whichever hypothesis won a cost race, because the winner changes as a project accumulates
+evidence and the room does not. Phase 15 shipped with that backwards and the symptom was a
+label that was right on a project's first frame and absent on its four-hundredth. Phases 16, 17,
+25 and 26 all describe scenes on top of these values and inherit the trap.
 
 Phase 16 is implemented conditionally: `aura-core::contract::colour` freezes the decision, the
 monotone curve, the eight bands, the content readings, the skin guard report, the three
@@ -727,6 +737,15 @@ Phase 17 corrected two earlier oversights: **`contracts.lock` carried a stale di
 on `main` - phase 16 re-locked before a final edit to the contract - and **the justfile had no
 `phase-16-verify` recipe**, so the only way to run that gate was to remember the argument. It
 also filled in the CHANGELOG entries phases 14 and 16 never wrote.
+
+Merging phase 15's coloured-light fix into this branch produced the first version collision in
+the repository: **both sides had bumped `tone::ANALYSIS_VER` from 1 to 2 for unrelated
+reasons** - `illuminant::ambient` plus the `u'v'` correction on one side, the style lean on the
+other - so a build carrying both is a third measurement and the constant is **3**. The general
+rule is that a version column counts *measurements*, not commits: two branches that each
+invalidate the same column do not merge into one invalidation, and taking either side's number
+would leave estimates written by the other parent looking current while being stale, which is
+the exact comparison `AURA-ML-5060` exists to prevent.
 
 Five rules that phase 13 adds and every later phase inherits:
 

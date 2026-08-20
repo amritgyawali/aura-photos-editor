@@ -125,3 +125,31 @@ so they are waived.
 `crates/aura-app/src/contract/ipc.rs` and `ui/src/ipc/types.ts` changed together.
 `crates/aura-recipe/src/contract/recipe.rs` also re-locked - its digest was stale at HEAD and
 the file itself is unchanged.
+
+## Completion pass - closing condition C5
+
+| Task | Files touched | Tests added | Benchmark delta |
+|---|---|---|---|
+| C5: the coloured-light note stopped depending on which hypothesis won | `tone/illuminant.rs`, `tone/solve.rs`, `tone/analyse.rs`, `tone/store/codec.rs` | 2 | none - no new pass, no new statistic |
+| Phase 08 regression: the burst label files were located by a Windows-only path edit | `tests/eval/burst_eval.rs` | 0 (existing test now runs) | none |
+
+`illuminant::ambient` reads the light falling on the frame rather than the hypothesis that best
+explained the subject, so the preserve-mood policy stops flipping with how much of the wedding
+has been analysed. Finding that exposed the second defect: the correction between two lights
+interpolated a *colour temperature*, which walks along the Planckian locus and therefore can
+never reach an off-locus light - so the branch that exists to preserve a coloured light landed on
+no coloured light and recorded `SkinLocusConstrained` instead. It walks in `u'v'` now, which is
+what invariant 8 already claimed.
+
+`TINT_PER_UV` was a literal in `illuminant::describe` and a private constant in
+`store/codec.rs`. It is one public constant now, because the inverse this work needed would have
+made it three.
+
+`ANALYSIS_VER` 1 -> 2: the temperature and tint written on a coloured-light frame both move, so
+every stored estimate is re-measured.
+
+Measured on the fixture wedding: coloured-light frames labelled 0/5 -> **3/5**; white balance
+**42/46 (0.913)**, unmoved; surviving cast **106 %**, unmoved; skin dE00 mean **0.110** and
+spread **0.159**, unmoved; determinism holds. The remaining 2/5 are below
+`Illuminant::SATURATED_ABOVE` in the fixture's own ground truth and wait for a photograph rather
+than a tuned constant - see condition C5 in the exit report.
