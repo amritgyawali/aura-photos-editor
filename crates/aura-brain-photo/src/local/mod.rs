@@ -22,7 +22,7 @@
 //! | [`governor`] | what to give up when the frame has changed enough |
 //! | [`guard`] | which plans this phase refuses to store |
 //! | [`plan`] | one decoded frame in, one plan out |
-//! | [`store`] | the four tables migration 16 adds |
+//! | [`store`] | the four tables migration 19 adds |
 //! | [`api`] | the frozen `LocalService` and the resumable project walk |
 //!
 //! Plus [`fixtures`], the synthetic ground truth every section 10.1 gate is measured against.
@@ -34,7 +34,7 @@
 //! retouch skin (phase 20), remove objects (phase 24) or normalise a gallery (phase 25), and
 //! the boundaries are structural rather than remembered: there is no blur radius, no
 //! smoothing strength and no texture parameter anywhere in
-//! [`aura_core::contract::local`] or in migration 16, and nothing here reads a second
+//! [`aura_core::contract::local`] or in migration 19, and nothing here reads a second
 //! photograph.
 //!
 //! ## The rule this phase adds, which every later phase inherits

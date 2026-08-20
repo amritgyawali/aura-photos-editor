@@ -60,7 +60,7 @@ use crate::local::{background, face_light, freqsep, shine, subject};
 ///
 /// Bumped on any change to a measurement, a trigger, a cap, a cost model or the way the
 /// confidence is combined. It is written into `local_light_plan.analysis_ver`, and two plans
-/// made under different values of it are not comparable: `AURA-ML-5066` exists so that
+/// made under different values of it are not comparable: `AURA-ML-5084` exists so that
 /// comparison never happens silently.
 pub const ANALYSIS_VER: u16 = 1;
 
@@ -379,7 +379,7 @@ impl Analyser {
         if reasons.is_empty() {
             reasons.push(LocalReason::plain(LocalCode::FaceAlreadyInBand, 0.0));
         }
-        // Invariant 2 and migration 16's own CHECK: at most eight reasons. Keep the doubts
+        // Invariant 2 and migration 19's own CHECK: at most eight reasons. Keep the doubts
         // first, because a truncated list that dropped the doubts would read as a confident
         // plan.
         reasons.sort_by(|a, b| a.weight.total_cmp(&b.weight));

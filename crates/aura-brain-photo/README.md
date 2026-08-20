@@ -31,7 +31,7 @@ perceptual allowance. `LocalStore` writes the versioned plan.
 
 **This crate contains no mask generator and no fallback that draws one.** Phase 18 owns masks;
 a rectangle's edge does not follow a person, and an edit through one leaves the bright rim the
-phase exists to avoid. See `docs/adr/ADR-0033-local-light-sculpting.md` section 4.
+phase exists to avoid. See `docs/adr/ADR-0039-local-light-sculpting.md` section 4.
 
 Policy is in `config/local_light.toml`, with a written reason on every row. Changing a strength
 bumps `policy_ver`; changing arithmetic bumps `ANALYSIS_VER`; changing how shaping zones become

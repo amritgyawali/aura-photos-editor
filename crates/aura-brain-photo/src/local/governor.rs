@@ -11,7 +11,7 @@
 //! "Face lighting first, dodge/burn last" is the **priority** order, not the scaling order.
 //! Face lighting has the first claim on the budget and dodge and burn the last, so what gets
 //! given up when the allowance runs out is the shaping.
-//! `docs/adr/ADR-0033-local-light-sculpting.md` section 5 records why that reading and not
+//! `docs/adr/ADR-0039-local-light-sculpting.md` section 5 records why that reading and not
 //! the other: face lighting is the operation section 1 exists for, dodge and burn is both the
 //! most decorative and the most artefact-prone, and a budget that protected the shaping and
 //! gave up the lift would be spending the allowance on the part a photographer would not

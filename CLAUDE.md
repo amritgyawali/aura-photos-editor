@@ -78,7 +78,7 @@ Never load two phase files into one session.
 | Tone evaluation gates | `tests/eval/tone_eval.rs` + `ml/models/tone/eval_tone.py` |
 | What the lighting marks mean, in the product's own words | `docs/mixed-lighting.md` |
 | The skin fairness statement | `docs/skin-fairness.md` |
-| Local light decisions | `docs/adr/ADR-0033-local-light-sculpting.md` |
+| Local light decisions | `docs/adr/ADR-0039-local-light-sculpting.md` |
 | Local light policy (versioned, PM-owned) | `crates/aura-brain-photo/config/local_light.toml` |
 | Local light evaluation gates | `tests/eval/local_eval.rs` + `ml/models/local/eval_local.py` |
 | What the local light adjustments do, in the product's own words | `docs/local-light.md` |
@@ -501,9 +501,9 @@ move and highlights barely do, solves every face in a frame together, pairs a su
 enhancement with a matching background reduction, separates three frequency bands and returns
 two, places ten retoucher's moves and derives the dodge-and-burn map from them, finds specular
 sheen and reduces luminance only, and spends every one of those against one per-image
-perceptual allowance. Migration 16 stores the plan, the lit faces and the gates; 22
+perceptual allowance. Migration 19 stores the plan, the lit faces and the gates; 22
 argued-over policy rows live in editable config; three shaders ship with the processor
-reference they are held to; six IPC commands (ADR-0034) feed a Local panel; and
+reference they are held to; six IPC commands (ADR-0040) feed a Local panel; and
 `aura-cli verify --phase 19` is the executable gate. Its exit report is
 `docs/progress/PHASE-19-EXIT.md`.
 
@@ -550,7 +550,7 @@ test passed. Compare against what was *wanted*, not against what was agreed.
 **Section 10.1's edge-gradient halo test cannot be implemented as written.** Every local
 brightening increases the step at its own boundary - that is what "local" means - so a
 before/after gradient ratio scores the edit's size. Two refinements are also wrong and
-ADR-0033 section 7 records why. What a halo is, is an edit that is stronger further from the
+ADR-0039 section 7 records why. What a halo is, is an edit that is stronger further from the
 subject than nearer to it.
 
 And one guarantee phase 19 deliberately weakened, which phases 20 and 25 will meet again:
@@ -558,7 +558,7 @@ And one guarantee phase 19 deliberately weakened, which phases 20 and 25 will me
 where one person is two stops down under a doorway cannot be evened without either refusing to
 plan the frame or darkening everybody else. What is guaranteed instead is about the *edit*:
 reach the threshold whenever the caps allow, and never make a group less even than you found
-it. ADR-0033 section 6, and `docs/local-light.md` says the same thing in the product's voice.
+it. ADR-0039 section 6, and `docs/local-light.md` says the same thing in the product's voice.
 
 Four decisions in phase 15 are worth remembering because they will be re-argued. **The
 white-balance confidence is built on agreement between the top two answers, not on the cost gap

@@ -468,17 +468,17 @@ pub fn skin_locus_unavailable(project: &str, identities: usize) -> AuraError {
 
 /// Stored plans came from different heads, different arithmetic, a different policy table or
 /// a different shaping derivation.
-pub const ML_LOCAL_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5066");
+pub const ML_LOCAL_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5084");
 /// A local strength override or acceptance was refused.
-pub const ML_LOCAL_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5067");
+pub const ML_LOCAL_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5085");
 /// One photograph's local light could not be planned.
-pub const ML_LOCAL_FAILED: ErrorCode = ErrorCode("AURA-ML-5068");
+pub const ML_LOCAL_FAILED: ErrorCode = ErrorCode("AURA-ML-5086");
 /// The local light policy table was refused.
-pub const ML_POLICY_REFUSED: ErrorCode = ErrorCode("AURA-ML-5069");
+pub const ML_POLICY_REFUSED: ErrorCode = ErrorCode("AURA-ML-5087");
 /// A scene has no local light policy row.
-pub const ML_SCENE_UNPOLICIED: ErrorCode = ErrorCode("AURA-ML-5070");
+pub const ML_SCENE_UNPOLICIED: ErrorCode = ErrorCode("AURA-ML-5088");
 /// A mask was unusable, so an operation was scaled down or skipped.
-pub const ML_MASK_UNUSABLE: ErrorCode = ErrorCode("AURA-ML-5071");
+pub const ML_MASK_UNUSABLE: ErrorCode = ErrorCode("AURA-ML-5089");
 
 /// Stored plans disagree with the running build about a version.
 ///

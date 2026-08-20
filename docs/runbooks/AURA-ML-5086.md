@@ -1,4 +1,4 @@
-# AURA-ML-5068 - One photograph's local light could not be planned
+# AURA-ML-5086 - One photograph's local light could not be planned
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 

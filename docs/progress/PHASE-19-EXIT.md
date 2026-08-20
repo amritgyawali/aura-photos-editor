@@ -33,7 +33,7 @@ reference, one IPC surface, one panel, two ADRs, six runbooks, two Python script
 document and a gate.
 
 `aura-core::contract::local` freezes the shape. `LocalLightPlan` is section 5's struct with
-five recorded spellings (ADR-0033 section 2), plus `MaskField` - the input port phase 18 fills -
+five recorded spellings (ADR-0039 section 2), plus `MaskField` - the input port phase 18 fills -
 `LocalOp` and its priority order, `FaceZone` and its ten named moves, thirty reason codes,
 `LocalOutline`, `LocalOverride` and `LocalService`. **There is no field anywhere in it that
 could hold image data**, which is what makes "all local work is stored as masks and parameters
@@ -46,10 +46,10 @@ and highlights do not. `face_light.rs` solves every face in a frame together.
 and returns two. `dodgeburn.rs` places ten named moves and derives the map from them.
 `shine.rs` finds specular sheen and reduces luminance only. `governor.rs` spends one allowance.
 `guard.rs` turns the contract's predicates into this phase's errors. `plan.rs` composes them.
-`store.rs` and `api.rs` own migration 16 and the frozen service. `fixtures.rs` is the synthetic
+`store.rs` and `api.rs` own migration 19 and the frozen service. `fixtures.rs` is the synthetic
 ground truth.
 
-Migration 16 adds `local_light_plan`, `local_light_face`, `local_light_gate` and
+Migration 19 adds `local_light_plan`, `local_light_face`, `local_light_gate` and
 `v_local_coverage`. **There is no mask column, no matte, no blur and nowhere to put one**, and
 the gate scans for one on every run.
 
@@ -57,7 +57,7 @@ the gate scans for one on every run.
 first shader *libraries* in the product - no entry point, called by `stage_masks` - and
 `shader_parity.rs` was narrowed and extended to cover that.
 
-The IPC surface is six commands (ADR-0034). The Local panel makes an invisible edit visible: a
+The IPC surface is six commands (ADR-0040). The Local panel makes an invisible edit visible: a
 strength per operation, a gated operation shown as *unavailable* rather than as off, what each
 face was moved by **and what stopped it**, and a group the caps could not even out reported as
 exactly that.
@@ -66,11 +66,11 @@ exactly that.
 
 | Criterion | Status |
 |---|---|
-| Faces in difficult light are lifted naturally without haloes or a glowing look | **met on fixtures.** The glow is prevented by the luminosity split and gated by `a_dark_face_lifts_mostly_through_the_shadows`; the halo by the monotonicity properties in `local_eval`, which **found a real one** (ADR-0033 section 7). Not measured on a photograph - C1, C3 |
+| Faces in difficult light are lifted naturally without haloes or a glowing look | **met on fixtures.** The glow is prevented by the luminosity split and gated by `a_dark_face_lifts_mostly_through_the_shadows`; the halo by the monotonicity properties in `local_eval`, which **found a real one** (ADR-0039 section 7). Not measured on a photograph - C1, C3 |
 | Bright or saturated backgrounds stop competing with subjects, invisibly | **met on fixtures.** Three measured triggers, and the pairing holds the frame's mean luminance to 0.028 against a 0.030 tolerance |
 | Dodge and burn shapes form without touching skin texture | **met, structurally.** The finest band is never produced, so no operator can reach it; the mid band moves by at most 5 % and is gated |
-| Everyone in a group photo is lit consistently | **met, under a rewritten guarantee.** The absolute reading of section 10.1 is unachievable and ADR-0033 section 6 says why. What is guaranteed: reach the threshold whenever the caps allow, and never make a group less even. Measured 0.343 apart before, 0.272 after, with nobody darkened |
-| All local work is stored as masks and parameters and is fully reversible | **met.** No path, no rendered output, no applied flag anywhere in migration 16 or on the IPC surface |
+| Everyone in a group photo is lit consistently | **met, under a rewritten guarantee.** The absolute reading of section 10.1 is unachievable and ADR-0039 section 6 says why. What is guaranteed: reach the threshold whenever the caps allow, and never make a group less even. Measured 0.343 apart before, 0.272 after, with nobody darkened |
+| All local work is stored as masks and parameters and is fully reversible | **met.** No path, no rendered output, no applied flag anywhere in migration 19 or on the IPC surface |
 | Expert reviewers rate the edits as invisible rather than obvious | **not done and cannot be** - C3 |
 
 ## 3. What the section 10.1 gates measured
@@ -137,7 +137,7 @@ in the matte while the lift grew linearly. Past about half coverage the restrain
 mid-bright pixel's edit peaked at 0.022 at half coverage and fell to 0.014 at full, which means
 **a bright pixel received more lift at the mask's edge than at its centre** - a bright rim.
 Both weights now read the input pixel and the whole edit is linear in the matte, on the
-processor path and in the shader. ADR-0033 section 7.
+processor path and in the shader. ADR-0039 section 7.
 
 **A cap detector that could never fire.** The joint face solve reported whether a lift had been
 capped by comparing against the group's converged common target - which has already absorbed
@@ -157,7 +157,7 @@ today rather than gate everything. It was rejected for two reasons, either suffi
 rectangle's edge does not follow a person, so an edit through it leaves a bright rim beside
 them; and it would be a second answer to "where does the subject end" that would disagree with
 phase 18's when it arrives, leaving a gallery with two different edits in it that nobody could
-tell apart by looking. ADR-0033 section 4.
+tell apart by looking. ADR-0039 section 4.
 
 **Anything from phase 20, 24 or 25.** No blur radius, no smoothing strength, no texture
 parameter, no object removal, nothing that reads a second photograph. All three boundaries are
@@ -194,7 +194,7 @@ source is re-pointed.
 
 **C5 - the group-fairness guarantee is weaker than section 10.1's words.** Section 10.1 asks
 for an absolute spread threshold; what is guaranteed is that the threshold is reached whenever
-the caps allow and that a group is never made less even. ADR-0033 section 6 has the argument
+the caps allow and that a group is never made less even. ADR-0039 section 6 has the argument
 and `docs/local-light.md` says the same thing in the product's own voice. This is a **recorded
 divergence rather than a gap** - it does not close, it stands unless somebody overturns the
 argument.

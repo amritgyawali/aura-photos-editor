@@ -1706,7 +1706,7 @@ impl AppState {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5069` when the local light policy table will not load, `AURA-ML-5063` when
+    /// `AURA-ML-5087` when the local light policy table will not load, `AURA-ML-5063` when
     /// phase 15's exposure targets will not, or whatever opening the preview service raised.
     pub fn local_pass(&self, project_id: &str) -> AuraResult<LocalPass> {
         let mut pass = LocalPass::new(

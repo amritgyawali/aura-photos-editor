@@ -146,7 +146,7 @@ max_face_lift_ev = 0.6
 rationale = "x"
 "#;
     let refused = PolicyTable::parse("test", text).expect_err("a row with no reason is refused");
-    assert_eq!(refused.code.0, "AURA-ML-5069");
+    assert_eq!(refused.code.0, "AURA-ML-5087");
 }
 
 #[test]
@@ -643,7 +643,7 @@ fn no_fixture_ever_spends_more_than_its_scenes_allowance() {
 
 #[test]
 fn the_governor_gives_up_shaping_before_it_gives_up_face_lighting() {
-    // Section 6.4, read as ADR-0033 section 5 records it: face lighting has the first claim
+    // Section 6.4, read as ADR-0039 section 5 records it: face lighting has the first claim
     // on the budget and dodge and burn the last.
     let ledger = governor::allocate([PERCEPTUAL_BUDGET; LocalOp::COUNT], 1.0);
     assert_eq!(ledger.allowed(LocalOp::FaceLight), 1.0);

@@ -1,4 +1,4 @@
-# AURA-ML-5069 - The local light policy table was refused
+# AURA-ML-5087 - The local light policy table was refused
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 

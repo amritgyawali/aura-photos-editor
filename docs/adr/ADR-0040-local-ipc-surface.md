@@ -1,8 +1,8 @@
-# ADR-0034 - The local light IPC surface
+# ADR-0040 - The local light IPC surface
 
 **Status:** accepted · **Date:** 2026-08-19 · **Phase:** 19 · **Supersedes:** nothing
 
-The second of phase 19's two ADRs. [ADR-0033](ADR-0033-local-light-sculpting.md) covers the
+The second of phase 19's two ADRs. [ADR-0039](ADR-0039-local-light-sculpting.md) covers the
 decisions; this covers the wire, which is a frozen contract in its own right -
 `ui/src/ipc/types.ts` is in `contracts.lock` and changing it needs a re-lock.
 
@@ -23,7 +23,7 @@ below is about the two fields that exist only for that.
 `LocalPlanDto` has no alpha, no matte, no grid and no field that could carry one. Neither does
 any other type on this surface.
 
-That is the same boundary [ADR-0033](ADR-0033-local-light-sculpting.md) section 4 draws in the
+That is the same boundary [ADR-0039](ADR-0039-local-light-sculpting.md) section 4 draws in the
 decision layer, drawn again here because the wire is where it would most plausibly be crossed:
 a panel that wanted to *show* a mask overlay would ask for one, and the shortest path to that
 is a base64 field on the plan. Phase 18 owns masks; when it ships it will have its own surface

@@ -35,7 +35,7 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // rather than a decision: every other migration since 0001 is frozen and a schema change
     // needs an ADR and a re-lock. Both are here now.
     "crates/aura-catalog/migrations/0015_tone.sql",
-    "crates/aura-catalog/migrations/0016_local_light.sql",
+    "crates/aura-catalog/migrations/0019_local_light.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

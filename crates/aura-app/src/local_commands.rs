@@ -114,7 +114,7 @@ pub fn local_review_queue(state: &AppState, input: &LocalReviewInput) -> IpcResu
 ///
 /// # Errors
 ///
-/// `AURA-ML-5067` when the photograph has no plan.
+/// `AURA-ML-5085` when the photograph has no plan.
 pub fn accept_local(state: &AppState, input: &AcceptLocalInput) -> IpcResult<LocalPlanDto> {
     let photo = parse_photo(&input.photo_id)?;
     let local = state.local();
@@ -134,7 +134,7 @@ pub fn accept_local(state: &AppState, input: &AcceptLocalInput) -> IpcResult<Loc
 ///
 /// # Errors
 ///
-/// `AURA-ML-5067` when the photograph has no plan, the operation is not one of the six, or the
+/// `AURA-ML-5085` when the photograph has no plan, the operation is not one of the six, or the
 /// strength is outside `0..1`; `AURA-RENDER-8002` when the merged recipe will not validate.
 pub fn set_local_strength(
     state: &AppState,
@@ -183,7 +183,7 @@ pub fn set_local_strength(
 ///
 /// # Errors
 ///
-/// `AURA-ML-5069` when the policy table will not load, `AURA-ML-5063` when phase 15's exposure
+/// `AURA-ML-5087` when the policy table will not load, `AURA-ML-5063` when phase 15's exposure
 /// targets will not, or whatever building the preview service raised. Per-photograph failures
 /// are counted rather than returned.
 pub fn sculpt_local(state: &AppState, input: &SculptLocalInput) -> IpcResult<LocalPassDto> {

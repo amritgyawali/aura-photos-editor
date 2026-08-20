@@ -1,4 +1,4 @@
-# AURA-ML-5071 - A mask was unusable, so a local operation was scaled down or skipped
+# AURA-ML-5089 - A mask was unusable, so a local operation was scaled down or skipped
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 

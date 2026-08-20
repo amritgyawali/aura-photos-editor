@@ -1,4 +1,4 @@
-# AURA-ML-5066 - Stored local light plans came from different heads, arithmetic, policy or shaping
+# AURA-ML-5084 - Stored local light plans came from different heads, arithmetic, policy or shaping
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 

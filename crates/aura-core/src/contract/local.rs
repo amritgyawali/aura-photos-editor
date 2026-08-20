@@ -430,7 +430,7 @@ impl MaskField {
     ///
     /// A sentence rather than an [`AuraError`], because `aura-core` owns the shape and
     /// `aura-brain-photo` owns the error registry - the same split every phase since 09 has
-    /// kept. `aura_brain_photo::local::guard` turns a `Some` here into `AURA-ML-5071`, and
+    /// kept. `aura_brain_photo::local::guard` turns a `Some` here into `AURA-ML-5089`, and
     /// the predicate lives here so the solver, the store and the eval harness cannot
     /// disagree about what a readable field is.
     #[must_use]
@@ -471,7 +471,7 @@ impl MaskField {
 /// is the phase's product argument about what matters, and section 6.4's own sentence -
 /// "operations are scaled down in priority order (face lighting first, dodge/burn last)" -
 /// is read here as *face lighting has the first claim on the budget and dodge and burn the
-/// last*. `docs/adr/ADR-0033-local-light-sculpting.md` section 5 records why that reading
+/// last*. `docs/adr/ADR-0039-local-light-sculpting.md` section 5 records why that reading
 /// and not the other: face lighting is the operation section 1 exists for and dodge and burn
 /// is both the most decorative and the most artefact-prone, so a budget that protected the
 /// shaping and gave up the lift would be spending the allowance on the part a photographer
@@ -1630,7 +1630,7 @@ impl LocalLightPlan {
     /// So the guarantee is: **the lighting reaches the threshold whenever the caps allow, and
     /// it can never make a group less even than it found it.** A frame that arrives inside
     /// the threshold must stay inside it; a frame that arrives outside must come closer or
-    /// stay where it is. `docs/adr/ADR-0033-local-light-sculpting.md` section 6 records the
+    /// stay where it is. `docs/adr/ADR-0039-local-light-sculpting.md` section 6 records the
     /// argument, and `crates/aura-brain-photo/src/local/face_light.rs` implements the second
     /// half by never brightening a face to meet the group - only ever giving back a lift.
     #[must_use]
@@ -1653,7 +1653,7 @@ impl LocalLightPlan {
     /// too far. They live here rather than in the store so the solver, the eval harness and
     /// the store all refuse the same frames - and they return a sentence rather than an
     /// [`AuraError`] because `aura-brain-photo` owns this phase's error registry.
-    /// `aura_brain_photo::local::guard` turns a `Some` here into `AURA-ML-5068`.
+    /// `aura_brain_photo::local::guard` turns a `Some` here into `AURA-ML-5086`.
     #[must_use]
     pub fn broken_guarantee(&self) -> Option<String> {
         if self.reasons.is_empty() {
@@ -1843,7 +1843,7 @@ impl LocalOverride {
 
     /// What is wrong with this override, if anything.
     ///
-    /// `aura_brain_photo::local::guard` turns a `Some` here into `AURA-ML-5067`.
+    /// `aura_brain_photo::local::guard` turns a `Some` here into `AURA-ML-5085`.
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         if self.is_empty() {
@@ -1915,7 +1915,7 @@ pub trait LocalService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5067` when the photograph has no plan.
+    /// `AURA-ML-5085` when the photograph has no plan.
     fn accept(&self, image: ImageId) -> Result<(), AuraError>;
 
     /// Record what the photographer set instead.
@@ -1932,7 +1932,7 @@ pub trait LocalService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5067` when the photograph has no plan, when the override is empty, or when a
+    /// `AURA-ML-5085` when the photograph has no plan, when the override is empty, or when a
     /// strength is outside `0..1`.
     fn set_override(&self, image: ImageId, values: LocalOverride) -> Result<(), AuraError>;
 }

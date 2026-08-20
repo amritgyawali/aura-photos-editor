@@ -56,7 +56,7 @@ unit tests.
 ## T6 - SRC: the strength governor and mask-quality scaling (section 8 step 6)
 
 Files: `local/governor.rs`, `local/policy.rs`. One shared per-image allowance, allocated in
-priority order; section 6.4's sentence read as ADR-0033 section 5 records. Mask confidence and
+priority order; section 6.4's sentence read as ADR-0039 section 5 records. Mask confidence and
 edge quality are two numbers rather than one because they fail differently. Tests: an empty
 frame spends nothing, face lighting is paid first and shaping last, an operation that cannot
 have it all is scaled rather than dropped, a tighter scene budget exhausts sooner, two
@@ -67,14 +67,14 @@ operations that cancel still both cost. 6 unit tests.
 Files: `local/face_light.rs` (`solve`, `enforce_spread`). A common target agreed over three
 weighted rounds, then a pass that may only ever move a face *down* toward the group and never
 below where the photograph put it. **The guarantee was rewritten during this task** - see
-ADR-0033 section 6. Tests: a group that can be evened ends inside the threshold, one that
+ADR-0039 section 6. Tests: a group that can be evened ends inside the threshold, one that
 cannot is still made more even, the rule never brightens a face it did not lift, an unmaskable
 face does not decide the group. 4 unit tests.
 
 ## T8 - SRC/SFE: the recipe, the store, the IPC surface and the panel (section 8 step 8)
 
 Files: `local/store.rs`, `local/api.rs`, `local/plan.rs`, `local/guard.rs`,
-`crates/aura-catalog/migrations/0016_local_light.sql`,
+`crates/aura-catalog/migrations/0019_local_light.sql`,
 `crates/aura-app/src/local_commands.rs`, `crates/aura-app/src/contract/ipc.rs`,
 `ui/src/ipc/{types.ts,client.ts}`, `ui/src/components/develop/LocalPanel.tsx`,
 `ui/src-tauri/src/main.rs`. Six commands, three tables, one view, five indexes. The panel makes
@@ -97,7 +97,7 @@ Files: `tests/eval/local_eval.rs`, `crates/aura-cli/src/phase19.rs`,
 gates, the mechanical gate, two performance budgets.
 
 **The harness found a real halo on its first run**, and three of its own formulations were
-wrong before that. ADR-0033 section 7 records all four. The defect: `apply_face_light`
+wrong before that. ADR-0039 section 7 records all four. The defect: `apply_face_light`
 evaluated its luminosity weights on the partially-edited pixel, so the highlight restraint grew
 quadratically in the matte while the lift grew linearly, and a bright pixel received *more*
 lift at the mask's edge than at its centre. Fixed on both paths.
@@ -121,7 +121,7 @@ apply through.
 ## T12 - PM/DOC: the policy and the documentation (section 9, PM and DOC)
 
 Files: `crates/aura-brain-photo/config/local_light.toml`, `docs/local-light.md`,
-`docs/adr/ADR-0033-local-light-sculpting.md`, `docs/adr/ADR-0034-local-ipc-surface.md`, six
+`docs/adr/ADR-0039-local-light-sculpting.md`, `docs/adr/ADR-0040-local-ipc-surface.md`, six
 runbooks. 22 scene rows with a written reason each; the loader refuses a row with no reason and
 a row that reverses the priority order. Two tests assert every reason code has a sentence in
 the product document and that the withdrawal count matches what the document claims.

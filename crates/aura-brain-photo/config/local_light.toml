@@ -75,7 +75,7 @@
 #
 # rationale
 #     Why a photographer would agree. Refused below nine characters -
-#     `AURA-ML-5069` - and expected to say something other than the numbers.
+#     `AURA-ML-5087` - and expected to say something other than the numbers.
 #
 # ---------------------------------------------------------------------------
 # VERSIONING
@@ -83,7 +83,7 @@
 #
 # Bump `version` on ANY change below. It is written into
 # `local_light_plan.policy_ver` on every row, and a plan made under version 1
-# and one made under version 2 are not comparable - `AURA-ML-5066` exists so
+# and one made under version 2 are not comparable - `AURA-ML-5084` exists so
 # that comparison never happens silently. The rows made under the old version
 # become pending by definition and the background pass replaces them, except
 # the ones a photographer owns.

@@ -1,4 +1,4 @@
--- Migration 16 - how the light inside one photograph was shaped.
+-- Migration 19 - how the light inside one photograph was shaped.
 --
 -- PHASE-19 section 4 names no table at all: its file list is six decision modules, three
 -- shaders, a policy file, two Python scripts and a panel. It needs two tables anyway, and
@@ -6,13 +6,13 @@
 -- it is fully reversible and inspectable". A recipe is reversible; it is not *inspectable*,
 -- because a recipe says a face mask carries +0.34 EV and says nothing about the band that
 -- number was aiming at, the noise cap that stopped it going further, or the twelve people
--- it was solved beside. `docs/adr/ADR-0033-local-light-sculpting.md` records the rest.
+-- it was solved beside. `docs/adr/ADR-0039-local-light-sculpting.md` records the rest.
 --
 -- ---------------------------------------------------------------------------
 -- WHAT THIS MIGRATION IS FOR
 -- ---------------------------------------------------------------------------
 --
--- Fifteen migrations have recorded what AURA found, what it decided, why the pixels should
+-- Eighteen migrations have recorded what AURA found, what it decided, why the pixels should
 -- move and what would happen to them. This one records **what it did locally, and what it
 -- decided not to do** - and the second half is the larger one. Six of the thirty reason
 -- codes in this phase describe an operation that was gated, capped or declined, and on a
@@ -44,7 +44,7 @@
 -- 3. **`shaping_ver` is the fourth version column, and it exists because of note 2.** A
 --    change to the derivation changes what a delivered JPEG looks like without changing one
 --    stored number. `model_ver` invalidates the learned targets, `analysis_ver` every
---    measurement, `policy_ver` the strengths, and `shaping_ver` the grids. `AURA-ML-5066` is
+--    measurement, `policy_ver` the strengths, and `shaping_ver` the grids. `AURA-ML-5084` is
 --    raised when a comparison would cross any of the four.
 --
 -- 4. **Nothing in this migration is an edit.** There is no path, no rendered output and no
@@ -77,9 +77,9 @@
 --   DROP TABLE IF EXISTS local_light_gate;
 --   DROP TABLE IF EXISTS local_light_face;
 --   DROP TABLE IF EXISTS local_light_plan;
---   DELETE FROM schema_version WHERE version = 16;
+--   DELETE FROM schema_version WHERE version = 19;
 --
--- Running those returns the catalog to schema 15. **It is recomputable**, like migration 15
+-- Running those returns the catalog to schema 18. **It is recomputable**, like migration 15
 -- and unlike 13 and 14: every row here is derived from pixels, phase 06's faces, phase 07's
 -- scenes, phase 09's noise and phase 15's bands, so a re-run reproduces it exactly - with
 -- the usual exception. The six per-operation strengths in `user_strengths` are not derivable

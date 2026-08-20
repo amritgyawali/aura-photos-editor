@@ -21,7 +21,7 @@
 //! ## Luminance only, and the type says so
 //!
 //! There is no radius, no smoothing strength and no texture parameter anywhere in
-//! [`aura_core::contract::local::ShineReduction`], in migration 16's columns, or in this
+//! [`aura_core::contract::local::ShineReduction`], in migration 19's columns, or in this
 //! module. The obvious wrong fix - blur the shiny bit - is an ADR away rather than a refactor
 //! away, and that boundary is what separates this phase from phase 20.
 

@@ -195,7 +195,7 @@ phase-14-verify:
 phase-15-verify:
     cargo run --release --package aura-cli -- verify --phase 15 --work target/phase15-verify
 
-# The phase 19 gate: migration 16 and the mask and blur columns it cannot have, the
+# The phase 19 gate: migration 19 and the mask and blur columns it cannot have, the
 # policy table's two argued-over rows, the seven fixtures lit, paired, shaped and
 # de-shined, what happens when phase 18 is not installed, the governor's priority
 # order, the override protection and determinism. It prints what it does not prove

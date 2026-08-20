@@ -21,7 +21,7 @@
 //!
 //! ## No silent failure, invariant 9
 //!
-//! A frame whose proxy will not decode is counted, coded `AURA-ML-5068` and reported. The run
+//! A frame whose proxy will not decode is counted, coded `AURA-ML-5086` and reported. The run
 //! continues, and **no row is written** - so the next pass tries again. A written-but-empty
 //! plan would read to phases 20, 25 and 27 as "AURA decided this photograph needed nothing
 //! locally", and all three act on that.
@@ -107,7 +107,7 @@ impl Local {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5069` when the embedded policy table will not load.
+    /// `AURA-ML-5087` when the embedded policy table will not load.
     pub fn current_versions() -> Result<(u16, u16, u16, u16), AuraError> {
         Ok((
             MODEL_VER,
@@ -130,7 +130,7 @@ impl LocalService for Local {
             .map(|table| table.unpolicied())
             .unwrap_or_default();
         let outline = self.store.outline(&project, unpolicied)?;
-        // The version check, reported rather than enforced. `AURA-ML-5066` is degraded: stale
+        // The version check, reported rather than enforced. `AURA-ML-5084` is degraded: stale
         // plans keep working while the background pass replaces them, and the outline reports
         // what is stored so a caller about to draw a conclusion over a mixed set finds out
         // before it draws it.
@@ -209,7 +209,7 @@ impl LocalPass {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5069` when the embedded policy table will not load, and `AURA-ML-5063` when
+    /// `AURA-ML-5087` when the embedded policy table will not load, and `AURA-ML-5063` when
     /// phase 15's exposure target table will not - the bands this phase lights faces toward
     /// are phase 15's, and inventing a substitute for them would be a second answer to what a
     /// well-lit face looks like.

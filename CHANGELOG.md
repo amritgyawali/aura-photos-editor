@@ -35,7 +35,7 @@ That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the p
   three-band frequency separation whose finest band is never produced, zone-based dodge and
   burn, specular shine detection with a luminance-only reduction, and one per-image perceptual
   allowance that every operation spends against.
-- **Migration 16**: `local_light_plan`, `local_light_face`, `local_light_gate` and
+- **Migration 19**: `local_light_plan`, `local_light_face`, `local_light_gate` and
   `v_local_coverage`. There is no mask column, no matte and no blur, and the phase gate scans
   the schema for one on every run.
 - **`local_light.toml`**: 22 scene rows with a written reason each. The loader refuses a row
@@ -43,7 +43,7 @@ That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the p
 - **Three shaders and a processor reference**: `luminosity_mask.wgsl`, `freq_sep.wgsl` and
   `local_apply.wgsl` - the first shader *libraries* in the product - held to
   `aura_render::local` by six shared constants in `shader_parity.rs`.
-- **Six IPC commands** (ADR-0034) and the Local panel. No command can return a mask.
+- **Six IPC commands** (ADR-0040) and the Local panel. No command can return a mask.
 - **`docs/local-light.md`**: what every one of the thirty notes means, in the product's own
   words, with the group-fairness guarantee stated as what it actually is.
 - **`aura-cli verify --phase 19`**, 38 evaluation gates and two performance budgets.
@@ -63,7 +63,7 @@ That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the p
   target above the scene's band and everybody else was lifted to meet it. Every move is now
   clamped to lie between the face and the band.
 - **`0015_tone.sql` was missing from the frozen contract list.** A phase 15 oversight rather
-  than a decision; it and `0016_local_light.sql` are both locked now.
+  than a decision; it and `0019_local_light.sql` are both locked now.
 - **CI had been red on `main` for five days, and the cause was a budget that assumed CI was
   fast.** Phase 14's proxy guardrail says it "leaves room for a slower CI machine" at 450 ms
   against a 210 ms development figure. It does not: three GitHub runners measured 497, 669 and
@@ -102,7 +102,7 @@ That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the p
   down under a doorway, and the two ways to satisfy it anyway - refuse to plan the frame, or
   darken everybody else - are both worse than the problem. What is guaranteed: reach the
   threshold whenever the caps allow, and never make a group less even than you found it.
-  ADR-0033 section 6.
+  ADR-0039 section 6.
 - **The shaping is stored as four numbers per face rather than as ten zones.** Every zone is a
   pure function of the face region, the light direction and the strength. This took the table
   from 2,236 to 1,064 bytes per image, and the panel still shows every zone by name because

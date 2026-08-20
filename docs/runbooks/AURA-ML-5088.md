@@ -1,4 +1,4 @@
-# AURA-ML-5070 - A scene has no local light policy row
+# AURA-ML-5088 - A scene has no local light policy row
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 
@@ -32,4 +32,4 @@ a hunt.
 2. Add the missing rows to the catalog-local override, or remove the override to fall back to
    the shipped table.
 3. Bump `version` in whichever file you edited; the background pass re-plans the affected
-   frames and `AURA-ML-5066` records the drift.
+   frames and `AURA-ML-5084` records the drift.

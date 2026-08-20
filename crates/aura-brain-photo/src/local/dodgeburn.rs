@@ -47,7 +47,7 @@ use crate::local::freqsep::Bands;
 ///
 /// Written into `local_light_plan.shaping_ver`. Bump it on any change to [`grid`], to
 /// [`zones_for`]'s geometry, or to the constants below - a change to any of them changes what
-/// a delivered JPEG looks like without changing a stored number, and `AURA-ML-5066` exists so
+/// a delivered JPEG looks like without changing a stored number, and `AURA-ML-5084` exists so
 /// that never happens silently.
 pub const SHAPING_VER: u16 = 1;
 

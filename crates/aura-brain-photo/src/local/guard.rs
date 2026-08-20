@@ -15,7 +15,7 @@ use crate::errors;
 ///
 /// # Errors
 ///
-/// `AURA-ML-5071` naming the kind and the problem.
+/// `AURA-ML-5089` naming the kind and the problem.
 pub fn check_mask(field: &MaskField) -> Result<(), AuraError> {
     match field.problem() {
         None => Ok(()),
@@ -31,7 +31,7 @@ pub fn check_mask(field: &MaskField) -> Result<(), AuraError> {
 ///
 /// # Errors
 ///
-/// `AURA-ML-5068` naming the photograph and the guarantee.
+/// `AURA-ML-5086` naming the photograph and the guarantee.
 pub fn check_plan(plan: &LocalLightPlan) -> Result<(), AuraError> {
     match plan.broken_guarantee() {
         None => Ok(()),
@@ -43,7 +43,7 @@ pub fn check_plan(plan: &LocalLightPlan) -> Result<(), AuraError> {
 ///
 /// # Errors
 ///
-/// `AURA-ML-5067` naming the problem.
+/// `AURA-ML-5085` naming the problem.
 pub fn check_override(values: &LocalOverride) -> Result<(), AuraError> {
     match values.problem() {
         None => Ok(()),
@@ -80,7 +80,7 @@ mod tests {
         let mut broken = good;
         broken.alpha.pop();
         let err = check_mask(&broken).expect_err("refused");
-        assert_eq!(err.code.0, "AURA-ML-5071");
+        assert_eq!(err.code.0, "AURA-ML-5089");
         assert!(err.detail.contains("subject"));
     }
 
@@ -96,13 +96,13 @@ mod tests {
         let mut bad = good;
         bad.reasons.clear();
         let err = check_plan(&bad).expect_err("refused");
-        assert_eq!(err.code.0, "AURA-ML-5068");
+        assert_eq!(err.code.0, "AURA-ML-5086");
     }
 
     #[test]
     fn an_empty_override_is_5067() {
         let err = check_override(&LocalOverride::default()).expect_err("refused");
-        assert_eq!(err.code.0, "AURA-ML-5067");
+        assert_eq!(err.code.0, "AURA-ML-5085");
         assert!(check_override(&LocalOverride::one(LocalOp::FaceLight, 0.5)).is_ok());
     }
 }

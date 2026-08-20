@@ -804,7 +804,7 @@ export const tone = {
  *
  * Six calls. Three read, one runs the pass, and two record what the photographer decided.
  * None of them returns a mask: phase 18 owns masks, phase 19 reads them, and nothing on this
- * surface can return an alpha, a matte or a grid (ADR-0034 section 4). What the panel gets
+ * surface can return an alpha, a matte or a grid (ADR-0040 section 4). What the panel gets
  * instead is the reasons' own evidence rectangles and the shaping zones by name.
  */
 export const local = {

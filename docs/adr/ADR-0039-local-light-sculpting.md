@@ -1,4 +1,4 @@
-# ADR-0033 - Local light sculpting: the mask port, the fairness guarantee and the halo test
+# ADR-0039 - Local light sculpting: the mask port, the fairness guarantee and the halo test
 
 **Status:** accepted · **Date:** 2026-08-19 · **Phase:** 19 · **Supersedes:** nothing
 
@@ -7,7 +7,7 @@ them: section 5 freezes a contract that consumes a phase which has not shipped, 
 scaling rule has two readings and only one of them is defensible, section 10.1's fairness gate
 cannot be met as written, and its halo gate cannot be *measured* as written. All four are
 decisions, and a decision nobody wrote down is a decision the next phase re-argues from
-scratch. The second document is [ADR-0034](ADR-0034-local-ipc-surface.md), which covers the
+scratch. The second document is [ADR-0040](ADR-0040-local-ipc-surface.md), which covers the
 wire.
 
 The ADR numbering in this repository is sequential across the whole project rather than aligned
@@ -80,7 +80,7 @@ panel still shows every zone by name because they are regenerated on read.
 
 The consequence is that **a change to either derivation moves delivered pixels without moving
 a single stored number**. Nothing else in the product has that property, and nothing else
-needs `shaping_ver`. `AURA-ML-5066` is raised when a comparison would cross any of the four.
+needs `shaping_ver`. `AURA-ML-5084` is raised when a comparison would cross any of the four.
 
 ## 4. Decision: this phase does not own a mask, and has no fallback that draws one
 
@@ -139,7 +139,7 @@ part they asked for.
 
 `LocalOp::PRIORITY` is the order, there is no second list, and `governor::allocate` walks it
 once. A scene policy row that gave `dodge_burn_low` a higher strength than `face_light` is
-refused by the loader with `AURA-ML-5069`, so a config file cannot reverse it either.
+refused by the loader with `AURA-ML-5087`, so a config file cannot reverse it either.
 
 ## 6. Decision: the group-fairness guarantee is about the edit, not about the frame
 
@@ -161,7 +161,7 @@ the absolute reading, and both are worse than the problem:
 So the guarantee is about the *edit*: **the lighting reaches the threshold whenever the caps
 allow, and it can never make a group less even than it found it.** A frame that arrives inside
 the threshold must stay inside it; a frame that arrives outside must come closer or stay where
-it is. `LocalLightPlan::group_is_fair` is that predicate and `AURA-ML-5068` refuses a plan
+it is. `LocalLightPlan::group_is_fair` is that predicate and `AURA-ML-5086` refuses a plan
 that breaks it.
 
 The second half is implemented structurally rather than promised: `face_light::enforce_spread`
@@ -226,7 +226,7 @@ shipped. The nine additions are not subdivisions of the six:
 | `freqsep` | Three-band separation. Owned by neither `dodgeburn` nor `shine`, read by both. |
 | `guard` | Turns the contract's predicates into this phase's errors. `aura-core` owns the shapes; `aura-brain-photo` owns the registry. |
 | `plan` | The analyser: one decoded frame in, one plan out. |
-| `store` | Migration 16's tables. |
+| `store` | Migration 19's tables. |
 | `api` | The frozen `LocalService` and the resumable walk. |
 | `fixtures` | The synthetic ground truth every gate is measured against. |
 

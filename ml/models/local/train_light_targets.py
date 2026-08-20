@@ -54,7 +54,7 @@ from pathlib import Path
 from typing import Any
 
 # Bounds the fit may not leave. Every one of them is a constant in
-# `aura_core::contract::local` or a column check in migration 16, restated here because this
+# `aura_core::contract::local` or a column check in migration 19, restated here because this
 # script has to run with nothing installed.
 MAX_FACE_LIFT_EV = 1.20
 MAX_BACKGROUND_EV = 0.67

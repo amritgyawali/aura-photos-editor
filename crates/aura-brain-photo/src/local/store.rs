@@ -1,4 +1,4 @@
-//! The four tables migration 16 adds, and the three rules that live in the SQL rather than
+//! The four tables migration 19 adds, and the three rules that live in the SQL rather than
 //! around it.
 //!
 //! ## `user_edited` is re-applied inside the statement, not read before it
@@ -209,7 +209,7 @@ impl LocalStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5068` when the plan breaks one of the phase's own guarantees, and
+    /// `AURA-ML-5086` when the plan breaks one of the phase's own guarantees, and
     /// `AURA-DB-3006` when the write fails.
     #[allow(clippy::too_many_lines)]
     pub fn put(&self, project: &ProjectId, plan: &LocalLightPlan) -> AuraResult<()> {
@@ -864,7 +864,7 @@ impl LocalStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5067` when the photograph has no plan.
+    /// `AURA-ML-5085` when the photograph has no plan.
     pub fn accept(&self, image: ImageId) -> Result<(), aura_core::AuraError> {
         let key = image.to_db();
         let changed = self.catalog.writer().transact(move |conn| {
@@ -887,7 +887,7 @@ impl LocalStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5067` when the photograph has no plan, the override is empty, or a strength is
+    /// `AURA-ML-5085` when the photograph has no plan, the override is empty, or a strength is
     /// outside `0..1`.
     pub fn set_override(
         &self,

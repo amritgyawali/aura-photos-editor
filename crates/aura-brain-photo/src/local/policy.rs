@@ -18,7 +18,7 @@
 //!
 //! ## Refusal is whole-file
 //!
-//! A malformed table raises `AURA-ML-5069` and **nothing is loaded**, exactly as phase 15's
+//! A malformed table raises `AURA-ML-5087` and **nothing is loaded**, exactly as phase 15's
 //! exposure targets and phase 11's composition rules behave. Half a policy table would shape
 //! the ceremony against measured strengths and the reception against nothing, and that
 //! inconsistency is invisible in a delivered gallery.
@@ -130,7 +130,7 @@ impl PolicyTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5069` when the embedded file is malformed, which would be a build bug rather
+    /// `AURA-ML-5087` when the embedded file is malformed, which would be a build bug rather
     /// than a deployment one - and is why `tests/local_policy.rs` loads it too.
     pub fn embedded() -> Result<Self, AuraError> {
         Self::parse("local_light.toml (embedded)", EMBEDDED)
@@ -143,7 +143,7 @@ impl PolicyTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5069` only when the embedded baseline itself will not load.
+    /// `AURA-ML-5087` only when the embedded baseline itself will not load.
     pub fn load_or_embedded(directory: &Path) -> Result<(Self, Option<AuraError>), AuraError> {
         let path = directory.join(OVERRIDE_FILE);
         if !path.exists() {
@@ -167,7 +167,7 @@ impl PolicyTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5069`, naming the file, the key and the rule.
+    /// `AURA-ML-5087`, naming the file, the key and the rule.
     pub fn parse(name: &str, text: &str) -> Result<Self, AuraError> {
         let parsed: PolicyFile = toml::from_str(text).map_err(|err| {
             errors::policy_refused(name, "file", &format!("is not valid TOML: {err}"))

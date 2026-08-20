@@ -1,6 +1,6 @@
 //! The phase 19 mechanical gate.
 //!
-//! This is the assembly proof for local light sculpting: migration 16 and its objects, the
+//! This is the assembly proof for local light sculpting: migration 19 and its objects, the
 //! policy table, the measurement pass, the luminosity split, the joint face solve, the paired
 //! subject/background move, the frequency separation, the shaping zones, the shine detector,
 //! the governor, the store and its override protection, and what happens to a whole synthetic
@@ -48,7 +48,7 @@ pub fn verify(args: &[String]) -> ExitCode {
     let clock: Arc<dyn Clock> = Arc::new(SystemClock::default());
     let mut failures = 0usize;
 
-    // 1. Migration 16 and every object it owns.
+    // 1. Migration 19 and every object it owns.
     let catalog_path = work.join("phase19.sqlite");
     drop(std::fs::remove_file(&catalog_path));
     let catalog = match Catalog::open(&catalog_path, Arc::clone(&clock), crate::APP_VERSION) {
@@ -59,9 +59,9 @@ pub fn verify(args: &[String]) -> ExitCode {
         }
     };
     match catalog.schema_version() {
-        Ok(version) if version >= 16 => println!("schema: version {version}"),
+        Ok(version) if version >= 19 => println!("schema: version {version}"),
         Ok(version) => {
-            eprintln!("schema: expected at least 16, found {version}");
+            eprintln!("schema: expected at least 19, found {version}");
             failures += 1;
         }
         Err(err) => {
@@ -99,11 +99,11 @@ pub fn verify(args: &[String]) -> ExitCode {
     // way a phase quietly acquires somebody else's job is by growing a column for it.
     match forbidden_columns(&catalog) {
         Ok(found) if found.is_empty() => {
-            println!("  no mask, matte or smoothing column anywhere in migration 16");
+            println!("  no mask, matte or smoothing column anywhere in migration 19");
         }
         Ok(found) => {
             eprintln!(
-                "  migration 16 grew a forbidden column: {}",
+                "  migration 19 grew a forbidden column: {}",
                 found.join(", ")
             );
             failures += 1;
@@ -509,7 +509,7 @@ fn schema_object(catalog: &Catalog, kind: &str, name: &str) -> AuraResult<bool> 
     })
 }
 
-/// Any column in migration 16's tables whose name suggests a mask or a blur.
+/// Any column in migration 19's tables whose name suggests a mask or a blur.
 ///
 /// Two boundaries, checked rather than remembered. The list is deliberately broad: this is
 /// looking for the *shape* of a mistake somebody would make in good faith while adding a
