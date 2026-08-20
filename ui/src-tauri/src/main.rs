@@ -30,6 +30,11 @@ use aura_app::contract::ipc::{
     AcceptColourInput, ColourDto, ColourPassDto, ColourReviewInput, ColourStatusDto,
     EstimateColourInput, SelectVariantInput, SetColourOverrideDto, SetColourOverrideInput,
 };
+// PHASE-19.
+use aura_app::contract::ipc::{
+    AcceptLocalInput, LocalPassDto, LocalPlanDto, LocalReviewInput, LocalStatusDto,
+    SculptLocalInput, SetLocalStrengthDto, SetLocalStrengthInput,
+};
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
 use tauri::{Manager, State};
@@ -598,7 +603,75 @@ fn catalog_path() -> Result<PathBuf, IpcError> {
     Ok(paths.data_dir.join("catalogs").join("default.sqlite"))
 }
 
-fn main() {
+// PHASE-19. Every local light command can touch SQLite, and `sculpt_local` decodes proxies
+// and separates frequency bands over a whole gallery. All six go off the renderer thread for
+// the reason the tone block above gives.
+#[tauri::command]
+async fn local_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<LocalStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::local_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_local(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<LocalPlanDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_local(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn local_review_queue(
+    state: State<'_, AppState>,
+    input: LocalReviewInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::local_review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn accept_local(
+    state: State<'_, AppState>,
+    input: AcceptLocalInput,
+) -> IpcResult<LocalPlanDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::accept_local(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_local_strength(
+    state: State<'_, AppState>,
+    input: SetLocalStrengthInput,
+) -> IpcResult<SetLocalStrengthDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_local_strength(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn sculpt_local(
+    state: State<'_, AppState>,
+    input: SculptLocalInput,
+) -> IpcResult<LocalPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::sculpt_local(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -691,7 +764,13 @@ fn main() {
             compare_profiles,
             export_profile,
             import_profile,
-            set_project_profile
+            set_project_profile,
+            local_status,
+            image_local,
+            local_review_queue,
+            accept_local,
+            set_local_strength,
+            sculpt_local
         ])
         .run(tauri::generate_context!());
 

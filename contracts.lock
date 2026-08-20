@@ -1,4 +1,4 @@
-f316a5213a7e9110befc5933977025126eff532b567908bc55032d2841fb0b45  crates/aura-app/src/contract/ipc.rs
+8de5baf76ef395f04fec38d49445c34ee440f99404575e3a4b3b1f8cd4b55f5c  crates/aura-app/src/contract/ipc.rs
 e73c77d6ac620fb3e62a91f2342dd22061769977dc6db49abdd60d669464ab7f  crates/aura-catalog/migrations/0001_init.sql
 1026d7b8166dc998476f1f009fb660e8a9a7ee7ac6866096eaf2a57fbdfda063  crates/aura-catalog/migrations/0004_cloud_audit.sql
 c0db688ee7efb4acf16b82555ffebff15eb28d241268080e81e0d66ec31cb0b5  crates/aura-catalog/migrations/0005_embeddings.sql
@@ -15,6 +15,7 @@ a847e4533b6fb28c262083c02d7061af526a7028eeb7e02a77995219f9c18973  crates/aura-ca
 39f1ea7e3074e05001acf4acfcb4718ece01562cae7ebda309d7643a9ed39ecd  crates/aura-catalog/migrations/0016_colour.sql
 adcd22cf652e6c7b5b783eaa8fd7c6c471260c7b87952f658af0ca5c216cfec2  crates/aura-catalog/migrations/0017_style.sql
 976ed6bbf30ce2c0124465a288ec21577c94ade306db87ac897cc75392be06ec  crates/aura-catalog/migrations/0018_masks.sql
+2d9df2439049aa5422b699063df83da3fdd4d49c442384a82d5b74d6e66d78ba  crates/aura-catalog/migrations/0019_local_light.sql
 39bdc1c97065b4d4d75376bf7b54afbd92760e9f7379ae05bac866cd8b5475fc  crates/aura-cloud/src/contract/cloud.rs
 14a44b84c24a363b1dbc2a884996d9dc8425aa87d939badd09cf33bf5dfad871  crates/aura-core/src/contract/colour.rs
 157fb1ddcaaa13e7ba2d12fc3235e9f38f7f6f7cd1b1fe4dfa0dd319acb54279  crates/aura-core/src/contract/composition.rs
@@ -26,6 +27,7 @@ d132fad56063619137e8ed78da674db6317d4c8545140f0c6fda58959f2037d0  crates/aura-co
 bc199e179c6eee6d003e366f1493950db36f7cdc0d16765723fbd8684f46bd6f  crates/aura-core/src/contract/ids.rs
 ef9882c3508a2dacf269f3fadcfde6a449038fffa62708005ae2b3fceaf10f61  crates/aura-core/src/contract/integrity.rs
 830879076bd899bd0f56fb27f5861e41523e1d83aeaff50ada409b2cb9acc764  crates/aura-core/src/contract/ledger.rs
+05451ee05cfaf1491ee307ab800fb65933ea749c921ef65a7005929d2e96d460  crates/aura-core/src/contract/local.rs
 e8a410a8d33006d77c4f4ac4f2e472e540e1fadcf5cb5eb1f34376b8253de84a  crates/aura-core/src/contract/moment.rs
 bb43f1ec62f8221dcaab649e47a9e3fa008beb05a9132a3632a56179d0e8e829  crates/aura-core/src/contract/people.rs
 488b4b251d5bf0859d13492de7ae66b3c1d27c2c6980e69457ac8aaf2de2278c  crates/aura-core/src/contract/priority.rs
@@ -44,4 +46,4 @@ d70190129547cfcc548915e34dd7e8539bf74ed1fcaad042eb4cf9b47a1a73c5  crates/aura-ra
 a63a94b88b02f3df09e5808cbe9ba985682d4290e91c0652b9edf55c91e566eb  crates/aura-render/shaders/mask_upsample.wgsl
 783877ce5cc70029c03bbd4dc0976f7b7a9c5dab73ef9851ade453ed619cc9a3  crates/aura-render/src/contract/render.rs
 d707ca15002555f46b7b9208b6a7a0792b2d8dd2a4e9b08a6f3858ae621218ee  crates/aura-vision/src/contract/mask.rs
-e9f4f9e94aa2e6d39e0e4335c47094aa669f66babb7fa836687e950654a92eaf  ui/src/ipc/types.ts
+1a6597ec551800af9d29cd27896555a7150b15f60dd4765c7f0ac620559bdc27  ui/src/ipc/types.ts

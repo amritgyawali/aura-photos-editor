@@ -586,3 +586,137 @@ pub fn colour_version_mismatch(
     .with_context("stored_analysis_ver", stored.1.to_string())
     .with_context("stored_intent_ver", stored.2.to_string())
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-19. Local light sculpting.
+// ---------------------------------------------------------------------------
+
+/// Stored plans came from different heads, different arithmetic, a different policy table or
+/// a different shaping derivation.
+pub const ML_LOCAL_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5084");
+/// A local strength override or acceptance was refused.
+pub const ML_LOCAL_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5085");
+/// One photograph's local light could not be planned.
+pub const ML_LOCAL_FAILED: ErrorCode = ErrorCode("AURA-ML-5086");
+/// The local light policy table was refused.
+pub const ML_POLICY_REFUSED: ErrorCode = ErrorCode("AURA-ML-5087");
+/// A scene has no local light policy row.
+pub const ML_SCENE_UNPOLICIED: ErrorCode = ErrorCode("AURA-ML-5088");
+/// A mask was unusable, so an operation was scaled down or skipped.
+pub const ML_MASK_UNUSABLE: ErrorCode = ErrorCode("AURA-ML-5089");
+
+/// Stored plans disagree with the running build about a version.
+///
+/// Degraded rather than fatal, exactly as `AURA-ML-5033`, `AURA-ML-5043` and `AURA-ML-5060`
+/// are. **Four** numbers rather than three, because this phase carries a fourth version
+/// column: the shaping grids are derived from stored zones rather than persisted, so a
+/// change to the derivation moves delivered pixels without moving a stored value, and
+/// `shaping_ver` is the only thing that makes it visible.
+#[must_use]
+pub fn local_version_mismatch(
+    stored: (u16, u16, u16, u16),
+    current: (u16, u16, u16, u16),
+    rows: usize,
+) -> AuraError {
+    AuraError::new(
+        ML_LOCAL_VERSION_MISMATCH,
+        Severity::Degraded,
+        Recovery::Fallback,
+        format!(
+            "{rows} local light plans were made under model {}/analysis {}/policy {}/shaping {} \
+             and this build is model {}/analysis {}/policy {}/shaping {}",
+            stored.0, stored.1, stored.2, stored.3, current.0, current.1, current.2, current.3
+        ),
+        "AURA has improved how it shapes light inside a photograph, so it is re-checking this \
+         wedding in the background. Anything you have already adjusted is kept.",
+    )
+    .with_context("rows", rows.to_string())
+}
+
+/// A strength override or an acceptance could not be recorded.
+///
+/// The message names the reason rather than the caller, because every one of the four
+/// causes - no plan, an empty override, a strength out of range, an id that does not parse -
+/// is something a support engineer can act on and none of them is a stack trace.
+#[must_use]
+pub fn local_edit_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_LOCAL_EDIT_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        detail.into(),
+        "AURA could not record that adjustment. Nothing was changed.",
+    )
+}
+
+/// One photograph's local light could not be planned.
+///
+/// **A refused plan is stored as no plan rather than as a weak one.** Three of the five
+/// guarantees `LocalLightPlan::broken_guarantee` checks describe a photograph that would look
+/// visibly edited, and a visibly edited photograph is the failure this phase exists to avoid.
+#[must_use]
+pub fn local_failed(photo: &str, detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_LOCAL_FAILED,
+        Severity::ItemFailed,
+        Recovery::Retry,
+        format!("{photo}: {}", detail.into()),
+        "AURA could not work out the local light adjustments for one photograph, and has left \
+         it with the overall settings only. Everything else in this wedding is unaffected.",
+    )
+    .with_context("photo", photo)
+}
+
+/// The local light policy table would not load.
+///
+/// Whole-file refusal, exactly as `AURA-ML-5063` and `AURA-ML-5049` are: half a policy table
+/// would shape the ceremony against measured strengths and the reception against nothing, and
+/// the inconsistency would be invisible in the delivered gallery.
+#[must_use]
+pub fn policy_refused(file: &str, key: &str, rule: &str) -> AuraError {
+    AuraError::new(
+        ML_POLICY_REFUSED,
+        Severity::RunBlocking,
+        Recovery::Halt,
+        format!("{file}: `{key}` {rule}"),
+        "AURA could not load the settings that decide how much local shaping each kind of \
+         photograph gets, so it has not made any local adjustments. Restore the file or \
+         reinstall.",
+    )
+    .with_context("file", file)
+    .with_context("key", key)
+}
+
+/// A scene with no policy row. The neutral strengths were used and the plan says so.
+#[must_use]
+pub fn scene_unpolicied(scene: &str) -> AuraError {
+    AuraError::new(
+        ML_SCENE_UNPOLICIED,
+        Severity::Warning,
+        Recovery::Fallback,
+        format!("no local light policy row for `{scene}`; the neutral strengths were used"),
+        "AURA has no local shaping guidance recorded for this kind of photograph yet, so it is \
+         treating those ones very gently. They are all still usable.",
+    )
+    .with_context("scene", scene)
+}
+
+/// A mask was missing or unusable, so an operation was scaled down or skipped.
+///
+/// **Warning rather than item-failed, and that is the phase's whole posture.** Phase 19 owns
+/// no mask generator and has no fallback that draws one, because a second answer to "where
+/// does the subject end" is a background reduction that traces an outline nothing else in the
+/// product agrees with. So an absent mask produces a gentler edit or none, and says so.
+#[must_use]
+pub fn mask_unusable(kind: &str, detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_MASK_UNUSABLE,
+        Severity::Warning,
+        Recovery::Fallback,
+        format!("{kind} mask: {}", detail.into()),
+        "AURA is not sure enough where the subject ends and the background begins in some \
+         photographs, so it made gentler local adjustments there - or none at all. Nothing has \
+         been damaged.",
+    )
+    .with_context("mask_kind", kind)
+}

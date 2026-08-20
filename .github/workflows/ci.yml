@@ -44,6 +44,14 @@ jobs:
     name: tests on ${{ matrix.os }}
     needs: gates
     runs-on: ${{ matrix.os }}
+    # Every timing budget in `perf/budgets.toml` and phase 14's proxy guardrail are measured
+    # on a development machine. A shared GitHub runner is two and a half to five times slower
+    # than that - measured: 497 ms on macOS, 669 ms and 1,123 ms on ubuntu, against a 210 ms
+    # development figure - so the budgets are relaxed by a named factor here rather than being
+    # loosened in the file, which would remove the guardrail from the machine anybody
+    # develops on. Sizes, counts and costs are NOT scaled: a byte is a byte on any host.
+    env:
+      AURA_PERF_HOST_SCALE: "4"
     strategy:
       fail-fast: false
       matrix:
@@ -86,6 +94,14 @@ jobs:
       # conditions C1 and C2 - and exits non-zero on a real failure.
       - name: phase 14 verify - recipe, colour, tiling, parity, interchange
         run: cargo run --release --package aura-cli -- verify --phase 14 --work target/phase14-verify
+
+      # PHASE-19. Local light sculpting. No network, no GPU, no model and - on this
+      # build - no mask: phase 18's MaskService is not wired into LocalPass, so the
+      # gate proves the arithmetic against fixtures and prints what it does not
+      # prove at the end of every run.
+      # See docs/progress/PHASE-19-EXIT.md conditions C1 to C3.
+      - name: phase 19 verify - policy, lighting, pairing, shaping, shine, governor
+        run: cargo run --release --package aura-cli -- verify --phase 19 --work target/phase19-verify
 
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
@@ -130,6 +146,14 @@ jobs:
     name: benchmarks
     needs: gates
     runs-on: ubuntu-latest
+    # Every timing budget in `perf/budgets.toml` and phase 14's proxy guardrail are measured
+    # on a development machine. A shared GitHub runner is two and a half to five times slower
+    # than that - measured: 497 ms on macOS, 669 ms and 1,123 ms on ubuntu, against a 210 ms
+    # development figure - so the budgets are relaxed by a named factor here rather than being
+    # loosened in the file, which would remove the guardrail from the machine anybody
+    # develops on. Sizes, counts and costs are NOT scaled: a byte is a byte on any host.
+    env:
+      AURA_PERF_HOST_SCALE: "4"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -166,8 +190,26 @@ jobs:
 
       # PHASE-14 section 11. Four of its five rows are waived (no GPU backend,
       # ADR-0029 section 4); what is asserted is the processor path and the store.
+      # `--test-threads=1` for the same reason the whole-suite step above uses it: these
+      # cases each render a frame, and five of them racing across the runner's cores
+      # measure the contention rather than the renderer. This step re-runs a suite that
+      # has already passed serially, purely to print the figures, and it was the one
+      # place the rule was missed - it read 737 ms per unit against 532 in parallel and
+      # 286 serially on the same machine.
       - name: develop budgets
-        run: cargo test --release --package aura-perf --test develop_budgets -- --nocapture
+        run: cargo test --release --package aura-perf --test develop_budgets -- --test-threads=1 --nocapture
+
+      # PHASE-19 section 10.1, as a test suite. Six of its seven gates are measured
+      # here; the seventh is an expert study over four hundred frames and is
+      # condition C3 rather than a number.
+      - name: local light evaluation gates
+        run: cargo test --release --package aura-brain-photo --test local_eval -- --nocapture
+
+      # PHASE-19 section 11. The render row is waived twice over - no GPU backend
+      # and no phase 18 matte reaching the pass - so what is asserted is the
+      # processor path and the store.
+      - name: local light budgets
+        run: cargo test --release --package aura-perf --test local_budgets -- --test-threads=1 --nocapture
 
       # Two independent implementations of the metrics have to agree, or neither
       # is trustworthy. The Python half also self-tests without cargo.
@@ -177,3 +219,5 @@ jobs:
           python ml/models/embed/train_contrastive.py --dry-run
           python ml/models/embed/eval_retrieval.py --self-test
           python ml/models/embed/export.py --placeholder --verify models
+          python ml/models/local/train_light_targets.py --self-test
+          python ml/models/local/eval_local.py --self-test

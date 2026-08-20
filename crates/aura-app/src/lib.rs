@@ -56,6 +56,7 @@ pub mod explain_commands;
 pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
+pub mod local_commands;
 pub mod mask_commands;
 pub mod moment_commands;
 pub mod people_commands;
@@ -107,6 +108,9 @@ pub use infer_commands::{
 pub use integrity_commands::{
     analyse_integrity, dismiss_flag, flagged_images, image_integrity, integrity_status,
     within_moment,
+};
+pub use local_commands::{
+    accept_local, image_local, local_review_queue, local_status, sculpt_local, set_local_strength,
 };
 pub use mask_commands::{
     edit_mask, ensure_masks, image_masks, mask_allowance, mask_kinds, mask_overlay, mask_status,

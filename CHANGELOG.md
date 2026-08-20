@@ -2,6 +2,127 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 19 - Local Light Sculpting (face lighting, subject enhancement, dodge and burn)
+
+The first phase that moves light *inside* a photograph rather than across all of it. Faces
+under a mandap are lifted through their shadows so they do not glow, a window behind the
+couple is brought down while the subject is lifted by the same amount so the frame is no
+brighter overall, sheen on a forehead is reduced as brightness rather than blurred away, and
+form is deepened the way a retoucher would without any operator in the product being able to
+reach skin texture at all.
+
+Its success condition is that none of that is visible, which is a hard thing to put in a
+panel. So the Local panel goes the other way: it shows what each face was moved by **and what
+stopped it**, shows an operation that could not run as *unavailable* rather than as off, and
+tells a photographer when a group could not be evened out completely and that nobody was
+darkened to close the gap.
+
+**Phase 18 has not shipped, so on this build every operation is gated and nothing is edited.**
+That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the panel and in
+`LocalOutline::mask_covered`, and it is not a fault to investigate.
+
+### Added
+
+- **`aura-core::contract::local`**: the frozen `LocalLightPlan`, `MaskField`, `LocalOp` and its
+  priority order, `FaceZone`'s ten named moves, `FaceLightDelta`, `SubjectEnhanceDelta`,
+  `BackgroundBalanceDelta`, `DodgeBurnMaps`, `ShineReduction`, thirty reason codes,
+  `LocalOutline`, `LocalOverride` and `LocalService`. **There is no field anywhere in it that
+  could hold image data**, which is what makes "all local work is reversible and inspectable"
+  a property of the shape.
+- **`aura-brain-photo::local`**: fifteen modules. The per-scene policy table, one measurement
+  pass, the luminosity split that stops a lifted face glowing, a joint face solve across every
+  face in a frame, the paired subject/background move with three measured triggers,
+  three-band frequency separation whose finest band is never produced, zone-based dodge and
+  burn, specular shine detection with a luminance-only reduction, and one per-image perceptual
+  allowance that every operation spends against.
+- **Migration 19**: `local_light_plan`, `local_light_face`, `local_light_gate` and
+  `v_local_coverage`. There is no mask column, no matte and no blur, and the phase gate scans
+  the schema for one on every run.
+- **`local_light.toml`**: 22 scene rows with a written reason each. The loader refuses a row
+  with no reason and a row that shapes form harder than it lights faces.
+- **Three shaders and a processor reference**: `luminosity_mask.wgsl`, `freq_sep.wgsl` and
+  `local_apply.wgsl` - the first shader *libraries* in the product - held to
+  `aura_render::local` by six shared constants in `shader_parity.rs`.
+- **Six IPC commands** (ADR-0040) and the Local panel. No command can return a mask.
+- **`docs/local-light.md`**: what every one of the thirty notes means, in the product's own
+  words, with the group-fairness guarantee stated as what it actually is.
+- **`aura-cli verify --phase 19`**, 38 evaluation gates and two performance budgets.
+
+### Fixed
+
+- **A halo made by arithmetic that looked conservative.** `apply_face_light` evaluated its
+  luminosity weights on the partially-edited pixel, so the highlight restraint grew
+  quadratically in the matte while the lift grew linearly. Past about half coverage the
+  restraint overtook, and a bright pixel received *more* lift at the mask's edge than at its
+  centre - a bright rim. Both weights now read the input pixel and the whole edit is linear in
+  the matte, on the processor path and in the shader.
+- **A cap detector that could never fire.** The joint solve reported whether a lift had been
+  capped by comparing against the group's converged target, which has already absorbed the
+  caps. It now compares against the scene's band.
+- **A joint solve that could brighten a face past the band.** One blown face dragged the common
+  target above the scene's band and everybody else was lifted to meet it. Every move is now
+  clamped to lie between the face and the band.
+- **`0019_local_light.sql` is locked.** Phase 19 also found that `0015_tone.sql` was missing
+  from the frozen contract list - a phase 15 oversight rather than a decision - but phase 16
+  had already noticed and fixed the same thing on `main`, so only the new migration is added
+  here.
+- **CI had been red on `main` for five days, and the cause was a budget that assumed CI was
+  fast.** Phase 14's proxy guardrail says it "leaves room for a slower CI machine" at 450 ms
+  against a 210 ms development figure. It does not: three GitHub runners measured 497, 669 and
+  1,123 ms. Timing budgets are now multiplied by `AURA_PERF_HOST_SCALE`, which CI sets to 4
+  and a developer does not, so the tight assertion survives on the machine anybody develops on
+  and CI asserts a looser but still real bound. **Sizes, counts and costs are never scaled** -
+  a slow runner is not a reason to store more, call more or spend more - and the factor is
+  clamped so a budget cannot be switched off from the environment.
+- **That scale then broke the tests that assert what a budget *means*.** It was read inside
+  `Budgets::check`, so the case proving 900 ms breaches a 400 ms budget stopped breaching the
+  moment CI exported a scale of four. `check` is now a wrapper over `check_at_scale`, which
+  takes the scale as an argument; the cases that assert the rule pin their own and nothing but
+  `host_scale` reads the environment. A measurement's verdict depends on the host, the rule
+  does not.
+- **Phase 09's storage budget had been failing on packing drift.** Also red on `main`, and
+  masked behind the guardrail above. It was measured with whole-file `PRAGMA page_count`,
+  which quantises to 4 KiB, and then recorded as "1,024 B, met, **exactly**" - pinned with no
+  headroom in a number that can only move in 4 KiB steps. It moved two pages and began failing
+  on nothing anybody had written. The test now counts `dbstat` payload over migration 9's two
+  tables and their indexes (927 B per image), and asserts the page overhead separately as a
+  bounded ratio (1.11x measured, 1.40x ceiling) so a structural regression still fails. No
+  schema changed and nothing was made cheaper: the same rows are counted with an instrument
+  that moves by the bytes actually added. **A budget measured with a quantised instrument must
+  not be set at its own measurement.**
+- **Two CI steps re-ran a budget suite in parallel and measured the contention.** The step
+  that runs the whole suite passes `--test-threads=1`, with a comment saying why - "a budget
+  suite that races itself reports a different number every run" - and the two dedicated steps
+  that re-run one suite each to print its figures did not. Five renders racing across a
+  runner's cores read 737 ms per unit against a 532 ms allowance where the same machine read
+  286 ms serially. Both steps now pass the flag the rule four lines above them already stated.
+
+### Changed
+
+- **The group-fairness guarantee is about the edit, not about the frame.** Section 10.1's
+  absolute spread threshold is unachievable on a family formal where one person is two stops
+  down under a doorway, and the two ways to satisfy it anyway - refuse to plan the frame, or
+  darken everybody else - are both worse than the problem. What is guaranteed: reach the
+  threshold whenever the caps allow, and never make a group less even than you found it.
+  ADR-0039 section 6.
+- **The shaping is stored as four numbers per face rather than as ten zones.** Every zone is a
+  pure function of the face region, the light direction and the strength. This took the table
+  from 2,236 to 1,064 bytes per image, and the panel still shows every zone by name because
+  they are regenerated on read - which is why `shaping_ver` exists.
+
+### Not done
+
+- **This phase was written on top of phase 15, before 16, 17 and 18 existed**, and merged into
+  them afterwards. It still reads phase 15's per-scene luminance bands rather than phase 16's
+  refined ones and reads no phase 17 style profile (condition C4), and phase 18's `MaskService`
+  is not wired into `LocalPass`, so every operation is still gated (condition C1). Its
+  migration, error codes and ADRs were renumbered on merge - migration 19, `AURA-ML-5084` to
+  `5089`, ADR-0039 and ADR-0040.
+- **The expert subtlety study and the four-hundred-frame halo audit do not exist**, so the
+  headline KPI of this phase is unmeasured. Condition C3.
+- **The learned targets are untrained and never consulted**; there is no corpus of expert edits
+  in this repository. Condition C2.
+
 ## Phase 18 - Local Mask AI: automatic semantic masking
 
 Every photograph you keep is split into the twenty regions the rest of the product edits inside:

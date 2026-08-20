@@ -2465,3 +2465,176 @@ export type MaskAllowanceDto = {
   permitted: boolean;
   reasons: MaskReasonDto[];
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-19. Local light sculpting.
+// ---------------------------------------------------------------------------
+
+/** One face, and what the light on it was moved by. */
+export type FaceLightDto = {
+  identityId?: string | null;
+  exposureEv: number;
+  shadows: number;
+  /** Never positive. A face is never lifted by pushing its highlights up. */
+  highlights: number;
+  lumaBefore: number;
+  lumaTarget: number;
+  lumaAfter: number;
+  /**
+   * The largest lift this frame's noise would have tolerated, in stops.
+   *
+   * What the panel shows when a lift stopped short: "AURA lifted her face 0.4 EV
+   * and would have lifted it 0.9" is a sentence a photographer can act on.
+   */
+  noiseCapEv: number;
+  maskScale: number;
+};
+
+/** One shaping move, as a retoucher would name it. */
+export type ShapingZoneDto = {
+  zone: string;
+  cx: number;
+  cy: number;
+  radius: number;
+  /** Positive lifts, negative deepens. Bounded to a sixth of a stop. */
+  gainEv: number;
+};
+
+/** One reason the local work came out the way it did. */
+export type LocalReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+  operation?: string | null;
+  /** True when the code withdraws a claim rather than making one. */
+  withdrawal: boolean;
+  evidence?: CropRectDto | null;
+};
+
+/** One operation that did not run at full strength, and the mask that stopped it. */
+export type GateDto = {
+  operation: string;
+  maskKind: string;
+};
+
+/** Everything phase 19 decided about the light inside one photograph. */
+export type LocalPlanDto = {
+  photoId: string;
+  /** The strength each operation ran at, in priority order. */
+  strengths: number[];
+  /** The operations' stable slugs, in the same order. */
+  operations: string[];
+  faces: FaceLightDto[];
+  subjectClarity: number;
+  subjectTexture: number;
+  subjectContrast: number;
+  /** Zero or negative. This phase calms a background and never enriches one. */
+  backgroundEv: number;
+  backgroundSaturation: number;
+  competitionRatio: number;
+  chromaEnergy: number;
+  meanLumaBefore: number;
+  meanLumaAfter: number;
+  shineRegions: number;
+  shineEv: number;
+  shineBoxes: CropRectDto[];
+  /** The shaping moves, by face ordinal. */
+  shaping: ShapingZoneDto[][];
+  faceSpread: number;
+  groupFair: boolean;
+  budgetUsed: number;
+  gated: GateDto[];
+  reasons: LocalReasonDto[];
+  confidence: number;
+  scene: string;
+  userEdited: boolean;
+  reviewed: boolean;
+  needsReview: boolean;
+  modelVer: number;
+  analysisVer: number;
+  policyVer: number;
+  shapingVer: number;
+};
+
+/** What a project's local light pass covered and found. */
+export type LocalStatusDto = {
+  photos: number;
+  planned: number;
+  coverage: number;
+  /**
+   * Fraction of planned frames where at least one operation actually ran.
+   *
+   * The number that matters when it is low: because this phase's work is meant to
+   * be invisible, a wedding at 100 % coverage and 4 % acted-on looks exactly like a
+   * wedding that was worked on.
+   */
+  actedOn: number;
+  maskCovered: number;
+  opCounts: number[];
+  opNames: string[];
+  gatedCounts: number[];
+  gatedNames: string[];
+  meanBudgetUsed: number;
+  shineReduced: number;
+  meanShineEv: number;
+  groupSolved: number;
+  needsReview: number;
+  userEdited: number;
+  unpoliciedScenes: string[];
+  modelVer: number;
+  analysisVer: number;
+  policyVer: number;
+  shapingVer: number;
+};
+
+export type SculptLocalInput = {
+  projectId: string;
+  /** Empty means every photograph with no current plan. */
+  photoIds?: string[];
+  cancelId?: string | null;
+};
+
+/** What one local light pass did. */
+export type LocalPassDto = {
+  planned: number;
+  failed: number;
+  actedOn: number;
+  opCounts: number[];
+  gated: number;
+  fullyMasked: number;
+  groupSolved: number;
+  shineReduced: number;
+  lowConfidence: number;
+  meanBudgetUsed: number;
+  unpoliciedScenes: string[];
+  recipesWritten: number;
+  /** Paths the merge refused because a person had set them. */
+  recipesProtected: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type LocalReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+export type AcceptLocalInput = {
+  photoId: string;
+};
+
+export type SetLocalStrengthInput = {
+  projectId: string;
+  photoId: string;
+  operation: string;
+  strength: number;
+};
+
+/** What recording a strength override did, on both sides. */
+export type SetLocalStrengthDto = {
+  plan: LocalPlanDto;
+  recipe: RecipeDto;
+  changed: string[];
+  /** The dotted paths a person now owns. */
+  protected: string[];
+};

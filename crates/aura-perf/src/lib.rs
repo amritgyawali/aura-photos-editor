@@ -20,6 +20,38 @@
 //!
 //! Every performance budget in a phase document becomes a value in `perf/budgets.toml`
 //! and a test that fails when the measurement exceeds it.
+//!
+//! ## One budget, two kinds of machine
+//!
+//! A timing budget is a statement about *this code on that hardware*, and the two hosts this
+//! product is tested on are three to five times apart. Every figure in `perf/budgets.toml` is
+//! measured on a development machine, and a shared CI runner cannot meet them - phase 14's
+//! proxy render was measured at 210 ms in release on a developer's laptop and at 497, 669 and
+//! 1,123 ms on three GitHub runners.
+//!
+//! There are two wrong ways to resolve that. Raising every figure to the slowest runner
+//! destroys the guardrail on the machine anybody actually develops on; leaving them alone
+//! means CI is permanently red and stops being read.
+//!
+//! So a timing budget is multiplied by [`host_scale`], read once from `AURA_PERF_HOST_SCALE`,
+//! which CI sets and a developer does not. The budget file keeps the developer-machine
+//! numbers, and the assertion stays real on both: at the scale CI sets, a genuine regression
+//! still fails.
+//!
+//! **It applies to timings only.** [`Budgets::check_size`], [`Budgets::check_count`] and
+//! [`Budgets::check_cost`] ignore it, because a byte is a byte, a call is a call and a dollar
+//! is a dollar on any machine. A slow runner is not a reason to store more.
+//!
+//! ## Why the scale is an argument and not only a variable
+//!
+//! [`Budgets::check`] is a thin wrapper over [`Budgets::check_at_scale`] at whatever the host
+//! says. The split exists because the first version read the environment inside `check`, and
+//! that quietly made every test of what a budget *means* depend on what CI had set: a case
+//! asserting that 900 ms breaches a 400 ms budget stopped breaching the moment the runner
+//! exported a scale of four, and the suite went red for a reason that had nothing to do with
+//! the code under test. A measurement's verdict depends on the host; the *rule* does not.
+//! Tests of the rule pass their own scale, and nothing in the crate but [`host_scale`] reads
+//! the process environment.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -133,6 +165,37 @@ impl CostBudget {
     }
 }
 
+/// The environment variable that relaxes timing budgets for slower hosts.
+///
+/// Unset - the developer machine - is a scale of one and the budget file's own figures apply.
+pub const HOST_SCALE_VAR: &str = "AURA_PERF_HOST_SCALE";
+
+/// The largest relaxation that will be honoured.
+///
+/// Eight. Past this the variable has stopped being a hardware allowance and started being a
+/// way to make a red build green, and a budget that can be switched off from the environment
+/// is not a budget. A larger value is clamped here rather than refused, because a CI change
+/// that typed an extra zero should degrade to the ceiling rather than fail every perf suite.
+pub const MAX_HOST_SCALE: u64 = 8;
+
+/// How much slower this host is allowed to be than the machine the budgets were measured on.
+///
+/// One unless `AURA_PERF_HOST_SCALE` names an integer between 1 and [`MAX_HOST_SCALE`].
+/// Anything unparseable is one: a typo must tighten the assertion rather than loosen it.
+#[must_use]
+pub fn host_scale() -> u64 {
+    scale_from(std::env::var(HOST_SCALE_VAR).ok().as_deref())
+}
+
+/// [`host_scale`] without the environment, so the parsing rules can be tested without a
+/// process-wide variable that leaks into whatever test runs next.
+#[must_use]
+pub fn scale_from(raw: Option<&str>) -> u64 {
+    raw.and_then(|raw| raw.trim().parse::<u64>().ok())
+        .unwrap_or(1)
+        .clamp(1, MAX_HOST_SCALE)
+}
+
 /// The parsed contents of `perf/budgets.toml`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Budgets {
@@ -170,21 +233,52 @@ impl Budgets {
     ///
     /// Returns a human-readable breach description.
     pub fn check(&self, measurement: &Measurement) -> Result<(), String> {
+        self.check_at_scale(measurement, host_scale())
+    }
+
+    /// [`Budgets::check`] against an explicit host scale rather than the environment.
+    ///
+    /// What a budget *means* is not a property of the machine reading it, so the tests that
+    /// assert the meaning call this and are unaffected by what CI sets. `scale` is clamped to
+    /// `1..=`[`MAX_HOST_SCALE`] here as well as in [`host_scale`]: a caller cannot switch a
+    /// budget off by passing a large number any more than a CI file can by setting one.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable breach description.
+    pub fn check_at_scale(&self, measurement: &Measurement, scale: u64) -> Result<(), String> {
         let Some(budget) = self.stage.get(&measurement.stage) else {
             return Ok(());
         };
-        if measurement.elapsed_ms > budget.max_elapsed_ms {
+        let scale = scale.clamp(1, MAX_HOST_SCALE);
+        // The message names the budget file's own figure *and* what this host was allowed, so
+        // a failing CI log says which of the two it breached without anybody going to look up
+        // the variable.
+        let note = |allowed: u64, stated: u64| {
+            if scale == 1 {
+                format!("budget {stated} ms")
+            } else {
+                format!("budget {allowed} ms ({stated} ms at host scale {scale})")
+            }
+        };
+        let elapsed_ceiling = budget.max_elapsed_ms.saturating_mul(scale);
+        if measurement.elapsed_ms > elapsed_ceiling {
             return Err(format!(
-                "{} took {} ms, budget {} ms",
-                measurement.stage, measurement.elapsed_ms, budget.max_elapsed_ms
+                "{} took {} ms, {}",
+                measurement.stage,
+                measurement.elapsed_ms,
+                note(elapsed_ceiling, budget.max_elapsed_ms)
             ));
         }
         if budget.max_ms_per_unit > 0 && measurement.units > 0 {
             let per_unit = measurement.elapsed_ms / measurement.units.max(1);
-            if per_unit > budget.max_ms_per_unit {
+            let unit_ceiling = budget.max_ms_per_unit.saturating_mul(scale);
+            if per_unit > unit_ceiling {
                 return Err(format!(
-                    "{} took {} ms per unit, budget {} ms",
-                    measurement.stage, per_unit, budget.max_ms_per_unit
+                    "{} took {} ms per unit, {}",
+                    measurement.stage,
+                    per_unit,
+                    note(unit_ceiling, budget.max_ms_per_unit)
                 ));
             }
         }

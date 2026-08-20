@@ -37,14 +37,31 @@ pub const MASK_UPSAMPLE: &str = include_str!("../shaders/mask_upsample.wgsl");
 /// PHASE-18. Compositing an edited buffer back through a mask, in linear light.
 pub const MASK_COMPOSITE: &str = include_str!("../shaders/mask_composite.wgsl");
 
+/// PHASE-19. The luminosity mask and the mask-quality gate in front of it.
+///
+/// A **library** rather than a stage: a luminosity mask is what `stage_masks` multiplies a
+/// generated mask's alpha by, and phases 20 to 22 will each want the same weighting from the
+/// same place. It declares no `fn stage_` entry point, and `every_entry_point_names_a_stage`
+/// is what keeps that true.
+pub const LUMINOSITY_MASK: &str = include_str!("../shaders/luminosity_mask.wgsl");
+
+/// PHASE-19. Frequency separation, three bands, of which two are returned.
+pub const FREQ_SEP: &str = include_str!("../shaders/freq_sep.wgsl");
+
+/// PHASE-19. Applying a local light plan.
+pub const LOCAL_APPLY: &str = include_str!("../shaders/local_apply.wgsl");
+
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 6] = [
+pub const SOURCES: [(&str, &str); 9] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
     ("output.wgsl", OUTPUT),
     ("mask_upsample.wgsl", MASK_UPSAMPLE),
     ("mask_composite.wgsl", MASK_COMPOSITE),
+    ("luminosity_mask.wgsl", LUMINOSITY_MASK),
+    ("freq_sep.wgsl", FREQ_SEP),
+    ("local_apply.wgsl", LOCAL_APPLY),
 ];
 
 /// The entry point name for a stage. `exposure` becomes `stage_exposure`.
@@ -86,6 +103,31 @@ pub fn shared_constants() -> Vec<(&'static str, String)> {
             format!("{MASK_FEATHER_MAX_FRACTION:.2}"),
         ),
         ("MASK_EPSILON", format!("{MASK_EPSILON:e}")),
+        // PHASE-19. The three constants the local light application shares with the
+        // processor reference in `crate::local`. A shader that drifted from any of them
+        // would change how far every face in the product gets lifted, and would do it
+        // silently on the day a backend first ran.
+        ("FACE_PIVOT", format!("{:.2}", crate::local::FACE_PIVOT)),
+        (
+            "SHADOWS_PER_EV",
+            format!("{:.1}", crate::local::SHADOWS_PER_EV),
+        ),
+        (
+            "HIGHLIGHTS_PER_EV",
+            format!("{:.1}", crate::local::HIGHLIGHTS_PER_EV),
+        ),
+        (
+            "SHAPING_UNIT_EV",
+            format!("{:.3}", crate::local::SHAPING_UNIT_EV),
+        ),
+        (
+            "MIN_MASK_CONFIDENCE",
+            format!("{:.2}", aura_core::contract::local::MIN_MASK_CONFIDENCE),
+        ),
+        (
+            "FULL_MASK_CONFIDENCE",
+            format!("{:.2}", aura_core::contract::local::FULL_MASK_CONFIDENCE),
+        ),
     ]
 }
 
@@ -185,19 +227,47 @@ mod tests {
     }
 
     #[test]
-    fn every_shader_declares_the_frame_uniform() {
-        // Every shader has to be told the size of the buffer it is walking, because a compute
-        // dispatch is rounded up to whole workgroups and an invocation that did not know where
-        // the frame ended would write past it.
+    fn every_dispatched_shader_declares_the_frame_uniform() {
+        // Every shader that is *dispatched* has to be told the size of the buffer it is
+        // walking, because a compute dispatch is rounded up to whole workgroups and an
+        // invocation that did not know where the frame ended would write past it.
         //
         // PHASE-18 widened this from `struct Frame` to "a uniform block carrying a width and a
         // height". The two mask shaders take *two* grids - a stored plane and the grid it is
         // composited onto - so a block called `Frame` would have had to mean one of them, and
         // naming which one in a struct called `Frame` is how the wrong one gets used.
+        //
+        // PHASE-19 narrowed the *set*, when the first shader libraries arrived. A file with no
+        // `@compute` entry point is never dispatched over anything - it is helper functions
+        // another shader calls - so it has no frame to know the dimensions of. The property is
+        // unchanged: anything dispatched must know how big the thing it walks is. The
+        // discriminator is `@compute` rather than `fn stage_`, because `mask_upsample` and
+        // `mask_composite` are dispatched and name no stage in `graph::ORDER`.
         for (file, source) in SOURCES {
+            if !source.contains("@compute") {
+                continue;
+            }
             assert!(
                 source.contains("width: u32") && source.contains("height: u32"),
                 "{file} declares no frame dimensions"
+            );
+        }
+    }
+
+    #[test]
+    fn a_shader_library_declares_no_entry_point_and_is_still_checked() {
+        // The three PHASE-19 files are libraries, and every other property in this module -
+        // no atomics, no encoding, the shared constants - still applies to them. A library
+        // that quietly acquired an entry point would be a stage nothing scheduled.
+        for name in ["luminosity_mask.wgsl", "freq_sep.wgsl", "local_apply.wgsl"] {
+            let source = SOURCES
+                .iter()
+                .find(|(file, _)| *file == name)
+                .map(|(_, source)| *source);
+            let source = source.unwrap_or_else(|| panic!("{name} is not in SOURCES"));
+            assert!(
+                !source.contains("fn stage_"),
+                "{name} declares an entry point but nothing schedules it"
             );
         }
     }

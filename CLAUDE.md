@@ -88,6 +88,10 @@ Never load two phase files into one session.
 | Semantic masks, matting and quality gating | `docs/adr/ADR-0037-semantic-masks-matting-and-quality-gating.md` |
 | Mask evaluation gates | `tests/eval/mask_eval.rs` + `ml/models/mask/eval_mask.py` |
 | What a region means, in the product's own words | `docs/masks.md` |
+| Local light decisions | `docs/adr/ADR-0039-local-light-sculpting.md` |
+| Local light policy (versioned, PM-owned) | `crates/aura-brain-photo/config/local_light.toml` |
+| Local light evaluation gates | `tests/eval/local_eval.rs` + `ml/models/local/eval_local.py` |
+| What the local light adjustments do, in the product's own words | `docs/local-light.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -290,7 +294,12 @@ code rather than their sentence** (a stored sentence is copy a release can chang
 catalog full of English cannot be translated), two indexes that served no query were
 removed after being measured, `face_eye_state` is `WITHOUT ROWID` with no `photo_id`, and
 the eye rows read their geometry from `faces` rather than copying it. Together those took
-the figure from 1,855 bytes per image to exactly 1,024 against a 1 KB budget.
+the figure from 1,855 bytes per image to 927 against a 1 KB budget. It read "exactly
+1,024" until phase 19, and the "exactly" was the tell: it was whole-file `PRAGMA
+page_count`, which quantises to 4 KiB, pinned with no headroom in a number that can only
+move in 4 KiB steps. **A budget measured with a quantised instrument must not be set at its
+own measurement**, and the test now counts `dbstat` payload with the page overhead asserted
+separately as a bounded ratio.
 
 Phase 10 is implemented: `aura-core::contract::emotion` (the frozen `GazeTarget`,
 `Interaction`, `FaceExpression`, `EmotionCode`, `EmotionReason`, `PeakKind`, `MomentPeak`,
@@ -746,6 +755,79 @@ rule is that a version column counts *measurements*, not commits: two branches t
 invalidate the same column do not merge into one invalidation, and taking either side's number
 would leave estimates written by the other parent looking current while being stale, which is
 the exact comparison `AURA-ML-5060` exists to prevent.
+
+Phase 19 is implemented conditionally, and it was **written out of order**: it was built on top
+of phase 15, under the phase ritual's contract-first handoff, while 16, 17 and 18 did not yet
+exist - and merged into them afterwards. `aura-core::contract::local`
+freezes `LocalLightPlan`, the `MaskField` input port phase 18 fills, six operations and their
+priority order, ten named face zones, thirty reason codes, the outline, the override and
+`LocalService`; `aura-brain-photo::local` measures the frame once, splits a lift so shadows
+move and highlights barely do, solves every face in a frame together, pairs a subject
+enhancement with a matching background reduction, separates three frequency bands and returns
+two, places ten retoucher's moves and derives the dodge-and-burn map from them, finds specular
+sheen and reduces luminance only, and spends every one of those against one per-image
+perceptual allowance. Migration 19 stores the plan, the lit faces and the gates; 22
+argued-over policy rows live in editable config; three shaders ship with the processor
+reference they are held to; six IPC commands (ADR-0040) feed a Local panel; and
+`aura-cli verify --phase 19` is the executable gate. Its exit report is
+`docs/progress/PHASE-19-EXIT.md`.
+
+**Phase 18's masks are not wired into this pass, so on this build every operation is still
+gated and nothing is edited.** `MaskField` is the only route to a mask, `AppState::local_pass`
+never calls `LocalPass::with_masks`, and `aura-brain-photo::local` contains no generator, no
+segmentation model and no geometric fallback - because a rectangle's edge does not follow a
+person, and an edit through one leaves the bright rim this phase exists to avoid. That gap is
+a *connection* rather than a missing dependency now: phase 18 ships `MaskService`, and turning
+its resolved planes into `MaskField`s is the one piece of phase 19 that this merge does not
+carry. Every quality gate was measured against fixtures whose masks are perfect by
+construction. That is condition C1, it is a Sev 2 trigger, and **no later phase may claim a
+local-light quality result until the pass reads real mattes and the gates are re-measured
+against them.** Condition C2 is the untrained target head, C3 is the missing expert subtlety
+study - which means **the headline KPI of this phase is unmeasured** - and C4 was the skipped
+dependencies, which this merge closes for 16 and 17 and leaves open for 18.
+
+Three rules that phase 19 adds and every later phase inherits:
+
+- **`LocalService` is the only way to ask how light was shaped inside a photograph.**
+  Fifteenth service of its kind. Phase 20 retouches skin this phase has already evened and
+  must not do it twice; `idx_local_evened` is that query. Two answers to "what did we do to
+  this face" is a portrait that gets lifted twice.
+- **The per-image perceptual allowance is shared, stored and checked by the schema.** Six
+  individually defensible adjustments are how a gallery quietly starts looking processed.
+  Phase 20 adds a seventh operation and inherits the allowance rather than getting its own,
+  and `LocalOp::PRIORITY` decides what is given up: face lighting has the first claim and
+  dodge and burn the last, because a photographer would not miss the shaping.
+- **A phase that consumes another phase's output owns no fallback for it.** When the field
+  does not arrive the operation is *gated*, named in `gated_by_mask_quality` and reported in
+  `LocalOutline::mask_covered`. A frame nobody could mask and a frame that needed nothing must
+  never be the same query.
+
+Three things phase 19 got wrong first, all found by its own gates, all worth generalising:
+
+**A weight evaluated on a partially-edited value is not linear in its own strength.**
+`apply_face_light` read its luminosity weights off the pixel *after* the exposure had moved, so
+the highlight restraint grew quadratically in the mask's alpha while the lift grew linearly.
+Past about half coverage the restraint overtook and a bright pixel received more lift at the
+mask's edge than at its centre - which is a bright rim, made by arithmetic that looked
+conservative. Any masked operator has this trap: **the weight must read the input.**
+
+**A converged target cannot be used to detect its own constraints.** The joint face solve asked
+"was this lift capped" by comparing against the group's common target, which had already
+absorbed the caps in order to be reachable. Nothing was ever reported as capped and every unit
+test passed. Compare against what was *wanted*, not against what was agreed.
+
+**Section 10.1's edge-gradient halo test cannot be implemented as written.** Every local
+brightening increases the step at its own boundary - that is what "local" means - so a
+before/after gradient ratio scores the edit's size. Two refinements are also wrong and
+ADR-0039 section 7 records why. What a halo is, is an edit that is stronger further from the
+subject than nearer to it.
+
+And one guarantee phase 19 deliberately weakened, which phases 20 and 25 will meet again:
+**section 10.1's absolute group-fairness threshold is unachievable**, because a family formal
+where one person is two stops down under a doorway cannot be evened without either refusing to
+plan the frame or darkening everybody else. What is guaranteed instead is about the *edit*:
+reach the threshold whenever the caps allow, and never make a group less even than you found
+it. ADR-0039 section 6, and `docs/local-light.md` says the same thing in the product's voice.
 
 Five rules that phase 13 adds and every later phase inherits:
 

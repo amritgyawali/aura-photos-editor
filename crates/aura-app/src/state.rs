@@ -9,6 +9,7 @@ use aura_brain_photo::colour::api::FrameExif as ColourExif;
 use aura_brain_photo::colour::{Colour, ColourPass, ColourStore};
 use aura_brain_photo::composition::{Composition, CompositionPass, CompositionStore};
 use aura_brain_photo::integrity::{Integrity, IntegrityPass, IntegrityStore};
+use aura_brain_photo::local::{Local, LocalPass, LocalStore};
 use aura_brain_photo::tone::api::FrameExif;
 use aura_brain_photo::tone::{AsShot, Tone, TonePass, ToneStore};
 use aura_brain_wedding::emotion::{Emotion, EmotionPass, EmotionStore};
@@ -1678,6 +1679,62 @@ impl AppState {
             || PathBuf::from("hardware"),
             |parent| parent.join("hardware"),
         )
+    }
+
+    /// The local light store for this catalog. PHASE-19.
+    ///
+    /// Stateless like the tone, integrity, emotion, composition and cull stores. It owns no
+    /// model and opens no preview; those belong to the pass below.
+    #[must_use]
+    pub fn local_store(&self) -> Arc<LocalStore> {
+        Arc::new(LocalStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `LocalService` for this catalog. PHASE-19.
+    #[must_use]
+    pub fn local(&self) -> Arc<Local> {
+        Arc::new(Local::new(self.local_store()))
+    }
+
+    /// The local light pass, wired to previews, people, story, integrity and composition.
+    /// PHASE-19.
+    ///
+    /// **No mask service is attached, because there is not one.** Phase 18 owns masks and has
+    /// not shipped; `LocalPass::with_masks` is the input port and nothing here fills it, so
+    /// every operation is gated and every plan says so. That is condition C1 of the phase 19
+    /// exit report and it is visible in `LocalOutline::mask_covered` rather than hidden.
+    ///
+    /// People, story, integrity and composition are all attached when their tables open, and
+    /// the degradation when one of them is absent is documented on the builder method rather
+    /// than being silent.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5087` when the local light policy table will not load, `AURA-ML-5063` when
+    /// phase 15's exposure targets will not, or whatever opening the preview service raised.
+    pub fn local_pass(&self, project_id: &str) -> AuraResult<LocalPass> {
+        let mut pass = LocalPass::new(
+            self.previews(project_id)?,
+            self.local_store(),
+            Arc::clone(&self.clock),
+        )?
+        .with_people(self.people())
+        .with_integrity(self.integrity())
+        .with_composition(self.composition());
+        match self.story() {
+            Ok(story) => pass = pass.with_story(story),
+            Err(err) => {
+                tracing::warn!(
+                    target: "local.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be shaped against the neutral policy row"
+                );
+            }
+        }
+        Ok(pass)
     }
 
     /// The tone store for this catalog. PHASE-15.

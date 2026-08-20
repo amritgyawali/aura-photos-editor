@@ -45,6 +45,8 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0018_masks.sql",
     "crates/aura-render/shaders/mask_upsample.wgsl",
     "crates/aura-render/shaders/mask_composite.wgsl",
+    // PHASE-19.
+    "crates/aura-catalog/migrations/0019_local_light.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];
