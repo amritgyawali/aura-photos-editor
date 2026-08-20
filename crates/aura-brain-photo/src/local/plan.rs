@@ -681,6 +681,15 @@ fn background_delta_area(frame: &FrameMeasure, ctx: &FrameContext) -> f32 {
         .map_or(0.0, |f| frame.region(f).area)
 }
 
+/// The frame-relative scale a face's zones were generated against.
+///
+/// One, because `zones_for`'s only use of it is a guard that the region is large enough and
+/// the region is already in frame coordinates. It exists as a named function rather than a
+/// literal so the day the guard needs a real value there is one place to put it.
+fn short_side_of(_face: &aura_core::contract::local::FaceShaping) -> f32 {
+    1.0
+}
+
 /// Scale every delta by what the governor allowed it.
 fn apply_ledger(
     ledger: &Ledger,
@@ -739,10 +748,18 @@ fn apply_ledger(
     if let Some(maps) = maps {
         if low_scale < 1.0 {
             for face in &mut maps.faces {
-                for zone in &mut face.zones {
-                    zone.gain_ev *= low_scale;
-                }
-                face.zones.retain(|z| z.gain_ev.abs() > 1e-4);
+                // Scale the *strength* and regenerate, rather than scaling the gains in
+                // place. The zones are stored as the four numbers that produce them, so a
+                // gain scaled without its strength would round-trip back to the unscaled
+                // value on the next read - which is the kind of bug that only shows up in a
+                // delivered gallery.
+                face.low_strength = (face.low_strength * low_scale).clamp(0.0, 1.0);
+                face.zones = dodgeburn::zones_for(
+                    face.region,
+                    face.light_direction,
+                    face.low_strength,
+                    short_side_of(face),
+                );
                 face.low_freq = dodgeburn::grid(face.region, &face.zones);
             }
         }

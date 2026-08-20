@@ -264,6 +264,8 @@ fn a_zone_shaped_in_the_wrong_direction_is_refused() {
             side: SHAPING_SIDE,
             low_freq: Vec::new(),
             mid_freq: Vec::new(),
+            light_direction: 0.0,
+            low_strength: 1.0,
             zones: vec![ShapingZone {
                 zone: FaceZone::UnderEye,
                 centre: [0.5, 0.5],
@@ -290,6 +292,8 @@ fn a_zone_that_moved_too_far_is_refused() {
             side: SHAPING_SIDE,
             low_freq: Vec::new(),
             mid_freq: Vec::new(),
+            light_direction: 0.0,
+            low_strength: 1.0,
             zones: vec![ShapingZone {
                 zone: FaceZone::Jaw,
                 centre: [0.5, 0.5],
@@ -314,6 +318,8 @@ fn texture_is_preserved_within_tolerance_and_not_beyond_it() {
         low_freq: Vec::new(),
         mid_freq: Vec::new(),
         zones: Vec::new(),
+        light_direction: 0.0,
+        low_strength: 0.0,
         evening: 0.5,
         band_energy_before: 1.0,
         band_energy_after: 0.97,

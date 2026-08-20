@@ -912,8 +912,29 @@ pub struct FaceShaping {
     /// less than [`MID_BAND_TOLERANCE`]. Never persisted.
     #[serde(skip)]
     pub mid_freq: Vec<i8>,
-    /// The moves the low-frequency map was generated from. This is what is stored.
+    /// The moves the low-frequency map was generated from.
+    ///
+    /// **Derived rather than stored**, and that is one step further than the grid. Every zone's
+    /// centre and radius is a fixed proportion of [`FaceShaping::region`], and its gain is a
+    /// fixed base scaled by [`FaceShaping::light_direction`] and
+    /// [`FaceShaping::low_strength`] - so the whole list is a pure function of four numbers,
+    /// and the catalog stores the four. Ten zones written out cost about 450 bytes a face and
+    /// four faces is most of a kilobyte; the four numbers cost about forty.
+    ///
+    /// The panel still shows the zones by name, because they are regenerated on read. What is
+    /// versioned is the derivation, which is what `shaping_ver` is for.
     pub zones: Vec<ShapingZone>,
+    /// Which side of the face was already darker: `-1` left, `1` right, `0` flatly lit.
+    ///
+    /// Stored, because it is measured from the pixels and cannot be recovered from anything
+    /// else in the row.
+    pub light_direction: f32,
+    /// The strength the low-frequency shaping ran at, after the scene policy, the mask
+    /// scaling and the governor, `0..1`.
+    ///
+    /// Stored for the same reason. Together with the region and the direction it reproduces
+    /// [`FaceShaping::zones`] exactly.
+    pub low_strength: f32,
     /// How strongly the mid-frequency evening was applied, `0..1`.
     pub evening: f32,
     /// The measured mid-band energy before, for the texture gate.

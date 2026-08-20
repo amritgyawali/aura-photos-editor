@@ -28,10 +28,18 @@
 --
 -- 2. **There is no image data anywhere, including in the shaping.** Phase 13's rule -
 --    evidence can never be a pixel - applied to a *decision*. A dodge-and-burn map is stored
---    as the handful of named `ShapingZone` rows it was generated from, and the grid is
---    re-derived deterministically at render time. Ten zones at four floats each is 160
---    bytes; the 32x32 grids they generate are 2 KB per band per face, and a wedding's worth
---    of those is a catalog nobody can back up.
+--    as the handful of named shaping zones it was generated from, in the `shaping` document,
+--    and the grid is re-derived deterministically at render time. Ten zones as a positional
+--    array is about 260 bytes; the 32x32 grids they generate are 2 KB per band per face, and
+--    a wedding's worth of those is a catalog nobody can back up.
+--
+--    The zones are a **document** rather than a child table, which migration 15 argued for
+--    its own three documents and which is sharper here: a shaping zone is read only by the
+--    panel that lists it and by the renderer that regenerates the grid from it, and nothing
+--    anywhere selects "every frame whose jaw was burned". A `WITHOUT ROWID` child table costs
+--    about 75 bytes a row once the primary key is counted twice, and ten of those per face
+--    is most of a kilobyte for rows nobody queries across. Measured: folding them into this
+--    column took the table from 2,154 to 1,559 bytes per image.
 --
 -- 3. **`shaping_ver` is the fourth version column, and it exists because of note 2.** A
 --    change to the derivation changes what a delivered JPEG looks like without changing one
@@ -67,7 +75,6 @@
 --
 --   DROP VIEW  IF EXISTS v_local_coverage;
 --   DROP TABLE IF EXISTS local_light_gate;
---   DROP TABLE IF EXISTS local_light_shaping;
 --   DROP TABLE IF EXISTS local_light_face;
 --   DROP TABLE IF EXISTS local_light_plan;
 --   DELETE FROM schema_version WHERE version = 16;
@@ -131,6 +138,11 @@ CREATE TABLE local_light_plan (
   -- it is not.
   mean_luma_before    REAL    NOT NULL DEFAULT 0.0 CHECK (mean_luma_before >= 0.0 AND mean_luma_before <= 1.0),
   mean_luma_after     REAL    NOT NULL DEFAULT 0.0 CHECK (mean_luma_after  >= 0.0 AND mean_luma_after  <= 1.0),
+
+  -- The shaping, as the named moves it was generated from. See note 2. A positional array
+  -- of `[zone, cx, cy, radius, gain_ev]` per zone, grouped by face ordinal, and
+  -- `aura_brain_photo::local::store` is the one place that knows what the positions mean.
+  shaping             TEXT    NOT NULL DEFAULT '[]',
 
   -- Shine. A luminance operation and nothing else: there is no radius, no strength-of-blur
   -- and no texture column here, which is what keeps the obvious wrong fix one ADR away
@@ -246,29 +258,6 @@ CREATE TABLE local_light_face (
 
 -- Phase 20's join, and the People panel's "what has been done to this person" question.
 CREATE INDEX idx_local_face_identity ON local_light_face(identity_id);
-
--- ---------------------------------------------------------------------------
--- The shaping, as zones rather than as pixels. See note 2.
--- ---------------------------------------------------------------------------
-CREATE TABLE local_light_shaping (
-  photo_id            TEXT    NOT NULL REFERENCES photo(photo_id) ON DELETE CASCADE,
-  -- Which face in `local_light_face` this shapes.
-  face_ordinal        INTEGER NOT NULL CHECK (face_ordinal >= 0 AND face_ordinal < 64),
-  -- Zero first, in `FaceZone::ALL` order among the zones present.
-  zone_ordinal        INTEGER NOT NULL CHECK (zone_ordinal >= 0 AND zone_ordinal < 16),
-
-  zone                TEXT    NOT NULL,
-  cx                  REAL    NOT NULL CHECK (cx >= 0.0 AND cx <= 1.0),
-  cy                  REAL    NOT NULL CHECK (cy >= 0.0 AND cy <= 1.0),
-  radius              REAL    NOT NULL CHECK (radius > 0.0 AND radius <= 1.0),
-
-  -- Bounded here as well as in `ShapingZone::MAX_GAIN_EV`, and deliberately: a sixth of a
-  -- stop is small enough that a bug producing ten times it would still render, and the only
-  -- place that would be caught is a schema that refuses to store it.
-  gain_ev             REAL    NOT NULL CHECK (gain_ev >= -0.2 AND gain_ev <= 0.2),
-
-  PRIMARY KEY (photo_id, face_ordinal, zone_ordinal)
-) STRICT, WITHOUT ROWID;
 
 -- ---------------------------------------------------------------------------
 -- One row per operation that was reduced or skipped. See note 7.

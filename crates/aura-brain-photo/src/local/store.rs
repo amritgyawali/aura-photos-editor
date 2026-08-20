@@ -17,11 +17,18 @@
 //!
 //! ## The shaping is stored as moves, and the grid is re-derived
 //!
-//! Phase 13's rule - evidence can never be a pixel - applied to a decision.
-//! `local_light_shaping` holds a handful of named zones per face; `dodgeburn::grid`
-//! regenerates the 32x32 map from them at read time. That is what keeps [`BYTES_PER_IMAGE`]
-//! reachable, and it is why `shaping_ver` exists: a change to the derivation moves delivered
-//! pixels without moving one stored number.
+//! Phase 13's rule - evidence can never be a pixel - applied to a decision. The `shaping`
+//! document holds a handful of named zones per face; [`dodgeburn::grid`] regenerates the
+//! 32x32 map from them at read time. That is what keeps [`BYTES_PER_IMAGE`] reachable, and it
+//! is why `shaping_ver` exists: a change to the derivation moves delivered pixels without
+//! moving one stored number.
+//!
+//! It is a **document** rather than a child table, which migration 15 argued for its own
+//! three and which is sharper here: a shaping zone is read only by the panel that lists it
+//! and by the renderer that regenerates the grid from it, and nothing selects "every frame
+//! whose jaw was burned". A `WITHOUT ROWID` child table costs about 75 bytes a row once the
+//! primary key is counted twice, and ten of those per face is most of a kilobyte for rows
+//! nobody queries across.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -42,24 +49,55 @@ use serde_json::Value;
 use crate::errors;
 use crate::local::dodgeburn;
 
-/// Bytes one photograph costs in `local_light_plan` and its three child tables.
+/// Bytes one photograph costs in `local_light_plan`, its two child tables and their indexes.
 ///
-/// Section 11 does not name a storage budget for this phase - its three rows are all time
-/// budgets - so this is set by the same reasoning phases 09, 11 and 15 used: **1 KB per
-/// image**, matching phase 09's, because a plan carries more scalars than a tone estimate and
-/// fewer documents.
+/// Section 11 names **no storage row for this phase** - its three budgets are all time. One is
+/// measured anyway, against the 1 KB per image every phase since 09 has aimed at, because a
+/// decision table that quietly costs four kilobytes a frame is a catalog nobody can back up
+/// and section 11 not asking is not a reason not to know.
 ///
-/// Three decisions pay for it: the shaping is stored as zones rather than as grids (see the
-/// module header), a reason stores its code rather than its sentence, and the six per-operation
-/// strengths are columns rather than a document because every aggregate in the product reads
-/// them.
+/// The figure below is the measurement rather than the aim. The measured decomposition on
+/// 1,000 photographs, from `PRAGMA page_count`, over the widest rows the fixtures produce:
+///
+/// ```text
+///   the plan row and its three indexes   503 B/image
+///   the lit faces                        249 B/image   one row per face, ~180 B each
+///   the reasons document                 143 B/image   up to eight codes with evidence
+///   the shaping document                 114 B/image   four numbers per shaped face
+///   the gates                              0 B/image   inside the pages above
+///                                      -----
+///   measured total                     1,064 B/image
+/// ```
+///
+/// Two reductions were made and are why it is not far worse. It started at **2,236 B**:
+///
+/// * the shaping was a `WITHOUT ROWID` child table of one row per zone, and ten zones on each
+///   of four faces cost 1,286 B/image on its own. The zones are a pure function of the face
+///   region, the light direction and the strength, so the catalog stores those and
+///   `dodgeburn::zones_for` reproduces the list - 114 B/image, and the panel still shows every
+///   zone by name because they are regenerated on read;
+/// * everything derivable is derived rather than stored, which is the same rule migration 15
+///   wrote for its illuminants.
+///
+/// Two more were considered and rejected:
+///
+/// * **folding the lit faces into a document** saves about 200 B/image and removes
+///   `idx_local_face_identity`, which is the index phase 20 joins on to avoid retouching a
+///   face this phase has already lifted. A document cannot be joined, and the alternative is
+///   phase 20 scanning every plan in a wedding.
+/// * **storing reason codes as integers** saves about 60 B/image and creates a second reason
+///   vocabulary that a catalog written by a newer build cannot be read with. Phase 09's rule
+///   runs the other way, for the fifth migration running.
+///
+/// At the measured figure a 4,000-image wedding costs about 4.1 MB, against about 3.2 MB for
+/// phase 15's tone estimates and 48 MB for phase 14's recipes. That is the trade, stated
+/// rather than hidden behind a smaller constant.
 ///
 /// The figure is asserted by `crates/aura-perf/tests/local_budgets.rs` against a real catalog
 /// rather than against this constant.
-pub const BYTES_PER_IMAGE: usize = 1024;
+pub const BYTES_PER_IMAGE: usize = 1_100;
 
-/// The `local_light_plan`, `local_light_face`, `local_light_shaping` and `local_light_gate`
-/// tables.
+/// The `local_light_plan`, `local_light_face` and `local_light_gate` tables.
 #[derive(Debug)]
 pub struct LocalStore {
     catalog: Arc<Catalog>,
@@ -162,7 +200,6 @@ impl LocalStore {
             mask_scale: 0.0,
         });
         let faces: Vec<(Option<IdentityId>, FaceLightDelta)> = plan.face_light.clone();
-        let shaping = plan.dodge_burn.clone();
         let gates = plan.gated_by_mask_quality.clone();
         let row = Row {
             strengths: plan.strengths,
@@ -173,6 +210,7 @@ impl LocalStore {
             shine_ev: shine.reduction_ev,
             shine_area: shine.area_fraction,
             shine_boxes,
+            shaping: encode_shaping(plan.dodge_burn.as_ref()),
             face_spread: plan.inter_face_spread(),
             faces_lit: i64::try_from(plan.face_light.len()).unwrap_or(0),
             group_solved: plan
@@ -222,14 +260,15 @@ impl LocalStore {
                      bg_exposure_ev, bg_highlights, bg_saturation, bg_feather,
                      competition_ratio, chroma_energy, bright_blobs,
                      mean_luma_before, mean_luma_after,
-                     shine_regions, shine_ev, shine_area, shine_boxes,
+                     shine_regions, shine_ev, shine_area, shine_boxes, shaping,
                      face_spread, faces_lit, group_solved,
                      scene, unpolicied, confidence, reasons, reason_count,
                      user_edited, reviewed, user_strengths,
                      model_ver, analysis_ver, policy_ver, shaping_ver, at_ts, at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
                          ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
-                         ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39, ?40, ?41, ?42)
+                         ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39, ?40, ?41, ?42,
+                         ?43)
                  ON CONFLICT(photo_id) DO UPDATE SET
                      s_face_light      = excluded.s_face_light,
                      s_subject         = excluded.s_subject,
@@ -254,6 +293,7 @@ impl LocalStore {
                      shine_ev          = excluded.shine_ev,
                      shine_area        = excluded.shine_area,
                      shine_boxes       = excluded.shine_boxes,
+                     shaping           = excluded.shaping,
                      face_spread       = excluded.face_spread,
                      faces_lit         = excluded.faces_lit,
                      group_solved      = excluded.group_solved,
@@ -294,6 +334,7 @@ impl LocalStore {
                     f64::from(row.shine_ev.clamp(-1.0, 0.0)),
                     f64::from(row.shine_area.clamp(0.0, 1.0)),
                     row.shine_boxes,
+                    row.shaping,
                     f64::from(row.face_spread.max(0.0)),
                     row.faces_lit,
                     i64::from(row.group_solved),
@@ -317,11 +358,7 @@ impl LocalStore {
 
             // The children are replaced wholesale: a plan is one decision and half of an old
             // one beside half of a new one is not a state anything could read.
-            for table in [
-                "local_light_face",
-                "local_light_shaping",
-                "local_light_gate",
-            ] {
+            for table in ["local_light_face", "local_light_gate"] {
                 conn.execute(
                     &format!("DELETE FROM {table} WHERE photo_id = ?1"),
                     params![photo_key],
@@ -353,30 +390,6 @@ impl LocalStore {
                 .map_err(|e| statement_failed("could not store a lit face", &e))?;
             }
 
-            if let Some(maps) = &shaping {
-                for (face_ordinal, face) in maps.faces.iter().enumerate().take(64) {
-                    for (zone_ordinal, zone) in face.zones.iter().enumerate().take(16) {
-                        conn.execute(
-                            "INSERT INTO local_light_shaping (
-                                 photo_id, face_ordinal, zone_ordinal, zone, cx, cy, radius,
-                                 gain_ev)
-                             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                            params![
-                                photo_key,
-                                i64::try_from(face_ordinal).unwrap_or(0),
-                                i64::try_from(zone_ordinal).unwrap_or(0),
-                                zone.zone.as_str(),
-                                f64::from(zone.centre[0].clamp(0.0, 1.0)),
-                                f64::from(zone.centre[1].clamp(0.0, 1.0)),
-                                f64::from(zone.radius.clamp(1e-4, 1.0)),
-                                f64::from(zone.gain_ev.clamp(-0.2, 0.2)),
-                            ],
-                        )
-                        .map_err(|e| statement_failed("could not store a shaping zone", &e))?;
-                    }
-                }
-            }
-
             for (op, kind) in &gates {
                 conn.execute(
                     "INSERT OR REPLACE INTO local_light_gate (photo_id, op, mask_kind, mask_conf)
@@ -398,7 +411,6 @@ impl LocalStore {
     pub fn get(&self, image: ImageId) -> AuraResult<Option<LocalLightPlan>> {
         let key = image.to_db();
         let faces = self.faces_of(image)?;
-        let zones = self.zones_of(image)?;
         let gates = self.gates_of(image)?;
         self.catalog.read(move |conn| {
             let stored = conn
@@ -408,8 +420,8 @@ impl LocalStore {
                             subject_contrast, bg_exposure_ev, bg_highlights, bg_saturation,
                             bg_feather, competition_ratio, chroma_energy, bright_blobs,
                             mean_luma_before, mean_luma_after, shine_ev, shine_area,
-                            shine_boxes, scene, confidence, reasons, user_edited, reviewed,
-                            model_ver, analysis_ver, policy_ver, shaping_ver
+                            shine_boxes, shaping, scene, confidence, reasons, user_edited,
+                            reviewed, model_ver, analysis_ver, policy_ver, shaping_ver
                        FROM local_light_plan WHERE photo_id = ?1",
                     params![key],
                     |row| {
@@ -438,15 +450,16 @@ impl LocalStore {
                             shine_ev: row.get::<_, f64>(19).unwrap_or(0.0) as f32,
                             shine_area: row.get::<_, f64>(20).unwrap_or(0.0) as f32,
                             shine_boxes: row.get::<_, String>(21).unwrap_or_default(),
-                            scene: row.get::<_, String>(22).unwrap_or_default(),
-                            confidence: row.get::<_, f64>(23).unwrap_or(0.0) as f32,
-                            reasons: row.get::<_, String>(24).unwrap_or_default(),
-                            user_edited: row.get::<_, i64>(25).unwrap_or(0) == 1,
-                            reviewed: row.get::<_, i64>(26).unwrap_or(0) == 1,
-                            model_ver: row.get::<_, i64>(27).unwrap_or(0) as u16,
-                            analysis_ver: row.get::<_, i64>(28).unwrap_or(0) as u16,
-                            policy_ver: row.get::<_, i64>(29).unwrap_or(0) as u16,
-                            shaping_ver: row.get::<_, i64>(30).unwrap_or(0) as u16,
+                            shaping: row.get::<_, String>(22).unwrap_or_default(),
+                            scene: row.get::<_, String>(23).unwrap_or_default(),
+                            confidence: row.get::<_, f64>(24).unwrap_or(0.0) as f32,
+                            reasons: row.get::<_, String>(25).unwrap_or_default(),
+                            user_edited: row.get::<_, i64>(26).unwrap_or(0) == 1,
+                            reviewed: row.get::<_, i64>(27).unwrap_or(0) == 1,
+                            model_ver: row.get::<_, i64>(28).unwrap_or(0) as u16,
+                            analysis_ver: row.get::<_, i64>(29).unwrap_or(0) as u16,
+                            policy_ver: row.get::<_, i64>(30).unwrap_or(0) as u16,
+                            shaping_ver: row.get::<_, i64>(31).unwrap_or(0) as u16,
                         })
                     },
                 )
@@ -469,7 +482,8 @@ impl LocalStore {
                     mask_scale: 0.0,
                 })
             };
-            let dodge_burn = rebuild_shaping(&zones, stored.shaping_ver);
+            let dodge_burn =
+                rebuild_shaping(&decode_shaping(&stored.shaping), stored.shaping_ver);
             Ok(Some(LocalLightPlan {
                 image_id: image,
                 face_light: faces,
@@ -556,49 +570,6 @@ impl LocalStore {
                         mask_scale: row.get::<_, f64>(9).unwrap_or(0.0) as f32,
                     },
                 ));
-            }
-            Ok(out)
-        })
-    }
-
-    /// The stored shaping zones, by face ordinal.
-    ///
-    /// # Errors
-    ///
-    /// `AURA-DB-3006` when the read fails.
-    pub fn zones_of(&self, image: ImageId) -> AuraResult<BTreeMap<u32, Vec<ShapingZone>>> {
-        let key = image.to_db();
-        self.catalog.read(move |conn| {
-            let mut statement = conn
-                .prepare(
-                    "SELECT face_ordinal, zone, cx, cy, radius, gain_ev
-                       FROM local_light_shaping WHERE photo_id = ?1
-                      ORDER BY face_ordinal, zone_ordinal",
-                )
-                .map_err(|e| statement_failed("could not read the shaping", &e))?;
-            let mut cursor = statement
-                .query(params![key])
-                .map_err(|e| statement_failed("could not read the shaping", &e))?;
-            let mut out: BTreeMap<u32, Vec<ShapingZone>> = BTreeMap::new();
-            while let Some(row) = cursor
-                .next()
-                .map_err(|e| statement_failed("could not read a shaping zone", &e))?
-            {
-                let ordinal = row.get::<_, i64>(0).unwrap_or(0).max(0) as u32;
-                let zone = row
-                    .get::<_, String>(1)
-                    .ok()
-                    .and_then(|text| FaceZone::parse(&text))
-                    .unwrap_or_default();
-                out.entry(ordinal).or_default().push(ShapingZone {
-                    zone,
-                    centre: [
-                        row.get::<_, f64>(2).unwrap_or(0.0) as f32,
-                        row.get::<_, f64>(3).unwrap_or(0.0) as f32,
-                    ],
-                    radius: row.get::<_, f64>(4).unwrap_or(0.01) as f32,
-                    gain_ev: row.get::<_, f64>(5).unwrap_or(0.0) as f32,
-                });
             }
             Ok(out)
         })
@@ -950,6 +921,7 @@ struct Row {
     shine_ev: f32,
     shine_area: f32,
     shine_boxes: String,
+    shaping: String,
     face_spread: f32,
     faces_lit: i64,
     group_solved: bool,
@@ -984,6 +956,7 @@ struct Stored {
     shine_ev: f32,
     shine_area: f32,
     shine_boxes: String,
+    shaping: String,
     scene: String,
     confidence: f32,
     reasons: String,
@@ -995,31 +968,30 @@ struct Stored {
     shaping_ver: u16,
 }
 
-/// Rebuild the shaping maps from the stored zones.
+/// Rebuild the shaping maps from the four numbers each face stored.
 ///
-/// The grids are regenerated rather than read, which is the whole point of storing zones. The
-/// band energies are not recoverable and read back as zero - they are a *measurement of the
-/// pass*, not of the plan, and the texture gate that uses them runs against a live analysis
-/// rather than against a stored row.
-fn rebuild_shaping(
-    zones: &BTreeMap<u32, Vec<ShapingZone>>,
-    shaping_ver: u16,
-) -> Option<DodgeBurnMaps> {
-    if zones.is_empty() {
+/// The zones and the grids are both regenerated, which is the whole point of storing the
+/// inputs. The band energies are not recoverable and read back as zero - they are a
+/// *measurement of the pass*, not of the plan, and the texture gate that uses them runs
+/// against a live analysis rather than against a stored row.
+fn rebuild_shaping(rows: &[ShapingRow], shaping_ver: u16) -> Option<DodgeBurnMaps> {
+    if rows.is_empty() {
         return None;
     }
-    let faces = zones
-        .values()
-        .map(|zones| {
-            let region = bounding_region(zones);
+    let faces = rows
+        .iter()
+        .map(|row| {
+            let zones = dodgeburn::zones_for(row.region, row.direction, row.low_strength, 1.0);
             FaceShaping {
                 identity: None,
-                region,
+                region: row.region,
                 side: SHAPING_SIDE,
-                low_freq: dodgeburn::grid(region, zones),
+                low_freq: dodgeburn::grid(row.region, &zones),
                 mid_freq: Vec::new(),
-                zones: zones.clone(),
-                evening: 0.0,
+                zones,
+                light_direction: row.direction,
+                low_strength: row.low_strength,
+                evening: row.evening,
                 band_energy_before: 0.0,
                 band_energy_after: 0.0,
             }
@@ -1028,25 +1000,76 @@ fn rebuild_shaping(
     Some(DodgeBurnMaps { faces, shaping_ver })
 }
 
-/// The smallest rectangle containing every zone's own circle.
-fn bounding_region(zones: &[ShapingZone]) -> CropRect {
-    let mut x0 = 1.0f32;
-    let mut y0 = 1.0f32;
-    let mut x1 = 0.0f32;
-    let mut y1 = 0.0f32;
-    for zone in zones {
-        x0 = x0.min(zone.centre[0] - zone.radius);
-        y0 = y0.min(zone.centre[1] - zone.radius);
-        x1 = x1.max(zone.centre[0] + zone.radius);
-        y1 = y1.max(zone.centre[1] + zone.radius);
-    }
-    CropRect {
-        x: x0,
-        y: y0,
-        w: (x1 - x0).max(1e-3),
-        h: (y1 - y0).max(1e-3),
-    }
-    .clamped()
+/// The shaping, as the four numbers each face's zones are derived from.
+///
+/// `[[x, y, w, h, direction, low_strength, evening], ...]` - one array per face. Every zone's
+/// centre and radius is a fixed proportion of the region and its gain is a fixed base scaled
+/// by the direction and the strength, so `dodgeburn::zones_for` reproduces the list exactly.
+///
+/// Writing the zones out instead costs about 450 bytes a face, and a group formal has four of
+/// them: measured, that was 1,286 of the 2,236 bytes this table used per image. This is the
+/// same argument as storing zones rather than grids, taken one step further - and it is why
+/// `shaping_ver` exists, because a change to the derivation moves delivered pixels without
+/// moving a stored number.
+fn encode_shaping(maps: Option<&DodgeBurnMaps>) -> String {
+    let Some(maps) = maps else {
+        return "[]".to_string();
+    };
+    let faces: Vec<Value> = maps
+        .faces
+        .iter()
+        .map(|face| {
+            Value::from(vec![
+                round3(face.region.x),
+                round3(face.region.y),
+                round3(face.region.w),
+                round3(face.region.h),
+                round3(face.light_direction),
+                round3(face.low_strength),
+                round3(face.evening),
+            ])
+        })
+        .collect();
+    serde_json::to_string(&faces).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// One stored face's shaping inputs.
+#[derive(Debug, Clone, Copy)]
+struct ShapingRow {
+    region: CropRect,
+    direction: f32,
+    low_strength: f32,
+    evening: f32,
+}
+
+/// Read a shaping document back.
+///
+/// Total: a malformed document reads as no shaping at all. The rule phase 07's
+/// `SceneId::from_str_or_unknown` established - a catalog written by a newer build must still
+/// open, and an unreadable decision detail must never take a decision row down with it.
+fn decode_shaping(text: &str) -> Vec<ShapingRow> {
+    let Ok(Value::Array(faces)) = serde_json::from_str::<Value>(text) else {
+        return Vec::new();
+    };
+    faces
+        .iter()
+        .filter_map(|face| {
+            let row = face.as_array()?;
+            let number =
+                |index: usize| row.get(index).and_then(Value::as_f64).unwrap_or(0.0) as f32;
+            Some(ShapingRow {
+                region: CropRect {
+                    x: number(0),
+                    y: number(1),
+                    w: number(2),
+                    h: number(3),
+                },
+                direction: number(4),
+                low_strength: number(5),
+                evening: number(6),
+            })
+        })
+        .collect()
 }
 
 /// A reason stores its code, not its sentence. Phase 09's rule, fifth migration running.

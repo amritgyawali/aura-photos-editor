@@ -313,6 +313,8 @@ pub fn shape_face(
         low_freq: low,
         mid_freq: mid,
         zones,
+        light_direction: direction,
+        low_strength: low_strength.clamp(0.0, 1.0),
         evening: applied,
         band_energy_before: before,
         band_energy_after: after,

@@ -737,3 +737,74 @@ max_ms_per_unit = 500
 # `crates/aura-perf/tests/tone_budgets.rs`.
 [size.tone_store_per_1000_images]
 max_bytes = 900000
+
+# PHASE-19. One frame's local light plan on the processor path: one 2048 px proxy read once,
+# the region statistics, the joint face solve, the paired subject/background move, the
+# three-band frequency separation of every shapeable face, the shaping grids, the specular
+# search and the governor.
+#
+# Section 11's own row is **80 ms per image** and it names the reference machines. This build
+# has no GPU backend (ADR-0029 section 4), so what is guarded here is the processor path, at
+# the same ratio phase 15's row uses. Section 11's second row - 12 ms of render overhead for
+# the local application - is waived twice over: there is no `wgpu` backend to measure and no
+# phase 18 matte to apply through, so the application costs nothing because it does not
+# happen. Its third row, 1,000 selected images in 90 s, is extrapolated from the per-image
+# figure and printed by the test rather than asserted separately.
+[stage.local_plan_frame]
+max_elapsed_ms  = 14000
+max_ms_per_unit = 500
+
+# Section 11 names **no storage row for this phase**. One is measured anyway, against the 1 KB
+# per image every phase since 09 has aimed at, because a decision table that quietly costs
+# four kilobytes a frame is a catalog nobody can back up and section 11 not asking is not a
+# reason not to know.
+#
+# The measured decomposition on 1,000 photographs, from `PRAGMA page_count`, over the widest
+# rows the fixtures produce - a group formal with four lit faces, ten shaping zones each and
+# eight reasons:
+#
+#   the plan row and its three indexes   503 B/image
+#   the lit faces                        249 B/image   one row per face, ~180 B each
+#   the reasons document                 143 B/image   up to eight codes with evidence
+#   the shaping document                 114 B/image   four numbers per shaped face
+#   the gates                              0 B/image   inside the pages above
+#                                      -----
+#   measured total                     1,064 B/image
+#
+# **It started at 2,236 B.** Two reductions took it here, and the first is the one worth
+# reading:
+#
+#   * The shaping was a `WITHOUT ROWID` child table with one row per zone, and ten zones on
+#     each of four faces cost 1,286 B/image on its own - more than half the table. Every
+#     zone's centre and radius is a fixed proportion of the face region and its gain is a
+#     fixed base scaled by the light direction and the strength, so the whole list is a pure
+#     function of four numbers. The catalog stores the four and `dodgeburn::zones_for`
+#     reproduces the list exactly: 114 B/image, and the panel still shows every zone by name
+#     because they are regenerated on read. This is the same argument as storing zones rather
+#     than grids, taken one step further, and it is why `shaping_ver` exists - a change to the
+#     derivation moves delivered pixels without moving a stored number.
+#   * Everything derivable is derived rather than stored, which is the rule migration 15 wrote
+#     for its illuminants.
+#
+# Two further reductions were considered and rejected:
+#
+#   * Folding the lit faces into a document saves about 200 B/image and removes
+#     `idx_local_face_identity`, which is the index phase 20 joins on to avoid retouching a
+#     face this phase has already lifted. A document cannot be joined, and the alternative is
+#     phase 20 scanning every plan in a wedding.
+#   * Storing reason codes as integers saves about 60 B/image and creates a second reason
+#     vocabulary a catalog written by a newer build cannot be read with. Phase 09's rule runs
+#     the other way, for the fifth migration running.
+#
+# The six per-operation strengths are columns rather than a document, which costs a little
+# more than a JSON object would and is what makes the outline's histogram, the review queue
+# and phase 20's "has this already been evened" query one aggregate each rather than a scan
+# with a JSON extract per row.
+#
+# At the measured figure a 4,000-image wedding costs about 4.1 MB, against about 3.2 MB for
+# phase 15's tone estimates and 48 MB for phase 14's recipes.
+#
+# Measured with SQLite page accounting before and after by
+# `crates/aura-perf/tests/local_budgets.rs`.
+[size.local_store_per_1000_images]
+max_bytes = 1100000
