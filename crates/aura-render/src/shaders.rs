@@ -25,12 +25,26 @@ pub const SPATIAL: &str = include_str!("../shaders/spatial.wgsl");
 /// The output transform.
 pub const OUTPUT: &str = include_str!("../shaders/output.wgsl");
 
+/// PHASE-18. Guided upsampling and feathering of a stored mask.
+///
+/// Two files rather than one because they are two jobs with two lifetimes: a mask is upsampled
+/// **once per render session** and re-uploaded only when the mask changes, and it is composited
+/// on **every parameter change**. Section 6.3's "GPU path uploads masks as textures once per
+/// render session and reuses them across parameter changes" is that split, and a single file
+/// would invite a single pipeline that redid the expensive half on every slider move.
+pub const MASK_UPSAMPLE: &str = include_str!("../shaders/mask_upsample.wgsl");
+
+/// PHASE-18. Compositing an edited buffer back through a mask, in linear light.
+pub const MASK_COMPOSITE: &str = include_str!("../shaders/mask_composite.wgsl");
+
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 4] = [
+pub const SOURCES: [(&str, &str); 6] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
     ("output.wgsl", OUTPUT),
+    ("mask_upsample.wgsl", MASK_UPSAMPLE),
+    ("mask_composite.wgsl", MASK_COMPOSITE),
 ];
 
 /// The entry point name for a stage. `exposure` becomes `stage_exposure`.
@@ -63,8 +77,27 @@ pub fn shared_constants() -> Vec<(&'static str, String)> {
         ("luma.r", "0.262700".to_string()),
         ("luma.g", "0.677998".to_string()),
         ("luma.b", "0.059302".to_string()),
+        // PHASE-18. The two mask constants that exist on both sides. The feather fraction
+        // decides how wide a soft edge is at every render level and the matting epsilon
+        // decides how much a change in the guide has to matter before the matte follows it;
+        // either of them drifting is a boundary that looks right on one path and not the other.
+        (
+            "FEATHER_MAX_FRACTION",
+            format!("{MASK_FEATHER_MAX_FRACTION:.2}"),
+        ),
+        ("MASK_EPSILON", format!("{MASK_EPSILON:e}")),
     ]
 }
+
+/// The largest feather, as a fraction of the plane's short edge.
+///
+/// Mirrors `aura_vision::mask::algebra::FEATHER_MAX_FRACTION`. It is duplicated rather than
+/// imported because `aura-render` does not depend on `aura-vision` and must not - the edge runs
+/// the other way - and the parity test is what stops the duplicate from drifting.
+pub const MASK_FEATHER_MAX_FRACTION: f32 = 0.08;
+
+/// The guided filter's regularisation. Mirrors `aura_vision::mask::matting::EPSILON`.
+pub const MASK_EPSILON: f32 = 1e-4;
 
 /// Every stage that has no entry point. Empty, and a test keeps it that way.
 #[must_use]
@@ -153,8 +186,19 @@ mod tests {
 
     #[test]
     fn every_shader_declares_the_frame_uniform() {
+        // Every shader has to be told the size of the buffer it is walking, because a compute
+        // dispatch is rounded up to whole workgroups and an invocation that did not know where
+        // the frame ended would write past it.
+        //
+        // PHASE-18 widened this from `struct Frame` to "a uniform block carrying a width and a
+        // height". The two mask shaders take *two* grids - a stored plane and the grid it is
+        // composited onto - so a block called `Frame` would have had to mean one of them, and
+        // naming which one in a struct called `Frame` is how the wrong one gets used.
         for (file, source) in SOURCES {
-            assert!(source.contains("struct Frame"), "{file} has no Frame block");
+            assert!(
+                source.contains("width: u32") && source.contains("height: u32"),
+                "{file} declares no frame dimensions"
+            );
         }
     }
 }

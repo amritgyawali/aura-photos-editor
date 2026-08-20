@@ -110,6 +110,68 @@ Until those exist, **no claim about fairness on real photographs should be made 
 behalf**, including by AURA. This is condition C1 in `docs/progress/PHASE-15-EXIT.md` and it is
 a Sev 2 trigger.
 
+## The second promise: grading never moves anybody's colour
+
+Everything above is about the *colour of the light*. AURA also grades - contrast, a tone
+curve, and per-colour adjustments that pull foliage back from yellow-green or calm down a
+fluorescent exit sign. Those adjustments are the ones that, in every product that has shipped
+them, eventually turn somebody's skin orange.
+
+**So the second promise is a limit with a number on it.** After AURA has finished grading a
+photograph, it looks at the skin in that photograph again and measures how far the grading
+moved it:
+
+- at most **2 degrees** of hue, which is below the point where the same face side by side
+  reads as a different colour;
+- at most **6 %** of colour intensity.
+
+If a grade moves skin further than that, AURA works the colour out again more gently. If even
+the gentlest version still moves it too far, **AURA drops the colour adjustments entirely** and
+says so - the photograph keeps its contrast and its curve, and its greenery stays as the camera
+recorded it. That is the trade the product makes on purpose: slightly flatter decor beats
+skin that has moved.
+
+### What it is measured against
+
+**This photograph's own skin, before the colour adjustments.** Not a target, not an ideal, not
+another photograph. The limit is on how far grading *moved* it, which is the only definition
+under which the promise means exactly the same thing for everybody in the frame and everybody
+in the wedding.
+
+Making a photograph lighter does change skin's measured colour intensity - that is what
+lightening is - so the measurement starts after the contrast and the curve and covers only the
+colour adjustments. That is the honest boundary rather than a convenient one: a limit that
+fired on every correctly brightened photograph would be a limit nobody could act on.
+
+### Where the number is
+
+On the photograph. The Tone panel says "skin moved 0.4 degrees of hue and 1% of colour. AURA's
+limit is 2 degrees and 6%", and the project header carries the **largest movement anywhere in
+the wedding** - because a wedding whose worst frame moved skin two and a half degrees has
+broken the promise however good its average is.
+
+When there is nobody in a photograph, the panel says *that*, rather than showing a perfect
+score. A photograph of the rings has no skin to protect and no measurement to report, and
+those are different things.
+
+### What this measurement is not
+
+The same caution as above, and it is worth repeating because the number looks harder than it
+is. The evaluation runs the guarantee across **five skin reflectances spanning light to dark**
+and checks two things: that every one of them stays inside both limits, and that AURA does not
+have to work *harder* on one than on another - a product whose protection strains on dark skin
+is treating it as a special case even when every individual frame passes.
+
+Five reflectances are five points on a line through the region human skin occupies. They are
+not five people. Until this has been measured on photographs of real people with their
+consent, the honest statement is that **the mechanism is self-referential and per-frame, and
+that says nothing yet about a photograph of you.** That is condition C2 in
+`docs/progress/PHASE-16-EXIT.md`.
+
+Nothing in the product stores a skin-tone group. The five buckets exist only in the evaluation
+code, because measuring a disparity needs the grouping and shipping the grouping into a
+catalog is how a measurement becomes a record about people.
+
 ## What is structural rather than promised
 
 Three properties hold regardless of what any model learns later, because they are properties of
@@ -121,6 +183,10 @@ the shapes rather than of the weights:
 - **A missing reference is visible, never silent.** The count of people with a usable region is
   stored per frame and reported per project, so "AURA had nothing to check this against" is a
   number somebody can look at rather than a state nobody notices.
+- **The grading limit is measured after the fact, on the pixels.** Not derived from the
+  settings and not promised by the arithmetic: AURA grades the skin, looks at what happened,
+  and works it out again if it moved too far. Every product that has shipped orange skin
+  promised it in the settings instead.
 
 ## What we will never build
 
@@ -131,6 +197,7 @@ have an exception for a customer who asks nicely.
 
 ---
 
-*See also: [Mixed lighting](mixed-lighting.md),
+*See also: [Mixed lighting](mixed-lighting.md), [Tone and colour](tone-and-colour.md),
 [ADR-0031](adr/ADR-0031-exposure-white-balance-and-skin.md) section 4,
-`docs/model-cards/white_balance.md`.*
+[ADR-0033](adr/ADR-0033-tone-curves-hsl-and-skin-protection.md) decision 1,
+`docs/model-cards/white_balance.md` and `docs/model-cards/tone_model.md`.*

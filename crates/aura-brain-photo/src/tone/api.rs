@@ -48,6 +48,7 @@ use aura_catalog::Catalog;
 use aura_core::clock::Clock;
 use aura_core::contract::people::{ImageSubjects, PeopleService};
 use aura_core::contract::scene::StoryService;
+use aura_core::contract::style::{StyleAdvice, StyleQuery, StyleService};
 use aura_core::contract::tone::{
     ImageId, ReferenceFrame, SkinLocus, ToneEstimate, ToneOutline, ToneOverride, ToneService,
 };
@@ -327,6 +328,8 @@ pub struct TonePass {
     calibration: CalibrationTable,
     people: Option<Arc<dyn PeopleService>>,
     story: Option<Arc<dyn StoryService>>,
+    style: Option<Arc<dyn StyleService>>,
+    style_project: Option<ProjectId>,
     exif: BTreeMap<PhotoId, FrameExif>,
     clock: Arc<dyn Clock>,
 }
@@ -337,6 +340,7 @@ impl fmt::Debug for TonePass {
             .field("targets_ver", &self.analyser.targets().version())
             .field("people", &self.people.is_some())
             .field("story", &self.story.is_some())
+            .field("style", &self.style.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -361,6 +365,8 @@ impl TonePass {
             calibration: CalibrationTable::embedded()?,
             people: None,
             story: None,
+            style: None,
+            style_project: None,
             exif: BTreeMap::new(),
             clock,
         })
@@ -388,6 +394,21 @@ impl TonePass {
     #[must_use]
     pub fn with_story(mut self, story: Arc<dyn StoryService>) -> Self {
         self.story = Some(story);
+        self
+    }
+
+    /// Read the photographer's own look through phase 17's frozen service.
+    ///
+    /// Optional, and without it every frame is exposed and balanced exactly as phase 15
+    /// decided on its own - which is the safety property of a residual design and is the same
+    /// degradation `ColourPass::with_style` documents.
+    ///
+    /// The shift is applied to the solved exposure and white balance and then phase 15's own
+    /// clipping bound and skin-locus constraint re-run on it. ADR-0035 decision 1.
+    #[must_use]
+    pub fn with_style(mut self, style: Arc<dyn StyleService>, project: ProjectId) -> Self {
+        self.style = Some(style);
+        self.style_project = Some(project);
         self
     }
 
@@ -822,6 +843,38 @@ impl TonePass {
             subjects,
             as_shot: exif.as_shot,
             shadow_headroom_ev: calibration.shadow_headroom_at(exif.iso),
+            style: self.style_for(scene),
+        }
+    }
+
+    /// What the photographer's own look says about a frame of this kind.
+    ///
+    /// A failed style lookup is a **warning and a neutral answer**, never a failed frame:
+    /// phase 15's own estimate is complete, constrained and deliverable, and losing the
+    /// personal lean on it is a degradation. Invariant 9's fallback path.
+    ///
+    /// The lighting axis is left at its default here. This pass is the one that *decides* what
+    /// colour the light was, so it cannot also condition on the answer - which means a style
+    /// resolves at the scene group's level on the first pass over a project. That is
+    /// `FallbackLevel::Group`, it is recorded on every decision, and it is honest.
+    fn style_for(&self, scene: SceneId) -> Option<StyleAdvice> {
+        let (style, project) = (self.style.as_ref()?, self.style_project?);
+        let query = StyleQuery {
+            project: Some(project),
+            scene,
+            ..StyleQuery::default()
+        };
+        match style.advise(&query) {
+            Ok(advice) => Some(advice),
+            Err(err) => {
+                tracing::warn!(
+                    target: "tone.context",
+                    service = "style",
+                    code = %err.code,
+                    "the style service failed; this frame was exposed without a personal look"
+                );
+                None
+            }
         }
     }
 

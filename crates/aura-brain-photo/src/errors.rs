@@ -461,3 +461,128 @@ pub fn skin_locus_unavailable(project: &str, identities: usize) -> AuraError {
     .with_context("project", project)
     .with_context("identities", identities.to_string())
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-16. Tone curves, HSL and skin protection.
+// ---------------------------------------------------------------------------
+
+/// A tone, curve or HSL override was refused.
+pub const ML_COLOUR_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5067");
+/// One photograph could not be graded.
+pub const ML_COLOUR_FAILED: ErrorCode = ErrorCode("AURA-ML-5068");
+/// The skin ceilings could not be met and the colour operations were withdrawn.
+pub const ML_SKIN_GUARD_WITHDREW: ErrorCode = ErrorCode("AURA-ML-5069");
+/// The tone intent table was refused.
+pub const ML_INTENT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5070");
+/// Stored grades came from different heads, arithmetic or intents.
+pub const ML_COLOUR_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5071");
+
+/// An override was refused. Nothing was recorded and nothing was rendered.
+///
+/// `ask_user` for `AURA-ML-5061`'s reason: every refusal case here is answered by re-reading
+/// the decision and redrawing the panel.
+#[must_use]
+pub fn colour_edit_refused(what: &str, why: &str) -> AuraError {
+    AuraError::new(
+        ML_COLOUR_EDIT_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        format!("{what}: {why}"),
+        "AURA could not record that adjustment. Nothing was changed.",
+    )
+    .with_context("target", what)
+}
+
+/// One photograph could not be graded. The pass continues.
+///
+/// **No row is written**, the rule `AURA-ML-5035`, `AURA-ML-5045` and `AURA-ML-5062` all
+/// state. A frame stored with a neutral grade would read to phases 17, 25 and 27 as "AURA
+/// decided this photograph needed nothing", and all three act on that.
+#[must_use]
+pub fn colour_failed(photo: &str, detail: &str) -> AuraError {
+    AuraError::new(
+        ML_COLOUR_FAILED,
+        Severity::ItemFailed,
+        Recovery::Retry,
+        format!("{photo}: {detail}"),
+        "AURA could not work out the contrast and colour for one photograph, and has left it \
+         as the camera recorded it. Everything else in this wedding is unaffected.",
+    )
+    .with_context("photo", photo)
+}
+
+/// The skin ceilings could not be met, so every colour operation was withdrawn.
+///
+/// **The only code in the product that fires because a guarantee could not be kept**, and it
+/// is a warning rather than a failure because the photograph is still delivered: what was
+/// withdrawn is the HSL, the vibrance and the saturation, not the tone, the curve or the
+/// frame.
+///
+/// It is the visible half of section 6.3's promise. A product that silently graded on
+/// anyway would be indistinguishable, frame by frame, from one that kept the promise - and
+/// the difference would only show up in a gallery somebody had already delivered.
+#[must_use]
+pub fn skin_guard_withdrew(photo: &str, hue_deg: f32, chroma: f32) -> AuraError {
+    AuraError::new(
+        ML_SKIN_GUARD_WITHDREW,
+        Severity::Warning,
+        Recovery::Fallback,
+        format!(
+            "{photo}: the gentlest colour solve still moved skin {hue_deg:.2} deg and \
+             {:.1} % in chroma, so every colour operation was withdrawn",
+            chroma * 100.0
+        ),
+        "AURA could not find a colour adjustment for this photograph that left everybody's \
+         skin exactly where it was, so it made none. The photograph is otherwise fully \
+         edited.",
+    )
+    .with_context("photo", photo)
+    .with_context("hue_shift_deg", format!("{hue_deg:.3}"))
+}
+
+/// The tone intent table was refused. Nothing was loaded and nothing was graded.
+///
+/// **This halts**, and it is the fourth code in this crate that does. `AURA-ML-5063`'s
+/// argument, moved one phase along: a table that loaded the ceremony rows and dropped the
+/// reception rows grades half a wedding against measured intents and half against neutral
+/// ones, and the contrast visibly changes at a chapter boundary.
+#[must_use]
+pub fn intent_refused(file: &str, key: &str, rule: &str) -> AuraError {
+    AuraError::new(
+        ML_INTENT_REFUSED,
+        Severity::RunBlocking,
+        Recovery::Halt,
+        format!("{file}: `{key}` {rule}"),
+        "AURA could not load the settings that decide how much contrast each kind of \
+         photograph wants, so it has not graded anything. Restore the file or reinstall.",
+    )
+    .with_context("file", file)
+    .with_context("key", key)
+}
+
+/// Stored rows disagree with the running build about a version.
+///
+/// Degraded rather than fatal, as `AURA-ML-5033`, `AURA-ML-5043` and `AURA-ML-5060` are.
+#[must_use]
+pub fn colour_version_mismatch(
+    stored: (u16, u16, u16),
+    current: (u16, u16, u16),
+    rows: usize,
+) -> AuraError {
+    AuraError::new(
+        ML_COLOUR_VERSION_MISMATCH,
+        Severity::Degraded,
+        Recovery::Fallback,
+        format!(
+            "{rows} grades are model {}/analysis {}/intents {}; this build is model \
+             {}/analysis {}/intents {}",
+            stored.0, stored.1, stored.2, current.0, current.1, current.2
+        ),
+        "AURA has improved how it grades, so it is re-checking this wedding in the \
+         background. Anything you have already adjusted is kept.",
+    )
+    .with_context("stale_rows", rows.to_string())
+    .with_context("stored_model_ver", stored.0.to_string())
+    .with_context("stored_analysis_ver", stored.1.to_string())
+    .with_context("stored_intent_ver", stored.2.to_string())
+}

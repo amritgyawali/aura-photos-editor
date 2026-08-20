@@ -26,6 +26,7 @@
 
 use std::collections::BTreeMap;
 
+use aura_raw::colour::curve::{monotone_tangents, pchip};
 use aura_recipe::{Bw, Curve, HslShift, HSL_BANDS};
 
 use crate::colour::{luma, set_luma};
@@ -185,6 +186,11 @@ impl CurveLut {
     /// curve, because it is the one that cannot overshoot: a cubic spline through four
     /// user-placed points can dip below its own control points and produce a band of
     /// inverted contrast that looks exactly like a bug in the renderer.
+    ///
+    /// The interpolation itself lives in `aura_raw::colour::curve` since PHASE-16, because
+    /// phase 16's curve fitter is its second consumer and two copies of an interpolation is
+    /// two curves that drift apart while looking identical. The arithmetic did not change
+    /// when it moved; phase 14's golden suite is the guard that says so.
     #[must_use]
     pub fn build(curve: &Curve) -> Self {
         let identity = curve.is_identity();
@@ -208,65 +214,11 @@ impl CurveLut {
             return Self { table, identity };
         }
 
-        // Secant slopes, then the Fritsch-Carlson limiter.
-        let mut secant = vec![0.0f32; n.saturating_sub(1)];
-        for i in 0..n - 1 {
-            let dx = xs.get(i + 1).copied().unwrap_or(1.0) - xs.get(i).copied().unwrap_or(0.0);
-            let dy = ys.get(i + 1).copied().unwrap_or(1.0) - ys.get(i).copied().unwrap_or(0.0);
-            if let Some(slot) = secant.get_mut(i) {
-                *slot = if dx.abs() < 1e-9 { 0.0 } else { dy / dx };
-            }
-        }
-        let mut tangent = vec![0.0f32; n];
-        if let Some(first) = secant.first().copied() {
-            if let Some(slot) = tangent.first_mut() {
-                *slot = first;
-            }
-        }
-        if let Some(last) = secant.last().copied() {
-            if let Some(slot) = tangent.last_mut() {
-                *slot = last;
-            }
-        }
-        for i in 1..n - 1 {
-            let a = secant.get(i - 1).copied().unwrap_or(0.0);
-            let b = secant.get(i).copied().unwrap_or(0.0);
-            if let Some(slot) = tangent.get_mut(i) {
-                *slot = if a * b <= 0.0 {
-                    0.0
-                } else {
-                    f32::midpoint(a, b)
-                };
-            }
-        }
-        for i in 0..n - 1 {
-            let s = secant.get(i).copied().unwrap_or(0.0);
-            if s.abs() < 1e-9 {
-                if let Some(slot) = tangent.get_mut(i) {
-                    *slot = 0.0;
-                }
-                if let Some(slot) = tangent.get_mut(i + 1) {
-                    *slot = 0.0;
-                }
-                continue;
-            }
-            let a = tangent.get(i).copied().unwrap_or(0.0) / s;
-            let b = tangent.get(i + 1).copied().unwrap_or(0.0) / s;
-            let norm = a.hypot(b);
-            if norm > 3.0 {
-                let scale = 3.0 / norm;
-                if let Some(slot) = tangent.get_mut(i) {
-                    *slot = scale * a * s;
-                }
-                if let Some(slot) = tangent.get_mut(i + 1) {
-                    *slot = scale * b * s;
-                }
-            }
-        }
+        let tangent = monotone_tangents(&xs, &ys);
 
         for (index, slot) in table.iter_mut().enumerate() {
             let x = index as f32 / (Self::ENTRIES - 1) as f32;
-            *slot = evaluate(&xs, &ys, &tangent, x);
+            *slot = pchip(&xs, &ys, &tangent, x);
         }
         Self { table, identity }
     }
@@ -304,34 +256,6 @@ impl CurveLut {
         let b = self.table.get(index + 1).copied().unwrap_or(a);
         a + (b - a) * frac
     }
-}
-
-fn evaluate(xs: &[f32], ys: &[f32], tangent: &[f32], x: f32) -> f32 {
-    let n = xs.len();
-    if x <= xs.first().copied().unwrap_or(0.0) {
-        return ys.first().copied().unwrap_or(0.0);
-    }
-    if x >= xs.last().copied().unwrap_or(1.0) {
-        return ys.last().copied().unwrap_or(1.0);
-    }
-    let mut i = 0usize;
-    while i + 1 < n && xs.get(i + 1).copied().unwrap_or(1.0) < x {
-        i += 1;
-    }
-    let x0 = xs.get(i).copied().unwrap_or(0.0);
-    let x1 = xs.get(i + 1).copied().unwrap_or(1.0);
-    let y0 = ys.get(i).copied().unwrap_or(0.0);
-    let y1 = ys.get(i + 1).copied().unwrap_or(1.0);
-    let m0 = tangent.get(i).copied().unwrap_or(0.0);
-    let m1 = tangent.get(i + 1).copied().unwrap_or(0.0);
-    let h = (x1 - x0).max(1e-9);
-    let t = (x - x0) / h;
-    let t2 = t * t;
-    let t3 = t2 * t;
-    (2.0 * t3 - 3.0 * t2 + 1.0) * y0
-        + (t3 - 2.0 * t2 + t) * h * m0
-        + (-2.0 * t3 + 3.0 * t2) * y1
-        + (t3 - t2) * h * m1
 }
 
 /// Apply a point curve to one pixel, holding its colour.

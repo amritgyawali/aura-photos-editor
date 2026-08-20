@@ -78,6 +78,16 @@ Never load two phase files into one session.
 | Tone evaluation gates | `tests/eval/tone_eval.rs` + `ml/models/tone/eval_tone.py` |
 | What the lighting marks mean, in the product's own words | `docs/mixed-lighting.md` |
 | The skin fairness statement | `docs/skin-fairness.md` |
+| Tone, curve and HSL decisions | `docs/adr/ADR-0033-tone-curves-hsl-and-skin-protection.md` |
+| Tone intents (versioned, PM-owned) | `crates/aura-brain-photo/config/tone_intent.toml` |
+| Colour evaluation gates | `tests/eval/colour_eval.rs` + `ml/models/colour/eval_colour.py` |
+| What AURA changes about how a photograph looks | `docs/tone-and-colour.md` |
+| Style learning and personal profiles | `docs/adr/ADR-0035-style-learning-and-personal-profiles.md` |
+| Style evaluation gates | `tests/eval/style_eval.rs` + `ml/models/style/eval_style.py` |
+| How Teach My AI works, in the product's own words | `docs/style-profiles.md` |
+| Semantic masks, matting and quality gating | `docs/adr/ADR-0037-semantic-masks-matting-and-quality-gating.md` |
+| Mask evaluation gates | `tests/eval/mask_eval.rs` + `ml/models/mask/eval_mask.py` |
+| What a region means, in the product's own words | `docs/masks.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -503,6 +513,239 @@ whichever hypothesis won a cost race, because the winner changes as a project ac
 evidence and the room does not. Phase 15 shipped with that backwards and the symptom was a
 label that was right on a project's first frame and absent on its four-hundredth. Phases 16, 17,
 25 and 26 all describe scenes on top of these values and inherit the trap.
+
+Phase 16 is implemented conditionally: `aura-core::contract::colour` freezes the decision, the
+monotone curve, the eight bands, the content readings, the skin guard report, the three
+variants, twenty-nine reasons, the outline, the override and `ColourService`;
+`aura-brain-photo::colour` solves the five tone parameters from the histogram and phase 09's
+noise headroom, fits a curve to the scene's subject-contrast intent under three constraints,
+reads what is in the frame from its colours, forms a harmony objective, expresses it in the
+recipe's eight bands, bounds the whole grade with a clipping guard and a subtlety cap, and
+then **measures what it did to the people in the frame and re-solves until they have not
+moved**. Migration 16 stores one decision per photograph; 22 argued-over scene rows live in
+editable config; one model is signed with a card; seven IPC commands (ADR-0034) feed a Tone
+panel, a curve editor and an HSL panel; and `aura-cli verify --phase 16` is the executable
+gate. Its exit report is `docs/progress/PHASE-16-EXIT.md`.
+
+**The shipped tone head is a placeholder and is never consulted.** `TONE_HEAD_TRAINED` is
+false, so `Analyser::tone_hint` returns `None` and no frame in this build is graded by a random
+projection. What ships is a deterministic solver, and that is a decision rather than a
+fallback: a random projection blended at any weight is a random contribution at that weight,
+and it would be indistinguishable in the panel from a learned one. Every gate in section 10.1
+is measured against synthetic frames whose foliage hue, dress luminance and subject contrast
+were **painted into the pixels** and read back through the real pipeline, which proves the
+arithmetic and says nothing about a photograph. That is condition C1 and a Sev 2 trigger.
+Condition C2 is the second and it is the one to be careful about: the fairness gate is measured
+on five *reflectances*, not five people. `docs/skin-fairness.md` says so in the product's own
+words, and `docs/tone-and-colour.md` is the rest of the phase in the same voice.
+
+Two rules that phase 16 adds and every later phase inherits:
+
+- **`ColourService` is the only way to ask how a photograph should be graded.** Twelfth service
+  of its kind. Phase 17 shifts these values toward one photographer's style, 18 grades locally
+  on top of them, 25 normalises a gallery of them, 27 checks them and 29 builds albums from
+  them. Two answers to "how much contrast does this frame want" is an album that does not match
+  the gallery.
+- **A guarantee is measured, not asserted.** Section 6.3 promises skin never shifts measurably;
+  `colour::skin_guard` grades this frame's own skin pixels **through the real renderer**,
+  measures the hue and chroma they actually moved, and re-solves - or withdraws the colour
+  operations entirely - until they are inside the ceilings. The measurement is stored on the
+  row, so "skin never shifts" is `SELECT MAX(skin_hue_shift)` rather than a sentence in a
+  document. A product that could only assert it would have no way to find out it had stopped
+  being true.
+
+Four decisions in phase 16 are worth remembering because they will be re-argued. **The skin
+guarantee is a post-condition with a re-solve, not an attenuation factor** - every product that
+has shipped orange skin applied the factor to a parameter while making the promise about a
+pixel, and between them sit a curve that moves chroma without touching a band and a vibrance
+operator that is not linear in what it touches. **Its baseline is the frame's own skin after
+the tone half**, because chroma scales with lightness and measuring against the raw pixel makes
+every correctly brightened frame a violation. **Monotonicity is a property of the control
+points rather than of an evaluator** - the renderer's Fritsch-Carlson interpolation is monotone
+exactly when its points are, so `ToneCurve::new` refusing a bad set is the whole guarantee, and
+the interpolation moved into `aura_raw::colour::curve` when the fitter became its second
+consumer. And **the curve fitter bounds its gain rather than clamping its nodes**: clamping a
+node that wanted to sit above white produced a flat top, which is a posterised band and new
+clipping in one move.
+
+Phase 16 also makes `aura-brain-photo` depend on `aura-render`, which is new and is the
+consequence of the guarantee being a post-condition: the guard measures what the *renderer*
+does to a skin pixel rather than what a copy of it would do. `aura-recipe` arrives
+transitively, and `crates/aura-brain-photo/tests/no_recipe_writes.rs` is a grep as a test that
+fails the build if this crate ever calls `schema::merge` - writing a recipe is phase 14's rule
+and stays in `aura-app`.
+
+Phase 16 corrected a phase 15 oversight: **migrations 15 and 16 are now in `contracts.lock`**.
+`docs/plan/CLAUDE.md` has listed every migration as a frozen contract since phase 01, and 15
+had been omitted from `EXTRA_CONTRACTS` when it shipped.
+
+Phase 17 is implemented conditionally: `aura-core::contract::style` freezes the profile, the
+delta, the curve shift, the skin lean, the eight scene groups, the ten kinds of light, the
+eighty-leaf bucket, the bucket model, the diagnostics, the four fallback levels, the four
+matching methods, the two extraction sources, the pair, the query, the advice, the outline,
+twenty reasons and `StyleService`, and `ids.rs` gains `ProfileId`; `aura-style` learns.
+`pairs.rs` matches an original to a final by content hash, by filename stem, by capture time
+and perceptually, and **refuses an ambiguous match** rather than guessing. `extract.rs` reads
+an XMP exactly when there is one and otherwise hands the pair to `fit.rs`, which reproduces the
+delivered photograph by coordinate descent over twelve parameters **through phase 14's real
+renderer** and rejects what it cannot explain, so the model learns a global look rather than
+somebody's unmodelled dodging. `bucket.rs` sorts each pair into one of eighty leaves.
+`tree.rs` fits ridge regressions with Huber reweighting, shrinks each level toward its parent
+by `n / (n + k)`, and caps what any one wedding may contribute. `diagnostics.rs` measures the
+result on held-out pairs *against the baseline as well as against the ceiling* and writes one
+sentence about what to shoot next. `infer.rs` resolves a leaf through bucket, group, global and
+factory and **always answers**. `profile.rs` versions, signs and refuses; `store.rs` owns
+migration 17 and `api.rs` is the frozen service and the resumable walk. Migration 17 stores
+four tables and a coverage view; two small modules in `aura-brain-photo` apply the shift; eleven
+IPC commands (ADR-0036) feed a Teach My AI wizard, a profile report, a bucket matrix and an A/B
+comparison; and `aura-cli verify --phase 17` is the executable gate. Its exit report is
+`docs/progress/PHASE-17-EXIT.md`.
+
+**This phase ships no model** - the second since phase 08, and for a different reason. There is
+nothing to train: the fit has a closed form, and what is missing is not weights but *weddings*.
+Section 9's DATA task asks for consented archives from five photographers across traditions and
+there are none in this repository, so every number in this phase is measured on synthetic
+archives whose look was chosen, applied to authored plates through the real renderer and
+recovered. That proves the matcher, the fitter, the bucketing, the regression, the shrinkage,
+the archive cap, the bundle and the store; it is not evidence that a photographer would
+recognise their own work. That is condition C1 in the phase 17 exit report and it is a Sev 2
+trigger. The other Sev 2 is C4: the baseline a training run is a residual *from* is supplied by
+the caller, and the desktop shell has only a neutral one, so until an archive can be imported as
+a project and run through phases 15 and 16 first, a learned delta is an absolute edit wearing a
+residual's shape.
+
+Three rules that phase 17 adds and every later phase inherits:
+
+- **`StyleService` is the only way to ask what a photographer's own look is.** Thirteenth
+  service of its kind. Phase 25 normalises a gallery toward these values, 26 matches a second
+  shooter to them, 27 checks them, 28 acts on them unattended and 30's learning loop updates
+  them. No phase may keep its own style profile or its own bucket vocabulary.
+- **A style is a residual, and the baseline is never re-derived.** An empty profile produces
+  exactly what phases 15 and 16 decided, so there is no state of this system in which switching
+  the feature on makes a photograph worse than switching it off - and `gate_4b` asserts it. Any
+  later phase that finds itself computing an absolute from a profile has misunderstood the shape.
+- **The shift happens before the guards, and every guard re-runs after it.** Phase 16 wrote this
+  rule before this phase existed and this phase implemented it: the style moves the *solved*
+  parameters, and then phase 15's clipping bound, phase 15's skin-locus constraint, phase 16's
+  clipping guard and phase 16's skin guard all decide how much of the move survives. A personal
+  style that would move somebody's skin is a personal style the guard withdraws.
+
+Four decisions in phase 17 are worth remembering because they will be re-argued. **The archive
+cap is `w = cap * rest / (1 - cap)` and not `cap / share`** - scaling one archive's weight by its
+share of the total leaves it *above* the cap, because shrinking the weight also shrinks the total
+it is a share of, and the first implementation measured 48 % influence against a documented 35 %
+while reading as correct. **The regression's slopes are fitted and then discarded**: a slope
+fitted on eleven samples spanning ISO 1600 to 4000 is not identified at ISO 400, which is exactly
+the frame it would be applied to, so the slopes keep confounds out of the intercept and the
+intercept is what ships - which is also what makes inference three map lookups and an addition.
+**A rejected pair is written rather than dropped**, the only place in the product where a failure
+writes a row, because here the failure *is* the evidence a photographer needs. And **the tone
+half styles the solved answer rather than the target band**: shifting the band is cleaner on
+paper and makes a style profile change what "correctly exposed" means, which is phase 15's
+decision and not this phase's.
+
+Phase 18 is implemented conditionally: `aura-vision::contract::mask` freezes the twenty-class
+vocabulary, the two payload forms, the region, the edge word, twelve reasons, the algebra, the
+resolved plane, the outline and `MaskService`, and `ids.rs` gains `MaskId`; `aura-vision::mask`
+measures. `segment.rs` finds twenty classes from geometry and colour seeded by phase 06's boxes
+and landmarks, `subject.rs` composes the person classes and bounds them by the person boxes,
+`trimap.rs` erodes and dilates into a band that is a fraction of the region's own size,
+`matting.rs` solves alpha inside that band with a guided filter in closed form and reports how
+much of the boundary the photograph could actually determine, `instance.rs` assigns components to
+identities by containment and leaves the ambiguous ones unassigned, `algebra.rs` is the seven
+operations the brush and phases 19 to 24 both go through, `quality.rs` turns the two quality
+numbers into a strength ceiling for five named operations, `store.rs` is the codec and migration
+18, and `api.rs` is the frozen service and the resumable lazy pass. Migration 18 stores one row
+per region and one per gated operation; two shaders are held to the reference by
+`shader_parity.rs`; two models are signed with cards; eight IPC commands (ADR-0038) feed a mask
+panel; and `aura-cli verify --phase 18` is the executable gate. Its exit report is
+`docs/progress/PHASE-18-EXIT.md`.
+
+**Both shipped heads are placeholders and neither is consulted.** `SEG_HEAD_TRAINED` and
+`MATTING_HEAD_TRAINED` are false, so no photograph in this build is segmented by a random
+projection. What ships is measurement, and the matting half of it is not a compromise: a guided
+filter in closed form is a real matting algorithm whose failure mode is a slightly soft edge
+rather than a confidently wrong one, and the interpreter has no `Resize` and no `ConvTranspose`
+to run a network with anyway. Every gate in section 10.1 is measured against synthetic frames
+whose regions were **painted into the pixels** and read back through the real pipeline, which
+proves the arithmetic and says nothing about a wedding photograph. That is condition C1 and a Sev
+2 trigger. Condition C2 is the second and it is the one to be careful about: **the 100 % zoom
+artefact audit did not happen**, the halo metric exists and has never been run on data, and a
+mask can pass every mIoU gate in the exit report and still show a rim a photographer sees
+immediately.
+
+Six rules that phase 18 adds and every later phase inherits:
+
+- **`MaskService` is the only way to ask what is where in a photograph.** Fourteenth service of
+  its kind, and the rule matters more here than in any of the thirteen: phases 19 to 24 each edit
+  a region, and two answers to "where is her face" is a gallery where the light sculpting and the
+  retouching disagree about the same pixels. That reads as neither, and it is unfixable
+  afterwards because nothing records which answer each stage used.
+- **A region says how much may be done with it, and a later phase multiplies.** `Mask::allowance`
+  is the **geometric** mean of two independent uncertainties and `quality::allowance` is the one
+  place a gating decision is made. This is the first time a phase has constrained what a *later*
+  phase may do, and it exists because a wrong mask is **silent**: a wrong exposure looks wrong,
+  and a face mask that includes the wall behind somebody's ear looks fine until phase 20
+  brightens it.
+- **Two quality numbers, never one.** Confidence is how sure the class is and edge quality is how
+  well determined the boundary is; they fail independently and are fixed by different things, and
+  a photographer can re-brush a boundary and cannot re-brush a class. Collapsing them loses which
+  of the two somebody is looking at.
+- **The coverage denominator is *selected* frames, and both numbers are on the wire.** Every
+  outline since phase 09 has counted against every photograph and this one does not: a mask over
+  a rejected frame is not a gap, it is a frame nobody asked about. Phase 08's rule - say what the
+  denominator is - is the one being followed.
+- **A photographer's region is never regenerated, and it takes two statements to guarantee it.**
+  `user_edited = 0` inside the `DELETE`, *and* the edited coordinates skipped on re-insert. The
+  first alone is what phases 06, 08 and 09 needed; here it was not enough, because
+  `INSERT OR REPLACE` deletes the row it conflicts with and `masks` has a unique key on
+  `(image_id, kind, identity_id)`.
+- **Nothing in this phase moves a pixel.** Sixth phase running. `MaskService` produces regions,
+  phases 19 to 24 consume them, and there is no `apply_mask` anywhere on the IPC surface.
+  `SkipReason::MaskGeneratorAbsent` therefore stays reachable - wiring the resolved planes into
+  the render graph is phase 19's first task and changes no shape frozen here.
+
+Three decisions in phase 18 are worth remembering because they will be re-argued. **The frozen
+contract is in `aura-vision` rather than in `aura-core`**, because section 5 freezes
+`upload_gpu(&self, mask: &Mask, level: RenderLevel)` and `aura-core` depends on no workspace
+crate - the rule was never "contracts live in `aura-core`" but "a contract lives in the crate
+that owns the kind of thing it describes", which is why `SimilarityIndex` and `RenderService` are
+where they are. **Instance scoping is containment rather than intersection-over-union**: a face
+is a small ellipse inside a large body box, so an IoU floor leaves every face in the wedding
+unassigned while looking like a careful threshold. And **the trimap band is narrow rather than
+generous** - it started at twelve per cent of the region's size and was halved after measuring
+what a wide band does when the boundary is not soft, because a band is a licence for the matte to
+decide and a wide one hands it forty pixels of wall to be wrong about.
+
+Phase 18 also **makes `aura-vision` depend on `aura-catalog`**, which retires a sentence phase 06
+wrote twice: "this crate has no catalog dependency, so it *cannot* write a face template". Section
+4 of the phase document puts the mask store here, so the claim became a rule.
+`crates/aura-vision/tests/no_template_writes.rs` is what replaces it and the phase gate runs the
+same grep - the third grep-as-a-test in the repository, after `colour_discipline.rs` and
+`no_recipe_writes.rs`. It is a weaker guarantee than the one it replaces and the exit report says
+so.
+
+Phase 18 found and fixed two defects of the kind that ship silently. **The resampler manufactured
+a halo**: `Plane::resize_bilinear` read zero outside the plane, darkening the outermost half-pixel
+of every upsampled region, which is a one-pixel dark rim around every mask at every render level
+produced by the code that *delivers* a boundary rather than the code that finds it. And **an
+`INSERT OR REPLACE` would have destroyed a hand-edited mask through a constraint** rather than
+through a statement anybody was reading. The phase gate caught the second on its first run.
+
+Phase 17 corrected two earlier oversights: **`contracts.lock` carried a stale digest for
+`crates/aura-core/src/contract/colour.rs`**, so `cargo xtask contracts --check` would have failed
+on `main` - phase 16 re-locked before a final edit to the contract - and **the justfile had no
+`phase-16-verify` recipe**, so the only way to run that gate was to remember the argument. It
+also filled in the CHANGELOG entries phases 14 and 16 never wrote.
+
+Merging phase 15's coloured-light fix into this branch produced the first version collision in
+the repository: **both sides had bumped `tone::ANALYSIS_VER` from 1 to 2 for unrelated
+reasons** - `illuminant::ambient` plus the `u'v'` correction on one side, the style lean on the
+other - so a build carrying both is a third measurement and the constant is **3**. The general
+rule is that a version column counts *measurements*, not commits: two branches that each
+invalidate the same column do not merge into one invalidation, and taking either side's number
+would leave estimates written by the other parent looking current while being stale, which is
+the exact comparison `AURA-ML-5060` exists to prevent.
 
 Five rules that phase 13 adds and every later phase inherits:
 

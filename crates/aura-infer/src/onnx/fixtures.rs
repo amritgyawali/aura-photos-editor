@@ -2277,3 +2277,292 @@ pub fn exposure_sample_input(batch: usize) -> Tensor {
         data: samples,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-16. The tone head.
+// ---------------------------------------------------------------------------
+
+/// The tone model's registered name.
+pub const TONE_MODEL: &str = "tone_model";
+
+/// How many measurements the tone head reads.
+///
+/// Eleven: five histogram percentiles, the dynamic range, the subject's spread and median,
+/// the clipped and crushed fractions, and the normalised shadow headroom. Every one of them
+/// is already computed by `tone::stats` and `colour::analyse`, so the head costs nothing but
+/// a matrix multiply - PHASE-16 section 6.1 asks for "a small MLP over features: histogram
+/// percentiles, subject luminance, scene class, dynamic range, flash flag, noise level" and
+/// this is that list with the flash flag folded into the scene conditioning.
+pub const TONE_FEATURES: usize = 11;
+
+/// How many scene slots condition the tone head.
+///
+/// `SceneId::ALL.len()`, as a one-hot, for `EXPOSURE_SCENES`' reason: invariant 7 makes every
+/// grading intent a function of the scene, and a one-hot cannot leak an ordering between
+/// scenes the way a scalar index would.
+pub const TONE_SCENES: usize = 23;
+
+/// Width of the tone head's input vector.
+pub const TONE_INPUT_DIM: usize = TONE_FEATURES + TONE_SCENES;
+
+/// How many numbers the tone head emits.
+///
+/// Five: contrast, highlights, shadows, whites and blacks. **Not a curve**, and the choice is
+/// the one ADR-0033 decision 2 records: a curve is solved from a target under three
+/// constraints and a head that emitted control points would be a head that could emit
+/// non-monotone ones.
+pub const TONE_OUTPUTS: usize = 5;
+
+/// The learned tone predictor.
+///
+/// `features [N, 34] -> tone [N, 5]`, five numbers in `0..1` that the decoder maps onto the
+/// recipe's units.
+///
+/// It is the second-smallest head in the product and it should be: what it has to learn is a
+/// conditional mean over twenty-three scene classes with eleven covariates, which is a table
+/// and not an image problem. Giving it pixels would make it spend its capacity rediscovering
+/// percentiles this build already computes exactly.
+///
+/// Every output is squashed by a `Sigmoid` and rescaled by the decoder. An unbounded
+/// regression head trained on a few thousand expert edits will occasionally emit a contrast
+/// of 300, and a contrast of 300 applied to a ceremony is a photograph nobody delivered.
+#[must_use]
+pub fn tone_model() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_70E0_1607_0001);
+
+    let graph = Graph {
+        name: TONE_MODEL.to_string(),
+        nodes: vec![
+            with_int(
+                node("Gemm", "layer1", &["features", "l1_w", "l1_b"], &["l1_out"]),
+                "transB",
+                1,
+            ),
+            node("Relu", "act1", &["l1_out"], &["l1_relu"]),
+            with_int(
+                node("Gemm", "layer2", &["l1_relu", "l2_w", "l2_b"], &["l2_out"]),
+                "transB",
+                1,
+            ),
+            node("Relu", "act2", &["l2_out"], &["l2_relu"]),
+            with_int(
+                node(
+                    "Gemm",
+                    "head",
+                    &["l2_relu", "head_w", "head_b"],
+                    &["logits"],
+                ),
+                "transB",
+                1,
+            ),
+            node("Sigmoid", "squash", &["logits"], &["tone"]),
+        ],
+        initializers: vec![
+            weights.tensor("l1_w", vec![64, TONE_INPUT_DIM], 0.18),
+            weights.tensor("l1_b", vec![64], 0.05),
+            weights.tensor("l2_w", vec![32, 64], 0.20),
+            weights.tensor("l2_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![TONE_OUTPUTS, 32], 0.22),
+            weights.tensor("head_b", vec![TONE_OUTPUTS], 0.05),
+        ],
+        inputs: vec![dynamic_batch("features", &[TONE_INPUT_DIM])],
+        outputs: vec![dynamic_batch("tone", &[TONE_OUTPUTS])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// A deterministic batch of tone feature vectors.
+///
+/// The eleven measurement slots ramp with the batch index and the scene one-hot walks across
+/// the twenty-three slots, so a head that ignored its conditioning would produce a flat column
+/// and a head that ignored its measurements would produce a flat row.
+#[must_use]
+pub fn tone_sample_input(batch: usize) -> Tensor {
+    let mut samples = Vec::with_capacity(batch * TONE_INPUT_DIM);
+    for image in 0..batch {
+        for slot in 0..TONE_FEATURES {
+            let step = (image * TONE_FEATURES + slot) as f32;
+            samples.push((step * 0.037).fract());
+        }
+        let scene = image % TONE_SCENES;
+        for slot in 0..TONE_SCENES {
+            samples.push(f32::from(u8::from(slot == scene)));
+        }
+    }
+    Tensor {
+        shape: vec![batch, TONE_INPUT_DIM],
+        data: samples,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PHASE-18. Semantic segmentation and alpha matting.
+// ---------------------------------------------------------------------------
+
+/// The semantic segmentation head's registered name.
+pub const SEGMENT_MODEL: &str = "semantic_segment";
+
+/// The alpha matting head's registered name.
+pub const MATTING_MODEL: &str = "alpha_matting";
+
+/// The side the segmentation network reads. Section 6.1's own number.
+pub const SEGMENT_INPUT_SIDE: usize = 768;
+
+/// How much the segmentation network reduces its input.
+///
+/// Sixteen. The decoder that would take the logits back to full resolution is not here and
+/// cannot be: the interpreter implements no `Resize` and no `ConvTranspose` (ADR-0007). That is
+/// not a gap in the fixture - it is the shape the product actually wants, because section 6.1
+/// asks for "guided-filter upsampling to full resolution at render time, so masks are stored
+/// small but composited precisely". The upsample lives in `aura_vision::mask` and in
+/// `crates/aura-render/shaders/mask_upsample.wgsl`, on both paths, where it can see the guide.
+pub const SEGMENT_STRIDE: usize = 16;
+
+/// The logit grid's side.
+pub const SEGMENT_HEAD_SIDE: usize = SEGMENT_INPUT_SIDE / SEGMENT_STRIDE;
+
+/// How many classes the head emits. The twenty in `aura_vision::contract::mask::ALL_KINDS`.
+///
+/// Twenty and not fourteen. Section 2.1 names fourteen semantic classes and then adds subject
+/// separation and five environment masks; the head predicts all of them rather than leaving six
+/// to be derived, because a class the head has never been trained to see is a class nothing
+/// downstream can improve.
+pub const SEGMENT_CLASSES: usize = 20;
+
+/// The patch side the matting head reads.
+///
+/// A patch rather than a frame: section 6.1 runs matting "only in the uncertain band", so what
+/// this network sees is a crop of the trimap band and its pixels, never a whole photograph.
+pub const MATTING_PATCH_SIDE: usize = 128;
+
+/// Channels into the matting head: three colour and one trimap.
+///
+/// The trimap is an *input* rather than a mask applied to the output, which is the whole
+/// difference between a matting network and a segmentation one. Without it the network has no
+/// way to know which side of the band is foreground.
+pub const MATTING_CHANNELS: usize = 4;
+
+/// The matting head's output side. Quarter resolution, upsampled by the guided filter.
+pub const MATTING_OUTPUT_SIDE: usize = MATTING_PATCH_SIDE / 4;
+
+/// The segmentation network: 768 px in, a 48x48 grid of twenty class logits out.
+///
+/// `pixels [N, 3, 768, 768] -> logits [N, 20, 48, 48]`
+///
+/// Three things about it are deliberate rather than convenient:
+///
+/// * **No softmax in the graph.** The interpreter's `Softmax` normalises the last axis and the
+///   class axis here is the second, so a softmax in the graph would normalise across *columns*
+///   of the logit grid - which produces a plausible tensor that means nothing. The
+///   normalisation happens per pixel in `aura_vision::mask::segment`, beside the argmax that
+///   consumes it.
+/// * **The stem strides by four before anything else runs.** A network that ran even one
+///   full-width convolution at 768 px would spend most of its arithmetic before it had any
+///   features and would tell a false story about where the cost of a masking pass is.
+/// * **The head is 1x1.** Twenty classes from a shared trunk, so adding a class is a channel
+///   count rather than a new network - and `SEGMENT_CLASSES` disagreeing with `ALL_KINDS` is a
+///   shape error at load time rather than a silent reinterpretation of one class as another.
+#[must_use]
+pub fn semantic_segment() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_1805_5E67_0001);
+    let side = SEGMENT_INPUT_SIDE;
+
+    let graph = Graph {
+        name: SEGMENT_MODEL.to_string(),
+        nodes: vec![
+            // 768 -> 192
+            conv3("stem", &["pixels", "stem_w", "stem_b"], &["stem_out"], 4),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 192 -> 96
+            pool2("pool1", "stem_relu", "pool1_out"),
+            conv3("c1", &["pool1_out", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            // 96 -> 48. Stride 16 from here on.
+            pool2("pool2", "c1_relu", "pool2_out"),
+            conv3("c2", &["pool2_out", "c2_w", "c2_b"], &["c2_out"], 1),
+            node("Relu", "c2_act", &["c2_out"], &["c2_relu"]),
+            conv3("c3", &["c2_relu", "c3_w", "c3_b"], &["c3_out"], 1),
+            node("Relu", "c3_act", &["c3_out"], &["trunk"]),
+            conv1("head", &["trunk", "head_w", "head_b"], &["logits"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.26),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("c1_w", vec![48, 24, 3, 3], 0.14),
+            weights.tensor("c1_b", vec![48], 0.05),
+            weights.tensor("c2_w", vec![64, 48, 3, 3], 0.11),
+            weights.tensor("c2_b", vec![64], 0.05),
+            weights.tensor("c3_w", vec![64, 64, 3, 3], 0.09),
+            weights.tensor("c3_b", vec![64], 0.05),
+            weights.tensor("head_w", vec![SEGMENT_CLASSES, 64, 1, 1], 0.08),
+            weights.tensor("head_b", vec![SEGMENT_CLASSES], 0.02),
+        ],
+        inputs: vec![dynamic_batch("pixels", &[3, side, side])],
+        outputs: vec![dynamic_batch(
+            "logits",
+            &[SEGMENT_CLASSES, SEGMENT_HEAD_SIDE, SEGMENT_HEAD_SIDE],
+        )],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The matting network: a 128 px band patch and its trimap in, a 32 px alpha out.
+///
+/// `patch [N, 4, 128, 128] -> alpha [N, 1, 32, 32]`
+///
+/// The `Sigmoid` **is** in this graph, unlike the segmentation head's softmax, and the reason is
+/// the axis: a logistic is per element and needs no normalisation across anything, so it cannot
+/// be applied to the wrong dimension. An alpha that arrived unbounded would also be an alpha a
+/// caller had to clamp, and a clamp outside the model is a contract nothing checks.
+#[must_use]
+pub fn alpha_matting() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_1805_A19A_0002);
+    let side = MATTING_PATCH_SIDE;
+
+    let graph = Graph {
+        name: MATTING_MODEL.to_string(),
+        nodes: vec![
+            // 128 -> 64
+            conv3("stem", &["patch", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 64 -> 32
+            pool2("pool", "stem_relu", "pool_out"),
+            conv3("c1", &["pool_out", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            conv1("head", &["c1_relu", "head_w", "head_b"], &["alpha_logits"]),
+            node("Sigmoid", "squash", &["alpha_logits"], &["alpha"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, MATTING_CHANNELS, 3, 3], 0.24),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("c1_w", vec![32, 24, 3, 3], 0.13),
+            weights.tensor("c1_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![1, 32, 1, 1], 0.10),
+            weights.tensor("head_b", vec![1], 0.02),
+        ],
+        inputs: vec![dynamic_batch("patch", &[MATTING_CHANNELS, side, side])],
+        outputs: vec![dynamic_batch(
+            "alpha",
+            &[1, MATTING_OUTPUT_SIDE, MATTING_OUTPUT_SIDE],
+        )],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}

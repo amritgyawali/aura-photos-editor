@@ -2,6 +2,15 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  AcceptColourInput,
+  ColourDto,
+  ColourPassDto,
+  ColourReviewInput,
+  ColourStatusDto,
+  EstimateColourInput,
+  SelectVariantInput,
+  SetColourOverrideDto,
+  SetColourOverrideInput,
   AcceptToneInput,
   EstimateToneInput,
   ReferenceFrameDto,
@@ -146,6 +155,29 @@ import type {
   IntegrityStatusDto,
   RankedFrameDto,
   WithinMomentInput,
+  // PHASE-17.
+  AdoptProfileInput,
+  CompareProfilesInput,
+  ExportProfileDto,
+  ExportProfileInput,
+  ImportProfileDto,
+  ImportProfileInput,
+  ProfileReportDto,
+  ScanArchiveDto,
+  ScanArchiveInput,
+  SetProjectProfileInput,
+  StyleComparisonDto,
+  StylePairDto,
+  StyleProfileDto,
+  StyleStatusDto,
+  TrainProfileDto,
+  TrainProfileInput,
+  EditMaskInput,
+  EnsureMasksInput,
+  MaskAllowanceDto,
+  MaskDto,
+  MaskOverlayDto,
+  MaskStatusDto,
 } from './types';
 
 /** True when the shell is present. Storybook-style dev runs fall back to stubs. */
@@ -789,4 +821,151 @@ export const tone = {
   /** Run the resumable pass, then carry what it decided into the recipes. */
   estimateTone: (input: EstimateToneInput): Promise<TonePassDto> =>
     invoke<TonePassDto>('estimate_tone', { input }),
+};
+
+/**
+ * PHASE-16. Tone curves, HSL and skin protection.
+ *
+ * Seven commands. Three read, one runs the pass, three record what the photographer decided.
+ *
+ * Nothing here can reach a white balance: phase 15 owns the temperature and the tint, and the
+ * "warmer" alternative is a shift of the warm hue bands rather than a change of light.
+ */
+export const colour = {
+  /** How much of a wedding has a grade, and how much of the skin guarantee was checked. */
+  colourStatus: (projectId: string): Promise<ColourStatusDto> =>
+    invoke<ColourStatusDto>('colour_status', { projectId }),
+
+  /** One photograph's grade, or `null` when nobody has graded it. */
+  imageColour: (photoId: string): Promise<ColourDto | null> =>
+    invoke<ColourDto | null>('image_colour', { photoId }),
+
+  /** The frames whose grade is worth a look, weakest first. A queue, not a cull. */
+  colourReviewQueue: (input: ColourReviewInput): Promise<string[]> =>
+    invoke<string[]>('colour_review_queue', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptColour: (input: AcceptColourInput): Promise<ColourDto> =>
+    invoke<ColourDto>('accept_colour', { input }),
+
+  /** Record what they set instead, and write it into the recipe as a person. */
+  setColourOverride: (input: SetColourOverrideInput): Promise<SetColourOverrideDto> =>
+    invoke<SetColourOverrideDto>('set_colour_override', { input }),
+
+  /**
+   * Promote one stored alternative to the primary grade.
+   *
+   * Safe because every variant has already been through the clipping guard and the skin
+   * guard, so the promoted set is one somebody checked.
+   */
+  selectColourVariant: (input: SelectVariantInput): Promise<SetColourOverrideDto> =>
+    invoke<SetColourOverrideDto>('select_colour_variant', { input }),
+
+  /** Run the resumable pass, then carry what it decided into the recipes. */
+  estimateColour: (input: EstimateColourInput): Promise<ColourPassDto> =>
+    invoke<ColourPassDto>('estimate_colour', { input }),
+};
+
+/**
+ * PHASE-17. Style learning: scene-conditional personal AI profiles.
+ *
+ * Eleven commands. Four read, two look at an archive, two move a profile through its
+ * lifecycle, two carry it between machines, and one chooses which profile a project uses.
+ *
+ * **Nothing here returns imagery.** Paths go in and names, numbers and verdicts come out,
+ * which is what makes "AURA never uploads your archive" a property of the shapes rather than a
+ * promise about the code.
+ */
+export const style = {
+
+  /** What this project knows about style. */
+  styleStatus: (projectId: string): Promise<StyleStatusDto> =>
+    invoke<StyleStatusDto>('style_status', { projectId }),
+
+  /** Every profile, newest first. */
+  listProfiles: (): Promise<StyleProfileDto[]> =>
+    invoke<StyleProfileDto[]>('list_profiles', {}),
+
+  /** One profile's honest report, or `null` when nobody has trained it. */
+  profileReport: (profileId: string): Promise<ProfileReportDto | null> =>
+    invoke<ProfileReportDto | null>('profile_report', { profileId }),
+
+  /** The pairs behind one profile - accepted **and** rejected. */
+  profilePairs: (name: string, limit?: number): Promise<StylePairDto[]> =>
+    invoke<StylePairDto[]>('profile_pairs', { name, limit: limit ?? null }),
+
+  /** Look at what is in a folder, before anything is fitted. Opens nothing. */
+  scanArchive: (input: ScanArchiveInput): Promise<ScanArchiveDto> =>
+    invoke<ScanArchiveDto>('scan_archive', { input }),
+
+  /** Train a profile. The result is a **candidate**; adoption is a separate act. */
+  trainProfile: (input: TrainProfileInput): Promise<TrainProfileDto> =>
+    invoke<TrainProfileDto>('train_profile', { input }),
+
+  /** Adopt one profile: it becomes what the product edits with. */
+  adoptProfile: (input: AdoptProfileInput): Promise<StyleProfileDto> =>
+    invoke<StyleProfileDto>('adopt_profile', { input }),
+
+  /** The side-by-side of the baseline, the adopted profile and a candidate. No pixels. */
+  compareProfiles: (input: CompareProfilesInput): Promise<StyleComparisonDto[]> =>
+    invoke<StyleComparisonDto[]>('compare_profiles', { input }),
+
+  /** Write a signed, portable profile. */
+  exportProfile: (input: ExportProfileInput): Promise<ExportProfileDto> =>
+    invoke<ExportProfileDto>('export_profile', { input }),
+
+  /** Read a signed profile bundle. A tampered one is refused with `AURA-ML-5076`. */
+  importProfile: (input: ImportProfileInput): Promise<ImportProfileDto> =>
+    invoke<ImportProfileDto>('import_profile', { input }),
+
+  /** Choose which profile a project, or one chapter of it, uses. */
+  setProjectProfile: (input: SetProjectProfileInput): Promise<StyleStatusDto> =>
+    invoke<StyleStatusDto>('set_project_profile', { input }),
+};
+
+
+// ---------------------------------------------------------------------------
+// PHASE-18. Local mask AI.
+//
+// Eight commands and no ninth. There is no `applyMask` here: section 2.2 of the phase document
+// puts every *use* of a mask in phases 19 to 24, and what this surface hands out is a region and
+// a strength ceiling.
+// ---------------------------------------------------------------------------
+
+export const maskApi = {
+  /** What the mask panel's project header shows. Two numbers, never a ratio. */
+  maskStatus: (projectId: string): Promise<MaskStatusDto> =>
+    invoke<MaskStatusDto>('mask_status', { projectId }),
+
+  /**
+   * Every region stored for one photograph, in the frozen class order.
+   *
+   * An empty list means nobody has masked this frame yet. It is not the same as a frame with no
+   * regions in it, and the panel renders the two differently.
+   */
+  imageMasks: (imageId: string): Promise<MaskDto[]> =>
+    invoke<MaskDto[]>('image_masks', { imageId }),
+
+  /** Produce the named regions if they are not already stored. Idempotent. */
+  ensureMasks: (input: EnsureMasksInput): Promise<MaskDto[]> =>
+    invoke<MaskDto[]>('ensure_masks', { input }),
+
+  /** One region as a plane to draw over a preview. Quarter resolution, capped. */
+  maskOverlay: (maskId: string): Promise<MaskOverlayDto> =>
+    invoke<MaskOverlayDto>('mask_overlay', { maskId }),
+
+  /** What one operation may do through one region, and why it may not do more. */
+  maskAllowance: (maskId: string, operation: string): Promise<MaskAllowanceDto> =>
+    invoke<MaskAllowanceDto>('mask_allowance', { maskId, operation }),
+
+  /** Apply a composition and keep the result as the photographer's own. Sets `userEdited`. */
+  editMask: (input: EditMaskInput): Promise<MaskDto> =>
+    invoke<MaskDto>('edit_mask', { input }),
+
+  /** Drop a photographer's edit so the next pass regenerates the region. */
+  regenerateMask: (maskId: string): Promise<boolean> =>
+    invoke<boolean>('regenerate_mask', { maskId }),
+
+  /** The twenty class slugs, in the frozen iteration order. */
+  maskKinds: (): Promise<string[]> => invoke<string[]>('mask_kinds', {}),
 };

@@ -1902,3 +1902,566 @@ export type ReferenceFrameDto = {
 export type ReferenceFramesInput = {
   segmentId: string;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-16. Tone curves, HSL and skin protection.
+// ---------------------------------------------------------------------------
+
+/**
+ * One control point of a tone curve, in the recipe's 0-255 units.
+ *
+ * A curve is always monotone: `x` strictly increases, `y` never decreases, and the first and
+ * last points sit at 0 and 255. The backend refuses to build one that is not, so a panel does
+ * not have to check - but a curve editor that lets a photographer drag a point **does**, and
+ * `setColourOverride` will refuse a set that breaks the rule rather than clamping it.
+ */
+export type CurvePointDto = {
+  x: number;
+  y: number;
+};
+
+/** One hue band's shift, in the recipe's units. */
+export type HslShiftDto = {
+  /** `red`, `orange`, `yellow`, `green`, `aqua`, `blue`, `purple` or `magenta`. */
+  band: string;
+  h: number;
+  s: number;
+  l: number;
+};
+
+/** What was found of one kind of content in one frame. */
+export type BandReadingDto = {
+  /** `greenery`, `sky`, `dress`, `wood`, `decor` or `skin`. */
+  band: string;
+  area: number;
+  hueDeg: number;
+  saturation: number;
+  luma: number;
+  /**
+   * How sure the inference is, `0..1`.
+   *
+   * The bands are inferred from colour statistics rather than segmented, so a low confidence
+   * is a real answer and the panel should say so: "AURA saw greenery and was not sure enough
+   * to touch it" and "AURA saw no greenery" are different sentences.
+   */
+  confidence: number;
+};
+
+/**
+ * What grading actually did to the skin in one frame.
+ *
+ * `measured` false is **not** a perfect score. A frame with nobody in it has no skin to
+ * protect and no measurement to report, and rendering the two the same way would turn a
+ * coverage gap into a guarantee.
+ */
+export type SkinGuardDto = {
+  maskArea: number;
+  maxHueShiftDeg: number;
+  maxChromaChange: number;
+  attenuation: number;
+  resolves: number;
+  measured: boolean;
+  withinCeilings: boolean;
+};
+
+/** One thing that moved a grade. */
+export type ColourReasonDto = {
+  code: string;
+  text: string;
+  /** How much confidence it cost. Negative is doubt. */
+  weight: number;
+  evidence?: CropRectDto | null;
+};
+
+/**
+ * A complete alternative grade.
+ *
+ * Whole parameter sets, never deltas: every one has been through the clipping guard and the
+ * skin guard, which is what makes switching safe rather than only fast.
+ */
+export type ColourVariantDto = {
+  /** `flatter`, `punchier` or `warmer`. */
+  kind: string;
+  contrast: number;
+  highlights: number;
+  shadows: number;
+  whites: number;
+  blacks: number;
+  vibrance: number;
+  saturation: number;
+  curve: CurvePointDto[];
+  hsl: HslShiftDto[];
+  skinGuard: SkinGuardDto;
+};
+
+/** One photograph's tone and colour decision. */
+export type ColourDto = {
+  photoId: string;
+  contrast: number;
+  highlights: number;
+  shadows: number;
+  whites: number;
+  blacks: number;
+  vibrance: number;
+  saturation: number;
+  curve: CurvePointDto[];
+  /** All eight bands, in the recipe's order, including the neutral ones. */
+  hsl: HslShiftDto[];
+  bands: BandReadingDto[];
+  skinGuard: SkinGuardDto;
+  clippingBefore: number;
+  clippingAfter: number;
+  clippingAdded: number;
+  alternatives: ColourVariantDto[];
+  reasons: ColourReasonDto[];
+  confidence: number;
+  /** The total adjustment magnitude, `0..1`. Lower is subtler. */
+  subtlety: number;
+  scene: string;
+  /** True when there was skin in the frame and the guarantee was checked on it. */
+  skinMeasured: boolean;
+  userEdited: boolean;
+  reviewed: boolean;
+  needsReview: boolean;
+  modelVer: number;
+  analysisVer: number;
+  intentVer: number;
+};
+
+/** What the Develop panel's project header shows. */
+export type ColourStatusDto = {
+  photos: number;
+  decided: number;
+  coverage: number;
+  skinMeasured: number;
+  skinGuardTriggered: number;
+  clipGuardResolved: number;
+  subtletyCapped: number;
+  needsReview: number;
+  userEdited: number;
+  meanContrast: number;
+  meanShadowLift: number;
+  meanSubtlety: number;
+  /** The one number that falsifies this phase's headline guarantee. */
+  worstSkinHueShift: number;
+  guaranteeHeld: boolean;
+  untargetedScenes: string[];
+  modelVer: number;
+  analysisVer: number;
+  intentVer: number;
+};
+
+export type EstimateColourInput = {
+  projectId: string;
+  cancelId?: string | null;
+};
+
+/** What one grading pass did. */
+export type ColourPassDto = {
+  decided: number;
+  failed: number;
+  skinMeasured: number;
+  skinGuardTriggered: number;
+  skinGuardWithdrew: number;
+  clipGuardResolved: number;
+  subtletyCapped: number;
+  lowConfidence: number;
+  meanContrast: number;
+  meanShadowLift: number;
+  meanSubtlety: number;
+  worstSkinHueShift: number;
+  untargetedScenes: string[];
+  recipesWritten: number;
+  recipesProtected: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type ColourReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+export type AcceptColourInput = {
+  photoId: string;
+};
+
+/** Promote one stored alternative to the primary grade. */
+export type SelectVariantInput = {
+  projectId: string;
+  photoId: string;
+  /** `flatter`, `punchier` or `warmer`. */
+  kind: string;
+};
+
+/**
+ * Record what the photographer set instead.
+ *
+ * Every field is optional and independent. The curve and the HSL block are whole-or-nothing,
+ * because a curve is not a set of independent numbers.
+ */
+export type SetColourOverrideInput = {
+  projectId: string;
+  photoId: string;
+  contrast?: number | null;
+  highlights?: number | null;
+  shadows?: number | null;
+  whites?: number | null;
+  blacks?: number | null;
+  vibrance?: number | null;
+  saturation?: number | null;
+  curve?: CurvePointDto[] | null;
+  hsl?: HslShiftDto[] | null;
+};
+
+/** What recording a colour override did, on both sides. */
+export type SetColourOverrideDto = {
+  decision: ColourDto;
+  recipe: RecipeDto;
+  changed: string[];
+  /** The dotted paths a person now owns. */
+  protected: string[];
+};
+
+// ---------------------------------------------------------------------------
+// PHASE-17. Style learning: scene-conditional personal AI profiles.
+// ---------------------------------------------------------------------------
+
+/** One leaf of the style tree, as the matrix draws it. */
+export type StyleBucketDto = {
+  /** `group/lighting`, the catalog's own key. */
+  key: string;
+  group: string;
+  lighting: string;
+  title: string;
+  samples: number;
+  heldOut: number;
+  /**
+   * The measured style-match error in dE00, or `null` when nothing was held out.
+   *
+   * **Never zero for "not measured".** A bucket trained on eleven pairs and evaluated on none
+   * has no measurement, and zero would render as a perfect match - which is the one thing a
+   * report about accuracy must not do where it knows least.
+   */
+  matchDe00: number | null;
+  /** `bucket`, `group`, `global` or `factory`. */
+  level: string;
+  weak: boolean;
+};
+
+/** One profile, as the list shows it. */
+export type StyleProfileDto = {
+  profileId: string;
+  name: string;
+  version: number;
+  /** `candidate`, `adopted` or `retired`. */
+  status: string;
+  trainedPairs: number;
+  /** `0..1`, for the meter section 12 asks for instead of a ready state. */
+  strength: number;
+  overallDe00: number;
+  taughtBuckets: number;
+  usable: boolean;
+  engineVer: string;
+  trainedAt: number;
+};
+
+/** The honest report a photographer reads before adopting. */
+export type ProfileReportDto = {
+  profile: StyleProfileDto;
+  perBucket: StyleBucketDto[];
+  weakBuckets: string[];
+  recommendation: string;
+  acceptedPairs: number;
+  /** On the wire beside the acceptance, so a report cannot claim a hundred percent. */
+  rejectedPairs: number;
+  acceptance: number;
+  metCeiling: boolean;
+};
+
+/** Point the scanner at folders of the photographer's own work. */
+export type ScanArchiveInput = {
+  name: string;
+  /** Paths in, and nothing but names out. */
+  roots: string[];
+};
+
+/** What one archive scan found, before anything is fitted. */
+export type ScanArchiveDto = {
+  originals: number;
+  finals: number;
+  matched: number;
+  unmatchedOriginals: number;
+  /** The one worth reporting: the RAWs are missing, elsewhere, or undecodable. */
+  unmatchedFinals: number;
+  byMethod: [string, number][];
+  weakestMethod: string;
+  enough: boolean;
+};
+
+/** One original-and-final pair. **No pixels.** */
+export type StylePairDto = {
+  original: string;
+  finalImage: string;
+  matchedBy: string;
+  extractedFrom: string;
+  bucket: string;
+  residualDe00: number;
+  accepted: boolean;
+  rejection: string | null;
+};
+
+export type TrainProfileInput = {
+  name: string;
+  cancelId?: string | null;
+};
+
+/** What one training run did. The profile it produced is a **candidate**. */
+export type TrainProfileDto = {
+  profile: StyleProfileDto | null;
+  matched: number;
+  accepted: number;
+  rejected: number;
+  reused: number;
+  fromXmp: number;
+  buckets: number;
+  overallDe00: number;
+  /** The same figure for the unstyled baseline, so the improvement is visible. */
+  baselineDe00: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type AdoptProfileInput = {
+  profileId: string;
+};
+
+export type StyleReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+};
+
+/** One leaf's three answers, for the side-by-side before adoption. */
+export type StyleComparisonDto = {
+  bucket: string;
+  title: string;
+  /** Exposure, temperature, contrast and vibrance. */
+  baseline: number[];
+  current: number[];
+  candidate: number[];
+  level: string;
+  confidence: number;
+  reasons: StyleReasonDto[];
+};
+
+export type CompareProfilesInput = {
+  projectId: string;
+  candidateId: string;
+  limit?: number | null;
+};
+
+export type ExportProfileInput = {
+  profileId: string;
+  path: string;
+};
+
+export type ExportProfileDto = {
+  path: string;
+  bytes: number;
+  fingerprint: string;
+};
+
+export type ImportProfileInput = {
+  path: string;
+};
+
+/** What importing a profile produced. */
+export type ImportProfileDto = {
+  profile: StyleProfileDto;
+  fingerprint: string;
+  /**
+   * True when the document is unchanged since it was signed.
+   *
+   * **Not `verified`.** With the public key inside the bundle this proves integrity and not
+   * provenance: there is no key distribution in this product and nothing to check a key
+   * against. The panel says "unchanged since signing" and never says "verified".
+   */
+  unchangedSinceSigning: boolean;
+};
+
+export type SetProjectProfileInput = {
+  projectId: string;
+  /** One of phase 07's nine chapter slugs, or `null` for the project default. */
+  chapter?: string | null;
+  /** The profile, or `null` to clear the selection. */
+  profileId?: string | null;
+};
+
+/** What the style panel's project header shows. */
+export type StyleStatusDto = {
+  profiles: number;
+  active: string | null;
+  activeName: string;
+  activeVersion: number;
+  trainedPairs: number;
+  strength: number;
+  overallDe00: number;
+  chapterOverrides: string[];
+  /**
+   * How many leaves resolve at each level.
+   *
+   * The number that matters when it is skewed: a wedding whose frames all resolve at `global`
+   * has had its scene conditioning do nothing, which is the quiet version of "one global
+   * style" - the exact thing this phase exists to beat.
+   */
+  levelCounts: [string, number][];
+  bucketRatio: number;
+  analysisVer: number;
+};
+
+// ---------------------------------------------------------------------------
+// PHASE-18. Local mask AI: the regions every later phase edits inside.
+// ---------------------------------------------------------------------------
+
+/**
+ * What the mask panel's project header shows.
+ *
+ * **`selected` and `masked` are two numbers rather than a ratio**, and this is the first status
+ * shape in the product where that matters. The denominator is *selected* frames, not every
+ * photograph: a mask over a rejected frame is not a gap, it is a frame nobody asked about. A
+ * project where the cull has not run sends `selected: 0` rather than a coverage figure computed
+ * against a denominator that does not exist.
+ */
+export type MaskStatusDto = {
+  selected: number;
+  masked: number;
+  masks: number;
+  userEdited: number;
+  lowQuality: number;
+  meanConfidence: number;
+  meanEdgeQuality: number;
+  payloadBytes: number;
+  /** Mean stored bytes per masked frame. What the 180 KB budget bounds. */
+  bytesPerImage: number;
+  modelVer: number;
+  analysisVer: number;
+  /** False in this build. The learned segmentation head is registered and never consulted. */
+  headTrained: boolean;
+};
+
+/** One reason a region is the way it is, with the sentence the panel renders. */
+export type MaskReasonDto = {
+  code: string;
+  text: string;
+};
+
+/**
+ * One region of one photograph.
+ *
+ * `confidence` and `edgeQuality` are never collapsed into one number: they fail independently
+ * and are fixed by different things, so the panel shows two bars and names which of the two is
+ * limiting what may be done.
+ */
+export type MaskDto = {
+  id: string;
+  imageId: string;
+  /** The class slug, from the frozen twenty. */
+  kind: string;
+  identityId: string | null;
+  identityName: string | null;
+  /** `rle` or `alpha8`. */
+  form: string;
+  width: number;
+  height: number;
+  bytes: number;
+  feather: number;
+  confidence: number;
+  edgeQuality: number;
+  /** `matted`, `soft`, `binary` or `unknown`. */
+  edge: string;
+  /**
+   * The strength ceiling phases 19 to 24 multiply by.
+   *
+   * Computed in Rust and sent. The panel could derive it from the two quality numbers and must
+   * not: two implementations of a gating rule is two answers to "may this mask carry skin
+   * smoothing", and the one written here is the one nobody tests against a fixture.
+   */
+  allowance: number;
+  allowsAggressive: boolean;
+  reasons: MaskReasonDto[];
+  userEdited: boolean;
+  modelVer: number;
+};
+
+/**
+ * A region as a plane the panel can draw.
+ *
+ * Quarter-resolution eight-bit alpha, base64, capped on the long edge. **There is no field here
+ * that could hold a photograph** - this is derived geometry about a region, and the pixels of
+ * the frame reach the panel through the preview surface and nowhere else.
+ */
+export type MaskOverlayDto = {
+  id: string;
+  width: number;
+  height: number;
+  alphaBase64: string;
+  level: string;
+};
+
+/** Ask for a photograph's regions, producing any that are missing. */
+export type EnsureMasksInput = {
+  /**
+   * The project the photograph is in.
+   *
+   * Needed because producing a region reads pixels, and the preview cache is opened per project.
+   * Every other command on this surface is a query over one table and takes no project.
+   */
+  projectId: string;
+  imageId: string;
+  /** Which classes. Empty means all twenty. */
+  kinds?: string[];
+};
+
+/**
+ * One step of a mask composition, in postfix order.
+ *
+ * A whole edit arrives as one command rather than as a stream of brush points: a per-point
+ * command would be a command per animation frame, and it would make undo a replay of two
+ * hundred rows.
+ */
+export type MaskOpDto = {
+  /**
+   * `source`, `plane`, `union`, `intersect`, `subtract`, `invert`, `feather`, `grow` or
+   * `shrink`.
+   */
+  op: string;
+  maskId?: string | null;
+  width?: number | null;
+  height?: number | null;
+  alphaBase64?: string | null;
+  amount?: number | null;
+  radius?: number | null;
+};
+
+/**
+ * Apply a composition to one region and keep the result.
+ *
+ * Sets `userEdited`, and there is no argument here that clears it. The one thing that clears it
+ * is `regenerateMask`, which is a separate deliberate act.
+ */
+export type EditMaskInput = {
+  maskId: string;
+  ops: MaskOpDto[];
+  feather?: number | null;
+};
+
+/** What one operation may do through one region. */
+export type MaskAllowanceDto = {
+  maskId: string;
+  operation: string;
+  /** Multiply by it; do not compare against it. */
+  ceiling: number;
+  permitted: boolean;
+  reasons: MaskReasonDto[];
+};

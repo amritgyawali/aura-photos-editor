@@ -40,6 +40,8 @@ pub const ML_PARSE_FAILED: ErrorCode = ErrorCode("AURA-ML-5010");
 pub const ML_CANCELLED: ErrorCode = ErrorCode("AURA-ML-5011");
 /// A delta update could not be applied and the full file is needed.
 pub const ML_DELTA_FAILED: ErrorCode = ErrorCode("AURA-ML-5012");
+/// A tone curve was refused because its control points are not monotone. PHASE-16.
+pub const ML_CURVE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5066");
 
 /// Asked for a model that no signed entry pins.
 #[must_use]
@@ -209,4 +211,28 @@ pub fn delta_failed(detail: impl Into<String>) -> AuraError {
         "A small model update could not be applied, so AURA will fetch the whole model instead. \
          The version you have keeps working.",
     )
+}
+
+/// A tone curve's control points are not monotone, so the curve was refused.
+///
+/// PHASE-16 section 6.1: "monotonicity is enforced structurally, so no AI decision can
+/// ever produce a posterised or inverted curve". This is the refusal that makes that
+/// sentence true, and it lives in `aura-core` rather than in the phase because
+/// `contract::colour::ToneCurve::new` is the only constructor and the contract cannot
+/// depend on the crate that implements it.
+///
+/// It halts nothing. A refused curve leaves the frame with the identity curve and the
+/// caller records the withdrawal, because a photograph rendered through a curve nobody
+/// checked is worse than a photograph rendered through no curve at all.
+#[must_use]
+pub fn curve_refused(detail: impl Into<String>, points: usize) -> AuraError {
+    AuraError::new(
+        ML_CURVE_REFUSED,
+        Severity::ItemFailed,
+        Recovery::Fallback,
+        detail,
+        "AURA worked out a tone curve it could not use safely, so it left this photograph's \
+         curve alone. Nothing else about the edit changed.",
+    )
+    .with_context("points", points.to_string())
 }

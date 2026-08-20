@@ -10,21 +10,39 @@ description  = "Perceptual embeddings and the cheap descriptors computed in the 
 
 [dependencies]
 aura-core    = { path = "../aura-core" }
+# PHASE-18. The mask store is `crates/aura-vision/src/mask/store.rs`, which section 4 of the
+# phase document names, so this crate gains the catalog. Phase 06's sentence - "this crate has
+# no catalog dependency, so it *cannot* write a face template" - stops being true here, and
+# `tests/no_template_writes.rs` is what replaces it: a grep as a test, the mechanism this
+# repository already trusts in `aura-render/tests/colour_discipline.rs` and
+# `aura-brain-photo/tests/no_recipe_writes.rs`. See ADR-0037 decision 11.
+aura-catalog = { path = "../aura-catalog" }
 aura-index   = { path = "../aura-index" }
 aura-infer   = { path = "../aura-infer" }
 aura-preview = { path = "../aura-preview" }
 aura-raw     = { path = "../aura-raw" }
+# PHASE-18. `RenderLevel` is in the frozen `MaskService::upload_gpu` signature and belongs to
+# `aura-render`; `aura-render` depends on neither this crate nor anything that reaches it, so
+# the edge runs one way. It is also why the mask contract is here rather than in `aura-core`,
+# which depends on no workspace crate at all. ADR-0037 decision 1.
+aura-render  = { path = "../aura-render" }
 blake3       = { workspace = true }
 rayon        = { workspace = true }
+rusqlite     = { workspace = true }
 serde        = { workspace = true }
+serde_json   = { workspace = true }
+time         = { workspace = true }
 toml         = { workspace = true }
 tracing      = { workspace = true }
 uuid         = { workspace = true }
 
 [dev-dependencies]
-aura-catalog = { path = "../aura-catalog" }
 tempfile     = { workspace = true }
 
 [[test]]
 name = "embedding_eval"
 path = "../../tests/eval/embedding_eval.rs"
+
+[[test]]
+name = "mask_eval"
+path = "../../tests/eval/mask_eval.rs"

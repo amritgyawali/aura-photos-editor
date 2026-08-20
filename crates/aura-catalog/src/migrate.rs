@@ -10,7 +10,7 @@ use aura_core::AuraResult;
 use rusqlite::{params, Connection, TransactionBehavior};
 
 /// The schema version this build understands.
-pub const APP_SCHEMA_VERSION: i64 = 15;
+pub const APP_SCHEMA_VERSION: i64 = 18;
 
 /// Every migration is (version, name, sql). Embedded so a shipped binary can
 /// never disagree with its own migrations.
@@ -63,6 +63,9 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         include_str!("../migrations/0014_develop.sql"),
     ),
     (15, "tone", include_str!("../migrations/0015_tone.sql")),
+    (16, "colour", include_str!("../migrations/0016_colour.sql")),
+    (17, "style", include_str!("../migrations/0017_style.sql")),
+    (18, "masks", include_str!("../migrations/0018_masks.sql")),
 ];
 
 /// Bring a catalog up to [`APP_SCHEMA_VERSION`].

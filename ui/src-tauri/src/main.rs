@@ -18,6 +18,18 @@ use aura_app::contract::ipc::{
     AcceptToneInput, EstimateToneInput, ReferenceFrameDto, ReferenceFramesInput,
     SetToneOverrideDto, SetToneOverrideInput, ToneDto, TonePassDto, ToneReviewInput, ToneStatusDto,
 };
+// PHASE-16.
+// PHASE-17.
+use aura_app::contract::ipc::{
+    AdoptProfileInput, CompareProfilesInput, ExportProfileDto, ExportProfileInput,
+    ImportProfileDto, ImportProfileInput, ProfileReportDto, ScanArchiveDto, ScanArchiveInput,
+    SetProjectProfileInput, StyleComparisonDto, StylePairDto, StyleProfileDto, StyleStatusDto,
+    TrainProfileDto, TrainProfileInput,
+};
+use aura_app::contract::ipc::{
+    AcceptColourInput, ColourDto, ColourPassDto, ColourReviewInput, ColourStatusDto,
+    EstimateColourInput, SelectVariantInput, SetColourOverrideDto, SetColourOverrideInput,
+};
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
 use tauri::{Manager, State};
@@ -359,6 +371,221 @@ async fn estimate_tone(
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-17. Every style command can touch SQLite, `scan_archive` walks a folder of somebody's
+// whole wedding, and `train_profile` can run for twenty minutes. All eleven go off the renderer
+// thread for the reason the phase 15 and 16 blocks above give.
+//
+// `train_profile` is registered here with the neutral baseline and no pair source, which makes
+// it a **refusal** rather than a training run in this build: there is no archive-import flow
+// yet, so the shell has nothing to hand it. The command exists, its shape is frozen and its
+// error is the honest one - `AURA-ML-5073`, "not enough usable pairs" - rather than a silent
+// success. See condition C3 in `docs/progress/PHASE-17-EXIT.md`.
+#[tauri::command]
+async fn style_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<StyleStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::style_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_profiles(state: State<'_, AppState>) -> IpcResult<Vec<StyleProfileDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::list_profiles(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn profile_report(
+    state: State<'_, AppState>,
+    profile_id: String,
+) -> IpcResult<Option<ProfileReportDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::profile_report(&app, &profile_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn profile_pairs(
+    state: State<'_, AppState>,
+    name: String,
+    limit: Option<u32>,
+) -> IpcResult<Vec<StylePairDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::profile_pairs(&app, &name, limit))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn scan_archive(
+    state: State<'_, AppState>,
+    input: ScanArchiveInput,
+) -> IpcResult<ScanArchiveDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::scan_archive(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn train_profile(
+    state: State<'_, AppState>,
+    input: TrainProfileInput,
+) -> IpcResult<TrainProfileDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::train_profile(
+            &app,
+            &input,
+            std::sync::Arc::new(aura_style::fixtures::EmptySource),
+            std::sync::Arc::new(aura_style::api::NeutralBaseline),
+        )
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn adopt_profile(
+    state: State<'_, AppState>,
+    input: AdoptProfileInput,
+) -> IpcResult<StyleProfileDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::adopt_profile(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn compare_profiles(
+    state: State<'_, AppState>,
+    input: CompareProfilesInput,
+) -> IpcResult<Vec<StyleComparisonDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::compare_profiles(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn export_profile(
+    state: State<'_, AppState>,
+    input: ExportProfileInput,
+) -> IpcResult<ExportProfileDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::export_profile(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn import_profile(
+    state: State<'_, AppState>,
+    input: ImportProfileInput,
+) -> IpcResult<ImportProfileDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::import_profile(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_project_profile(
+    state: State<'_, AppState>,
+    input: SetProjectProfileInput,
+) -> IpcResult<StyleStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_project_profile(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-16. Every colour command can touch SQLite, and `estimate_colour` decodes proxies and
+// grades a whole wedding. All seven go off the renderer thread for the reason the phase 15
+// block above gives.
+#[tauri::command]
+async fn colour_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<ColourStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::colour_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_colour(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<ColourDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_colour(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn colour_review_queue(
+    state: State<'_, AppState>,
+    input: ColourReviewInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::colour_review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn accept_colour(
+    state: State<'_, AppState>,
+    input: AcceptColourInput,
+) -> IpcResult<ColourDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::accept_colour(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_colour_override(
+    state: State<'_, AppState>,
+    input: SetColourOverrideInput,
+) -> IpcResult<SetColourOverrideDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_colour_override(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn select_colour_variant(
+    state: State<'_, AppState>,
+    input: SelectVariantInput,
+) -> IpcResult<SetColourOverrideDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::select_colour_variant(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn estimate_colour(
+    state: State<'_, AppState>,
+    input: EstimateColourInput,
+) -> IpcResult<ColourPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::estimate_colour(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn background_request_failed() -> IpcError {
     IpcError::from(aura_core::errors::db::statement_failed(
         "the background composition task stopped before returning its result",
@@ -446,7 +673,25 @@ fn main() {
             reference_frames,
             accept_tone,
             set_tone_override,
-            estimate_tone
+            estimate_tone,
+            colour_status,
+            image_colour,
+            colour_review_queue,
+            accept_colour,
+            set_colour_override,
+            select_colour_variant,
+            estimate_colour,
+            style_status,
+            list_profiles,
+            profile_report,
+            profile_pairs,
+            scan_archive,
+            train_profile,
+            adopt_profile,
+            compare_profiles,
+            export_profile,
+            import_profile,
+            set_project_profile
         ])
         .run(tauri::generate_context!());
 

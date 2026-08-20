@@ -3860,3 +3860,901 @@ pub struct ReferenceFramesInput {
     /// The chapter.
     pub segment_id: String,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-16. Tone curves, HSL and skin protection.
+// ---------------------------------------------------------------------------
+
+/// One control point of a tone curve, in the recipe's 0-255 units.
+///
+/// A pair rather than an object, because that is what the recipe stores and a second spelling
+/// of the same two numbers is a second thing to keep in step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurvePointDto {
+    /// Input level, `0..=255`.
+    pub x: u16,
+    /// Output level, `0..=255`.
+    pub y: u16,
+}
+
+/// One hue band's shift, in the recipe's units.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HslShiftDto {
+    /// Which band: `red`, `orange`, `yellow`, `green`, `aqua`, `blue`, `purple` or `magenta`.
+    pub band: String,
+    /// Hue rotation within the band, `-100..100`.
+    pub h: f32,
+    /// Saturation within the band.
+    pub s: f32,
+    /// Luminance within the band.
+    pub l: f32,
+}
+
+/// What was found of one kind of content in one frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BandReadingDto {
+    /// `greenery`, `sky`, `dress`, `wood`, `decor` or `skin`.
+    pub band: String,
+    /// The fraction of the frame it covers, `0..1`.
+    pub area: f32,
+    /// Its mean hue, in degrees.
+    pub hue_deg: f32,
+    /// Its mean saturation, `0..1`.
+    pub saturation: f32,
+    /// Its mean luminance, `0..1`.
+    pub luma: f32,
+    /// How sure the inference is, `0..1`.
+    ///
+    /// On the wire rather than hidden behind the adjustment, because "AURA saw greenery and
+    /// was not sure enough to touch it" and "AURA saw no greenery" are different sentences and
+    /// only one of them is about this photograph.
+    pub confidence: f32,
+}
+
+/// What grading actually did to the skin in one frame.
+///
+/// `measured` false is **not** a perfect score. A frame with nobody in it has no skin to
+/// protect and no measurement to report, and a panel that rendered the two the same way would
+/// turn a coverage gap into a guarantee.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkinGuardDto {
+    /// The fraction of the frame the skin mask covers, `0..1`.
+    pub mask_area: f32,
+    /// The largest hue rotation any sampled skin region suffered, in degrees.
+    pub max_hue_shift_deg: f32,
+    /// The largest relative chroma change.
+    pub max_chroma_change: f32,
+    /// What every colour operation was scaled by inside the mask, `0..1`.
+    pub attenuation: f32,
+    /// How many times the grade was re-solved to meet the ceilings.
+    pub resolves: u32,
+    /// True when there was skin to measure and it was measured.
+    pub measured: bool,
+    /// True when both ceilings were met.
+    pub within_ceilings: bool,
+}
+
+/// One thing that moved a grade.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourReasonDto {
+    /// Stable reason code.
+    pub code: String,
+    /// The sentence, rendered from the code and the numbers the catalog stored.
+    pub text: String,
+    /// How much confidence it cost. Negative is doubt.
+    pub weight: f32,
+    /// The pixels behind it, when the reason is about a region.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// A complete alternative grade.
+///
+/// **Whole parameter sets, never deltas.** Every one has been through the clipping guard and
+/// the skin guard, which is what makes the switcher safe rather than only fast.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourVariantDto {
+    /// `flatter`, `punchier` or `warmer`.
+    pub kind: String,
+    /// Contrast, `-100..100`.
+    pub contrast: f32,
+    /// Highlight recovery.
+    pub highlights: f32,
+    /// Shadow lift.
+    pub shadows: f32,
+    /// White point.
+    pub whites: f32,
+    /// Black point.
+    pub blacks: f32,
+    /// Vibrance.
+    pub vibrance: f32,
+    /// Flat saturation.
+    pub saturation: f32,
+    /// Its own curve.
+    pub curve: Vec<CurvePointDto>,
+    /// Its own eight bands.
+    pub hsl: Vec<HslShiftDto>,
+    /// Its skin guard report. Every variant is guarded.
+    pub skin_guard: SkinGuardDto,
+}
+
+/// One photograph's tone and colour decision.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct ColourDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Contrast, `-100..100`.
+    pub contrast: f32,
+    /// Highlight recovery. Negative pulls highlights down.
+    pub highlights: f32,
+    /// Shadow lift. Positive opens shadows.
+    pub shadows: f32,
+    /// White point.
+    pub whites: f32,
+    /// Black point.
+    pub blacks: f32,
+    /// Vibrance.
+    pub vibrance: f32,
+    /// Flat saturation.
+    pub saturation: f32,
+    /// The fitted point curve, monotone by construction.
+    pub curve: Vec<CurvePointDto>,
+    /// The eight bands, in the recipe's order.
+    pub hsl: Vec<HslShiftDto>,
+    /// What the content pass read.
+    pub bands: Vec<BandReadingDto>,
+    /// What grading did to the skin, measured.
+    pub skin_guard: SkinGuardDto,
+    /// Highlight clipping before the grade, as a fraction of the frame.
+    pub clipping_before: f32,
+    /// Highlight clipping after it.
+    pub clipping_after: f32,
+    /// How much new highlight clipping the grade added.
+    pub clipping_added: f32,
+    /// Complete alternatives, at most three.
+    pub alternatives: Vec<ColourVariantDto>,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<ColourReasonDto>,
+    /// How sure the grade is, `0..1`.
+    pub confidence: f32,
+    /// The total adjustment magnitude, `0..1`. Lower is subtler.
+    pub subtlety: f32,
+    /// The scene the intents came from.
+    pub scene: String,
+    /// True when there was skin in the frame and the guarantee was checked on it.
+    pub skin_measured: bool,
+    /// True when the photographer set these values by hand.
+    pub user_edited: bool,
+    /// True when the photographer has looked at this frame.
+    pub reviewed: bool,
+    /// True when this frame belongs in the review queue.
+    pub needs_review: bool,
+    /// Which learned head produced the prediction.
+    pub model_ver: u32,
+    /// Which build's arithmetic produced the solve.
+    pub analysis_ver: u32,
+    /// Which intent table the targets came from.
+    pub intent_ver: u32,
+}
+
+/// What the Develop panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a stored grade.
+    pub decided: u32,
+    /// `decided / photos`.
+    pub coverage: f64,
+    /// Photographs where there was skin to protect and it was measured.
+    pub skin_measured: u32,
+    /// Photographs where the skin guard had to intervene.
+    pub skin_guard_triggered: u32,
+    /// Photographs where the clipping guard re-solved.
+    pub clip_guard_resolved: u32,
+    /// Photographs whose grade was capped by the subtlety ceiling.
+    pub subtlety_capped: u32,
+    /// Photographs below the review threshold.
+    pub needs_review: u32,
+    /// Photographs the photographer has set by hand.
+    pub user_edited: u32,
+    /// Mean contrast over graded frames.
+    pub mean_contrast: f32,
+    /// Mean shadow lift over graded frames.
+    pub mean_shadow_lift: f32,
+    /// Mean subtlety over graded frames.
+    pub mean_subtlety: f32,
+    /// The largest skin hue shift anywhere in the project, in degrees.
+    ///
+    /// **The one number that falsifies this phase's headline guarantee.** On the wire rather
+    /// than derived, so a support engineer can ask for it directly.
+    pub worst_skin_hue_shift: f32,
+    /// True when every stored grade met the ceilings.
+    pub guarantee_held: bool,
+    /// Scenes graded against the neutral intent row.
+    pub untargeted_scenes: Vec<String>,
+    /// The lowest model version present.
+    pub model_ver: u32,
+    /// The lowest analysis version present.
+    pub analysis_ver: u32,
+    /// The lowest intent-table version present.
+    pub intent_ver: u32,
+}
+
+/// Run the resumable grading pass.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EstimateColourInput {
+    /// The project.
+    pub project_id: String,
+    /// A token the UI can cancel with.
+    pub cancel_id: Option<String>,
+}
+
+/// What one grading pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourPassDto {
+    /// Photographs graded.
+    pub decided: u32,
+    /// Photographs that could not be graded.
+    pub failed: u32,
+    /// Frames where the guarantee was actually checked.
+    pub skin_measured: u32,
+    /// Frames where the skin guard had to intervene.
+    pub skin_guard_triggered: u32,
+    /// Frames where every colour operation was withdrawn to keep skin where it was.
+    pub skin_guard_withdrew: u32,
+    /// Frames where the clipping guard re-solved.
+    pub clip_guard_resolved: u32,
+    /// Frames whose grade was scaled back by the subtlety cap.
+    pub subtlety_capped: u32,
+    /// Frames below the review threshold.
+    pub low_confidence: u32,
+    /// Mean contrast.
+    pub mean_contrast: f32,
+    /// Mean shadow lift.
+    pub mean_shadow_lift: f32,
+    /// Mean subtlety.
+    pub mean_subtlety: f32,
+    /// The worst skin hue shift in the run, in degrees.
+    pub worst_skin_hue_shift: f32,
+    /// Scenes graded against the neutral intent row.
+    pub untargeted_scenes: Vec<String>,
+    /// Recipes the pass wrote.
+    pub recipes_written: u32,
+    /// Recipe paths the merge refused because a person already owned them.
+    pub recipes_protected: u32,
+    /// Wall clock.
+    pub elapsed_ms: u64,
+    /// True when the pass was cancelled.
+    pub cancelled: bool,
+}
+
+/// Ask for the frames whose grade is worth a photographer's attention.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColourReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many, at most.
+    pub limit: Option<u32>,
+}
+
+/// Record that the photographer has looked at one grade and agrees.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptColourInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Promote one stored alternative to the primary grade.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectVariantInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// `flatter`, `punchier` or `warmer`.
+    pub kind: String,
+}
+
+/// Record what the photographer set instead, and write it into the recipe.
+///
+/// Every field is optional and independent: somebody who reduced the contrast has not made a
+/// claim about the greenery. The curve and the HSL block are whole-or-nothing, because a curve
+/// is not a set of independent numbers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetColourOverrideInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// Contrast.
+    pub contrast: Option<f32>,
+    /// Highlight recovery.
+    pub highlights: Option<f32>,
+    /// Shadow lift.
+    pub shadows: Option<f32>,
+    /// White point.
+    pub whites: Option<f32>,
+    /// Black point.
+    pub blacks: Option<f32>,
+    /// Vibrance.
+    pub vibrance: Option<f32>,
+    /// Flat saturation.
+    pub saturation: Option<f32>,
+    /// The whole curve, or nothing.
+    pub curve: Option<Vec<CurvePointDto>>,
+    /// The whole HSL block, or nothing.
+    pub hsl: Option<Vec<HslShiftDto>>,
+}
+
+/// What recording a colour override did, on both sides.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetColourOverrideDto {
+    /// The decision after the override, with `userEdited` set.
+    pub decision: ColourDto,
+    /// The edit after the merge.
+    pub recipe: RecipeDto,
+    /// The dotted paths that moved.
+    pub changed: Vec<String>,
+    /// The dotted paths a person now owns.
+    pub protected: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// PHASE-17. Style learning: scene-conditional personal AI profiles.
+// ---------------------------------------------------------------------------
+
+/// One leaf of the style tree, as the matrix draws it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleBucketDto {
+    /// `group/lighting`, the catalog's own key.
+    pub key: String,
+    /// `preparation`, `details`, `ceremony`, `portraits`, `reception`, `dance`, `candid` or
+    /// `other`.
+    pub group: String,
+    /// `unknown`, `daylight`, `golden_hour`, `shade`, `overcast`, `tungsten`, `artificial`,
+    /// `flash`, `candle` or `stage`.
+    pub lighting: String,
+    /// What the matrix calls it.
+    pub title: String,
+    /// How many of the photographer's own pairs landed here.
+    pub samples: u32,
+    /// How many were held out and used to measure the fit.
+    pub held_out: u32,
+    /// The measured style-match error in dE00, or `null` when nothing was held out.
+    ///
+    /// **Never zero for "not measured".** A bucket trained on eleven pairs and evaluated on
+    /// none has no measurement, and zero would render as a perfect match - which is the one
+    /// thing a report about accuracy must not do where it knows least. ADR-0036 decision 2.
+    pub match_de00: Option<f32>,
+    /// Which level of the tree answers here: `bucket`, `group`, `global` or `factory`.
+    pub level: String,
+    /// True when this leaf has too few pairs to be trusted on its own.
+    pub weak: bool,
+}
+
+/// One profile, as the list shows it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleProfileDto {
+    /// The profile.
+    pub profile_id: String,
+    /// What the photographer calls it.
+    pub name: String,
+    /// Which training produced it.
+    pub version: u32,
+    /// `candidate`, `adopted` or `retired`.
+    pub status: String,
+    /// How many pairs it was trained on.
+    pub trained_pairs: u32,
+    /// Its strength, `0..1`, for the meter section 12 asks for instead of a ready state.
+    pub strength: f32,
+    /// The measured style-match error over every held-out pair, in dE00.
+    pub overall_de00: f32,
+    /// How many leaves carry the photographer's own evidence.
+    pub taught_buckets: u32,
+    /// True when it has enough evidence for AURA to be confident.
+    pub usable: bool,
+    /// The render engine it was fitted against.
+    pub engine_ver: String,
+    /// When, in milliseconds since the Unix epoch.
+    pub trained_at: i64,
+}
+
+/// The honest report a photographer reads before adopting.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileReportDto {
+    /// Which profile.
+    pub profile: StyleProfileDto,
+    /// Every populated leaf, in matrix order.
+    pub per_bucket: Vec<StyleBucketDto>,
+    /// The leaves the photographer should add weddings for, worst first.
+    pub weak_buckets: Vec<String>,
+    /// What to add next, as a sentence generated from the actual gap.
+    pub recommendation: String,
+    /// How many pairs the fit accepted.
+    pub accepted_pairs: u32,
+    /// How many it rejected. **On the wire beside the acceptance**, because a report that
+    /// showed only the accepted count could claim a hundred percent on any archive.
+    pub rejected_pairs: u32,
+    /// The fraction that survived the residual check, `0..1`.
+    pub acceptance: f32,
+    /// True when the overall figure met section 10.1's ceiling.
+    pub met_ceiling: bool,
+}
+
+/// Point the scanner at folders of the photographer's own work.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanArchiveInput {
+    /// The profile name to scan for. Versions of one look share a name.
+    pub name: String,
+    /// Absolute paths to the folders, one per wedding.
+    ///
+    /// Paths **in**, and nothing but names out: `StylePairDto` carries two file names and a
+    /// verdict. ADR-0036 decision 1.
+    pub roots: Vec<String>,
+}
+
+/// What one archive scan found, before anything is fitted.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanArchiveDto {
+    /// Camera originals found.
+    pub originals: u32,
+    /// Delivered finals found.
+    pub finals: u32,
+    /// Pairs the matcher made.
+    pub matched: u32,
+    /// Originals with no final. Usually a culled frame, which is normal.
+    pub unmatched_originals: u32,
+    /// Finals with no original. **The one worth reporting**: it means the RAWs are missing, on
+    /// another disk, or in a format this build does not decode.
+    pub unmatched_finals: u32,
+    /// How many pairs each strategy found, by slug.
+    pub by_method: Vec<(String, u32)>,
+    /// The weakest strategy any pair needed, which is how much to trust the whole pairing.
+    pub weakest_method: String,
+    /// True when there are enough pairs for a training run to produce anything.
+    pub enough: bool,
+}
+
+/// One original-and-final pair, as the report lists it.
+///
+/// **No pixels.** There is no field here that could hold image bytes, which is what makes
+/// "AURA never uploads your archive" a property of the shape rather than a promise about the
+/// code.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StylePairDto {
+    /// The original's file name, without its directory.
+    pub original: String,
+    /// The final's file name.
+    pub final_image: String,
+    /// `content_hash`, `filename_stem`, `capture_time`, `perceptual` or `unmatched`.
+    pub matched_by: String,
+    /// `xmp`, `fitted` or `none`.
+    pub extracted_from: String,
+    /// Which leaf it landed in.
+    pub bucket: String,
+    /// What the fit could not explain, in dE00.
+    pub residual_de00: f32,
+    /// True when it was used.
+    pub accepted: bool,
+    /// The reason code when it was not.
+    pub rejection: Option<String>,
+}
+
+/// Train a profile from whatever the scan already stored.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainProfileInput {
+    /// The profile name.
+    pub name: String,
+    /// A token the UI can cancel with.
+    pub cancel_id: Option<String>,
+}
+
+/// What one training run did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrainProfileDto {
+    /// The profile it produced, at `candidate`. **Adoption is a separate command.**
+    pub profile: Option<StyleProfileDto>,
+    /// Pairs the matcher found.
+    pub matched: u32,
+    /// Pairs the fit accepted.
+    pub accepted: u32,
+    /// Pairs it rejected, each stored with a reason.
+    pub rejected: u32,
+    /// Pairs already fitted at this version and skipped. Invariant 5, on the wire.
+    pub reused: u32,
+    /// Pairs whose parameters came from a sidecar rather than from a fit.
+    pub from_xmp: u32,
+    /// Leaves the tree populated.
+    pub buckets: u32,
+    /// The measured style-match error, in dE00.
+    pub overall_de00: f32,
+    /// The same figure for the unstyled baseline, so the improvement is visible rather than
+    /// asserted.
+    pub baseline_de00: f32,
+    /// Wall clock.
+    pub elapsed_ms: u64,
+    /// True when the run was cancelled.
+    pub cancelled: bool,
+}
+
+/// Adopt one profile: it becomes what the product edits with.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdoptProfileInput {
+    /// The profile.
+    pub profile_id: String,
+}
+
+/// One thing that moved, or did not move, a styled edit.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleReasonDto {
+    /// Stable reason code.
+    pub code: String,
+    /// The sentence.
+    pub text: String,
+    /// How much confidence it cost. Negative is doubt.
+    pub weight: f32,
+}
+
+/// One leaf's three answers, for the side-by-side before adoption.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleComparisonDto {
+    /// Which leaf.
+    pub bucket: String,
+    /// What the matrix calls it.
+    pub title: String,
+    /// The exposure, temperature, contrast and vibrance the baseline would use.
+    ///
+    /// Four numbers rather than a whole parameter set, because the comparison is a *summary*
+    /// and the develop surface already owns showing a recipe. A panel that drew a whole set
+    /// here would be a second Develop panel that could drift from the first.
+    pub baseline: Vec<f32>,
+    /// What the currently adopted profile would use, or empty when there is none.
+    pub current: Vec<f32>,
+    /// What the candidate would use.
+    pub candidate: Vec<f32>,
+    /// Which level of the tree the candidate answered from.
+    pub level: String,
+    /// How sure the candidate is.
+    pub confidence: f32,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<StyleReasonDto>,
+}
+
+/// Ask for the side-by-side of the baseline, the adopted profile and a candidate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareProfilesInput {
+    /// The project the comparison is for.
+    pub project_id: String,
+    /// The candidate.
+    pub candidate_id: String,
+    /// How many leaves, at most.
+    pub limit: Option<u32>,
+}
+
+/// Write a signed, portable profile to a file the photographer names.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportProfileInput {
+    /// The profile.
+    pub profile_id: String,
+    /// Where to write it.
+    pub path: String,
+}
+
+/// What exporting a profile produced.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportProfileDto {
+    /// Where it was written.
+    pub path: String,
+    /// How many bytes.
+    pub bytes: u64,
+    /// The signing key's fingerprint, in groups of four.
+    pub fingerprint: String,
+}
+
+/// Read a signed profile bundle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportProfileInput {
+    /// The `.auraprofile` file.
+    pub path: String,
+}
+
+/// What importing a profile produced.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportProfileDto {
+    /// The profile that was read, at `candidate` whatever it said about itself.
+    pub profile: StyleProfileDto,
+    /// The signing key's fingerprint.
+    pub fingerprint: String,
+    /// True when the document is unchanged since it was signed.
+    ///
+    /// **Not called `verified`.** With the public key inside the bundle, this proves integrity
+    /// and not provenance: there is no key distribution in this product and nothing to check a
+    /// key against. ADR-0035 decision 8, and `ProfileReport.tsx` never renders the word.
+    pub unchanged_since_signing: bool,
+}
+
+/// Which profile a project, and optionally one chapter of it, uses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetProjectProfileInput {
+    /// The project.
+    pub project_id: String,
+    /// One of phase 07's nine chapter slugs, or `null` for the project default.
+    pub chapter: Option<String>,
+    /// The profile, or `null` to clear the selection.
+    pub profile_id: Option<String>,
+}
+
+/// What the style panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleStatusDto {
+    /// Profiles in the catalog, adopted and candidate.
+    pub profiles: u32,
+    /// The profile this project uses, when one is selected.
+    pub active: Option<String>,
+    /// What it is called.
+    pub active_name: String,
+    /// Which version.
+    pub active_version: u32,
+    /// How many pairs it was trained on.
+    pub trained_pairs: u32,
+    /// Its strength, `0..1`.
+    pub strength: f32,
+    /// Its measured style-match error, in dE00.
+    pub overall_de00: f32,
+    /// Which chapters have an override, by slug.
+    pub chapter_overrides: Vec<String>,
+    /// How many of this project's leaves resolve at each level, by slug.
+    ///
+    /// **The number that matters when it is skewed.** A wedding whose frames all resolve at
+    /// `global` has had its scene conditioning do nothing, which is the quiet version of "one
+    /// global style" - the exact thing this phase exists to beat.
+    pub level_counts: Vec<(String, u32)>,
+    /// The fraction that resolved at their own leaf, `0..1`.
+    pub bucket_ratio: f64,
+    /// Which build's fitter produced the active profile.
+    pub analysis_ver: u32,
+}
+
+// ---------------------------------------------------------------------------
+// PHASE-18. Local mask AI: the regions every later phase edits inside.
+// ---------------------------------------------------------------------------
+
+/// What the mask panel's project header shows.
+///
+/// **`selected` and `masked` are two numbers rather than a ratio**, and this is the first
+/// status shape in the product where that matters. The denominator is *selected* frames, not
+/// every photograph: a mask over a rejected frame is not a gap, it is a frame nobody asked
+/// about. A photographer looking at a project where the cull has not run sees `selected: 0`
+/// rather than a coverage figure computed against a denominator that does not exist.
+/// See `docs/adr/ADR-0038-mask-ipc-surface.md` decision 5.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskStatusDto {
+    /// Frames the cull kept.
+    pub selected: u64,
+    /// How many of those carry masks at the current versions.
+    pub masked: u64,
+    /// How many masks exist in total.
+    pub masks: u64,
+    /// How many of those a photographer has edited by hand.
+    pub user_edited: u64,
+    /// How many are below the aggressive floor.
+    pub low_quality: u64,
+    /// Mean class confidence, weighted by area.
+    pub mean_confidence: f32,
+    /// Mean edge quality, weighted by area.
+    pub mean_edge_quality: f32,
+    /// Total stored bytes for this project.
+    pub payload_bytes: u64,
+    /// Mean stored bytes per masked frame. What the 180 KB budget bounds.
+    pub bytes_per_image: f32,
+    /// The model set the stored masks were produced under.
+    pub model_ver: u32,
+    /// The analysis version the stored masks were produced under.
+    pub analysis_ver: u32,
+    /// False in this build. The learned segmentation head is registered and never consulted.
+    pub head_trained: bool,
+}
+
+/// One reason a region is the way it is, with the sentence the panel renders.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskReasonDto {
+    /// The stable code from the frozen `MaskReason` vocabulary.
+    pub code: String,
+    /// One sentence, in the product's own voice.
+    pub text: String,
+}
+
+/// One region of one photograph.
+///
+/// **`confidence` and `edgeQuality` are never collapsed into one number.** They fail
+/// independently and are fixed by different things - a photographer can re-brush a boundary and
+/// cannot re-brush a class - so the panel shows two bars and names which of the two is limiting.
+/// ADR-0038 decision 2.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskDto {
+    /// Prefixed mask id.
+    pub id: String,
+    /// Prefixed photo id.
+    pub image_id: String,
+    /// The class slug, from the frozen twenty.
+    pub kind: String,
+    /// Which person, when the region belongs to one. Absent is a real answer.
+    pub identity_id: Option<String>,
+    /// The identity's display name, when there is one.
+    pub identity_name: Option<String>,
+    /// `rle` or `alpha8`.
+    pub form: String,
+    /// The stored plane's width.
+    pub width: u32,
+    /// The stored plane's height.
+    pub height: u32,
+    /// Stored bytes.
+    pub bytes: u64,
+    /// Edge softness applied on top of the payload.
+    pub feather: f32,
+    /// How sure the class assignment is.
+    pub confidence: f32,
+    /// How well determined the boundary is.
+    pub edge_quality: f32,
+    /// The word for the boundary: `matted`, `soft`, `binary` or `unknown`.
+    pub edge: String,
+    /// The strength ceiling phases 19 to 24 multiply by.
+    ///
+    /// Computed once, in Rust, and sent. The panel could derive it from the two quality numbers
+    /// and must not: two implementations of a gating rule is two answers to "may this mask carry
+    /// skin smoothing". ADR-0038 decision 3.
+    pub allowance: f32,
+    /// False when this mask may not carry skin smoothing or generative cleanup.
+    pub allows_aggressive: bool,
+    /// Why the region is the way it is. Never empty.
+    pub reasons: Vec<MaskReasonDto>,
+    /// True when a photographer brushed it. Automation never regenerates one of these.
+    pub user_edited: bool,
+    /// The model set this mask was produced under.
+    pub model_ver: u32,
+}
+
+/// A region as a plane the panel can draw.
+///
+/// Quarter-resolution eight-bit alpha, base64, capped at `OVERLAY_MAX_EDGE` on the long edge.
+/// The panel draws over a preview that is itself a proxy, so a full-resolution plane is detail
+/// nobody can see costing bytes everybody pays - and the brush wants the alpha values
+/// themselves rather than an image of them. ADR-0038 decision 1.
+///
+/// **There is no field here that could hold a photograph.** This is derived geometry about a
+/// region; the pixels of the frame reach the panel through the preview surface and nowhere else.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskOverlayDto {
+    /// Prefixed mask id.
+    pub id: String,
+    /// Plane width.
+    pub width: u32,
+    /// Plane height.
+    pub height: u32,
+    /// `width * height` alpha bytes, base64.
+    pub alpha_base64: String,
+    /// Which render level it was resolved at.
+    pub level: String,
+}
+
+/// Ask for a photograph's regions, producing any that are missing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnsureMasksInput {
+    /// The project the photograph is in.
+    ///
+    /// Needed because producing a region reads pixels, and the preview cache is opened per
+    /// project. Every other command on this surface is a query over one table and takes no
+    /// project, which is the difference this field makes visible.
+    pub project_id: String,
+    /// The photograph.
+    pub image_id: String,
+    /// Which classes. Empty means all twenty.
+    #[serde(default)]
+    pub kinds: Vec<String>,
+}
+
+/// One step of a mask composition.
+///
+/// A whole edit arrives as one command with an explicit op rather than as a stream of brush
+/// points: a per-point command would be a command per animation frame, which breaks the 50 ms
+/// rule by volume rather than by latency, and it would make undo a replay of two hundred rows.
+/// ADR-0038 decision 4.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskOpDto {
+    /// `source`, `plane`, `union`, `intersect`, `subtract`, `invert`, `feather`, `grow` or
+    /// `shrink`.
+    pub op: String,
+    /// The mask this step pushes, for `source`.
+    #[serde(default)]
+    pub mask_id: Option<String>,
+    /// A stroke plane, for `plane`: `width`, `height` and base64 alpha.
+    #[serde(default)]
+    pub width: Option<u32>,
+    /// The stroke plane's height.
+    #[serde(default)]
+    pub height: Option<u32>,
+    /// The stroke plane's alpha bytes, base64.
+    #[serde(default)]
+    pub alpha_base64: Option<String>,
+    /// The amount, for `feather`.
+    #[serde(default)]
+    pub amount: Option<f32>,
+    /// The radius in analysis pixels, for `grow` and `shrink`.
+    #[serde(default)]
+    pub radius: Option<u32>,
+}
+
+/// Apply a composition to one of a photograph's regions and keep the result.
+///
+/// Sets `userEdited`, and there is no argument here that clears it. The one thing that clears it
+/// is `regenerate_mask`, which is a separate deliberate act. ADR-0037 decision 7.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditMaskInput {
+    /// The mask being edited.
+    pub mask_id: String,
+    /// The program, in postfix order.
+    pub ops: Vec<MaskOpDto>,
+    /// The feather to store with the result.
+    #[serde(default)]
+    pub feather: Option<f32>,
+}
+
+/// What one operation may do through one region.
+///
+/// The shape phases 19 to 24 read before they apply anything. It is on this surface as well so
+/// the panel can say *why* an operation is unavailable rather than only that it is.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MaskAllowanceDto {
+    /// Prefixed mask id.
+    pub mask_id: String,
+    /// The operation asked about.
+    pub operation: String,
+    /// The strength ceiling. Multiply by it; do not compare against it.
+    pub ceiling: f32,
+    /// False when the operation is refused outright.
+    pub permitted: bool,
+    /// Why the ceiling is below one. Empty when nothing is limiting.
+    pub reasons: Vec<MaskReasonDto>,
+}
