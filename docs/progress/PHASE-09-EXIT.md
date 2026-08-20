@@ -112,7 +112,7 @@ by `crates/aura-perf/tests/integrity_budgets.rs`.
 | Integrity analysis per image (GPU) | <= 45 ms | - | **waived**, no GPU backend - ADR-0019 section 11 |
 | Integrity analysis per image (CPU) | <= 220 ms | **128 ms** | **met** |
 | 4,000 images (RTX 4070) | <= 180 s | - | **waived**, same reason; the processor path costs **512 s** and is printed beside it |
-| Storage per image | <= 1 KB | **1,024 B** | **met, exactly** |
+| Storage per image | <= 1 KB | **927 B** | **met** - re-measured, see below |
 
 ### The GPU waiver
 
@@ -137,10 +137,26 @@ each of the following worth doing, and all four are improvements rather than com
 | `face_eye_state` is `WITHOUT ROWID`, with no `photo_id` and no identity index | ~450 B |
 | The eye rows read their geometry from `faces` rather than copying it | ~120 B |
 
-The measured split at the end is **704 bytes for the verdict row and its one index, 320
+The measured split at the end is **649 bytes for the verdict row and its one index, 278
 for three eye states**. The reason decision is the one worth keeping in mind: a stored
 sentence is copy that a release can change, and a catalog full of English sentences is a
 catalog that cannot be translated.
+
+#### The instrument changed, in phase 19
+
+This row first read **1,024 B, met, exactly**, measured with whole-file `PRAGMA
+page_count`. That was the wrong instrument and the "exactly" was the tell: page accounting
+quantises to 4 KiB, a thousand verdicts occupy about 250 pages, and the figure was pinned
+at 250 pages with no headroom in a number that can only move in 4 KiB steps. It duly moved
+two pages, to 1,032 B, and the budget began failing on packing drift rather than on
+anything anybody had written - which is where phase 19 found it, red on `main` and masked
+behind an earlier failure.
+
+The test now measures `dbstat` payload over migration 9's two tables and their indexes.
+None of the four decisions above is undone and nothing was made cheaper; the same rows are
+being counted with an instrument that moves by the bytes actually added. Page overhead is
+still asserted, as a bounded ratio to the payload - 1.11x measured against a 1.40x ceiling
+- so a schema change that makes the overhead structural still fails.
 
 ### Phase 06's clustering budget still does not reproduce
 

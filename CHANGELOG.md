@@ -72,6 +72,22 @@ That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the p
   and CI asserts a looser but still real bound. **Sizes, counts and costs are never scaled** -
   a slow runner is not a reason to store more, call more or spend more - and the factor is
   clamped so a budget cannot be switched off from the environment.
+- **That scale then broke the tests that assert what a budget *means*.** It was read inside
+  `Budgets::check`, so the case proving 900 ms breaches a 400 ms budget stopped breaching the
+  moment CI exported a scale of four. `check` is now a wrapper over `check_at_scale`, which
+  takes the scale as an argument; the cases that assert the rule pin their own and nothing but
+  `host_scale` reads the environment. A measurement's verdict depends on the host, the rule
+  does not.
+- **Phase 09's storage budget had been failing on packing drift.** Also red on `main`, and
+  masked behind the guardrail above. It was measured with whole-file `PRAGMA page_count`,
+  which quantises to 4 KiB, and then recorded as "1,024 B, met, **exactly**" - pinned with no
+  headroom in a number that can only move in 4 KiB steps. It moved two pages and began failing
+  on nothing anybody had written. The test now counts `dbstat` payload over migration 9's two
+  tables and their indexes (927 B per image), and asserts the page overhead separately as a
+  bounded ratio (1.11x measured, 1.40x ceiling) so a structural regression still fails. No
+  schema changed and nothing was made cheaper: the same rows are counted with an instrument
+  that moves by the bytes actually added. **A budget measured with a quantised instrument must
+  not be set at its own measurement.**
 
 ### Changed
 

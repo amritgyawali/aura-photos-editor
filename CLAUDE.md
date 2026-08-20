@@ -284,7 +284,12 @@ code rather than their sentence** (a stored sentence is copy a release can chang
 catalog full of English cannot be translated), two indexes that served no query were
 removed after being measured, `face_eye_state` is `WITHOUT ROWID` with no `photo_id`, and
 the eye rows read their geometry from `faces` rather than copying it. Together those took
-the figure from 1,855 bytes per image to exactly 1,024 against a 1 KB budget.
+the figure from 1,855 bytes per image to 927 against a 1 KB budget. It read "exactly
+1,024" until phase 19, and the "exactly" was the tell: it was whole-file `PRAGMA
+page_count`, which quantises to 4 KiB, pinned with no headroom in a number that can only
+move in 4 KiB steps. **A budget measured with a quantised instrument must not be set at its
+own measurement**, and the test now counts `dbstat` payload with the page overhead asserted
+separately as a bounded ratio.
 
 Phase 10 is implemented: `aura-core::contract::emotion` (the frozen `GazeTarget`,
 `Interaction`, `FaceExpression`, `EmotionCode`, `EmotionReason`, `PeakKind`, `MomentPeak`,

@@ -45,6 +45,13 @@ const FRAMES: usize = if cfg!(debug_assertions) { 12 } else { 60 };
 /// How many photographs the storage row is measured over.
 const STORAGE_FRAMES: usize = 1_000;
 
+/// How much b-tree the payload is allowed to sit inside.
+///
+/// Measured at 1.11x. The ceiling is loose because page packing is SQLite's business and
+/// not this schema's - it exists to catch a change that makes the overhead structural,
+/// such as an index on a wide column, rather than to pin the packing.
+const MAX_PAGE_OVERHEAD: f64 = 1.40;
+
 fn budgets() -> Budgets {
     Budgets::load(Path::new("../../perf/budgets.toml")).unwrap_or_else(|reason| {
         panic!("the budget file must parse: {reason}");
@@ -231,9 +238,14 @@ fn the_pass_reads_the_pixels_once() {
 
 #[test]
 fn a_verdict_costs_a_photograph_under_a_kilobyte() {
-    // Section 11: 1 KB per image including per-face eye states. Measured with SQLite's
-    // own page accounting on a real catalog, before and after - not estimated from the
-    // column widths, which is how migration 7's claim of 330 bytes turned out to be 410.
+    // Section 11: 1 KB per image including per-face eye states. Measured on a real
+    // catalog, before and after - not estimated from the column widths, which is how
+    // migration 7's claim of 330 bytes turned out to be 410.
+    //
+    // The figure is `dbstat` payload over migration 9's two tables and their indexes.
+    // It was whole-file `PRAGMA page_count` first; see `payload_bytes` for why a
+    // 4 KiB-quantised number set at exactly its budget could not survive contact with
+    // ordinary row packing.
     let clock: Arc<dyn Clock> = Arc::new(SystemClock::default());
     let dir = TempDir::new().unwrap_or_else(|e| panic!("tempdir: {e}"));
     let (store, project, _) = catalog_with_photos(&dir, Arc::clone(&clock), STORAGE_FRAMES);
@@ -266,7 +278,8 @@ fn a_verdict_costs_a_photograph_under_a_kilobyte() {
         .iter()
         .map(|photo| seed_faces(store.catalog(), &project, *photo, template.eyes.len()))
         .collect();
-    let before = page_bytes(store.catalog());
+    let before = payload_bytes(store.catalog(), &INTEGRITY_TABLES);
+    let page_before = page_bytes(store.catalog());
 
     for (photo, faces) in photos.iter().zip(&per_photo) {
         let mut eyes = template.eyes.clone();
@@ -289,7 +302,8 @@ fn a_verdict_costs_a_photograph_under_a_kilobyte() {
             .unwrap_or_else(|err| panic!("store: {}", err.detail));
     }
 
-    let midpoint = page_bytes(store.catalog());
+    let midpoint = payload_bytes(store.catalog(), &INTEGRITY_TABLES);
+    let page_grown = page_bytes(store.catalog()).saturating_sub(page_before);
 
     // The same thousand verdicts again with no eye states, into a second catalog, so the
     // waiver in `perf/budgets.toml` carries a *measured* split rather than an estimated
@@ -314,7 +328,7 @@ fn a_verdict_costs_a_photograph_under_a_kilobyte() {
             )
             .unwrap_or_else(|err| panic!("store: {}", err.detail));
     }
-    let bare = page_bytes(bare_store.catalog()).saturating_sub(bare_before);
+    let bare = payload_bytes(bare_store.catalog(), &INTEGRITY_TABLES).saturating_sub(bare_before);
     println!(
         "  of which: {} bytes per image is the verdict row and its index, {} is three eye          states",
         bare / STORAGE_FRAMES as u64,
@@ -334,6 +348,15 @@ fn a_verdict_costs_a_photograph_under_a_kilobyte() {
         template.eyes.len()
     );
 
+    // What the b-tree costs around those rows. Reported next to the payload so the two
+    // are never confused again, and bounded so that a schema change which quietly
+    // doubles the page cost is still a failure - it is just no longer the *same* number
+    // as the per-image budget, which is what let 4 KiB of packing drift read as a
+    // regression.
+    #[allow(clippy::cast_precision_loss)]
+    let overhead = page_grown as f64 / grown.max(1) as f64;
+    println!("  {page_grown} bytes of pages hold them: {overhead:.2}x the payload");
+
     if cfg!(debug_assertions) {
         println!("  (debug build: reported, not asserted)");
         return;
@@ -341,10 +364,53 @@ fn a_verdict_costs_a_photograph_under_a_kilobyte() {
     if let Err(reason) = budgets().check_size("integrity_store_per_1000_images", grown) {
         panic!("{reason}");
     }
+    assert!(
+        overhead < MAX_PAGE_OVERHEAD,
+        "the pages around these rows cost {overhead:.2}x their payload, over {MAX_PAGE_OVERHEAD:.2}x"
+    );
 }
 
 // -- helpers -----------------------------------------------------------------
 
+/// The tables phase 09 stores a verdict in, with their indexes.
+const INTEGRITY_TABLES: [&str; 2] = ["image_integrity", "face_eye_state"];
+
+/// Payload bytes held by `tables` and every index on them.
+///
+/// `dbstat.payload` is what the rows themselves occupy. This budget was measured with
+/// `PRAGMA page_count` first, and that quantises to a 4 KiB page: a thousand verdicts
+/// live in about 250 pages, so one byte of growth per row can move the reported figure
+/// by 4 KiB and two pages of ordinary packing drift look exactly like a regression. The
+/// budget was then set at 250 pages *exactly*, which left no headroom at all in a number
+/// that can only move in 4 KiB steps - so it was going to flip on the first change that
+/// touched a row, and it did. A payload figure moves by the bytes that were added.
+///
+/// Page overhead is still real and it is still asserted - as a bounded *ratio* to the
+/// payload, in the same test - rather than folded into the per-image number where 4 KiB
+/// of quantisation is indistinguishable from a regression.
+fn payload_bytes(catalog: &Arc<Catalog>, tables: &[&str]) -> u64 {
+    catalog
+        .read(|conn| {
+            let mut total: i64 = 0;
+            for table in tables {
+                let bytes: i64 = conn
+                    .query_row(
+                        "SELECT COALESCE(SUM(payload), 0) FROM dbstat WHERE name IN (
+                             SELECT name FROM sqlite_master
+                             WHERE name = ?1 OR (type = 'index' AND tbl_name = ?1)
+                         )",
+                        [table],
+                        |row| row.get(0),
+                    )
+                    .unwrap_or(0);
+                total = total.saturating_add(bytes);
+            }
+            Ok(u64::try_from(total).unwrap_or(0))
+        })
+        .unwrap_or(0)
+}
+
+/// Whole-file bytes, page-quantised. Only used for the overhead check.
 fn page_bytes(catalog: &Arc<Catalog>) -> u64 {
     catalog
         .read(|conn| {
@@ -471,7 +537,7 @@ fn catalog_with_photos(
         })
         .unwrap_or_else(|err| panic!("seed: {}", err.detail));
 
-    let before = page_bytes(&catalog);
+    let before = payload_bytes(&catalog, &INTEGRITY_TABLES);
     (
         Arc::new(IntegrityStore::new(catalog, clock)),
         project,

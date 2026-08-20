@@ -399,8 +399,22 @@ max_ms_per_unit = 220
 # and it is the difference between a technical verdict a photographer can argue
 # with and one they can only accept or switch off.
 #
-# Measured with `PRAGMA page_count` on a real catalog before and after, over a
-# thousand photographs, by `crates/aura-perf/tests/integrity_budgets.rs`.
+# Measured on a real catalog before and after, over a thousand photographs, by
+# `crates/aura-perf/tests/integrity_budgets.rs`. The figure is `dbstat` payload
+# over migration 9's two tables and their indexes: 927 B per image today, of
+# which 649 is the verdict row and its index and 278 is three eye states.
+#
+# It was whole-file `PRAGMA page_count` first, and that was the wrong instrument
+# for this budget. Page accounting quantises to 4 KiB, a thousand verdicts sit in
+# about 250 pages, and phase 09 then recorded the figure as "1,024 B, met,
+# exactly" - a number that can only move in 4 KiB steps, pinned with zero
+# headroom. The next change that touched a row moved it two pages to 1,032 B and
+# the budget failed on packing drift rather than on anything anybody wrote. A
+# payload figure moves by the bytes that were actually added.
+#
+# Page overhead did not stop being real: the same test asserts it as a bounded
+# ratio to the payload (1.11x measured, 1.40x ceiling), where a schema change
+# that makes the overhead structural still fails and ordinary packing does not.
 [size.integrity_store_per_1000_images]
 max_bytes = 1024000
 
