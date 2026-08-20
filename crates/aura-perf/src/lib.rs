@@ -41,6 +41,17 @@
 //! **It applies to timings only.** [`Budgets::check_size`], [`Budgets::check_count`] and
 //! [`Budgets::check_cost`] ignore it, because a byte is a byte, a call is a call and a dollar
 //! is a dollar on any machine. A slow runner is not a reason to store more.
+//!
+//! ## Why the scale is an argument and not only a variable
+//!
+//! [`Budgets::check`] is a thin wrapper over [`Budgets::check_at_scale`] at whatever the host
+//! says. The split exists because the first version read the environment inside `check`, and
+//! that quietly made every test of what a budget *means* depend on what CI had set: a case
+//! asserting that 900 ms breaches a 400 ms budget stopped breaching the moment the runner
+//! exported a scale of four, and the suite went red for a reason that had nothing to do with
+//! the code under test. A measurement's verdict depends on the host; the *rule* does not.
+//! Tests of the rule pass their own scale, and nothing in the crate but [`host_scale`] reads
+//! the process environment.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -173,9 +184,14 @@ pub const MAX_HOST_SCALE: u64 = 8;
 /// Anything unparseable is one: a typo must tighten the assertion rather than loosen it.
 #[must_use]
 pub fn host_scale() -> u64 {
-    std::env::var(HOST_SCALE_VAR)
-        .ok()
-        .and_then(|raw| raw.trim().parse::<u64>().ok())
+    scale_from(std::env::var(HOST_SCALE_VAR).ok().as_deref())
+}
+
+/// [`host_scale`] without the environment, so the parsing rules can be tested without a
+/// process-wide variable that leaks into whatever test runs next.
+#[must_use]
+pub fn scale_from(raw: Option<&str>) -> u64 {
+    raw.and_then(|raw| raw.trim().parse::<u64>().ok())
         .unwrap_or(1)
         .clamp(1, MAX_HOST_SCALE)
 }
@@ -217,10 +233,24 @@ impl Budgets {
     ///
     /// Returns a human-readable breach description.
     pub fn check(&self, measurement: &Measurement) -> Result<(), String> {
+        self.check_at_scale(measurement, host_scale())
+    }
+
+    /// [`Budgets::check`] against an explicit host scale rather than the environment.
+    ///
+    /// What a budget *means* is not a property of the machine reading it, so the tests that
+    /// assert the meaning call this and are unaffected by what CI sets. `scale` is clamped to
+    /// `1..=`[`MAX_HOST_SCALE`] here as well as in [`host_scale`]: a caller cannot switch a
+    /// budget off by passing a large number any more than a CI file can by setting one.
+    ///
+    /// # Errors
+    ///
+    /// Returns a human-readable breach description.
+    pub fn check_at_scale(&self, measurement: &Measurement, scale: u64) -> Result<(), String> {
         let Some(budget) = self.stage.get(&measurement.stage) else {
             return Ok(());
         };
-        let scale = host_scale();
+        let scale = scale.clamp(1, MAX_HOST_SCALE);
         // The message names the budget file's own figure *and* what this host was allowed, so
         // a failing CI log says which of the two it breached without anybody going to look up
         // the variable.
