@@ -88,6 +88,12 @@ That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the p
   schema changed and nothing was made cheaper: the same rows are counted with an instrument
   that moves by the bytes actually added. **A budget measured with a quantised instrument must
   not be set at its own measurement.**
+- **Two CI steps re-ran a budget suite in parallel and measured the contention.** The step
+  that runs the whole suite passes `--test-threads=1`, with a comment saying why - "a budget
+  suite that races itself reports a different number every run" - and the two dedicated steps
+  that re-run one suite each to print its figures did not. Five renders racing across a
+  runner's cores read 737 ms per unit against a 532 ms allowance where the same machine read
+  286 ms serially. Both steps now pass the flag the rule four lines above them already stated.
 
 ### Changed
 

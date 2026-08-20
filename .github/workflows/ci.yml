@@ -189,8 +189,14 @@ jobs:
 
       # PHASE-14 section 11. Four of its five rows are waived (no GPU backend,
       # ADR-0029 section 4); what is asserted is the processor path and the store.
+      # `--test-threads=1` for the same reason the whole-suite step above uses it: these
+      # cases each render a frame, and five of them racing across the runner's cores
+      # measure the contention rather than the renderer. This step re-runs a suite that
+      # has already passed serially, purely to print the figures, and it was the one
+      # place the rule was missed - it read 737 ms per unit against 532 in parallel and
+      # 286 serially on the same machine.
       - name: develop budgets
-        run: cargo test --release --package aura-perf --test develop_budgets -- --nocapture
+        run: cargo test --release --package aura-perf --test develop_budgets -- --test-threads=1 --nocapture
 
       # PHASE-19 section 10.1, as a test suite. Six of its seven gates are measured
       # here; the seventh is an expert study over four hundred frames and is
@@ -202,7 +208,7 @@ jobs:
       # and no phase 18 matte to apply through - so what is asserted is the
       # processor path and the store.
       - name: local light budgets
-        run: cargo test --release --package aura-perf --test local_budgets -- --nocapture
+        run: cargo test --release --package aura-perf --test local_budgets -- --test-threads=1 --nocapture
 
       # Two independent implementations of the metrics have to agree, or neither
       # is trustworthy. The Python half also self-tests without cargo.
