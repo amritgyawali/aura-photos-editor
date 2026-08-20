@@ -44,6 +44,14 @@ jobs:
     name: tests on ${{ matrix.os }}
     needs: gates
     runs-on: ${{ matrix.os }}
+    # Every timing budget in `perf/budgets.toml` and phase 14's proxy guardrail are measured
+    # on a development machine. A shared GitHub runner is two and a half to five times slower
+    # than that - measured: 497 ms on macOS, 669 ms and 1,123 ms on ubuntu, against a 210 ms
+    # development figure - so the budgets are relaxed by a named factor here rather than being
+    # loosened in the file, which would remove the guardrail from the machine anybody
+    # develops on. Sizes, counts and costs are NOT scaled: a byte is a byte on any host.
+    env:
+      AURA_PERF_HOST_SCALE: "4"
     strategy:
       fail-fast: false
       matrix:
@@ -137,6 +145,14 @@ jobs:
     name: benchmarks
     needs: gates
     runs-on: ubuntu-latest
+    # Every timing budget in `perf/budgets.toml` and phase 14's proxy guardrail are measured
+    # on a development machine. A shared GitHub runner is two and a half to five times slower
+    # than that - measured: 497 ms on macOS, 669 ms and 1,123 ms on ubuntu, against a 210 ms
+    # development figure - so the budgets are relaxed by a named factor here rather than being
+    # loosened in the file, which would remove the guardrail from the machine anybody
+    # develops on. Sizes, counts and costs are NOT scaled: a byte is a byte on any host.
+    env:
+      AURA_PERF_HOST_SCALE: "4"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master

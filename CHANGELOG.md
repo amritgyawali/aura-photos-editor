@@ -64,6 +64,14 @@ That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the p
   clamped to lie between the face and the band.
 - **`0015_tone.sql` was missing from the frozen contract list.** A phase 15 oversight rather
   than a decision; it and `0016_local_light.sql` are both locked now.
+- **CI had been red on `main` for five days, and the cause was a budget that assumed CI was
+  fast.** Phase 14's proxy guardrail says it "leaves room for a slower CI machine" at 450 ms
+  against a 210 ms development figure. It does not: three GitHub runners measured 497, 669 and
+  1,123 ms. Timing budgets are now multiplied by `AURA_PERF_HOST_SCALE`, which CI sets to 4
+  and a developer does not, so the tight assertion survives on the machine anybody develops on
+  and CI asserts a looser but still real bound. **Sizes, counts and costs are never scaled** -
+  a slow runner is not a reason to store more, call more or spend more - and the factor is
+  clamped so a budget cannot be switched off from the environment.
 
 ### Changed
 

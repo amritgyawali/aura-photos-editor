@@ -29,7 +29,17 @@ use rusqlite::params;
 
 /// Section 11's interactive row is a GPU figure. This is the processor guardrail the phase
 /// asserts instead, and the gate prints the gap rather than hiding it.
+///
+/// Measured at 210 ms in release on the development machine; the figure here leaves room for
+/// a two-times regression. It is **multiplied by `aura_perf::host_scale`**, because a shared
+/// CI runner is three to five times slower than that machine and a guardrail that is red on
+/// every run is a guardrail nobody reads. See `crates/aura-perf/src/lib.rs`.
 const PROXY_GUARDRAIL_MS: u128 = 450;
+
+/// The guardrail this host is held to, in milliseconds.
+fn proxy_guardrail_ms() -> u128 {
+    PROXY_GUARDRAIL_MS.saturating_mul(u128::from(aura_perf::host_scale()))
+}
 
 /// Run the phase 14 gate.
 #[allow(clippy::too_many_lines)]
@@ -448,12 +458,22 @@ pub fn verify(args: &[String]) -> ExitCode {
                 rendered.stages_run.len()
             );
             println!("  section 11 asks for 60 ms on an RTX 4070. This build has no GPU backend");
-            println!(
-                "  (AURA-RENDER-8001, ADR-0029 section 4); the guardrail is {PROXY_GUARDRAIL_MS} ms"
-            );
+            let guardrail = proxy_guardrail_ms();
+            if guardrail == PROXY_GUARDRAIL_MS {
+                println!(
+                    "  (AURA-RENDER-8001, ADR-0029 section 4); the guardrail is \
+                     {PROXY_GUARDRAIL_MS} ms"
+                );
+            } else {
+                println!(
+                    "  (AURA-RENDER-8001, ADR-0029 section 4); the guardrail is {guardrail} ms \
+                     ({PROXY_GUARDRAIL_MS} ms at host scale {})",
+                    aura_perf::host_scale()
+                );
+            }
             if cfg!(debug_assertions) {
                 println!("  debug build: reported, not asserted");
-            } else if elapsed > PROXY_GUARDRAIL_MS {
+            } else if elapsed > guardrail {
                 eprintln!("  over the guardrail");
                 failures += 1;
             }

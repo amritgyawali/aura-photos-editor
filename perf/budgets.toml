@@ -624,7 +624,19 @@ max_ms_per_unit = 133
 # Section 11's 60 ms is an RTX 4070 figure and is waived. This row is its processor
 # counterpart and it is a **regression guardrail rather than a claim of parity**: measured at
 # 210 ms in release on the development machine with the reference grade, budgeted at 450 ms,
-# which leaves room for a slower CI machine and fails on a two-times regression.
+# which fails on a two-times regression.
+#
+# The 450 originally said it "leaves room for a slower CI machine". **It does not**, and that
+# assumption is what made this suite red on `main` for five days in August 2026. Measured on
+# three GitHub runners: 497 ms (macOS), 669 ms (ubuntu, tests lane) and 1,123 ms (ubuntu,
+# benchmarks lane) - two and a half to five times the development machine rather than the
+# under-two-times the figure assumed.
+#
+# The room for a slower host is now explicit instead: `AURA_PERF_HOST_SCALE`, which CI sets
+# and a developer does not, multiplies every timing budget in this file. See
+# `crates/aura-perf/src/lib.rs`. At the scale CI sets this row allows 1,800 ms, which is 60 %
+# clear of the slowest figure ever observed and still fails on a regression - so the guardrail
+# is real on both machines rather than tight on one and absent on the other.
 #
 # The gap between 60 and 210 is the honest cost of having no GPU backend, it is printed by
 # `aura-cli verify --phase 14` on every run, and it is condition C1 in the exit report.
