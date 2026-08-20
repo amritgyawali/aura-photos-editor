@@ -29,7 +29,7 @@ use aura_catalog::model::ProjectRow;
 use aura_catalog::{repo, Catalog};
 use aura_core::clock::{Clock, SystemClock};
 use aura_core::contract::local::{
-    LocalCode, LocalLightPlan, LocalOp, LocalOverride, LocalService, MaskKind, MAX_FACE_LIFT_EV,
+    LocalCode, LocalLightPlan, LocalOp, LocalOverride, LocalService, MAX_FACE_LIFT_EV,
     MAX_INTER_FACE_SPREAD, MAX_MEAN_LUMA_DRIFT, PERCEPTUAL_BUDGET,
 };
 use aura_core::{AuraResult, PhotoId, ProjectId, SceneId};
@@ -102,7 +102,10 @@ pub fn verify(args: &[String]) -> ExitCode {
             println!("  no mask, matte or smoothing column anywhere in migration 16");
         }
         Ok(found) => {
-            eprintln!("  migration 16 grew a forbidden column: {}", found.join(", "));
+            eprintln!(
+                "  migration 16 grew a forbidden column: {}",
+                found.join(", ")
+            );
             failures += 1;
         }
         Err(err) => {
@@ -115,7 +118,11 @@ pub fn verify(args: &[String]) -> ExitCode {
     println!();
     let policy = match PolicyTable::embedded() {
         Ok(table) => {
-            println!("policy: version {} loaded, {} scenes", table.version(), table.rows());
+            println!(
+                "policy: version {} loaded, {} scenes",
+                table.version(),
+                table.rows()
+            );
             let dance = table.get(SceneId::DanceFloor);
             let family = table.get(SceneId::FamilyPortrait);
             if dance.declines(LocalOp::DodgeBurnLow) {
@@ -166,7 +173,10 @@ pub fn verify(args: &[String]) -> ExitCode {
     println!("fixtures: {} planned", plans.len());
 
     // Face lighting reaches the band on a dark face and leaves a correct one alone.
-    match (find(&plans, "face_in_shadow"), find(&plans, "already_right")) {
+    match (
+        find(&plans, "face_in_shadow"),
+        find(&plans, "already_right"),
+    ) {
         (Some(dark), Some(right)) => {
             let lifted = dark
                 .face_light
@@ -208,7 +218,9 @@ pub fn verify(args: &[String]) -> ExitCode {
             failures += 1;
         }
     }
-    println!("  the worst mean-luminance drift is {worst_drift:.4} against {MAX_MEAN_LUMA_DRIFT:.3}");
+    println!(
+        "  the worst mean-luminance drift is {worst_drift:.4} against {MAX_MEAN_LUMA_DRIFT:.3}"
+    );
 
     // Group fairness.
     if let Some(group) = find(&plans, "uneven_group") {
@@ -217,7 +229,9 @@ pub fn verify(args: &[String]) -> ExitCode {
         if after < before && group.group_is_fair() {
             println!("  a group {before:.3} apart ended {after:.3} apart, against a threshold of {MAX_INTER_FACE_SPREAD:.3}");
         } else {
-            eprintln!("  the group solve did not make the group more even: {before:.3} then {after:.3}");
+            eprintln!(
+                "  the group solve did not make the group more even: {before:.3} then {after:.3}"
+            );
             failures += 1;
         }
         if group
@@ -416,8 +430,12 @@ pub fn verify(args: &[String]) -> ExitCode {
     println!();
     let mut deterministic = true;
     for (index, frame) in frames.iter().enumerate() {
-        let a = analyser.analyse(&frame.buffer, fixture_photo(index), &frame.context).plan;
-        let b = analyser.analyse(&frame.buffer, fixture_photo(index), &frame.context).plan;
+        let a = analyser
+            .analyse(&frame.buffer, fixture_photo(index), &frame.context)
+            .plan;
+        let b = analyser
+            .analyse(&frame.buffer, fixture_photo(index), &frame.context)
+            .plan;
         if a != b {
             eprintln!("  {} is not deterministic", frame.name);
             deterministic = false;
@@ -430,7 +448,10 @@ pub fn verify(args: &[String]) -> ExitCode {
 
     // 9. What this gate does not prove.
     println!();
-    println!("versions: model {MODEL_VER}, analysis {ANALYSIS_VER}, policy {}, shaping {SHAPING_VER}", policy.version());
+    println!(
+        "versions: model {MODEL_VER}, analysis {ANALYSIS_VER}, policy {}, shaping {SHAPING_VER}",
+        policy.version()
+    );
     println!(
         "caps: a face may be lifted at most {MAX_FACE_LIFT_EV:.2} EV before the noise cap, and \
          at most {:.3} of the allowance is spendable",
@@ -496,16 +517,19 @@ fn schema_object(catalog: &Catalog, kind: &str, name: &str) -> AuraResult<bool> 
 /// "since we are already in the skin".
 fn forbidden_columns(catalog: &Catalog) -> AuraResult<Vec<String>> {
     const NEEDLES: [&str; 9] = [
-        "matte", "alpha", "mask_data", "mask_blob", "blur", "smooth", "radius_px", "soften",
+        "matte",
+        "alpha",
+        "mask_data",
+        "mask_blob",
+        "blur",
+        "smooth",
+        "radius_px",
+        "soften",
         "texture_blur",
     ];
     catalog.read(move |conn| {
         let mut found = Vec::new();
-        for table in [
-            "local_light_plan",
-            "local_light_face",
-            "local_light_gate",
-        ] {
+        for table in ["local_light_plan", "local_light_face", "local_light_gate"] {
             let mut statement = conn
                 .prepare(&format!("PRAGMA table_info({table})"))
                 .map_err(|e| aura_core::errors::db::statement_failed("table_info", &e))?;
@@ -531,8 +555,10 @@ fn forbidden_columns(catalog: &Catalog) -> AuraResult<Vec<String>> {
 fn stored_rows(catalog: &Catalog) -> AuraResult<(i64, i64, i64)> {
     catalog.read(move |conn| {
         let count = |table: &str| -> i64 {
-            conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
-                .unwrap_or(0)
+            conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(0)
         };
         Ok((
             count("local_light_plan"),
@@ -564,10 +590,7 @@ fn seed(
         .transact(move |conn| repo::create_project(conn, &row))?;
     let project_key = project.to_db();
     let ids: Vec<String> = photos.iter().map(PhotoId::to_db).collect();
-    let mut identities: Vec<String> = people
-        .iter()
-        .map(aura_core::IdentityId::to_db)
-        .collect();
+    let mut identities: Vec<String> = people.iter().map(aura_core::IdentityId::to_db).collect();
     identities.sort_unstable();
     identities.dedup();
     let identity_project = project.to_db();

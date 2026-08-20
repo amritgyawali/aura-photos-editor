@@ -87,6 +87,13 @@ jobs:
       - name: phase 14 verify - recipe, colour, tiling, parity, interchange
         run: cargo run --release --package aura-cli -- verify --phase 14 --work target/phase14-verify
 
+      # PHASE-19. Local light sculpting. No network, no GPU, no model and - on this
+      # build - no mask: phase 18 has not shipped, so the gate proves the arithmetic
+      # against fixtures and prints what it does not prove at the end of every run.
+      # See docs/progress/PHASE-19-EXIT.md conditions C1 to C3.
+      - name: phase 19 verify - policy, lighting, pairing, shaping, shine, governor
+        run: cargo run --release --package aura-cli -- verify --phase 19 --work target/phase19-verify
+
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
     name: ui type-check, tests and build
@@ -169,6 +176,18 @@ jobs:
       - name: develop budgets
         run: cargo test --release --package aura-perf --test develop_budgets -- --nocapture
 
+      # PHASE-19 section 10.1, as a test suite. Six of its seven gates are measured
+      # here; the seventh is an expert study over four hundred frames and is
+      # condition C3 rather than a number.
+      - name: local light evaluation gates
+        run: cargo test --release --package aura-brain-photo --test local_eval -- --nocapture
+
+      # PHASE-19 section 11. The render row is waived twice over - no GPU backend
+      # and no phase 18 matte to apply through - so what is asserted is the
+      # processor path and the store.
+      - name: local light budgets
+        run: cargo test --release --package aura-perf --test local_budgets -- --nocapture
+
       # Two independent implementations of the metrics have to agree, or neither
       # is trustworthy. The Python half also self-tests without cargo.
       - name: python evaluation self-tests
@@ -177,3 +196,5 @@ jobs:
           python ml/models/embed/train_contrastive.py --dry-run
           python ml/models/embed/eval_retrieval.py --self-test
           python ml/models/embed/export.py --placeholder --verify models
+          python ml/models/local/train_light_targets.py --self-test
+          python ml/models/local/eval_local.py --self-test

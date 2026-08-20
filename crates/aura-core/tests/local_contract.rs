@@ -58,10 +58,7 @@ fn no_two_reason_codes_share_a_slug() {
 fn the_withdrawals_are_the_ones_that_decline_to_act() {
     // Fourteen, and the module header says so. A build that adds a code without deciding
     // whether it is a withdrawal changes this number and has to say why.
-    let withdrawals = LocalCode::ALL
-        .iter()
-        .filter(|c| c.is_withdrawal())
-        .count();
+    let withdrawals = LocalCode::ALL.iter().filter(|c| c.is_withdrawal()).count();
     assert_eq!(withdrawals, 14, "the withdrawal set moved");
 }
 
@@ -91,7 +88,11 @@ fn every_code_belongs_to_an_operation_or_to_the_plan() {
 #[test]
 fn the_priority_order_is_the_only_priority_order() {
     assert_eq!(LocalOp::PRIORITY.len(), LocalOp::COUNT);
-    assert_eq!(LocalOp::FaceLight.rank(), 0, "face lighting has first claim");
+    assert_eq!(
+        LocalOp::FaceLight.rank(),
+        0,
+        "face lighting has first claim"
+    );
     assert_eq!(
         LocalOp::DodgeBurnMid.rank(),
         LocalOp::COUNT - 1,
@@ -135,7 +136,11 @@ fn three_zones_may_only_ever_be_lifted() {
         .collect();
     assert_eq!(
         dodge_only,
-        vec![FaceZone::UnderEye, FaceZone::Cheekbone, FaceZone::NoseBridge],
+        vec![
+            FaceZone::UnderEye,
+            FaceZone::Cheekbone,
+            FaceZone::NoseBridge
+        ],
         "the dodge-only set moved; a shaping map can now put a shadow under somebody's eyes"
     );
     for zone in FaceZone::ALL {
@@ -196,7 +201,9 @@ fn an_unreadable_field_says_what_is_wrong_with_it() {
 #[test]
 fn coverage_is_a_fraction_of_the_frame() {
     let mut half = field(1.0, 1.0);
-    half.alpha = vec![255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0];
+    half.alpha = vec![
+        255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
     assert!((half.coverage() - 0.5).abs() < 1e-6);
 }
 

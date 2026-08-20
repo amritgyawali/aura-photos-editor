@@ -165,7 +165,11 @@ max_face_lift_ev = 0.6
 rationale = "shaping matters more than faces here"
 "#;
     let refused = PolicyTable::parse("test", text).expect_err("refused");
-    assert!(refused.detail.contains("dodge_burn_low"), "{}", refused.detail);
+    assert!(
+        refused.detail.contains("dodge_burn_low"),
+        "{}",
+        refused.detail
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -342,7 +346,10 @@ fn shaping_never_moves_the_mid_frequency_band_past_its_tolerance() {
     assert!(
         maps.texture_preserved(),
         "the shaping moved the texture band by {:?}",
-        maps.faces.iter().map(|f| f.band_drift()).collect::<Vec<_>>()
+        maps.faces
+            .iter()
+            .map(|f| f.band_drift())
+            .collect::<Vec<_>>()
     );
     for face in &maps.faces {
         assert!(face.band_drift() <= MID_BAND_TOLERANCE + 1e-4);
@@ -459,7 +466,9 @@ fn every_operation_is_gated_when_its_mask_is_absent() {
         .collect();
     for op in LocalOp::PRIORITY {
         // A scene that declines an operation does not gate it - it never asked for it.
-        let policy = PolicyTable::embedded().expect("policy").get(frame.context.scene);
+        let policy = PolicyTable::embedded()
+            .expect("policy")
+            .get(frame.context.scene);
         if policy.declines(op) {
             continue;
         }
@@ -783,6 +792,78 @@ fn the_two_luminosity_curves_agree_within_the_encoding() {
             (decision - render).abs() < 0.02,
             "at {linear}: {decision} against {render}"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The documentation is written against the vocabulary, and a test says so
+// ---------------------------------------------------------------------------
+
+/// Collapse every run of whitespace to one space.
+///
+/// The doc wraps at ninety-odd columns, so a sentence in it is the same sentence with the
+/// newlines in different places. Comparing on the collapsed form is what makes the assertion
+/// about the *words* rather than about the line breaks.
+fn flattened(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+#[test]
+fn every_reason_code_is_documented_in_the_products_own_words() {
+    // Section 9 gives DOC "explain local light shaping and how to tune strength", which is
+    // only a finishable job if the vocabulary is enumerable. Phases 11, 12 and 15 wrote this
+    // test for their own codes; this is the same test four phases later, and it is the reason
+    // a new reason code cannot ship without a sentence a photographer can read.
+    //
+    // It asserts on the **sentence** rather than on the slug, which is stricter than phase
+    // 12's version and deliberately: a document that listed thirty slugs and explained
+    // twenty-eight of them would pass that test and fail a reader.
+    let doc = flattened(
+        &std::fs::read_to_string("../../docs/local-light.md")
+            .expect("docs/local-light.md must exist"),
+    );
+    for code in LocalCode::ALL {
+        assert!(
+            doc.contains(&flattened(code.user_text())),
+            "`{}` has no sentence in docs/local-light.md",
+            code.as_str()
+        );
+    }
+}
+
+#[test]
+fn every_withdrawal_is_marked_as_one_in_the_documentation() {
+    // Fourteen of the thirty codes describe something the product declined to do, and that is
+    // the point of the phase rather than a footnote. The doc marks each of them in italics,
+    // and this asserts the count matches so a code that changed sides does not quietly lose
+    // its mark.
+    let doc = std::fs::read_to_string("../../docs/local-light.md")
+        .expect("docs/local-light.md must exist");
+    let claimed = doc.matches("Fourteen of the thirty").count();
+    assert_eq!(
+        claimed, 1,
+        "docs/local-light.md must state how many codes are withdrawals"
+    );
+    let withdrawals = LocalCode::ALL.iter().filter(|c| c.is_withdrawal()).count();
+    assert_eq!(
+        withdrawals, 14,
+        "the withdrawal count moved and docs/local-light.md still says fourteen"
+    );
+}
+
+#[test]
+fn every_mask_kind_and_face_zone_is_nameable_by_a_photographer() {
+    // Not a documentation test - a *vocabulary* test. The panel renders a gate as "AURA could
+    // not find the background", which needs every mask kind to have words, and it lists a
+    // shaping move by name, which needs every zone to. A variant with no words is a variant
+    // the panel renders as a slug.
+    for kind in MaskKind::ALL {
+        assert!(!kind.as_str().is_empty());
+        assert!(!kind.as_recipe_str().is_empty());
+    }
+    for zone in aura_core::contract::local::FaceZone::ALL {
+        assert!(!zone.as_str().is_empty());
+        assert!(zone.as_str().contains(|c: char| c.is_ascii_lowercase()));
     }
 }
 

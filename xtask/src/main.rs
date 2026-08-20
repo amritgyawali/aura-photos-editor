@@ -31,6 +31,11 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0012_selection.sql",
     "crates/aura-catalog/migrations/0013_ledger.sql",
     "crates/aura-catalog/migrations/0014_develop.sql",
+    // Added in PHASE-19. 0015 was missing from this list, which was a phase 15 oversight
+    // rather than a decision: every other migration since 0001 is frozen and a schema change
+    // needs an ADR and a re-lock. Both are here now.
+    "crates/aura-catalog/migrations/0015_tone.sql",
+    "crates/aura-catalog/migrations/0016_local_light.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

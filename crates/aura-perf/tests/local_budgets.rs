@@ -164,10 +164,9 @@ fn the_storage_cost_of_one_plan_is_measured_rather_than_assumed() {
         "  a 4,000-image wedding costs about {:.1} MB",
         per_image as f64 * 4_000.0 / 1_048_576.0
     );
-    if let Err(reason) = budgets().check_size(
-        "local_store_per_1000_images",
-        after.saturating_sub(before),
-    ) {
+    if let Err(reason) =
+        budgets().check_size("local_store_per_1000_images", after.saturating_sub(before))
+    {
         panic!("{reason}");
     }
 }

@@ -105,9 +105,7 @@ pub use integrity::{
     Analyser, Calibration, CalibrationTable, FrameContext, FrameExif, Integrity, IntegrityPass,
     IntegrityStore, PassReport, ANALYSIS_VER, INTEGRITY_LEVEL, MODEL_VER,
 };
-pub use local::{
-    Local, LocalPass, LocalStore, PolicyTable, ScenePolicy, LOCAL_LEVEL, SHAPING_VER,
-};
+pub use local::{Local, LocalPass, LocalStore, PolicyTable, ScenePolicy, LOCAL_LEVEL, SHAPING_VER};
 pub use tone::{
     AsShot, LocusBuilder, Mood, SceneTarget, TargetTable, Tone, TonePass, ToneStore, TONE_LEVEL,
 };

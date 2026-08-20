@@ -30,7 +30,6 @@
 //! **No command normalises a gallery.** Nothing here reads a second photograph. That is
 //! phase 25.
 
-use aura_brain_photo::local::store::LocalStore;
 use aura_core::contract::local::{
     LocalCode, LocalLightPlan, LocalOp, LocalOverride, LocalReason, LocalService, MaskKind,
 };
@@ -243,7 +242,7 @@ fn write_recipes(
     let mut written = 0_u32;
     let mut protected = 0_u32;
 
-    for photo in all_planned(state, project)? {
+    for photo in state.local_store().planned(project)? {
         if cancel.is_cancelled() {
             break;
         }
@@ -267,16 +266,6 @@ fn write_recipes(
         written = written.saturating_add(1);
     }
     Ok((written, protected))
-}
-
-/// Every photograph in a project that has a plan.
-fn all_planned(state: &AppState, project: &ProjectId) -> Result<Vec<PhotoId>, IpcError> {
-    let store: std::sync::Arc<LocalStore> = state.local_store();
-    // Everything with no plan at *any* version, subtracted from everything: the pending query
-    // is the one the store already owns, and asking it twice is cheaper than a second query
-    // that could disagree with it about what "planned" means.
-    let all = store.pending(project, (0, 0, 0, 0))?;
-    Ok(all)
 }
 
 /// The base recipe with this plan's masks.
@@ -577,7 +566,10 @@ mod tests {
         assert_eq!(out.masks.len(), 1);
         assert!((out.global.exposure - base.global.exposure).abs() < f32::EPSILON);
         assert_eq!(out.global.temperature, base.global.temperature);
-        assert!(out.retouch.is_empty(), "phase 19 must not write a retouch op");
+        assert!(
+            out.retouch.is_empty(),
+            "phase 19 must not write a retouch op"
+        );
     }
 
     #[test]

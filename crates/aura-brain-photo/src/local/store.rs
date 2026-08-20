@@ -37,9 +37,9 @@ use aura_catalog::Catalog;
 use aura_core::clock::Clock;
 use aura_core::contract::integrity::CropRect;
 use aura_core::contract::local::{
-    BackgroundBalanceDelta, DodgeBurnMaps, FaceLightDelta, FaceShaping, FaceZone, ImageId,
-    LocalCode, LocalLightPlan, LocalOp, LocalOutline, LocalOverride, LocalReason, MaskKind,
-    ShapingZone, ShineReduction, SubjectEnhanceDelta, REVIEW_BELOW, SHAPING_SIDE,
+    BackgroundBalanceDelta, DodgeBurnMaps, FaceLightDelta, FaceShaping, ImageId, LocalCode,
+    LocalLightPlan, LocalOp, LocalOutline, LocalOverride, LocalReason, MaskKind, ShineReduction,
+    SubjectEnhanceDelta, REVIEW_BELOW, SHAPING_SIDE,
 };
 use aura_core::errors::db::statement_failed;
 use aura_core::{AuraResult, IdentityId, PhotoId, ProjectId, SceneId};
@@ -160,6 +160,41 @@ impl LocalStore {
             while let Some(row) = cursor
                 .next()
                 .map_err(|e| statement_failed("could not read the pending set", &e))?
+            {
+                let text: String = row.get(0).unwrap_or_default();
+                if let Ok(id) = PhotoId::from_db(&text) {
+                    out.push(id);
+                }
+            }
+            Ok(out)
+        })
+    }
+
+    /// Every photograph in a project that has a plan, in id order.
+    ///
+    /// What the IPC layer walks when it carries plans into recipes. Separate from
+    /// [`LocalStore::pending`], which answers the opposite question and would return every
+    /// photograph in the project if it were asked this one.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the query fails.
+    pub fn planned(&self, project: &ProjectId) -> AuraResult<Vec<PhotoId>> {
+        let key = project.to_db();
+        self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare(
+                    "SELECT photo_id FROM local_light_plan
+                      WHERE project_id = ?1 ORDER BY photo_id",
+                )
+                .map_err(|e| statement_failed("could not list the planned frames", &e))?;
+            let mut cursor = statement
+                .query(params![key])
+                .map_err(|e| statement_failed("could not list the planned frames", &e))?;
+            let mut out = Vec::new();
+            while let Some(row) = cursor
+                .next()
+                .map_err(|e| statement_failed("could not read a planned frame", &e))?
             {
                 let text: String = row.get(0).unwrap_or_default();
                 if let Ok(id) = PhotoId::from_db(&text) {
@@ -482,8 +517,7 @@ impl LocalStore {
                     mask_scale: 0.0,
                 })
             };
-            let dodge_burn =
-                rebuild_shaping(&decode_shaping(&stored.shaping), stored.shaping_ver);
+            let dodge_burn = rebuild_shaping(&decode_shaping(&stored.shaping), stored.shaping_ver);
             Ok(Some(LocalLightPlan {
                 image_id: image,
                 face_light: faces,
@@ -596,8 +630,14 @@ impl LocalStore {
                 .next()
                 .map_err(|e| statement_failed("could not read a gate", &e))?
             {
-                let op = row.get::<_, String>(0).ok().and_then(|t| LocalOp::parse(&t));
-                let kind = row.get::<_, String>(1).ok().and_then(|t| MaskKind::parse(&t));
+                let op = row
+                    .get::<_, String>(0)
+                    .ok()
+                    .and_then(|t| LocalOp::parse(&t));
+                let kind = row
+                    .get::<_, String>(1)
+                    .ok()
+                    .and_then(|t| MaskKind::parse(&t));
                 if let (Some(op), Some(kind)) = (op, kind) {
                     out.push((op, kind));
                 }
@@ -612,7 +652,11 @@ impl LocalStore {
     ///
     /// `AURA-DB-3006` when the read fails.
     #[allow(clippy::too_many_lines)]
-    pub fn outline(&self, project: &ProjectId, unpolicied: Vec<String>) -> AuraResult<LocalOutline> {
+    pub fn outline(
+        &self,
+        project: &ProjectId,
+        unpolicied: Vec<String>,
+    ) -> AuraResult<LocalOutline> {
         let key = project.to_db();
         self.catalog.read(move |conn| {
             let (photos, planned, acted_on, group_solved, shine_reduced, user_edited, needs_review): (
@@ -1112,9 +1156,8 @@ fn decode_reasons(text: &str) -> Vec<LocalReason> {
                 .unwrap_or_default();
             let weight = row.get(1).and_then(Value::as_f64).unwrap_or(0.0) as f32;
             let evidence = row.get(2).and_then(Value::as_array).map(|rect| {
-                let value = |index: usize| {
-                    rect.get(index).and_then(Value::as_f64).unwrap_or(0.0) as f32
-                };
+                let value =
+                    |index: usize| rect.get(index).and_then(Value::as_f64).unwrap_or(0.0) as f32;
                 CropRect {
                     x: value(0),
                     y: value(1),
@@ -1158,8 +1201,7 @@ fn decode_boxes(text: &str) -> Vec<CropRect> {
         .iter()
         .filter_map(|item| {
             let row = item.as_array()?;
-            let value =
-                |index: usize| row.get(index).and_then(Value::as_f64).unwrap_or(0.0) as f32;
+            let value = |index: usize| row.get(index).and_then(Value::as_f64).unwrap_or(0.0) as f32;
             Some(CropRect {
                 x: value(0),
                 y: value(1),

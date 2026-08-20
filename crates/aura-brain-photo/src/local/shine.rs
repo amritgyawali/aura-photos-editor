@@ -147,7 +147,8 @@ fn cluster(cells: &[(usize, usize, f32)], face: CropRect, area_of_face: f32) -> 
     let mut seen = vec![false; SEARCH_SIDE * SEARCH_SIDE];
     let mut spots: Vec<Spot> = Vec::new();
     for start in 0..(SEARCH_SIDE * SEARCH_SIDE) {
-        if !occupied.get(start).copied().unwrap_or(false) || seen.get(start).copied().unwrap_or(true)
+        if !occupied.get(start).copied().unwrap_or(false)
+            || seen.get(start).copied().unwrap_or(true)
         {
             continue;
         }

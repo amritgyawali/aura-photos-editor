@@ -19,8 +19,8 @@ use aura_core::contract::integrity::CropRect;
 use aura_core::contract::local::{MaskField, MaskKind};
 use aura_core::contract::people::FaceRef;
 use aura_core::{FaceId, IdentityId, SceneId};
-use uuid::Uuid;
 use aura_raw::contract::pixels::{ColourSpace, PixelBuffer, PixelData, PixelSource};
+use uuid::Uuid;
 
 use crate::local::plan::FrameContext;
 
@@ -233,10 +233,10 @@ pub fn background_mask(rects: &[CropRect]) -> MaskField {
         let rect = rect.clamped();
         let x0 = (rect.x * f32::from(field.width)) as usize;
         let y0 = (rect.y * f32::from(field.height)) as usize;
-        let x1 = (((rect.x + rect.w) * f32::from(field.width)) as usize)
-            .min(usize::from(field.width));
-        let y1 = (((rect.y + rect.h) * f32::from(field.height)) as usize)
-            .min(usize::from(field.height));
+        let x1 =
+            (((rect.x + rect.w) * f32::from(field.width)) as usize).min(usize::from(field.width));
+        let y1 =
+            (((rect.y + rect.h) * f32::from(field.height)) as usize).min(usize::from(field.height));
         for y in y0..y1 {
             for x in x0..x1 {
                 if let Some(slot) = field.alpha.get_mut(y * usize::from(field.width) + x) {

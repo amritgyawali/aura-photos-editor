@@ -48,10 +48,7 @@ pub const ENCODING_GAMMA: f32 = 2.2;
 /// Rec.2020 luminance of a linear triple.
 #[must_use]
 pub fn luma(rgb: [f32; 3]) -> f32 {
-    0.262_700f32.mul_add(
-        rgb[0],
-        0.677_998f32.mul_add(rgb[1], 0.059_302 * rgb[2]),
-    )
+    0.262_700f32.mul_add(rgb[0], 0.677_998f32.mul_add(rgb[1], 0.059_302 * rgb[2]))
 }
 
 /// How much of a lift this pixel should receive, `0..1`.
@@ -260,7 +257,10 @@ mod tests {
                     edit <= full + 1e-5,
                     "at {linear} the edit peaked at alpha {alpha}: {edit} against {full}"
                 );
-                assert!(edit >= previous - 1e-5, "the edit weakened at alpha {alpha}");
+                assert!(
+                    edit >= previous - 1e-5,
+                    "the edit weakened at alpha {alpha}"
+                );
                 previous = edit;
             }
         }
@@ -312,8 +312,14 @@ mod tests {
         for channel in 0..3 {
             let a = before[channel] - grey_before;
             let b = after[channel] - grey_after;
-            assert!(a.signum() == b.signum() || b.abs() < 1e-6, "channel {channel}");
-            assert!(b.abs() <= a.abs() + 1e-6, "channel {channel} got more saturated");
+            assert!(
+                a.signum() == b.signum() || b.abs() < 1e-6,
+                "channel {channel}"
+            );
+            assert!(
+                b.abs() <= a.abs() + 1e-6,
+                "channel {channel} got more saturated"
+            );
         }
     }
 
@@ -343,6 +349,9 @@ mod tests {
         // A sixth of a stop is 33 units. Even the full i8 range must stay small enough that a
         // shaping map cannot be mistaken for an exposure adjustment.
         let out = apply_shaping(grey(0.18), 127, 0, 1.0);
-        assert!(out[0] < 0.18 * 2.0f32.powf(0.64), "127 units is more than 0.64 EV");
+        assert!(
+            out[0] < 0.18 * 2.0f32.powf(0.64),
+            "127 units is more than 0.64 EV"
+        );
     }
 }

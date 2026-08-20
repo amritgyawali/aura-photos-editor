@@ -197,7 +197,12 @@ impl Analyser {
     /// Plan one photograph.
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn analyse(&self, pixels: &PixelBuffer, image: ImageId, ctx: &FrameContext) -> FrameOutcome {
+    pub fn analyse(
+        &self,
+        pixels: &PixelBuffer,
+        image: ImageId,
+        ctx: &FrameContext,
+    ) -> FrameOutcome {
         let policy = self.policy.get(ctx.scene);
         let unpolicied = !policy.measured;
         let mut reasons: Vec<LocalReason> = Vec::new();
@@ -259,20 +264,14 @@ impl Analyser {
         if !gated.is_empty() {
             reasons.push(LocalReason::plain(LocalCode::MaskUnavailable, -0.25));
         }
-        if scale
-            .iter()
-            .any(|s| *s > 0.0 && *s < 1.0)
-        {
+        if scale.iter().any(|s| *s > 0.0 && *s < 1.0) {
             reasons.push(LocalReason::plain(LocalCode::MaskWeak, -0.08));
         }
 
         // 2. Face lighting.
         let short_side = pixels.width.min(pixels.height).max(1) as f32;
-        let caps = face_light::Caps::from_noise(
-            ctx.noise,
-            ctx.shadow_scale,
-            policy.max_face_lift_ev,
-        );
+        let caps =
+            face_light::Caps::from_noise(ctx.noise, ctx.shadow_scale, policy.max_face_lift_ev);
         let face_inputs = Self::face_inputs(&frame, ctx, at(&scale, LocalOp::FaceLight));
         let solved = face_light::solve(
             &face_inputs,
@@ -293,8 +292,8 @@ impl Analyser {
             (Some(subject_region), Some(background_region)) => {
                 let competition =
                     subject::Competition::measure(subject_region, background_region, blobs);
-                let mask_scale = at(&scale, LocalOp::SubjectEnhance)
-                    .min(at(&scale, LocalOp::BackgroundBalance));
+                let mask_scale =
+                    at(&scale, LocalOp::SubjectEnhance).min(at(&scale, LocalOp::BackgroundBalance));
                 if !competition.is_competing() {
                     reasons.push(LocalReason::plain(LocalCode::NoCompetitionMeasured, 0.0));
                 }
@@ -707,8 +706,8 @@ fn apply_ledger(
             delta.exposure_ev *= face_scale;
             delta.shadows = (f32::from(delta.shadows) * face_scale).round() as i16;
             delta.highlights = (f32::from(delta.highlights) * face_scale).round() as i16;
-            let ev = crate::local::measure::ev_between(delta.luma_before, delta.luma_after)
-                * face_scale;
+            let ev =
+                crate::local::measure::ev_between(delta.luma_before, delta.luma_after) * face_scale;
             delta.luma_after = apply_ev(delta.luma_before, ev);
         }
     }
@@ -723,8 +722,10 @@ fn apply_ledger(
     let background_scale = ledger.allowed(LocalOp::BackgroundBalance);
     if background_scale < 1.0 {
         background.exposure_ev *= background_scale;
-        background.highlights = (f32::from(background.highlights) * background_scale).round() as i16;
-        background.saturation = (f32::from(background.saturation) * background_scale).round() as i16;
+        background.highlights =
+            (f32::from(background.highlights) * background_scale).round() as i16;
+        background.saturation =
+            (f32::from(background.saturation) * background_scale).round() as i16;
         background.mean_luma_after = background.mean_luma_before
             + (background.mean_luma_after - background.mean_luma_before) * background_scale;
         // The two halves are one decision. Scaling the background without the subject is
@@ -774,10 +775,11 @@ fn apply_ledger(
             }
         }
     }
-    if maps
-        .as_ref()
-        .is_some_and(|m| m.faces.iter().all(|f| f.zones.is_empty() && f.evening <= 0.0))
-    {
+    if maps.as_ref().is_some_and(|m| {
+        m.faces
+            .iter()
+            .all(|f| f.zones.is_empty() && f.evening <= 0.0)
+    }) {
         *maps = None;
     }
 }
@@ -787,12 +789,12 @@ fn apply_ledger(
 /// One minus the doubts, floored. The doubts are the reason weights, which is the shape phases
 /// 09, 11 and 15 all use: a confidence assembled from a separate set of numbers is a
 /// confidence that can disagree with the sentences underneath it.
-fn confidence_of(
-    reasons: &[LocalReason],
-    unpolicied: bool,
-    gated: &[(LocalOp, MaskKind)],
-) -> f32 {
-    let doubts: f32 = reasons.iter().filter(|r| r.is_doubt()).map(|r| r.weight).sum();
+fn confidence_of(reasons: &[LocalReason], unpolicied: bool, gated: &[(LocalOp, MaskKind)]) -> f32 {
+    let doubts: f32 = reasons
+        .iter()
+        .filter(|r| r.is_doubt())
+        .map(|r| r.weight)
+        .sum();
     let mut confidence = 1.0 + doubts;
     if unpolicied {
         confidence -= UNPOLICIED_CONFIDENCE_PENALTY;

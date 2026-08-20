@@ -2,6 +2,90 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 19 - Local Light Sculpting (face lighting, subject enhancement, dodge and burn)
+
+The first phase that moves light *inside* a photograph rather than across all of it. Faces
+under a mandap are lifted through their shadows so they do not glow, a window behind the
+couple is brought down while the subject is lifted by the same amount so the frame is no
+brighter overall, sheen on a forehead is reduced as brightness rather than blurred away, and
+form is deepened the way a retoucher would without any operator in the product being able to
+reach skin texture at all.
+
+Its success condition is that none of that is visible, which is a hard thing to put in a
+panel. So the Local panel goes the other way: it shows what each face was moved by **and what
+stopped it**, shows an operation that could not run as *unavailable* rather than as off, and
+tells a photographer when a group could not be evened out completely and that nobody was
+darkened to close the gap.
+
+**Phase 18 has not shipped, so on this build every operation is gated and nothing is edited.**
+That is condition C1 of `docs/progress/PHASE-19-EXIT.md`, it is visible in the panel and in
+`LocalOutline::mask_covered`, and it is not a fault to investigate.
+
+### Added
+
+- **`aura-core::contract::local`**: the frozen `LocalLightPlan`, `MaskField`, `LocalOp` and its
+  priority order, `FaceZone`'s ten named moves, `FaceLightDelta`, `SubjectEnhanceDelta`,
+  `BackgroundBalanceDelta`, `DodgeBurnMaps`, `ShineReduction`, thirty reason codes,
+  `LocalOutline`, `LocalOverride` and `LocalService`. **There is no field anywhere in it that
+  could hold image data**, which is what makes "all local work is reversible and inspectable"
+  a property of the shape.
+- **`aura-brain-photo::local`**: fifteen modules. The per-scene policy table, one measurement
+  pass, the luminosity split that stops a lifted face glowing, a joint face solve across every
+  face in a frame, the paired subject/background move with three measured triggers,
+  three-band frequency separation whose finest band is never produced, zone-based dodge and
+  burn, specular shine detection with a luminance-only reduction, and one per-image perceptual
+  allowance that every operation spends against.
+- **Migration 16**: `local_light_plan`, `local_light_face`, `local_light_gate` and
+  `v_local_coverage`. There is no mask column, no matte and no blur, and the phase gate scans
+  the schema for one on every run.
+- **`local_light.toml`**: 22 scene rows with a written reason each. The loader refuses a row
+  with no reason and a row that shapes form harder than it lights faces.
+- **Three shaders and a processor reference**: `luminosity_mask.wgsl`, `freq_sep.wgsl` and
+  `local_apply.wgsl` - the first shader *libraries* in the product - held to
+  `aura_render::local` by six shared constants in `shader_parity.rs`.
+- **Six IPC commands** (ADR-0034) and the Local panel. No command can return a mask.
+- **`docs/local-light.md`**: what every one of the thirty notes means, in the product's own
+  words, with the group-fairness guarantee stated as what it actually is.
+- **`aura-cli verify --phase 19`**, 38 evaluation gates and two performance budgets.
+
+### Fixed
+
+- **A halo made by arithmetic that looked conservative.** `apply_face_light` evaluated its
+  luminosity weights on the partially-edited pixel, so the highlight restraint grew
+  quadratically in the matte while the lift grew linearly. Past about half coverage the
+  restraint overtook, and a bright pixel received *more* lift at the mask's edge than at its
+  centre - a bright rim. Both weights now read the input pixel and the whole edit is linear in
+  the matte, on the processor path and in the shader.
+- **A cap detector that could never fire.** The joint solve reported whether a lift had been
+  capped by comparing against the group's converged target, which has already absorbed the
+  caps. It now compares against the scene's band.
+- **A joint solve that could brighten a face past the band.** One blown face dragged the common
+  target above the scene's band and everybody else was lifted to meet it. Every move is now
+  clamped to lie between the face and the band.
+- **`0015_tone.sql` was missing from the frozen contract list.** A phase 15 oversight rather
+  than a decision; it and `0016_local_light.sql` are both locked now.
+
+### Changed
+
+- **The group-fairness guarantee is about the edit, not about the frame.** Section 10.1's
+  absolute spread threshold is unachievable on a family formal where one person is two stops
+  down under a doorway, and the two ways to satisfy it anyway - refuse to plan the frame, or
+  darken everybody else - are both worse than the problem. What is guaranteed: reach the
+  threshold whenever the caps allow, and never make a group less even than you found it.
+  ADR-0033 section 6.
+- **The shaping is stored as four numbers per face rather than as ten zones.** Every zone is a
+  pure function of the face region, the light direction and the strength. This took the table
+  from 2,236 to 1,064 bytes per image, and the panel still shows every zone by name because
+  they are regenerated on read - which is why `shaping_ver` exists.
+
+### Not done
+
+- **Phases 16, 17 and 18 were skipped**, and this phase depends on 16 and 18. Condition C4.
+- **The expert subtlety study and the four-hundred-frame halo audit do not exist**, so the
+  headline KPI of this phase is unmeasured. Condition C3.
+- **The learned targets are untrained and never consulted**; there is no corpus of expert edits
+  in this repository. Condition C2.
+
 ## Phase 15 - Exposure AI and White Balance AI (mixed lighting mastery)
 
 The first phase that decides what a photograph should look like. Exposure is set for the

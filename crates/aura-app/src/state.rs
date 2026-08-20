@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use aura_brain_photo::composition::{Composition, CompositionPass, CompositionStore};
 use aura_brain_photo::integrity::{Integrity, IntegrityPass, IntegrityStore};
-use aura_brain_photo::tone::api::FrameExif;
 use aura_brain_photo::local::{Local, LocalPass, LocalStore};
+use aura_brain_photo::tone::api::FrameExif;
 use aura_brain_photo::tone::{AsShot, Tone, TonePass, ToneStore};
 use aura_brain_wedding::emotion::{Emotion, EmotionPass, EmotionStore};
 use aura_brain_wedding::moments::{MomentStore, Moments};

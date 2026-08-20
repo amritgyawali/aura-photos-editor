@@ -345,7 +345,8 @@ mod tests {
     #[test]
     fn severity_takes_the_worst_trigger_rather_than_their_sum() {
         let one_bad = Competition::measure(region(0.30, 0.05, 0.20), region(0.95, 0.02, 0.80), 0);
-        let three_mild = Competition::measure(region(0.45, 0.05, 0.20), region(0.55, 0.13, 0.80), 1);
+        let three_mild =
+            Competition::measure(region(0.45, 0.05, 0.20), region(0.55, 0.13, 0.80), 1);
         assert!(one_bad.severity() > three_mild.severity());
         assert!(three_mild.severity() <= 1.0);
     }

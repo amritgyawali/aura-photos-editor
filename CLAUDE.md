@@ -78,6 +78,10 @@ Never load two phase files into one session.
 | Tone evaluation gates | `tests/eval/tone_eval.rs` + `ml/models/tone/eval_tone.py` |
 | What the lighting marks mean, in the product's own words | `docs/mixed-lighting.md` |
 | The skin fairness statement | `docs/skin-fairness.md` |
+| Local light decisions | `docs/adr/ADR-0033-local-light-sculpting.md` |
+| Local light policy (versioned, PM-owned) | `crates/aura-brain-photo/config/local_light.toml` |
+| Local light evaluation gates | `tests/eval/local_eval.rs` + `ml/models/local/eval_local.py` |
+| What the local light adjustments do, in the product's own words | `docs/local-light.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -482,6 +486,74 @@ Two rules that phase 15 adds and every later phase inherits:
   is correcting a cast; the defence is that nothing here has a constant it could compare a person
   against, and the phase gate scans the schema for one on every run. The Monk-scale buckets the
   evaluation needs live in `tests/eval` and never reach the catalog.
+
+Phase 19 is implemented conditionally, **out of order**: the phase document depends on phases
+15, 16 and 18, and 16, 17 and 18 do not exist in this repository. `aura-core::contract::local`
+freezes `LocalLightPlan`, the `MaskField` input port phase 18 fills, six operations and their
+priority order, ten named face zones, thirty reason codes, the outline, the override and
+`LocalService`; `aura-brain-photo::local` measures the frame once, splits a lift so shadows
+move and highlights barely do, solves every face in a frame together, pairs a subject
+enhancement with a matching background reduction, separates three frequency bands and returns
+two, places ten retoucher's moves and derives the dodge-and-burn map from them, finds specular
+sheen and reduces luminance only, and spends every one of those against one per-image
+perceptual allowance. Migration 16 stores the plan, the lit faces and the gates; 22
+argued-over policy rows live in editable config; three shaders ship with the processor
+reference they are held to; six IPC commands (ADR-0034) feed a Local panel; and
+`aura-cli verify --phase 19` is the executable gate. Its exit report is
+`docs/progress/PHASE-19-EXIT.md`.
+
+**Phase 18 has not shipped, so on this build every operation is gated and nothing is edited.**
+`MaskField` is the only route to a mask and `aura-brain-photo::local` contains no generator,
+no segmentation model and no geometric fallback - because a rectangle's edge does not follow a
+person, and an edit through one leaves the bright rim this phase exists to avoid. Every quality
+gate was measured against fixtures whose masks are perfect by construction. That is condition
+C1, it is a Sev 2 trigger, and **no later phase may claim a local-light quality result until
+phase 18 lands and the gates are re-measured against real mattes.** Condition C2 is the
+untrained target head, C3 is the missing expert subtlety study - which means **the headline KPI
+of this phase is unmeasured** - and C4 is the two skipped dependencies.
+
+Three rules that phase 19 adds and every later phase inherits:
+
+- **`LocalService` is the only way to ask how light was shaped inside a photograph.**
+  Thirteenth service of its kind. Phase 20 retouches skin this phase has already evened and
+  must not do it twice; `idx_local_evened` is that query. Two answers to "what did we do to
+  this face" is a portrait that gets lifted twice.
+- **The per-image perceptual allowance is shared, stored and checked by the schema.** Six
+  individually defensible adjustments are how a gallery quietly starts looking processed.
+  Phase 20 adds a seventh operation and inherits the allowance rather than getting its own,
+  and `LocalOp::PRIORITY` decides what is given up: face lighting has the first claim and
+  dodge and burn the last, because a photographer would not miss the shaping.
+- **A phase that consumes another phase's output owns no fallback for it.** When the field
+  does not arrive the operation is *gated*, named in `gated_by_mask_quality` and reported in
+  `LocalOutline::mask_covered`. A frame nobody could mask and a frame that needed nothing must
+  never be the same query.
+
+Three things phase 19 got wrong first, all found by its own gates, all worth generalising:
+
+**A weight evaluated on a partially-edited value is not linear in its own strength.**
+`apply_face_light` read its luminosity weights off the pixel *after* the exposure had moved, so
+the highlight restraint grew quadratically in the mask's alpha while the lift grew linearly.
+Past about half coverage the restraint overtook and a bright pixel received more lift at the
+mask's edge than at its centre - which is a bright rim, made by arithmetic that looked
+conservative. Any masked operator has this trap: **the weight must read the input.**
+
+**A converged target cannot be used to detect its own constraints.** The joint face solve asked
+"was this lift capped" by comparing against the group's common target, which had already
+absorbed the caps in order to be reachable. Nothing was ever reported as capped and every unit
+test passed. Compare against what was *wanted*, not against what was agreed.
+
+**Section 10.1's edge-gradient halo test cannot be implemented as written.** Every local
+brightening increases the step at its own boundary - that is what "local" means - so a
+before/after gradient ratio scores the edit's size. Two refinements are also wrong and
+ADR-0033 section 7 records why. What a halo is, is an edit that is stronger further from the
+subject than nearer to it.
+
+And one guarantee phase 19 deliberately weakened, which phases 20 and 25 will meet again:
+**section 10.1's absolute group-fairness threshold is unachievable**, because a family formal
+where one person is two stops down under a doorway cannot be evened without either refusing to
+plan the frame or darkening everybody else. What is guaranteed instead is about the *edit*:
+reach the threshold whenever the caps allow, and never make a group less even than you found
+it. ADR-0033 section 6, and `docs/local-light.md` says the same thing in the product's voice.
 
 Four decisions in phase 15 are worth remembering because they will be re-argued. **The
 white-balance confidence is built on agreement between the top two answers, not on the cost gap

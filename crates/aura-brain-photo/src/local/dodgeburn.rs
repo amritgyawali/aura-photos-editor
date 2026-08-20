@@ -443,7 +443,10 @@ mod tests {
         let a = grid(region, &zones);
         let b = grid(region, &zones);
         assert_eq!(a, b);
-        assert_eq!(a.len(), usize::from(SHAPING_SIDE) * usize::from(SHAPING_SIDE));
+        assert_eq!(
+            a.len(),
+            usize::from(SHAPING_SIDE) * usize::from(SHAPING_SIDE)
+        );
         // A sixth of a stop is 33 units; overlapping zones may add, but not without bound.
         assert!(a.iter().all(|v| v.abs() < 100));
     }

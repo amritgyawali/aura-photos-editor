@@ -83,9 +83,7 @@ pub fn split(total_ev: f32, mean_luma: f32) -> (f32, i16, i16) {
     let shadow_ev = total_ev * share;
     let exposure_ev = total_ev - shadow_ev;
     let shadows = (shadow_ev * SHADOWS_PER_EV).round().clamp(0.0, 100.0) as i16;
-    let highlights = (-(total_ev * HIGHLIGHTS_PER_EV))
-        .round()
-        .clamp(-100.0, 0.0) as i16;
+    let highlights = (-(total_ev * HIGHLIGHTS_PER_EV)).round().clamp(-100.0, 0.0) as i16;
     (exposure_ev, shadows, highlights)
 }
 
@@ -103,7 +101,9 @@ pub fn feather_for(side: f32) -> f32 {
     // edge on a large face against hair is the classic halo, and section 12's first row names
     // it.
     let large = (side / 0.35).clamp(0.0, 1.0);
-    0.30f32.mul_add(large, 0.85 * (1.0 - large)).clamp(0.30, 0.85)
+    0.30f32
+        .mul_add(large, 0.85 * (1.0 - large))
+        .clamp(0.30, 0.85)
 }
 
 /// Fill the three fields of a delta from a solved lift.

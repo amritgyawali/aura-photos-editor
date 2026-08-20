@@ -316,7 +316,10 @@ impl MaskKind {
     /// does.
     #[must_use]
     pub const fn is_writable(self) -> bool {
-        matches!(self, Self::Face | Self::Subject | Self::Background | Self::Skin)
+        matches!(
+            self,
+            Self::Face | Self::Subject | Self::Background | Self::Skin
+        )
     }
 }
 
@@ -1226,7 +1229,9 @@ impl LocalCode {
     #[must_use]
     pub const fn user_text(self) -> &'static str {
         match self {
-            Self::FaceLit => "the light on this face was lifted to match the rest of this part of the day",
+            Self::FaceLit => {
+                "the light on this face was lifted to match the rest of this part of the day"
+            }
             Self::FaceAlreadyInBand => {
                 "the faces here were already lit the way this kind of photograph should be, so \
                  nothing was changed"
@@ -1362,9 +1367,7 @@ impl LocalCode {
             | Self::LiftCappedByBudget
             | Self::GroupSolvedJointly
             | Self::GroupSpreadCapped => Some(LocalOp::FaceLight),
-            Self::SubjectSeparated | Self::SubjectBackgroundPaired => {
-                Some(LocalOp::SubjectEnhance)
-            }
+            Self::SubjectSeparated | Self::SubjectBackgroundPaired => Some(LocalOp::SubjectEnhance),
             Self::NoCompetitionMeasured
             | Self::BackgroundLumaReduced
             | Self::BackgroundChromaReduced

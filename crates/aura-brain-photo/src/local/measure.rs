@@ -236,7 +236,13 @@ impl FrameMeasure {
         let mut values = Vec::with_capacity(w * h);
         for y in y0..y1 {
             for x in x0..x1 {
-                values.push(self.luma.values.get(y * self.width + x).copied().unwrap_or(0.0));
+                values.push(
+                    self.luma
+                        .values
+                        .get(y * self.width + x)
+                        .copied()
+                        .unwrap_or(0.0),
+                );
             }
         }
         LumaPlane {
