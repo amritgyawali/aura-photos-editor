@@ -1475,3 +1475,72 @@ summary      = "The texture guarantee forced a gentler retouch, or withdrew one"
 user_message = "AURA used gentler retouching on some photographs, or none at all, so that skin kept its own texture. Nothing has been damaged."
 runbook      = "docs/runbooks/AURA-ML-5095.md"
 introduced   = "PHASE-20"
+
+# Phase 21. The micro-retouch suite, ML 5096-5101. The same five shapes phases
+# 09, 11, 15, 19 and 20 use - version drift, one item that could not be done, a
+# refused edit, a refused config file and a region that could not be used - plus
+# one that is this phase's own: the naturalness guard made an operation gentler
+# or withdrew a family of them. That last one is not a failure to fix; it is the
+# mechanism working, and it is registered so a photographer can find out it
+# happened rather than wondering why one frame looks different from the next.
+#
+# There is deliberately no code for a cross-frame borrow. A borrow that happens
+# is a reason on the plan (`micro_borrowed_from_sibling`), a row in `micro_op`
+# and a line in the delivery report; a borrow that is refused is one of two other
+# reasons. None of the three is an error, and registering one would put the most
+# consequential thing this phase does into a channel a photographer only reads
+# when something has gone wrong.
+
+[[error]]
+code         = "AURA-ML-5096"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored micro-retouch plans came from different heads, arithmetic or matrix"
+user_message = "AURA has improved the small fixes it makes, so it is re-checking this wedding in the background. Anything you have already changed is kept."
+runbook      = "docs/runbooks/AURA-ML-5096.md"
+introduced   = "PHASE-21"
+
+[[error]]
+code         = "AURA-ML-5097"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph's small fixes could not be worked out"
+user_message = "AURA could not work out the small fixes for one photograph, and has left that photograph alone. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5097.md"
+introduced   = "PHASE-21"
+
+[[error]]
+code         = "AURA-ML-5098"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A change to which small fixes are permitted was refused"
+user_message = "AURA could not record that change. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5098.md"
+introduced   = "PHASE-21"
+
+[[error]]
+code         = "AURA-ML-5099"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The micro-retouch matrix file was refused"
+user_message = "AURA could not load the settings that decide which small fixes it may make, so it has not made any. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5099.md"
+introduced   = "PHASE-21"
+
+[[error]]
+code         = "AURA-ML-5100"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A region was unusable, so a small fix was skipped"
+user_message = "AURA is not sure enough where hair, teeth, eyes or clothing are in some photographs, so it left those areas alone. Nothing has been damaged."
+runbook      = "docs/runbooks/AURA-ML-5100.md"
+introduced   = "PHASE-21"
+
+[[error]]
+code         = "AURA-ML-5101"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The naturalness guard made an operation gentler, or withdrew a family"
+user_message = "AURA made some of its small fixes more gently, or not at all, so that hair, teeth and eyes still look like themselves. Nothing has been damaged."
+runbook      = "docs/runbooks/AURA-ML-5101.md"
+introduced   = "PHASE-21"

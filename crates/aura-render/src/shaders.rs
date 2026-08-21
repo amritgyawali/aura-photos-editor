@@ -70,8 +70,25 @@ pub const INPAINT_PATCH: &str = include_str!("../shaders/inpaint_patch.wgsl");
 /// drift this test exists to catch.
 pub const RETOUCH_APPLY: &str = include_str!("../shaders/retouch_apply.wgsl");
 
+/// PHASE-21. The micro-retouch operators: flyaway, teeth, sclera and iris, through phase 18's
+/// regions.
+///
+/// A library rather than a stage, for the reason [`INPAINT_PATCH`] and [`FREQ_BANDS`] are: the
+/// micro operations run inside the retouch stage phase 20 already owns, one dispatch per
+/// operation, and a second entry in `graph::ORDER` would be a change to a frozen contract for no
+/// behavioural reason.
+pub const MICRO_APPLY: &str = include_str!("../shaders/micro_apply.wgsl");
+
+/// PHASE-21. Glare: the conservative reduction, and the composite of an aligned sibling patch.
+///
+/// It composites and does not decide what may be composited - the specular test, the area cap
+/// and the alignment search all happen in `aura_retouch::micro::borrow` first, and the patch
+/// arrives as pixels rather than as a source and a transform so that the decision cannot be
+/// re-made here by accident.
+pub const MICRO_BORROW: &str = include_str!("../shaders/micro_borrow.wgsl");
+
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 12] = [
+pub const SOURCES: [(&str, &str); 14] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
@@ -84,6 +101,8 @@ pub const SOURCES: [(&str, &str); 12] = [
     ("freq_bands.wgsl", FREQ_BANDS),
     ("inpaint_patch.wgsl", INPAINT_PATCH),
     ("retouch_apply.wgsl", RETOUCH_APPLY),
+    ("micro_apply.wgsl", MICRO_APPLY),
+    ("micro_borrow.wgsl", MICRO_BORROW),
 ];
 
 /// The entry point name for a stage. `exposure` becomes `stage_exposure`.
@@ -172,6 +191,49 @@ pub fn shared_constants() -> Vec<(&'static str, String)> {
         (
             "MAX_EVENING_MID",
             format!("{:.2}", aura_core::contract::retouch::MAX_EVENING_MID),
+        ),
+        // PHASE-21. The eight constants the micro operators share with the processor reference
+        // in `crate::micro`. Two of them decide whether an operation happens at all - the
+        // specular floor, which is what keeps a catchlight out of every operator, and the
+        // clipped floor, which is half of what permits a borrow - and the other six are the
+        // ceilings the contract owns. A shader that drifted from any of them would deliver a
+        // gallery that differs from the preview a photographer approved, on the day a backend
+        // first runs.
+        (
+            "MICRO_SPECULAR_FLOOR",
+            format!("{:.2}", crate::micro::SPECULAR_FLOOR),
+        ),
+        (
+            "MICRO_CLIPPED_FLOOR",
+            format!("{:.3}", crate::micro::CLIPPED_FLOOR),
+        ),
+        (
+            "MAX_TEETH_LUMA_EV",
+            format!("{:.2}", aura_core::contract::micro::MAX_TEETH_LUMA_EV),
+        ),
+        (
+            "MAX_TEETH_YELLOW",
+            format!("{:.2}", aura_core::contract::micro::MAX_TEETH_YELLOW),
+        ),
+        (
+            "MAX_SCLERA",
+            format!("{:.2}", aura_core::contract::micro::MAX_SCLERA),
+        ),
+        (
+            "MAX_IRIS_CLARITY",
+            format!("{:.2}", aura_core::contract::micro::MAX_IRIS_CLARITY),
+        ),
+        (
+            "MAX_FLYAWAY_STRENGTH",
+            format!("{:.2}", aura_core::contract::micro::MAX_FLYAWAY_STRENGTH),
+        ),
+        (
+            "MIN_SPECULAR_FRACTION",
+            format!("{:.2}", aura_core::contract::micro::MIN_SPECULAR_FRACTION),
+        ),
+        (
+            "MIN_ALIGNMENT",
+            format!("{:.2}", aura_core::contract::micro::MIN_ALIGNMENT),
         ),
         (
             "SHAPING_UNIT_EV",

@@ -56,3 +56,10 @@ tempfile     = { workspace = true }
 [[test]]
 name = "retouch_eval"
 path = "../../tests/eval/retouch_eval.rs"
+
+# PHASE-21's own gates, beside phase 20's rather than inside them: the two phases measure
+# different guarantees over different regions, and a single file would make a red line ambiguous
+# about which promise broke.
+[[test]]
+name = "micro_eval"
+path = "../../tests/eval/micro_eval.rs"

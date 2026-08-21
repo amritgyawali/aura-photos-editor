@@ -36,6 +36,7 @@ pub mod contract {
     pub mod integrity;
     pub mod ledger;
     pub mod local;
+    pub mod micro;
     pub mod moment;
     pub mod people;
     pub mod priority;
@@ -95,6 +96,11 @@ pub use contract::local::{
     BackgroundBalanceDelta, DodgeBurnMaps, FaceLightDelta, FaceShaping, FaceZone, LocalCode,
     LocalLightPlan, LocalOp, LocalOutline, LocalOverride, LocalReason, LocalService, MaskField,
     MaskKind, ShapingZone, ShineReduction, SubjectEnhanceDelta,
+};
+pub use contract::micro::{
+    ClothingIssue, ColourLocus, GlareMethod, MicroCode, MicroField, MicroOp, MicroOutline,
+    MicroOverride, MicroPlan, MicroReason, MicroRegion, MicroService, NaturalnessGuard,
+    NaturalnessReport, OpFamily,
 };
 pub use contract::moment::{
     CameraId, DuplicateKind, DuplicateSet, Moment, MomentEdit, MomentOutline, MomentService,

@@ -2,6 +2,44 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 21 - Micro-Retouch Suite (hair, teeth, eyes, clothing, glare)
+
+The small fixes a retoucher makes without being asked, and the first phase in which AURA can put
+pixels from one photograph into another.
+
+Stray hairs are calmed rather than erased, and only where the background behind them is quiet
+enough that a measurement can tell a strand from a twig. Teeth are evened toward their own
+brighter half and moved a little way back toward a locus centred on the frame's own neutral -
+never toward a colour, because there is no ideal-teeth constant anywhere in the code. Sclera
+redness comes out as chroma only, iris definition goes up a little, and the catchlights are
+excluded from both operations by construction rather than by a threshold applied afterwards. Lint,
+threads and small stains come off a garment; a visible strap and a crease are opt-in per studio,
+off by default, and refused by the database if anything tries to insert one anyway.
+
+Glasses glare is the operation that composites. Where a specular sheet has destroyed the record -
+more than half of it at or above the clipped floor - a sibling frame from the same moment may
+repair that small region, aligned and blended. Where the record survived, it never may: a closed
+eye *is* the record, and borrowing one is excluded permanently rather than deferred. **Every
+borrow is disclosed in five places** - the operation, the plan, the project header, the composites
+view and the delivery report - and a database trigger aborts any attempt to take a borrow's source
+away.
+
+The headline claim is three measurements rather than a promise. Every photograph carries what the
+plan did to its catchlights, to its hair region's edge energy, and to how far its teeth sit from
+the locus, all measured by running the plan through the real renderer. A family that misses its
+floor is re-solved at three quarters strength up to three times and then **withdrawn** - per
+family, so a frame whose teeth could not be evened safely still gets its lint removed.
+
+A studio chooses which of these operations run. It cannot choose how far any of them goes: there
+is no strength field on the wire, and the config file can lower a ceiling and never raise one.
+`docs/retouch-ethics.md` is the list of what this product will not do, and every item on it is
+enforced by there being nowhere to express it.
+
+**All three shipped heads are untrained and none is consulted, phase 06 finds no faces, and no
+region reaches this pass from phase 18** - so on this build nothing is micro-retouched on a real
+photograph. That is condition C1 of `docs/progress/PHASE-21-EXIT.md`, and the naturalness audit
+that would be this phase's headline result is condition C2.
+
 ## Phase 20 - Portrait Retouch AI (blemishes, protected features, texture protection)
 
 The first phase that changes what a person's skin looks like, and the one with the least room

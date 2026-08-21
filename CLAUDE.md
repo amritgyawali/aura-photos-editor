@@ -96,6 +96,10 @@ Never load two phase files into one session.
 | Retouch presets and per-scene limits (versioned, PM-owned) | `crates/aura-retouch/config/retouch_presets.toml` |
 | Retouch evaluation gates | `tests/eval/retouch_eval.rs` + `ml/models/retouch/eval_retouch.py` |
 | What AURA does to skin, in the product's own words | `docs/retouch.md` |
+| Micro-retouch and cross-frame borrowing decisions | `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md` |
+| The opt-in matrix, ceilings and loci (versioned, PM-owned) | `crates/aura-retouch/config/micro_retouch.toml` |
+| Micro-retouch evaluation gates | `tests/eval/micro_eval.rs` + `ml/models/micro/eval_micro.py` |
+| What AURA will and will not do to somebody's appearance | `docs/retouch-ethics.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -906,6 +910,89 @@ is often no brighter or darker than the skin it sits on - it is redder. Any dete
 the falloff as well as the core, and a falloff sample is half skin - so painting the fixture spot
 brighter made its temporary probability go *down*. Weight a region's reading by how far each
 sample departs from the background it sits on.
+
+Phase 21 is implemented conditionally: `aura-core::contract::micro` freezes the five operations,
+the ten regions and their total mapping onto phase 18's vocabulary, the mask port, the two
+colour-locus shapes, the five clothing issues, the two glare methods, three op families, the
+naturalness guard and its report, thirty-three reason codes, the plan, the outline, the override and
+`MicroService`; `aura-retouch::micro` decides. `matrix.rs` loads an opt-in table whose ceilings the
+*code* bounds rather than the file, `hair.rs` finds thin high-contrast structures in the halo
+outside the hair alpha and refuses every one of them over a background with detail of its own,
+`teeth.rs` and `eyes.rs` measure a mouth and a pair of eyes against the frame's own neutral and
+its own redness, `clothing.rs` finds small anomalies inside the garment and vetoes patterned
+fabric entirely, `glare.rs` finds specular sheets over an iris, `borrow.rs` searches a sibling
+frame for an alignment and **refuses to composite anything that still carries information**,
+`guard.rs` runs the plan through the real renderer and measures the catchlights, the hairline and
+the teeth, re-solving at three quarters strength up to three times and withdrawing a family that
+still misses, `ops.rs` is one frame in and one plan out, `store.rs` owns migration 21 and `api.rs`
+is the frozen service and the resumable walk. Migration 21 stores three tables, two views and two
+triggers; 22 argued-over scene rows and a neutral one live in editable config; two shaders ship with the processor
+reference they are held to; three models are signed with cards; nine IPC commands (ADR-0044) feed
+a Micro-Retouch panel; and `aura-cli verify --phase 21` is the executable gate. Its exit report is
+`docs/progress/PHASE-21-EXIT.md`.
+
+**All three shipped heads are placeholders and none is consulted.** `FLYAWAY_HEAD_TRAINED`,
+`GLARE_HEAD_TRAINED` and `LINT_HEAD_TRAINED` are false, so what runs is the measured detection
+ADR-0043 section 6 argues for - and the argument is not the same for all three: glare and lint are
+*measurements by definition*, and the flyaway detector is deliberately the most conservative of
+them because a measurement cannot tell a strand from a twig. Every gate in section 10.1 is
+measured against synthetic frames whose strands, sheets, marks and teeth were painted into the
+pixels and read back through the real detectors, the real operators, the real guard and the real
+renderer. That is condition C1 and a Sev 2 trigger. Condition C2 is the second and it is the
+headline: **the naturalness audit did not happen**, so the phase's own KPI - corrections judged
+natural at or above 95 % - is unmeasured, and no claim about naturalness may be made from this
+build.
+
+Four rules that phase 21 adds and every later phase inherits:
+
+- **`MicroService` is the only way to ask what was done to somebody's hair, teeth, eyes or
+  clothes.** Seventeenth service of its kind. Phase 22 restores and sharpens, phase 24 removes
+  objects, phase 25 normalises a gallery of these decisions and phase 27 has to be able to say why
+  a face looks worked on. No phase may keep its own flyaway detector, its own teeth locus or its
+  own idea of what a borrow is.
+- **A borrow may only replace pixels that carry no information, and it is disclosed in five
+  places.** This is the first code in the product that composites two photographs. What separates
+  a glare repair from the eye swap section 2.2 forbids is not the mechanism: a specular sheet has
+  destroyed the record, and a closed eye *is* the record. `MIN_SPECULAR_FRACTION` is that rule as
+  a number, `GlareMethod::BorrowFrom` carries the source in the type, and a database trigger
+  aborts any statement that would take it away.
+- **A ceiling can be lowered by a studio and raised by nobody.** The contract owns every bound,
+  the config file may only tighten one, and there is no strength field anywhere on the IPC
+  surface. That is what makes `docs/retouch-ethics.md` a promise about the product rather than a
+  description of its defaults - and it is the shape any later phase that touches somebody's
+  appearance should copy.
+- **A guarantee is measured per family, not per plan.** Phase 20's texture guard withdrew a whole
+  retouch; this one withdraws hair, teeth or eyes independently, because the three measurements
+  are over disjoint regions and a frame whose teeth could not be evened safely should still get
+  its lint removed. Collapsing them would throw away work for a reason that has nothing to do with
+  it.
+
+Three things phase 21 got wrong first, all found by its own gates, all worth generalising:
+
+**A chance-corrected margin cannot be met at an extreme marginal rate.** `eval_micro.py` required
+the retouchers to agree an absolute 0.10 above chance, and at a 97 % natural rate chance agreement
+is already 0.92 - eight points of headroom for a ten-point margin, so a *perfect* panel failed the
+gate. It is now a share of the available headroom, which is Scott's pi. This is the same shape of
+defect as phase 19's edge-gradient halo test: **a threshold a correct implementation cannot meet
+is a bug in the threshold**, not a finding.
+
+**A per-image storage figure written before it was measured was wrong by a factor of two.** The
+store documented 612 B and measures 1,633 B over a thousand rows. The reason is structural and is
+worth remembering when phase 22 or 24 writes its own: every phase from 09 to 20 stores **one
+fixed-width verdict** per photograph, and this stores a **list** whose length is the number of
+things that were wrong with the frame. It is also the first figure in the product above a kilobyte
+per image, and `perf/budgets.toml` carries the argument rather than the aspiration.
+
+**A refusal test that cannot tell a working guard from a broken fixture proves nothing.** The
+phase gate's two trigger checks read "the statement failed" as a pass, and an INSERT refused for a
+missing foreign key looks exactly like one refused by the promise. Both now run a control first
+and report `Inconclusive` rather than success when the attempt never reached the thing under test.
+
+Phase 21 also **closes phase 20's condition C5**: `ui/src-tauri` had no `icons/` directory and its
+`main.rs` had lost `fn main` in the phase 19 to 20 merge, so the desktop shell had not compiled
+since. Both are fixed, the shell builds under the GNU toolchain with the target directory moved
+off the space-containing project path, and this phase's nine commands are registered in it - 75 of
+the product's IPC commands are now reachable from the window.
 
 Five rules that phase 13 adds and every later phase inherits:
 

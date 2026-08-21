@@ -5404,3 +5404,287 @@ pub struct SetProtectionInput {
     /// True to protect, false to clear.
     pub protect: bool,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-21. The micro-retouch surface.
+// ---------------------------------------------------------------------------
+
+/// One small fix, as the panel draws it.
+///
+/// The five operators, flattened into one shape: `kind` says which, and only the fields that
+/// operator uses are non-zero. A tagged union on the wire would be more precise and would make
+/// the panel's list rendering a switch with five arms over shapes that differ in one field each.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroOpDto {
+    /// `flyaway`, `teeth`, `eyes`, `clothing` or `glare`.
+    pub kind: String,
+    /// How strongly it ran, `0..1`, as a fraction of that operator's own ceiling.
+    pub strength: f32,
+    /// Where it acted, for the three operators that name a rectangle.
+    pub region: Option<CropRectDto>,
+    /// Whose face, for the two that name a person.
+    pub identity_id: Option<String>,
+    /// Teeth luminance lift in stops. Bounded at 0.20.
+    pub luma_ev: f32,
+    /// Teeth yellow reduction, as a share of the measured excess. Bounded at 0.35.
+    pub yellow_reduce: f32,
+    /// Sclera redness reduction, as a share of the measured excess. Bounded at 0.30.
+    pub sclera: f32,
+    /// Iris local contrast gain. Bounded at 0.25.
+    pub iris_clarity: f32,
+    /// `lint`, `thread`, `stain`, `strap` or `crease`, for a clothing operation.
+    pub clothing_kind: Option<String>,
+    /// `reduce` or `borrow`, for a glare operation.
+    pub method: Option<String>,
+    /// **The disclosure.** The photograph these pixels came from, for a borrow.
+    ///
+    /// Never absent on an operation whose `method` is `borrow`; the schema refuses one, and the
+    /// panel renders a borrowed region with a visible marker rather than as an ordinary edit.
+    pub borrowed_from: Option<String>,
+    /// How well the two regions aligned, `0..1`, for a borrow.
+    pub alignment: f32,
+}
+
+/// What the naturalness guard measured on the rendered result.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NaturalnessReportDto {
+    /// Peak iris luminance after the plan over the same before it. Held at or above 0.98.
+    pub catchlight_ratio: f32,
+    /// Hair-region edge energy after over before. Held at or above 0.94.
+    pub hair_energy_ratio: f32,
+    /// How much further outside the locus the plan pushed the teeth. Held below 0.003.
+    pub teeth_excursion: f32,
+    /// How many pixels the three measurements were taken over, summed.
+    ///
+    /// The panel shows the ratios to three decimal places only when this is large enough to mean
+    /// something. A ratio over eleven samples is arithmetic rather than evidence.
+    pub measured_on: u32,
+    /// How many times a family gave up strength to reach its bound.
+    pub resolves: u8,
+    /// Which families were withdrawn, in `hair`, `teeth`, `eyes` order.
+    pub withdrawn: Vec<bool>,
+    /// The names of those three families, so the panel never hard-codes the order.
+    pub families: Vec<String>,
+}
+
+/// One reason the plan came out the way it did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroReasonDto {
+    /// The stable slug.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// How much this moved the confidence. Negative for a doubt.
+    pub weight: f32,
+    /// True when the code withdraws a claim rather than making one.
+    pub doubt: bool,
+    /// The rectangle this reason is about, when it is about one.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// One photograph's micro-retouch plan.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroPlanDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// What was done.
+    pub ops: Vec<MicroOpDto>,
+    /// What the guard measured.
+    pub naturalness: NaturalnessReportDto,
+    /// Which operations the matrix permitted on this frame, in operator order.
+    pub allowed: Vec<bool>,
+    /// The operator names, so the panel never hard-codes the order.
+    pub operators: Vec<String>,
+    /// Why. Never empty.
+    pub reasons: Vec<MicroReasonDto>,
+    /// How much the plan trusts itself, `0..1`.
+    pub confidence: f32,
+    /// What the photograph is of.
+    pub scene: String,
+    /// Share of the shared per-image perceptual allowance this plan spent.
+    pub budget_used: f32,
+    /// **The disclosure, per frame.** Every photograph this plan borrowed pixels from.
+    pub borrowed_from: Vec<String>,
+    /// True when a photographer changed what may run.
+    pub user_edited: bool,
+    /// True when a photographer has looked at this plan and agreed.
+    pub reviewed: bool,
+    /// Which heads produced the detections.
+    pub model_ver: u32,
+    /// Which build's arithmetic produced the decisions.
+    pub analysis_ver: u32,
+    /// Which matrix file the switches came from.
+    pub matrix_ver: u32,
+}
+
+/// What the Micro-Retouch panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a plan.
+    pub planned: u32,
+    /// Fraction of the project with a plan, `0..1`. The denominator is every photograph.
+    pub coverage: f32,
+    /// Photographs where at least one operation ran.
+    pub acted_on: u32,
+    /// Photographs where the regions this phase needs arrived from phase 18.
+    pub region_covered: u32,
+    /// How many operations of each kind ran, in operator order.
+    pub op_counts: Vec<u32>,
+    /// The operator names.
+    pub operators: Vec<String>,
+    /// **How many frames in this gallery composited pixels from another.**
+    ///
+    /// On the project header rather than buried per frame, because the question a photographer is
+    /// asked by a client is whether any of this got composited, not whether one frame did.
+    pub borrows: u32,
+    /// How many families were withdrawn across the project, in family order.
+    pub withdrawn_counts: Vec<u32>,
+    /// The family names.
+    pub families: Vec<String>,
+    /// Frames where a family gave up strength to reach its bound.
+    pub resolved: u32,
+    /// Mean catchlight ratio over frames that had eye work.
+    pub mean_catchlight_ratio: f32,
+    /// Mean hair energy ratio over frames that had hair work.
+    pub mean_hair_energy_ratio: f32,
+    /// Frames below the review threshold.
+    pub needs_review: u32,
+    /// Frames a photographer has changed by hand.
+    pub user_edited: u32,
+    /// Scenes with no row in the matrix file.
+    pub unlisted_scenes: Vec<String>,
+    /// The versions the stored plans were made under.
+    pub model_ver: u32,
+    /// The build arithmetic they were made under.
+    pub analysis_ver: u32,
+    /// The matrix file they were made under.
+    pub matrix_ver: u32,
+}
+
+/// Which operations a project permits.
+///
+/// **There is no strength field and no ceiling field, and there never will be.** A photographer
+/// chooses which small fixes run; how far each may go is bounded by the contract, and a surface
+/// that could raise a ceiling would make `docs/retouch-ethics.md` a description of the defaults
+/// rather than a promise.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroMatrixDto {
+    /// Which operations may run, in operator order.
+    pub allowed: Vec<bool>,
+    /// The operator names.
+    pub operators: Vec<String>,
+    /// Which clothing issues may be cleaned, in issue order.
+    pub clothing: Vec<bool>,
+    /// The issue names.
+    pub clothing_kinds: Vec<String>,
+    /// Which of those issues are opt-in only and start switched off.
+    pub clothing_opt_in: Vec<bool>,
+    /// Whether cross-frame borrowing is permitted at all.
+    ///
+    /// Separate from the glare switch deliberately: a studio can want reflections calmed and want
+    /// no composited pixels in a delivery.
+    pub borrowing: bool,
+}
+
+/// Record which operations a project permits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetMicroMatrixInput {
+    /// The project.
+    pub project_id: String,
+    /// Which operations may run, in operator order. Absent leaves them alone.
+    #[serde(default)]
+    pub allowed: Option<Vec<bool>>,
+    /// Which clothing issues may be cleaned. Absent leaves them alone.
+    #[serde(default)]
+    pub clothing: Option<Vec<bool>>,
+    /// Whether cross-frame borrowing is permitted. Absent leaves it alone.
+    #[serde(default)]
+    pub borrowing: Option<bool>,
+}
+
+/// Run the resumable micro-retouch pass.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroPassInput {
+    /// The project.
+    pub project_id: String,
+    /// `visible`, `interactive`, `ai_batch` or `background`.
+    #[serde(default)]
+    pub priority: Option<String>,
+    /// Switch the whole stage off for this run. The kill switch hard rule 8 requires.
+    #[serde(default)]
+    pub enabled: Option<bool>,
+}
+
+/// What one pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroPassDto {
+    /// Photographs planned.
+    pub planned: u32,
+    /// Photographs that could not be planned.
+    pub failed: u32,
+    /// Photographs where at least one operation ran.
+    pub acted_on: u32,
+    /// Photographs where at least one usable region arrived.
+    pub region_covered: u32,
+    /// Operations of each kind, in operator order.
+    pub ops: Vec<u32>,
+    /// Frames that borrowed pixels.
+    pub borrows: u32,
+    /// Mean alignment over the borrows that happened.
+    pub mean_alignment: f32,
+    /// Families withdrawn, in family order.
+    pub withdrawn: Vec<u32>,
+    /// Frames where a family gave up strength.
+    pub resolved: u32,
+    /// Frames below the review threshold.
+    pub low_confidence: u32,
+    /// Scenes planned against the neutral row.
+    pub unlisted_scenes: Vec<String>,
+    /// Milliseconds the pass took.
+    pub elapsed_ms: u64,
+    /// True when the pass stopped early.
+    pub cancelled: bool,
+}
+
+/// Ask for the frames worth a photographer's attention.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many at most.
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Record that a photographer has looked at one plan and agrees.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptMicroInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// One frame that composited pixels from another, and where they came from.
+///
+/// **The disclosure list.** Read by the panel, by the delivery report and by phase 27, all through
+/// the same view, so no two of them can disagree about what was composited.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicroCompositeDto {
+    /// The photograph that was repaired.
+    pub photo_id: String,
+    /// The photographs its pixels were borrowed from.
+    pub source_photo_ids: Vec<String>,
+}

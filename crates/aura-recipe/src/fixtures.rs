@@ -112,6 +112,7 @@ pub fn reference() -> Recipe {
             strength: 0.35,
             protect_texture: 0.8,
             mask: Some("skin".to_string()),
+            borrowed_from: None,
         }],
         restoration: Restoration {
             denoise: "auto".to_string(),

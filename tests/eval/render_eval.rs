@@ -429,6 +429,7 @@ fn the_interactive_path_runs_fewer_stages_than_the_export_path() {
         strength: 0.4,
         protect_texture: 0.8,
         mask: Some("skin".to_string()),
+        borrowed_from: None,
     });
 
     let interactive = graph::plan(

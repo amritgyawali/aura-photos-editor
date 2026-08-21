@@ -651,6 +651,72 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::no_int8(),
             },
         ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::FLYAWAY_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "detection",
+                class: ModelClass::Retouch,
+                model: fixtures::flyaway_detector(),
+                input: Placeholder::linear_image(fixtures::FLYAWAY_TILE_SIDE),
+                output: BTreeMap::from([(
+                    "strands".to_string(),
+                    vec![
+                        1,
+                        fixtures::FLYAWAY_CHANNELS,
+                        fixtures::FLYAWAY_HEAD_SIDE,
+                        fixtures::FLYAWAY_HEAD_SIDE,
+                    ],
+                )]),
+                // int8 is forbidden because the whole safety of this operator is
+                // a *comparison*: a strand is only a strand where the background
+                // behind it is quiet, and both halves of that comparison are a
+                // few hundredths apart on a busy background. A systematic shift
+                // moves candidates across the background gate, which is the one
+                // thing standing between this detector and a twig.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::GLARE_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "detection",
+                class: ModelClass::Retouch,
+                model: fixtures::glare_detector(),
+                input: Placeholder::linear_image(fixtures::GLARE_REGION_SIDE),
+                output: BTreeMap::from([("glare".to_string(), vec![1, fixtures::GLARE_OUTPUTS])]),
+                // int8 is forbidden because the second output is not a score but
+                // a *share*, and `MIN_SPECULAR_FRACTION` turns it into permission
+                // to composite two photographs. A quantisation that moves it by a
+                // few hundredths is a borrow that happens on a frame where the
+                // record was never destroyed - which is the failure ADR-0043
+                // section 4 exists to make impossible.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::LINT_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "classification",
+                class: ModelClass::Retouch,
+                model: fixtures::lint_detector(),
+                input: Placeholder::linear_image(fixtures::LINT_PATCH_SIDE),
+                output: BTreeMap::from([("kinds".to_string(), vec![1, fixtures::LINT_CLASSES])]),
+                // int8 is forbidden for the ordinary phase 20 reason rather than
+                // an ethical one: the classes this head separates differ by how
+                // far a small mark departs from the fabric around it, and that
+                // departure is the smallest quantity anything in this phase
+                // measures. It is also the class boundary a studio switches on
+                // and off by name, so a confusion is an operation running that
+                // somebody believes is off.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {

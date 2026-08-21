@@ -51,6 +51,7 @@ use aura_people::store::PeopleStore;
 use aura_people::vault::BiometricKeyStore;
 use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
+use aura_retouch::micro::{Micro, MicroPass, MicroStore};
 use aura_retouch::{Retouch, RetouchPass, RetouchStore};
 use aura_style::profile::Identity;
 use aura_style::{Style, StyleStore};
@@ -1825,6 +1826,81 @@ impl AppState {
                 );
             }
         }
+        Ok(pass)
+    }
+
+    /// The micro-retouch store for this catalog. PHASE-21.
+    ///
+    /// Stateless like every decision store since phase 09.
+    #[must_use]
+    pub fn micro_store(&self) -> Arc<MicroStore> {
+        Arc::new(MicroStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `MicroService` for this catalog. PHASE-21.
+    ///
+    /// Project-scoped for phase 20's reason: two of its frozen methods - the disclosure list and
+    /// the opt-in matrix - are about a *project* rather than about a photograph.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5099` when the micro-retouch matrix file will not load.
+    pub fn micro(&self, project: &ProjectId) -> AuraResult<Arc<Micro>> {
+        let _ = project;
+        Ok(Arc::new(Micro::new(self.micro_store())?))
+    }
+
+    /// The micro-retouch pass, wired to previews, people, story and moments. PHASE-21.
+    ///
+    /// **No region service is attached, because none reaches this port.** Phase 18 owns regions
+    /// and `MicroPass::with_regions` is the input port; nothing here fills it, so every operation
+    /// is skipped and every plan says `micro_region_unavailable`. That is condition C1 of the
+    /// phase 21 exit report and it is visible in `MicroOutline::region_covered` rather than
+    /// hidden.
+    ///
+    /// **Phase 15's estimator is attached**, because the teeth and sclera operators measure a
+    /// distance from the frame's own neutral and there is no other way to ask what that was.
+    /// A frame nobody has estimated still records `micro_no_illuminant` and skips both colour
+    /// halves, which is the conservative direction.
+    ///
+    /// Moments **are** attached, because they are the only route to a sibling frame and a borrow
+    /// with no sibling is not a degraded borrow, it is no borrow at all.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5099` when the matrix file will not load, or whatever opening the preview service
+    /// raised.
+    pub fn micro_pass(&self, project_id: &str) -> AuraResult<MicroPass> {
+        let mut pass = MicroPass::new(
+            self.micro_store(),
+            self.previews(project_id)?,
+            Arc::clone(&self.clock),
+        )?
+        .with_people(self.people());
+        match self.story() {
+            Ok(story) => pass = pass.with_story(story),
+            Err(err) => {
+                tracing::warn!(
+                    target: "micro.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be planned against the neutral matrix row"
+                );
+            }
+        }
+        match self.moments() {
+            Ok(moments) => pass = pass.with_moments(moments),
+            Err(err) => {
+                tracing::warn!(
+                    target: "micro.pass",
+                    code = %err.code,
+                    "no moment service; no glare sheet can be repaired from a sibling frame"
+                );
+            }
+        }
+        pass = pass.with_tone(self.tone());
         Ok(pass)
     }
 

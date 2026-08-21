@@ -33,7 +33,9 @@ contract: changing it requires an ADR and a re-lock of `contracts.lock`.
     { "id": "m2", "kind": "background", "invert_of": "subject", "feather": 0.5,
       "params": { "exposure": -0.22, "saturation": -6 } }
   ],
-  "retouch": [ { "op": "skin_smooth", "strength": 0.35, "protect_texture": 0.8, "mask": "skin" } ],
+  "retouch": [ { "op": "skin_smooth", "strength": 0.35, "protect_texture": 0.8, "mask": "skin" },
+               { "op": "glare", "strength": 1.0, "protect_texture": 0.0, "mask": "eyes",
+                 "borrowed_from": "pht_9f31" } ],
   "restoration": { "denoise": "auto", "face_recovery": 20, "deblur": 0 },
   "bw": null,
   "provenance": {
@@ -67,7 +69,15 @@ contract: changing it requires an ADR and a re-lock of `contracts.lock`.
 | `geometry.crop` | `[left, top, right, bottom]` in `0 … 1` | `right > left`, `bottom > top`. |
 | `masks[].feather` | `0.0 … 1.0` | |
 | `retouch[].strength`, `protect_texture` | `0.0 … 1.0` | |
+| `retouch[].borrowed_from` | a photo id, or absent | **The disclosure.** Present only on an operation whose pixels came from another photograph. |
 | `provenance.confidence` | `0.0 … 1.0` | |
+
+**`borrowed_from` is how a delivered file says it is a composite.** Added by phase 21 and
+optional, so a recipe written by any earlier build reads unchanged. It is in the recipe rather
+than only in the catalog because a delivered file has to be re-creatable from the RAW hash, the
+recipe, the engine string and the output spec - and a composite whose source is in none of those
+four cannot be re-created or audited. AURA never composites two photographs without writing it
+here; `docs/retouch-ethics.md` section 5 lists the four other places the same fact appears.
 
 **A value out of range is clamped, not refused.** An exposure of +9 renders at +5. A *shape*
 that has no correct interpretation is refused with `AURA-RENDER-8002`: a curve that goes

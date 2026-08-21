@@ -454,6 +454,19 @@ pub struct RetouchOp {
     /// The mask id or mask kind it applies within.
     #[serde(default)]
     pub mask: Option<String>,
+    /// The photograph these pixels were borrowed from, for a cross-frame repair.
+    ///
+    /// **Added by PHASE-21; see ADR-0044 section 3.** Optional and absent on every operation any
+    /// earlier build wrote, so the change is additive in both directions: an older reader ignores
+    /// it and a newer reader defaults it to `None`.
+    ///
+    /// It is in the *recipe* rather than only in the catalog because phase 14's rule is that a
+    /// delivered file can be re-created from the RAW hash, the canonical recipe, the engine string
+    /// and the output spec. A composite whose source appears in none of those four is a delivered
+    /// file that cannot be re-created and, more to the point, cannot be audited. It is also the
+    /// third of the five places `docs/retouch-ethics.md` section 5 promises a borrow is disclosed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub borrowed_from: Option<String>,
 }
 
 /// Restoration settings. Phase 22 owns the values.

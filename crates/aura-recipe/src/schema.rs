@@ -551,6 +551,7 @@ mod tests {
             strength: 0.3,
             protect_texture: 0.8,
             mask: Some("m_nonexistent".to_string()),
+            borrowed_from: None,
         });
         assert!(Validation::check(&recipe).is_err());
     }

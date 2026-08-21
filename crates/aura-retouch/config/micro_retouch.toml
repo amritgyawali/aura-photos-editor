@@ -1,0 +1,498 @@
+# Which small fixes run, on which kind of photograph, and how far each may go.
+#
+# PHASE-21 section 4 asks for this file and section 9 gives PM two tasks: "own the ethics policy
+# and default opt-in matrix" and "approve ceilings". Both are decisions rather than measurements,
+# so **every row carries a written reason** - the rule phases 07, 10, 12, 15, 16, 19 and 20 all
+# enforce. A ceiling nobody can explain is a product quietly deciding how somebody should look.
+#
+# WHAT IS AND IS NOT IN THIS FILE
+#
+# The ceilings are here and they are BOUNDED BY THE CODE. `MicroTable::parse` refuses a file that
+# raises any of them above the constant in `aura_core::contract::micro`, and it refuses a file
+# that switches on one of the two operations the contract marks opt-in only. A studio may lower a
+# ceiling and may switch anything off; nothing here can widen one. `docs/retouch-ethics.md`
+# section 4 makes that promise to a photographer and this is the half that keeps it.
+#
+# There is no absolute chromaticity anywhere in this file. `[locus.teeth]` and `[locus.sclera]`
+# are offsets in CIE u'v' FROM THE FRAME'S OWN MEASURED NEUTRAL, which phase 15 produces, and the
+# operators reduce a distance to the boundary rather than moving toward the centre. A frame with
+# no illuminant estimate gets no colour move at all. ADR-0043 section 3 has the argument and the
+# phase gate scans migration 21 for a constant that would break it.
+#
+# There is no per-person, per-ethnicity or per-age row and there never will be one. Every
+# measurement in this phase is against the frame's own content.
+#
+# BUMP `version` ON ANY CHANGE. It is written into `micro_plan.matrix_ver`, and a plan made under
+# one table is not comparable with a plan made under another - `AURA-ML-5096` exists so that
+# comparison never happens silently.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# The ceilings. Each may be lowered by a studio and none may be raised.
+# ---------------------------------------------------------------------------
+
+[guard]
+teeth_max_luma        = 0.20
+sclera_max            = 0.30
+iris_max              = 0.25
+flyaway_max_area_frac = 0.004
+require_confidence    = 0.55
+reason = """
+Every number here sits at the ceiling the contract owns, which is a decision rather than a
+default: this is the first release, there is no photographer feedback to tune against, and a
+table that started below its own maximum would make the maximum untested. The bounds themselves
+are argued in `aura_core::contract::micro` beside each constant.
+
+`require_confidence` is the one that is a floor rather than a ceiling. Below it an operation does
+not run at all, and it is deliberately not a scaling factor: a half-strength edit made on a
+doubtful detection is still an edit in the wrong place.
+"""
+
+# ---------------------------------------------------------------------------
+# The two loci. Offsets in CIE u'v' from the frame's own neutral, never absolutes.
+# ---------------------------------------------------------------------------
+
+[locus.teeth]
+du     = 0.004
+dv     = 0.008
+radius = 0.030
+reason = """
+Where real teeth sit relative to the light falling on them. Enamel is slightly warm of neutral
+and slightly yellow of it - which is what enamel is - so the centre is a small positive offset in
+both axes rather than the origin. The radius is wide on purpose: teeth vary between people far
+more than skin does at a given illuminant, and a tight locus would call a perfectly normal set of
+teeth a defect.
+
+The number a photographer should care about is not this one but `MAX_TEETH_YELLOW` in the code,
+which is the share of the *excess* that may be removed. Even a set of teeth well outside this
+region only ever moves a third of the way back.
+"""
+
+[locus.sclera]
+du     = 0.001
+dv     = 0.002
+radius = 0.022
+reason = """
+Where the white of an eye sits relative to the light. Very nearly neutral, which is why the
+offsets are almost zero, and the radius covers the normal warm cast a sclera picks up from the
+lids and lashes around it.
+
+This locus bounds a CHROMA-ONLY operation. Nothing that reads it can add light to a sclera, and
+`MicroOp::Eyes` has nowhere to put a luminance term - so "no whitening of the sclera beyond a
+cap" is a property of the contract rather than of this row.
+"""
+
+# ---------------------------------------------------------------------------
+# The opt-in matrix. Studio defaults, per operation.
+# ---------------------------------------------------------------------------
+
+[op.flyaway]
+default_on = true
+reason = """
+On by default. A stray hair across a cheek is the single most common thing a photographer fixes
+by hand on their best thirty frames, and the operation is bounded three ways - it only attenuates
+contrast, only outside the hair mass, only over a quiet background - so the failure mode when it
+is wrong is that nothing visible happens.
+"""
+
+[op.teeth]
+default_on = true
+reason = """
+On by default, and it is the row PM argued longest about. The case against is that whitened teeth
+are the most recognisable sign of an automated retoucher; the case for is that a fifth of a stop
+inside a measured locus is not whitening, and that leaving it off means every studio that wants
+it has to find the switch. The ceiling is what makes the default defensible, so if the ceiling
+ever moves this row is re-argued.
+"""
+
+[op.eyes]
+default_on = true
+reason = """
+On by default. Sclera redness reduction is chroma-only and iris clarity is local contrast; there
+is no colour change and no geometry change available at any setting, and catchlights are excluded
+by construction and verified after rendering. What is left is the thing a retoucher does to make
+somebody look rested rather than to make them look different.
+"""
+
+[op.clothing]
+default_on = true
+reason = """
+On by default for lint, threads and stains, and OFF for the two the contract marks opt-in - see
+`[clothing]` below. Taking a speck of fluff off a groom's lapel is uncontroversial in a way that
+nothing else in this phase is: the fluff was not part of anybody.
+"""
+
+[op.glare]
+default_on = true
+reason = """
+On by default for reduction. Cross-frame borrowing is a separate switch - see `[borrow]` - because
+a studio can reasonably want reflections calmed and want no composited pixels in a delivery, and
+collapsing the two would force them to choose.
+"""
+
+# ---------------------------------------------------------------------------
+# Which clothing issues may be cleaned.
+# ---------------------------------------------------------------------------
+
+[clothing.lint]
+default_on = true
+reason = "Fluff and lint. Not part of the garment and not part of the person."
+
+[clothing.thread]
+default_on = true
+reason = "A stray thread. Same argument as lint, and it is usually more distracting."
+
+[clothing.stain]
+default_on = true
+reason = """
+A small mark, bounded by the same area cap as everything else here. Above that cap it is not a
+stain but an object, and removing an object is phase 24 with its own consent surface.
+"""
+
+[clothing.strap]
+default_on = false
+reason = """
+OFF, and the loader refuses a file that sets this to true - `ClothingIssue::is_opt_in_only` is
+what makes that a property of the type rather than of this comment. A visible bra strap is a
+garment somebody chose to wear that morning, and a product that removes it by default has decided
+something about how they should have dressed. A studio whose clients ask for it can switch it on.
+"""
+
+[clothing.crease]
+default_on = false
+reason = """
+OFF, and refused if set to true, for a different reason from the strap: creases are what fabric
+does, and removing them is the single most artificial-looking operation available in this phase.
+A jacket with no creases reads as rendered. Section 2.1 marks it opt-in and this is that.
+"""
+
+# ---------------------------------------------------------------------------
+# Cross-frame borrowing.
+# ---------------------------------------------------------------------------
+
+[borrow]
+default_on = true
+reason = """
+On by default, bounded hard, and always disclosed. The bounds are in the code rather than here:
+a borrow region must be substantially blown specular in the target frame (you may only borrow
+pixels that carry no information), it is capped at a small fraction of the frame, it needs a high
+alignment score, and it carries the source photograph's id in the operation itself - so an
+undisclosed composite is not a representable state.
+
+A studio that does not want composited pixels in a delivery at all sets this to false and keeps
+conservative glare reduction. `docs/retouch-ethics.md` section 3 explains the rule to a
+photographer.
+"""
+
+# ---------------------------------------------------------------------------
+# The neutral row: what an unclassified photograph gets.
+# ---------------------------------------------------------------------------
+
+[neutral]
+limit    = 0.35
+flyaway  = false
+teeth    = false
+eyes     = false
+clothing = true
+glare    = true
+reason = """
+A photograph AURA cannot classify gets the two operations that do not depend on knowing what the
+photograph is - a lint on a lapel is a lint whatever the scene - at about a third strength, and
+none of the three that act on a face. The alternative, treating an unknown scene as a portrait, is
+how a detail shot of the rings acquires teeth correction on a reflection.
+"""
+
+# ---------------------------------------------------------------------------
+# The 22 scenes. `limit` is the ceiling on every operation in this kind of photograph.
+# ---------------------------------------------------------------------------
+
+[scene.getting_ready_bride]
+limit    = 1.00
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Full strength. Close, deliberate, well-lit portraits made at leisure, and the frames a bride looks
+at longest. Every operation applies: hair is being worked on so there are strands everywhere, and
+the light is soft enough that a mask boundary is reliable.
+"""
+
+[scene.getting_ready_groom]
+limit    = 1.00
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Full strength, and the clothing operation matters more here than anywhere else in the wedding: a
+dark suit against a bright window shows every speck of lint, and it is the classic frame a
+retoucher cleans by hand.
+"""
+
+[scene.details]
+limit    = 0.00
+flyaway  = false
+teeth    = false
+eyes     = false
+clothing = false
+glare    = false
+reason = """
+Nothing. Rings, shoes, stationery and flowers have no hair, teeth, eyes or clothing in them, and
+a detector that found some has found a reflection. Zero rather than a small number, because the
+only thing that could fire here is a false positive.
+"""
+
+[scene.first_look]
+limit    = 0.85
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+High but not full. These are reaction frames and their value is the expression; the small fixes
+are worth making and are worth making slightly more gently, because a frame this emotionally
+loaded is one where anything that reads as processed reads very loudly.
+"""
+
+[scene.ceremony_entrance]
+limit    = 0.70
+flyaway  = true
+teeth    = false
+eyes     = false
+clothing = true
+glare    = true
+reason = """
+Hair and clothing only. Faces are usually mid-distance and moving, so teeth and eye work is
+either invisible or acting on a doubtful landmark. Flyaways against an aisle background are very
+visible and worth calming.
+"""
+
+[scene.ceremony]
+limit    = 0.60
+flyaway  = true
+teeth    = false
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Reduced, and teeth are off. A ceremony is composed rather than smiling - phase 10's weighting
+makes the same point about expression - so a teeth detector firing here has usually found a lip
+highlight. Eyes stay on because tearful eyes at a ceremony are red for a reason and the chroma-only
+reduction is what makes them read as moved rather than as sore.
+"""
+
+[scene.ritual]
+limit    = 0.55
+flyaway  = true
+teeth    = false
+eyes     = true
+clothing = false
+glare    = true
+reason = """
+Reduced further, and clothing is OFF. A ritual garment is not a suit: the marks on it are often
+deliberate - haldi, sindoor, ash, dye, embroidery irregularity - and a lint detector cannot tell a
+ceremonial mark from a stain. This is the row that would cause a cultural failure if it were set
+by convenience rather than argued, and it is why every row in this file needs a written reason.
+"""
+
+[scene.vows]
+limit    = 0.55
+flyaway  = true
+teeth    = false
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+As the ceremony, one step gentler. The frames are close and slow, so a mask is reliable; what is
+happening in them is not something a product should be polishing hard.
+"""
+
+[scene.rings]
+limit    = 0.35
+flyaway  = false
+teeth    = false
+eyes     = false
+clothing = true
+glare    = false
+reason = """
+Clothing only, gently. A ring exchange frame is mostly hands and cuffs; the faces in it are
+usually out of the plane of focus, and glare on glasses at this distance is a highlight rather
+than a sheet.
+"""
+
+[scene.kiss]
+limit    = 0.60
+flyaway  = true
+teeth    = false
+eyes     = false
+clothing = true
+glare    = true
+reason = """
+Hair, clothing and glare. Teeth and eyes are off for the obvious reason - both are usually closed
+or occluded - and a detector that found teeth in a kiss frame has found something else.
+"""
+
+[scene.family_portrait]
+limit    = 0.90
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Nearly full. Posed, static, everybody looking at the camera, and the frames most likely to be
+printed large by people who are not the couple. Glasses glare is at its most common here because
+half a family group wears them and the flash is on-axis.
+"""
+
+[scene.group_portrait]
+limit    = 0.80
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+High. Same shape as the family portrait, one step down because faces are smaller in frame and a
+correction that is invisible at this size still spends the shared allowance.
+"""
+
+[scene.couple_portrait]
+limit    = 1.00
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Full strength. The hero frames of the wedding, made deliberately, at the size where every one of
+these fixes is visible and where a photographer would make all of them by hand.
+"""
+
+[scene.golden_hour]
+limit    = 0.90
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Nearly full, and the one scene where the flyaway background gate does most of its work: rim light
+through hair produces exactly the thin bright structures the detector looks for, and they are the
+photograph rather than a defect. The gate is what stops the operation there, and this row stays
+high so that the gate is doing the deciding rather than a threshold.
+"""
+
+[scene.reception_entrance]
+limit    = 0.60
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Reduced. Movement, mixed light and small faces, so every detection is less certain; the
+confidence floor does most of the refusing and this ceiling catches the rest.
+"""
+
+[scene.speeches]
+limit    = 0.65
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Reduced. Long lens, dim room, and a speaker who is talking - which means teeth are visible in a
+way they are not elsewhere and are also the most likely thing to be motion-blurred. The ceiling
+is what keeps a correction on a blurred mouth from becoming a smear.
+"""
+
+[scene.cake]
+limit    = 0.55
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = "Reduced. Bright cake, dark room, small faces, and everything happening at once."
+
+[scene.first_dance]
+limit    = 0.50
+flyaway  = false
+teeth    = false
+eyes     = false
+clothing = true
+glare    = true
+reason = """
+Clothing and glare only. Spotlights and haze produce hair-like structures everywhere and faces
+that are half in shadow; the face operations would be acting on doubtful masks and are switched
+off rather than gated frame by frame.
+"""
+
+[scene.dance_floor]
+limit    = 0.40
+flyaway  = false
+teeth    = false
+eyes     = false
+clothing = false
+glare    = true
+reason = """
+Glare only, gently. Motion, flash, sweat and moving light: nothing else in this phase can be
+measured reliably here, and a dance floor frame is not one anybody examines at 100 per cent.
+"""
+
+[scene.candid]
+limit    = 0.70
+flyaway  = true
+teeth    = true
+eyes     = true
+clothing = true
+glare    = true
+reason = """
+Moderate-to-high. Candids are where a guest is caught mid-laugh, which is where teeth show most
+and where somebody would most notice them corrected badly. Everything runs, at seven tenths.
+"""
+
+[scene.venue]
+limit    = 0.00
+flyaway  = false
+teeth    = false
+eyes     = false
+clothing = false
+glare    = false
+reason = """
+Nothing, for the reason `details` gets nothing: an empty room has none of these regions in it, so
+anything found is a false positive. Zero rather than small.
+"""
+
+[scene.exit]
+limit    = 0.45
+flyaway  = false
+teeth    = false
+eyes     = false
+clothing = true
+glare    = true
+reason = """
+Clothing and glare, gently. Sparklers, confetti and night: the hair detector's background gate
+would refuse most of these frames anyway and the face operations would be working from doubtful
+masks.
+"""
+
+[scene.unknown]
+limit    = 0.35
+flyaway  = false
+teeth    = false
+eyes     = false
+clothing = true
+glare    = true
+reason = """
+The same as the neutral row, and present as a row of its own so that a project which has not been
+classified at all reports `micro_scene_limited` rather than `micro_scene_unlisted`. Phase 07's
+`SceneId::Unknown` is an abstention rather than a gap, and the two are different answers.
+"""

@@ -40,6 +40,11 @@ use aura_app::contract::ipc::{
     AcceptRetouchInput, ProtectedFeatureDto, RetouchPassDto, RetouchPassInput, RetouchPlanDto,
     RetouchReviewInput, RetouchStatusDto, SetProtectionInput, SetRetouchDto, SetRetouchInput,
 };
+// PHASE-21.
+use aura_app::contract::ipc::{
+    AcceptMicroInput, MicroCompositeDto, MicroMatrixDto, MicroPassDto, MicroPassInput,
+    MicroPlanDto, MicroReasonDto, MicroReviewInput, MicroStatusDto, SetMicroMatrixInput,
+};
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
 use tauri::{Manager, State};
@@ -771,6 +776,103 @@ async fn sculpt_local(
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-21. The micro-retouch surface. `micro_pass` decodes proxies, decodes a sibling frame for
+// every borrow it considers, and runs every plan through the renderer so the naturalness guard
+// can measure what it did, so it goes off the renderer thread with the rest.
+//
+// `micro_reason_codes` is the one command here that touches nothing: it assembles the panel's
+// legend from the frozen enum, so it stays on the calling thread.
+#[tauri::command]
+async fn micro_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<MicroStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::micro_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_micro(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<MicroPlanDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_micro(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn micro_composites(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<MicroCompositeDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::micro_composites(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn micro_review_queue(
+    state: State<'_, AppState>,
+    input: MicroReviewInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::micro_review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn micro_matrix(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<MicroMatrixDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::micro_matrix(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_micro_matrix(
+    state: State<'_, AppState>,
+    input: SetMicroMatrixInput,
+) -> IpcResult<MicroMatrixDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_micro_matrix(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn accept_micro(state: State<'_, AppState>, input: AcceptMicroInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::accept_micro(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn micro_pass(
+    state: State<'_, AppState>,
+    input: MicroPassInput,
+) -> IpcResult<MicroPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::micro_pass(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+fn micro_reason_codes() -> IpcResult<Vec<MicroReasonDto>> {
+    Ok(aura_app::micro_reason_codes())
+}
+
+fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -877,7 +979,16 @@ async fn sculpt_local(
             accept_retouch,
             set_retouch,
             set_protection,
-            retouch_pass
+            retouch_pass,
+            micro_status,
+            image_micro,
+            micro_composites,
+            micro_review_queue,
+            micro_matrix,
+            set_micro_matrix,
+            accept_micro,
+            micro_pass,
+            micro_reason_codes
         ])
         .run(tauri::generate_context!());
 

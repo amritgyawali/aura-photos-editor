@@ -2717,3 +2717,220 @@ pub fn permanent_features() -> OnnxModel {
         graph,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-21. Flyaway, glare and lint detection.
+// ---------------------------------------------------------------------------
+
+/// The flyaway detector registered name.
+pub const FLYAWAY_MODEL: &str = "flyaway_detector";
+
+/// The glare detector registered name.
+pub const GLARE_MODEL: &str = "glare_detector";
+
+/// The lint and thread classifier registered name.
+pub const LINT_MODEL: &str = "lint_detector";
+
+/// The hair tile side the flyaway detector reads.
+///
+/// 128 px. A tile straddling the hairline rather than a face crop: a flyaway is a structure a
+/// couple of pixels wide that only exists *outside* the hair mass, so the tile has to carry both
+/// the hair edge and the background behind it and nothing else. A 256 px face crop would spend
+/// three quarters of its arithmetic on a cheek.
+pub const FLYAWAY_TILE_SIDE: usize = 128;
+
+/// How much the flyaway detector reduces its input.
+pub const FLYAWAY_STRIDE: usize = 8;
+
+/// The flyaway detection grid side.
+pub const FLYAWAY_HEAD_SIDE: usize = FLYAWAY_TILE_SIDE / FLYAWAY_STRIDE;
+
+/// What the flyaway detector emits per cell: how strand-like this cell is, and nothing else.
+///
+/// One channel rather than phase 20's two, and the difference is the whole subject of phase 21.
+/// The blemish detector needed a second channel because a mark can be temporary or permanent and
+/// the product treats those two completely differently. A strand of hair is never temporary.
+/// There is no second question to ask, and a second channel would be a number nothing could read.
+///
+/// The hair alpha the runtime uses to refuse a candidate *inside* the mass is an input from phase
+/// 18 rather than a prediction. `ml/models/micro/train_flyaway.py` drops those candidates before
+/// the loss sees them, because "no bald patches" is not a threshold that can be traded off
+/// against recall.
+pub const FLYAWAY_CHANNELS: usize = 1;
+
+/// The lens region side the glare detector reads.
+///
+/// 64 px around one eye. The question is about a specular sheet over an iris, and the sheet is
+/// the same size as the thing it has destroyed.
+pub const GLARE_REGION_SIDE: usize = 64;
+
+/// What the glare detector emits: whether this region is a sheet, and what share of it clipped.
+///
+/// Two, and they are deliberately different kinds of number. The first is a judgement about the
+/// region; the second is a **measurable property of the photograph** - how much of it carries no
+/// information at all - and `aura_core::contract::micro::MIN_SPECULAR_FRACTION` is what turns
+/// that into permission to borrow from a sibling frame.
+///
+/// Training one output that said "this may be rebuilt from another frame" would put an ethical
+/// decision inside a learned weight. `ml/models/micro/train_glare.py` records the argument, and
+/// its third self-test property is what checks the two do not collapse into one.
+pub const GLARE_OUTPUTS: usize = 2;
+
+/// The clothing patch side the lint classifier reads.
+pub const LINT_PATCH_SIDE: usize = 64;
+
+/// How many kinds the lint classifier separates: none, lint, thread, stain.
+///
+/// Four, and the two kinds that are *missing* are the point. `ClothingIssue` has five variants,
+/// and the other two - a visible strap and a crease - are the two that section 2.1 marks opt-in
+/// only. They are absent from the head rather than present and suppressed, so there is no
+/// accuracy at which a detector starts finding creases in a studio that never asked for them.
+pub const LINT_CLASSES: usize = 4;
+
+/// The flyaway detector: a 128 px hairline tile in, a 16x16 strand map out.
+///
+/// `tile [N, 3, 128, 128] -> strands [N, 1, 16, 16]`
+///
+/// **Untrained in this build**, and `aura_retouch::micro::ops::FLYAWAY_HEAD_TRAINED` is false, so
+/// it is never consulted: what runs is the measured detector in `aura_retouch::micro::hair`,
+/// whose background gate is what makes it safe without a learned model. ADR-0043 section 6
+/// records why two of this phase's three placeholders are backed by a measurement, and why the
+/// third is backed by the most conservative measurement of the three.
+///
+/// No sigmoid in the graph. The output is a logit, and the calibration that would turn it into a
+/// probability belongs to phase 13.
+#[must_use]
+pub fn flyaway_detector() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_2105_F1A7_0001);
+    let side = FLYAWAY_TILE_SIDE;
+
+    let graph = Graph {
+        name: FLYAWAY_MODEL.to_string(),
+        nodes: vec![
+            // 128 -> 64
+            conv3("stem", &["tile", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            // 64 -> 32
+            pool2("pool1", "stem_relu", "pool1_out"),
+            conv3("c1", &["pool1_out", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            // 32 -> 16. Stride 8 from here on.
+            pool2("pool2", "c1_relu", "pool2_out"),
+            conv3("c2", &["pool2_out", "c2_w", "c2_b"], &["c2_out"], 1),
+            node("Relu", "c2_act", &["c2_out"], &["trunk"]),
+            conv1("head", &["trunk", "head_w", "head_b"], &["strands"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.24),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("c1_w", vec![48, 24, 3, 3], 0.16),
+            weights.tensor("c1_b", vec![48], 0.05),
+            weights.tensor("c2_w", vec![64, 48, 3, 3], 0.12),
+            weights.tensor("c2_b", vec![64], 0.05),
+            weights.tensor("head_w", vec![FLYAWAY_CHANNELS, 64, 1, 1], 0.10),
+            weights.tensor("head_b", vec![FLYAWAY_CHANNELS], 0.02),
+        ],
+        inputs: vec![dynamic_batch("tile", &[3, side, side])],
+        outputs: vec![dynamic_batch(
+            "strands",
+            &[FLYAWAY_CHANNELS, FLYAWAY_HEAD_SIDE, FLYAWAY_HEAD_SIDE],
+        )],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The glare detector: a 64 px eye region in, a sheet logit and a clipped share out.
+///
+/// `region [N, 3, 64, 64] -> glare [N, 2]`
+///
+/// **Untrained in this build**, and `aura_retouch::micro::ops::GLARE_HEAD_TRAINED` is false. What
+/// runs instead is a measurement, and here that is not a compromise: a specular sheet *is* a
+/// connected region of near-clipped, near-neutral pixels over an eye, so the measurement is the
+/// definition and a placeholder head would add nothing to it.
+#[must_use]
+pub fn glare_detector() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_2105_61A6_0002);
+    let side = GLARE_REGION_SIDE;
+
+    let graph = Graph {
+        name: GLARE_MODEL.to_string(),
+        nodes: vec![
+            conv3("stem", &["region", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            pool2("pool", "stem_relu", "pool_out"),
+            conv3("c1", &["pool_out", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            node("GlobalAveragePool", "squeeze", &["c1_relu"], &["pooled"]),
+            node("Flatten", "flatten", &["pooled"], &["flat"]),
+            node("Gemm", "head", &["flat", "head_w", "head_b"], &["glare"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.27),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("c1_w", vec![32, 24, 3, 3], 0.15),
+            weights.tensor("c1_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![GLARE_OUTPUTS, 32], 0.13),
+            weights.tensor("head_b", vec![GLARE_OUTPUTS], 0.02),
+        ],
+        inputs: vec![dynamic_batch("region", &[3, side, side])],
+        outputs: vec![dynamic_batch("glare", &[GLARE_OUTPUTS])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The lint classifier: a 64 px clothing patch in, four class logits out.
+///
+/// `patch [N, 3, 64, 64] -> kinds [N, 4]`
+///
+/// **Untrained in this build**, and `aura_retouch::micro::ops::LINT_HEAD_TRAINED` is false. What
+/// runs is the measured detector in `aura_retouch::micro::clothing` - a small high-frequency
+/// anomaly inside the clothing mask whose colour departs from the fabric around it, which is
+/// phase 20's blemish shape one region up.
+#[must_use]
+pub fn lint_detector() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_2105_11A7_0003);
+    let side = LINT_PATCH_SIDE;
+
+    let graph = Graph {
+        name: LINT_MODEL.to_string(),
+        nodes: vec![
+            conv3("stem", &["patch", "stem_w", "stem_b"], &["stem_out"], 2),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            pool2("pool", "stem_relu", "pool_out"),
+            conv3("c1", &["pool_out", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            node("GlobalAveragePool", "squeeze", &["c1_relu"], &["pooled"]),
+            node("Flatten", "flatten", &["pooled"], &["flat"]),
+            node("Gemm", "head", &["flat", "head_w", "head_b"], &["kinds"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.25),
+            weights.tensor("stem_b", vec![24], 0.05),
+            weights.tensor("c1_w", vec![32, 24, 3, 3], 0.14),
+            weights.tensor("c1_b", vec![32], 0.05),
+            weights.tensor("head_w", vec![LINT_CLASSES, 32], 0.12),
+            weights.tensor("head_b", vec![LINT_CLASSES], 0.02),
+        ],
+        inputs: vec![dynamic_batch("patch", &[3, side, side])],
+        outputs: vec![dynamic_batch("kinds", &[LINT_CLASSES])],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}

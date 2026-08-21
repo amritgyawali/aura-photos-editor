@@ -280,6 +280,24 @@ retouch-eval:
     python ml/models/retouch/eval_retouch.py --self-test
     python ml/models/retouch/export.py --verify models
 
+# The phase 21 gate: migration 21 and its two triggers, the opt-in matrix and the ceilings the
+# code owns rather than the file, the four measured detectors, the naturalness guard, the borrow
+# rule and its disclosure end to end, and a studio switch that survives. It prints what it does
+# not prove at the end of every run - see docs/progress/PHASE-21-EXIT.md conditions C1 to C5.
+phase-21-verify:
+    cargo run --release --package aura-cli -- verify --phase 21 --work target/phase21-verify
+
+# The phase 21 gates, from the Python side. None of the three training scripts can run on real
+# data here - there is no labelled corpus of flyaways, glare sheets or lint - so all four
+# self-test against a synthetic answer known by construction, and `export.py --verify` checks
+# that the three registered heads agree with the shapes the code expects.
+micro-eval:
+    python ml/models/micro/train_flyaway.py --self-test
+    python ml/models/micro/train_glare.py --self-test
+    python ml/models/micro/train_lint.py --self-test
+    python ml/models/micro/eval_micro.py --self-test
+    python ml/models/micro/export.py --verify models
+
 # The calibration metrics, from the Python side. `--self-test` proves the
 # estimator catches an overconfident predictor and that a fit improves held-out
 # ECE; `--outcomes FILE --fit --diagram OUT.svg` reports on real outcomes when

@@ -416,6 +416,10 @@ fn with_retouch(base: &Recipe, plan: &RetouchPlan) -> Recipe {
                 RetouchOp::ToneEvening { mask, .. } => Some(mask.to_db()),
                 _ => Some("skin".to_string()),
             },
+            // Phase 20 never composites. The field exists because phase 21's glare repair does,
+            // and `None` here is a statement rather than a default: nothing in this phase reads
+            // another photograph.
+            borrowed_from: None,
         })
         .collect();
     out

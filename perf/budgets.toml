@@ -883,3 +883,52 @@ max_ms_per_unit = 500
 # 4 KiB steps.
 [size.retouch_store_per_1000_images]
 max_bytes = 1000000
+
+# PHASE-21. The micro-retouch decision, on the processor path.
+#
+# Section 11 has four rows and two of them are waived here. The 250 ms full-resolution row is a
+# GPU figure and this build links no backend (ADR-0029 section 4); the five-minute gallery row is
+# extrapolated from the per-image figure rather than measured, because a thousand-image project
+# needs a thousand proxies this repository does not have.
+#
+# The figure below is a per-image ceiling on the *decision* on the processor path in release, on
+# a 256 px fixture frame. It is far above section 11's 35 ms proxy row for the reason phase 20's
+# is far above its own: that row is about applying a plan on a GPU and this is about producing
+# one on a processor, including up to four renders through the naturalness guard. Conflating them
+# would be a budget that looks strict and measures the wrong thing.
+[stage.micro_plan_frame]
+max_elapsed_ms  = 12000
+max_ms_per_unit = 500
+
+# The alignment search for one borrow, measured on its own because it is a per-*repair* cost
+# rather than a per-image one. Section 11's row is 180 ms for alignment plus blend; the blend runs
+# with the rest of the plan in `aura_render::micro`, so what is bounded here is the search.
+[stage.micro_borrow]
+max_elapsed_ms  = 6000
+max_ms_per_unit = 300
+
+# Section 11 sets no storage row for this phase. One is measured anyway, and it is the first
+# figure since phase 09 that is **above** the kilobyte per image the earlier phases aimed at.
+#
+# The measured decomposition on 1,000 photographs of the widest frame the fixtures produce - a
+# flyaway calmed, four marks off a lapel, teeth and eyes corrected, seven reason codes - taken as
+# `dbstat` payload rather than `PRAGMA page_count`, which quantises to 4 KiB:
+#
+#   micro_plan and its four indexes       524 B/image
+#   micro_op  and its primary key       1,108 B/image   seven operations, ~158 B each
+#                                     -------
+#   measured total                      1,633 B/image
+#
+# The reason it is larger than every phase before it is structural rather than sloppy: phases 09
+# to 20 each store one fixed-width verdict per photograph, and this stores a *list* of up to
+# `MAX_OPS` operations, each with its own rectangle and its own magnitudes. A typical frame
+# carries three or four of them and costs about 1.1 KB. A 4,000-image wedding is about 6 MB.
+#
+# `micro_matrix` is deliberately outside the figure: it is one row per *project* rather than per
+# photograph, so it costs about a hundred bytes for a whole wedding and does not scale with the
+# import.
+#
+# The budget is 2,000 B/image rather than the measured 1,633, and the headroom is phase 19's
+# correction: a budget must not be pinned at its own measurement.
+[size.micro_store_per_1000_images]
+max_bytes = 2000000

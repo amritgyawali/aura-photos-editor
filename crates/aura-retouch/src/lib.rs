@@ -116,6 +116,7 @@ pub mod errors;
 pub mod evening;
 pub mod fixtures;
 pub mod guard;
+pub mod micro;
 pub mod ops;
 pub mod permanent;
 pub mod presets;
@@ -125,6 +126,7 @@ pub mod texture_guard;
 pub mod undereye;
 
 pub use api::{PassReport, Retouch, RetouchPass};
+pub use micro::{Micro, MicroPass, MicroPassReport, MicroStore, MicroTable};
 pub use ops::{Analyser, FrameContext, FrameOutcome, ANALYSIS_VER, MODEL_VER, RETOUCH_LEVEL};
 pub use presets::{PresetRow, PresetTable, SceneRow};
 pub use store::{RetouchStore, BYTES_PER_IMAGE};

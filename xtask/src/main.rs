@@ -55,6 +55,14 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-render/shaders/freq_bands.wgsl",
     "crates/aura-render/shaders/inpaint_patch.wgsl",
     "crates/aura-render/shaders/retouch_apply.wgsl",
+    // PHASE-21. The migration, and the two shaders. `micro_borrow.wgsl` is the one shader in the
+    // product that reads pixels from a second photograph, so a change to it is a change to what
+    // a composite is; `micro_apply.wgsl` carries the five operators the reference path in
+    // `aura_render::micro` also draws, and a shader that drifts while no device can run it is a
+    // pair of teeth that look different on the day a backend first runs.
+    "crates/aura-catalog/migrations/0021_micro_retouch.sql",
+    "crates/aura-render/shaders/micro_apply.wgsl",
+    "crates/aura-render/shaders/micro_borrow.wgsl",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

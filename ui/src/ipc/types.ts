@@ -2833,3 +2833,198 @@ export type SetProtectionInput = {
   area: CropRectDto;
   protect: boolean;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-21. The micro-retouch surface.
+// ---------------------------------------------------------------------------
+
+/**
+ * One small fix, as the panel draws it.
+ *
+ * The five operators flattened into one shape: `kind` says which, and only the fields that
+ * operator uses are non-zero.
+ */
+export type MicroOpDto = {
+  /** `flyaway`, `teeth`, `eyes`, `clothing` or `glare`. */
+  kind: string;
+  /** How strongly it ran, as a fraction of that operator's own ceiling. */
+  strength: number;
+  /** Where it acted, for the three operators that name a rectangle. */
+  region?: CropRectDto | null;
+  /** Whose face, for the two that name a person. */
+  identityId?: string | null;
+  /** Teeth luminance lift in stops. Bounded at 0.20. */
+  lumaEv: number;
+  /** Teeth yellow reduction, as a share of the measured excess. Bounded at 0.35. */
+  yellowReduce: number;
+  /** Sclera redness reduction, as a share of the measured excess. Bounded at 0.30. */
+  sclera: number;
+  /** Iris local contrast gain. Bounded at 0.25. */
+  irisClarity: number;
+  /** `lint`, `thread`, `stain`, `strap` or `crease`, for a clothing operation. */
+  clothingKind?: string | null;
+  /** `reduce` or `borrow`, for a glare operation. */
+  method?: string | null;
+  /**
+   * **The disclosure.** The photograph these pixels came from, for a borrow.
+   *
+   * Never absent when `method` is `borrow`. The panel must render such a region with a visible
+   * marker rather than as an ordinary edit - see `docs/retouch-ethics.md` section 5.
+   */
+  borrowedFrom?: string | null;
+  /** How well the two regions aligned, for a borrow. */
+  alignment: number;
+};
+
+/** What the naturalness guard measured on the rendered result. */
+export type NaturalnessReportDto = {
+  /** Peak iris luminance after over before. Held at or above 0.98. */
+  catchlightRatio: number;
+  /** Hair-region edge energy after over before. Held at or above 0.94. */
+  hairEnergyRatio: number;
+  /** How much further outside the locus the plan pushed the teeth. Held below 0.003. */
+  teethExcursion: number;
+  /**
+   * How many pixels the three measurements were taken over, summed.
+   *
+   * Show the ratios to three decimals only when this is large enough to mean something.
+   */
+  measuredOn: number;
+  /** How many times a family gave up strength to reach its bound. */
+  resolves: number;
+  /** Which families were withdrawn, aligned with `families`. */
+  withdrawn: boolean[];
+  /** The family names, so the panel never hard-codes the order. */
+  families: string[];
+};
+
+/** One reason the plan came out the way it did. */
+export type MicroReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+  /** True when the code withdraws a claim rather than making one. */
+  doubt: boolean;
+  evidence?: CropRectDto | null;
+};
+
+/** One photograph's micro-retouch plan. */
+export type MicroPlanDto = {
+  photoId: string;
+  ops: MicroOpDto[];
+  naturalness: NaturalnessReportDto;
+  /** Which operations the matrix permitted, aligned with `operators`. */
+  allowed: boolean[];
+  operators: string[];
+  reasons: MicroReasonDto[];
+  confidence: number;
+  scene: string;
+  budgetUsed: number;
+  /** **The disclosure, per frame.** Every photograph this plan borrowed pixels from. */
+  borrowedFrom: string[];
+  userEdited: boolean;
+  reviewed: boolean;
+  modelVer: number;
+  analysisVer: number;
+  matrixVer: number;
+};
+
+/** What the Micro-Retouch panel's project header shows. */
+export type MicroStatusDto = {
+  photos: number;
+  planned: number;
+  /** Fraction of the project with a plan. The denominator is every photograph. */
+  coverage: number;
+  actedOn: number;
+  /** Photographs where the regions this phase needs arrived from phase 18. */
+  regionCovered: number;
+  /** How many operations of each kind ran, aligned with `operators`. */
+  opCounts: number[];
+  operators: string[];
+  /** **How many frames in this gallery composited pixels from another.** */
+  borrows: number;
+  /** How many families were withdrawn, aligned with `families`. */
+  withdrawnCounts: number[];
+  families: string[];
+  resolved: number;
+  meanCatchlightRatio: number;
+  meanHairEnergyRatio: number;
+  needsReview: number;
+  userEdited: number;
+  unlistedScenes: string[];
+  modelVer: number;
+  analysisVer: number;
+  matrixVer: number;
+};
+
+/**
+ * Which operations a project permits.
+ *
+ * **There is no strength field and no ceiling field, and there never will be.** A studio chooses
+ * which small fixes run; how far each may go is bounded by the contract.
+ */
+export type MicroMatrixDto = {
+  allowed: boolean[];
+  operators: string[];
+  clothing: boolean[];
+  clothingKinds: string[];
+  /** Which issues are opt-in only and start switched off. */
+  clothingOptIn: boolean[];
+  /** Whether cross-frame borrowing is permitted at all. */
+  borrowing: boolean;
+};
+
+/** Record which operations a project permits. Absent fields are left alone. */
+export type SetMicroMatrixInput = {
+  projectId: string;
+  allowed?: boolean[] | null;
+  clothing?: boolean[] | null;
+  borrowing?: boolean | null;
+};
+
+/** Run the resumable micro-retouch pass. */
+export type MicroPassInput = {
+  projectId: string;
+  priority?: string | null;
+  /** Switch the whole stage off for this run. */
+  enabled?: boolean | null;
+};
+
+/** What one pass did. */
+export type MicroPassDto = {
+  planned: number;
+  failed: number;
+  actedOn: number;
+  regionCovered: number;
+  ops: number[];
+  borrows: number;
+  meanAlignment: number;
+  withdrawn: number[];
+  resolved: number;
+  lowConfidence: number;
+  unlistedScenes: string[];
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+/** Ask for the frames worth a photographer's attention. */
+export type MicroReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+/** Record that a photographer has looked at one plan and agrees. */
+export type AcceptMicroInput = {
+  photoId: string;
+};
+
+/**
+ * One frame that composited pixels from another, and where they came from.
+ *
+ * **The disclosure list.** The panel, the delivery report and the QC agent all read this, so no
+ * two of them can disagree about what was composited.
+ */
+export type MicroCompositeDto = {
+  photoId: string;
+  sourcePhotoIds: string[];
+};

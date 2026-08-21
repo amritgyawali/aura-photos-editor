@@ -106,6 +106,7 @@ pub mod golden;
 pub mod gpu;
 pub mod graph;
 pub mod local;
+pub mod micro;
 pub mod output;
 pub mod parity;
 pub mod profiles;
