@@ -604,6 +604,10 @@ pub fn verify(args: &[String]) -> ExitCode {
     println!("  no region reached the pass from phase 18, so a real frame is not micro-retouched");
     println!("  no naturalness audit has been run, and no 100 % zoom artefact audit either");
     println!("  storage budget: {BYTES_PER_IMAGE} B per image, asserted by aura-perf");
+    println!(
+        "  the panel is not reachable from the running application: `ui/src/ipc/client.ts` has \
+         no wrappers and `App.tsx` mounts no develop panel - exit report condition C6"
+    );
 
     if failures == 0 {
         println!();

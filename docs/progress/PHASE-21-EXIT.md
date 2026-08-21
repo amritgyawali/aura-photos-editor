@@ -1,7 +1,7 @@
 # PHASE-21 exit report - Micro-Retouch Suite: hair, teeth, eyes, clothing and glare
 
 **Branch:** `feat/phase-21-micro-retouch-suite` · **Gate:** `aura-cli verify --phase 21` exits 0 ·
-**Status:** implemented **conditionally**, on the five conditions in section 8.
+**Status:** implemented **conditionally**, on the six conditions in section 8.
 
 ## 0. Read this first: what this phase can and cannot claim
 
@@ -214,6 +214,13 @@ one burst differ by subject motion, camera motion, noise and a little exposure d
 alignment floor has never been tested against that. This is the condition most likely to change a
 number when real files arrive.
 
+**C6 - the panel is not reachable from the running application.** The nine commands are
+registered in `ui/src-tauri/src/main.rs` and the shell builds, but `ui/src/ipc/client.ts` has no
+wrappers for them and `ui/src/App.tsx` mounts no develop panel at all. That is a repository-wide
+gap rather than this phase's: `client.ts` stops at phase 19, and every panel from phase 12 onward
+exists with tests and is imported nowhere. `MicroRetouchPanel` is props-driven and fully tested,
+so wiring it is a caller rather than a component.
+
 ## 9. Rollback
 
 The stage is off with one field: `MicroPassInput::enabled = false`, which produces a plan carrying
@@ -241,4 +248,5 @@ object. Dropping them leaves every phase up to 20 intact.
   rebuilt a recipe without `borrowed_from` would produce an undisclosed composite. Phase 30's
   delivery report reads `v_micro_composites`.
 - **The desktop shell builds again**, with 75 commands registered. Phase 20's condition C5 is
-  closed.
+  closed, and what is left of that gap is C6: the TypeScript client and `App.tsx`, which have
+  lagged the engine since phase 12 and are one task rather than twenty.
