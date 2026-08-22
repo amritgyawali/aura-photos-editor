@@ -298,6 +298,25 @@ micro-eval:
     python ml/models/micro/eval_micro.py --self-test
     python ml/models/micro/export.py --verify models
 
+# The phase 22 gate: migration 22 and its trigger, the scene profiles and the twenty camera noise
+# models, the bounds the code owns rather than the files, the evidence-driven tier ladder, the four
+# sharpening preconditions, the identity constraint end to end, the self-check and its two levers,
+# and a recovered face the database will not deliver past the identity ceiling. It prints what it
+# does not prove at the end of every run - see docs/progress/PHASE-22-EXIT.md conditions C1 to C6.
+phase-22-verify:
+    cargo run --release --package aura-cli -- verify --phase 22 --work target/phase22-verify
+
+# The phase 22 gates, from the Python side. Neither training script can run on real data here -
+# there are no paired noisy/clean captures and no consented face data - so all three self-test
+# against a synthetic answer known by construction, and `export.py --verify` checks that the two
+# registered heads agree with the shapes the code expects and that both emit a *residual* rather
+# than an image.
+restore-eval:
+    python ml/models/restore/train_denoise.py --self-test
+    python ml/models/restore/train_face_recovery.py --self-test
+    python ml/models/restore/eval_restore.py --self-test
+    python ml/models/restore/export.py --verify models
+
 # The calibration metrics, from the Python side. `--self-test` proves the
 # estimator catches an overconfident predictor and that a fit improves held-out
 # ECE; `--outcomes FILE --fit --diagram OUT.svg` reports on real outcomes when

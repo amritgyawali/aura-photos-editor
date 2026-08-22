@@ -5688,3 +5688,326 @@ pub struct MicroCompositeDto {
     /// The photographs its pixels were borrowed from.
     pub source_photo_ids: Vec<String>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-22. The restoration surface.
+// ---------------------------------------------------------------------------
+
+/// What happened to one face the restoration pass considered.
+///
+/// **Every face gets one of these, whether it was recovered or not.** ADR-0046 section 4: a panel
+/// that only listed what happened would make a careful product look like a careless one, and two
+/// thirds of this phase's reason codes are refusals.
+///
+/// `identityDrift` is on the wire whether the face was kept or skipped, so the panel can show a
+/// measured distance beside the sentence rather than a bare refusal.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreFaceDto {
+    /// Whose face, when phase 06 has assigned one.
+    pub identity_id: Option<String>,
+    /// Where it is, in **frame** coordinates as the panel draws it.
+    pub area: CropRectDto,
+    /// The measured sharpness that decided whether it was inside the soft band, `0..1`.
+    pub sharpness: f32,
+    /// The recovery strength that survived, `0..0.4`. Zero when the face was skipped.
+    pub strength: f32,
+    /// How far the phase 06 embedding moved, `0..1`. **Never above 0.08 on a kept face.**
+    pub identity_drift: f32,
+    /// How many times the strength was reduced to bring it back.
+    pub resolves: u8,
+    /// True when nothing was applied to this face.
+    pub skipped: bool,
+    /// Why it was skipped, as a `RestoreCode` slug.
+    pub skipped_because: Option<String>,
+}
+
+/// What the artefact self-check measured on the rendered result.
+///
+/// Three numbers rather than one score, and ADR-0045 section 2.1 has the argument: smearing is
+/// fixed by lowering the denoise tier, ringing by reducing the sharpen amount, and drift by the
+/// identity constraint. A photographer whose complaint is that an edge looks crunchy needs the
+/// ringing figure rather than a score that averaged it with something else.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtefactReportDto {
+    /// High-band energy outside the face, after over before. Held at or above 0.90.
+    pub texture_retention: f32,
+    /// Mean edge overshoot on the strongest edges, `0..1`. Held below 0.020.
+    pub ringing: f32,
+    /// The largest identity movement over the faces that were kept, `0..1`. Held at or below 0.08.
+    pub identity_drift: f32,
+    /// How many pixels the first two were measured over.
+    ///
+    /// The panel shows three decimal places only when this is large enough to mean something. A
+    /// ratio over eleven samples is arithmetic rather than evidence - phase 21's rule.
+    pub measured_on: u32,
+    /// How many times a strength was reduced to reach the bounds.
+    pub resolves: u8,
+    /// True when the denoise tier was stepped down by the self-check.
+    pub denoise_reduced: bool,
+    /// True when sharpening was reduced or withdrawn.
+    pub sharpen_reduced: bool,
+    /// True when at least one face was skipped for drift.
+    pub face_skipped: bool,
+}
+
+/// One reason a restoration came out the way it did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreReasonDto {
+    /// The stable slug.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// Which of the four decisions this is about: `denoise`, `sharpen`, `face_recovery`, `plan`.
+    ///
+    /// The panel groups thirty codes into four groups with this, rather than hard-coding which
+    /// code belongs where.
+    pub subject: String,
+    /// How much this reason moved the decision, `-1..1`.
+    pub weight: f32,
+    /// True when this says something did **not** happen.
+    pub restraint: bool,
+    /// Where in the frame, when naming a place helps.
+    pub area: Option<CropRectDto>,
+}
+
+/// One photograph's restoration plan.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct RestorePlanDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// `off`, `light`, `standard` or `strong`.
+    pub denoise: String,
+    /// Luminance noise reduction, `0..1`. Absent when the tier is `off`.
+    pub denoise_luminance: Option<f32>,
+    /// Chroma noise reduction, `0..1`. Never below the luminance figure.
+    pub denoise_colour: Option<f32>,
+    /// The sensor sigma the tier was chosen from, in linear working-space units.
+    pub denoise_sigma: Option<f32>,
+    /// The camera body whose noise model conditioned it.
+    pub denoise_camera: Option<String>,
+    /// True when that model was measured rather than derived from a specification.
+    ///
+    /// **False on every body in this build.** An unmeasured model caps the tier at `standard`.
+    pub denoise_measured: bool,
+    /// The estimated blur kernel, in pixels of Gaussian sigma. Absent when nothing was sharpened.
+    pub sharpen_kernel: Option<f32>,
+    /// How much of the deconvolution was applied, `0..0.5`.
+    pub sharpen_amount: f32,
+    /// The share of that amount withheld on skin, `0..1`.
+    pub sharpen_skin_attenuation: f32,
+    /// Fraction of the frame the sharpening acted on, `0..1`.
+    pub sharpen_coverage: f32,
+    /// The plan-wide face-recovery strength, `0..0.4`.
+    pub face_recovery: f32,
+    /// One record per face considered.
+    pub faces: Vec<RestoreFaceDto>,
+    /// How many faces were recovered.
+    pub faces_recovered: u32,
+    /// **How many were declined to keep somebody looking like themselves.**
+    pub faces_skipped_identity: u32,
+    /// What the self-check measured. Absent on a frame nothing was done to.
+    pub selfcheck: Option<ArtefactReportDto>,
+    /// `local_gpu`, `local_cpu` or `cloud`. Never `cloud` in this build.
+    pub run_where: String,
+    /// `export` or `background`. There is no interactive value.
+    pub run_when: String,
+    /// True when phase 18 supplied at least one usable region.
+    pub region_covered: bool,
+    /// Why, strongest first.
+    pub reasons: Vec<RestoreReasonDto>,
+    /// How much the plan trusts itself, `0..1`.
+    pub confidence: f32,
+    /// The scene it was decided under.
+    pub scene: String,
+    /// True when a photographer changed it.
+    pub user_edited: bool,
+    /// True when a photographer has looked at it and agreed.
+    pub reviewed: bool,
+}
+
+/// What the Restore panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a plan.
+    pub planned: u32,
+    /// Fraction of the project with a plan, `0..1`. **The denominator is every photograph.**
+    pub coverage: f32,
+    /// Photographs where at least one operation ran.
+    pub acted_on: u32,
+    /// Photographs where the regions this phase needs arrived from phase 18.
+    pub region_covered: u32,
+    /// How many frames got each tier, in `off`, `light`, `standard`, `strong` order.
+    pub tiers: Vec<u32>,
+    /// The names of those four tiers, so the panel never hard-codes the order.
+    pub tier_names: Vec<String>,
+    /// Frames that were sharpened.
+    pub sharpened: u32,
+    /// Why sharpening was refused, as `(code, count)` pairs, commonest first.
+    ///
+    /// A histogram rather than a count: "AURA sharpened nothing in this wedding" has six causes
+    /// and five of them are somebody else's bug. ADR-0046 section 7.
+    pub sharpen_refusals: Vec<RestoreRefusalDto>,
+    /// Faces recovered across the project.
+    pub faces_recovered: u32,
+    /// **Faces declined to keep somebody looking like themselves.**
+    pub faces_skipped_identity: u32,
+    /// The largest identity movement over every kept face in the project, `0..1`.
+    ///
+    /// Section 10.1's gate, as one number: it is never above 0.08 on a sound catalog.
+    pub worst_identity_drift: f32,
+    /// Mean texture retention over frames that were denoised.
+    pub mean_texture_retention: f32,
+    /// Mean ringing over frames that were sharpened.
+    pub mean_ringing: f32,
+    /// Frames where the self-check reduced or withdrew something.
+    pub reduced: u32,
+    /// Frames below the review threshold.
+    pub needs_review: u32,
+    /// Frames a photographer has changed by hand.
+    pub user_edited: u32,
+    /// Camera bodies denoised against a synthetic noise model, by name.
+    ///
+    /// **Every body in this build.** A studio that sees its main camera here knows why its
+    /// dance-floor frames are capped at `standard`. ADR-0046 section 7.
+    pub unmeasured_cameras: Vec<String>,
+    /// Scenes with no row in the profile file.
+    pub unlisted_scenes: Vec<String>,
+    /// The versions the stored plans were made under: heads, arithmetic, profiles.
+    pub versions: Vec<u16>,
+}
+
+/// One reason sharpening was refused, and how often.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreRefusalDto {
+    /// The stable slug.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// How many frames.
+    pub count: u32,
+}
+
+/// Ask for the frames worth a photographer's attention.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many at most.
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Record that a photographer has looked at one plan and agrees.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptRestoreInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Record what a photographer chose for one photograph.
+///
+/// **A tier and two switches, and no other number.** ADR-0046 section 3: the line is between
+/// *which of four* and *how far each goes*. A photographer choosing `standard` on a frame AURA put
+/// at `light` is making a judgement about their own photograph; one setting a luminance amount is
+/// overriding a decision conditioned on the camera's noise model, and the number would mean
+/// something different on their other body.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetRestoreOverrideInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// `off`, `light`, `standard` or `strong`. Absent leaves AURA's own choice alone.
+    #[serde(default)]
+    pub denoise: Option<String>,
+    /// Whether sharpening may run. Absent leaves the decision alone.
+    #[serde(default)]
+    pub sharpen: Option<bool>,
+    /// Whether face recovery may run. Absent leaves the decision alone.
+    ///
+    /// Separate from `sharpen` because a photographer can want a frame sharpened and want no model
+    /// near anybody's face.
+    #[serde(default)]
+    pub face_recovery: Option<bool>,
+}
+
+/// Run the resumable restoration pass.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestorePassInput {
+    /// The project.
+    pub project_id: String,
+    /// `export` or `background`. **There is no interactive value**, and there is no variant of
+    /// `RestoreWhen` that could carry one.
+    #[serde(default)]
+    pub when: Option<String>,
+    /// `visible`, `interactive`, `ai_batch` or `background`.
+    #[serde(default)]
+    pub priority: Option<String>,
+    /// The delivery's long edge in pixels, for the output-size modifier.
+    #[serde(default)]
+    pub output_long_edge: Option<u32>,
+    /// Switch the whole stage off for this run. The kill switch hard rule 8 requires.
+    #[serde(default)]
+    pub enabled: Option<bool>,
+}
+
+/// What one pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestorePassDto {
+    /// Photographs planned.
+    pub planned: u32,
+    /// Photographs that could not be planned.
+    pub failed: u32,
+    /// Photographs where at least one operation ran.
+    pub acted_on: u32,
+    /// Photographs where at least one usable region arrived.
+    pub region_covered: u32,
+    /// How many frames got each tier, in tier order.
+    pub tiers: Vec<u32>,
+    /// Frames that were sharpened.
+    pub sharpened: u32,
+    /// Faces recovered.
+    pub faces_recovered: u32,
+    /// Faces declined to keep somebody looking like themselves.
+    pub faces_skipped_identity: u32,
+    /// Frames where the self-check reduced or withdrew something.
+    pub reduced: u32,
+    /// Frames below the review threshold.
+    pub low_confidence: u32,
+    /// Camera bodies denoised against a synthetic noise model.
+    pub unmeasured_cameras: Vec<String>,
+    /// Scenes planned against the neutral row.
+    pub unlisted_scenes: Vec<String>,
+    /// Milliseconds the pass took.
+    pub elapsed_ms: u64,
+    /// True when the pass stopped early.
+    pub cancelled: bool,
+}
+
+/// One frame whose face recovery was declined to keep somebody looking like themselves.
+///
+/// **The guarantee's own list**, and it is on the surface deliberately. Section 10.1 gates
+/// identity preservation at 100 %, and a gate that can only be checked by opening four hundred
+/// plans one at a time is a gate nobody checks. ADR-0046 section 4.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreIdentityRefusalDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The largest distance a face in it moved before being declined, `0..1`.
+    pub worst_drift: f32,
+    /// How many faces in it were declined.
+    pub faces: u32,
+}

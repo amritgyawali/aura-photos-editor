@@ -62,6 +62,7 @@ pub mod micro_commands;
 pub mod moment_commands;
 pub mod people_commands;
 pub mod preview_commands;
+pub mod restore_commands;
 pub mod retouch_commands;
 pub mod state;
 pub mod story_commands;
@@ -135,6 +136,10 @@ pub use preview_commands::base64;
 pub use preview_commands::{
     cancel_previews, get_preview, prefetch_previews, preview_problems, preview_stats, purge_cache,
     set_cache_budget,
+};
+pub use restore_commands::{
+    accept_restore, image_restore, restore_identity_refusals, restore_pass, restore_reason_codes,
+    restore_review_queue, restore_status, set_restore_override,
 };
 pub use retouch_commands::{
     accept_retouch, image_retouch, protected_features, retouch_pass, retouch_review_queue,

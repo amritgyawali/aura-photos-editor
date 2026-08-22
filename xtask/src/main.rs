@@ -63,6 +63,14 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0021_micro_retouch.sql",
     "crates/aura-render/shaders/micro_apply.wgsl",
     "crates/aura-render/shaders/micro_borrow.wgsl",
+    // PHASE-22. The migration, and the two shaders. `denoise_tile.wgsl` reads a noise-model plane
+    // and decides what to keep in units of the sensor own uncertainty, so a drift in it is a
+    // wedding denoised by a different rule from the one that produced its preview;
+    // `deconv.wgsl` is the only iterative operator in the product and its damping guard is what
+    // stands between a recovered edge and a drawn one.
+    "crates/aura-catalog/migrations/0022_restoration.sql",
+    "crates/aura-render/shaders/denoise_tile.wgsl",
+    "crates/aura-render/shaders/deconv.wgsl",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

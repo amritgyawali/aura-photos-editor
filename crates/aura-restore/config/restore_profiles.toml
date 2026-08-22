@@ -1,0 +1,335 @@
+# How far each kind of photograph may be repaired.
+#
+# PHASE-22 section 4 asks only for `config/noise_models/<camera>.toml`, which describes sensors.
+# This file is the other half and it exists because of invariant 7: "no threshold is global; every
+# threshold is a function of the detected scene and subject role". A denoiser with one ceiling for
+# a candlelit vow and a dance floor is a denoiser with a global threshold.
+#
+# Every row carries a written reason - the rule phases 07, 10, 12, 15, 16, 19, 20 and 21 all
+# enforce. A ceiling nobody can explain is a product quietly deciding how much of somebody's
+# wedding to smooth away.
+#
+# WHAT IS AND IS NOT IN THIS FILE
+#
+# The ceilings are here and they are BOUNDED BY THE CODE. `RestoreProfiles::parse` refuses a file
+# that raises `max_sharpen` above `MAX_SHARPEN_AMOUNT`, that lowers `skin_attenuation` below
+# `SKIN_ATTENUATION`, or that names a tier outside the four. A studio may lower a ceiling and may
+# switch an operation off; nothing here can widen one. That is what makes the guarantees in
+# `docs/restoration.md` promises about the product rather than descriptions of its defaults.
+#
+# There is no absolute noise figure anywhere in this file. The tier is chosen from phase 09's
+# `noise_sigma_rel`, which is the measured sigma RELATIVE TO WHAT THIS SCENE TOLERATES at this ISO
+# on this body, so a frame with no noise in it gets no denoising however permissive its row is.
+# The rows here are ceilings on what may happen, never targets for what should.
+#
+# There is no per-person, per-ethnicity or per-age row and there never will be one.
+#
+# BUMP `version` ON ANY CHANGE. It is written into `restore_plan.profile_ver`, and a plan made
+# under one table is not comparable with a plan made under another - `AURA-ML-5102` exists so
+# that comparison never happens silently.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# The ceilings. Each may be lowered by a studio and none may be raised.
+# ---------------------------------------------------------------------------
+
+[bounds]
+# The largest deconvolution amount any scene may reach. Bounded above by MAX_SHARPEN_AMOUNT.
+max_sharpen      = 0.50
+# The share of the sharpening amount withheld on skin. Bounded BELOW by SKIN_ATTENUATION: a file
+# may protect skin more than the contract requires and may never protect it less.
+skin_attenuation = 0.80
+# The largest face-recovery strength any scene may reach. Bounded above by MAX_FACE_RECOVERY.
+max_face_recovery = 0.40
+reason = """
+Three numbers, and the second is the only one in this product whose bound runs the other way. A
+studio that wants skin left entirely alone can raise `skin_attenuation` toward 1.0; a studio that
+wants faces crunchy cannot lower it, because "sharpening is explicitly attenuated on skin" is
+section 6.2 of the phase document rather than a default somebody chose. The first and third are
+the contract's own ceilings restated so that lowering them is a one-line change here rather than
+a rebuild.
+"""
+
+# ---------------------------------------------------------------------------
+# The tier ladder. Where `noise_sigma_rel` crosses from one tier into the next.
+# ---------------------------------------------------------------------------
+
+[ladder]
+light    = 1.00
+standard = 1.60
+strong   = 2.60
+reason = """
+Phase 09's `noise_sigma_rel` is 1.0 at exactly the scene's own tolerance, so the first threshold
+is not a number anybody chose - it is the definition of "more noise than this kind of photograph
+carries well", and denoising below it would be removing noise a photographer had already decided
+was acceptable. The other two are set from what the tiers cost: `standard` is where leaving the
+noise starts to be more visible than the texture removing it costs, and `strong` is reserved for
+frames whose noise is more than two and a half times what the scene tolerates - a dance floor at
+ISO 12800 and very little else. The ladder is deliberately not evenly spaced: the interesting
+decisions are all in the first stop above tolerance.
+"""
+
+# ---------------------------------------------------------------------------
+# The two modifiers. Each may raise a tier by one step and neither may pass the scene ceiling.
+# ---------------------------------------------------------------------------
+
+[modifiers]
+# Subject prominence at or above which the tier may rise one step.
+prominence_raises_above = 0.55
+# Output long edge, in pixels, at or above which the tier may rise one step.
+output_raises_above     = 3000
+reason = """
+Section 6.1: the tier is chosen "from noise level, subject prominence and output size". Both of
+these are about where the noise LANDS rather than how much of it there is. A frame whose subject
+fills more than half of it has its noise on somebody's face; a delivery whose long edge is over
+3000 px is a print or a full-screen view, where grain that is invisible in a gallery thumbnail is
+the first thing anybody sees. Each may raise the tier by one step and neither may raise it twice,
+because two modifiers that both fire would take a frame from `light` to `strong` on evidence that
+is entirely about presentation rather than about noise.
+"""
+
+# ---------------------------------------------------------------------------
+# One row per scene. `max_tier` is the strongest denoise this kind of photograph may receive,
+# `sharpen` is whether deconvolution may run at all, and `face_recovery` likewise.
+# ---------------------------------------------------------------------------
+
+[scene.getting_ready_bride]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+Window light in a hotel room: usually ISO 800 to 3200, and the frame is full of the two things
+denoising damages first - lace on a dress and fine hair. `standard` is the ceiling because a
+getting-ready frame that has lost its lace has lost the reason it was taken.
+"""
+
+[scene.getting_ready_groom]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+The same light and the same ceiling as the bridal room. Suit fabric has a weave at the same scale
+as lace and suffers the same way, and a cufflinks detail is a macro frame where every remaining
+grain is structure.
+"""
+
+[scene.details]
+max_tier      = "light"
+sharpen       = true
+face_recovery = false
+reason = """
+The lowest ceiling in the file, and the only scene where the reason is not about noise at all.
+Detail frames are shot on a tripod at base ISO with the subject filling the frame; they have very
+little noise and a great deal of texture, so `light` is generous already. Face recovery is off
+because there are no faces here and an operation that cannot fire should not be permitted to.
+"""
+
+[scene.first_look]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+Outdoors or in a doorway, mid ISO, and the whole frame is two expressions. Sharpening helps here
+more than almost anywhere, because a first look is usually shot wide open and the plane of focus
+is a few centimetres deep.
+"""
+
+[scene.ceremony_entrance]
+max_tier      = "strong"
+sharpen       = true
+face_recovery = true
+reason = """
+A dark aisle, a backlit door and a subject walking. One of two scenes where `strong` is permitted,
+because an entrance is unrepeatable and a noisy frame of it is the only frame of it. Sharpening is
+on, but the motion test in `sharpen` will refuse most of these frames on its own.
+"""
+
+[scene.ceremony]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+Often the darkest part of the day and often the least repeatable, which argues for `strong` - and
+the ceiling is `standard` anyway, because a ceremony frame is a wide shot of a room full of
+fabric, flowers and faces at small scale, and that is exactly the content a strong denoise turns
+into plastic. Where a ceremony frame really is at ISO 12800 the honest answer is that it is a
+noisy photograph of a moment that happened.
+"""
+
+[scene.ritual]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+The same ceiling as the ceremony and for one additional reason: a ritual frame is full of small
+decorated objects - garlands, thread, tilak, sindoor, mehndi - whose whole significance is their
+detail. A denoiser that flattens them has removed the content of the photograph while leaving the
+composition intact, which is the failure nobody notices until the family does.
+"""
+
+[scene.vows]
+max_tier      = "standard"
+sharpen       = false
+face_recovery = true
+reason = """
+Sharpening is off here, and this is the one scene where that is a deliberate aesthetic decision
+rather than a technical one. Vows are shot long and wide open on purpose; the softness is the
+photographer's, and an engine that recovered it would be arguing with them. Denoising still runs,
+because grain is not a choice anybody made.
+"""
+
+[scene.rings]
+max_tier      = "light"
+sharpen       = true
+face_recovery = false
+reason = """
+A macro frame of metal and stone, usually at base ISO. The same argument as `details`: almost no
+noise and a great deal of texture, so the ceiling is the lowest one and the sharpening is where
+the value is.
+"""
+
+[scene.kiss]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+Two faces at close range in whatever light the ceremony had. Face recovery matters more here than
+in any other scene and is also constrained harder, because the frame is almost entirely two
+people and the identity measurement has the whole photograph to be wrong about.
+"""
+
+[scene.family_portrait]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+Usually flashed and usually clean, so the tier rarely rises above `light` in practice. The
+ceiling is `standard` for the frames shot in a corner of a dark hall after the light went, which
+every wedding has and nobody plans for.
+"""
+
+[scene.group_portrait]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+The same as a family portrait, with one difference that matters for this phase: faces are small,
+so the deconvolution's kernel estimate is dominated by the background rather than by anybody's
+eyes. The kernel band in `sharpen` refuses most of these on its own.
+"""
+
+[scene.couple_portrait]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+Controlled light, deliberate softness in the background and two faces the client will look at
+more closely than any other frame in the gallery. Sharpening is on and the bokeh exclusion is
+what makes it safe: a deconvolved out-of-focus background is the single most recognisable
+artefact a restoration tool produces.
+"""
+
+[scene.golden_hour]
+max_tier      = "light"
+sharpen       = true
+face_recovery = true
+reason = """
+Bright, low ISO and full of haze, flare and rim light that a denoiser reads as noise because it
+is low-contrast and unstructured. `light` is the ceiling for that reason rather than for a
+technical one: there is little noise here and a great deal to lose.
+"""
+
+[scene.reception_entrance]
+max_tier      = "strong"
+sharpen       = true
+face_recovery = true
+reason = """
+The second scene where `strong` is permitted. A reception entrance is a dark room, a spotlight and
+people moving fast; the noise is genuinely extreme and the alternative to denoising is not
+delivering the frame.
+"""
+
+[scene.speeches]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+Dark room, static subject, long lens. Technically the easiest scene in the reception and the one
+where a `standard` denoise costs almost nothing, because a speech frame is a face and a
+background rather than a room full of texture.
+"""
+
+[scene.cake]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = false
+reason = """
+Face recovery is off because a cake frame is about the cake and the two people are usually small
+and turned away. The denoise ceiling is ordinary; icing has a texture that a strong denoise turns
+into a matte surface, which is why it is not higher.
+"""
+
+[scene.first_dance]
+max_tier      = "strong"
+sharpen       = false
+face_recovery = true
+reason = """
+The only row in this file that permits the strongest tier and forbids sharpening at the same
+time. A first dance is the darkest scene of the night and the subjects are always moving, so the
+noise is extreme and the softness is motion - and section 2.2 puts motion-blur removal out of
+scope. Denoise hard, sharpen not at all.
+"""
+
+[scene.dance_floor]
+max_tier      = "strong"
+sharpen       = false
+face_recovery = false
+reason = """
+The scene this whole phase's commercial argument is about, and the one with the fewest operations
+switched on. ISO 12800 and above, flash mixed with coloured LEDs, everybody moving. Denoising is
+what makes these frames deliverable; sharpening would be deconvolving motion, and face recovery
+would be running a prior on faces that are blurred past the band it is allowed to act in.
+"""
+
+[scene.candid]
+max_tier      = "standard"
+sharpen       = true
+face_recovery = true
+reason = """
+Everything from a bright garden to a dark corridor, which is why the ceiling is the middle one
+rather than a decision. The tier ladder does the work here: a candid at ISO 400 gets nothing and
+a candid at ISO 6400 gets `standard`, from the same row.
+"""
+
+[scene.venue]
+max_tier      = "light"
+sharpen       = true
+face_recovery = false
+reason = """
+Architecture, usually on a tripod, usually at base ISO. The ceiling is low for the reason
+`details` and `rings` are: there is little noise and a lot of fine structure, and a venue frame
+with denoised brickwork looks like a rendering.
+"""
+
+[scene.exit]
+max_tier      = "strong"
+sharpen       = false
+face_recovery = true
+reason = """
+Sparklers, confetti and darkness. `strong` because the light is gone and the frames matter;
+sharpening off because every one of these is a long exposure of moving people and deconvolving it
+would produce doubled edges rather than detail.
+"""
+
+[scene.unknown]
+max_tier      = "light"
+sharpen       = false
+face_recovery = false
+reason = """
+The neutral row, used for any scene with no row of its own and for a frame phase 07 could not
+classify. It is the most conservative row in the file deliberately: a photograph AURA cannot
+describe is a photograph it should barely touch, and every other row in this file is an argument
+for doing more than this. `AURA-ML-5102` is not raised for a frame planned here - the plan simply
+records `restore_tier_capped_by_scene` and the outline lists the scene as unlisted.
+"""

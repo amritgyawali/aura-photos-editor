@@ -2,6 +2,47 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 22 - Restoration Stack (scene-aware denoise, selective sharpen, face recovery)
+
+The first phase that repairs a photograph rather than deciding something about it, and the one
+where a wrong answer removes information instead of changing an opinion.
+
+Noise reduction is chosen from the noise that is actually in the frame, measured against what that
+kind of photograph carries well, and conditioned on what the camera's own sensor does at that ISO -
+so the same tier removes visibly different amounts on two bodies, and a frame with no noise in it
+gets nothing however permissive its scene row is. After deciding, AURA renders the result and
+measures how much fine texture it removed; lace that lost too much steps the tier down and is
+measured again.
+
+Sharpening refuses far more often than it runs, and all four of its preconditions are refusals
+with reason codes rather than reduced amounts: the softness has to be recoverable rather than gross
+or already at the sensor's limit, it has to be focus rather than movement, the focus has to have
+landed on the subject, and phase 18 has to have said where the skin, the sky and the out-of-focus
+background are. That last one has no fallback on purpose - those three regions are where sharpening
+is visible *as damage* and almost nowhere else, so an unmasked global sharpen spends its whole
+artefact budget on the three places a photographer looks first.
+
+**The guarantee is that AURA stops rather than changes what somebody looks like.** A face is only
+considered inside a narrow band of softness - never one too blurred for a prior to be constrained
+by, because what comes back then is the prior. Inside the band, the recovery is rendered, the face
+is embedded before and after, and if the person has started to measure as even slightly different
+the strength drops and it renders again; still different, and **the face is put back the way it
+was**. There is no fourth outcome and no setting that disables it. The measured distance is stored
+on every face whether it passed or not, so "no delivered face was changed" is a query rather than
+a sentence, and a database trigger aborts the update that would deliver one anyway.
+
+Restoration never runs while you are editing. `RestoreWhen` has two variants and no interactive
+one, the render graph refuses independently, and denoising is the exception only because it sits
+at stage 6 with the rest of the tonal pipeline.
+
+**Both shipped heads are untrained, and one ships as a refusal rather than as a measurement**: no
+face in this build is recovered at all, because the substitute for a face prior would be unsharp
+masking on a face - a different operation with the same name. **No camera noise model has been
+measured**, so every body is capped below the strongest tier and named in the panel. **No frame in
+this build is sharpened**, because no region reaches the pass. Conditions C1 to C7 of
+`docs/progress/PHASE-22-EXIT.md`, and the expert preference study that would be this phase's
+headline result is C4.
+
 ## Phase 21 - Micro-Retouch Suite (hair, teeth, eyes, clothing, glare)
 
 The small fixes a retoucher makes without being asked, and the first phase in which AURA can put

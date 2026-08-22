@@ -463,9 +463,13 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         recipe.retouch.first().map(|op| op.op.clone()),
     );
 
-    let wants_restoration = recipe.restoration.denoise != "off"
-        || recipe.restoration.face_recovery > 0
-        || recipe.restoration.deblur > 0;
+    // PHASE-22, ADR-0045 section 2. `restoration.denoise` deliberately does **not** appear here.
+    // Denoising is a sensor-domain operation and runs at `Stage::NoiseReduction`, index 6, thirteen
+    // stages earlier - which is what satisfies section 2.1's "denoise before local retouch and
+    // sharpening" without moving anything in `ORDER`. The field carries the *tier name* for audit
+    // and the panel; the numbers that make it happen are `global.noise.*`. A tier alone enabling
+    // this stage would report a stage that ran and changed nothing.
+    let wants_restoration = recipe.restoration.face_recovery > 0 || recipe.restoration.deblur > 0;
     push!(
         Stage::Restoration,
         wants_restoration && caps.restoration && !skip_heavy,
@@ -556,6 +560,14 @@ pub fn stage_for(path: &str) -> Option<Stage> {
                 Some(Stage::Hsl)
             } else if path.starts_with("bw") {
                 Some(Stage::Monochrome)
+            } else if path == "restoration.denoise" {
+                // PHASE-22, ADR-0045 section 2. The tier decides `global.noise.*`, which
+                // `Stage::NoiseReduction` reads at index 6, so a cache told the change is valid
+                // from index 19 would serve the buffer it had already denoised under the previous
+                // tier. Routing it to the earlier stage is conservative and correct; the previous
+                // routing was a latent invalidation bug that nothing had hit because nothing wrote
+                // the field.
+                Some(Stage::NoiseReduction)
             } else if path.starts_with("restoration") {
                 Some(Stage::Restoration)
             } else if path.starts_with("geometry.perspective") {

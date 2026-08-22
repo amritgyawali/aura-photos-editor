@@ -1544,3 +1544,88 @@ summary      = "The naturalness guard made an operation gentler, or withdrew a f
 user_message = "AURA made some of its small fixes more gently, or not at all, so that hair, teeth and eyes still look like themselves. Nothing has been damaged."
 runbook      = "docs/runbooks/AURA-ML-5101.md"
 introduced   = "PHASE-21"
+
+# ---------------------------------------------------------------------------
+# PHASE-22. Restoration: denoise, deconvolution sharpening and face recovery.
+# ---------------------------------------------------------------------------
+#
+# Seven codes. Five are the shapes phases 09, 11, 15, 19, 20 and 21 use - version
+# drift, one item that could not be done, a refused edit, a refused config file
+# and a region that could not be used - and two are this phase's own.
+#
+# The first of those two is the self-check making an operation gentler or
+# withdrawing it, which is the same shape phase 21 registered for its naturalness
+# guard and is here for the same reason: it is the mechanism working, and it is
+# registered so a photographer can find out it happened rather than wondering why
+# one frame looks softer than the next.
+#
+# The second is `AURA-ML-5108`, and it is the most important code this phase adds.
+# It fires when face recovery was refused because the face had started to measure
+# as a slightly different person. It is a *warning* rather than a failure, because
+# a face that was left alone is the correct outcome and not a broken one - but it
+# is registered rather than silent, because "AURA declined to change what somebody
+# looks like" is the single sentence this phase most needs to be able to say out
+# loud. `docs/restoration.md` says it in the product's own words.
+
+[[error]]
+code         = "AURA-ML-5102"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored restoration plans came from different heads, arithmetic or profile tables"
+user_message = "AURA has improved how it cleans up noisy and soft photographs, so it is re-checking this wedding in the background. Anything you have already changed is kept."
+runbook      = "docs/runbooks/AURA-ML-5102.md"
+introduced   = "PHASE-22"
+
+[[error]]
+code         = "AURA-ML-5103"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph's restoration could not be worked out"
+user_message = "AURA could not work out how to clean up one photograph, and has left that photograph alone. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5103.md"
+introduced   = "PHASE-22"
+
+[[error]]
+code         = "AURA-ML-5104"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A change to a photograph's restoration was refused"
+user_message = "AURA could not record that change. Nothing was changed."
+runbook      = "docs/runbooks/AURA-ML-5104.md"
+introduced   = "PHASE-22"
+
+[[error]]
+code         = "AURA-ML-5105"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "A restoration profile or camera noise-model file was refused"
+user_message = "AURA could not load the settings that decide how much noise it may remove, so it has not removed any. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5105.md"
+introduced   = "PHASE-22"
+
+[[error]]
+code         = "AURA-ML-5106"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A region was unusable, so sharpening was skipped"
+user_message = "AURA is not sure enough where skin, sky and out-of-focus background are in some photographs, so it did not sharpen them. Nothing has been damaged."
+runbook      = "docs/runbooks/AURA-ML-5106.md"
+introduced   = "PHASE-22"
+
+[[error]]
+code         = "AURA-ML-5107"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The artefact self-check made a restoration gentler, or withdrew one"
+user_message = "AURA cleaned up some photographs more gently, or not at all, so that fabric keeps its texture and edges keep their shape. Nothing has been damaged."
+runbook      = "docs/runbooks/AURA-ML-5107.md"
+introduced   = "PHASE-22"
+
+[[error]]
+code         = "AURA-ML-5108"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "Face recovery was declined to keep somebody looking like themselves"
+user_message = "AURA stopped short of recovering detail in some faces, because going further would have started to change what those people look like. Those photographs are unchanged."
+runbook      = "docs/runbooks/AURA-ML-5108.md"
+introduced   = "PHASE-22"

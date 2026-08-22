@@ -51,6 +51,8 @@ use aura_people::store::PeopleStore;
 use aura_people::vault::BiometricKeyStore;
 use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
+use aura_restore::schedule::Capacity as RestoreCapacity;
+use aura_restore::{Restore, RestorePass, RestoreStore};
 use aura_retouch::micro::{Micro, MicroPass, MicroStore};
 use aura_retouch::{Retouch, RetouchPass, RetouchStore};
 use aura_style::profile::Identity;
@@ -1901,6 +1903,78 @@ impl AppState {
             }
         }
         pass = pass.with_tone(self.tone());
+        Ok(pass)
+    }
+
+    /// The restoration store for this catalog. PHASE-22.
+    ///
+    /// Stateless like every decision store since phase 09.
+    #[must_use]
+    pub fn restore_store(&self) -> Arc<RestoreStore> {
+        Arc::new(RestoreStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `RestoreService` for this catalog. PHASE-22.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5105` when the scene profile table or a camera noise model will not load.
+    pub fn restore(&self, project: &ProjectId) -> AuraResult<Arc<Restore>> {
+        let _ = project;
+        Ok(Arc::new(Restore::new(self.restore_store())?))
+    }
+
+    /// The restoration pass, wired to previews, integrity, people and story. PHASE-22.
+    ///
+    /// **No region service is attached, because none reaches this port.** Phase 18 owns regions
+    /// and `RestorePass::with_regions` is the input port; nothing here fills it, so no frame is
+    /// sharpened and every plan says `restore_sharpen_no_regions`. That is condition C3 of the
+    /// phase 22 exit report and it is visible in `RestoreOutline::region_covered` rather than
+    /// hidden. Sharpening refuses rather than running blind - ADR-0045 section 4.
+    ///
+    /// **No identity probe is attached either**, and the consequence is larger: phase 06's
+    /// recogniser is the only thing that can measure whether a face still looks like the same
+    /// person, and a guarantee that cannot be measured is a guarantee that cannot be kept. Every
+    /// face therefore records `restore_recovery_head_untrained` and nothing is recovered. The
+    /// face-recovery head is untrained in this build anyway - see
+    /// `docs/model-cards/face_recovery.md` - so this is the second of two reasons rather than the
+    /// only one.
+    ///
+    /// **Phase 09's verdicts are attached**, and they are what makes any denoising happen at all:
+    /// the tier comes from the measured `noise_sigma_rel` and a frame with no verdict records
+    /// `restore_no_noise_reading` and is left alone.
+    ///
+    /// `Capacity::default()` has `gpu` false, because this build links no `wgpu` backend
+    /// (ADR-0029 section 4), and `cloud_consent` false, which nothing reads: ADR-0045 section 7
+    /// records why the offload is not built and `crates/aura-restore/tests/boundaries.rs` fails
+    /// the build if the dependency ever appears.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5105` when either table will not load, or whatever opening the preview service
+    /// raised.
+    pub fn restore_pass(&self, project_id: &str) -> AuraResult<RestorePass> {
+        let mut pass = RestorePass::new(
+            self.previews(project_id)?,
+            self.restore_store(),
+            Arc::clone(&self.clock),
+            RestoreCapacity::default(),
+        )?
+        .with_integrity(self.integrity())
+        .with_people(self.people());
+        match self.story() {
+            Ok(story) => pass = pass.with_story(story),
+            Err(err) => {
+                tracing::warn!(
+                    target: "restore.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be planned against the neutral profile row"
+                );
+            }
+        }
         Ok(pass)
     }
 

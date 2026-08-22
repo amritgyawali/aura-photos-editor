@@ -1,0 +1,62 @@
+# Noise model for SONY ILCE-7SM3.
+#
+# PHASE-22 section 8 step 1: "Measure noise models for the top 20 camera bodies (COL) and commit
+# the config files." This is one of those twenty files.
+#
+# ===========================================================================
+# THIS ROW WAS NOT MEASURED, AND `measured` SAYS SO
+# ===========================================================================
+#
+# There are no camera files in this repository - phase 02's first exit condition, still open, see
+# `docs/adr/ADR-0006-phase-02-waiver.md`. The two figures below are derived from the published
+# sensor specification and from the physics that relates photosite area to full-well capacity,
+# exactly as phase 09's `camera_calibration.toml` derives its own. That is honest and it is not a
+# measurement, so `measured = false`, and an unmeasured model **caps the denoise tier at
+# `standard`** - `NoiseModel::tier_ceiling`, and ADR-0045 section 3 for why the asymmetry runs
+# that way. A model that under-estimates the noise under-denoises, which a photographer can see
+# and correct; one that over-estimates it smears lace, which they cannot.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# make, model
+#     Matched case-insensitively against `camera.make` and `camera.model` from EXIF, after
+#     trimming, by the same normalisation phase 09 uses.
+#
+# iso
+#     The ISO the two electron figures describe. Everything else scales from here: the loader
+#     converts to the normalised photon-transfer form `variance = read^2 + shot * signal`, where
+#     signal is linear working-space luminance with diffuse white at 1.0, and `NoiseModel::sigma_at`
+#     scales both terms by the ratio of the frame's ISO to this one.
+#
+# read_noise_e        electrons, > 0
+#     The standard deviation of the sensor's read chain at this ISO. What is left in a black frame.
+#
+# full_well_e         electrons, > 0
+#     The photosite's saturation capacity at this ISO. It is the divisor that turns both electron
+#     figures into the normalised units the renderer works in, and it is the reason a 12 MP body
+#     and a 61 MP body with the same read noise behave completely differently at ISO 12800.
+#
+# BUMP `version` ON ANY CHANGE. It is folded into `restore_plan.profile_ver`.
+
+version = 1
+
+make  = "SONY"
+model = "ILCE-7SM3"
+
+# See the header. This is the field that closes when a photographed reference arrives.
+measured = false
+
+iso          = 100
+read_noise_e = 2.4
+full_well_e  = 95000
+
+reason = """
+12 MP full frame. The largest wells in the table and the reason it is the reception body.
+
+Read noise 2.4 e- and a full well of 95000 e- give a normalised read term of 2.526e-05 and
+a shot slope of 1.053e-05 at ISO 100. At ISO 12800 both scale by 128, which puts the predicted
+sigma at twenty per cent grey at about 0.0167 of diffuse white - which is what a denoiser has
+to be told before it can remove the right amount rather than a learned average.
+"""

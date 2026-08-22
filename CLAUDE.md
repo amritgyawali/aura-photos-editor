@@ -100,6 +100,11 @@ Never load two phase files into one session.
 | The opt-in matrix, ceilings and loci (versioned, PM-owned) | `crates/aura-retouch/config/micro_retouch.toml` |
 | Micro-retouch evaluation gates | `tests/eval/micro_eval.rs` + `ml/models/micro/eval_micro.py` |
 | What AURA will and will not do to somebody's appearance | `docs/retouch-ethics.md` |
+| Restoration decisions | `docs/adr/ADR-0045-restoration-denoise-sharpen-and-identity.md` |
+| Scene ceilings for restoration (versioned, PM-owned) | `crates/aura-restore/config/restore_profiles.toml` |
+| Per-camera noise models (versioned, COL-owned) | `crates/aura-restore/config/noise_models/` |
+| Restoration evaluation gates | `tests/eval/restore_eval.rs` + `ml/models/restore/eval_restore.py` |
+| What AURA does to a noisy or soft photograph | `docs/restoration.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -993,6 +998,95 @@ Phase 21 also **closes phase 20's condition C5**: `ui/src-tauri` had no `icons/`
 since. Both are fixed, the shell builds under the GNU toolchain with the target directory moved
 off the space-containing project path, and this phase's nine commands are registered in it - 75 of
 the product's IPC commands are now reachable from the window.
+
+Phase 22 is implemented conditionally: `aura-core::contract::restore` freezes the four tiers, the
+seven regions, the mask port, the sensor noise model, the denoise spec, the sharpen spec and its
+mask, the per-face recovery record, the three destinations, the two occasions, the artefact report,
+thirty reason codes in four subjects, the plan, the outline, the override and `RestoreService`;
+`aura-restore` decides. `profiles.rs` loads 22 scene ceilings and twenty camera noise models and
+refuses a file that widens a bound the code owns, `denoise.rs` chooses one of four tiers from phase
+09's measured `noise_sigma_rel` and turns it into three amounts under *this* sensor at *this* ISO,
+`kernel.rs` measures the blur from the frame's own edge profiles at a low quantile, `sharpen.rs`
+refuses deconvolution unless four independent preconditions hold, `face_recovery.rs` checks a
+narrow softness band before any model is consulted and then holds every face to a cosine-distance
+ceiling measured through the real renderer, `selfcheck.rs` measures texture retention and ringing
+on the rendered result and steps two independent levers, `schedule.rs` keeps the work off the
+interactive path and can never reach a provider, `decide.rs` is one frame in and one plan out,
+`store.rs` owns migration 22 and `api.rs` is the frozen service and the resumable walk. Migration
+22 stores two tables, two views and one trigger; `aura-render` gains `restore` plus two shaders
+held to it; two models are signed with cards; seven IPC commands (ADR-0046) feed a Restore panel;
+and `aura-cli verify --phase 22` is the executable gate. Its exit report is
+`docs/progress/PHASE-22-EXIT.md`.
+
+**Both shipped heads are untrained, and for the first time in this product one of them ships as a
+refusal rather than as a measurement.** Denoising falls back on a noise-model-conditioned
+edge-preserving filter whose failure mode is leaving noise behind, which a photographer can see and
+correct. Face recovery falls back on **nothing**: `FACE_RECOVERY_HEAD_TRAINED` is false,
+`solve` returns `None` on every frame, and no face in this build is recovered - because the
+measurement that would stand in for a face prior is unsharp masking on a face, which is a different
+operation with a worse result and the same name. ADR-0045 section 6 has the argument. Every gate in
+section 10.1 is measured against synthetic frames whose noise, blur and structure were painted into
+the pixels and read back through the real detectors, the real operators and the real renderer.
+That is condition C1 and a Sev 2 trigger. Condition C2 is the second Sev 2 and it is the one to be
+careful about: **the identity constraint is measured with an untrained recogniser**, so what the
+gates prove is that it refuses what it should refuse, and not that a real embedding would notice a
+real identity change. Condition C4 is the third gap and it is the headline: **the expert preference
+study did not happen**, so the phase's own KPI is unmeasured and no claim about how a restored
+photograph looks may be made from this build.
+
+Four rules that phase 22 adds and every later phase inherits:
+
+- **`RestoreService` is the only way to ask what was repaired in a photograph.** Eighteenth service
+  of its kind. Phase 23 straightens and crops after this phase sharpens and must not sharpen again;
+  phase 24 fills generatively and inherits this phase's identity constraint rather than re-deriving
+  one; phase 25 normalises a gallery denoised at four different tiers; phase 27 has to be able to
+  say why an edge looks crunchy. Two answers to "how much noise reduction did this frame get" is a
+  delivery where the album and the gallery disagree about the same photograph's grain.
+- **A repair that cannot be measured is not performed.** The denoiser does nothing without a sigma,
+  sharpening refuses without regions rather than running at a lower amount, and the identity
+  constraint skips a face it cannot embed. This is the strongest form the rule has taken: phase 19
+  said a phase owns no fallback for another phase's output, and here the absence of an input is a
+  *refusal* rather than an attenuation, because the three regions sharpening needs are exactly the
+  three places sharpening is visible as damage.
+- **A guarantee is a stored number on every row, including the rows where nothing happened.**
+  `restore_face.identity_drift` is written whether the face was kept or skipped, so "no delivered
+  face was changed" is `SELECT MAX(identity_drift) FROM restore_face WHERE skipped = 0` rather than
+  a sentence. A refusal is a row, because here the refusal *is* the product working.
+- **A ceiling can be lowered by a studio and raised by nobody - and one bound runs the other way.**
+  `restore_profiles.toml` may lower the sharpening ceiling and the face-recovery cap, and may only
+  *raise* `skin_attenuation`, because "sharpening is explicitly attenuated on skin" is section 6.2
+  of the phase document rather than a default somebody chose.
+
+Three things phase 22 got wrong first, all found by its own gates, all worth generalising:
+
+**A threshold on a measurement is a statement about the instrument as well as about the world.**
+`SHARPEN_KERNEL_LO` was set from optics at 0.55, and the estimator measures the width of a Sobel
+gradient ridge - which for a mathematically perfect step edge is two samples, a sigma of 0.849.
+Nothing can measure below that, so *every frame in every wedding* would have passed the kernel
+precondition. A synthetic chequerboard came back needing sharpening. Phase 19's edge-gradient halo
+test could not be met by a correct implementation and phase 21's agreement margin could not be met
+by a perfect panel; **a threshold nothing can meet and a threshold everything necessarily meets are
+the same bug**, and the fix in all three cases was to define the threshold against the instrument.
+
+**A ringing measurement must score the excursion, not the edit.** Comparing the gradient before and
+after measures how hard the frame was sharpened, because every sharpening increases the step at an
+edge. What ringing is, is a pixel pushed **beyond the range its own neighbourhood had before the
+operation**. Phase 19 made the same mistake with its halo test and ADR-0039 section 7 recorded it;
+this is the same lesson in the phase that could most easily have shipped it.
+
+**Cosine distance is a function of direction, so a "more sensitive" probe built by scaling one
+component is less sensitive.** The identity test probe multiplied its high-band term by a gain, and
+raising the gain made the before and after vectors both point along that component - the distance
+between them collapsing toward zero. A broken constraint would have passed. The response is an
+angle now. Any test that turns a magnitude into a direction has this trap.
+
+Phase 22 also makes two changes to phase 14's render graph, both recorded in ADR-0045 section 2 and
+neither to a frozen file. **`restoration.denoise` now invalidates from `Stage::NoiseReduction`
+rather than from `Stage::Restoration`**, which is a latent cache-invalidation bug nothing had hit
+because nothing wrote the field; and a denoise tier alone no longer enables `Stage::Restoration`,
+because this phase occupies *two* of phase 14's stages rather than the one named after it.
+Denoising is a sensor-domain operation and belongs at index 6, before every stage that reads
+texture as signal; only face recovery belongs at index 19.
 
 Five rules that phase 13 adds and every later phase inherits:
 

@@ -21,6 +21,7 @@ members = [
   "crates/aura-style",
   "crates/aura-render",
   "crates/aura-retouch",
+  "crates/aura-restore",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",

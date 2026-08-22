@@ -932,3 +932,50 @@ max_ms_per_unit = 300
 # correction: a budget must not be pinned at its own measurement.
 [size.micro_store_per_1000_images]
 max_bytes = 2000000
+
+# PHASE-22. The restoration decision, on the processor path.
+#
+# Section 11 has five rows and **four of them are waived here**. The 2.5 s, 5 s and 1.2 s figures
+# are device budgets and this build links no `wgpu` backend (ADR-0029 section 4); the 45-minute
+# thousand-image export row is extrapolated from the per-image figure rather than measured,
+# because a thousand-image project needs a thousand proxies this repository does not have. The
+# fifth - 40 s for a 45 MP denoise on the processor, int8 - is about applying an operator at full
+# resolution and is not what this pass does.
+#
+# The figure below is a per-image ceiling on the *decision* on the processor path in release, on a
+# 96 px fixture frame. It is far above section 11's device rows for the reason phases 20 and 21's
+# are: those rows are about moving 45 megapixels and this is about producing a plan, including up
+# to seven renders through the self-check and the identity constraint. Conflating them would be a
+# budget that looks strict and measures the wrong thing.
+[stage.restore_plan_frame]
+max_elapsed_ms  = 12000
+max_ms_per_unit = 500
+
+# The identity constraint for one face, measured on its own because it is a per-*face* cost rather
+# than a per-image one, and because it is the only loop in this phase whose length depends on how
+# badly the first attempt went: at most `MAX_RESOLVES + 1` renders and embeddings.
+[stage.restore_identity_guard]
+max_elapsed_ms  = 6000
+max_ms_per_unit = 400
+
+# Section 11 sets no storage row for this phase. One is measured anyway, and it is **back under a
+# kilobyte** after phase 21's was not - for a structural reason rather than a lucky one.
+#
+# The measured decomposition on 1,000 photographs of the widest frame the fixtures produce - a
+# denoised, sharpened frame with two faces considered and eight reason codes - taken as `dbstat`
+# payload rather than `PRAGMA page_count`, which quantises to 4 KiB:
+#
+#   restore_plan and its five indexes     540 B/image
+#   restore_face and its primary key      190 B/image   two faces, ~95 B each
+#                                       -------
+#   measured total                        730 B/image
+#
+# `restore_plan` is one fixed-width verdict per photograph, as phases 09 to 20 all were, and the
+# only list is one row per *face* rather than one row per thing that was wrong with the frame. A
+# wedding is a few faces per photograph and can be dozens of blemishes, which is the whole of why
+# phase 21 measured 1,633 B and this measures 730.
+#
+# The budget is 1,000 B/image rather than the measured 730, and the headroom is phase 19's
+# correction: a budget must not be pinned at its own measurement.
+[size.restore_store_per_1000_images]
+max_bytes = 1000000

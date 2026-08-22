@@ -3028,3 +3028,182 @@ export type MicroCompositeDto = {
   photoId: string;
   sourcePhotoIds: string[];
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-22. Restoration.
+// ---------------------------------------------------------------------------
+
+/**
+ * What happened to one face the restoration pass considered.
+ *
+ * **Every face gets one of these, whether it was recovered or not.** Two thirds of this phase's
+ * reason codes are refusals, and a panel that only listed what happened would make a careful
+ * product look like a careless one.
+ *
+ * `identityDrift` is present whether the face was kept or skipped, so the panel can show a
+ * measured distance beside the sentence rather than a bare refusal.
+ */
+export type RestoreFaceDto = {
+  identityId: string | null;
+  area: CropRectDto;
+  sharpness: number;
+  strength: number;
+  identityDrift: number;
+  resolves: number;
+  skipped: boolean;
+  skippedBecause: string | null;
+};
+
+/**
+ * What the artefact self-check measured on the rendered result.
+ *
+ * Three numbers rather than one score: smearing is fixed by lowering the denoise tier, ringing by
+ * reducing the sharpen amount, and drift by the identity constraint. A photographer whose
+ * complaint is that an edge looks crunchy needs the ringing figure rather than a score that
+ * averaged it with something else.
+ */
+export type ArtefactReportDto = {
+  textureRetention: number;
+  ringing: number;
+  identityDrift: number;
+  measuredOn: number;
+  resolves: number;
+  denoiseReduced: boolean;
+  sharpenReduced: boolean;
+  faceSkipped: boolean;
+};
+
+/** One reason a restoration came out the way it did. */
+export type RestoreReasonDto = {
+  code: string;
+  text: string;
+  /** `denoise`, `sharpen`, `face_recovery` or `plan`. The panel groups by this. */
+  subject: string;
+  weight: number;
+  restraint: boolean;
+  area: CropRectDto | null;
+};
+
+/** One photograph's restoration plan. */
+export type RestorePlanDto = {
+  photoId: string;
+  denoise: string;
+  denoiseLuminance: number | null;
+  denoiseColour: number | null;
+  denoiseSigma: number | null;
+  denoiseCamera: string | null;
+  denoiseMeasured: boolean;
+  sharpenKernel: number | null;
+  sharpenAmount: number;
+  sharpenSkinAttenuation: number;
+  sharpenCoverage: number;
+  faceRecovery: number;
+  faces: RestoreFaceDto[];
+  facesRecovered: number;
+  facesSkippedIdentity: number;
+  selfcheck: ArtefactReportDto | null;
+  runWhere: string;
+  runWhen: string;
+  regionCovered: boolean;
+  reasons: RestoreReasonDto[];
+  confidence: number;
+  scene: string;
+  userEdited: boolean;
+  reviewed: boolean;
+};
+
+/** One reason sharpening was refused, and how often. */
+export type RestoreRefusalDto = {
+  code: string;
+  text: string;
+  count: number;
+};
+
+/** What the Restore panel's project header shows. */
+export type RestoreStatusDto = {
+  photos: number;
+  planned: number;
+  coverage: number;
+  actedOn: number;
+  regionCovered: number;
+  tiers: number[];
+  tierNames: string[];
+  sharpened: number;
+  sharpenRefusals: RestoreRefusalDto[];
+  facesRecovered: number;
+  facesSkippedIdentity: number;
+  worstIdentityDrift: number;
+  meanTextureRetention: number;
+  meanRinging: number;
+  reduced: number;
+  needsReview: number;
+  userEdited: number;
+  /** Camera bodies denoised against a synthetic noise model. Every body in this build. */
+  unmeasuredCameras: string[];
+  unlistedScenes: string[];
+  versions: number[];
+};
+
+/** Ask for the frames worth a photographer's attention. */
+export type RestoreReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+/** Record that a photographer has looked at one plan and agrees. */
+export type AcceptRestoreInput = {
+  photoId: string;
+};
+
+/**
+ * Record what a photographer chose for one photograph.
+ *
+ * **A tier and two switches, and no other number.** The line is between which of four and how far
+ * each goes: a tier is on the wire and the three denoise amounts are not, because they are what
+ * the tier becomes under one sensor at one ISO.
+ */
+export type SetRestoreOverrideInput = {
+  photoId: string;
+  denoise?: string | null;
+  sharpen?: boolean | null;
+  faceRecovery?: boolean | null;
+};
+
+/** Run the resumable restoration pass. */
+export type RestorePassInput = {
+  projectId: string;
+  /** `export` or `background`. There is no interactive value. */
+  when?: string | null;
+  priority?: string | null;
+  outputLongEdge?: number | null;
+  enabled?: boolean | null;
+};
+
+/** What one pass did. */
+export type RestorePassDto = {
+  planned: number;
+  failed: number;
+  actedOn: number;
+  regionCovered: number;
+  tiers: number[];
+  sharpened: number;
+  facesRecovered: number;
+  facesSkippedIdentity: number;
+  reduced: number;
+  lowConfidence: number;
+  unmeasuredCameras: string[];
+  unlistedScenes: string[];
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+/**
+ * One frame whose face recovery was declined to keep somebody looking like themselves.
+ *
+ * **The guarantee's own list.** The panel, the delivery report and the QC agent all read it.
+ */
+export type RestoreIdentityRefusalDto = {
+  photoId: string;
+  worstDrift: number;
+  faces: number;
+};

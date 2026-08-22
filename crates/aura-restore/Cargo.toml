@@ -1,0 +1,62 @@
+[package]
+name         = "aura-restore"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Restoration: noise removed where the sensor says there is noise, edges recovered where recovering them helps, and a face that stays the same person (phase 22)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# The two guarantees of this phase are post-conditions, so they are measured by running the plan
+# through the REAL renderer - phase 16's precedent, repeated by phases 20 and 21. A second
+# implementation of the denoiser or the deconvolution in this crate would make the stored
+# `texture_retention`, `ringing` and `identity_drift` statements about a model of the renderer.
+aura-render  = { path = "../aura-render" }
+# `contract::pixels` for the proxy buffer and `colour::curve::srgb_decode` for the one conversion
+# this crate makes. Phase 02 owns colour; this crate repairs inside the space phase 02 defined.
+aura-raw     = { path = "../aura-raw" }
+# The pass reads proxies through phase 02's frozen `PreviewService`, exactly as phases 06 to 21
+# do. Nothing here opens a file: invariant 1 as a property of the dependency list.
+aura-preview = { path = "../aura-preview" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+time         = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+
+# Deliberately absent: `aura-cloud`, `aura-recipe`, and every brain crate.
+#
+# `aura-cloud` is absent because PHASE-22 section 7 is one sentence - "No cloud AI call in this
+# phase. The phase must work with the network cable unplugged" - while section 2.1 lists a cloud
+# offload for heavy restoration anyway. ADR-0045 section 7 resolves that in favour of section 7,
+# and this file is the enforcement: `RunWhere::Cloud` exists in the contract because section 5
+# freezes it, and there is no dependency here that could reach a provider.
+# `tests/no_network.rs` fails the build if one ever appears.
+#
+# The data an offload would send is not a thumbnail, a crop or a statistic - it is the
+# photograph, at 45 MP, in linear floating point. Section 9 of `docs/plan/CLAUDE.md` says to send
+# derivative data and never originals, and a linear 45 MP buffer is a derivative in the sense
+# that a print is. The consent design that would make it acceptable is larger than this phase.
+#
+# `aura-recipe` is absent because writing a recipe is phase 14's rule and lives in `aura-app`.
+# This crate decides; `aura_recipe::schema::merge` is the only function in the workspace that
+# writes one recipe into another, and `tests/no_recipe_writes.rs` is the grep that keeps this
+# crate away from it - the fifth grep-as-a-test in the repository.
+#
+# The brain crates are absent for the reason every crate since phase 09 has kept them out:
+# everything this crate needs from phases 06, 07, 09 and 18 arrives through the frozen traits in
+# `aura-core`.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. In `tests/eval/`
+# beside every harness since phase 05, because a gate is a claim about the product and not about
+# a crate.
+[[test]]
+name = "restore_eval"
+path = "../../tests/eval/restore_eval.rs"

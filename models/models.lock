@@ -1211,6 +1211,106 @@
         "require_fp32": false
       },
       "opset": 13
+    },
+    {
+      "name": "denoise",
+      "version": "1.0.0",
+      "task": "restoration",
+      "class": "retouch",
+      "input": {
+        "shape": [
+          1,
+          4,
+          128,
+          128
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "linear_srgb+noise"
+      },
+      "output": {
+        "residual": [
+          1,
+          3,
+          128,
+          128
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "denoise_1.0.0.fp32.onnx",
+          "sha256": "8846ad4be048ab89440e3e6f391dced2c5e4d71339a779cbfb8921cb5ce6128a",
+          "bytes": 79914
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "denoise_1.0.0.fp16.onnx",
+          "sha256": "ad0af93ab84f20ef45d19325883249dfe3081bb339461a3eba92b0bc3490e518",
+          "bytes": 79914
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/denoise.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
+    },
+    {
+      "name": "face_recovery",
+      "version": "1.0.0",
+      "task": "restoration",
+      "class": "retouch",
+      "input": {
+        "shape": [
+          1,
+          3,
+          112,
+          112
+        ],
+        "layout": "NCHW",
+        "range": "0..1",
+        "colour": "linear_srgb"
+      },
+      "output": {
+        "detail": [
+          1,
+          1,
+          112,
+          112
+        ]
+      },
+      "variants": [
+        {
+          "ep": "cpu",
+          "precision": "fp32",
+          "file": "face_recovery_1.0.0.fp32.onnx",
+          "sha256": "d7ee7f22c361fe283f81b4dcd82cc295bb1e55da357f73f486ed946cd4f1fc65",
+          "bytes": 24238
+        },
+        {
+          "ep": "cuda",
+          "precision": "fp16",
+          "file": "face_recovery_1.0.0.fp16.onnx",
+          "sha256": "2295b543847a55961b0a7121abedf2116dc53d909fbf05246649b52f299f48e8",
+          "bytes": 24238
+        }
+      ],
+      "licence": "proprietary",
+      "model_card": "docs/model-cards/face_recovery.md",
+      "min_app_version": "0.1.0",
+      "working_set_mb": 8,
+      "precision_policy": {
+        "forbid_int8": true,
+        "require_fp32": false
+      },
+      "opset": 13
     }
   ]
 }

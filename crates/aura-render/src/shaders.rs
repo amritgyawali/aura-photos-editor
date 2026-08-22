@@ -87,8 +87,24 @@ pub const MICRO_APPLY: &str = include_str!("../shaders/micro_apply.wgsl");
 /// re-made here by accident.
 pub const MICRO_BORROW: &str = include_str!("../shaders/micro_borrow.wgsl");
 
+/// PHASE-22. The noise-model-conditioned denoiser, tiled.
+///
+/// A library rather than a stage, for the reason [`MICRO_APPLY`] is: denoising runs inside
+/// `Stage::NoiseReduction`, which phase 14 already owns. ADR-0045 section 2 records why this
+/// phase occupies two of phase 14 stages rather than the one named after it.
+pub const DENOISE_TILE: &str = include_str!("../shaders/denoise_tile.wgsl");
+
+/// PHASE-22. Richardson-Lucy deconvolution with edge-aware damping, through a weight plane.
+///
+/// A library rather than a stage: the deconvolution runs inside `Stage::Sharpen`, which section
+/// 2.1 of PHASE-22 requires to be the last pixel operation before the output transform. One
+/// dispatch per iteration, because a single dispatch cannot synchronise across workgroups and an
+/// iterative operator that read its own half-written output is not the operator the processor
+/// reference implements.
+pub const DECONV: &str = include_str!("../shaders/deconv.wgsl");
+
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 14] = [
+pub const SOURCES: [(&str, &str); 16] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
@@ -103,6 +119,8 @@ pub const SOURCES: [(&str, &str); 14] = [
     ("retouch_apply.wgsl", RETOUCH_APPLY),
     ("micro_apply.wgsl", MICRO_APPLY),
     ("micro_borrow.wgsl", MICRO_BORROW),
+    ("denoise_tile.wgsl", DENOISE_TILE),
+    ("deconv.wgsl", DECONV),
 ];
 
 /// The entry point name for a stage. `exposure` becomes `stage_exposure`.
@@ -127,6 +145,11 @@ pub fn source_for(stage: Stage) -> Option<(&'static str, &'static str)> {
 /// different value, is a parity failure that would otherwise show up as "the image is nearly
 /// right" the first time a device runs.
 #[must_use]
+// One list of every constant that exists on both paths, and it grows by a block per phase. The
+// lint that wants it split is measuring the wrong thing: a function that has to be read as a
+// single table is a function whose value is that it is one table, and splitting it per phase
+// would put the answer to "does this shader agree with the processor path" in seven places.
+#[allow(clippy::too_many_lines)]
 pub fn shared_constants() -> Vec<(&'static str, String)> {
     vec![
         ("MID_GREY", format!("{:.2}", crate::tonemap::MID_GREY)),
@@ -226,6 +249,33 @@ pub fn shared_constants() -> Vec<(&'static str, String)> {
         (
             "MAX_FLYAWAY_STRENGTH",
             format!("{:.2}", aura_core::contract::micro::MAX_FLYAWAY_STRENGTH),
+        ),
+        // PHASE-22. The five constants the restoration operators share with the processor
+        // reference in `crate::restore`. Two of them decide how much is removed at all - the
+        // edge threshold, which is the whole of "conditioned on the noise model", and the chroma
+        // radius ratio - and three are the ceilings the contract owns. A shader that drifted from
+        // the first would denoise a wedding by a different rule from the one that produced its
+        // preview, and would do it on the day a backend first ran.
+        ("EDGE_SIGMAS", format!("{:.1}", crate::restore::EDGE_SIGMAS)),
+        (
+            "CHROMA_RADIUS_RATIO",
+            format!("{:.1}", crate::restore::CHROMA_RADIUS_RATIO),
+        ),
+        (
+            "MAX_DENOISE_RADIUS",
+            format!("{}u", crate::restore::MAX_DENOISE_RADIUS),
+        ),
+        (
+            "MAX_SHARPEN_AMOUNT",
+            format!("{:.2}", aura_core::contract::restore::MAX_SHARPEN_AMOUNT),
+        ),
+        (
+            "SKIN_ATTENUATION",
+            format!("{:.2}", aura_core::contract::restore::SKIN_ATTENUATION),
+        ),
+        (
+            "MAX_DECONV_ITERATIONS",
+            format!("{}u", aura_core::contract::restore::MAX_DECONV_ITERATIONS),
         ),
         (
             "MIN_SPECULAR_FRACTION",

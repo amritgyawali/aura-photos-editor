@@ -717,6 +717,75 @@ fn generate() -> ExitCode {
                 precision_policy: PrecisionPolicy::no_int8(),
             },
         ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::DENOISE_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "restoration",
+                class: ModelClass::Retouch,
+                model: fixtures::denoise(),
+                // Four planes rather than three, and the fourth is not colour. `linear_srgb+noise`
+                // says so, the way phase 18's matting head says `linear_srgb+trimap`: a manifest
+                // that claimed four colour planes would be documenting a normalisation nobody
+                // performs on the sigma plane.
+                input: InputSpec {
+                    shape: vec![
+                        1,
+                        fixtures::DENOISE_INPUT_PLANES,
+                        fixtures::DENOISE_TILE_SIDE,
+                        fixtures::DENOISE_TILE_SIDE,
+                    ],
+                    layout: "NCHW".to_string(),
+                    range: "0..1".to_string(),
+                    colour: "linear_srgb+noise".to_string(),
+                },
+                output: BTreeMap::from([(
+                    "residual".to_string(),
+                    vec![
+                        1,
+                        fixtures::DENOISE_OUTPUT_CHANNELS,
+                        fixtures::DENOISE_TILE_SIDE,
+                        fixtures::DENOISE_TILE_SIDE,
+                    ],
+                )]),
+                // int8 is forbidden, and here the reason is arithmetic rather than ethical. The
+                // output is a *residual* whose whole useful range is a few hundredths of diffuse
+                // white - that is what noise is - so an int8 quantisation of it has about four
+                // usable levels. A denoiser quantised to four levels is a posteriser, and the
+                // artefact it makes is banding in exactly the smooth regions it was asked to
+                // clean.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
+        build_entry(
+            &directory,
+            &Placeholder {
+                name: fixtures::FACE_RECOVERY_MODEL,
+                version: Version::new(1, 0, 0),
+                task: "restoration",
+                class: ModelClass::Retouch,
+                model: fixtures::face_recovery(),
+                input: Placeholder::linear_image(fixtures::FACE_RECOVERY_SIDE),
+                output: BTreeMap::from([(
+                    "detail".to_string(),
+                    vec![
+                        1,
+                        fixtures::FACE_RECOVERY_CHANNELS,
+                        fixtures::FACE_RECOVERY_SIDE,
+                        fixtures::FACE_RECOVERY_SIDE,
+                    ],
+                )]),
+                // int8 is forbidden for the reason that runs through the whole of PHASE-22
+                // section 6.3: the output of this head is measured against a face embedding, and
+                // `MAX_IDENTITY_DRIFT` is eight hundredths of a cosine distance. A systematic
+                // quantisation shift moves every face in a wedding by the same small amount in
+                // the same direction, which is the one kind of error an eight-hundredths ceiling
+                // cannot absorb - and the thing on the other side of that ceiling is whether
+                // somebody still looks like themselves.
+                precision_policy: PrecisionPolicy::no_int8(),
+            },
+        ),
     ];
 
     let lock = ModelsLock {

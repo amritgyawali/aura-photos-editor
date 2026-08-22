@@ -2934,3 +2934,169 @@ pub fn lint_detector() -> OnnxModel {
         graph,
     }
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-22. Denoising and face recovery.
+// ---------------------------------------------------------------------------
+
+/// The denoiser registered name.
+pub const DENOISE_MODEL: &str = "denoise";
+
+/// The face-recovery registered name.
+pub const FACE_RECOVERY_MODEL: &str = "face_recovery";
+
+/// The tile side the denoiser reads.
+///
+/// 128 px. Section 11 budgets 2.5 s for a 45 MP frame on a device, which is about 2,700 tiles of
+/// this size - so the tile is chosen from the throughput a batch scheduler can reach rather than
+/// from what a network wants. It is also small enough that the halo phase 14's tiler decodes
+/// around it stays a modest fraction of the work.
+pub const DENOISE_TILE_SIDE: usize = 128;
+
+/// What the denoiser reads beside the pixels.
+///
+/// Four planes: three colour and one **noise-model plane**, which carries the sigma the camera's
+/// photon transfer curve predicts at each pixel's own signal level. Section 6.1 asks for the
+/// denoiser to be "conditioned on the measured per-camera noise model ... so it removes the right
+/// amount rather than a learned average", and this fourth plane is that conditioning.
+///
+/// It is a plane rather than a scalar because the predicted sigma is **signal-dependent**: shot
+/// noise grows with the square root of the signal, so a shadow and a highlight in the same frame
+/// have different sigmas, and a scalar would force the network to learn that relationship from
+/// the pixels it is trying to denoise. Phase 18's matting head makes the same distinction for its
+/// trimap.
+pub const DENOISE_INPUT_PLANES: usize = 4;
+
+/// What the denoiser emits: a residual, not a clean image.
+///
+/// Three channels, and the choice of *residual* is the one that matters. A network trained to
+/// output the clean image has to reproduce the whole photograph, so its errors are errors in the
+/// photograph; a network trained to output what should be **subtracted** starts from the identity
+/// and its errors are errors in the correction. The failure mode of the second is leaving noise
+/// behind. The failure mode of the first is inventing texture, which is what this phase exists
+/// not to do.
+pub const DENOISE_OUTPUT_CHANNELS: usize = 3;
+
+/// The face crop side the recovery head reads.
+///
+/// 112 px, the same crop phases 06, 09 and 10 already produce through `aura_vision`'s two-point
+/// warp. Deliberately the same rather than larger: the identity constraint embeds the crop
+/// **before and after** through phase 06's recogniser, and a recovery that worked at a different
+/// scale from the measurement would be measured on a resample of itself.
+pub const FACE_RECOVERY_SIDE: usize = FACE_CROP_SIDE;
+
+/// What the face-recovery head emits: a high-frequency residual over the crop.
+///
+/// One channel, and it is **luminance only**. Section 6.3 asks to "blend with the original at
+/// high frequencies to keep skin realistic", and a chroma residual on a face is a colour change
+/// on a face - which is a different operation with a much worse failure mode and no way for the
+/// identity constraint to distinguish it from the one that was wanted.
+pub const FACE_RECOVERY_CHANNELS: usize = 1;
+
+/// The denoiser: a 128 px tile plus its noise-model plane in, a residual out.
+///
+/// `tile [N, 4, 128, 128] -> residual [N, 3, 128, 128]`
+///
+/// **Untrained in this build**, and `aura_restore::decide::MODEL_VER` is zero, so it is never
+/// consulted: what runs is the noise-model-conditioned filter in `aura_render::restore`. ADR-0045
+/// section 6 records why that is a measurement worth shipping rather than a compromise - its
+/// failure mode is leaving noise behind, which a photographer can see and correct.
+///
+/// The graph keeps its full resolution throughout. Every other detection fixture in this file
+/// pools its way down to a decision grid, because it is answering a question about a region; this
+/// one has to write a value for every pixel it read, and a pooled trunk with no `Resize` and no
+/// `ConvTranspose` in the documented opset subset (ADR-0007) could not get back.
+#[must_use]
+pub fn denoise() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_2206_DE01_0001);
+    let side = DENOISE_TILE_SIDE;
+
+    let graph = Graph {
+        name: DENOISE_MODEL.to_string(),
+        nodes: vec![
+            conv3("stem", &["tile", "stem_w", "stem_b"], &["stem_out"], 1),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            conv3("c1", &["stem_relu", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["c1_relu"]),
+            conv3("c2", &["c1_relu", "c2_w", "c2_b"], &["c2_out"], 1),
+            node("Relu", "c2_act", &["c2_out"], &["trunk"]),
+            conv1("head", &["trunk", "head_w", "head_b"], &["residual"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![32, DENOISE_INPUT_PLANES, 3, 3], 0.20),
+            weights.tensor("stem_b", vec![32], 0.02),
+            weights.tensor("c1_w", vec![32, 32, 3, 3], 0.14),
+            weights.tensor("c1_b", vec![32], 0.02),
+            weights.tensor("c2_w", vec![32, 32, 3, 3], 0.12),
+            weights.tensor("c2_b", vec![32], 0.02),
+            weights.tensor("head_w", vec![DENOISE_OUTPUT_CHANNELS, 32, 1, 1], 0.06),
+            weights.tensor("head_b", vec![DENOISE_OUTPUT_CHANNELS], 0.01),
+        ],
+        inputs: vec![dynamic_batch("tile", &[DENOISE_INPUT_PLANES, side, side])],
+        outputs: vec![dynamic_batch(
+            "residual",
+            &[DENOISE_OUTPUT_CHANNELS, side, side],
+        )],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}
+
+/// The face-recovery head: a 112 px face crop in, a luminance residual out.
+///
+/// `crop [N, 3, 112, 112] -> detail [N, 1, 112, 112]`
+///
+/// **Untrained in this build, and unlike every other placeholder in this file there is no
+/// measurement standing in for it.** `aura_restore::face_recovery::FACE_RECOVERY_HEAD_TRAINED` is
+/// false and `solve` returns `None` on every frame. ADR-0045 section 6 records why: the
+/// measurement that would stand in for a face prior is unsharp masking on a face, and that is not
+/// a weaker version of face recovery - it is a different operation with a worse result and the
+/// same name.
+///
+/// The output is a residual for the reason [`denoise`]'s is, and the argument is stronger here. A
+/// head that emitted a face would be a head that could emit *a* face; a head that emits a
+/// high-frequency correction to the face that is already there cannot replace a feature, because
+/// the low and mid bands never pass through it. The identity constraint in
+/// `aura_restore::face_recovery::enforce` is the second line and the one that is measured, but
+/// the shape of the output is the first.
+#[must_use]
+pub fn face_recovery() -> OnnxModel {
+    let mut weights = Weights::new(0x0000_2206_FACE_0002);
+    let side = FACE_RECOVERY_SIDE;
+
+    let graph = Graph {
+        name: FACE_RECOVERY_MODEL.to_string(),
+        nodes: vec![
+            conv3("stem", &["crop", "stem_w", "stem_b"], &["stem_out"], 1),
+            node("Relu", "stem_act", &["stem_out"], &["stem_relu"]),
+            conv3("c1", &["stem_relu", "c1_w", "c1_b"], &["c1_out"], 1),
+            node("Relu", "c1_act", &["c1_out"], &["trunk"]),
+            conv1("head", &["trunk", "head_w", "head_b"], &["detail"]),
+        ],
+        initializers: vec![
+            weights.tensor("stem_w", vec![24, 3, 3, 3], 0.18),
+            weights.tensor("stem_b", vec![24], 0.02),
+            weights.tensor("c1_w", vec![24, 24, 3, 3], 0.12),
+            weights.tensor("c1_b", vec![24], 0.02),
+            weights.tensor("head_w", vec![FACE_RECOVERY_CHANNELS, 24, 1, 1], 0.05),
+            weights.tensor("head_b", vec![FACE_RECOVERY_CHANNELS], 0.01),
+        ],
+        inputs: vec![dynamic_batch("crop", &[3, side, side])],
+        outputs: vec![dynamic_batch(
+            "detail",
+            &[FACE_RECOVERY_CHANNELS, side, side],
+        )],
+    };
+
+    OnnxModel {
+        ir_version: IR_VERSION,
+        producer_name: "aura-infer fixtures".to_string(),
+        opset: OPSET,
+        graph,
+    }
+}

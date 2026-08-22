@@ -75,6 +75,7 @@ dependencies = [
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-restore",
  "aura-retouch",
  "aura-style",
  "aura-vision",
@@ -187,6 +188,7 @@ dependencies = [
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-restore",
  "aura-retouch",
  "aura-style",
  "aura-vision",
@@ -468,6 +470,23 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "tempfile",
+ "time",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "aura-restore"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "aura-render",
+ "rusqlite",
+ "serde",
  "tempfile",
  "time",
  "toml",
