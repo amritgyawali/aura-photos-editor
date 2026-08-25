@@ -1413,3 +1413,63 @@ summary      = "A mask was unusable, so a local operation was scaled down or ski
 user_message = "AURA is not sure enough where the subject ends and the background begins in some photographs, so it made gentler local adjustments there - or none at all. Nothing has been damaged."
 runbook      = "docs/runbooks/AURA-ML-5089.md"
 introduced   = "PHASE-19"
+
+# Phase 23. Geometry suite, ML 5090-5095. The same five shapes the phase 09, 11,
+# 15 and 19 blocks have - version drift, a refused edit, one item that could not
+# be done, a refused config file, and a config file missing a row - plus one that
+# is this phase's own honesty: there was no profile for the lens, so the optics
+# were left alone rather than corrected by a guess.
+
+[[error]]
+code         = "AURA-ML-5090"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored geometry plans came from different lens profiles, arithmetic or crop rules"
+user_message = "AURA has improved how it corrects lenses and chooses crops, so it is re-checking this wedding in the background. Any framing you have set yourself is kept."
+runbook      = "docs/runbooks/AURA-ML-5090.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5091"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A crop or straightening override was refused"
+user_message = "AURA could not record that framing. The photograph is unchanged."
+runbook      = "docs/runbooks/AURA-ML-5091.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5092"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph's geometry could not be planned"
+user_message = "AURA could not work out the lens corrections and framing for one photograph, so it has left it exactly as it was shot. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5092.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5093"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The crop rules table was refused"
+user_message = "AURA could not load the settings that decide what a crop is allowed to remove, so it has not cropped anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5093.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5094"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A scene has no crop rule row"
+user_message = "AURA has no cropping guidance recorded for this kind of photograph yet, so it is leaving those ones framed as they were shot. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5094.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5095"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "No lens profile matched, so the optics were left alone"
+user_message = "AURA has no correction profile for the lens some photographs were shot on, so it has left their distortion and fringing alone. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5095.md"
+introduced   = "PHASE-23"
