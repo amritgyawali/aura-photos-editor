@@ -1,0 +1,46 @@
+[package]
+name         = "aura-geometry"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Finishing the frame: lens corrections, horizon and architecture levelling, and subject-aware smart cropping that never cuts what matters (phase 23)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+aura-preview = { path = "../aura-preview" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+
+# Deliberately absent: `aura-people`, `aura-brain-photo`, `aura-brain-wedding`, `aura-vision`
+# and `aura-render`.
+#
+# Phase 23 consumes phases 06, 07, 08 and 11 and depends on none of them. Everything it
+# needs it takes through the frozen traits in `aura-core` - `PeopleService`, `StoryService`,
+# `MomentService` and `CompositionService` - which are the only ways any phase may ask who is
+# in a photograph, what it is of, what was shot once and how it is framed. Depending on the
+# implementing crates would let a hurried change reach past a service into a store, and four
+# rules those phases wrote would become things people remember rather than things the
+# dependency graph enforces.
+#
+# `aura-render` is absent for a sharper reason. This crate decides a rectangle, an angle and a
+# set of coefficients; `aura-render` applies them, and it does so from `edit_recipes` through
+# `aura_recipe::schema::merge` only, which is phase 14's rule. A dependency in this direction
+# would let a geometry decision reach a pixel without going through the merge, and
+# `tests/no_render_calls.rs` is a grep that fails the build if one ever does.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
+# `tests/eval/` beside the phase 05 to 19 harnesses rather than in this crate's own `tests/`,
+# because a gate is a claim about the product and not about a crate.
+[[test]]
+name = "geometry_eval"
+path = "../../tests/eval/geometry_eval.rs"

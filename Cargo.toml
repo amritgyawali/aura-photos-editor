@@ -20,6 +20,7 @@ members = [
   "crates/aura-recipe",
   "crates/aura-style",
   "crates/aura-render",
+  "crates/aura-geometry",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",

@@ -1,0 +1,166 @@
+# SYNTHETIC lens profiles. Every row here was fabricated - see README.md.
+#
+# The coefficients have the right sign and order of magnitude for the focal length: a wide
+# zoom at its short end barrels, the same zoom at its long end pincushions slightly, a fast
+# standard prime barrels a little and vignettes a lot wide open, and lateral chromatic
+# aberration is a few parts in ten thousand and larger at the wide end. They are not
+# measurements of any lens.
+
+[table]
+version     = 1
+attribution = "Fabricated for the AURA test suite. No lens was measured to produce this file."
+
+# --- fast standard primes ---------------------------------------------------------------
+
+[[lens]]
+id          = "Canon RF 50mm F1.2 L USM"
+mount       = "RF"
+measured_by = "nobody - synthetic"
+synthetic   = true
+[[lens.entry]]
+focal_mm = 50.0
+k1       = -0.0090
+k2       =  0.0031
+vignette =  0.44
+ca_red   =  1.00016
+ca_blue   = 0.99985
+
+[[lens]]
+id          = "Sony FE 50mm F1.2 GM"
+mount       = "E"
+measured_by = "nobody - synthetic"
+synthetic   = true
+[[lens.entry]]
+focal_mm = 50.0
+k1       = -0.0075
+k2       =  0.0026
+vignette =  0.41
+ca_red   =  1.00014
+ca_blue   = 0.99987
+
+[[lens]]
+id          = "NIKKOR Z 50mm f/1.2 S"
+mount       = "Z"
+measured_by = "nobody - synthetic"
+synthetic   = true
+[[lens.entry]]
+focal_mm = 50.0
+k1       = -0.0068
+k2       =  0.0022
+vignette =  0.39
+ca_red   =  1.00013
+ca_blue   = 0.99988
+
+# --- the two zooms every wedding is shot on ----------------------------------------------
+
+[[lens]]
+id          = "Canon RF 24-70mm F2.8 L IS USM"
+mount       = "RF"
+measured_by = "nobody - synthetic"
+synthetic   = true
+[[lens.entry]]
+focal_mm = 24.0
+k1       =  0.0310
+k2       = -0.0084
+vignette =  0.58
+ca_red   =  1.00042
+ca_blue   = 0.99961
+[[lens.entry]]
+focal_mm = 35.0
+k1       =  0.0075
+k2       = -0.0021
+vignette =  0.41
+ca_red   =  1.00024
+ca_blue   = 0.99978
+[[lens.entry]]
+focal_mm = 50.0
+k1       = -0.0062
+k2       =  0.0018
+vignette =  0.33
+ca_red   =  1.00016
+ca_blue   = 0.99985
+[[lens.entry]]
+focal_mm = 70.0
+k1       = -0.0121
+k2       =  0.0034
+vignette =  0.29
+ca_red   =  1.00011
+ca_blue   = 0.99990
+
+[[lens]]
+id          = "Sony FE 70-200mm F2.8 GM OSS II"
+mount       = "E"
+measured_by = "nobody - synthetic"
+synthetic   = true
+[[lens.entry]]
+focal_mm = 70.0
+k1       =  0.0042
+k2       = -0.0011
+vignette =  0.35
+ca_red   =  1.00019
+ca_blue   = 0.99982
+[[lens.entry]]
+focal_mm = 135.0
+k1       = -0.0088
+k2       =  0.0024
+vignette =  0.27
+ca_red   =  1.00012
+ca_blue   = 0.99989
+[[lens.entry]]
+focal_mm = 200.0
+k1       = -0.0142
+k2       =  0.0039
+vignette =  0.24
+ca_red   =  1.00009
+ca_blue   = 0.99992
+
+# --- the wide the getting-ready room is shot in -------------------------------------------
+
+[[lens]]
+id          = "NIKKOR Z 14-24mm f/2.8 S"
+mount       = "Z"
+measured_by = "nobody - synthetic"
+synthetic   = true
+[[lens.entry]]
+focal_mm = 14.0
+k1       =  0.0620
+k2       = -0.0190
+k3       =  0.0041
+vignette =  0.71
+ca_red   =  1.00071
+ca_blue   = 0.99934
+[[lens.entry]]
+focal_mm = 24.0
+k1       =  0.0195
+k2       = -0.0052
+vignette =  0.52
+ca_red   =  1.00033
+ca_blue   = 0.99970
+
+# --- the 85 the portraits are shot on ------------------------------------------------------
+
+[[lens]]
+id          = "Canon RF 85mm F1.2 L USM"
+mount       = "RF"
+measured_by = "nobody - synthetic"
+synthetic   = true
+[[lens.entry]]
+focal_mm = 85.0
+k1       = -0.0104
+k2       =  0.0029
+vignette =  0.46
+ca_red   =  1.00010
+ca_blue   = 0.99991
+
+[[lens]]
+id          = "Sigma 35mm F1.4 DG HSM Art"
+mount       = "EF"
+measured_by = "nobody - synthetic"
+synthetic   = true
+[[lens.entry]]
+focal_mm = 35.0
+k1       =  0.0128
+k2       = -0.0033
+vignette =  0.49
+ca_red   =  1.00027
+ca_blue   = 0.99975

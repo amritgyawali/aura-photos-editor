@@ -82,7 +82,7 @@ pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
 pub use contract::geometry::{
     Aspect, CropPurpose, CropSafetyReport, CropVariant, GeometryCode, GeometryOutline,
     GeometryOverride, GeometryPlan, GeometryReason, GeometryService, Keystone, LensCorrection,
-    LensSource,
+    LensSource, ProtectedKind, ProtectedRegion,
 };
 pub use contract::ids::{
     ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MaskId, MomentId, PhotoId,

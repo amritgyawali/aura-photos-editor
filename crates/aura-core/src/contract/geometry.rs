@@ -353,7 +353,7 @@ impl Keystone {
         verticals: u16,
     ) -> AuraResult<Self> {
         let refuse = |detail: &str| -> AuraError { crate::errors::ml::geometry_failed(detail) };
-        if !stretch.is_finite() || stretch > MAX_STRETCH || stretch < 1.0 {
+        if !stretch.is_finite() || !(1.0..=MAX_STRETCH).contains(&stretch) {
             return Err(refuse("keystone stretch outside the documented cap"));
         }
         if verticals < Self::MIN_VERTICALS {
@@ -617,6 +617,135 @@ impl CropVariant {
 }
 
 // ---------------------------------------------------------------------------
+// The input port
+// ---------------------------------------------------------------------------
+
+/// What kind of thing a crop must not cut.
+///
+/// A closed set. Section 6.3's hard constraints name three: "every detected face fully
+/// inside, primary identities' hands and joined hands inside, and the moment's key content
+/// preserved".
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum ProtectedKind {
+    /// A face, from `PeopleService`.
+    #[default]
+    Face,
+    /// A pair of hands, joined or not, from a pose estimate.
+    Hands,
+    /// What the frame is about, from phase 11's [`crate::contract::composition::CropHint`]
+    /// or phase 08's moment.
+    KeyContent,
+}
+
+impl ProtectedKind {
+    /// Every kind.
+    pub const ALL: [Self; 3] = [Self::Face, Self::Hands, Self::KeyContent];
+
+    /// How many there are.
+    pub const COUNT: usize = 3;
+
+    /// The stored text.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Face => "face",
+            Self::Hands => "hands",
+            Self::KeyContent => "key_content",
+        }
+    }
+
+    /// Parse the stored text. Unknown values read as [`ProtectedKind::Face`].
+    #[must_use]
+    pub fn from_str_or_face(text: &str) -> Self {
+        Self::ALL
+            .into_iter()
+            .find(|kind| kind.as_str() == text)
+            .unwrap_or(Self::Face)
+    }
+
+    /// The refusal a crop earns for cutting one of these.
+    #[must_use]
+    pub const fn refusal(self) -> GeometryCode {
+        match self {
+            Self::Face => GeometryCode::CropCutsFace,
+            Self::Hands => GeometryCode::CropCutsHands,
+            Self::KeyContent => GeometryCode::CropLosesContent,
+        }
+    }
+}
+
+impl fmt::Display for ProtectedKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// One region a crop must keep whole.
+///
+/// **The input port, and phase 23 owns no generator for it.** Phase 06 finds faces, a pose
+/// estimate finds hands and phase 11 says what the frame is about; this phase has no face
+/// detector, no pose model and no saliency fallback - because a second answer to "where is
+/// her face" is a crop that cuts one this product elsewhere insists it can see. The rule
+/// phase 18 wrote for `MaskService`, read from the consuming side.
+///
+/// When a kind does not arrive, the crops that would have been checked against it are
+/// **not** reported as having passed. [`CropSafetyReport::faces_checked`] and
+/// [`CropSafetyReport::hands_checked`] are counts rather than booleans for exactly that, and
+/// [`CropSafetyReport::is_evidence`] is the predicate a panel asks before it says "safe".
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ProtectedRegion {
+    /// What it is.
+    pub kind: ProtectedKind,
+    /// Whose, when it belongs to somebody.
+    #[serde(default)]
+    pub identity: Option<crate::contract::ids::IdentityId>,
+    /// Where it is, normalised to the **corrected** frame.
+    ///
+    /// The coordinates [`CropVariant::rect`] is in, and the trap this phase found the hard
+    /// way: a face box measured on the frame as shot is in the wrong place once a distortion
+    /// correction has moved every pixel outward, and a safety filter that checked the
+    /// un-mapped box would clear a crop that cuts the face by however much the optics bent.
+    pub rect: CropRect,
+    /// True when this belongs to a primary identity - the couple, or the frame's dominant
+    /// subject.
+    ///
+    /// Hands are only protected when they are, which is section 6.3's own wording: "primary
+    /// identities' hands and joined hands". A guest's hand at the edge of a dance floor frame
+    /// is not a reason to refuse every crop in the wedding.
+    pub primary: bool,
+}
+
+impl ProtectedRegion {
+    /// True when this region is entirely inside `crop`, with `margin` to spare.
+    ///
+    /// The margin is a fraction of the frame rather than of the region: a rule enforced to
+    /// the pixel is a rule enforced to whichever rounding mode the resampler happened to use,
+    /// and the resampler's is not this module's to know.
+    #[must_use]
+    pub fn is_inside(&self, crop: CropRect, margin: f32) -> bool {
+        self.rect.x >= crop.x + margin
+            && self.rect.y >= crop.y + margin
+            && self.rect.x + self.rect.w <= crop.x + crop.w - margin
+            && self.rect.y + self.rect.h <= crop.y + crop.h - margin
+    }
+
+    /// True when this region is checked at all.
+    ///
+    /// [`ProtectedKind::Hands`] on a guest is not: section 6.3 protects primary identities'
+    /// hands, and every other region kind is protected whoever it belongs to.
+    #[must_use]
+    pub const fn is_enforced(&self) -> bool {
+        match self.kind {
+            ProtectedKind::Hands => self.primary,
+            ProtectedKind::Face | ProtectedKind::KeyContent => true,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Safety
 // ---------------------------------------------------------------------------
 
@@ -640,6 +769,14 @@ pub struct CropSafetyReport {
     /// on this build it is what every frame reports, because phase 06's detector finds no
     /// faces. [`CropSafetyReport::is_evidence`] is how a caller tells the two apart.
     pub faces_checked: u32,
+    /// How many pairs of hands were checked.
+    ///
+    /// A second count rather than a second boolean, and for a sharper reason than the first:
+    /// **this build has no pose estimate**, so hands are never checked on any frame, and a
+    /// `hands_intact` boolean would be `true` on every photograph in the product. Section
+    /// 10.1's zero-face-cut gate is a claim; the same gate for hands is currently a claim
+    /// about an empty set, and the exit report says so.
+    pub hands_checked: u32,
     /// How many candidate rectangles the filter refused, by reason.
     ///
     /// Indexed by [`GeometryCode`]'s refusal codes in [`GeometryCode::REFUSALS`] order.
@@ -654,7 +791,7 @@ impl CropSafetyReport {
         self.faces_intact && self.resolution_ok && self.content_kept
     }
 
-    /// True when the face rule was checked against at least one face.
+    /// True when at least one region was actually checked.
     ///
     /// **The distinction phase 09's rule about denominators applies here.** A crop over a
     /// frame with no detected faces satisfies `faces_intact` trivially, and reporting that as
@@ -1071,6 +1208,7 @@ impl GeometryPlan {
                 resolution_ok: true,
                 content_kept: true,
                 faces_checked: 0,
+                hands_checked: 0,
                 refused: [0; GeometryCode::REFUSAL_COUNT],
             },
             reasons: vec![GeometryReason::plain(GeometryCode::Clean, 0.0)],
@@ -1160,8 +1298,18 @@ impl GeometryPlan {
         if self.crops.is_empty() {
             return Some("a plan carries no crop at all".into());
         }
+        // **Entry zero is the frame as shot, and the only thing that may shrink it is the
+        // rotation the frame needed.** A levelled frame has to be cropped to the rectangle that
+        // still fits inside it - that is what "levelled" means - and requiring entry zero to
+        // cover the whole frame would make every straightened photograph an unsound plan. What
+        // is guaranteed instead is that entry zero exists, is the original, keeps the frame's
+        // own aspect ratio, and is untouched by the crop search: a plan that re-framed the
+        // photograph put that rectangle somewhere else.
         match self.crops.first() {
-            Some(first) if first.purpose == CropPurpose::Original && first.is_full_frame() => {}
+            Some(first)
+                if first.purpose == CropPurpose::Original
+                    && first.aspect == Aspect::Original
+                    && (self.rotate_deg.abs() >= f32::EPSILON || first.is_full_frame()) => {}
             _ => return Some("the original framing is not the first crop".into()),
         }
         if self.crops.len() > MAX_VARIANTS {
@@ -1476,6 +1624,7 @@ mod tests {
             resolution_ok: true,
             content_kept: true,
             faces_checked: 0,
+            hands_checked: 0,
             refused: [0; GeometryCode::REFUSAL_COUNT],
         };
         assert!(report.all_clear());
@@ -1494,9 +1643,12 @@ mod tests {
         let mut seen = [false; GeometryCode::REFUSAL_COUNT];
         for code in GeometryCode::REFUSALS {
             let index = code.refusal_index().unwrap_or(usize::MAX);
-            assert!(index < GeometryCode::REFUSAL_COUNT);
-            assert!(!seen[index], "{code} shares a slot");
-            seen[index] = true;
+            let slot = seen.get_mut(index);
+            assert!(slot.is_some(), "{code} has no histogram slot");
+            if let Some(slot) = slot {
+                assert!(!*slot, "{code} shares a slot");
+                *slot = true;
+            }
         }
         assert!(seen.iter().all(|hit| *hit));
     }
@@ -1539,6 +1691,66 @@ mod tests {
     }
 
     #[test]
+    fn a_guests_hands_are_not_enforced_and_a_guests_face_is() {
+        let rect = CropRect {
+            x: 0.4,
+            y: 0.4,
+            w: 0.1,
+            h: 0.1,
+        };
+        let guest_hands = ProtectedRegion {
+            kind: ProtectedKind::Hands,
+            identity: None,
+            rect,
+            primary: false,
+        };
+        let guest_face = ProtectedRegion {
+            kind: ProtectedKind::Face,
+            identity: None,
+            rect,
+            primary: false,
+        };
+        assert!(!guest_hands.is_enforced());
+        assert!(guest_face.is_enforced());
+        assert_eq!(ProtectedKind::Hands.refusal(), GeometryCode::CropCutsHands);
+        assert_eq!(ProtectedKind::Face.refusal(), GeometryCode::CropCutsFace);
+        assert_eq!(
+            ProtectedKind::KeyContent.refusal(),
+            GeometryCode::CropLosesContent
+        );
+    }
+
+    #[test]
+    fn a_region_touching_the_crop_edge_is_not_inside_it() {
+        let region = ProtectedRegion {
+            kind: ProtectedKind::Face,
+            identity: None,
+            rect: CropRect {
+                x: 0.20,
+                y: 0.20,
+                w: 0.10,
+                h: 0.10,
+            },
+            primary: true,
+        };
+        // Flush against the left edge: inside by area, cut by rounding.
+        let flush = CropRect {
+            x: 0.20,
+            y: 0.10,
+            w: 0.50,
+            h: 0.50,
+        };
+        assert!(!region.is_inside(flush, SAFETY_MARGIN));
+        let clear = CropRect {
+            x: 0.10,
+            y: 0.10,
+            w: 0.60,
+            h: 0.60,
+        };
+        assert!(region.is_inside(clear, SAFETY_MARGIN));
+    }
+
+    #[test]
     fn every_aspect_and_source_round_trips() {
         for aspect in Aspect::ALL {
             assert_eq!(Aspect::from_str_or_original(aspect.as_str()), aspect);
@@ -1548,6 +1760,9 @@ mod tests {
         }
         for purpose in CropPurpose::ALL {
             assert_eq!(CropPurpose::from_str_or_original(purpose.as_str()), purpose);
+        }
+        for kind in ProtectedKind::ALL {
+            assert_eq!(ProtectedKind::from_str_or_face(kind.as_str()), kind);
         }
     }
 
