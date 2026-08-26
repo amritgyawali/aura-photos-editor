@@ -139,9 +139,13 @@ impl GeometryStore {
 
     /// Every photograph in a project that has a plan, in id order.
     ///
-    /// What the IPC layer walks when it carries plans into recipes. Separate from
-    /// [`GeometryStore::pending`], which answers the opposite question and would return every
-    /// photograph in the project if it were asked this one.
+    /// What a caller walks when it needs every plan a project holds - phase 29's album layout
+    /// and a support bundle, rather than the pass. **The pass does not use this**: a run that
+    /// re-planned ten photographs must not re-merge four thousand recipes, so it carries the
+    /// ids it touched instead.
+    ///
+    /// Separate from [`GeometryStore::pending`], which answers the opposite question and would
+    /// return every photograph in the project if it were asked this one.
     ///
     /// # Errors
     ///

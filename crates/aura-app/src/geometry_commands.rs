@@ -219,7 +219,11 @@ pub fn plan_geometry(state: &AppState, input: &PlanGeometryInput) -> IpcResult<G
     let cancel = CancelToken::new();
     let limit = input.limit.map_or(usize::MAX, |value| value as usize);
 
+    // The frames this run touched, collected as it goes. **Not every planned frame in the
+    // project**: a call that re-planned ten photographs must not re-merge four thousand
+    // recipes, and the difference is a wedding's worth of writes on every incremental run.
     let mut seen = 0usize;
+    let mut touched: Vec<PhotoId> = Vec::new();
     let pass = GeometryPass::new(&service, &NullProgress, &cancel);
     let outcome = pass.run(project, |image| {
         if seen >= limit {
@@ -227,13 +231,14 @@ pub fn plan_geometry(state: &AppState, input: &PlanGeometryInput) -> IpcResult<G
             return None;
         }
         seen += 1;
+        touched.push(image);
         Some(build_input(state, image))
     })?;
 
     // The recipes, written through the merge exactly as phase 19's pass writes its masks.
     let mut written = 0u32;
     let mut protected = 0u32;
-    for image in service.store().planned(&project).unwrap_or_default() {
+    for image in touched {
         let Ok(Some(plan)) = service.of_image(image) else {
             continue;
         };
