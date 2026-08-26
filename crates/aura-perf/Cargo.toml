@@ -24,6 +24,7 @@ aura-infer.path    = "../aura-infer"
 aura-brain-wedding = { path = "../aura-brain-wedding" }
 aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-cull          = { path = "../aura-cull" }
+aura-geometry      = { path = "../aura-geometry" }
 aura-explain       = { path = "../aura-explain" }
 aura-people.path   = "../aura-people"
 aura-raw.path      = "../aura-raw"

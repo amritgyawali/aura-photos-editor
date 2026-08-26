@@ -21,12 +21,20 @@
 --
 -- Eight properties are enforced here rather than remembered:
 --
--- 1. **The original framing is always recoverable, and the schema is why.** `geometry_crop`
---    always carries a `purpose = 'original'` row covering the whole frame, enforced by the
---    CHECK on `geometry_plan.primary_ordinal` addressing a row that exists and by
---    `GeometryPlan::new` being the only constructor. Section 13's "original framing is always
---    one click away" is not a button that has to be maintained; it is a row that has to be
---    deleted, and nothing deletes it.
+-- 1. **The original framing is always recoverable, and it is not stored.** Ordinal zero -
+--    `purpose = 'original'` - is a pure function of two columns already on the plan row: the
+--    whole frame when `rotate_deg` is zero, and the rectangle that rotation left inside it
+--    when it is not. `GeometryStore` regenerates it on every read and never writes it.
+--
+--    That is stronger than storing it, not weaker. A stored row is a row somebody can delete;
+--    a derived one cannot be lost, cannot drift from the rotation it belongs to, and cannot
+--    be edited into something that is not the frame as shot. Section 13's "original framing is
+--    always one click away" becomes a property of the reader. It also saves about ninety bytes
+--    a photograph for a rectangle that could not have been anything else - the same argument
+--    phase 19 made about regenerating shaping zones from the four numbers they derive from.
+--
+--    `primary_ordinal = 0` therefore means "deliver the frame as shot", and it addresses a row
+--    that is generated rather than selected.
 --
 -- 2. **There is no path, no rendered output and no `applied` flag.** Phase 14's rule for the
 --    seventh phase running: the values reach the pixels through `edit_recipes` and
@@ -60,6 +68,15 @@
 --    faces" and that is a number. The rectangle that caused it is carried by the reason's
 --    evidence for the ones worth showing. This is the same argument phase 19 made about
 --    shaping zones, taken to its natural end.
+--
+-- 6b. **A reason stores its code, and its sentence only when the sentence carries a number.**
+--    Phase 09's rule, for the sixth migration running: a stored sentence is copy a release can
+--    change, and a catalog full of English cannot be translated. `GeometryCode::user_text`
+--    regenerates it on read. Four of this phase's twenty-four reasons carry a *measured* value
+--    inside the sentence - "scored 0.71 against 0.63", "levelled 4.2 degrees of the 7.0 it
+--    needed" - which no static string can reproduce, and only those rows store their text.
+--    Measured: 1,474 bytes per image with every sentence stored, 999 without, 839 once ordinal
+--    zero stopped being written.
 --
 -- 7. **`faces_checked` and `hands_checked` are counts rather than booleans.** A crop over a
 --    frame with no detected faces satisfies the face rule trivially, and storing that as
@@ -202,6 +219,8 @@ CREATE TABLE geometry_crop (
   -- Normalised to the CORRECTED frame - after the lens model and the keystone, not the file.
   -- A rectangle expressed against the raw frame would drift by however much the optics bent,
   -- which on a 14 mm wide is several per cent of the width.
+  -- Ordinal zero is never written; see note 1. The rows here are the primary and the aspect
+  -- variants, so a plan delivered as shot carries no crop rows at all.
   x                   REAL    NOT NULL CHECK (x >= 0.0 AND x <= 1.0),
   y                   REAL    NOT NULL CHECK (y >= 0.0 AND y <= 1.0),
   w                   REAL    NOT NULL CHECK (w > 0.0 AND w <= 1.0),

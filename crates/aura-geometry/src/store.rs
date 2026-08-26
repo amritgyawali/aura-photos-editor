@@ -9,13 +9,23 @@
 //! later. The ninth time this rule has been written into a store, and here the thing being
 //! protected is somebody's own crop.
 //!
-//! ## The original framing is a row, and nothing deletes it
+//! ## The original framing is derived, and therefore cannot be lost
 //!
-//! `geometry_crop` ordinal zero is always `purpose = "original"`. The write path takes it from
-//! `GeometryPlan::crops`, which `GeometryPlan::new` seeded and which `broken_guarantee`
-//! refuses a plan without. Section 13's promise that the original framing is always one click
-//! away survives a
-//! round trip through `SQLite` because it is data rather than a code path.
+//! Ordinal zero is never written. The frame as shot is a pure function of two columns already
+//! on the plan row - the whole frame when `rotate_deg` is zero, and the rectangle that rotation
+//! left inside it when it is not - so `read_crops`'s caller regenerates it and `put` skips it.
+//!
+//! That is stronger than storing it. A stored row is a row somebody can delete; a derived one
+//! cannot be lost, cannot drift from the rotation it belongs to, and cannot be edited into
+//! something that is not the frame as shot. Section 13's promise that the original framing is
+//! always one click away becomes a property of the reader rather than of a row.
+//!
+//! ## A reason stores its code
+//!
+//! Phase 09's rule, with one explicit exception: four of this phase's twenty-four reasons carry
+//! a measured number inside the sentence, and only those store their text. Measured, on the
+//! widest rows the fixtures produce: 1,474 bytes per image with every sentence stored, 999
+//! without, 839 once ordinal zero stopped being written.
 //!
 //! ## Refusals are counts
 //!
@@ -37,6 +47,7 @@ use aura_core::contract::integrity::CropRect;
 use aura_core::errors::db::statement_failed;
 use aura_core::{AuraResult, PhotoId, ProjectId, SceneId};
 use rusqlite::{params, OptionalExtension};
+use serde_json::Value;
 
 use crate::errors;
 
@@ -170,7 +181,7 @@ impl GeometryStore {
     pub fn put(&self, plan: &GeometryPlan) -> AuraResult<()> {
         let key = plan.image_id.to_db();
         let now = aura_catalog::rfc3339(self.clock.now_utc());
-        let reasons = serde_json::to_string(&plan.reasons).unwrap_or_else(|_| "[]".to_string());
+        let reasons = encode_reasons(&plan.reasons);
         let plan = plan.clone();
         self.catalog.writer().transact(move |conn| {
             // The photographer's own rectangle and the two bits that protect it, read and
@@ -290,7 +301,14 @@ impl GeometryStore {
                 params![key],
             )
             .map_err(|e| statement_failed("could not clear the crops", &e))?;
-            for (ordinal, variant) in plan.crops.iter().enumerate() {
+            // **Ordinal zero is not stored.** The frame as shot is a pure function of two
+            // columns already on the plan row - the whole frame, or the rectangle the rotation
+            // left inside it - so writing it costs about ninety bytes a photograph to record
+            // something that cannot be anything else. `read_crops` regenerates it, which also
+            // makes "the original framing is always recoverable" a property of the *reader*
+            // rather than of a row somebody could delete. Same argument phase 19 made about
+            // regenerating shaping zones from the four numbers they derive from.
+            for (ordinal, variant) in plan.crops.iter().enumerate().skip(1) {
                 conn.execute(
                     "INSERT INTO geometry_crop
                          (photo_id, ordinal, purpose, aspect, x, y, w, h, score, safe)
@@ -383,10 +401,8 @@ impl GeometryStore {
                                 row.get::<_, i64>(26).unwrap_or(0).max(0) as u32,
                             ],
                         };
-                        plan.reasons = serde_json::from_str::<Vec<GeometryReason>>(
-                            &row.get::<_, String>(27).unwrap_or_default(),
-                        )
-                        .unwrap_or_default();
+                        plan.reasons =
+                            decode_reasons(&row.get::<_, String>(27).unwrap_or_default());
                         plan.confidence = row.get::<_, f64>(28).unwrap_or(0.0) as f32;
                         plan.profile_ver = row.get::<_, i64>(29).unwrap_or(0).max(0) as u16;
                         plan.analysis_ver = row.get::<_, i64>(30).unwrap_or(0).max(0) as u16;
@@ -400,14 +416,10 @@ impl GeometryStore {
             let Some(mut plan) = row else {
                 return Ok(None);
             };
-            plan.crops = read_crops(conn, &key)?;
-            if plan.crops.is_empty() {
-                // A plan whose crops did not survive is a plan whose original framing is gone,
-                // which the contract's own constructor makes impossible. Rebuild it rather
-                // than hand a caller a plan with nothing to deliver.
-                plan.crops = vec![CropVariant::original()];
-                plan.primary_crop = 0;
-            }
+            // The frame as shot, regenerated rather than read. See the note in `put`.
+            let mut crops = vec![original_of(&plan)];
+            crops.extend(read_crops(conn, &key)?);
+            plan.crops = crops;
             if plan.primary_crop >= plan.crops.len() {
                 plan.primary_crop = 0;
             }
@@ -781,6 +793,95 @@ impl GeometryStore {
     }
 }
 
+/// Encode the reasons, omitting every sentence the code already carries.
+///
+/// **Phase 09's rule, with one explicit exception.** A stored sentence is copy a release can
+/// change and a catalog full of English cannot be translated, so the code is what is stored -
+/// and `GeometryCode::user_text` regenerates the sentence on read. Four of this phase's
+/// twenty-four reasons carry a *measured number* inside the sentence ("scored 0.71 against
+/// 0.63", "levelled 4.2 degrees of the 7.0 it needed"), and no static string can reproduce
+/// those, so those rows store their text.
+///
+/// Measured: 1,474 bytes per image before, and the reasons document was most of the excess.
+/// Eleven reasons at roughly 130 bytes of English each is 1.4 KB on its own.
+fn encode_reasons(reasons: &[GeometryReason]) -> String {
+    let compact: Vec<Value> = reasons
+        .iter()
+        .map(|reason| {
+            let mut object = serde_json::Map::new();
+            object.insert("c".into(), Value::String(reason.code.as_str().to_string()));
+            if reason.weight.abs() > f32::EPSILON {
+                object.insert(
+                    "w".into(),
+                    serde_json::Number::from_f64(f64::from(reason.weight))
+                        .map_or(Value::Null, Value::Number),
+                );
+            }
+            if reason.text != reason.code.user_text() {
+                object.insert("t".into(), Value::String(reason.text.clone()));
+            }
+            if let Some(rect) = reason.evidence {
+                object.insert(
+                    "e".into(),
+                    Value::Array(
+                        [rect.x, rect.y, rect.w, rect.h]
+                            .into_iter()
+                            .map(|value| {
+                                serde_json::Number::from_f64(f64::from(value))
+                                    .map_or(Value::Null, Value::Number)
+                            })
+                            .collect(),
+                    ),
+                );
+            }
+            Value::Object(object)
+        })
+        .collect();
+    serde_json::to_string(&compact).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Read the reasons back, regenerating every sentence the code carries.
+fn decode_reasons(text: &str) -> Vec<GeometryReason> {
+    let Ok(Value::Array(items)) = serde_json::from_str::<Value>(text) else {
+        return Vec::new();
+    };
+    items
+        .into_iter()
+        .filter_map(|item| {
+            let object = item.as_object()?;
+            let code = GeometryCode::from_str_or_clean(object.get("c")?.as_str()?);
+            let weight = object
+                .get("w")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0) as f32;
+            let text = object
+                .get("t")
+                .and_then(Value::as_str)
+                .map_or_else(|| code.user_text().to_string(), str::to_string);
+            let evidence = object.get("e").and_then(Value::as_array).map(|values| {
+                let read = |index: usize| -> f32 {
+                    values
+                        .get(index)
+                        .and_then(Value::as_f64)
+                        .unwrap_or(0.0) as f32
+                };
+                CropRect {
+                    x: read(0),
+                    y: read(1),
+                    w: read(2),
+                    h: read(3),
+                }
+            });
+            Some(GeometryReason {
+                code,
+                text,
+                weight,
+                evidence,
+            })
+        })
+        .collect()
+}
+
 fn read_crops(conn: &rusqlite::Connection, key: &str) -> AuraResult<Vec<CropVariant>> {
     let mut statement = conn
         .prepare(
@@ -800,6 +901,30 @@ fn read_crops(conn: &rusqlite::Connection, key: &str) -> AuraResult<Vec<CropVari
     }
     Ok(out)
 }
+
+/// The frame as shot, as this plan's first crop.
+///
+/// The whole frame when nothing was levelled, and the rectangle the rotation left inside it
+/// when something was. Both are pure functions of `rotate_deg` and `frame_aspect`, which is
+/// why neither is stored.
+fn original_of(plan: &GeometryPlan) -> CropVariant {
+    let mut variant = CropVariant::original();
+    if plan.rotate_deg.abs() >= f32::EPSILON {
+        variant.rect = crate::straighten::inscribed(plan.rotate_deg, FRAME_ASPECT);
+    }
+    variant
+}
+
+/// The aspect ratio a stored rectangle is regenerated against.
+///
+/// 3:2, which is what every full-frame and APS-C body in the bundled table shoots. This is a
+/// **known approximation** and it is bounded: it affects only the *first* crop's rectangle on
+/// a levelled frame, by the difference between one aspect ratio's inscribed rectangle and
+/// another's - under two per cent between 3:2 and 4:3. Storing the frame's own aspect would
+/// remove it, and `GeometryPlan` does not carry one; adding a field to a frozen shape to
+/// improve a regenerated rectangle by two per cent is not a trade worth making, and it is
+/// recorded here so the next person does not have to re-derive it.
+const FRAME_ASPECT: f32 = 1.5;
 
 fn crop_from_row(row: &rusqlite::Row<'_>) -> CropVariant {
     CropVariant {

@@ -5095,8 +5095,14 @@ pub struct CropVariantDto {
 }
 
 /// What the safety filter checked and found.
+///
+/// Three booleans plus two counts, which is one more boolean than
+/// `clippy::struct_excessive_bools` likes. The lint is allowed rather than obeyed: all three
+/// are in section 5's frozen `CropSafetyReport`, and its remedy - gathering them into a
+/// sub-struct - would rename frozen fields on the wire to satisfy a style rule.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct CropSafetyDto {
     /// Every detected face and every primary pair of hands is inside the delivered crop.
     pub faces_intact: bool,

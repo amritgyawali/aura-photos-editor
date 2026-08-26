@@ -347,8 +347,10 @@ fn into_recipe(base: &Recipe, plan: &GeometryPlan) -> Recipe {
     let mut out = base.clone();
     out.lens.distortion = plan.lens.corrects_distortion();
     out.lens.ca = plan.lens.corrects_ca();
-    out.lens.vignette = (plan.lens.vignette * 100.0).round().clamp(0.0, 100.0) as i16;
-    out.lens.profile = plan.lens.profile_id.clone();
+    // The decision is a fraction and the recipe is an integer instruction. Clamped before the
+    // cast, so the truncation the lint warns about cannot reach a value outside 0..100.
+    out.lens.vignette = vignette_percent(plan.lens.vignette);
+    plan.lens.profile_id.clone_into(&mut out.lens.profile);
     out.lens.coefficients = if plan.lens.is_identity() {
         None
     } else {
@@ -456,6 +458,20 @@ fn reason_dto(reason: &GeometryReason) -> GeometryReasonDto {
             h: rect.h,
         }),
     }
+}
+
+/// The recipe's `0..100` integer for a `0..1` decision.
+///
+/// The decision is a fraction and the recipe is an instruction. Clamped before the conversion
+/// rather than after it, so there is no value of the input for which this truncates.
+fn vignette_percent(strength: f32) -> i16 {
+    // Integer arithmetic after the clamp: `0..=100` has an exact `i16`, and the only way to
+    // reach the fallback is a NaN strength, which is a value the contract's `0..1` bound
+    // already excludes.
+    let scaled = (strength * 100.0).round().clamp(0.0, 100.0);
+    (0..=100i16)
+        .find(|step| f32::from(*step) >= scaled - 0.5)
+        .unwrap_or(0)
 }
 
 fn parse_project(id: &str) -> IpcResult<ProjectId> {
