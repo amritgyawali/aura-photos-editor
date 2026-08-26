@@ -12,6 +12,10 @@ description  = "Finishing the frame: lens corrections, horizon and architecture 
 aura-core    = { path = "../aura-core" }
 aura-catalog = { path = "../aura-catalog" }
 aura-preview = { path = "../aura-preview" }
+# PHASE-23. The optics transform only - `aura_raw::colour::lens`. This crate decides the
+# coefficients and the renderer applies them, and a second copy of the polynomial is a second
+# answer to where a face has moved to: one used to check a crop, the other used to draw it.
+aura-raw      = { path = "../aura-raw" }
 rusqlite     = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }
@@ -37,6 +41,15 @@ tracing      = { workspace = true }
 
 [dev-dependencies]
 tempfile     = { workspace = true }
+
+# PHASE-23 only, and only in the evaluation harness. `tests/eval/geometry_eval.rs` holds the
+# decision side's idea of where a corrected pixel lands to the render side's, by rendering a
+# recipe this crate's coefficients produced. The library itself depends on neither:
+# `aura-recipe` and `aura-render` are downstream of this crate, and a dependency in the other
+# direction would let a decision reach a pixel without going through `schema::merge`.
+# `tests/no_render_calls.rs` is the grep that keeps it that way.
+aura-recipe  = { path = "../aura-recipe" }
+aura-render  = { path = "../aura-render" }
 
 # The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
 # `tests/eval/` beside the phase 05 to 19 harnesses rather than in this crate's own `tests/`,

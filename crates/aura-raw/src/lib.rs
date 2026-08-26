@@ -65,6 +65,7 @@ pub mod codecs;
 /// The colour pipeline: matrices, profiles, the working space and the curve.
 pub mod colour {
     pub mod curve;
+    pub mod lens;
     pub mod de2000;
     pub mod illuminant;
     pub mod matrix;

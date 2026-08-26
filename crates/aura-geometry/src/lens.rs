@@ -196,96 +196,17 @@ fn push_component_reasons(correction: &LensCorrection, reasons: &mut Vec<Geometr
 // The transform
 // ---------------------------------------------------------------------------
 
-/// The radial distortion model, in normalised radius where one is the corner.
-///
-/// Maps an **undistorted** radius to the **distorted** one it should be sampled from, which is
-/// the direction a resampler walks: for every output pixel, where in the source does it come
-/// from. Positive `k1` is barrel distortion, so `r_d > r_u` and the correction pulls content
-/// inward from further out - which is what straightens a bowed horizon.
-#[must_use]
-pub fn radial(k: [f32; 3], r: f32) -> f32 {
-    let r2 = r * r;
-    let (k1, k2, k3) = (
-        k.first().copied().unwrap_or(0.0),
-        k.get(1).copied().unwrap_or(0.0),
-        k.get(2).copied().unwrap_or(0.0),
-    );
-    r * (1.0 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2)
-}
+// ---------------------------------------------------------------------------
+// The transform
+// ---------------------------------------------------------------------------
 
-/// Where one normalised point in the corrected frame comes from in the source.
-///
-/// Coordinates are `0..1` across the frame in each axis. `aspect` is width over height, and
-/// the radius is normalised by the half-diagonal so that `r = 1` is exactly the corner - which
-/// is the convention every coefficient in `assets/lens_profiles/` is expressed in.
-#[must_use]
-pub fn source_of(point: [f32; 2], k: [f32; 3], aspect: f32, scale: f32) -> [f32; 2] {
-    let (x, y) = (
-        point.first().copied().unwrap_or(0.0),
-        point.get(1).copied().unwrap_or(0.0),
-    );
-    // Centre, then into a space where one unit is the half-diagonal.
-    let half_diag = (aspect * aspect + 1.0).sqrt() / 2.0;
-    let dx = (x - 0.5) * aspect * scale;
-    let dy = (y - 0.5) * scale;
-    let r = (dx * dx + dy * dy).sqrt() / half_diag;
-    if r <= f32::EPSILON {
-        return [0.5, 0.5];
-    }
-    let ratio = radial(k, r) / r;
-    [
-        0.5 + dx * ratio / aspect,
-        0.5 + dy * ratio,
-    ]
-}
-
-/// The largest scale at which every corrected pixel still comes from inside the source.
-///
-/// Barrel correction pulls content inward from beyond the frame edge, which leaves the
-/// corrected frame's corners sampling off the image. Rather than smearing an edge pixel into
-/// them - a corner that is a lie, which is the argument `aura_render::spatial::crop_rotate`
-/// already makes about rotation - the frame is scaled until nothing samples outside.
-///
-/// A binary search over the destination boundary rather than a closed form, because the valid
-/// region is the pre-image of a **rectangle** under a radially symmetric map and that is not a
-/// disc: the binding constraint is at an edge midpoint for barrel and at a corner for
-/// pincushion, and a closed form has to know which in advance.
-#[must_use]
-pub fn valid_scale(k: [f32; 3], aspect: f32) -> f32 {
-    if k.iter().all(|value| value.abs() < f32::EPSILON) {
-        return 1.0;
-    }
-    let inside = |scale: f32| -> bool {
-        const STEPS: usize = 64;
-        for step in 0..=STEPS {
-            let t = step as f32 / STEPS as f32;
-            for point in [[t, 0.0], [t, 1.0], [0.0, t], [1.0, t]] {
-                let source = source_of(point, k, aspect, scale);
-                let (sx, sy) = (
-                    source.first().copied().unwrap_or(0.0),
-                    source.get(1).copied().unwrap_or(0.0),
-                );
-                if !(-1e-4..=1.0 + 1e-4).contains(&sx) || !(-1e-4..=1.0 + 1e-4).contains(&sy) {
-                    return false;
-                }
-            }
-        }
-        true
-    };
-    if inside(1.0) {
-        return 1.0;
-    }
-    let (mut lo, mut hi) = (0.25f32, 1.0f32);
-    for _ in 0..24 {
-        let mid = f32::midpoint(lo, hi);
-        if inside(mid) {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    lo
-}
+// **One implementation, in `aura-raw`.** The optics maths is not this crate's to own: the
+// renderer applies it and this crate decides it, and two copies of a distortion polynomial is
+// two answers to where a face is - one used to check a crop and the other used to draw it.
+// `aura_raw::colour::profile` makes the same argument about camera matrices and
+// `aura_raw::colour::curve` about monotone interpolation, and `aura-raw` is the lowest crate
+// both sides can reach.
+pub use aura_raw::colour::lens::{dest_of, radial, source_of, valid_scale, Coefficients};
 
 /// Move a rectangle from the frame as shot into the corrected frame.
 ///
@@ -332,41 +253,6 @@ pub fn map_rect(rect: CropRect, k: [f32; 3], aspect: f32, scale: f32) -> CropRec
         h: max_y - min_y,
     }
     .clamped()
-}
-
-/// Where a point in the frame as shot lands in the corrected frame. The inverse of
-/// [`source_of`].
-#[must_use]
-pub fn dest_of(point: [f32; 2], k: [f32; 3], aspect: f32, scale: f32) -> [f32; 2] {
-    let (x, y) = (
-        point.first().copied().unwrap_or(0.0),
-        point.get(1).copied().unwrap_or(0.0),
-    );
-    let half_diag = (aspect * aspect + 1.0).sqrt() / 2.0;
-    let dx = (x - 0.5) * aspect;
-    let dy = y - 0.5;
-    let r_d = (dx * dx + dy * dy).sqrt() / half_diag;
-    if r_d <= f32::EPSILON {
-        return [0.5, 0.5];
-    }
-    // Invert `radial` by bisection. Monotone over the range the coefficients are bounded to,
-    // so twenty-four steps is exact to well under a pixel on a 45 MP frame.
-    let (mut lo, mut hi) = (0.0f32, 2.0f32);
-    for _ in 0..24 {
-        let mid = f32::midpoint(lo, hi);
-        if radial(k, mid) < r_d {
-            lo = mid;
-        } else {
-            hi = mid;
-        }
-    }
-    let r_u = f32::midpoint(lo, hi);
-    let ratio = r_u / r_d;
-    let scale = if scale.abs() < f32::EPSILON { 1.0 } else { scale };
-    [
-        0.5 + dx * ratio / (aspect * scale),
-        0.5 + dy * ratio / scale,
-    ]
 }
 
 /// Move every protected region into the corrected frame.

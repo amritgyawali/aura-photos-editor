@@ -624,3 +624,105 @@ fn what_this_harness_does_not_prove() {
          hands is currently a claim about an empty set.\n"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The decision side, held to the render side
+// ---------------------------------------------------------------------------
+
+#[test]
+fn gate_11_the_decision_and_the_renderer_agree_about_where_a_pixel_lands() {
+    // Phase 19 wrote this shape and this phase needs it more sharply. `aura_geometry` maps a
+    // face box through the distortion model to decide whether a crop cuts it; `aura_render`
+    // maps a *pixel* through the same model to draw it. If the two ever disagreed, a crop
+    // would be checked against one frame and applied to another - and the failure is silent,
+    // because both frames look like photographs.
+    //
+    // They cannot disagree, because both call `aura_raw::colour::lens`. This asserts that,
+    // rather than trusting it: one implementation is a fact about the dependency graph today
+    // and a comment tomorrow.
+    for k in [
+        [0.031_f32, -0.008, 0.0],
+        [-0.012, 0.004, 0.0],
+        [0.062, -0.019, 0.004],
+    ] {
+        for aspect in [1.5_f32, 0.6667] {
+            let decision_scale = lens::valid_scale(k, aspect);
+            let render_scale = aura_raw::colour::lens::valid_scale(k, aspect);
+            assert!(
+                (decision_scale - render_scale).abs() < f32::EPSILON,
+                "{k:?} at {aspect}: decided {decision_scale}, rendered {render_scale}"
+            );
+            for point in [[0.1_f32, 0.2], [0.5, 0.5], [0.92, 0.88]] {
+                let decided = lens::source_of(point, k, aspect, decision_scale);
+                let rendered =
+                    aura_raw::colour::lens::source_of(point, k, aspect, render_scale);
+                assert_eq!(decided, rendered, "{k:?} at {aspect}, {point:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn gate_12_a_plans_coefficients_reach_the_renderer_through_the_recipe() {
+    // The whole route, end to end: the planner decides a correction from the bundled table,
+    // the coefficients are written into a recipe, and the render graph schedules the two lens
+    // stages rather than skipping them. On a build with no coefficients in the recipe the same
+    // graph reports `LensProfileAbsent`, which is the honest reading of a lens nobody profiled.
+    use aura_recipe::{Lens, LensCoefficients};
+    use aura_render::graph::{self, Capabilities, InputKind, Stage};
+    use aura_render::RenderPurpose;
+
+    let mut input = GeometryInput::bare(fixtures::photo(12), SceneId::GettingReadyBride);
+    input.lens = LensInput {
+        lens_id: Some("Canon RF 24-70mm F2.8 L IS USM".to_string()),
+        focal_mm: Some(24.0),
+        embedded: None,
+    };
+    let planner = Planner::new(bundled(), CropRules::shipped().expect("rules"));
+    let plan = planner.plan(&input);
+    assert!(plan.lens.corrects_distortion() && plan.lens.corrects_ca());
+
+    let mut recipe = aura_recipe::fixtures::neutral(
+        "a3f200000000000000000000000000000000000000000000000000000000beef",
+        "ILCE-7M4",
+    );
+    recipe.lens = Lens {
+        distortion: true,
+        vignette: (plan.lens.vignette * 100.0).round() as i16,
+        ca: true,
+        profile: plan.lens.profile_id.clone(),
+        coefficients: Some(LensCoefficients {
+            k1: plan.lens.distortion[0],
+            k2: plan.lens.distortion[1],
+            k3: plan.lens.distortion[2],
+            ca_red: plan.lens.ca[0],
+            ca_blue: plan.lens.ca[1],
+        }),
+    };
+
+    let caps = Capabilities {
+        geometry_models: true,
+        ..Capabilities::default()
+    };
+    let scheduled = graph::plan(
+        &recipe,
+        RenderPurpose::Export,
+        InputKind::CameraNative,
+        caps,
+    );
+    for stage in [Stage::LensDistortion, Stage::LensCa, Stage::LensVignette] {
+        assert!(
+            scheduled.stages.contains(&stage),
+            "{} was not scheduled for a profiled lens",
+            stage.as_str()
+        );
+    }
+
+    // The same recipe with the numbers removed corrects nothing, and the renderer says why.
+    recipe.lens.coefficients = None;
+    let corrections = aura_render::geometry::coefficients_of(&recipe.lens);
+    assert!(
+        corrections.is_none(),
+        "a recipe with no coefficients corrected something"
+    );
+}

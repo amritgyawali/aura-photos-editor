@@ -126,6 +126,41 @@ impl GeometryStore {
         })
     }
 
+    /// Every photograph in a project that has a plan, in id order.
+    ///
+    /// What the IPC layer walks when it carries plans into recipes. Separate from
+    /// [`GeometryStore::pending`], which answers the opposite question and would return every
+    /// photograph in the project if it were asked this one.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the query fails.
+    pub fn planned(&self, project: &ProjectId) -> AuraResult<Vec<PhotoId>> {
+        let key = project.to_db();
+        self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare(
+                    "SELECT g.photo_id FROM geometry_plan g
+                       JOIN photo p ON p.photo_id = g.photo_id
+                      WHERE p.project_id = ?1 ORDER BY g.photo_id",
+                )
+                .map_err(|e| statement_failed("could not list the planned frames", &e))?;
+            let mut out = Vec::new();
+            let mut cursor = statement
+                .query(params![key])
+                .map_err(|e| statement_failed("could not list the planned frames", &e))?;
+            while let Some(row) = cursor
+                .next()
+                .map_err(|e| statement_failed("could not list the planned frames", &e))?
+            {
+                if let Ok(id) = PhotoId::from_db(&row.get::<_, String>(0).unwrap_or_default()) {
+                    out.push(id);
+                }
+            }
+            Ok(out)
+        })
+    }
+
     /// Write one plan, carrying any override forward inside the statement.
     ///
     /// # Errors

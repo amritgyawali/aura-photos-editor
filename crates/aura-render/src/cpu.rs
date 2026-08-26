@@ -31,6 +31,7 @@ use crate::contract::render::{
     Backend, RenderCaps, RenderLevel, RenderNote, RenderPurpose, RenderRequest, RenderService,
     RenderedImage, SkipReason,
 };
+use crate::geometry;
 use crate::graph::{self, Capabilities, InputKind, Plan, Stage};
 use crate::spatial;
 use crate::tonemap::{self, CurveLut, Tone};
@@ -127,7 +128,13 @@ impl CpuEngine {
         Self {
             source,
             clock,
-            caps: Capabilities::default(),
+            // PHASE-23. The reference path can correct a lens and square up a wall, so the
+            // three geometry stages are schedulable rather than skipped. The other three
+            // capabilities stay false: phases 20, 21 and 22 have not shipped.
+            caps: Capabilities {
+                geometry_models: true,
+                ..Capabilities::default()
+            },
             working_bytes: DEFAULT_WORKING_BYTES,
         }
     }
@@ -283,6 +290,10 @@ impl CpuEngine {
         }
 
         // ---- lens ----------------------------------------------------------------------
+        //
+        // In linear light, before the creative operations, so a vignette correction does not
+        // fight phase 15's exposure and a distortion correction does not resample a graded
+        // frame. `graph::ORDER` put them here in phase 14; phase 23 filled them in.
         if plan.stages.contains(&Stage::LensVignette) {
             spatial::correct_vignette(
                 &mut rgb,
@@ -291,6 +302,27 @@ impl CpuEngine {
                 f32::from(recipe.lens.vignette) / 100.0,
                 position,
             );
+        }
+        let corrections = geometry::coefficients_of(&recipe.lens);
+        if plan.stages.contains(&Stage::LensDistortion) {
+            if let Some(coefficients) = corrections {
+                geometry::correct_distortion(
+                    &mut rgb,
+                    width as usize,
+                    height as usize,
+                    coefficients.k,
+                );
+            }
+        }
+        if plan.stages.contains(&Stage::LensCa) {
+            if let Some(coefficients) = corrections {
+                geometry::correct_ca(
+                    &mut rgb,
+                    width as usize,
+                    height as usize,
+                    [coefficients.ca_red, coefficients.ca_blue],
+                );
+            }
         }
 
         // ---- noise ---------------------------------------------------------------------
@@ -410,7 +442,14 @@ impl CpuEngine {
         }
 
         // ---- geometry ------------------------------------------------------------------
+        //
+        // The keystone first, then the crop and the rotation. A crop is expressed against the
+        // *corrected* frame - which is what `aura_geometry` decided it against - so squaring
+        // the walls before applying it is what makes the two agree about the same rectangle.
         if plan.stages.contains(&Stage::Geometry) {
+            if let Some(keystone) = recipe.geometry.perspective {
+                geometry::apply_keystone(&mut rgb, width as usize, height as usize, keystone);
+            }
             let (out, w, h) = spatial::crop_rotate(
                 &rgb,
                 width as usize,

@@ -531,6 +531,13 @@ pub fn stage_for(path: &str) -> Option<Stage> {
         "lens.distortion" => Some(Stage::LensDistortion),
         "lens.ca" => Some(Stage::LensCa),
         "lens.profile" => Some(Stage::LensDistortion),
+        // PHASE-23. Each coefficient invalidates from the stage that reads it, not from the
+        // lens block as a whole: changing `ca_red` re-runs the fringing correction and leaves
+        // the distortion resample alone, which on a 45 MP export is most of the lens half.
+        "lens.coefficients.k1" | "lens.coefficients.k2" | "lens.coefficients.k3" => {
+            Some(Stage::LensDistortion)
+        }
+        "lens.coefficients.ca_red" | "lens.coefficients.ca_blue" => Some(Stage::LensCa),
         "global.noise.luminance"
         | "global.noise.colour"
         | "global.noise.detail"

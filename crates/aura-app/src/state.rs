@@ -20,6 +20,7 @@ use aura_brain_wedding::scene::taxonomy::Taxonomy;
 use aura_brain_wedding::story::{Story, StoryStore};
 use aura_cache::CacheBudget;
 use aura_catalog::consent::CatalogConsent;
+use aura_geometry::Geometry;
 use aura_catalog::Catalog;
 use aura_cloud::audit::{AuditSink, CatalogAudit};
 use aura_cloud::budget::{CatalogBudget, CostGovernor};
@@ -1697,6 +1698,24 @@ impl AppState {
     #[must_use]
     pub fn local(&self) -> Arc<Local> {
         Arc::new(Local::new(self.local_store()))
+    }
+
+    /// The frozen `GeometryService` for this catalog. PHASE-23.
+    ///
+    /// Opens the bundled lens profile table and `crop_rules.toml` on every call, which is the
+    /// same shape `composition()` and `cull()` take with their own tables: the files are small,
+    /// they are read once per command rather than once per photograph, and a service that
+    /// cached them would be a service that keeps serving a rules file a product manager has
+    /// just edited.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5093` when either file will not load.
+    pub fn geometry(&self) -> AuraResult<Arc<Geometry>> {
+        Ok(Arc::new(Geometry::shipped(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        )?))
     }
 
     /// The local light pass, wired to previews, people, story, integrity and composition.

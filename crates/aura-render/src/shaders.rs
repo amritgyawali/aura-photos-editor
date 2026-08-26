@@ -51,8 +51,12 @@ pub const FREQ_SEP: &str = include_str!("../shaders/freq_sep.wgsl");
 /// PHASE-19. Applying a local light plan.
 pub const LOCAL_APPLY: &str = include_str!("../shaders/local_apply.wgsl");
 
+/// PHASE-23. Lens distortion, fringing, keystone, crop and rotate: the four entry points that
+/// gather rather than map.
+const GEOMETRY: &str = include_str!("../shaders/geometry.wgsl");
+
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 9] = [
+pub const SOURCES: [(&str, &str); 10] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
@@ -62,6 +66,7 @@ pub const SOURCES: [(&str, &str); 9] = [
     ("luminosity_mask.wgsl", LUMINOSITY_MASK),
     ("freq_sep.wgsl", FREQ_SEP),
     ("local_apply.wgsl", LOCAL_APPLY),
+    ("geometry.wgsl", GEOMETRY),
 ];
 
 /// The entry point name for a stage. `exposure` becomes `stage_exposure`.
@@ -107,6 +112,14 @@ pub fn shared_constants() -> Vec<(&'static str, String)> {
         // processor reference in `crate::local`. A shader that drifted from any of them
         // would change how far every face in the product gets lifted, and would do it
         // silently on the day a backend first ran.
+        // PHASE-23. The bisection depth the shader inverts the distortion polynomial with.
+        // A shader that used sixteen steps where the reference uses twenty-four would place
+        // every corrected pixel a fraction differently, and the difference grows with the
+        // radius - which is a soft frame edge on one path and not the other.
+        (
+            "BISECTION_STEPS",
+            format!("{}", aura_raw::colour::lens::BISECTION_STEPS),
+        ),
         ("FACE_PIVOT", format!("{:.2}", crate::local::FACE_PIVOT)),
         (
             "SHADOWS_PER_EV",

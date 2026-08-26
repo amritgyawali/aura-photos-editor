@@ -98,14 +98,50 @@ fn the_shaders_declare_f32_storage_rather_than_f16() {
 fn the_geometry_shader_uses_pixel_centres() {
     // The half-pixel bug, caught once on the processor path and pinned on both. A crop that
     // resampled by half a pixel would soften every straightened frame.
-    let (_, spatial) = SOURCES
+    let (_, geometry) = SOURCES
         .iter()
-        .find(|(name, _)| *name == "spatial.wgsl")
+        .find(|(name, _)| *name == "geometry.wgsl")
         .copied()
-        .expect("spatial.wgsl");
+        .expect("geometry.wgsl");
     assert!(
-        spatial.contains("(left + right - 1.0)"),
+        geometry.contains("(left + right - 1.0)"),
         "the geometry shader must centre on pixel centres, not edges"
+    );
+}
+
+#[test]
+fn the_geometry_shader_never_fills_what_it_could_not_sample() {
+    // PHASE-23. A barrel correction pulls content in from beyond the frame edge and a keystone
+    // opens two corners. Both are scaled until nothing samples outside, and whatever still
+    // falls out is left black - never clamped to the edge pixel, which is a corner that is a
+    // lie, and never generated, which is phase 24.
+    let (_, geometry) = SOURCES
+        .iter()
+        .find(|(name, _)| *name == "geometry.wgsl")
+        .copied()
+        .expect("geometry.wgsl");
+    assert!(
+        !geometry.contains("clamp_to_edge") && !geometry.contains("textureSampleLevel"),
+        "the geometry shader must not sample past the frame"
+    );
+    assert!(
+        geometry.contains("return 0.0;"),
+        "the geometry shader must return black outside the frame rather than smear an edge"
+    );
+}
+
+#[test]
+fn green_is_never_scaled_by_the_fringing_shader() {
+    // The one line in this shader a reviewer should be able to find in a second. Scaling green
+    // moves the whole image rather than registering the other two channels against it.
+    let (_, geometry) = SOURCES
+        .iter()
+        .find(|(name, _)| *name == "geometry.wgsl")
+        .copied()
+        .expect("geometry.wgsl");
+    assert!(
+        geometry.contains("dst[base + 1u] = src[base + 1u];"),
+        "stage_lens_ca must pass green through untouched"
     );
 }
 
@@ -117,9 +153,12 @@ fn each_stage_entry_point_is_in_the_file_its_subject_belongs_to() {
             Stage::HighlightRecovery
             | Stage::WhiteBalance
             | Stage::CameraMatrix
-            | Stage::LensVignette
-            | Stage::LensDistortion
-            | Stage::LensCa => "colour.wgsl",
+            | Stage::LensVignette => "colour.wgsl",
+            // PHASE-23. The two lens corrections and the crop moved out of `colour.wgsl` and
+            // `spatial.wgsl` when they stopped being point-wise: all three gather from
+            // somewhere else in the source, and every other entry point in those two files
+            // reads index `i` and writes index `i`.
+            Stage::LensDistortion | Stage::LensCa | Stage::Geometry => "geometry.wgsl",
             Stage::OutputTransform => "output.wgsl",
             Stage::Exposure
             | Stage::Tone
