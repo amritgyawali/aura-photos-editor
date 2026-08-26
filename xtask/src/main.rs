@@ -47,6 +47,12 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-render/shaders/mask_composite.wgsl",
     // PHASE-19.
     "crates/aura-catalog/migrations/0019_local_light.sql",
+    // PHASE-23. The migration, and the shader: `geometry.wgsl` is the GPU half of a resample
+    // the reference path also performs, and a shader that drifts while no device can run it is
+    // a soft frame edge nobody finds until one arrives. `shader_parity.rs` holds it to the
+    // reference; this holds it to a review.
+    "crates/aura-catalog/migrations/0020_geometry.sql",
+    "crates/aura-render/shaders/geometry.wgsl",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

@@ -2,6 +2,89 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 23 - Geometry Suite (lens corrections, straightening, smart crop)
+
+The first phase in the product that takes something away from a photograph. Twenty-two
+phases have decided what is delivered, what it is of, whether it worked, how it should
+look and how light moves inside it; not one of them has removed anything.
+
+That asymmetry runs through every decision here. A wrong exposure looks wrong on the
+screen it was decided on. A frame with somebody's hand missing from the edge looks like a
+frame, until it is printed.
+
+So the headline behaviour of this phase is **restraint**: seven photographs in ten are
+delivered exactly as they were shot, fourteen of the twenty-three kinds of wedding
+photograph AURA recognises are never cropped at all, and eleven of the twenty-four reason
+codes describe something the product declined to do. The Geometry panel renders those
+*first*, because a panel that reads as empty on most photographs is a panel nobody opens.
+
+### Added
+
+- **`aura-core::contract::geometry`**: the frozen `GeometryPlan`, `LensCorrection`,
+  `Keystone`, `CropVariant`, `CropPurpose`, `Aspect`, `CropSafetyReport`,
+  `ProtectedRegion`, twenty-four reason codes, `GeometryOutline`, `GeometryOverride` and
+  `GeometryService`. **The frame as you shot it is index zero of every plan**, inserted by
+  the only constructor - so "original framing is always one click away" is the shape
+  rather than a button somebody has to maintain.
+- **`aura-geometry`**: fourteen modules. Three routes to a lens correction, an edge
+  tracker and a filtered fit for lenses nobody has profiled, a straightening solve that
+  reduces the angle rather than cropping into somebody, a keystone that is refused past
+  its cap instead of halved, a hard safety filter that runs *before* the composition
+  objective, a bounded crop search, and the aspect variants.
+- **Migration 20**: `geometry_plan`, `geometry_crop` and `v_geometry_coverage`. 839 bytes
+  per photograph, measured.
+- **`crop_rules.toml`**: 23 scene rows with a written reason each. The loader may only
+  make a safety rule stricter, never looser.
+- **`assets/lens_profiles/`**: the bundled table, with attribution required on every row.
+- **`aura_raw::colour::lens`**: the optics transform, in the lowest crate the decision and
+  the renderer both reach.
+- **`geometry.wgsl`** and `aura-render::geometry`: the corrections applied, in linear
+  light, before the creative operations, once.
+- **Six IPC commands** (ADR-0042) and the Geometry panel.
+- **`docs/geometry-and-cropping.md`**: what all of it means, in the product's own words.
+- **`aura-cli verify --phase 23`**, 23 evaluation gates and four performance rows.
+
+### Changed
+
+- **`aura_recipe::Lens` carries its coefficients.** A frozen contract amended, recorded in
+  ADR-0041 section 4. The tidier alternative - look the profile up at render time - fails
+  phase 14's rule that a delivered file can be re-created from four values: a coefficient
+  living only in a profile table is a fifth, and updating that table would silently change
+  what an already-delivered photograph looks like.
+- **`Capabilities::geometry_models` is true on the reference path**, so a perspective
+  correction is applied rather than reported as absent.
+
+### Fixed
+
+- **An edge tracker that found nothing on a plate made of nothing but straight lines.** It
+  died at every intersection, because the gradient *along* one edge collapses where
+  another crosses it. A crossing is not an ending.
+- **A robust fit that threw away exactly the evidence it needed.** Trimming the worst
+  residuals keeps the chains nearest the optical centre - the ones that see no distortion
+  at all - and discards the chains at the edge. What separates junk from signal is not the
+  size of a residual but whether any coefficient removes it.
+- **A one-pixel re-acquire window that flattened the curve at every crossing**, biasing
+  the recovered lens coefficient low by about a sixth. Every chain agreed with every other
+  chain about the wrong answer, which is what makes that class of bug survive review.
+- **A straighten that reframed.** The largest inscribed rectangle changes shape with the
+  angle, so levelling a 3:2 photograph by two degrees delivered 1.72:1. The frame keeps
+  its own shape now.
+- **An objective that preferred slicing a bright window in half to leaving it whole.**
+
+### Known limitations
+
+Four conditions in `docs/progress/PHASE-23-EXIT.md`, two of them Sev 2.
+
+- **C1**: there are no wedding photographs and no expert crop labels here. Every gate
+  measures a geometry that was painted into the pixels and read back. It proves the
+  arithmetic and says nothing about whether a photographer would agree with a crop.
+- **C2**: every bundled lens profile was fabricated. No lens was measured. The panel says
+  so on every photograph they touch.
+- **C3**: there is no pose estimate, so no crop in this build has ever been checked
+  against a pair of hands. The mechanism is built and the set it runs over is empty.
+- **C4**: the crop objective's weights and the improvement margin are authored rather than
+  fitted, because fitting them needs C1's labels.
+
 ## Phase 19 - Local Light Sculpting (face lighting, subject enhancement, dodge and burn)
 
 The first phase that moves light *inside* a photograph rather than across all of it. Faces
