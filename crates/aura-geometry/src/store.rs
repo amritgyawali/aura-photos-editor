@@ -178,7 +178,13 @@ impl GeometryStore {
     ///
     /// `AURA-DB-3006` when the write fails.
     #[allow(clippy::too_many_lines)] // One upsert with thirty-seven columns, spelled out.
-    pub fn put(&self, plan: &GeometryPlan) -> AuraResult<()> {
+    /// `rules_row` is false when the scene had no row in `crop_rules.toml` and the conservative
+    /// fallback was used - which is `AURA-ML-5094`, and is knowledge the *planner* has and this
+    /// store does not. `frame_aspect` is the frame's own width over height, and it is stored
+    /// for the same reason: a rectangle read back has to be re-checked against a resolution
+    /// floor without decoding the photograph, and ordinal zero has to be regenerated against
+    /// the shape it was levelled inside.
+    pub fn put(&self, plan: &GeometryPlan, rules_row: bool, frame_aspect: f32) -> AuraResult<()> {
         let key = plan.image_id.to_db();
         let now = aura_catalog::rfc3339(self.clock.now_utc());
         let reasons = encode_reasons(&plan.reasons);
@@ -257,8 +263,8 @@ impl GeometryStore {
                 params![
                     key,
                     plan.scene.as_str(),
-                    1_i64,
-                    1.5_f64,
+                    i64::from(rules_row),
+                    f64::from(if frame_aspect > 0.0 { frame_aspect } else { 1.5 }),
                     plan.lens.source.as_str(),
                     plan.lens.lens_id.clone(),
                     plan.lens.profile_id.clone(),
@@ -340,7 +346,7 @@ impl GeometryStore {
     pub fn get(&self, image: ImageId) -> AuraResult<Option<GeometryPlan>> {
         let key = image.to_db();
         self.catalog.read(move |conn| {
-            let row: Option<GeometryPlan> = conn
+            let row: Option<(GeometryPlan, f32)> = conn
                 .query_row(
                     "SELECT scene, lens_source, lens_id, lens_profile, k1, k2, k3, vignette,
                             ca_red, ca_blue, rotate_deg, rotate_conf,
@@ -349,10 +355,13 @@ impl GeometryStore {
                             faces_intact, resolution_ok, content_kept, faces_checked,
                             hands_checked, refused_face, refused_hands, refused_small,
                             refused_content, reasons, confidence,
-                            profile_ver, analysis_ver, rules_ver, user_edited
+                            profile_ver, analysis_ver, rules_ver, user_edited, frame_aspect
                        FROM geometry_plan WHERE photo_id = ?1",
                     params![key],
                     |row| {
+                        // `frame_aspect` is column 33, last, deliberately: appending keeps every
+                        // index above stable, and a read that renumbers thirty columns to add
+                        // one at the front is a read that silently swaps two of them.
                         let scene = SceneId::from_str_or_unknown(
                             &row.get::<_, String>(0).unwrap_or_default(),
                         );
@@ -408,16 +417,16 @@ impl GeometryStore {
                         plan.analysis_ver = row.get::<_, i64>(30).unwrap_or(0).max(0) as u16;
                         plan.rules_ver = row.get::<_, i64>(31).unwrap_or(0).max(0) as u16;
                         plan.user_edited = row.get::<_, i64>(32).unwrap_or(0) == 1;
-                        Ok(plan)
+                        Ok((plan, row.get::<_, f64>(33).unwrap_or(1.5) as f32))
                     },
                 )
                 .optional()
                 .map_err(|e| statement_failed("could not read the geometry plan", &e))?;
-            let Some(mut plan) = row else {
+            let Some((mut plan, frame_aspect)) = row else {
                 return Ok(None);
             };
             // The frame as shot, regenerated rather than read. See the note in `put`.
-            let mut crops = vec![original_of(&plan)];
+            let mut crops = vec![original_of(&plan, frame_aspect)];
             crops.extend(read_crops(conn, &key)?);
             plan.crops = crops;
             if plan.primary_crop >= plan.crops.len() {
@@ -907,24 +916,14 @@ fn read_crops(conn: &rusqlite::Connection, key: &str) -> AuraResult<Vec<CropVari
 /// The whole frame when nothing was levelled, and the rectangle the rotation left inside it
 /// when something was. Both are pure functions of `rotate_deg` and `frame_aspect`, which is
 /// why neither is stored.
-fn original_of(plan: &GeometryPlan) -> CropVariant {
+fn original_of(plan: &GeometryPlan, frame_aspect: f32) -> CropVariant {
     let mut variant = CropVariant::original();
     if plan.rotate_deg.abs() >= f32::EPSILON {
-        variant.rect = crate::straighten::inscribed(plan.rotate_deg, FRAME_ASPECT);
+        let aspect = if frame_aspect > 0.0 { frame_aspect } else { 1.5 };
+        variant.rect = crate::straighten::inscribed(plan.rotate_deg, aspect);
     }
     variant
 }
-
-/// The aspect ratio a stored rectangle is regenerated against.
-///
-/// 3:2, which is what every full-frame and APS-C body in the bundled table shoots. This is a
-/// **known approximation** and it is bounded: it affects only the *first* crop's rectangle on
-/// a levelled frame, by the difference between one aspect ratio's inscribed rectangle and
-/// another's - under two per cent between 3:2 and 4:3. Storing the frame's own aspect would
-/// remove it, and `GeometryPlan` does not carry one; adding a field to a frozen shape to
-/// improve a regenerated rectangle by two per cent is not a trade worth making, and it is
-/// recorded here so the next person does not have to re-derive it.
-const FRAME_ASPECT: f32 = 1.5;
 
 fn crop_from_row(row: &rusqlite::Row<'_>) -> CropVariant {
     CropVariant {

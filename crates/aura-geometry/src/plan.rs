@@ -21,8 +21,7 @@
 //! not permit a crop at all.
 
 use aura_core::contract::geometry::{
-    CropPurpose, CropVariant, GeometryCode, GeometryPlan, GeometryReason, ProtectedKind,
-    ProtectedRegion,
+    CropPurpose, CropVariant, GeometryCode, GeometryPlan, GeometryReason, ProtectedRegion,
 };
 use aura_core::contract::integrity::CropRect;
 use aura_core::contract::scene::ImageId;
@@ -322,20 +321,11 @@ fn trim(mut reasons: Vec<GeometryReason>) -> Vec<GeometryReason> {
     reasons
 }
 
-/// How many faces are protected in one input, for the pass's telemetry.
-#[must_use]
-pub fn face_count(input: &GeometryInput) -> usize {
-    input
-        .regions
-        .iter()
-        .filter(|region| region.kind == ProtectedKind::Face)
-        .count()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::guard;
+    use aura_core::contract::geometry::ProtectedKind;
     use aura_core::PhotoId;
 
     fn photo(n: u8) -> ImageId {

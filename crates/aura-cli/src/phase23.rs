@@ -361,7 +361,8 @@ pub fn verify(args: &[String]) -> ExitCode {
     let mut stored = 0usize;
     for case in &cases {
         let plan = planner.plan(&case.input);
-        if store.put(&plan).is_ok() {
+        let rules_row = planner.rules().for_scene(case.input.scene).1;
+        if store.put(&plan, rules_row, case.input.aspect).is_ok() {
             stored += 1;
         }
     }
@@ -425,7 +426,7 @@ pub fn verify(args: &[String]) -> ExitCode {
         }
         // Re-plan the same frame. The override must survive.
         let replanned = planner.plan(&case.input);
-        drop(store.put(&replanned));
+        drop(store.put(&replanned, true, case.input.aspect));
         match service.of_image(image) {
             Ok(Some(after)) if after.user_edited => {
                 println!("  a re-plan does not overwrite it (checked inside the statement)");

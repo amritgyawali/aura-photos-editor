@@ -29,8 +29,6 @@
 //! **No command chooses which crop an album uses.** That is phase 29, and `variant` is how it
 //! will ask.
 
-use std::sync::Arc;
-
 use aura_core::contract::geometry::{
     Aspect, CropPurpose, CropVariant, GeometryCode, GeometryOverride, GeometryPlan, GeometryReason,
     GeometryService, ProtectedKind, ProtectedRegion,
@@ -43,7 +41,6 @@ use aura_core::progress::{CancelToken, NullProgress};
 use aura_core::{PhotoId, ProjectId};
 use aura_geometry::api::GeometryPass;
 use aura_geometry::plan::GeometryInput;
-use aura_geometry::Geometry;
 use aura_recipe::{schema, EditSource, LensCoefficients, Perspective, Recipe};
 
 use crate::commands::IpcResult;
@@ -230,7 +227,7 @@ pub fn plan_geometry(state: &AppState, input: &PlanGeometryInput) -> IpcResult<G
             return None;
         }
         seen += 1;
-        Some(build_input(state, &service, image))
+        Some(build_input(state, image))
     })?;
 
     // The recipes, written through the merge exactly as phase 19's pass writes its masks.
@@ -286,8 +283,7 @@ pub fn plan_geometry(state: &AppState, input: &PlanGeometryInput) -> IpcResult<G
 /// is planned with no tilt, no regions and no distractions, and is delivered exactly as it was
 /// shot - which is what a phase with a seventy-per-cent restraint target should do with a
 /// photograph it knows nothing about.
-fn build_input(state: &AppState, service: &Arc<Geometry>, image: PhotoId) -> GeometryInput {
-    let _ = service;
+fn build_input(state: &AppState, image: PhotoId) -> GeometryInput {
     let mut input = GeometryInput::bare(image, aura_core::SceneId::Unknown);
 
     if let Ok(story) = state.story() {

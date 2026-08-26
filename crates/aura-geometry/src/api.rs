@@ -119,7 +119,12 @@ impl Geometry {
     pub fn plan_and_store(&self, input: &GeometryInput) -> Result<GeometryPlan, AuraError> {
         let plan = self.planner.plan(input);
         guard::check_plan(&plan)?;
-        self.store.put(&plan)?;
+        // Whether the scene had a rules row and what shape the frame is are both things the
+        // *planner* knows and the store does not. Passing them here rather than storing them on
+        // the plan keeps `GeometryPlan` to what section 5 freezes, and keeps `AURA-ML-5094`
+        // answerable as a query instead of as a reason a panel has to parse back out.
+        let rules_row = self.planner.rules().for_scene(input.scene).1;
+        self.store.put(&plan, rules_row, input.aspect)?;
         Ok(plan)
     }
 

@@ -216,7 +216,7 @@ fn the_storage_cost_of_one_plan_is_measured_rather_than_assumed() {
         let mut plan = template.clone();
         plan.image_id = photo;
         store
-            .put(&plan)
+            .put(&plan, true, 1.5)
             .unwrap_or_else(|err| panic!("put: {}", err.detail));
     }
 
