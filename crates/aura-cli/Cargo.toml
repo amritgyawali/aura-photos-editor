@@ -14,6 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 aura-core    = { path = "../aura-core" }
+aura-geometry = { path = "../aura-geometry" }
 aura-catalog = { path = "../aura-catalog" }
 aura-ingest  = { path = "../aura-ingest" }
 aura-jobs    = { path = "../aura-jobs" }

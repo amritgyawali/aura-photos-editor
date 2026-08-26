@@ -259,63 +259,6 @@ fn stage_restoration(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 
 // ---------------------------------------------------------------------------
-// geometry - crop and rotate in one bilinear resample
+// geometry moved to geometry.wgsl in PHASE-23, together with the keystone it grew.
 // ---------------------------------------------------------------------------
-struct GeometryParams {
-    crop: vec4<f32>,
-    rotate: f32,
-    out_width: u32,
-    out_height: u32,
-};
-@group(0) @binding(11) var<uniform> geometry_params: GeometryParams;
-@group(0) @binding(12) var<storage, read_write> geometry_out: array<f32>;
 
-@compute @workgroup_size(64)
-fn stage_geometry(@builtin(global_invocation_id) id: vec3<u32>) {
-    let index = id.x;
-    let out_w = geometry_params.out_width;
-    let out_h = geometry_params.out_height;
-    if (index >= out_w * out_h) { return; }
-
-    let left = geometry_params.crop.x * f32(frame.width);
-    let top = geometry_params.crop.y * f32(frame.height);
-    let right = geometry_params.crop.z * f32(frame.width);
-    let bottom = geometry_params.crop.w * f32(frame.height);
-
-    let radians = -radians(geometry_params.rotate);
-    let s = sin(radians);
-    let c = cos(radians);
-    // Pixel centres, not edges. See `spatial::crop_rotate`.
-    let ccx = (left + right - 1.0) * 0.5;
-    let ccy = (top + bottom - 1.0) * 0.5;
-    let ocx = (f32(out_w) - 1.0) * 0.5;
-    let ocy = (f32(out_h) - 1.0) * 0.5;
-
-    let dx = f32(index % out_w) - ocx;
-    let dy = f32(index / out_w) - ocy;
-    let sx = ccx + dx * c - dy * s;
-    let sy = ccy + dx * s + dy * c;
-
-    let base = index * 3u;
-    if (sx < 0.0 || sy < 0.0 || sx > f32(frame.width) - 1.0 || sy > f32(frame.height) - 1.0) {
-        geometry_out[base] = 0.0;
-        geometry_out[base + 1u] = 0.0;
-        geometry_out[base + 2u] = 0.0;
-        return;
-    }
-
-    let x0 = u32(floor(sx));
-    let y0 = u32(floor(sy));
-    let x1 = min(x0 + 1u, frame.width - 1u);
-    let y1 = min(y0 + 1u, frame.height - 1u);
-    let fx = sx - floor(sx);
-    let fy = sy - floor(sy);
-
-    for (var channel = 0u; channel < 3u; channel = channel + 1u) {
-        let a = mix(pixels[(y0 * frame.width + x0) * 3u + channel],
-                    pixels[(y0 * frame.width + x1) * 3u + channel], fx);
-        let b = mix(pixels[(y1 * frame.width + x0) * 3u + channel],
-                    pixels[(y1 * frame.width + x1) * 3u + channel], fx);
-        geometry_out[base + channel] = mix(a, b, fy);
-    }
-}

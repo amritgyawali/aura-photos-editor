@@ -834,3 +834,73 @@ max_ms_per_unit = 500
 # `crates/aura-perf/tests/local_budgets.rs`.
 [size.local_store_per_1000_images]
 max_bytes = 1100000
+
+# PHASE-23. One frame's geometry plan on the processor path: the lens decision, the
+# straightening solve with its reduction loop, the keystone fit, the crop search over about
+# two hundred candidates and the variant generation.
+#
+# Section 11's own row is **40 ms per image** and it names the reference machines. This build
+# has no GPU backend (ADR-0029 section 4), so what is guarded here is the processor path, at
+# the same ratio phases 15 and 19 use. Section 11's second row - 120 ms of resampling overhead
+# on a 45 MP export - is waived: there is no `wgpu` backend to measure it on. The reference
+# path's own resample is measured separately below so the waiver has a number beside it rather
+# than only a sentence. Its third row, 1,000 selected images in 45 s, is extrapolated from the
+# per-image figure and printed by the test rather than asserted separately.
+#
+# **The estimator is not in this row and has its own.** It runs only when a lens has no
+# profile at all, and it is by far the most expensive thing in the phase - a chain walk over
+# every seed pixel, then a hundred and twenty-nine straightness evaluations per surviving
+# chain. Folding it into the per-frame budget would make the budget describe a case most
+# weddings never hit, and would hide a change to `MIN_CHAIN_SPAN` that tripled it.
+[stage.geometry_plan_frame]
+max_elapsed_ms  = 2400
+max_ms_per_unit = 40
+
+# The reference path's distortion plus fringing resample at 1,024 px squared. Not a section 11
+# row: section 11 asks about a 45 MP export on a GPU, which this build cannot measure. This is
+# what the waiver is measured against instead, and it is the number a future GPU row will be
+# compared to.
+[stage.geometry_resample_proxy]
+max_elapsed_ms  = 6000
+max_ms_per_unit = 500
+
+# The manual-lens estimator at 512 px squared. Runs only on a lens with no profile, which on a
+# wedding shot with profiled glass is no frames at all and on one shot with rented manual
+# glass is every frame.
+[stage.geometry_estimate_lens]
+max_elapsed_ms  = 12000
+max_ms_per_unit = 3000
+
+# Section 11 names **no storage row for this phase**. One is measured anyway, against the 1 KB
+# per image every phase since 09 has aimed at.
+#
+# The measured decomposition on 1,000 photographs, from `PRAGMA page_count`, over the widest
+# rows the fixtures produce - a frame carrying three variants, a full set of reasons and a
+# non-zero refusal histogram:
+#
+#   the plan row and its three indexes   ~520 B/image
+#   the crop rows                        ~190 B/image   up to six, ~65 B each WITHOUT ROWID
+#   the reasons document                 ~180 B/image   up to eleven codes with evidence
+#                                      -----
+#   budget                                890 B/image
+#
+# **Refusals are four counters rather than rows, and that is most of the saving.** The crop
+# search refuses on the order of two hundred rectangles per photograph; a child table would be
+# 800,000 rows on a 4,000-image wedding for information nobody queries across. What a
+# photographer needs is "AURA tried and could not, because of faces", and that is a number.
+# The rectangle that caused it is carried by the reason's evidence for the ones worth showing.
+#
+# Two further reductions were considered and rejected:
+#
+#   * Storing the reasons as codes rather than as sentences saves about 90 B/image and creates
+#     a second reason vocabulary a catalog written by a newer build cannot be read with. Phase
+#     09's rule runs the other way, for the sixth migration running - and here the sentences
+#     carry measured numbers ("scored 0.71 against 0.63") that no static string can.
+#   * Folding the crops into a document saves about 60 B/image and removes
+#     `idx_geometry_crop_purpose`, which is the index phase 29 joins on to find every album
+#     variant in a wedding. A document cannot be joined.
+#
+# At the measured figure a 4,000-image wedding costs about 3.4 MB, against about 4.1 MB for
+# phase 19's local light plans and 48 MB for phase 14's recipes.
+[size.geometry_store_per_1000_images]
+max_bytes = 890000

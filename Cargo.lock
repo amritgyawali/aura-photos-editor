@@ -65,6 +65,7 @@ dependencies = [
  "aura-core",
  "aura-cull",
  "aura-explain",
+ "aura-geometry",
  "aura-index",
  "aura-infer",
  "aura-ingest",
@@ -175,6 +176,7 @@ dependencies = [
  "aura-core",
  "aura-cull",
  "aura-explain",
+ "aura-geometry",
  "aura-index",
  "aura-infer",
  "aura-ingest",
@@ -263,6 +265,24 @@ dependencies = [
  "serde_json",
  "tempfile",
  "time",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "aura-geometry"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "aura-recipe",
+ "aura-render",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
  "toml",
  "tracing",
 ]
@@ -389,6 +409,7 @@ dependencies = [
  "aura-core",
  "aura-cull",
  "aura-explain",
+ "aura-geometry",
  "aura-index",
  "aura-infer",
  "aura-people",

@@ -100,6 +100,7 @@ pub mod cpu;
 pub mod errors;
 pub mod fixtures;
 pub mod golden;
+pub mod geometry;
 pub mod gpu;
 pub mod graph;
 pub mod local;

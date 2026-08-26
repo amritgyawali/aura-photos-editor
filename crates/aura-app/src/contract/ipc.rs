@@ -5063,3 +5063,265 @@ pub struct SetLocalStrengthDto {
     /// The dotted paths a person now owns.
     pub protected: Vec<String>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-23 - geometry
+//
+// Six commands. Three read - the project's coverage, one photograph's plan and the review
+// queue - one runs the resumable pass, and two record what the photographer decided.
+//
+// **No command returns a pixel and none returns a lens profile table.** What the panel gets is
+// rectangles, an angle, a set of coefficients and reason codes; the profile table is an input
+// to a decision and reaches the wire only as the name of the profile that matched and the
+// `lensSynthetic` flag that says whether anybody measured it.
+// ---------------------------------------------------------------------------
+
+/// One crop the plan carries.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CropVariantDto {
+    /// `CropPurpose::as_str`: original, primary, album, social, wide.
+    pub purpose: String,
+    /// What the panel calls it.
+    pub title: String,
+    /// `Aspect::as_str`: original, 4:5, 5:4, 1:1, 16:9.
+    pub aspect: String,
+    /// The rectangle, normalised to the corrected frame.
+    pub rect: CropRectDto,
+    /// The objective's score, comparable with the original's by construction.
+    pub score: f32,
+    /// True when it passed every safety rule. False only on a row re-checked under newer rules.
+    pub safe: bool,
+}
+
+/// What the safety filter checked and found.
+///
+/// Three booleans plus two counts, which is one more boolean than
+/// `clippy::struct_excessive_bools` likes. The lint is allowed rather than obeyed: all three
+/// are in section 5's frozen `CropSafetyReport`, and its remedy - gathering them into a
+/// sub-struct - would rename frozen fields on the wire to satisfy a style rule.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct CropSafetyDto {
+    /// Every detected face and every primary pair of hands is inside the delivered crop.
+    pub faces_intact: bool,
+    /// The crop keeps enough of the original long edge.
+    pub resolution_ok: bool,
+    /// What the frame is about is inside.
+    pub content_kept: bool,
+    /// How many faces were checked. **Zero is "nothing was checked", never "nothing was cut".**
+    pub faces_checked: u32,
+    /// How many pairs of hands were checked. Zero on every photograph in this build.
+    pub hands_checked: u32,
+    /// True when at least one region was actually checked. The predicate the panel asks before
+    /// it says "safe".
+    pub is_evidence: bool,
+    /// Refusals in `GeometryCode::REFUSALS` order: face, hands, resolution, content.
+    pub refused: Vec<u32>,
+    /// The names of those four, so the panel does not keep its own copy of the order.
+    pub refused_names: Vec<String>,
+}
+
+/// One reason, with the pixels behind it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryReasonDto {
+    /// `GeometryCode::as_str`.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// How much this moved the confidence. Negative for a doubt.
+    pub weight: f32,
+    /// True when this describes something the product declined to do.
+    pub restraint: bool,
+    /// What would have been lost, when the reason is about a region.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// One photograph's finished frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryPlanDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Which scene the bands were conditioned on.
+    pub scene: String,
+    /// `LensSource::as_str`: none, embedded, profile, estimated.
+    pub lens_source: String,
+    /// The lens as EXIF named it, whether or not it matched.
+    pub lens_id: Option<String>,
+    /// The profile that produced the numbers, when one did.
+    pub lens_profile: Option<String>,
+    /// True when that profile was fabricated rather than measured. **On this build, always.**
+    pub lens_synthetic: bool,
+    /// Brown-Conrady radial terms.
+    pub distortion: Vec<f32>,
+    /// Vignette correction strength, `0..1`.
+    pub vignette: f32,
+    /// Per-channel radial scale for red and blue relative to green.
+    pub ca: Vec<f32>,
+    /// Rotation in degrees, positive clockwise. Zero when nothing was levelled.
+    pub rotate_deg: f32,
+    /// How sure the rotation is.
+    pub rotate_conf: f32,
+    /// Vertical keystone in `-100..100`, or `None`.
+    pub keystone_vertical: Option<f32>,
+    /// Horizontal keystone.
+    pub keystone_horizontal: Option<f32>,
+    /// The largest per-axis stretch the keystone applies.
+    pub keystone_stretch: Option<f32>,
+    /// How many verticals it was fitted from.
+    pub keystone_verticals: u32,
+    /// Every crop. Never empty; index zero is always the frame as shot.
+    pub crops: Vec<CropVariantDto>,
+    /// Which entry is delivered. Zero when the framing was kept.
+    pub primary_crop: u32,
+    /// True when the framing as shot survived.
+    pub kept_original: bool,
+    /// What the filter checked and found.
+    pub safety: CropSafetyDto,
+    /// Why, worst first.
+    pub reasons: Vec<GeometryReasonDto>,
+    /// How sure the whole plan is.
+    pub confidence: f32,
+    /// Which lens profile table.
+    pub profile_ver: u32,
+    /// Which arithmetic.
+    pub analysis_ver: u32,
+    /// Which rules file.
+    pub rules_ver: u32,
+    /// True when the photographer set the framing themselves.
+    pub user_edited: bool,
+}
+
+/// What the Geometry panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a plan.
+    pub planned: u32,
+    /// Fraction of the project with a plan. The denominator is every photograph.
+    pub coverage: f32,
+    /// Fraction of planned frames delivered as shot. **Above 0.70 is the passing direction** -
+    /// the only number in the product where more restraint is a better result.
+    pub kept_original: f32,
+    /// Fraction whose lens was corrected from a measured profile.
+    pub profile_covered: f32,
+    /// How many frames were levelled.
+    pub levelled: u32,
+    /// Mean absolute rotation over those, in degrees.
+    pub mean_rotate_deg: f32,
+    /// How many were keystoned.
+    pub keystoned: u32,
+    /// Variants produced, in `CropPurpose::ALL` order.
+    pub variant_counts: Vec<u32>,
+    /// The names of those, so the panel keeps no copy of the order.
+    pub variant_names: Vec<String>,
+    /// Refusals, in `GeometryCode::REFUSALS` order.
+    pub refused_counts: Vec<u32>,
+    /// The names of those four.
+    pub refused_names: Vec<String>,
+    /// Lens ids with no profile, most frequent first, at most twenty.
+    pub missing_profiles: Vec<String>,
+    /// Scenes planned with no row in `crop_rules.toml`.
+    pub unpolicied_scenes: Vec<String>,
+    /// Frames worth a photographer's attention.
+    pub needs_review: u32,
+    /// Frames the photographer framed themselves.
+    pub user_edited: u32,
+    /// True when any bundled lens profile was fabricated rather than measured.
+    pub profiles_synthetic: bool,
+    /// How many lenses the bundled table knows.
+    pub profiles_known: u32,
+    /// Which lens profile table.
+    pub profile_ver: u32,
+    /// Which arithmetic.
+    pub analysis_ver: u32,
+    /// Which rules file.
+    pub rules_ver: u32,
+}
+
+/// Run the geometry pass over a project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanGeometryInput {
+    /// The project.
+    pub project_id: String,
+    /// How many photographs to plan in this call. Defaults to everything outstanding.
+    pub limit: Option<u32>,
+}
+
+/// What one run of the geometry pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryPassDto {
+    /// Photographs planned.
+    pub planned: u32,
+    /// Photographs that could not be planned. `AURA-ML-5092`, one at a time.
+    pub failed: u32,
+    /// Fraction of the planned frames delivered as shot.
+    pub kept_original: f32,
+    /// Recipes written through the merge.
+    pub recipes_written: u32,
+    /// Recipes the merge refused to touch because a person had set the field.
+    pub recipes_protected: u32,
+    /// Milliseconds for the pass.
+    pub elapsed_ms: u64,
+    /// True when the pass stopped early because it was cancelled.
+    pub cancelled: bool,
+}
+
+/// Ask for the frames whose geometry is worth a photographer's attention.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many to return. Defaults to 200, capped at 5,000.
+    pub limit: Option<u32>,
+}
+
+/// Record the framing the photographer chose, and write it into the recipe.
+///
+/// **Reverting is this command with the whole frame and zero degrees**, not a separate one.
+/// A revert implemented as *clearing* the row would be a revert the next pass undoes; recorded
+/// as an override it survives a re-analysis exactly as any other choice does.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetFramingInput {
+    /// The project.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// The rectangle, normalised to the corrected frame.
+    pub rect: CropRectDto,
+    /// The angle, in degrees. `-45..45`.
+    pub rotate_deg: f32,
+    /// Which aspect they were working in. `Aspect::as_str`.
+    pub aspect: String,
+}
+
+/// What recording a framing did, on both sides.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetFramingDto {
+    /// The plan after the override, with `userEdited` set.
+    pub plan: GeometryPlanDto,
+    /// The edit after the merge.
+    pub recipe: RecipeDto,
+    /// The dotted paths that moved.
+    pub changed: Vec<String>,
+    /// The dotted paths a person now owns.
+    pub protected: Vec<String>,
+}
+
+/// Record that the photographer has looked at one plan and agrees.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptGeometryInput {
+    /// The photograph.
+    pub photo_id: String,
+}

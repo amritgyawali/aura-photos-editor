@@ -103,6 +103,19 @@ jobs:
       - name: phase 19 verify - policy, lighting, pairing, shaping, shine, governor
         run: cargo run --release --package aura-cli -- verify --phase 19 --work target/phase19-verify
 
+      # PHASE-23. Geometry. No network, no GPU and no model: the gate proves the
+      # lens estimator, the straightening solve, the keystone cap, the crop safety
+      # filter and the store against fixtures whose geometry was painted in, and
+      # prints what it does not prove at the end of every run.
+      # See docs/progress/PHASE-23-EXIT.md conditions C1 to C3.
+      - name: phase 23 verify - lens, straighten, keystone, crop safety, variants
+        run: cargo run --release --package aura-cli -- verify --phase 23 --work target/phase23-verify
+
+      # The same gate from the Python side. There are no expert crop labels in this
+      # repository, so this runs the whole computation against an authored answer.
+      - name: crop agreement self-test
+        run: python ml/eval/crop_agreement.py --self-test
+
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
     name: ui type-check, tests and build
