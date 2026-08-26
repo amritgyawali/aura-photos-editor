@@ -281,6 +281,10 @@ pub fn candidates(aspect: Aspect, frame_aspect: f32, floor: f32) -> Vec<CropRect
                     h,
                 });
                 if room_x <= 1e-6 && room_y <= 1e-6 {
+                    // A full-frame candidate has nowhere to move, so every position in this
+                    // scale's grid is the same rectangle. The `break` leaves the row and the
+                    // `dedup_by` below removes what the remaining rows repeat - they are
+                    // adjacent, which is what makes a consecutive dedup sufficient.
                     break;
                 }
             }

@@ -25,7 +25,7 @@ d132fad56063619137e8ed78da674db6317d4c8545140f0c6fda58959f2037d0  crates/aura-co
 2d846735ff9d18c200bae43fe68b21cfaacaf22905878d0d4e64de3bc0dda826  crates/aura-core/src/contract/cull.rs
 02e0c77ee6ececd50f7ed88404e261b35ca72e8d9cbc86235b838769cb376552  crates/aura-core/src/contract/emotion.rs
 580859e76ab69bbbc8b46688939f6cf109115b82af69bd7289b0feca540ab75a  crates/aura-core/src/contract/error.rs
-d390f01cb1c49ab443628db1d0de2aaed271f59c608f893b53334ca5c9b43afc  crates/aura-core/src/contract/geometry.rs
+27947c9f043a69a6dda4af109cbe08321eee49496d6f7b2de1222a973f06585e  crates/aura-core/src/contract/geometry.rs
 bc199e179c6eee6d003e366f1493950db36f7cdc0d16765723fbd8684f46bd6f  crates/aura-core/src/contract/ids.rs
 ef9882c3508a2dacf269f3fadcfde6a449038fffa62708005ae2b3fceaf10f61  crates/aura-core/src/contract/integrity.rs
 830879076bd899bd0f56fb27f5861e41523e1d83aeaff50ada409b2cb9acc764  crates/aura-core/src/contract/ledger.rs

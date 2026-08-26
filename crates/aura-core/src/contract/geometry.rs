@@ -1285,8 +1285,16 @@ impl GeometryPlan {
 
     /// The first of this phase's own guarantees this plan breaks, if it breaks one.
     ///
-    /// Asked by the solver, the store, the IPC layer and the evaluation harness, so that none
-    /// of them can disagree about what a sound plan is. The rule phase 19 wrote for
+    /// **A guarantee over what AURA decided, not over what a photographer chose.** It is
+    /// checked before a *planned* row is stored, and an override is deliberately not put
+    /// through it: somebody who drags a crop to a rectangle this would refuse has made a
+    /// decision, and a product that silently declined to record it would be worse than one
+    /// that recorded a rectangle its own solver would not have picked. `GeometryOverride`'s
+    /// own `problem` is what bounds that side, and it bounds it much more loosely - a
+    /// rectangle inside the frame and an angle inside `-45..45`.
+    ///
+    /// Asked by the solver, the IPC layer and the evaluation harness, so that none of them can
+    /// disagree about what a sound plan is. The rule phase 19 wrote for
     /// `LocalLightPlan::broken_guarantee`, in a phase where four of the six clauses are the
     /// safety filter restated as a post-condition - because a filter that runs before the
     /// objective is only a guarantee if nothing downstream can put a rejected rectangle back.
