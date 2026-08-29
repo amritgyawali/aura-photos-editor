@@ -133,9 +133,9 @@ pub use moment_commands::{
     moment_status, set_keep_hint, split_moment, undo_moment_edit,
 };
 pub use people_commands::{
-    erase_biometrics, group_people, identity_cover, identity_timelines, list_identities,
-    merge_identities, people_status, rename_identity, scan_faces, set_identity_importance,
-    set_identity_role, split_identity,
+    erase_biometrics, group_people, identity_cover, identity_timelines, image_subjects,
+    list_identities, merge_identities, people_status, rename_identity, scan_faces,
+    set_identity_importance, set_identity_role, split_identity,
 };
 pub use preview_commands::base64;
 pub use preview_commands::{

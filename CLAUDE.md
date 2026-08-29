@@ -1002,14 +1002,28 @@ Phase 21 also **closes phase 20's condition C5**: `ui/src-tauri` had no `icons/`
 `main.rs` had lost `fn main` in the phase 19 to 20 merge, so the desktop shell had not compiled
 since. Both are fixed, the shell builds under the GNU toolchain with the target directory moved
 off the space-containing project path, and this phase's nine commands are registered in it - 75 of
-the product's IPC commands were reachable from the window when this phase shipped. The merge that
-brought phases 20, 21 and 22 onto main registered phase 22's seven restoration commands and phase
-23's six geometry commands as well, which neither phase had done, and the figure is **89**. The
-shell's own Rust does not compile on this machine - `dlltool` is absent and the toolchain's
-`self-contained` copy has no assembler to call - so the registration is verified by a symbol
-cross-check rather than by a build: every name in `generate_handler!` has a `#[tauri::command]`
-definition, every definition calls an `aura_app` function that crate re-exports, and every DTO
-the shell imports is a type `contract::ipc` defines.
+the product's IPC commands were reachable from the window when this phase shipped.
+
+The merge that brought phases 20, 21 and 22 onto main closed that gap for the whole product, and
+found it was much larger than any exit report had said. `ui/src/ipc/client.ts` carried 179 typed
+wrappers and the shell registered 89 commands, so **ninety client calls reached a window that did
+not answer to them** - `get_preview`, `render_image`, `set_param`, every mask command, every moment
+command. All 180 are registered now, they are generated from the command functions' own signatures
+rather than typed by hand, and `image_subjects` was missing from `aura-app`'s own `pub use` list as
+well, so nothing anywhere could have called it. The three-way count is **180 handlers, 180
+`#[tauri::command]` definitions, 180 typed client wrappers**, and a script asserts the equality.
+
+The shell's own Rust does not compile on this machine - `dlltool` is absent and the toolchain's
+`self-contained` copy has no assembler to call - so this is verified by `rustfmt` parsing the file
+plus that symbol cross-check: every handler name has a definition, every definition calls an
+`aura_app` function the crate re-exports, and every DTO the shell imports is a type `contract::ipc`
+defines. **That proves the names and the syntax and not the types**, and it is weaker than a build.
+
+**What is still not reachable is the panels.** `ui/src/App.tsx` mounts three of them - problems,
+hardware and AI keys - and every develop panel from phase 12 onward exists with tests and is
+imported nowhere. The commands answer and the components are props-driven; no view puts the two
+together. That is the remaining half of phase 21's condition C6, it is a UI-shell task rather than
+any one phase's, and it is what stands between this product and a photographer using it.
 
 Phase 22 is implemented conditionally: `aura-core::contract::restore` freezes the four tiers, the
 seven regions, the mask port, the sensor noise model, the denoise spec, the sharpen spec and its

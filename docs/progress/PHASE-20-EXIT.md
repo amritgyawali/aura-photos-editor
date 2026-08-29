@@ -191,6 +191,14 @@ until retouchers have judged it.
 eight new commands are wired in the same shape as phases 15 to 19's and are not compile-checked on
 this machine. The workspace excludes `ui/src-tauri`, so no gate covers it either.
 
+> **Update, at the merge onto main.** The icons are in place and the missing `fn main` was
+> restored in phase 21, so the shell builds where a linker exists; `dlltool` is what is absent on
+> this machine. `rustfmt` parses `main.rs` cleanly, which proves the syntax and not the types, and
+> a symbol cross-check proves the names: 180 handler entries, 180 `#[tauri::command]` definitions,
+> 180 `aura_app` functions the crate re-exports, 210 DTOs `contract::ipc` defines, and 180 typed
+> client wrappers. That is the strongest statement available without a linker, and it is weaker
+> than a build.
+
 ## 9. Rollback
 
 Feature flag: `RetouchPass::enabled(false)`, or `RetouchPreset::Off` on a project. A disabled pass

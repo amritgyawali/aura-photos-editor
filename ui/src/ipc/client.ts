@@ -187,6 +187,47 @@ import type {
   SculptLocalInput,
   SetLocalStrengthDto,
   SetLocalStrengthInput,
+  // PHASE-20.
+  AcceptRetouchInput,
+  ProtectedFeatureDto,
+  RetouchPassDto,
+  RetouchPassInput,
+  RetouchPlanDto,
+  RetouchReviewInput,
+  RetouchStatusDto,
+  SetProtectionInput,
+  SetRetouchDto,
+  SetRetouchInput,
+  // PHASE-21.
+  AcceptMicroInput,
+  MicroCompositeDto,
+  MicroMatrixDto,
+  MicroPassDto,
+  MicroPassInput,
+  MicroPlanDto,
+  MicroReasonDto,
+  MicroReviewInput,
+  MicroStatusDto,
+  SetMicroMatrixInput,
+  // PHASE-22.
+  AcceptRestoreInput,
+  RestoreIdentityRefusalDto,
+  RestorePassDto,
+  RestorePassInput,
+  RestorePlanDto,
+  RestoreReasonDto,
+  RestoreReviewInput,
+  RestoreStatusDto,
+  SetRestoreOverrideInput,
+  // PHASE-23.
+  AcceptGeometryInput,
+  GeometryPassDto,
+  GeometryPlanDto,
+  GeometryReviewInput,
+  GeometryStatusDto,
+  PlanGeometryInput,
+  SetFramingDto,
+  SetFramingInput,
 } from './types';
 
 /** True when the shell is present. Storybook-style dev runs fall back to stubs. */
@@ -980,6 +1021,19 @@ export const maskApi = {
 };
 
 /**
+ * The previews a project could not build, with the reason each one was quarantined.
+ *
+ * Phase 02's surface, and the last command in the product to get a typed wrapper: the shell
+ * has answered to it since phase 02 and nothing had ever called it. A preview that failed is
+ * not an image that is missing - it is an image the grid must render as a problem rather than
+ * as an empty cell, which is invariant 9 at the level a photographer sees.
+ */
+export const previewProblems = {
+  previewProblems: (projectId: string): Promise<Array<[string, string]>> =>
+    invoke<Array<[string, string]>>('preview_problems', { projectId }),
+};
+
+/**
  * PHASE-19. Local light sculpting.
  *
  * Six calls. Three read, one runs the pass, and two record what the photographer decided.
@@ -1017,4 +1071,210 @@ export const local = {
    */
   sculptLocal: (input: SculptLocalInput): Promise<LocalPassDto> =>
     invoke<LocalPassDto>('sculpt_local', { input }),
+};
+
+
+/**
+ * PHASE-20. Portrait retouch.
+ *
+ * Eight calls. Three read, one runs the pass, and four record what the photographer decided.
+ *
+ * **There is no strength argument anywhere on this surface.** Retouch strength is one stored
+ * number per identity per project, computed from gallery statistics, and the frame decides
+ * which operations run rather than how hard they run - so a per-frame strength is not a field
+ * a caller forgot, it is a field the contract refuses to have (ADR-0043).
+ */
+export const retouch = {
+  /** How much of a wedding has a retouch plan, and how much of it actually did anything. */
+  retouchStatus: (projectId: string): Promise<RetouchStatusDto> =>
+    invoke<RetouchStatusDto>('retouch_status', { projectId }),
+
+  /** One photograph's plan, or `null` when nobody has planned it. */
+  imageRetouch: (photoId: string): Promise<RetouchPlanDto | null> =>
+    invoke<RetouchPlanDto | null>('image_retouch', { photoId }),
+
+  /**
+   * What this product will never remove from one person's face.
+   *
+   * The rectangles are **face-normalised** - origin between the eyes, x along the eye-to-eye
+   * line, unit the inter-ocular distance - which is what lets one row protect the same mole in
+   * four hundred photographs. Drawing one on a frame projects it through that frame's landmarks.
+   */
+  protectedFeatures: (projectId: string, identityId: string): Promise<ProtectedFeatureDto[]> =>
+    invoke<ProtectedFeatureDto[]>('protected_features', { projectId, identityId }),
+
+  /** The frames whose retouch is worth a look, weakest first. A queue, not a cull. */
+  retouchReviewQueue: (input: RetouchReviewInput): Promise<string[]> =>
+    invoke<string[]>('retouch_review_queue', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptRetouch: (input: AcceptRetouchInput): Promise<RetouchPlanDto> =>
+    invoke<RetouchPlanDto>('accept_retouch', { input }),
+
+  /** Record the preset the photographer chose, and write it into the recipe as a person. */
+  setRetouch: (input: SetRetouchInput): Promise<SetRetouchDto> =>
+    invoke<SetRetouchDto>('set_retouch', { input }),
+
+  /**
+   * Protect or unprotect one feature.
+   *
+   * A tattoo cannot be unprotected. The refusal is `AURA-ML-5097` and it lives in the type, in
+   * the service and in a database trigger, because a promise enforced in one layer lasts until
+   * somebody writes a second caller.
+   */
+  setProtection: (input: SetProtectionInput): Promise<ProtectedFeatureDto[]> =>
+    invoke<ProtectedFeatureDto[]>('set_protection', { input }),
+
+  /** Run the resumable retouch pass, then carry what it decided into the recipes. */
+  retouchPass: (input: RetouchPassInput): Promise<RetouchPassDto> =>
+    invoke<RetouchPassDto>('retouch_pass', { input }),
+};
+
+/**
+ * PHASE-21. The micro-retouch suite: hair, teeth, eyes, clothing and glare.
+ *
+ * Nine calls. Four read, one runs the pass, three record a decision, and one assembles the
+ * panel's legend from the frozen enum.
+ *
+ * **`microComposites` is the disclosure surface.** A glare repair may borrow pixels from a
+ * sibling frame, and that is the only place in this product where two photographs are
+ * composited. Every borrow is listed here with its source frame, because a composite a
+ * photographer cannot find is a composite they cannot disclose (ADR-0045).
+ */
+export const micro = {
+  /** How much of a wedding has a micro-retouch plan, and how much of it did anything. */
+  microStatus: (projectId: string): Promise<MicroStatusDto> =>
+    invoke<MicroStatusDto>('micro_status', { projectId }),
+
+  /** One photograph's plan, or `null` when nobody has planned it. */
+  imageMicro: (photoId: string): Promise<MicroPlanDto | null> =>
+    invoke<MicroPlanDto | null>('image_micro', { photoId }),
+
+  /** Every frame in the project that carries pixels borrowed from another frame. */
+  microComposites: (projectId: string): Promise<MicroCompositeDto[]> =>
+    invoke<MicroCompositeDto[]>('micro_composites', { projectId }),
+
+  /** The frames whose small fixes are worth a look, weakest first. A queue, not a cull. */
+  microReviewQueue: (input: MicroReviewInput): Promise<string[]> =>
+    invoke<string[]>('micro_review_queue', { input }),
+
+  /** Which of the five operations this studio has opted into, and their ceilings. */
+  microMatrix: (projectId: string): Promise<MicroMatrixDto> =>
+    invoke<MicroMatrixDto>('micro_matrix', { projectId }),
+
+  /**
+   * Change the opt-in matrix.
+   *
+   * A studio may switch an operation off and may lower a ceiling. Nothing here can raise one:
+   * the contract owns every bound and the config file may only tighten it, which is what makes
+   * `docs/retouch-ethics.md` a promise about the product rather than about its defaults.
+   */
+  setMicroMatrix: (input: SetMicroMatrixInput): Promise<MicroMatrixDto> =>
+    invoke<MicroMatrixDto>('set_micro_matrix', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptMicro: (input: AcceptMicroInput): Promise<void> =>
+    invoke<void>('accept_micro', { input }),
+
+  /** Run the resumable pass, then carry what it decided into the recipes. */
+  microPass: (input: MicroPassInput): Promise<MicroPassDto> =>
+    invoke<MicroPassDto>('micro_pass', { input }),
+
+  /** The panel's legend, assembled from the frozen enum rather than from a stored table. */
+  microReasonCodes: (): Promise<MicroReasonDto[]> =>
+    invoke<MicroReasonDto[]>('micro_reason_codes', {}),
+};
+
+/**
+ * PHASE-22. Restoration: denoise, selective sharpening and face recovery.
+ *
+ * Eight calls. Four read, one runs the pass, two record a decision, and one assembles the
+ * legend.
+ *
+ * **`restoreIdentityRefusals` is the guarantee made visible.** Face recovery is held to a
+ * cosine-distance ceiling measured through the real renderer, and a face that would have moved
+ * past it is skipped rather than recovered. Those skips are rows, not silence, because here the
+ * refusal is the product working (ADR-0047).
+ */
+export const restore = {
+  /** How much of a wedding has a restoration plan, and how much of it did anything. */
+  restoreStatus: (projectId: string): Promise<RestoreStatusDto> =>
+    invoke<RestoreStatusDto>('restore_status', { projectId }),
+
+  /** One photograph's plan, or `null` when nobody has planned it. */
+  imageRestore: (photoId: string): Promise<RestorePlanDto | null> =>
+    invoke<RestorePlanDto | null>('image_restore', { photoId }),
+
+  /** Every face this product declined to recover, and how far it would have moved. */
+  restoreIdentityRefusals: (input: RestoreReviewInput): Promise<RestoreIdentityRefusalDto[]> =>
+    invoke<RestoreIdentityRefusalDto[]>('restore_identity_refusals', { input }),
+
+  /** The frames whose repairs are worth a look, weakest first. A queue, not a cull. */
+  restoreReviewQueue: (input: RestoreReviewInput): Promise<string[]> =>
+    invoke<string[]>('restore_review_queue', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptRestore: (input: AcceptRestoreInput): Promise<void> =>
+    invoke<void>('accept_restore', { input }),
+
+  /** Record the photographer's own tier or amount, and write it into the recipe as a person. */
+  setRestoreOverride: (input: SetRestoreOverrideInput): Promise<RestorePlanDto> =>
+    invoke<RestorePlanDto>('set_restore_override', { input }),
+
+  /** Run the resumable pass, then carry what it decided into the recipes. */
+  restorePass: (input: RestorePassInput): Promise<RestorePassDto> =>
+    invoke<RestorePassDto>('restore_pass', { input }),
+
+  /** The panel's legend, assembled from the frozen enum rather than from a stored table. */
+  restoreReasonCodes: (): Promise<RestoreReasonDto[]> =>
+    invoke<RestoreReasonDto[]>('restore_reason_codes', {}),
+};
+
+/**
+ * PHASE-23. Geometry: lens corrections, straightening and the crop.
+ *
+ * Six calls. Three read, one runs the pass, and two record what the photographer decided.
+ *
+ * **There is no revert call, and that is deliberate.** `GeometryPlanDto.crops[0]` is always the
+ * original framing - the contract's constructor puts it there and nothing can take it away - so
+ * "the original framing is one click away" is a property of the shape rather than a button
+ * somebody has to remember to wire. Reverting is `setFraming` with the whole frame at zero
+ * degrees (ADR-0041).
+ */
+export const geometry = {
+  /** How much of a wedding is planned, and what share of it was delivered exactly as shot. */
+  geometryStatus: (projectId: string): Promise<GeometryStatusDto> =>
+    invoke<GeometryStatusDto>('geometry_status', { projectId }),
+
+  /**
+   * One photograph's plan, or `null` when nobody has planned it.
+   *
+   * The aspect variants an album or a feed needs are `crops`, on this plan. They are rectangles
+   * in one recipe rather than files on a disk, which is what "without duplicating files" means.
+   */
+  imageGeometry: (photoId: string): Promise<GeometryPlanDto | null> =>
+    invoke<GeometryPlanDto | null>('image_geometry', { photoId }),
+
+  /** The frames whose framing is worth a look, weakest first. A queue, not a cull. */
+  geometryReviewQueue: (input: GeometryReviewInput): Promise<string[]> =>
+    invoke<string[]>('geometry_review_queue', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptGeometry: (input: AcceptGeometryInput): Promise<GeometryPlanDto> =>
+    invoke<GeometryPlanDto>('accept_geometry', { input }),
+
+  /**
+   * Record the framing the photographer chose, and write it into the recipe as a person.
+   *
+   * A person may crop one photograph of their own through a face, because it is their
+   * photograph and they are looking at it. There is no field anywhere on this surface that says
+   * cutting faces is acceptable *in general* - that is the setting which would crop the next
+   * four hundred frames through people.
+   */
+  setFraming: (input: SetFramingInput): Promise<SetFramingDto> =>
+    invoke<SetFramingDto>('set_framing', { input }),
+
+  /** Run the resumable pass, then carry what it decided into the recipes. */
+  planGeometry: (input: PlanGeometryInput): Promise<GeometryPassDto> =>
+    invoke<GeometryPassDto>('plan_geometry', { input }),
 };

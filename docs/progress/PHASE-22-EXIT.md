@@ -174,6 +174,11 @@ its four properties self-test; the study itself needs a panel and four ISO steps
 **C5 - Sev 3. `ui/src/ipc/client.ts` still stops at phase 19.** The seven commands are reachable
 from the Tauri shell and not from a typed client method. Phases 20 and 21 are in the same state.
 
+> **Closed at the merge onto main.** All seven have typed wrappers, and so do phases 20, 21 and
+> 23's. The sentence above was also wrong about the shell: these seven were *not* registered in
+> `generate_handler!` when this report was written, and neither were ninety others. See phase 21's
+> C6 for what that cost and what is still open.
+
 **C6 - Sev 3. Four of section 11's five performance rows are waived**, because this build links no
 `wgpu` backend. Closes with ADR-0029's own condition.
 

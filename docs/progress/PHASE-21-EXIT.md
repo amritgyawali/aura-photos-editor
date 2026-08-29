@@ -221,6 +221,21 @@ gap rather than this phase's: `client.ts` stops at phase 19, and every panel fro
 exists with tests and is imported nowhere. `MicroRetouchPanel` is props-driven and fully tested,
 so wiring it is a caller rather than a component.
 
+> **Half closed at the merge onto main, and the half that closed was worse than this row said.**
+> `client.ts` has wrappers for all nine now, and for phases 20, 22 and 23's as well. The reason
+> that mattered more than it looks: the client already carried 179 wrappers for phases 01 to 19,
+> the shell registered 89 commands, and **ninety of those calls reached a window that did not
+> answer to them** - `get_preview`, `render_image`, `set_param`, every mask command, every moment
+> command. The shell registers all 180 now, and one of them, `image_subjects`, was missing from
+> `aura-app`'s own `pub use` list even though the module's doc comment named it, so no caller
+> anywhere could have reached it.
+>
+> What is still open is the half this row named first: **`App.tsx` mounts three panels** -
+> problems, hardware and AI keys - and every develop panel from phase 12 onward is imported
+> nowhere. The commands are reachable and the components are tested; there is no view that puts
+> the two together. That is a UI-shell task rather than any one phase's, and it is the honest
+> remaining blocker on "every new AI decision surface is rendered".
+
 ## 9. Rollback
 
 The stage is off with one field: `MicroPassInput::enabled = false`, which produces a plan carrying

@@ -6,29 +6,29 @@
 use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
-    AnalyseCompositionInput, CompositionDto, CompositionPassDto, CompositionStatusDto,
-    CreateProjectInput, CullPassDto, CullProjectInput, CullStatusDto, DecisionDto,
-    DismissCompositionFlagInput, FlaggedCompositionInput, ImageRowLite, IpcError, JobHandle,
-    ListImagesInput, OverrideDecisionInput, ProblemRow, ProjectHandle, ProjectSummary,
-    ExplainPanelDto, ExportBundleInput, LedgerDecisionDto, LedgerStatusDto, RecordDecisionsDto,
-    RecordDecisionsInput, ResizeGalleryInput, ReviewQueueInput, SelectionDto, SetCameraLabelInput,
-    SetCullModeInput, StartIngestInput, SupportBundleDto,
-};
-use aura_app::contract::ipc::{
     AcceptToneInput, EstimateToneInput, ReferenceFrameDto, ReferenceFramesInput,
     SetToneOverrideDto, SetToneOverrideInput, ToneDto, TonePassDto, ToneReviewInput, ToneStatusDto,
 };
+use aura_app::contract::ipc::{
+    AnalyseCompositionInput, CompositionDto, CompositionPassDto, CompositionStatusDto,
+    CreateProjectInput, CullPassDto, CullProjectInput, CullStatusDto, DecisionDto,
+    DismissCompositionFlagInput, ExplainPanelDto, ExportBundleInput, FlaggedCompositionInput,
+    ImageRowLite, IpcError, JobHandle, LedgerDecisionDto, LedgerStatusDto, ListImagesInput,
+    OverrideDecisionInput, ProblemRow, ProjectHandle, ProjectSummary, RecordDecisionsDto,
+    RecordDecisionsInput, ResizeGalleryInput, ReviewQueueInput, SelectionDto, SetCameraLabelInput,
+    SetCullModeInput, StartIngestInput, SupportBundleDto,
+};
 // PHASE-16.
 // PHASE-17.
+use aura_app::contract::ipc::{
+    AcceptColourInput, ColourDto, ColourPassDto, ColourReviewInput, ColourStatusDto,
+    EstimateColourInput, SelectVariantInput, SetColourOverrideDto, SetColourOverrideInput,
+};
 use aura_app::contract::ipc::{
     AdoptProfileInput, CompareProfilesInput, ExportProfileDto, ExportProfileInput,
     ImportProfileDto, ImportProfileInput, ProfileReportDto, ScanArchiveDto, ScanArchiveInput,
     SetProjectProfileInput, StyleComparisonDto, StylePairDto, StyleProfileDto, StyleStatusDto,
     TrainProfileDto, TrainProfileInput,
-};
-use aura_app::contract::ipc::{
-    AcceptColourInput, ColourDto, ColourPassDto, ColourReviewInput, ColourStatusDto,
-    EstimateColourInput, SelectVariantInput, SetColourOverrideDto, SetColourOverrideInput,
 };
 // PHASE-19.
 use aura_app::contract::ipc::{
@@ -58,6 +58,28 @@ use aura_app::contract::ipc::{
 use aura_app::contract::ipc::{
     AcceptGeometryInput, GeometryPassDto, GeometryPlanDto, GeometryReviewInput, GeometryStatusDto,
     PlanGeometryInput, SetFramingDto, SetFramingInput,
+};
+// The types the ninety newly registered commands name.
+use aura_app::contract::ipc::{
+    AnalyseIntegrityInput, CacheStatsDto, ChapterHandleDto, ClassifyScenesInput,
+    CloudCacheStatsDto, CloudCallDto, CloudSpendDto, CloudStatusDto, DescriptorsDto,
+    DevelopImageInput, DevelopStatusDto, DismissFlagInput, DuplicateSetDto, EditMaskInput,
+    EmbedProgressDto, EmbedProjectInput, EmotionDto, EmotionPassDto, EmotionStatusDto,
+    EnsureMasksInput, EraseBiometricsDto, EraseBiometricsInput, FaceCropDto, FindSimilarInput,
+    FlaggedInput, GetPreviewInput, GroupMomentsInput, GroupPeopleDto, GroupPeopleInput,
+    HardwarePlanDto, HistoryDto, HistoryStepInput, IdentityCardDto, IdentityHandleDto,
+    IdentityTimelineDto, ImageSubjectsDto, IndexStatusDto, InferStatsDto, IntegrityDto,
+    IntegrityPassDto, IntegrityStatusDto, KeyCheckDto, LockMomentInput, MaskAllowanceDto, MaskDto,
+    MaskOverlayDto, MaskStatusDto, MergeChaptersInput, MergeIdentitiesInput, MergeMomentsInput,
+    ModelStatusDto, MomentDto, MomentEditDto, MomentHandleDto, MomentListDto, MomentPeakDto,
+    MomentStatusDto, MomentsInput, MoveBoundaryInput, PeopleStatusDto, PreferInput, PrefetchInput,
+    PreviewPayload, RankedByEmotionDto, RankedFrameDto, RankedInput, ReactionLinkDto, RecipeDto,
+    RenameIdentityInput, RenderCapsDto, RenderDto, RenderImageInput, ScanFacesDto, ScanFacesInput,
+    SceneDto, SceneProfileDto, ScoreEmotionInput, SetAiKeyInput, SetCacheBudgetInput,
+    SetChapterInput, SetCloudBudgetInput, SetCloudPrivacyInput, SetExecutionProviderInput,
+    SetIdentityImportanceInput, SetIdentityRoleInput, SetKeepHintInput, SetParamDto, SetParamInput,
+    SetPeakInput, SimilarResultDto, SnapshotInput, SplitChapterInput, SplitIdentityInput,
+    SplitMomentInput, StoryOutlineDto, StoryStatusDto, WarmupReportDto, WithinMomentInput,
 };
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
@@ -175,7 +197,10 @@ async fn cull_status(state: State<'_, AppState>, project_id: String) -> IpcResul
 }
 
 #[tauri::command]
-async fn gallery(state: State<'_, AppState>, project_id: String) -> IpcResult<Option<SelectionDto>> {
+async fn gallery(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<SelectionDto>> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::gallery(&app, &project_id))
         .await
@@ -244,10 +269,7 @@ async fn override_decision(
 // for the panel to open, which is 250 ms the window must stay alive through.
 
 #[tauri::command]
-async fn explain_image(
-    state: State<'_, AppState>,
-    photo_id: String,
-) -> IpcResult<ExplainPanelDto> {
+async fn explain_image(state: State<'_, AppState>, photo_id: String) -> IpcResult<ExplainPanelDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::explain_image(&app, &photo_id))
         .await
@@ -410,10 +432,7 @@ async fn estimate_tone(
 // error is the honest one - `AURA-ML-5073`, "not enough usable pairs" - rather than a silent
 // success. See condition C3 in `docs/progress/PHASE-17-EXIT.md`.
 #[tauri::command]
-async fn style_status(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> IpcResult<StyleStatusDto> {
+async fn style_status(state: State<'_, AppState>, project_id: String) -> IpcResult<StyleStatusDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::style_status(&app, &project_id))
         .await
@@ -631,10 +650,7 @@ fn catalog_path() -> Result<PathBuf, IpcError> {
 // and separates frequency bands over a whole gallery. All six go off the renderer thread for
 // the reason the tone block above gives.
 #[tauri::command]
-async fn local_status(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> IpcResult<LocalStatusDto> {
+async fn local_status(state: State<'_, AppState>, project_id: String) -> IpcResult<LocalStatusDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::local_status(&app, &project_id))
         .await
@@ -797,10 +813,7 @@ async fn sculpt_local(
 // `micro_reason_codes` is the one command here that touches nothing: it assembles the panel's
 // legend from the frozen enum, so it stays on the calling thread.
 #[tauri::command]
-async fn micro_status(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> IpcResult<MicroStatusDto> {
+async fn micro_status(state: State<'_, AppState>, project_id: String) -> IpcResult<MicroStatusDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::micro_status(&app, &project_id))
         .await
@@ -841,10 +854,7 @@ async fn micro_review_queue(
 }
 
 #[tauri::command]
-async fn micro_matrix(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> IpcResult<MicroMatrixDto> {
+async fn micro_matrix(state: State<'_, AppState>, project_id: String) -> IpcResult<MicroMatrixDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::micro_matrix(&app, &project_id))
         .await
@@ -871,10 +881,7 @@ async fn accept_micro(state: State<'_, AppState>, input: AcceptMicroInput) -> Ip
 }
 
 #[tauri::command]
-async fn micro_pass(
-    state: State<'_, AppState>,
-    input: MicroPassInput,
-) -> IpcResult<MicroPassDto> {
+async fn micro_pass(state: State<'_, AppState>, input: MicroPassInput) -> IpcResult<MicroPassDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::micro_pass(&app, &input))
         .await
@@ -1036,6 +1043,943 @@ async fn plan_geometry(
         .map_err(|_| background_request_failed())?
 }
 
+// Registered by the merge that brought phases 20, 21 and 22 onto main. Every command
+// below was exported by `aura-app` when its phase shipped and was never named in
+// `generate_handler!`, so `ui/src/ipc/client.ts` called ninety commands the window did
+// not answer to. The wrappers are generated from the command functions' own signatures
+// rather than typed by hand, because this crate cannot be compiled on this machine and a
+// wrong argument name would not be caught by anything.
+//
+// Every one of them goes through `spawn_blocking` for the reason phases 15 to 23 give:
+// a command that opens a catalog, decodes a proxy or renders must not run on the thread
+// the window paints from.
+
+// PHASE-04. The cloud AI gateway.
+#[tauri::command]
+async fn check_ai_key(state: State<'_, AppState>) -> IpcResult<KeyCheckDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::check_ai_key(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn clear_ai_key(state: State<'_, AppState>, provider: String) -> IpcResult<CloudStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::clear_ai_key(&app, &provider))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cloud_cache_stats(state: State<'_, AppState>) -> IpcResult<CloudCacheStatsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cloud_cache_stats(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cloud_calls(
+    state: State<'_, AppState>,
+    project_id: String,
+    limit: u32,
+) -> IpcResult<Vec<CloudCallDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cloud_calls(&app, &project_id, limit))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cloud_spend(state: State<'_, AppState>, project_id: String) -> IpcResult<CloudSpendDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cloud_spend(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cloud_status(state: State<'_, AppState>) -> IpcResult<CloudStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cloud_status(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn purge_cloud_cache(
+    state: State<'_, AppState>,
+    task: String,
+    task_version: u32,
+) -> IpcResult<u64> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::purge_cloud_cache(&app, &task, task_version)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_ai_key(state: State<'_, AppState>, input: SetAiKeyInput) -> IpcResult<CloudStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_ai_key(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_cloud_budget(
+    state: State<'_, AppState>,
+    input: SetCloudBudgetInput,
+) -> IpcResult<CloudSpendDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_cloud_budget(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_cloud_privacy(
+    state: State<'_, AppState>,
+    input: SetCloudPrivacyInput,
+) -> IpcResult<CloudStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_cloud_privacy(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-14. The develop engine and the edit recipe.
+#[tauri::command]
+async fn develop_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<DevelopStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::develop_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn history_step(
+    state: State<'_, AppState>,
+    input: HistoryStepInput,
+) -> IpcResult<SetParamDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::history_step(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_history(
+    state: State<'_, AppState>,
+    input: DevelopImageInput,
+) -> IpcResult<HistoryDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_history(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_recipe(
+    state: State<'_, AppState>,
+    input: DevelopImageInput,
+) -> IpcResult<RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_recipe(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn render_caps(state: State<'_, AppState>) -> IpcResult<RenderCapsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::render_caps(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn render_image(state: State<'_, AppState>, input: RenderImageInput) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::render_image(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_param(state: State<'_, AppState>, input: SetParamInput) -> IpcResult<SetParamDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_param(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn snapshot(state: State<'_, AppState>, input: SnapshotInput) -> IpcResult<HistoryDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::snapshot(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-10. Emotion and moment ranking.
+#[tauri::command]
+async fn emotion_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<EmotionStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::emotion_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_emotion(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<EmotionDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_emotion(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn moment_peak(
+    state: State<'_, AppState>,
+    moment_id: String,
+) -> IpcResult<Option<MomentPeakDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::moment_peak(&app, &moment_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn prefer_frame(state: State<'_, AppState>, input: PreferInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::prefer_frame(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn ranked_by_emotion(
+    state: State<'_, AppState>,
+    input: RankedInput,
+) -> IpcResult<Vec<RankedByEmotionDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::ranked_by_emotion(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn reactions_of(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Vec<ReactionLinkDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::reactions_of(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn score_emotion(
+    state: State<'_, AppState>,
+    input: ScoreEmotionInput,
+) -> IpcResult<EmotionPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::score_emotion(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_moment_peak(
+    state: State<'_, AppState>,
+    input: SetPeakInput,
+) -> IpcResult<MomentPeakDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_moment_peak(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-05. Embeddings and the similarity index.
+#[tauri::command]
+async fn build_index(state: State<'_, AppState>, project_id: String) -> IpcResult<IndexStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::build_index(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn embed_project(
+    state: State<'_, AppState>,
+    input: EmbedProjectInput,
+) -> IpcResult<EmbedProgressDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::embed_project(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn find_similar(
+    state: State<'_, AppState>,
+    input: FindSimilarInput,
+) -> IpcResult<SimilarResultDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::find_similar(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_descriptors(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+) -> IpcResult<DescriptorsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::image_descriptors(&app, &project_id, &photo_id)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn index_status(state: State<'_, AppState>, project_id: String) -> IpcResult<IndexStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::index_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-03. The inference runtime and the model registry.
+#[tauri::command]
+async fn hardware_plan(state: State<'_, AppState>) -> IpcResult<HardwarePlanDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::hardware_plan(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn infer_stats(state: State<'_, AppState>) -> IpcResult<InferStatsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::infer_stats(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_models(state: State<'_, AppState>) -> IpcResult<Vec<ModelStatusDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::list_models(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn recheck_hardware(state: State<'_, AppState>) -> IpcResult<HardwarePlanDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::recheck_hardware(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_execution_provider(
+    state: State<'_, AppState>,
+    input: SetExecutionProviderInput,
+) -> IpcResult<HardwarePlanDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_execution_provider(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn warmup_models(state: State<'_, AppState>) -> IpcResult<WarmupReportDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::warmup_models(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-09. Frame integrity.
+#[tauri::command]
+async fn analyse_integrity(
+    state: State<'_, AppState>,
+    input: AnalyseIntegrityInput,
+) -> IpcResult<IntegrityPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::analyse_integrity(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn dismiss_flag(
+    state: State<'_, AppState>,
+    input: DismissFlagInput,
+) -> IpcResult<IntegrityDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::dismiss_flag(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn flagged_images(state: State<'_, AppState>, input: FlaggedInput) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::flagged_images(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_integrity(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<IntegrityDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_integrity(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn integrity_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<IntegrityStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::integrity_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn within_moment(
+    state: State<'_, AppState>,
+    input: WithinMomentInput,
+) -> IpcResult<Vec<RankedFrameDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::within_moment(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-18. Semantic masks.
+#[tauri::command]
+async fn edit_mask(state: State<'_, AppState>, input: EditMaskInput) -> IpcResult<MaskDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::edit_mask(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn ensure_masks(
+    state: State<'_, AppState>,
+    input: EnsureMasksInput,
+) -> IpcResult<Vec<MaskDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::ensure_masks(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_masks(state: State<'_, AppState>, image_id: String) -> IpcResult<Vec<MaskDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_masks(&app, &image_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn mask_allowance(
+    state: State<'_, AppState>,
+    mask_id: String,
+    operation: String,
+) -> IpcResult<MaskAllowanceDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::mask_allowance(&app, &mask_id, &operation)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+fn mask_kinds() -> IpcResult<Vec<String>> {
+    Ok(aura_app::mask_kinds())
+}
+
+#[tauri::command]
+async fn mask_overlay(state: State<'_, AppState>, mask_id: String) -> IpcResult<MaskOverlayDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::mask_overlay(&app, &mask_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn mask_status(state: State<'_, AppState>, project_id: String) -> IpcResult<MaskStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::mask_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn regenerate_mask(state: State<'_, AppState>, mask_id: String) -> IpcResult<bool> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::regenerate_mask(&app, &mask_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-08. Moments, bursts and duplicates.
+#[tauri::command]
+async fn group_moments(
+    state: State<'_, AppState>,
+    input: GroupMomentsInput,
+) -> IpcResult<MomentStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::group_moments(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_moments(state: State<'_, AppState>, input: MomentsInput) -> IpcResult<MomentListDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::list_moments(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn lock_moment(
+    state: State<'_, AppState>,
+    input: LockMomentInput,
+) -> IpcResult<MomentHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::lock_moment(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn merge_moments(
+    state: State<'_, AppState>,
+    input: MergeMomentsInput,
+) -> IpcResult<MomentHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::merge_moments(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn moment_duplicates(
+    state: State<'_, AppState>,
+    moment_id: String,
+) -> IpcResult<Vec<DuplicateSetDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::moment_duplicates(&app, &moment_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn moment_of_image(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<MomentDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::moment_of_image(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn moment_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<MomentStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::moment_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_keep_hint(
+    state: State<'_, AppState>,
+    input: SetKeepHintInput,
+) -> IpcResult<MomentHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_keep_hint(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn split_moment(
+    state: State<'_, AppState>,
+    input: SplitMomentInput,
+) -> IpcResult<MomentHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::split_moment(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn undo_moment_edit(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<MomentEditDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::undo_moment_edit(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-06. People intelligence.
+#[tauri::command]
+async fn image_subjects(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<ImageSubjectsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_subjects(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn erase_biometrics(
+    state: State<'_, AppState>,
+    input: EraseBiometricsInput,
+) -> IpcResult<EraseBiometricsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::erase_biometrics(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn group_people(
+    state: State<'_, AppState>,
+    input: GroupPeopleInput,
+) -> IpcResult<GroupPeopleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::group_people(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn identity_cover(
+    state: State<'_, AppState>,
+    project_id: String,
+    face_id: String,
+) -> IpcResult<FaceCropDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::identity_cover(&app, &project_id, &face_id)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn identity_timelines(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<IdentityTimelineDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::identity_timelines(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_identities(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<IdentityCardDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::list_identities(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn merge_identities(
+    state: State<'_, AppState>,
+    input: MergeIdentitiesInput,
+) -> IpcResult<IdentityHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::merge_identities(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn people_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<PeopleStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::people_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn rename_identity(state: State<'_, AppState>, input: RenameIdentityInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::rename_identity(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn scan_faces(state: State<'_, AppState>, input: ScanFacesInput) -> IpcResult<ScanFacesDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::scan_faces(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_identity_importance(
+    state: State<'_, AppState>,
+    input: SetIdentityImportanceInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_identity_importance(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_identity_role(
+    state: State<'_, AppState>,
+    input: SetIdentityRoleInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_identity_role(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn split_identity(
+    state: State<'_, AppState>,
+    input: SplitIdentityInput,
+) -> IpcResult<IdentityHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::split_identity(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-02. Previews and the pixel cache.
+#[tauri::command]
+async fn cancel_previews(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_ids: [String],
+) -> IpcResult<i64> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::cancel_previews(&app, &project_id, &photo_ids)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn get_preview(
+    state: State<'_, AppState>,
+    input: GetPreviewInput,
+) -> IpcResult<PreviewPayload> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::get_preview(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn prefetch_previews(state: State<'_, AppState>, input: PrefetchInput) -> IpcResult<i64> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::prefetch_previews(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn preview_problems(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<(String, String)>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::preview_problems(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn preview_stats(state: State<'_, AppState>, project_id: String) -> IpcResult<CacheStatsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::preview_stats(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn purge_cache(state: State<'_, AppState>, project_id: String) -> IpcResult<CacheStatsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::purge_cache(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_cache_budget(
+    state: State<'_, AppState>,
+    input: SetCacheBudgetInput,
+) -> IpcResult<CacheStatsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_cache_budget(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// PHASE-07. The wedding scene and story surface.
+#[tauri::command]
+async fn classify_scenes(
+    state: State<'_, AppState>,
+    input: ClassifyScenesInput,
+) -> IpcResult<StoryStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::classify_scenes(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_scene(state: State<'_, AppState>, photo_id: String) -> IpcResult<Option<SceneDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_scene(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn merge_chapters(
+    state: State<'_, AppState>,
+    input: MergeChaptersInput,
+) -> IpcResult<ChapterHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::merge_chapters(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn move_chapter_boundary(
+    state: State<'_, AppState>,
+    input: MoveBoundaryInput,
+) -> IpcResult<ChapterHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::move_chapter_boundary(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn scene_profiles(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<SceneProfileDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::scene_profiles(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn segment_story(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<StoryOutlineDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::segment_story(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_chapter(
+    state: State<'_, AppState>,
+    input: SetChapterInput,
+) -> IpcResult<ChapterHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_chapter(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn split_chapter(
+    state: State<'_, AppState>,
+    input: SplitChapterInput,
+) -> IpcResult<ChapterHandleDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::split_chapter(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn story_outline(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<StoryOutlineDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::story_outline(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn story_status(state: State<'_, AppState>, project_id: String) -> IpcResult<StoryStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::story_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -1166,7 +2110,98 @@ fn main() {
             geometry_review_queue,
             accept_geometry,
             set_framing,
-            plan_geometry
+            plan_geometry,
+            analyse_integrity,
+            build_index,
+            cancel_previews,
+            check_ai_key,
+            classify_scenes,
+            clear_ai_key,
+            cloud_cache_stats,
+            cloud_calls,
+            cloud_spend,
+            cloud_status,
+            develop_status,
+            dismiss_flag,
+            edit_mask,
+            embed_project,
+            emotion_status,
+            ensure_masks,
+            erase_biometrics,
+            find_similar,
+            flagged_images,
+            get_preview,
+            group_moments,
+            group_people,
+            hardware_plan,
+            history_step,
+            identity_cover,
+            image_subjects,
+            identity_timelines,
+            image_descriptors,
+            image_emotion,
+            image_history,
+            image_integrity,
+            image_masks,
+            image_recipe,
+            image_scene,
+            index_status,
+            infer_stats,
+            integrity_status,
+            list_identities,
+            list_models,
+            list_moments,
+            lock_moment,
+            mask_allowance,
+            mask_kinds,
+            mask_overlay,
+            mask_status,
+            merge_chapters,
+            merge_identities,
+            merge_moments,
+            moment_duplicates,
+            moment_of_image,
+            moment_peak,
+            moment_status,
+            move_chapter_boundary,
+            people_status,
+            prefer_frame,
+            prefetch_previews,
+            preview_problems,
+            preview_stats,
+            purge_cache,
+            purge_cloud_cache,
+            ranked_by_emotion,
+            reactions_of,
+            recheck_hardware,
+            regenerate_mask,
+            rename_identity,
+            render_caps,
+            render_image,
+            scan_faces,
+            scene_profiles,
+            score_emotion,
+            segment_story,
+            set_ai_key,
+            set_cache_budget,
+            set_chapter,
+            set_cloud_budget,
+            set_cloud_privacy,
+            set_execution_provider,
+            set_identity_importance,
+            set_identity_role,
+            set_keep_hint,
+            set_moment_peak,
+            set_param,
+            snapshot,
+            split_chapter,
+            split_identity,
+            split_moment,
+            story_outline,
+            story_status,
+            undo_moment_edit,
+            warmup_models,
+            within_moment
         ])
         .run(tauri::generate_context!());
 
