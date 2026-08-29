@@ -1,0 +1,58 @@
+[package]
+name         = "aura-generative"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Distraction removal bounded by a safety engine: small, extraneous clutter taken out where removal can be shown to be safe, and refused loudly everywhere else (phase 24)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+aura-preview = { path = "../aura-preview" }
+# PHASE-24. The masks the denylist intersects against, and the only route to them. Phase 18's
+# rule: `MaskService` is the one way to ask what is where in a photograph, and a second answer
+# to "where is her hand" is a removal that disagrees with the retouch about the same pixels.
+aura-vision  = { path = "../aura-vision" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+
+# Deliberately absent: `aura-people`, `aura-brain-photo`, `aura-brain-wedding`, `aura-render`
+# and `aura-cloud`.
+#
+# Phase 24 consumes phases 06, 08, 11 and 18 and depends on one of them. Everything else it
+# needs it takes through the frozen traits in `aura-core` - `PeopleService`, `MomentService`
+# and `CompositionService` - which are the only ways any phase may ask who is in a photograph,
+# what was shot once, and how it is framed.
+#
+# `aura-render` is absent for the reason it is absent from `aura-geometry`: this crate decides
+# a rectangle and a method, and the renderer applies them, from `edit_recipes` through
+# `aura_recipe::schema::merge` only. A dependency in this direction would let a removal reach a
+# pixel without going through the merge.
+#
+# `aura-cloud` is absent because phase 04's rule says the gateway is reached through
+# `aura-core`'s frozen `CloudTask` shape and nothing else. The editorial-judgement task of
+# section 7 is defined against that shape like every other task in the product.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# PHASE-24 only, and only in the evaluation harness. `tests/eval/cleanup_eval.rs` measures the
+# self-check on frames rendered through the real renderer, because an artefact is a property of
+# pixels rather than of a plan - phase 20's rule for its texture guard and phase 22's for its
+# ringing test. The library depends on neither: `aura-recipe` and `aura-render` are downstream,
+# and `tests/one_choke_point.rs` is the grep that keeps it that way.
+aura-recipe  = { path = "../aura-recipe" }
+aura-render  = { path = "../aura-render" }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
+# `tests/eval/` beside the phase 05 to 23 harnesses rather than in this crate's own `tests/`,
+# because a gate is a claim about the product and not about a crate.
+[[test]]
+name = "cleanup_eval"
+path = "../../tests/eval/cleanup_eval.rs"

@@ -26,6 +26,7 @@ pub mod clock;
 
 /// Frozen contracts. Changing anything in here requires an ADR.
 pub mod contract {
+    pub mod cleanup;
     pub mod colour;
     pub mod composition;
     pub mod consent;
@@ -64,6 +65,11 @@ pub mod paths;
 pub mod progress;
 pub mod redact;
 
+pub use contract::cleanup::{
+    CleanupCode, CleanupDisclosure, CleanupMethod, CleanupOutline, CleanupOverride,
+    CleanupProposal, CleanupReason, CleanupService, DistractionClass, PreviewRef, SafetyCheck,
+    SafetyVerdict,
+};
 pub use contract::colour::{
     BandReading, ColourCode, ColourDecision, ColourOutline, ColourOverride, ColourReason,
     ColourService, ColourVariant, ContentBand, CurvePoint, HslAdjustments, HslBand, HslShift,
@@ -89,7 +95,7 @@ pub use contract::geometry::{
 };
 pub use contract::ids::{
     ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MaskId, MomentId, PhotoId,
-    ProfileId, ProjectId, RunId, SegmentId,
+    ProfileId, ProjectId, ProposalId, RunId, SegmentId,
 };
 pub use contract::integrity::{
     CropRect, ExposureVerdict, EyeOpenness, EyeState, IntegrityFlags, IntegrityOutline,

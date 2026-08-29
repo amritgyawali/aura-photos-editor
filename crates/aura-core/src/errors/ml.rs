@@ -45,6 +45,10 @@ pub const ML_CURVE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5066");
 
 /// PHASE-23. One photograph's geometry could not be planned.
 pub const ML_GEOMETRY_FAILED: ErrorCode = ErrorCode("AURA-ML-5092");
+/// A cleanup proposal broke one of phase 24's own guarantees, so it was refused. PHASE-24.
+pub const ML_CLEANUP_PROPOSAL_REFUSED: ErrorCode = ErrorCode("AURA-ML-5116");
+/// A photographer's cleanup decision could not be recorded. PHASE-24.
+pub const ML_CLEANUP_OVERRIDE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5117");
 
 /// Asked for a model that no signed entry pins.
 #[must_use]
@@ -260,5 +264,43 @@ pub fn geometry_failed(detail: impl Into<String>) -> AuraError {
         detail,
         "AURA could not work out the lens corrections and framing for one photograph, so it \
          has left it exactly as it was shot. Everything else in this wedding is unaffected.",
+    )
+}
+
+/// A cleanup proposal broke one of phase 24's own guarantees, so it was refused.
+///
+/// PHASE-24 section 5, restated as a post-condition on the only constructor. It lives in
+/// `aura-core` rather than in `aura-generative` because `contract::cleanup::CleanupProposal::new`
+/// is the only way to make one and the contract cannot depend on the crate that implements it -
+/// the same reason [`curve_refused`] and [`geometry_failed`] are here.
+///
+/// **The clause that matters most is the first one.** A proposal whose safety verdict is absent,
+/// malformed or not `allowed` cannot be constructed at all, which is what makes "the safety filter
+/// runs before the score" a property of the type rather than an ordering in a function somebody
+/// could reorder. ADR-0049 section 2.
+#[must_use]
+pub fn cleanup_proposal_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_CLEANUP_PROPOSAL_REFUSED,
+        Severity::ItemFailed,
+        Recovery::Fallback,
+        detail,
+        "AURA found something it might have tidied out of one photograph and could not show that          removing it was safe, so it left the photograph alone. Nothing has been changed.",
+    )
+}
+
+/// A photographer's cleanup decision could not be recorded.
+///
+/// Accepting or rejecting a proposal is the only thing a person says on this surface - there is no
+/// strength, no size and no description - so a refused override is always one of two things: it
+/// named no proposal, or it asked for nothing.
+#[must_use]
+pub fn cleanup_override_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_CLEANUP_OVERRIDE_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        detail,
+        "AURA could not record that decision about tidying this photograph. The photograph is          unchanged.",
     )
 }

@@ -71,6 +71,10 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0023_restoration.sql",
     "crates/aura-render/shaders/denoise_tile.wgsl",
     "crates/aura-render/shaders/deconv.wgsl",
+    // PHASE-24. The contract only, so far. `cleanup_policy.toml` is deliberately *not* frozen -
+    // it is a file a studio is meant to edit, and the loader is what holds it to the contract's
+    // bounds rather than a digest. The migration and any shader arrive with the modules that
+    // need them.
     // PHASE-23. The migration, and the shader: `geometry.wgsl` is the GPU half of a resample
     // the reference path also performs, and a shader that drifts while no device can run it is
     // a soft frame edge nobody finds until one arrives. `shader_parity.rs` holds it to the
