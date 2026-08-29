@@ -195,6 +195,15 @@ pub enum SkipReason {
     RestorationAbsent,
     /// A geometry correction this build does not have. Phase 23.
     GeometryAbsent,
+    /// The pixels a cleanup operation would need are not available. Phase 24.
+    ///
+    /// **The one skip reason in this enum that is about a stored patch rather than about a
+    /// capability.** A cleanup operation in a recipe is a disclosure that pixels were replaced,
+    /// and the replacement pixels live in the catalog beside the proposal. A render that cannot
+    /// find them must leave the object in the photograph and say so, because the alternative -
+    /// running the fill again at render time - would produce different pixels from the ones the
+    /// self-check passed and the photographer approved.
+    CleanupPatchAbsent,
     /// The lens profile named by the recipe is not in the table.
     LensProfileAbsent,
     /// The camera profile is not in the table; the reference profile rendered it.
@@ -214,6 +223,7 @@ impl SkipReason {
             Self::OperatorAbsent => "operator_absent",
             Self::RestorationAbsent => "restoration_absent",
             Self::GeometryAbsent => "geometry_absent",
+            Self::CleanupPatchAbsent => "cleanup_patch_absent",
             Self::LensProfileAbsent => "lens_profile_absent",
             Self::CameraProfileAbsent => "camera_profile_absent",
             Self::UpstreamAlready => "upstream_already",

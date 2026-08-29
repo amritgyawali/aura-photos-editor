@@ -6,8 +6,11 @@
 use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
-    AcceptToneInput, EstimateToneInput, ReferenceFrameDto, ReferenceFramesInput,
-    SetToneOverrideDto, SetToneOverrideInput, ToneDto, TonePassDto, ToneReviewInput, ToneStatusDto,
+    AcceptToneInput, CleanupBlockedDto, CleanupDisclosureDto, CleanupPassDto, CleanupPassInput,
+    CleanupProposalDto, CleanupReasonDto, CleanupStatusDto, DecideCleanupInput,
+    DisableCleanupInput, EstimateToneInput, ManualRemoveDto, ManualRemoveInput, ReferenceFrameDto,
+    ReferenceFramesInput, SetToneOverrideDto, SetToneOverrideInput, ToneDto, TonePassDto,
+    ToneReviewInput, ToneStatusDto,
 };
 use aura_app::contract::ipc::{
     AnalyseCompositionInput, CompositionDto, CompositionPassDto, CompositionStatusDto,
@@ -1980,6 +1983,100 @@ async fn story_status(state: State<'_, AppState>, project_id: String) -> IpcResu
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-24. The distraction-cleanup surface. `cleanup_pass` decodes proxies, searches sibling
+// frames for a homography and runs an exemplar synthesis per candidate, so it goes off the calling
+// thread with the rest. `manual_remove` does the same work for one region a person drew, and
+// `cleanup_reason_codes` assembles the panel's legend from the frozen enum and touches nothing.
+#[tauri::command]
+async fn cleanup_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<CleanupStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cleanup_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_cleanup(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Vec<CleanupProposalDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_cleanup(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cleanup_blocked(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Vec<CleanupBlockedDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cleanup_blocked(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cleanup_disclosures(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<CleanupDisclosureDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cleanup_disclosures(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cleanup_pass(
+    state: State<'_, AppState>,
+    input: CleanupPassInput,
+) -> IpcResult<CleanupPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cleanup_pass(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn decide_cleanup(state: State<'_, AppState>, input: DecideCleanupInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::decide_cleanup(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn disable_cleanup(state: State<'_, AppState>, input: DisableCleanupInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::disable_cleanup(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn manual_remove(
+    state: State<'_, AppState>,
+    input: ManualRemoveInput,
+) -> IpcResult<ManualRemoveDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::manual_remove(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn cleanup_reason_codes(state: State<'_, AppState>) -> IpcResult<Vec<CleanupReasonDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::cleanup_reason_codes(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -2109,6 +2206,15 @@ fn main() {
             image_geometry,
             geometry_review_queue,
             accept_geometry,
+            cleanup_status,
+            image_cleanup,
+            cleanup_blocked,
+            cleanup_disclosures,
+            cleanup_pass,
+            decide_cleanup,
+            disable_cleanup,
+            manual_remove,
+            cleanup_reason_codes,
             set_framing,
             plan_geometry,
             analyse_integrity,

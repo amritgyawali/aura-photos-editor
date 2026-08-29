@@ -2,6 +2,84 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 24 - Generative cleanup: distraction removal, bounded by a safety engine
+
+The first code in the product that removes something the camera got right. Phase 22 removed
+noise, which is not information. Phase 23 removed framing. This removes an **object that was
+there** and puts pixels in its place that were not, and when it is wrong the result is not a
+photograph edited differently from the one somebody wanted - it is a photograph containing
+something that never existed, delivered to a couple who will keep it for fifty years.
+
+So the crate is shaped upside down compared with every phase before it. The usual shape is find
+candidates, score them, apply the best. Here it is find candidates, **prove each one is safe**,
+discard the ones that cannot be proved, and only then score what is left. `safety::check` was the
+first module written and everything else is downstream of it. The ordering is not a convention:
+`source::select` takes a `SafeCandidate`, which has no public constructor and can only be obtained
+from the safety engine returning `Allowed`, so a caller who wanted to fill an unchecked region
+could not construct the argument.
+
+**A penalty would have been simpler and is what most products ship.** Any penalty large enough to
+be safe across four hundred frames loses on the one frame where the salience term is most
+confident - and the frame where a distraction is most salient is the frame where it is nearest the
+subject. The 1 % that design gets wrong is a bride's hands.
+
+**Real pixels first, then this photograph's own texture, then nothing.** `CleanupMethod::preference`
+is borrow 0, fill 1, inpaint 2, and nothing configurable reorders it: diffusion is faster than a
+homography search across a moment, so a studio that could reorder them would do it for the reason
+that makes it worst. The borrow fits an exhaustive least-median homography over 495 four-subsets -
+exhaustive rather than sampled because invariant 4 needs the same recipe to produce the same
+pixels, and at twelve control points that is cheaper than seeding a generator.
+
+**The diffusion tier is declared, refused and reachable.** `inpaint::solve` returns
+`InpaintUnavailable` on every call and there is no fallback under it, because the fallback would be
+the classical fill the selector already tried - so it would be the product doing what it had just
+decided was insufficient, and then writing `method = inpaint` on the row. A stored disclosure saying
+a model ran means a model ran.
+
+**The cloud call can only say no.** `CleanupJudgement` is the first task in the product whose output
+type has no approving variant: it can turn a proposed removal into a refusal, and it cannot raise a
+confidence, move a band or reach a candidate that failed a mechanical check. An unreachable
+provider, an invalid response, a spent budget and a cautious model all leave the photograph in the
+same state. Phase 12 declined to build its tie-breaker and wrote down why; this one is built, and
+the difference is the direction it can move a decision.
+
+**A disclosure is written in the same transaction as the removal and can never be edited.** Three
+triggers in migration 24: one aborts `applied = 1` with no disclosure, one aborts every UPDATE on a
+disclosure, one refuses to delete one while the removal stands. `Recipe.cleanup[]` is the other half
+- the fourth amendment to a frozen contract in the product's history - because phase 14's rule is
+that a delivered file is re-creatable from four values, and a removal that appeared in none of them
+is a photograph that cannot be audited.
+
+**This build proposes no removals on a real photograph**, for two independent reasons, and both are
+in the outline rather than hidden. There is no trained detector, so `detect::candidates` names
+nothing and everything it finds is `Unclassified`, which cannot be shown to be extraneous. And phase
+18's twenty mask classes contain **no word for a ring or a cake**, so a coverage assembled from them
+is never complete and every candidate is refused with `protection_unknown` - which is the second
+finding of this phase and the one that survives a trained segmenter.
+
+Six things were got wrong first and are written down in `docs/progress/PHASE-24.md`. Two are worth
+repeating here. **A normalised correlation is undefined over a flat window and returns zero**, and
+most wedding distractions are close to flat - so the check that refused a sibling frame containing
+the *same object* read "identical" as "completely different" and borrowed anyway, replacing the exit
+sign with the exit sign. And **both removal modules feathered toward the object they were
+removing**: the seam feather ran inward from the region's boundary, so the code that exists to hide
+a seam left a rim of the distraction behind. That is phase 18's resampler defect in a different
+module, and `pixels::feather_out` is where it is written down.
+
+Sixteen of thirty-one reason codes are refusals, which is the highest proportion in the product and
+is the phase working rather than failing. `aura-cli verify --phase 24` makes three hundred
+adversarial attempts to get a removal past the engine and none succeeds; the exit report records
+that the *human* audit section 9 asks for did not happen, which is condition C4.
+
+- **Added:** `aura-generative` (fifteen modules), migration 24, `Stage::Cleanup` at index 18,
+  `cleanup_paste.wgsl`, `CleanupJudgement`, `Recipe.cleanup[]`, `ProposalId`, nine IPC commands,
+  three panels, three ML scripts, ADR-0049 and ADR-0050, error codes ML 5115-5122.
+- **Changed:** `contracts.lock` re-locked for `cleanup.rs`, `ids.rs`, `recipe.rs`, `render.rs` and
+  `types.ts`; `Capabilities` gains `cleanup_patches`; `SkipReason` gains `CleanupPatchAbsent`;
+  `denylist::Coverage` gains a resolved set, so an unaskable kind is `Unknown` rather than `Clear`.
+- **Not built:** a trained detector, a diffusion tier, a creative-fill mode, and any way to reorder
+  the three sources.
+
 ## Tooling - the phase ritual becomes branch-first, and landing becomes one command
 
 Not a phase. A change to how every phase after phase 24 is started and finished, recorded

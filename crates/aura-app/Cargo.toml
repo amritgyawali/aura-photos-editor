@@ -29,6 +29,10 @@ aura-retouch       = { path = "../aura-retouch" }
 aura-cull          = { path = "../aura-cull" }
 aura-explain       = { path = "../aura-explain" }
 aura-geometry      = { path = "../aura-geometry" }
+# PHASE-24. The cleanup engine. `aura-app` is where the editorial-judgement port meets
+# `aura-cloud`, and where an accepted proposal meets `aura_recipe::schema::merge` - the
+# two edges `aura-generative` deliberately does not have.
+aura-generative    = { path = "../aura-generative" }
 aura-recipe        = { path = "../aura-recipe" }
 aura-render        = { path = "../aura-render" }
 aura-style         = { path = "../aura-style" }

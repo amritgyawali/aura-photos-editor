@@ -74,6 +74,20 @@ pub struct Recipe {
     pub retouch: Vec<RetouchOp>,
     /// Restoration settings. Phase 22 fills these.
     pub restoration: Restoration,
+    /// Distractions removed from the frame, in application order. Phase 24 fills these.
+    ///
+    /// **Added by PHASE-24; see ADR-0049 section 11.** Optional and absent on every recipe any
+    /// earlier build wrote, so the change is additive in both directions: an older reader ignores
+    /// it and a newer reader defaults it to empty.
+    ///
+    /// It is in the *recipe* rather than only in the catalog for phase 14's reason and phase 21's:
+    /// a delivered file must be re-creatable from the RAW hash, the canonical recipe, the engine
+    /// string and the output spec, and a removal that appeared in none of those four is a delivered
+    /// photograph that cannot be re-created and, more to the point, **cannot be audited**. It is
+    /// also section 13's fifth acceptance criterion - "every cleanup is disclosed in the recipe and
+    /// the delivery report" - and this array is the first half of it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cleanup: Vec<CleanupOp>,
     /// Black-and-white conversion, or `None` for a colour render.
     #[serde(default)]
     pub bw: Option<Bw>,
@@ -530,6 +544,85 @@ pub struct RetouchOp {
     /// third of the five places `docs/retouch-ethics.md` section 5 promises a borrow is disclosed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub borrowed_from: Option<String>,
+}
+
+/// One distraction removed from a photograph. Phase 24 owns the values.
+///
+/// **The shape is a disclosure rather than an instruction**, and the difference is the whole point.
+/// A retouch operation says "smooth this at 0.4"; this says "these pixels are not what the camera
+/// recorded, and here is where they came from". Everything in it exists so that somebody reading a
+/// delivered recipe a year later can answer a client's question without opening the catalog.
+///
+/// There is **no strength**, because a removal either happened or did not, and **no prompt**,
+/// because `docs/generative-policy.md` promises AURA never generates from a description and the way
+/// that promise is kept is that no type on this path could carry one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CleanupOp {
+    /// Which proposal, so a delivered file can be joined back to the decision that made it.
+    pub proposal: String,
+    /// How the pixels were replaced: `borrow`, `fill` or `inpaint`.
+    ///
+    /// A slug rather than an enum for the reason every other field in this file is a primitive: the
+    /// recipe is a published JSON document that non-Rust tools read, and `aura_core`'s
+    /// `CleanupMethod` is where the vocabulary is closed.
+    pub method: String,
+    /// The photograph these pixels were borrowed from, when the method is `borrow`.
+    ///
+    /// Required by that method and absent from the other two, exactly as `RetouchOp::borrowed_from`
+    /// is: a stored row that says a borrow happened without saying where from is a disclosure that
+    /// discloses nothing. Migration 24 has the same rule as a CHECK.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub borrowed_from: Option<String>,
+    /// Which model made the pixels up, when the method is `inpaint`.
+    ///
+    /// Absent in every build so far: there is no diffusion model in `models.lock` and
+    /// `aura_generative::inpaint::solve` refuses on every call, so `method` is never `inpaint`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// The region, normalised to the frame: left, top, width, height.
+    pub region: [f32; 4],
+    /// What the class was, from phase 24's closed vocabulary.
+    pub class: String,
+    /// What the artefact self-check measured on the result, `0..1`, lower is cleaner.
+    ///
+    /// Stored so that a delivered photograph carries its own quality evidence. A recipe with a
+    /// cleanup operation and no measurement behind it is one nobody can check after the fact.
+    pub artefact_score: f32,
+    /// True when a person accepted this removal rather than a mode applying it.
+    pub accepted_by_user: bool,
+}
+
+impl CleanupOp {
+    /// True when this operation is self-consistent.
+    ///
+    /// A borrow names its source, an inpaint names its model, the region is on the frame and the
+    /// artefact score is a fraction. Checked by `schema::validate` as well as by migration 24, for
+    /// the reason a guarantee is enforced in two layers: one of them is a constructor a future
+    /// caller could route around.
+    #[must_use]
+    pub fn is_well_formed(&self) -> bool {
+        let region_ok = self.region.iter().all(|v| v.is_finite())
+            && self.region.get(2).copied().unwrap_or(0.0) > 0.0
+            && self.region.get(3).copied().unwrap_or(0.0) > 0.0
+            && self.region.first().copied().unwrap_or(-1.0) >= 0.0
+            && self.region.get(1).copied().unwrap_or(-1.0) >= 0.0;
+        let method_ok = match self.method.as_str() {
+            "borrow" => self.borrowed_from.is_some(),
+            "fill" => self.borrowed_from.is_none() && self.model.is_none(),
+            "inpaint" => self.model.is_some(),
+            _ => false,
+        };
+        region_ok
+            && method_ok
+            && (0.0..=1.0).contains(&self.artefact_score)
+            && !self.proposal.trim().is_empty()
+    }
+
+    /// True when these pixels were recorded by a camera rather than made up.
+    #[must_use]
+    pub fn is_real_pixels(&self) -> bool {
+        matches!(self.method.as_str(), "borrow" | "fill")
+    }
 }
 
 /// Restoration settings. Phase 22 owns the values.

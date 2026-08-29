@@ -91,7 +91,8 @@ pub mod store;
 pub mod xmp;
 
 pub use contract::recipe::{
-    Bw, Curve, EditSource, Geometry, Global, HslShift, ImageRef, Lens, LensCoefficients, Mask,
+    Bw, CleanupOp, Curve, EditSource, Geometry, Global, HslShift, ImageRef, Lens, LensCoefficients,
+    Mask,
     MaskKind, MaskParams, Noise, Perspective, Provenance, Recipe, Restoration, RetouchOp, Sharpen,
     ENGINE, HSL_BANDS, SCHEMA_VERSION,
 };

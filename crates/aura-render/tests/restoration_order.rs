@@ -22,6 +22,7 @@ fn caps() -> Capabilities {
         retouch_operators: true,
         restoration: true,
         geometry_models: true,
+        cleanup_patches: true,
     }
 }
 

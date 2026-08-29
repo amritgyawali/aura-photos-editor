@@ -350,6 +350,20 @@ restore-eval:
 phase-23-verify:
     cargo run --release --package aura-cli -- verify --phase 23 --work target/phase23-verify
 
+# The phase 24 gate. Migration 24 and its four triggers, the policy table both PM
+# and SEC own, three hundred adversarial attempts to make the safety engine damage
+# a photograph, the source ordering, three deliberate artefacts the self-check has
+# to catch and three clean frames it must not, the disclosure rules the SQL keeps,
+# and a whole synthetic wedding. It prints what it does not prove at the end of
+# every run - see docs/progress/PHASE-24-EXIT.md conditions C1 to C5.
+phase-24-verify:
+    cargo run --release --package aura-cli -- verify --phase 24 --work target/phase24-verify
+
+# The phase 24 gate from the catalog side. Reads a real project read-only and
+# reports the artefact-free rate, the borrow share and the refusal histogram.
+cleanup-eval CATALOG:
+    python ml/models/generative/eval_cleanup.py {{CATALOG}}
+
 # The phase 23 gate from the Python side. There are no expert crop labels here,
 # so `--self-test` runs the whole computation against an authored answer.
 crop-eval:

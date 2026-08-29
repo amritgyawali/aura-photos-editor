@@ -171,6 +171,12 @@ fn each_stage_entry_point_is_in_the_file_its_subject_belongs_to() {
             // left in `spatial.wgsl` is gone. A stage whose entry point sits beside the sharpen
             // kernel is a stage nobody finds when they go looking for the retoucher.
             Stage::Retouch => "retouch_apply.wgsl",
+            // PHASE-24. The same argument one phase on, and a stronger one: this entry point is a
+            // straight copy of an approved patch, and what matters about it is the three things it
+            // must NOT do - re-derive the pixels, feather toward the original, or resample. Beside
+            // the sharpen kernel in `spatial.wgsl` those constraints read as an oddly simple
+            // shader; in a file of their own they read as the point.
+            Stage::Cleanup => "cleanup_paste.wgsl",
             _ => "spatial.wgsl",
         };
         assert_eq!(file, expected, "{} is in the wrong file", stage.as_str());

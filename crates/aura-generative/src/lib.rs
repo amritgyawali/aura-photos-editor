@@ -68,6 +68,17 @@
 //! | [`safety`] | The five checks of section 6.2, run before anything is scored |
 //! | [`denylist`] | The intersection against phase 18's masks, where an absent mask blocks |
 //! | [`detect`] | Unexplained-salience candidates, ranked and capped |
+//! | [`pixels`] | The one linear image view the three removal modules share |
+//! | [`borrow`] | Real pixels from a sibling frame, homography-aligned |
+//! | [`fill`] | This photograph's own texture, copied in |
+//! | [`inpaint`] | The diffusion tier, declared and refused |
+//! | [`source`] | **The choke point**: borrow, then fill, then nothing |
+//! | [`selfcheck`] | Three artefact measurements over the result, and an automatic revert |
+//! | [`judgement`] | The cloud editorial port, whose answer type cannot approve anything |
+//! | [`queue`] | Safety, source, self-check, band - one photograph in, one plan out |
+//! | [`store`] | Migration 24, and the disclosure a trigger will not let go |
+//! | [`api`] | The frozen `CleanupService` and the resumable pass |
+//! | [`fixtures`] | Synthetic frames whose answers are known by construction |
 //! | [`errors`] | This crate's own constructors, ML 5115-5122 |
 //!
 //! Everything that moves a pixel lives behind one choke point, and
@@ -85,14 +96,31 @@
 //!
 //! [`AREA_CAP_DEFAULT`]: aura_core::contract::cleanup::AREA_CAP_DEFAULT
 
+pub mod api;
+pub mod borrow;
 pub mod denylist;
 pub mod detect;
 pub mod errors;
+pub mod fill;
+pub mod fixtures;
+pub mod inpaint;
+pub mod judgement;
+pub mod pixels;
 pub mod policy;
+pub mod queue;
 pub mod safety;
+pub mod selfcheck;
+pub mod source;
+pub mod store;
 
+pub use api::{Cleanup, CleanupPass, CleanupPassReport};
+pub use judgement::{Answer, Ask, EditorialJudge, NeverAsk};
+pub use pixels::Image;
 pub use policy::{Policy, ScenePolicy};
+pub use queue::{Plan, Prepared};
 pub use safety::{check, Candidate, SafeCandidate};
+pub use selfcheck::ArtefactReport;
+pub use store::CleanupStore;
 
 /// Which safety arithmetic judged a stored proposal.
 ///

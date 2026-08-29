@@ -70,6 +70,10 @@ pub const INPAINT_PATCH: &str = include_str!("../shaders/inpaint_patch.wgsl");
 /// drift this test exists to catch.
 pub const RETOUCH_APPLY: &str = include_str!("../shaders/retouch_apply.wgsl");
 
+/// PHASE-24. Putting a stored patch back where an object was. The shortest stage shader in the
+/// pipeline, because every decision it embodies was made in `aura-generative`.
+pub const CLEANUP_PASTE: &str = include_str!("../shaders/cleanup_paste.wgsl");
+
 /// PHASE-21. The micro-retouch operators: flyaway, teeth, sclera and iris, through phase 18's
 /// regions.
 ///
@@ -108,7 +112,7 @@ pub const DECONV: &str = include_str!("../shaders/deconv.wgsl");
 const GEOMETRY: &str = include_str!("../shaders/geometry.wgsl");
 
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 17] = [
+pub const SOURCES: [(&str, &str); 18] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
@@ -121,6 +125,7 @@ pub const SOURCES: [(&str, &str); 17] = [
     ("freq_bands.wgsl", FREQ_BANDS),
     ("inpaint_patch.wgsl", INPAINT_PATCH),
     ("retouch_apply.wgsl", RETOUCH_APPLY),
+    ("cleanup_paste.wgsl", CLEANUP_PASTE),
     ("micro_apply.wgsl", MICRO_APPLY),
     ("micro_borrow.wgsl", MICRO_BORROW),
     ("denoise_tile.wgsl", DENOISE_TILE),

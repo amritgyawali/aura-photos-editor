@@ -52,6 +52,8 @@ use aura_people::store::PeopleStore;
 use aura_people::vault::BiometricKeyStore;
 use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
+use aura_generative::denylist::Coverage as CleanupCoverage;
+use aura_generative::{Cleanup, CleanupPass, CleanupStore};
 use aura_restore::schedule::Capacity as RestoreCapacity;
 use aura_restore::{Restore, RestorePass, RestoreStore};
 use aura_retouch::micro::{Micro, MicroPass, MicroStore};
@@ -1991,6 +1993,91 @@ impl AppState {
                     target: "restore.pass",
                     code = %err.code,
                     "no scene service; every frame will be planned against the neutral profile row"
+                );
+            }
+        }
+        Ok(pass)
+    }
+
+    /// The cleanup store for this catalog. PHASE-24.
+    ///
+    /// Stateless like the integrity, emotion, composition, cull and restore stores. It owns no
+    /// model and opens no preview; those belong to the pass below.
+    #[must_use]
+    pub fn cleanup_store(&self) -> Arc<CleanupStore> {
+        Arc::new(CleanupStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `CleanupService` for this catalog. PHASE-24.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5119` when `cleanup_policy.toml` will not load, because the version on every
+    /// stored proposal comes from it and a service that could not say which policy a removal was
+    /// judged under could not detect a drift.
+    pub fn cleanup(&self) -> AuraResult<Arc<Cleanup>> {
+        Ok(Arc::new(Cleanup::new(self.cleanup_store())?))
+    }
+
+    /// The distraction-cleanup pass, wired to previews, composition, people, moments and story.
+    /// PHASE-24.
+    ///
+    /// **No mask coverage is attached, and that is the phase's condition C1 rather than an
+    /// oversight.** Phase 18's `MaskService` is the only route to a protected region, its
+    /// segmenter is a placeholder, and its twenty-class vocabulary has no word for a ring or a
+    /// cake - so `aura_generative::api::coverage_from_masks` could not return a complete coverage
+    /// even with a trained segmenter behind it. Without coverage, `Coverage::Absent` blocks every
+    /// candidate at the denylist check and **this build proposes no removals on a real
+    /// photograph**, which is the correct behaviour rather than a gap to work around.
+    ///
+    /// The three services that *are* attached decide what the pass can see rather than whether it
+    /// is safe: composition supplies the salience regions, people the subject boxes, moments the
+    /// sibling frames a borrow could come from, and story the scene that chooses the policy row.
+    /// Each is attached when its tables open and named in a warning when they do not - phase 19's
+    /// rule that a phase owns no fallback for another phase's output.
+    ///
+    /// **No editorial judge is attached either.** TLS is waived (ADR-0009), so no public vision
+    /// provider is reachable from this build; the pass behaves exactly as it does with an
+    /// unreachable one, which is that every proposal in the judgement band waits for a person.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5119` when the policy table will not load. Halting rather than falling back on a
+    /// default, because tidying every wedding to a table nobody approved is far worse than tidying
+    /// nothing.
+    pub fn cleanup_pass(&self, project_id: &str) -> AuraResult<CleanupPass> {
+        let mut pass = CleanupPass::new(
+            self.cleanup_store(),
+            self.previews(project_id)?,
+            Arc::clone(&self.clock),
+        )?
+        .with_composition(self.composition())
+        .with_people(self.people())
+        // Empty, deliberately. See the doc comment.
+        .with_masks(std::collections::BTreeMap::<aura_core::PhotoId, CleanupCoverage>::new());
+
+        match self.moments() {
+            Ok(moments) => pass = pass.with_moments(moments),
+            Err(err) => {
+                tracing::warn!(
+                    target: "cleanup.pass",
+                    code = %err.code,
+                    "no moment service; no sibling frames are reachable and every removal that \
+                     happens will be a fill rather than a borrow"
+                );
+            }
+        }
+        match self.story() {
+            Ok(story) => pass = pass.with_story(story),
+            Err(err) => {
+                tracing::warn!(
+                    target: "cleanup.pass",
+                    code = %err.code,
+                    "no scene service; every frame is judged against the unknown-scene row, which \
+                     has cleanup switched off"
                 );
             }
         }

@@ -21,10 +21,33 @@ check. Only the first is a claim. ADR-0049 section 3.
 
 ## Why this is expected in this build
 
-Phase 18's segmenter is a placeholder and `MaskField` is not wired into this pass, so on a real
+Phase 18's segmenter is a placeholder and no mask coverage is wired into this pass, so on a real
 photograph there is nothing to intersect. **This build therefore proposes no removals on a real
 photograph at all**, which is the correct behaviour and not a limitation to work around. It is
 condition C1 of the phase 24 exit report.
+
+## The second reason, which survives a trained segmenter
+
+There is a further and more durable cause, found while building this phase and recorded here
+because it will still be true on the day phase 18's model is trained.
+
+**Phase 18's twenty mask classes contain no word for a ring or a cake.** `Protected::ALL` names six
+kinds; `Face`, `Skin` and `Dress` map onto phase 18's vocabulary exactly, `Hands` maps onto `Skin`
+(a superset, which can only refuse more than asked), and `Rings` and `Cake` map onto nothing at all.
+
+A coverage assembled from phase 18 is therefore never *complete*, and a candidate that clears every
+kind the segmenter could look for still comes back `Unknown` rather than `Clear`. Treating it as
+clear would be the same mistake this whole error code exists to prevent, made one level up and much
+harder to see: the product would be claiming a region is free of the rings on the strength of never
+having looked for them.
+
+`Coverage::partial` is the shape that carries this, `Coverage::is_complete` is what
+`CleanupOutline::mask_covered` counts, and `api::coverage_from_masks` is the one place the two
+vocabularies meet.
+
+**What closes it** is a mask class for rings and one for cake, which is a phase 18 change rather
+than a phase 24 one. Until then `mask_covered` is zero on every project, and that is the honest
+figure rather than a bug in this phase.
 
 ## What to check
 

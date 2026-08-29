@@ -1049,3 +1049,91 @@ max_ms_per_unit = 3000
 # phase 19's local light plans and 48 MB for phase 14's recipes.
 [size.geometry_store_per_1000_images]
 max_bytes = 890000
+
+# =================================================================================================
+# PHASE-24. Generative cleanup.
+#
+# Section 11 sets five time budgets and no storage row. Four of the five are written about
+# operations at full resolution on hardware this build does not link, so they are recorded here
+# against the **proxy** the decision path actually runs on, and the exit report says which is which.
+# =================================================================================================
+
+# Candidate detection on a 2048 px proxy. Section 11 budgets 45 ms per image at full resolution;
+# this pass opens no pixels of its own for detection at all - phase 11 measured the salience, phase
+# 06 found the subjects - so what is being measured is the ranking and the cap.
+[stage.cleanup_detect]
+max_elapsed_ms  = 6000
+max_ms_per_unit = 6
+
+# The classical fill of one region on a proxy. Section 11 budgets 400 ms per region at 45 MP; the
+# exemplar search is quadratic in the source window and the window scales with the region, so a
+# proxy region costs a small fraction of that.
+#
+# **This is the number to watch when the region cap moves.** The search is O(hole x window) and the
+# window is `RING_REACH` times the hole, so doubling the area cap quadruples the work.
+[stage.cleanup_fill]
+max_elapsed_ms  = 20000
+max_ms_per_unit = 200
+
+# The sibling borrow of one region on a proxy. Section 11 budgets 700 ms per region. The cost is
+# the block match - twelve control patches over a 49-by-49 search window - plus 495 four-subset
+# homography solves, and the second of those is deliberately exhaustive rather than sampled:
+# invariant 4 needs the fit to be reproducible, and at twelve points an exhaustive least-median is
+# cheaper than seeding a generator.
+[stage.cleanup_borrow]
+max_elapsed_ms  = 35000
+max_ms_per_unit = 350
+
+# The artefact self-check over one patched result. Three measurements, and the expensive one is the
+# frame-wide step percentile, which is bucketed rather than sorted and strided rather than
+# exhaustive for exactly this reason.
+[stage.cleanup_selfcheck]
+max_elapsed_ms  = 12000
+max_ms_per_unit = 120
+
+# Section 11 names no storage row for this phase. One is measured anyway, and **the first figure
+# written here was wrong by a factor of two and a half** because it was written before it was
+# measured - phase 21's defect, committed by the phase whose own progress note describes it.
+# `crates/aura-perf/tests/cleanup_budgets.rs` now prints the per-object breakdown on every run.
+#
+# Measured over 1,000 photographs of the widest plan the fixtures produce - one examined image,
+# three proposals and six refused candidates - as the change in `dbstat` payload rather than in
+# `PRAGMA page_count`, which quantises to 4 KiB:
+#
+#   cleanup_proposal                     1,008 B/image   three rows, ~336 B each
+#   cleanup_blocked (WITHOUT ROWID)        662 B/image   six rows, ~110 B each
+#   idx_cleanup_blocked_check              446 B/image
+#   idx_cleanup_proposal_photo             162 B/image
+#   idx_cleanup_proposal_queue             162 B/image
+#   cleanup_image                          139 B/image
+#   idx_cleanup_proposal_project           138 B/image
+#   idx_cleanup_image_project               46 B/image
+#                                       --------
+#   measured total                       2,763 B/image
+#
+# Nearly three kilobytes, for two structural reasons.
+#
+# The first is phase 21's: every phase from 09 to 20 stored one fixed-width verdict per photograph,
+# and this stores a *list* whose length is the number of things the pass considered.
+#
+# The second is this phase's own, and it is the interesting one: **the refusals and their index are
+# 1,108 B of the total, forty per cent.** They cost more than the proposals do. Phase 23 faced the
+# same choice for its rejected crop rectangles and went the other way - four counters instead of
+# rows - and the difference is what the rows are for. Phase 23's rejects are search intermediates;
+# these are decisions, section 10.1's adversarial audit is scored from them, and "AURA declined to
+# touch this photograph" is unprovable from a counter.
+#
+# Two reductions were considered and rejected:
+#
+#   * Dropping `idx_cleanup_blocked_check`, saving 446 B/image. It is the index the panel's refusal
+#     histogram and the audit both read, and without it both become a full scan of the largest
+#     table in the schema.
+#   * Dropping `artefact_score` from proposals that were never applied. Rejected because the
+#     artefact-free gate is measured over approved removals, and a figure that existed only on
+#     applied rows would be measuring the set that had already passed.
+#
+# At the measured figure a 4,000-image wedding costs about 11 MB, against 3.4 MB for phase 23's
+# geometry plans and 48 MB for phase 14's recipes. The budget carries headroom over the
+# measurement, which is phase 19's correction: a budget must not be pinned at its own measurement.
+[size.cleanup_store_per_1000_images]
+max_bytes = 3200000

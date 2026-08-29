@@ -229,12 +229,55 @@ This **amends a frozen contract**. The amendment is recorded here before `contra
 re-locked, following the same ADR-then-re-lock rule used for phase 09's `FaceRef` amendment and
 phase 23's recipe coefficients.
 
+## 10a. Amendment: three frozen contracts change, and each one is named here before the re-lock
+
+Recorded after implementation, in the ADR-then-re-lock order `docs/plan/CLAUDE.md` requires. Four
+files under `contracts.lock` move:
+
+**`crates/aura-core/src/contract/ids.rs`** gains `typed_id!(ProposalId, "prp")`. Section 10 above.
+
+**`crates/aura-core/src/contract/cleanup.rs`** gains `DistractionClass::user_text` and
+`CleanupCode::user_text`. Additive methods on frozen enums, in the shape `RestoreCode::user_text`
+already has: the sentence a photographer reads lives beside the code rather than in a panel, so the
+Explain surface, the delivery report and phase 27's QC agent cannot disagree about what a refusal
+means. No variant, no field and no signature changes.
+
+**`crates/aura-recipe/src/contract/recipe.rs`** gains `Recipe.cleanup: Vec<CleanupOp>` and the
+`CleanupOp` shape. This is the fourth amendment to a frozen contract in the product's history, after
+phase 09's `FaceRef`, phase 16's re-lock and phase 23's `Lens::coefficients`, and it is required by
+section 13's fifth acceptance criterion: *every cleanup is disclosed in the recipe and the delivery
+report*.
+
+The field is `#[serde(default, skip_serializing_if = "Vec::is_empty")]`, so the change is additive
+in both directions - an older reader ignores it and a newer reader defaults it to empty - and
+`SCHEMA_VERSION` therefore does not move.
+
+It is in the recipe rather than only in the catalog for phase 14's reason and phase 21's: a
+delivered file must be re-creatable from the RAW hash, the canonical recipe, the engine string and
+the output spec. A removal that appeared in none of those four is a delivered photograph that cannot
+be re-created and, more to the point, cannot be audited.
+
+**`crates/aura-render/src/graph.rs`** gains `Stage::Cleanup` at index 18, between `Stage::Masks` and
+`Stage::Retouch`, taking `ORDER` from 23 stages to 24. Not itself a locked file, but the pipeline
+order is a contract in every sense that matters, so the position is argued here: after the masks,
+because a cleanup region is decided against phase 18's regions; before the retouch, because the two
+are disjoint by construction - the denylist guarantees a removal never overlaps skin - and putting
+the removal first means every operator downstream sees the background the photographer will actually
+be delivered.
+
+`SkipReason` gains `CleanupPatchAbsent`, which is the one variant in that enum about a *stored
+patch* rather than about a capability: the replacement pixels live beside the proposal, and a render
+that cannot find them must leave the object in the photograph rather than re-deriving them. Pixels
+re-derived at render time would not be the ones the self-check passed and the photographer approved.
+
 ## 11. Consequences
 
 - `aura-generative` is the twenty-seventh crate. It depends on `aura-vision` for masks, `aura-core`
-  for the contract, `aura-catalog` for the store and `aura-render` for the self-check's rendered
-  input. It does **not** depend on `aura-cloud`; the judgement task lives behind `aura-core`'s
-  frozen `CloudTask` shape like every other.
+  for the contract, `aura-catalog` for the store and `aura-preview` for pixels. It depends on
+  **neither** `aura-render` nor `aura-recipe`: the self-check measures a plain linear image handed
+  in, so the crate that decides a removal cannot reach the one that applies it. `aura-cloud` is
+  absent too; the judgement task lives behind `aura-core`'s frozen `CloudTask` shape like every
+  other, reached through the `EditorialJudge` port in `judgement.rs`.
 - Migration 24 stores proposals, their safety verdicts and their disclosures. A disclosure is
   written in the same statement as the removal and a trigger aborts any statement that would
   remove it, which is phase 21's shape for its borrow disclosure.

@@ -98,6 +98,7 @@ pub mod contract {
 }
 
 pub mod bands;
+pub mod cleanup;
 pub mod colour;
 pub mod cpu;
 pub mod errors;

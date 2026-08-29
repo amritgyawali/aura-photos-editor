@@ -63,6 +63,15 @@ pub enum Stage {
     Monochrome,
     /// Local masks and the parameters inside them.
     Masks,
+    /// Distraction removal: real pixels put where an object was. Phase 24.
+    ///
+    /// **Between the masks and the retouch, deliberately.** After the masks, because a cleanup
+    /// region is decided against phase 18's regions and running before them would edit pixels the
+    /// mask stage is about to describe. Before the retouch, because the two are disjoint by
+    /// construction - the denylist guarantees a removal never overlaps skin - and putting the
+    /// removal first means every operator downstream sees the background the photographer will
+    /// actually be delivered rather than the one with the bin still in it.
+    Cleanup,
     /// Retouch operators.
     Retouch,
     /// Denoise, face recovery, deblur.
@@ -76,7 +85,7 @@ pub enum Stage {
 }
 
 /// Every stage, in execution order. The array *is* the pipeline.
-pub const ORDER: [Stage; 23] = [
+pub const ORDER: [Stage; 24] = [
     Stage::HighlightRecovery,
     Stage::WhiteBalance,
     Stage::CameraMatrix,
@@ -95,6 +104,7 @@ pub const ORDER: [Stage; 23] = [
     Stage::Vibrance,
     Stage::Monochrome,
     Stage::Masks,
+    Stage::Cleanup,
     Stage::Retouch,
     Stage::Restoration,
     Stage::Sharpen,
@@ -125,6 +135,7 @@ impl Stage {
             Self::Vibrance => "vibrance",
             Self::Monochrome => "monochrome",
             Self::Masks => "masks",
+            Self::Cleanup => "cleanup",
             Self::Retouch => "retouch",
             Self::Restoration => "restoration",
             Self::Sharpen => "sharpen",
@@ -239,6 +250,13 @@ pub struct Capabilities {
     pub mask_generators: bool,
     /// Retouch operators. Phases 20 and 21.
     pub retouch_operators: bool,
+    /// Distraction removal. Phase 24.
+    ///
+    /// True when the caller can supply the stored patches a recipe's cleanup operations refer to.
+    /// False on every path that has only the recipe, because a cleanup operation is a *disclosure*
+    /// and the pixels it discloses are in the catalog: a renderer that re-derived them would put
+    /// different pixels into the frame from the ones the self-check passed.
+    pub cleanup_patches: bool,
     /// Restoration models. Phase 22.
     pub restoration: bool,
     /// Perspective correction and lens distortion models. Phase 23.
@@ -251,6 +269,7 @@ impl Default for Capabilities {
         Self {
             mask_generators: false,
             retouch_operators: false,
+            cleanup_patches: false,
             restoration: false,
             geometry_models: false,
         }
@@ -450,6 +469,21 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         });
     }
 
+    // PHASE-24. A cleanup operation is a disclosure that pixels were replaced, so the stage runs
+    // exactly when the recipe carries one *and* the caller brought the patches. It is not heavy in
+    // the `is_heavy` sense - pasting a stored patch costs nothing - so the interactive path runs it
+    // like any other stage, which is what makes a proxy show the photograph the client will get.
+    push!(
+        Stage::Cleanup,
+        !recipe.cleanup.is_empty() && caps.cleanup_patches,
+        if recipe.cleanup.is_empty() {
+            SkipReason::NotRequested
+        } else {
+            SkipReason::CleanupPatchAbsent
+        },
+        recipe.cleanup.first().map(|op| op.method.clone()),
+    );
+
     push!(
         Stage::Retouch,
         !recipe.retouch.is_empty() && caps.retouch_operators && !skip_heavy,
@@ -556,6 +590,7 @@ pub fn stage_for(path: &str) -> Option<Stage> {
         "global.vibrance" | "global.saturation" => Some(Stage::Vibrance),
         "masks" => Some(Stage::Masks),
         "retouch" => Some(Stage::Retouch),
+        "cleanup" => Some(Stage::Cleanup),
         "global.sharpen.amount"
         | "global.sharpen.radius"
         | "global.sharpen.detail"
@@ -563,7 +598,9 @@ pub fn stage_for(path: &str) -> Option<Stage> {
         "geometry.rotate" | "geometry.crop" => Some(Stage::Geometry),
         "image.camera" | "image.profile" => Some(Stage::CameraMatrix),
         _ => {
-            if path.starts_with("global.hsl") {
+            if path.starts_with("cleanup") {
+                Some(Stage::Cleanup)
+            } else if path.starts_with("global.hsl") {
                 Some(Stage::Hsl)
             } else if path.starts_with("bw") {
                 Some(Stage::Monochrome)

@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn a_hand_in_the_region_blocks_and_says_overlaps_protected() {
-        let coverage = Coverage::Known(vec![(Protected::Hands, rect(0.0, 0.75, 0.20, 0.20))]);
+        let coverage = Coverage::known(vec![(Protected::Hands, rect(0.0, 0.75, 0.20, 0.20))]);
         let outcome = check(&small_bin(), &policy(), &coverage);
         match outcome {
             Outcome::Blocked { check, code, .. } => {
@@ -397,7 +397,7 @@ mod tests {
         // is what lets the pass avoid resolving masks for regions it was never going to allow.
         let mut c = bin();
         c.region = rect(0.1, 0.1, 0.5, 0.5);
-        let coverage = Coverage::Known(vec![(Protected::Face, rect(0.1, 0.1, 0.5, 0.5))]);
+        let coverage = Coverage::known(vec![(Protected::Face, rect(0.1, 0.1, 0.5, 0.5))]);
         assert_eq!(
             check(&c, &policy(), &coverage).blocked_by(),
             Some(SafetyCheck::SizeCap)
