@@ -274,6 +274,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-generative"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-recipe",
+ "aura-render",
+ "aura-vision",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "tracing",
+]
+
+[[package]]
 name = "aura-geometry"
 version = "0.1.0"
 dependencies = [

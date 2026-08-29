@@ -178,6 +178,23 @@ typed_id!(ProfileId, "prf");
 // See docs/adr/ADR-0037-semantic-masks-matting-and-quality-gating.md decision 1.
 typed_id!(MaskId, "msk");
 
+// PHASE-24. Section 5 writes `ProposalId` into the frozen `CleanupProposal` shape, so a proposed
+// removal is an id of the same kind as the twelve above.
+//
+// It is the second id in this file that names a *part of* something rather than a whole thing,
+// after `MaskId`, and the first that names something that may never happen. A proposal is a
+// suggestion; most of them are rejected, and the rejected ones are exactly the rows the delivery
+// report and the adversarial audit are read from. Something that is refused still needs a name,
+// because "which one did you refuse" is the question both of those ask.
+//
+// It is not a `CleanupId` on the applied removal, and the alternative was real: an id issued only
+// when a removal happens would make the applied table's key one column. It is not here because
+// then a rejection would have no identity, and a photographer who rejects a proposal and re-runs
+// the pass would be shown it again with nothing to say they had already answered.
+//
+// See docs/adr/ADR-0049-generative-cleanup-and-the-safety-engine.md decision 10.
+typed_id!(ProposalId, "prp");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

@@ -23,6 +23,7 @@ members = [
   "crates/aura-retouch",
   "crates/aura-restore",
   "crates/aura-geometry",
+  "crates/aura-generative",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",

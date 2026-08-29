@@ -1689,3 +1689,93 @@ summary      = "Face recovery was declined to keep somebody looking like themsel
 user_message = "AURA stopped short of recovering detail in some faces, because going further would have started to change what those people look like. Those photographs are unchanged."
 runbook      = "docs/runbooks/AURA-ML-5114.md"
 introduced   = "PHASE-22"
+
+# ---------------------------------------------------------------------------
+# PHASE-24. Generative cleanup: distraction removal, bounded by a safety engine.
+# ---------------------------------------------------------------------------
+#
+# Eight codes, ML 5115-5122. Five are the shapes phases 09, 11, 15, 19 to 23 use -
+# version drift, a refused edit, one item that could not be done, a refused config
+# file and a config file missing a row - and three are this phase's own.
+#
+# The three are all refusals, and that is the phase rather than an accident. AURA-ML-5121
+# is the self-check undoing a removal before anybody saw it. AURA-ML-5122 is the product
+# saying it could not show a removal was safe, which is different from saying it found a
+# person - one is a claim and the other is the absence of one. And AURA-ML-5116 is a
+# proposal that broke a guarantee, which cannot be constructed and therefore cannot be
+# stored, so the code exists to say that the attempt happened.
+#
+# Removing a distraction is the first thing this product does that takes away something
+# the camera got right, so every code here resolves toward leaving the photograph alone.
+
+[[error]]
+code         = "AURA-ML-5115"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored cleanup proposals came from different detectors, safety arithmetic or policy"
+user_message = "AURA has improved how it spots and removes distractions, so it is re-checking this wedding in the background. Anything you have accepted or rejected yourself is kept."
+runbook      = "docs/runbooks/AURA-ML-5115.md"
+introduced   = "PHASE-24"
+
+[[error]]
+code         = "AURA-ML-5116"
+severity     = "item_failed"
+recovery     = "fallback"
+summary      = "A cleanup proposal broke one of this phase's own guarantees"
+user_message = "AURA found something it might have tidied out of one photograph and could not show that removing it was safe, so it left the photograph alone. Nothing has been changed."
+runbook      = "docs/runbooks/AURA-ML-5116.md"
+introduced   = "PHASE-24"
+
+[[error]]
+code         = "AURA-ML-5117"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A cleanup decision could not be recorded"
+user_message = "AURA could not record that decision about tidying this photograph. The photograph is unchanged."
+runbook      = "docs/runbooks/AURA-ML-5117.md"
+introduced   = "PHASE-24"
+
+[[error]]
+code         = "AURA-ML-5118"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be examined for distractions"
+user_message = "AURA could not look for distractions in one photograph, so it has left it exactly as it was. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5118.md"
+introduced   = "PHASE-24"
+
+[[error]]
+code         = "AURA-ML-5119"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The cleanup policy table was refused"
+user_message = "AURA could not load the settings that decide what may be tidied out of a photograph, so it has not removed anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5119.md"
+introduced   = "PHASE-24"
+
+[[error]]
+code         = "AURA-ML-5120"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A scene has no cleanup policy row"
+user_message = "AURA has no tidying guidance recorded for this kind of photograph yet, so it is leaving those ones exactly as they were shot. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5120.md"
+introduced   = "PHASE-24"
+
+[[error]]
+code         = "AURA-ML-5121"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A removal was undone by the artefact self-check before it was shown"
+user_message = "AURA tried tidying something out of a photograph, did not like its own result, and put the photograph back exactly as it was."
+runbook      = "docs/runbooks/AURA-ML-5121.md"
+introduced   = "PHASE-24"
+
+[[error]]
+code         = "AURA-ML-5122"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "Nothing could be shown safe to remove, because the regions that prove it are absent"
+user_message = "AURA cannot yet tell where people, dresses and rings are in some photographs, so it will not tidy anything out of them. They are all still usable and nothing has been changed."
+runbook      = "docs/runbooks/AURA-ML-5122.md"
+introduced   = "PHASE-24"

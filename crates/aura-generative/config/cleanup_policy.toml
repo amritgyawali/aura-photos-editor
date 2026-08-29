@@ -1,0 +1,202 @@
+# What may be tidied out of a photograph, per scene. PHASE-24.
+#
+# Co-owned by the Product Manager and the Security & Privacy Engineer - section 9 gives them this
+# file jointly, and it is the only file in the product with two owners. The numbers here are a
+# product decision and a safety decision at the same time.
+#
+# ## Three rules this file cannot break
+#
+# `area_cap` may not exceed the contract's AREA_CAP_DEFAULT (0.04).
+# `denylist_overlap_max` may not exceed DENYLIST_OVERLAP_MAX (0.01).
+# `zero_touch_confidence` may not fall below ZERO_TOUCH_CONFIDENCE (0.97).
+#
+# The loader refuses a file that tries any of the three. A config file that could relax a safety
+# guarantee is a safety guarantee that lives in a text file somebody can edit, and
+# docs/generative-policy.md would then be a description of some defaults rather than a promise.
+#
+# ## Every row carries a reason, and eight rows switch cleanup off entirely
+#
+# The reason is required and the loader refuses a row without one. A threshold nobody can explain
+# is a product decision nobody made, and here it is also a safety decision nobody made.
+#
+# Eight of the twenty-three scenes have `enabled = false`. That is not caution about the
+# algorithm - it is a statement about those photographs. In a ritual, a detector sees a stack of
+# brass vessels, a garland draped over a chair and a plate of offerings, and three of those three
+# are the wedding. The failure mode of automation there is not a bad removal, it is the removal of
+# something a family will look for in the photographs in thirty years.
+#
+# Where the rows are generous - a venue interior, a couple portrait at golden hour - the
+# background genuinely is background, and this is where the phase earns its keep.
+
+version = 1
+
+# --- Preparation -------------------------------------------------------------------------------
+
+[scene.getting_ready_bride]
+area_cap = 0.030
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "A dressing room is the most cluttered space at a wedding and almost none of the clutter is anybody's memory: hangers, garment bags, room-service trays, a hotel kettle. The cap is below the ceiling because the shots are tight and a 4 % region in a tight frame is a large object."
+
+[scene.getting_ready_groom]
+area_cap = 0.030
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "As above. Beer bottles are the recurring case and they are genuinely ambiguous - a bottle in somebody's hand is the morning, a bottle on a windowsill is litter - which is why the denylist's hand check matters more here than the size cap."
+
+[scene.details]
+area_cap = 0.000
+denylist_overlap_max = 0.000
+zero_touch_confidence = 1.000
+enabled = false
+reason = "OFF. A detail shot is entirely about objects. There is no principled way for a detector to tell the ring box from the water glass beside it, because the difference is not visual - it is that one of them was chosen. Nothing is removed from a frame whose whole subject is a thing."
+
+# --- Ceremony ----------------------------------------------------------------------------------
+
+[scene.first_look]
+area_cap = 0.025
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "Two people and a location chosen for them. Backgrounds are usually incidental - a parked car, a bin at a path's end - and the moment is one nobody re-shoots, so a clean frame is worth having."
+
+[scene.ceremony_entrance]
+area_cap = 0.020
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "An aisle with tape on it is the single most common wedding distraction and it is unambiguous. The cap is tight because guests line the frame and the denylist is doing most of the work."
+
+[scene.ceremony]
+area_cap = 0.000
+denylist_overlap_max = 0.000
+zero_touch_confidence = 1.000
+enabled = false
+reason = "OFF. Nearly everything in a ceremony frame is the ceremony. A microphone stand is clutter to a detector and is how the vows were heard; a chair at the edge is where somebody's grandmother sat. The one clear win - a fire exit sign - is not worth the class of mistakes the rest invites."
+
+[scene.ritual]
+area_cap = 0.000
+denylist_overlap_max = 0.000
+zero_touch_confidence = 1.000
+enabled = false
+reason = "OFF, and this is the row the whole file is written around. A ritual frame contains vessels, fire, cloth, food, flowers and implements, and a detector trained on Western reception clutter will read most of them as objects that do not belong. Removing one is not a bad edit, it is the removal of something a family will look for in thirty years. Nothing automatic happens here in any tradition."
+
+[scene.vows]
+area_cap = 0.000
+denylist_overlap_max = 0.000
+zero_touch_confidence = 1.000
+enabled = false
+reason = "OFF. Same argument as the ceremony, and the frames are tighter, so the share of the frame that is not the story is smaller still."
+
+[scene.rings]
+area_cap = 0.000
+denylist_overlap_max = 0.000
+zero_touch_confidence = 1.000
+enabled = false
+reason = "OFF, for the reason `details` is off and more so: the subject is an object, and the surrounding objects are the reason it is where it is."
+
+[scene.kiss]
+area_cap = 0.000
+denylist_overlap_max = 0.000
+zero_touch_confidence = 1.000
+enabled = false
+reason = "OFF. Part of the ceremony family. The frame is short-lived and unrepeatable, and there is no distraction worth the risk of an automated edit in the one photograph most likely to be printed large."
+
+# --- Portraits ---------------------------------------------------------------------------------
+
+[scene.family_portrait]
+area_cap = 0.030
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "Posed, static, and shot where the light was rather than where the background was. Stacked chairs, a stray cone, a catering crate. The denylist carries the load because the frame is mostly people, and the size cap keeps a removal from reaching between two of them."
+
+[scene.group_portrait]
+area_cap = 0.030
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "As the family portrait, with more people and therefore more denylist. A group shot is also where a background stranger is most likely to appear, and that class is never automatic in any scene."
+
+[scene.couple_portrait]
+area_cap = 0.035
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "The most generous row after `venue`, because this is where cleanup earns its keep: two subjects, a deliberately chosen background, and everything else in frame is an accident of where the venue put its bins. A photographer would clean these by hand if they had time."
+
+[scene.golden_hour]
+area_cap = 0.035
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "Outdoors, wide, low sun, and the frame usually contains a car park or a service road the photographer worked around rather than eliminated. Backgrounds here are genuinely background."
+
+# --- Reception ---------------------------------------------------------------------------------
+
+[scene.reception_entrance]
+area_cap = 0.025
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "A doorway, a corridor, and the venue's own signage and fire equipment. Clear wins, in a frame where the couple are moving and the background is fixed."
+
+[scene.speeches]
+area_cap = 0.020
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "Tight cap. A speeches table carries glasses, bottles and half-eaten plates, and those are the dinner rather than litter. What is removable is behind the table: a bin, a service trolley, an exit sign."
+
+[scene.cake]
+area_cap = 0.000
+denylist_overlap_max = 0.000
+zero_touch_confidence = 1.000
+enabled = false
+reason = "OFF. The cake, the knife, the stand, the table and the flowers on it were all chosen and paid for. `cake` is already on the semantic denylist, and switching the scene off as well means a candidate near it is refused twice by two different mechanisms."
+
+[scene.first_dance]
+area_cap = 0.020
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "A dark room with lit rectangles in it - exit signs, DJ laptops, phone screens - which is the clearest case in the product for a removal that costs nothing and improves every frame. The cap is tight because the subjects are close and the light is not."
+
+[scene.dance_floor]
+area_cap = 0.020
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "As the first dance, with more people and therefore more denylist. Stray hands entering the frame are common here and are the one class where a small automatic removal is nearly always right."
+
+# --- Everything else ---------------------------------------------------------------------------
+
+[scene.candid]
+area_cap = 0.020
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "Unposed and shot fast, so backgrounds are whatever was there. Tight cap, because a candid is also where the product is least sure what it is looking at, and an unclassified candidate never applies unattended anyway."
+
+[scene.venue]
+area_cap = 0.040
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "The one row at the contract's own ceiling. An empty-room or architecture frame has no people in it, so the denylist blocks nothing and the size cap is the only bound that matters - and a fire extinguisher, a cable run or a stack of spare chairs in an otherwise finished room is exactly what a photographer would remove by hand."
+
+[scene.exit]
+area_cap = 0.030
+denylist_overlap_max = 0.010
+zero_touch_confidence = 0.970
+enabled = true
+reason = "Sparklers, a car, a doorway and the venue's own signage. Similar to the reception entrance, with a slightly larger cap because the frames are wider."
+
+[scene.unknown]
+area_cap = 0.000
+denylist_overlap_max = 0.000
+zero_touch_confidence = 1.000
+enabled = false
+reason = "OFF. Invariant 7: no threshold is global. A photograph whose scene AURA could not work out is a photograph AURA does not understand, and removing something from it would be applying a default nobody wrote for it. The row exists so that the loader's per-scene coverage test passes rather than so that anything happens."
