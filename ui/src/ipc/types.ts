@@ -3207,3 +3207,149 @@ export type RestoreIdentityRefusalDto = {
   worstDrift: number;
   faces: number;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-23 - geometry
+//
+// No shape here can hold a pixel, and none returns the lens profile table. What the panel
+// gets is rectangles, an angle, a set of coefficients and reason codes - plus `lensSynthetic`,
+// which says whether anybody actually measured the lens.
+// ---------------------------------------------------------------------------
+
+export type CropVariantDto = {
+  /** original | primary | album | social | wide */
+  purpose: string;
+  title: string;
+  /** original | 4:5 | 5:4 | 1:1 | 16:9 */
+  aspect: string;
+  rect: CropRectDto;
+  score: number;
+  safe: boolean;
+};
+
+export type CropSafetyDto = {
+  facesIntact: boolean;
+  resolutionOk: boolean;
+  contentKept: boolean;
+  /** **Zero is "nothing was checked", never "nothing was cut".** */
+  facesChecked: number;
+  /** Zero on every photograph in this build: there is no pose estimate. */
+  handsChecked: number;
+  /** True when at least one region was actually checked. Ask this before saying "safe". */
+  isEvidence: boolean;
+  /** face, hands, resolution, content. */
+  refused: number[];
+  refusedNames: string[];
+};
+
+export type GeometryReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+  /** True when this describes something AURA declined to do. Eleven of the twenty-four do. */
+  restraint: boolean;
+  evidence?: CropRectDto | null;
+};
+
+export type GeometryPlanDto = {
+  photoId: string;
+  scene: string;
+  /** none | embedded | profile | estimated */
+  lensSource: string;
+  lensId?: string | null;
+  lensProfile?: string | null;
+  /** True when the profile was fabricated rather than measured. On this build, always. */
+  lensSynthetic: boolean;
+  distortion: number[];
+  vignette: number;
+  ca: number[];
+  rotateDeg: number;
+  rotateConf: number;
+  keystoneVertical?: number | null;
+  keystoneHorizontal?: number | null;
+  keystoneStretch?: number | null;
+  keystoneVerticals: number;
+  /** Never empty. Index zero is always the frame as shot. */
+  crops: CropVariantDto[];
+  primaryCrop: number;
+  keptOriginal: boolean;
+  safety: CropSafetyDto;
+  reasons: GeometryReasonDto[];
+  confidence: number;
+  profileVer: number;
+  analysisVer: number;
+  rulesVer: number;
+  userEdited: boolean;
+};
+
+export type GeometryStatusDto = {
+  photos: number;
+  planned: number;
+  coverage: number;
+  /** **Above 0.70 is the passing direction.** More restraint is a better result. */
+  keptOriginal: number;
+  profileCovered: number;
+  levelled: number;
+  meanRotateDeg: number;
+  keystoned: number;
+  variantCounts: number[];
+  variantNames: string[];
+  refusedCounts: number[];
+  refusedNames: string[];
+  missingProfiles: string[];
+  unpoliciedScenes: string[];
+  needsReview: number;
+  userEdited: number;
+  profilesSynthetic: boolean;
+  profilesKnown: number;
+  profileVer: number;
+  analysisVer: number;
+  rulesVer: number;
+};
+
+export type PlanGeometryInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+export type GeometryPassDto = {
+  planned: number;
+  failed: number;
+  keptOriginal: number;
+  recipesWritten: number;
+  /** Paths the merge refused because a person had set them. */
+  recipesProtected: number;
+  elapsedMs: number;
+  cancelled: boolean;
+};
+
+export type GeometryReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+/**
+ * Record the framing the photographer chose.
+ *
+ * **Reverting is this command with the whole frame and zero degrees**, not a separate one:
+ * a revert implemented as clearing the row is a revert the next pass undoes.
+ */
+export type SetFramingInput = {
+  projectId: string;
+  photoId: string;
+  rect: CropRectDto;
+  rotateDeg: number;
+  aspect: string;
+};
+
+export type SetFramingDto = {
+  plan: GeometryPlanDto;
+  recipe: RecipeDto;
+  changed: string[];
+  /** The dotted paths a person now owns. */
+  protected: string[];
+};
+
+export type AcceptGeometryInput = {
+  photoId: string;
+};

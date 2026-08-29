@@ -43,6 +43,9 @@ pub const ML_DELTA_FAILED: ErrorCode = ErrorCode("AURA-ML-5012");
 /// A tone curve was refused because its control points are not monotone. PHASE-16.
 pub const ML_CURVE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5066");
 
+/// PHASE-23. One photograph's geometry could not be planned.
+pub const ML_GEOMETRY_FAILED: ErrorCode = ErrorCode("AURA-ML-5092");
+
 /// Asked for a model that no signed entry pins.
 #[must_use]
 pub fn model_unknown(name: &str, version: &str) -> AuraError {
@@ -235,4 +238,27 @@ pub fn curve_refused(detail: impl Into<String>, points: usize) -> AuraError {
          curve alone. Nothing else about the edit changed.",
     )
     .with_context("points", points.to_string())
+}
+
+/// A geometry plan broke one of phase 23's own guarantees, so it was refused.
+///
+/// PHASE-23 section 6.3's hard constraints, restated as a post-condition. It lives in
+/// `aura-core` rather than in `aura-geometry` because
+/// `contract::geometry::Keystone::new` is the only constructor of a capped keystone and the
+/// contract cannot depend on the crate that implements it - the same reason
+/// [`curve_refused`] is here.
+///
+/// **A refused plan is stored as no plan rather than as a weak one.** Four of the six
+/// clauses it reports are the crop safety filter, and a plan that fails one of those is a
+/// delivered photograph with somebody's hands cropped off it.
+#[must_use]
+pub fn geometry_failed(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_GEOMETRY_FAILED,
+        Severity::ItemFailed,
+        Recovery::Retry,
+        detail,
+        "AURA could not work out the lens corrections and framing for one photograph, so it \
+         has left it exactly as it was shot. Everything else in this wedding is unaffected.",
+    )
 }

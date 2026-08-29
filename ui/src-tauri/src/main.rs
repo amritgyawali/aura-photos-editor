@@ -45,6 +45,20 @@ use aura_app::contract::ipc::{
     AcceptMicroInput, MicroCompositeDto, MicroMatrixDto, MicroPassDto, MicroPassInput,
     MicroPlanDto, MicroReasonDto, MicroReviewInput, MicroStatusDto, SetMicroMatrixInput,
 };
+// PHASE-22. The seven restoration commands existed on `aura-app` from the day phase 22 shipped
+// and had never been registered here, so the phase 22 exit report's claim that they were reachable
+// from the Tauri surface was wrong about them. Registering them is four lines per command.
+use aura_app::contract::ipc::{
+    AcceptRestoreInput, RestoreIdentityRefusalDto, RestorePassDto, RestorePassInput,
+    RestorePlanDto, RestoreReasonDto, RestoreReviewInput, RestoreStatusDto,
+    SetRestoreOverrideInput,
+};
+// PHASE-23. The same gap, for the same reason: the geometry commands landed on `aura-app` with
+// the crate and the panel, and nothing in the shell named them.
+use aura_app::contract::ipc::{
+    AcceptGeometryInput, GeometryPassDto, GeometryPlanDto, GeometryReviewInput, GeometryStatusDto,
+    PlanGeometryInput, SetFramingDto, SetFramingInput,
+};
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
 use tauri::{Manager, State};
@@ -872,6 +886,156 @@ fn micro_reason_codes() -> IpcResult<Vec<MicroReasonDto>> {
     Ok(aura_app::micro_reason_codes())
 }
 
+// PHASE-22. The restoration surface. `restore_pass` decodes proxies, renders every plan twice for
+// the self-check and embeds every candidate face, so it goes off the calling thread with the rest.
+// `restore_reason_codes` assembles the panel's legend from the frozen enum and touches nothing.
+#[tauri::command]
+async fn restore_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<RestoreStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::restore_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_restore(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<RestorePlanDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_restore(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn restore_identity_refusals(
+    state: State<'_, AppState>,
+    input: RestoreReviewInput,
+) -> IpcResult<Vec<RestoreIdentityRefusalDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::restore_identity_refusals(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn restore_review_queue(
+    state: State<'_, AppState>,
+    input: RestoreReviewInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::restore_review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn accept_restore(state: State<'_, AppState>, input: AcceptRestoreInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::accept_restore(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_restore_override(
+    state: State<'_, AppState>,
+    input: SetRestoreOverrideInput,
+) -> IpcResult<RestorePlanDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_restore_override(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn restore_pass(
+    state: State<'_, AppState>,
+    input: RestorePassInput,
+) -> IpcResult<RestorePassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::restore_pass(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+fn restore_reason_codes() -> IpcResult<Vec<RestoreReasonDto>> {
+    Ok(aura_app::restore_reason_codes())
+}
+
+// PHASE-23. The geometry surface. `plan_geometry` decodes a proxy per frame and searches a
+// bounded crop space over it, so it goes off the calling thread with the rest.
+#[tauri::command]
+async fn geometry_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<GeometryStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::geometry_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_geometry(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<GeometryPlanDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_geometry(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn geometry_review_queue(
+    state: State<'_, AppState>,
+    input: GeometryReviewInput,
+) -> IpcResult<Vec<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::geometry_review_queue(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn accept_geometry(
+    state: State<'_, AppState>,
+    input: AcceptGeometryInput,
+) -> IpcResult<GeometryPlanDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::accept_geometry(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_framing(
+    state: State<'_, AppState>,
+    input: SetFramingInput,
+) -> IpcResult<SetFramingDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_framing(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn plan_geometry(
+    state: State<'_, AppState>,
+    input: PlanGeometryInput,
+) -> IpcResult<GeometryPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::plan_geometry(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -988,7 +1152,21 @@ fn main() {
             set_micro_matrix,
             accept_micro,
             micro_pass,
-            micro_reason_codes
+            micro_reason_codes,
+            restore_status,
+            image_restore,
+            restore_identity_refusals,
+            restore_review_queue,
+            accept_restore,
+            set_restore_override,
+            restore_pass,
+            restore_reason_codes,
+            geometry_status,
+            image_geometry,
+            geometry_review_queue,
+            accept_geometry,
+            set_framing,
+            plan_geometry
         ])
         .run(tauri::generate_context!());
 

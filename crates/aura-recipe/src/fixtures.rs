@@ -9,8 +9,9 @@
 use std::collections::BTreeMap;
 
 use crate::contract::recipe::{
-    Bw, Curve, EditSource, Geometry, Global, HslShift, ImageRef, Lens, Mask, MaskKind, MaskParams,
-    Noise, Provenance, Recipe, Restoration, RetouchOp, Sharpen, ENGINE, SCHEMA_VERSION,
+    Bw, Curve, EditSource, Geometry, Global, HslShift, ImageRef, Lens, LensCoefficients, Mask,
+    MaskKind, MaskParams, Noise, Provenance, Recipe, Restoration, RetouchOp, Sharpen, ENGINE,
+    SCHEMA_VERSION,
 };
 
 /// A content hash that is obviously synthetic and is still 64 hex characters.
@@ -73,6 +74,15 @@ pub fn reference() -> Recipe {
             vignette: 60,
             ca: true,
             profile: Some("FE 35mm F1.4 GM".to_string()),
+            // PHASE-23. A profiled 35 mm: a little barrel, a few parts in ten thousand of
+            // lateral fringing. Fabricated, like every coefficient in this repository.
+            coefficients: Some(LensCoefficients {
+                k1: 0.0128,
+                k2: -0.0033,
+                k3: 0.0,
+                ca_red: 1.000_27,
+                ca_blue: 0.999_75,
+            }),
         },
         geometry: Geometry {
             rotate: -0.6,

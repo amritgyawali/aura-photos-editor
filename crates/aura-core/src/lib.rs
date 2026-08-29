@@ -32,6 +32,7 @@ pub mod contract {
     pub mod cull;
     pub mod emotion;
     pub mod error;
+    pub mod geometry;
     pub mod ids;
     pub mod integrity;
     pub mod ledger;
@@ -81,6 +82,11 @@ pub use contract::emotion::{
     ImageEmotion, Interaction, MomentPeak, PeakKind, Preference, ReactionLink,
 };
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
+pub use contract::geometry::{
+    Aspect, CropPurpose, CropSafetyReport, CropVariant, GeometryCode, GeometryOutline,
+    GeometryOverride, GeometryPlan, GeometryReason, GeometryService, Keystone, LensCorrection,
+    LensSource, ProtectedKind, ProtectedRegion,
+};
 pub use contract::ids::{
     ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MaskId, MomentId, PhotoId,
     ProfileId, ProjectId, RunId, SegmentId,
@@ -113,10 +119,18 @@ pub use contract::restore::{
     RestoreOutline, RestoreOverride, RestorePlan, RestoreReason, RestoreRegion, RestoreService,
     RestoreSubject, RestoreWhen, RunWhere, SharpenMask, SharpenSpec,
 };
+// `contract::geometry` and `contract::retouch` both name a type `ProtectedKind`, and they mean
+// different things: geometry's is content a crop must not cut through - a face, a pair of hands,
+// the rings - and retouch's is a feature of somebody's skin that is never removed - a mole, a
+// scar, a tattoo. Neither is the wrong name in its own contract, and both contracts are frozen.
+// The root re-export can only carry one of them, so it carries the one that was published first
+// and retouch's arrives beside it under a qualified name. Both are reachable unaliased through
+// their own module, which is how every caller in the workspace already reaches them.
+pub use contract::retouch::ProtectedKind as RetouchProtectedKind;
 pub use contract::retouch::{
-    FreqBand, InpaintMethod, ProtectedFeature, ProtectedKind, ProtectedSource, RetouchCode,
-    RetouchOp, RetouchOutline, RetouchOverride, RetouchPlan, RetouchPreset, RetouchReason,
-    RetouchService, TextureReport,
+    FreqBand, InpaintMethod, ProtectedFeature, ProtectedSource, RetouchCode, RetouchOp,
+    RetouchOutline, RetouchOverride, RetouchPlan, RetouchPreset, RetouchReason, RetouchService,
+    TextureReport,
 };
 pub use contract::scene::{
     AttrFlags, ChapterId, EditIntent, RitualId, SceneId, SceneProfile, SceneResult, SceneScore,

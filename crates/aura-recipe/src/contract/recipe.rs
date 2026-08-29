@@ -241,7 +241,7 @@ impl Default for Noise {
 }
 
 /// Lens corrections.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Lens {
     /// Apply the distortion model for the profile.
     pub distortion: bool,
@@ -252,6 +252,68 @@ pub struct Lens {
     /// The lens profile name, or `None` when the lens is unknown.
     #[serde(default)]
     pub profile: Option<String>,
+    /// The coefficients the corrections are made with. PHASE-23.
+    ///
+    /// **Amended in phase 23**, recorded in
+    /// `docs/adr/ADR-0041-geometry-lens-straightening-and-crop-safety.md` section 4. The
+    /// booleans above say *what* to apply and this says *by how much*, and the argument for
+    /// putting the numbers here rather than looking them up at render time is phase 14's own
+    /// rule: **a delivered file can be re-created from four values** - the RAW's content hash,
+    /// the canonical recipe, the engine string and the output spec. A coefficient that lived
+    /// only in a profile table would be a fifth, and updating that table would silently change
+    /// what an already-delivered photograph looks like.
+    ///
+    /// `None` means no correction was decided, which is what a lens with no profile gets and
+    /// what `SkipReason::LensProfileAbsent` reports. `distortion` and `ca` are still consulted:
+    /// coefficients present with the flag off is a recipe whose photographer switched the
+    /// correction off, and both states have to be expressible.
+    #[serde(default)]
+    pub coefficients: Option<LensCoefficients>,
+}
+
+/// The Brown-Conrady terms and the two chromatic scales, as they travel in a recipe.
+///
+/// Mirrors `aura_raw::colour::lens::Coefficients`, which is the one implementation of the
+/// maths; this is its serialised form, because a recipe is a document and `aura-recipe` does
+/// not re-export another crate's types into schema v1.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+pub struct LensCoefficients {
+    /// Radial term. Positive is barrel, which is what a wide zoom at its short end has.
+    pub k1: f32,
+    /// Fourth-order radial term.
+    #[serde(default)]
+    pub k2: f32,
+    /// Sixth-order radial term.
+    #[serde(default)]
+    pub k3: f32,
+    /// Radial scale for the red channel relative to green. One is no correction.
+    #[serde(default = "one_f32")]
+    pub ca_red: f32,
+    /// Radial scale for the blue channel relative to green.
+    #[serde(default = "one_f32")]
+    pub ca_blue: f32,
+}
+
+const fn one_f32() -> f32 {
+    1.0
+}
+
+impl LensCoefficients {
+    /// True when these would move no pixel.
+    #[must_use]
+    pub fn is_identity(&self) -> bool {
+        self.k1.abs() < f32::EPSILON
+            && self.k2.abs() < f32::EPSILON
+            && self.k3.abs() < f32::EPSILON
+            && (self.ca_red - 1.0).abs() < f32::EPSILON
+            && (self.ca_blue - 1.0).abs() < f32::EPSILON
+    }
+
+    /// The three radial terms, in the order the model wants them.
+    #[must_use]
+    pub const fn radial(&self) -> [f32; 3] {
+        [self.k1, self.k2, self.k3]
+    }
 }
 
 impl Default for Lens {
@@ -263,6 +325,7 @@ impl Default for Lens {
             vignette: 0,
             ca: false,
             profile: None,
+            coefficients: None,
         }
     }
 }

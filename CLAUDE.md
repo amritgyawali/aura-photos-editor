@@ -105,6 +105,11 @@ Never load two phase files into one session.
 | Per-camera noise models (versioned, COL-owned) | `crates/aura-restore/config/noise_models/` |
 | Restoration evaluation gates | `tests/eval/restore_eval.rs` + `ml/models/restore/eval_restore.py` |
 | What AURA does to a noisy or soft photograph | `docs/restoration.md` |
+| Geometry, lens and crop-safety decisions | `docs/adr/ADR-0041-geometry-lens-straightening-and-crop-safety.md` |
+| Crop rules (versioned, PM-owned) | `crates/aura-geometry/config/crop_rules.toml` |
+| Bundled lens profiles, with attribution | `assets/lens_profiles/` |
+| Geometry evaluation gates | `tests/eval/geometry_eval.rs` + `ml/eval/crop_agreement.py` |
+| What AURA does to a frame's edges, in the product's own words | `docs/geometry-and-cropping.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -997,7 +1002,14 @@ Phase 21 also **closes phase 20's condition C5**: `ui/src-tauri` had no `icons/`
 `main.rs` had lost `fn main` in the phase 19 to 20 merge, so the desktop shell had not compiled
 since. Both are fixed, the shell builds under the GNU toolchain with the target directory moved
 off the space-containing project path, and this phase's nine commands are registered in it - 75 of
-the product's IPC commands are now reachable from the window.
+the product's IPC commands were reachable from the window when this phase shipped. The merge that
+brought phases 20, 21 and 22 onto main registered phase 22's seven restoration commands and phase
+23's six geometry commands as well, which neither phase had done, and the figure is **89**. The
+shell's own Rust does not compile on this machine - `dlltool` is absent and the toolchain's
+`self-contained` copy has no assembler to call - so the registration is verified by a symbol
+cross-check rather than by a build: every name in `generate_handler!` has a `#[tauri::command]`
+definition, every definition calls an `aura_app` function that crate re-exports, and every DTO
+the shell imports is a type `contract::ipc` defines.
 
 Phase 22 is implemented conditionally: `aura-core::contract::restore` freezes the four tiers, the
 seven regions, the mask port, the sensor noise model, the denoise spec, the sharpen spec and its
@@ -1087,6 +1099,94 @@ because nothing wrote the field; and a denoise tier alone no longer enables `Sta
 because this phase occupies *two* of phase 14's stages rather than the one named after it.
 Denoising is a sensor-domain operation and belongs at index 6, before every stage that reads
 texture as signal; only face recovery belongs at index 19.
+
+Phase 23 is implemented conditionally, and it was **written out of order**: it was built on top
+of phase 19, with 20, 21 and 22 not yet existing, and it reached `main` before them. They are
+here now, merged behind it and renumbered onto the migration, the error codes and the ADR
+numbers this phase had already taken - so this section's own numbers are the ones it shipped
+with and the three sections above it are the ones that moved. Unlike phase 19 it consumes
+nothing that has not shipped - its dependencies are phases 06, 11 and 14, and all three are
+here.
+`aura-core::contract::geometry` freezes `GeometryPlan`, `LensCorrection`, `Keystone`,
+`CropVariant`, `CropPurpose`, `Aspect`, `CropSafetyReport`, the `ProtectedRegion` input port,
+twenty-four reason codes, the outline, the override and `GeometryService`; `aura-geometry`
+picks one of three routes to a lens correction and withholds fringing on the weakest of them,
+tracks straight edges out of a proxy and fits a distortion coefficient from them, gates a
+rotation on confidence and band and then *solves* it against the crop it implies, fits a
+vanishing point from at least three verticals and refuses past the stretch cap, filters
+candidate rectangles for safety **before** the composition objective ever sees one, searches a
+bounded lattice, and generates the aspect variants an album and a feed need. Migration 20 stores
+the plan and its crops at 839 bytes a photograph; 23 argued-over scene rows live in editable
+config; eight fabricated lens profiles ship with attribution; `geometry.wgsl` and
+`aura-render::geometry` apply it; six IPC commands (ADR-0042) feed a Geometry panel; and
+`aura-cli verify --phase 23` is the executable gate. Its exit report is
+`docs/progress/PHASE-23-EXIT.md`.
+
+**This phase ships no model** - the third since phase 08, and for the same reason phase 17 gave:
+there is nothing to train. What is missing is not weights but *weddings*. Section 9's DATA task
+asks for expert crop labels on two thousand frames and there are none, so every gate is measured
+against frames whose geometry was chosen, painted into the pixels and read back through the real
+pipeline. That proves the estimator, the tracker, the caps, the safety filter, the search and
+the store; it is not evidence that a photographer would agree with a crop, and section 10.1's
+audit of 300 auto-crops has not happened. That is condition C1 and a Sev 2 trigger. C2 is the
+second: **every bundled lens profile was fabricated**, no lens was measured, and the first
+measured profile reopens this phase's criteria whatever phase is in flight - exactly as the
+first real camera file reopens phase 02's.
+
+Four rules that phase 23 adds and every later phase inherits:
+
+- **`GeometryService` is the only way to ask how a photograph's frame was finished.** Nineteenth
+  service of its kind - sixteenth when this phase was written, because phases 20, 21 and 22 had
+  not yet added `RetouchService`, `MicroService` and `RestoreService` in front of it. Phase 27 checks these crops, phase 29 lays albums out of the variants and
+  phase 30 exports them; two answers to "what is this photograph's frame" is an album page
+  cropped from a rectangle the gallery never delivered.
+- **A crop that cannot be proven safe is not a candidate.** The safety filter runs before the
+  objective, never after it as a penalty. Phase 12's rule - a guarantee outranks a preference -
+  applied where the preference is a tuned score and the guarantee is a bride's hands. A filter
+  applied afterwards invites exactly one repair: nudge the winning rectangle until the face is
+  back inside, and a nudged crop is a different aspect ratio, a different resolution, or a fresh
+  violation at the opposite edge. Any later phase that finds itself adjusting a rejected
+  rectangle has misunderstood the ordering.
+- **The optics maths has one implementation, in the lowest crate both sides reach.**
+  `aura_raw::colour::lens`, beside the camera matrices and the monotone curve, for the reason
+  those are there: this crate decides where a face box lands after a correction and
+  `aura-render` draws it, and two copies of the polynomial is two answers to where the face is.
+- **The corners this phase opens are phase 24's to fill, and phase 24 must not widen the crop to
+  hide them.** The rectangle here is the one the safety filter passed.
+
+Two decisions in phase 23 are worth remembering because they will be re-argued. **The lens
+coefficients travel in the recipe rather than being looked up at render time** - the tidier
+alternative fails phase 14's rule that a delivered file can be re-created from four values,
+because a coefficient living only in a profile table is a fifth, and updating that table changes
+what an already-delivered photograph looks like under an identical hash. And **the improvement
+margin applies to the primary crop and to nothing else**: a 1:1 crop of a wide reception frame
+will essentially never score better than the frame it came out of, so requiring an improvement
+from the aspect variants ships a product with no square variants in it at all.
+
+Three things phase 23 got wrong first, all found by its own gates, and all three the same
+shape - **a measurement pipeline can be wrong in a way that is self-consistent**, so unit tests
+over synthetic inputs to the *fitter* will not find it, because the fitter is correct:
+
+**A crossing is not an ending.** The edge tracker died at every line intersection, because the
+gradient *along* one edge collapses for two or three pixels where another crosses it. An
+eleven-by-eleven grid produced chains of twenty-three pixels and the span floor rejected every
+one: zero chains, on a plate made of nothing but straight lines, with every unit test passing.
+
+**A robust fit must reject the chains no coefficient can straighten, not the chains with the
+largest residual.** Trimming the worst third scored 0.000 against a painted 0.020 - because on a
+distorted frame the largest residuals belong to the chains nearest the *edge*, which are the
+only ones that see any distortion at all. Trimming by residual keeps the optical centre and
+throws away the evidence.
+
+**Re-acquiring after a gap needs a window as wide as the gap.** A one-pixel search re-acquires
+at the wrong place after a three-row crossing, holding the chain flat at every intersection and
+straightening the very curvature the estimator exists to measure. It biased the answer low by
+about a sixth, and **every chain agreed with every other chain about the wrong answer**.
+
+Phase 23 also amended a frozen contract for the third time in the product's history, after phase
+09's `FaceRef` and phase 16's re-lock: `aura_recipe::Lens` gained `coefficients`. And it added
+the fourth grep-as-a-test, `crates/aura-geometry/tests/no_render_calls.rs`, which fails the build
+if the deciding crate ever reaches a pixel, writes a recipe, or grows a face detector.
 
 Five rules that phase 13 adds and every later phase inherits:
 

@@ -177,6 +177,14 @@ from the Tauri shell and not from a typed client method. Phases 20 and 21 are in
 **C6 - Sev 3. Four of section 11's five performance rows are waived**, because this build links no
 `wgpu` backend. Closes with ADR-0029's own condition.
 
+**C8 - Sev 3. Phase 22's three performance rows are declared and unasserted.**
+`perf/budgets.toml` carries `restore_plan_frame`, `restore_identity_guard` and
+`restore_store_per_1000_images`, and no test reads them: every phase from 09 to 21 shipped a
+`*_budgets.rs` beside its rows and this one did not. The numbers are therefore documentation
+rather than a gate, which is the failure phase 09's storage row exists to prevent - a budget
+nothing measures cannot tell you it has been exceeded. Found while wiring this phase's CI gates
+during the merge onto main; the fix is one test file and it is not in that merge.
+
 **C7 - Sev 3. None of the twenty camera noise models is measured.** Every body is capped at
 `DenoiseTier::Standard` and named in `RestoreOutline::unmeasured_cameras`. The first photographed
 noise reference for any body is a Sev 3 trigger that reopens this row for that body.

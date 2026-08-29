@@ -103,6 +103,19 @@ jobs:
       - name: phase 19 verify - policy, lighting, pairing, shaping, shine, governor
         run: cargo run --release --package aura-cli -- verify --phase 19 --work target/phase19-verify
 
+      # PHASE-23. Geometry. No network, no GPU and no model: the gate proves the
+      # lens estimator, the straightening solve, the keystone cap, the crop safety
+      # filter and the store against fixtures whose geometry was painted in, and
+      # prints what it does not prove at the end of every run.
+      # See docs/progress/PHASE-23-EXIT.md conditions C1 to C3.
+      - name: phase 23 verify - lens, straighten, keystone, crop safety, variants
+        run: cargo run --release --package aura-cli -- verify --phase 23 --work target/phase23-verify
+
+      # The same gate from the Python side. There are no expert crop labels in this
+      # repository, so this runs the whole computation against an authored answer.
+      - name: crop agreement self-test
+        run: python ml/eval/crop_agreement.py --self-test
+
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
     name: ui type-check, tests and build
@@ -211,7 +224,7 @@ jobs:
       - name: local light budgets
         run: cargo test --release --package aura-perf --test local_budgets -- --test-threads=1 --nocapture
 
-      # PHASE-20. The assembly proof: migration 20, the preset floor the code owns
+      # PHASE-20. The assembly proof: migration 21, the preset floor the code owns
       # rather than the file, the detector, the protect veto, the texture guard and
       # a tattoo that neither the service nor the database will delete.
       - name: phase 20 gate
@@ -225,6 +238,37 @@ jobs:
       # processor path and the store.
       - name: retouch budgets
         run: cargo test --release --package aura-perf --test retouch_budgets -- --test-threads=1 --nocapture
+
+      # PHASE-21. The assembly proof: migration 22 and its two triggers, the opt-in
+      # matrix and the ceilings the code owns rather than the file, the four measured
+      # detectors, the naturalness guard, and the borrow rule with its disclosure end
+      # to end. This step and the two below it were never added when phase 21 shipped.
+      - name: phase 21 gate
+        run: cargo run --release --package aura-cli -- verify --phase 21 --work target/phase21-verify
+
+      - name: micro-retouch evaluation gates
+        run: cargo test --release --package aura-retouch --test micro_eval -- --nocapture
+
+      # PHASE-21 section 11. The render rows are waived for the same reason phase 20's
+      # are; what is asserted is the decision on the processor path and the store.
+      - name: micro-retouch budgets
+        run: cargo test --release --package aura-perf --test micro_budgets -- --test-threads=1 --nocapture
+
+      # PHASE-22. The assembly proof: migration 23 and its trigger, the scene profiles
+      # and the twenty camera noise models, the evidence-driven tier ladder, the four
+      # sharpening preconditions, the identity constraint end to end, and the self-check
+      # with its two levers.
+      - name: phase 22 gate
+        run: cargo run --release --package aura-cli -- verify --phase 22 --work target/phase22-verify
+
+      - name: restoration evaluation gates
+        run: cargo test --release --package aura-restore --test restore_eval -- --nocapture
+
+      # PHASE-22 has no budgets test. Its three rows in perf/budgets.toml -
+      # restore_plan_frame, restore_identity_guard and restore_store_per_1000_images -
+      # were written when the phase shipped and no `restore_budgets.rs` was written with
+      # them, so nothing asserts them. Recorded as a gap rather than papered over with a
+      # step that would fail on a missing target. PHASE-22-EXIT.md condition C8.
 
       # Two independent implementations of the metrics have to agree, or neither
       # is trustworthy. The Python half also self-tests without cargo.
@@ -240,3 +284,12 @@ jobs:
           python ml/models/retouch/train_permanent.py --self-test
           python ml/models/retouch/eval_retouch.py --self-test
           python ml/models/retouch/export.py --verify models
+          python ml/models/micro/train_flyaway.py --self-test
+          python ml/models/micro/train_glare.py --self-test
+          python ml/models/micro/train_lint.py --self-test
+          python ml/models/micro/eval_micro.py --self-test
+          python ml/models/micro/export.py --verify models
+          python ml/models/restore/train_denoise.py --self-test
+          python ml/models/restore/train_face_recovery.py --self-test
+          python ml/models/restore/eval_restore.py --self-test
+          python ml/models/restore/export.py --verify models

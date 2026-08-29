@@ -1,0 +1,354 @@
+# Crop rules - PHASE-23 sections 6.3 and 9.
+#
+# ===========================================================================
+# THIS FILE IS A PRODUCT DECISION, NOT AN IMPLEMENTATION DETAIL
+# ===========================================================================
+#
+# Section 9 gives PM the task "approve `crop_rules.toml`, aspect list and the
+# conservative default (keep original framing)". This is that file, and it is
+# the eighth in the product to require a written reason on every row.
+#
+# It is the one with the sharpest failure mode. Every other policy table in
+# AURA decides how much something moves; this one decides what is allowed to
+# be *removed from a photograph*. A row that is too timid costs a photographer
+# nothing - they crop it themselves, which they were going to do anyway. A row
+# that is too eager delivers a gallery with somebody's hand missing from the
+# frame, and nobody notices until it is printed.
+#
+# So the rule for editing this file is: when in doubt, keep the frame. The
+# product's own headline number for this phase is that SEVENTY PER CENT OR
+# MORE of frames are delivered exactly as they were shot.
+#
+# ---------------------------------------------------------------------------
+# WHAT THIS FILE CANNOT DO
+# ---------------------------------------------------------------------------
+#
+# It cannot loosen a safety rule. `resolution_floor` may only be raised above
+# the contract's `RESOLUTION_FLOOR`, `improvement_margin` may only be raised
+# above `IMPROVEMENT_MARGIN`, and there is no field anywhere in the schema
+# that could permit cutting a face. The loader refuses a file that tries, with
+# `AURA-ML-5093`, and it is run-blocking - because a config file that could
+# relax a safety guarantee is a safety guarantee that lives in a text file
+# somebody can edit.
+#
+# It cannot switch straightening or lens correction off either. Those are not
+# in this file: a scene that wants a tilt kept says so through phase 11's
+# `tilt_intentional`, which is a measurement of the photograph rather than a
+# policy about the scene.
+#
+# ---------------------------------------------------------------------------
+# WHAT EACH FIELD MEANS
+# ---------------------------------------------------------------------------
+#
+# crop                          true | false
+#     Whether a tighter primary framing may be proposed at all. False is not
+#     "crop gently"; it is "this kind of photograph is delivered as shot".
+#     Nine of the twenty-two scenes set it false, and every one of those nine
+#     has a reason on the row.
+#
+# improvement_margin            >= 0.05
+#     How much better a proposed primary crop must score than the frame as
+#     shot. The contract's floor is 0.05 and a row may only raise it. This is
+#     the dial that decides the seventy-per-cent number: raising it everywhere
+#     by 0.02 is a product that crops almost nothing.
+#
+# resolution_floor              >= 0.60
+#     The smallest fraction of the ORIGINAL long edge a crop may keep. The
+#     contract's floor is 0.60 and a row may only raise it. Scenes that end up
+#     on an album spread raise it, because a 60 % crop of a 45 MP frame is
+#     still a big file and a 60 % crop of a 24 MP frame at 300 dpi is not a
+#     two-page spread.
+#
+# headroom_min / headroom_max   0.0 .. 0.5
+#     The band, as a fraction of the CROP's height, that the space above the
+#     topmost face should fall in for the placement term to score well. Not a
+#     hard rule: a candidate outside the band loses points, it is not refused.
+#     Refusing on headroom would refuse every dance floor frame in the wedding.
+#
+# variants                      a list of purposes: "album", "social", "wide"
+#     Which aspect variants this scene generates. Empty means none. A variant
+#     does NOT have to beat the improvement margin - it is asked for by its
+#     purpose - but it does have to pass every safety rule, which is why a
+#     scene full of wide group shots generates no square social crop.
+#
+# reason                        REQUIRED
+#     Why. The loader refuses a row without one.
+
+[defaults]
+crop               = false
+improvement_margin = 0.05
+resolution_floor   = 0.60
+headroom_min       = 0.04
+headroom_max       = 0.18
+variants           = []
+reason             = "The conservative default: an unrecognised scene is delivered as shot."
+
+# ---------------------------------------------------------------------------
+# GETTING READY
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id                 = "getting_ready_bride"
+crop               = true
+improvement_margin = 0.06
+resolution_floor   = 0.65
+headroom_min       = 0.05
+headroom_max       = 0.20
+variants           = ["album", "social"]
+reason = """
+Shot fast in a small room with whatever was behind the subject, so this is the
+scene where a tighter frame most often genuinely helps. The margin is raised
+slightly above the floor anyway, because the clutter that makes a crop tempting
+is frequently the mother of the bride."""
+
+[[scene]]
+id                 = "getting_ready_groom"
+crop               = true
+improvement_margin = 0.06
+resolution_floor   = 0.65
+headroom_min       = 0.05
+headroom_max       = 0.20
+variants           = ["album", "social"]
+reason = "The same room and the same argument as the bride's."
+
+[[scene]]
+id                 = "details"
+crop               = true
+improvement_margin = 0.05
+resolution_floor   = 0.70
+headroom_min       = 0.00
+headroom_max       = 0.50
+variants           = ["album", "social", "wide"]
+reason = """
+The one scene where cropping is the point: a flat-lay is composed in the crop
+and there is nobody in it to cut. Headroom is unbounded because the concept
+does not apply, and the resolution floor is the highest in the table because a
+detail shot is what ends up printed large on an album's opening spread."""
+
+# ---------------------------------------------------------------------------
+# THE CEREMONY - nine scenes, and eight of them are delivered as shot
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id                 = "first_look"
+crop               = false
+reason = """
+The frame IS the distance between two people. Cropping in on the reaction
+throws away the space that makes it a first look rather than a portrait, and
+a photographer who wants that crop wants to choose it themselves."""
+
+[[scene]]
+id                 = "ceremony_entrance"
+crop               = false
+variants           = ["wide"]
+reason = """
+An aisle shot is about the aisle. A wide variant is generated for a gallery
+header because the frame is already wide; nothing is cropped for delivery."""
+
+[[scene]]
+id                 = "ceremony"
+crop               = false
+resolution_floor   = 0.75
+variants           = ["wide"]
+reason = """
+Delivered as shot, always. A ceremony frame carries the room, the guests and
+the light, and a product that decides which of the three to remove has
+overstepped. The resolution floor is raised even though nothing crops, because
+the floor also bounds what the rotation-induced crop may take."""
+
+[[scene]]
+id                 = "ritual"
+crop               = false
+resolution_floor   = 0.80
+reason = """
+The highest floor in the table, and the one row a future edit should be most
+careful with. A rite has participants, implements and an order that a
+photographer may not recognise and this product certainly does not; removing
+anything from the edge of a ritual frame risks removing the part that made it
+that rite. `docs/adding-a-tradition.md` says the same thing from the other
+side."""
+
+[[scene]]
+id                 = "vows"
+crop               = false
+variants           = ["album"]
+reason = """
+Delivered as shot. An album variant is generated because a vows frame is a
+portrait-page candidate, and phase 29 may use it - but the gallery keeps the
+native framing."""
+
+[[scene]]
+id                 = "rings"
+crop               = true
+improvement_margin = 0.08
+resolution_floor   = 0.70
+headroom_min       = 0.00
+headroom_max       = 0.50
+variants           = ["album", "social"]
+reason = """
+Hands and a small object, usually shot with room around them. Cropping helps
+often enough to allow it, and the margin is the second-highest in the table
+because the thing a tighter crop most often removes here is the other person's
+hands. The safety filter refuses those outright; the margin means a candidate
+also has to be clearly better before anything moves."""
+
+[[scene]]
+id                 = "kiss"
+crop               = false
+variants           = ["album", "social"]
+reason = """
+Never cropped. This is the photograph the wedding is bought for, the frame
+usually already contains exactly what it should, and the cost of a mistake is
+the highest of any scene in the wedding."""
+
+# ---------------------------------------------------------------------------
+# PORTRAITS - where a crop helps most and cuts most
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id                 = "family_portrait"
+crop               = false
+resolution_floor   = 0.85
+variants           = ["album"]
+reason = """
+Never cropped, and the floor is the highest in the file. A family formal has
+someone at each end of the row who is exactly as important as the couple and
+much easier to clip, and the person cropped out of the edge of a family group
+is the person who will notice. Phase 12's coverage guarantee makes the same
+argument from the culling side."""
+
+[[scene]]
+id                 = "group_portrait"
+crop               = false
+resolution_floor   = 0.85
+variants           = ["album"]
+reason = "The same row and the same edge as a family formal."
+
+[[scene]]
+id                 = "couple_portrait"
+crop               = true
+improvement_margin = 0.07
+resolution_floor   = 0.70
+headroom_min       = 0.06
+headroom_max       = 0.22
+variants           = ["album", "social", "wide"]
+reason = """
+Two people, deliberately posed, usually with room to spare - the scene the
+smart crop was designed for. Every variant is generated here because a couple
+portrait is what goes on the album cover and on the photographer's feed. The
+margin is raised because a deliberately composed frame is a frame somebody
+already made a decision about."""
+
+[[scene]]
+id                 = "golden_hour"
+crop               = true
+improvement_margin = 0.09
+resolution_floor   = 0.70
+headroom_min       = 0.08
+headroom_max       = 0.30
+variants           = ["album", "social", "wide"]
+reason = """
+The highest margin in the table. A golden hour frame is usually mostly sky and
+mostly negative space, which scores badly on every composition term and is
+exactly the point of the photograph. The margin has to be high enough that the
+objective cannot talk itself into cropping the light out."""
+
+# ---------------------------------------------------------------------------
+# THE RECEPTION
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id                 = "reception_entrance"
+crop               = false
+variants           = ["wide"]
+reason = "Motion into a room. The room is the context; nothing is removed."
+
+[[scene]]
+id                 = "speeches"
+crop               = true
+improvement_margin = 0.06
+resolution_floor   = 0.65
+headroom_min       = 0.05
+headroom_max       = 0.20
+variants           = ["album", "social"]
+reason = """
+One person at a microphone with a room behind them, shot from wherever the
+photographer could stand. Tightening usually helps and there is rarely anybody
+at the edge of the frame to lose."""
+
+[[scene]]
+id                 = "cake"
+crop               = true
+improvement_margin = 0.06
+resolution_floor   = 0.70
+headroom_min       = 0.02
+headroom_max       = 0.25
+variants           = ["album", "social"]
+reason = """
+An object and two pairs of hands. Cropping helps; the safety filter is what
+keeps the hands in, and the resolution floor is raised because a cake shot is
+an album candidate."""
+
+[[scene]]
+id                 = "first_dance"
+crop               = false
+variants           = ["album", "wide"]
+reason = """
+Delivered as shot. A first dance frame is about a couple in a room full of
+people watching them, and the watching is half of it."""
+
+[[scene]]
+id                 = "dance_floor"
+crop               = false
+variants           = ["wide"]
+reason = """
+Never cropped. A dance floor frame is a frame with limbs at every edge - the
+scene where the safety filter would refuse almost everything anyway, and where
+a crop that got through would be the one that cut somebody's arm off."""
+
+# ---------------------------------------------------------------------------
+# EVERYTHING ELSE
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id                 = "candid"
+crop               = true
+improvement_margin = 0.07
+resolution_floor   = 0.65
+headroom_min       = 0.04
+headroom_max       = 0.22
+variants           = ["social"]
+reason = """
+Shot on instinct with no time to frame, which is the argument for allowing a
+crop, and full of people who happened to be standing there, which is the
+argument for the raised margin and for the safety filter doing most of the
+work."""
+
+[[scene]]
+id                 = "venue"
+crop               = true
+improvement_margin = 0.05
+resolution_floor   = 0.70
+headroom_min       = 0.00
+headroom_max       = 0.50
+variants           = ["wide", "social"]
+reason = """
+Architecture with nobody in it. The lowest margin in the table because there
+is nothing to cut, and the scene where keystone correction does most of its
+work."""
+
+[[scene]]
+id                 = "exit"
+crop               = false
+variants           = ["wide"]
+reason = """
+A sparkler line or a car with people either side of it. Everything at the edge
+of the frame is part of the picture."""
+
+[[scene]]
+id                 = "unknown"
+crop               = false
+reason = """
+Phase 07's abstention. A photograph AURA cannot name is a photograph AURA has
+no business re-framing, and this row is what makes `SceneId::Unknown` mean
+"leave it alone" rather than "use the average of the others"."""

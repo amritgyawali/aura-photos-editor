@@ -316,6 +316,19 @@ restore-eval:
     python ml/models/restore/train_face_recovery.py --self-test
     python ml/models/restore/eval_restore.py --self-test
     python ml/models/restore/export.py --verify models
+# The phase 23 gate: migration 20 and the columns it cannot have, the crop rules'
+# six protected rows, the lens table's attribution refusal, the straightening
+# gates, the keystone cap, the estimator against a painted bend, the whole
+# synthetic wedding, the store round trip, the override protection and the
+# revert. It prints what it does not prove at the end of every run - see
+# docs/progress/PHASE-23-EXIT.md conditions C1 to C3.
+phase-23-verify:
+    cargo run --release --package aura-cli -- verify --phase 23 --work target/phase23-verify
+
+# The phase 23 gate from the Python side. There are no expert crop labels here,
+# so `--self-test` runs the whole computation against an authored answer.
+crop-eval:
+    python ml/eval/crop_agreement.py --self-test
 
 # The calibration metrics, from the Python side. `--self-test` proves the
 # estimator catches an overconfident predictor and that a fit improves held-out

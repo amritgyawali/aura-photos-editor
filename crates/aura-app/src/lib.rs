@@ -53,6 +53,7 @@ pub mod contract {
 
 pub mod emotion_commands;
 pub mod explain_commands;
+pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
@@ -100,6 +101,10 @@ pub use emotion_commands::{
 pub use explain_commands::{
     compact_ledger, decision_by_id, decision_history, explain_image, export_support_bundle,
     ledger_status, record_decisions, review_queue,
+};
+pub use geometry_commands::{
+    accept_geometry, geometry_review_queue, geometry_status, image_geometry, plan_geometry,
+    set_framing,
 };
 pub use index_commands::{
     build_index, embed_project, find_similar, image_descriptors, index_status,

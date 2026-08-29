@@ -67,6 +67,7 @@ pub mod colour {
     pub mod curve;
     pub mod de2000;
     pub mod illuminant;
+    pub mod lens;
     pub mod matrix;
     pub mod profile;
     pub mod working_space;

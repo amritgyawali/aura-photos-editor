@@ -72,6 +72,11 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         include_str!("../migrations/0019_local_light.sql"),
     ),
     (
+        20,
+        "geometry",
+        include_str!("../migrations/0020_geometry.sql"),
+    ),
+    (
         21,
         "retouch",
         include_str!("../migrations/0021_retouch.sql"),
