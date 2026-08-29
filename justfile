@@ -8,6 +8,31 @@ setup:
     git config core.hooksPath .githooks
     cd ui && npm install
 
+# Step 0 of the phase ritual: cut feat/phase-NN-<slug> off an up-to-date
+# origin/main and push it to origin before a line of the phase is written. Run
+# this first, every phase, without being asked.
+#
+#   just phase-start 25 gallery-consistency
+phase-start NN SLUG:
+    bash scripts/phase-branch.sh {{NN}} {{SLUG}}
+
+# Step 9 of the phase ritual: commit what is left, push, open the pull request,
+# merge it into main, and leave the checkout on an up-to-date main. Run this
+# after the gate exits 0 and the exit report is written.
+#
+#   just phase-ship "feat(gallery): consistency pass and its store"
+#
+# `benchmarks` is excused by name because it is red on main for a recorded
+# reason - the interactive render budget is waived while no wgpu backend is
+# linked, phase 14 condition C1. Every other check still gates the merge.
+phase-ship MESSAGE:
+    bash scripts/phase-land.sh --message "{{MESSAGE}}" --ignore-check benchmarks
+
+# The same landing, stopping at the pull request. For a phase that wants a human
+# on the diff before it reaches main.
+phase-pr MESSAGE:
+    bash scripts/phase-land.sh --message "{{MESSAGE}}" --no-merge
+
 # Run the desktop app against the dev server.
 dev:
     cd ui/src-tauri && cargo tauri dev

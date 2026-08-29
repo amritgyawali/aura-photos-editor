@@ -110,6 +110,7 @@ Never load two phase files into one session.
 | Bundled lens profiles, with attribution | `assets/lens_profiles/` |
 | Geometry evaluation gates | `tests/eval/geometry_eval.rs` + `ml/eval/crop_agreement.py` |
 | What AURA does to a frame's edges, in the product's own words | `docs/geometry-and-cropping.md` |
+| Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -119,10 +120,22 @@ Never load two phase files into one session.
 - Every crate root carries the lint block, including `#![forbid(unsafe_code)]`.
 - `aura-core` depends on no other workspace crate; a test asserts it.
 - Changing a frozen contract requires an ADR and a re-lock, in that order.
-- **Every phase ends with a commit and a push**, on its own `feat/phase-NN-<slug>` branch,
-  without being asked. Step 9 of the ritual in `docs/plan/CLAUDE.md`. The gate exits 0, the
-  exit report is written, and then it is pushed - because until it is, the whole phase
-  exists on exactly one disk.
+- **Every phase begins by cutting its branch and pushing it**, and **ends by merging its
+  own pull request into `main`**, without being asked. Steps 0 and 9 of the ritual in
+  `docs/plan/CLAUDE.md`, and two commands:
+
+  ```bash
+  scripts/phase-branch.sh 25 gallery-consistency        # step 0, before any code
+  scripts/phase-land.sh --message "feat(gallery): ..."  # step 9, after the gate exits 0
+  ```
+
+  The first cuts `feat/phase-NN-<slug>` off an up-to-date `origin/main` and pushes it
+  immediately, so a phase is visible from its first minute rather than its last. The
+  second commits what is left, pushes, opens the pull request over the GitHub REST API,
+  refuses to merge on a failed check, merges into `main` and leaves the checkout on an
+  up-to-date `main`. `just phase-start` and `just phase-ship` are the same two commands.
+  `gh` is used for the token when it is installed and is not required; the runbook is
+  `docs/runbooks/phase-landing.md`.
 
 ## Building on this machine
 
