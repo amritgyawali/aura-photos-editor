@@ -226,6 +226,26 @@ jobs:
       - name: retouch budgets
         run: cargo test --release --package aura-perf --test retouch_budgets -- --test-threads=1 --nocapture
 
+      # PHASE-23. The assembly proof: migration 23 with its two triggers and its
+      # deferred foreign key, the crop rules and the lens database with the four
+      # bounds the code owns rather than the files, the rotation band at both
+      # ends, the safety filter, the conservatism gate, the keystone cap, the
+      # store round trip and the revert. It prints what it does not prove at the
+      # end of every run - see docs/progress/PHASE-23-EXIT.md conditions C1 to C7.
+      - name: phase 23 gate
+        run: cargo run --release --package aura-cli -- verify --phase 23 --work target/phase23-verify
+
+      # Section 10.1 as executable rows. This phase ships no model, so there is no
+      # Python half to agree with: the eval harness is the whole of it, and it
+      # prints the two rows it cannot measure on every run.
+      - name: geometry evaluation gates
+        run: cargo test --release --package aura-geometry --test geometry_eval -- --nocapture
+
+      # PHASE-23 section 11. The resampling row is waived - no GPU backend - so
+      # what is asserted is the decision on the processor path and the store.
+      - name: geometry budgets
+        run: cargo test --release --package aura-perf --test geometry_budgets -- --test-threads=1 --nocapture
+
       # Two independent implementations of the metrics have to agree, or neither
       # is trustworthy. The Python half also self-tests without cargo.
       - name: python evaluation self-tests

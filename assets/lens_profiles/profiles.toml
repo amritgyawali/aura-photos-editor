@@ -1,0 +1,320 @@
+# The bundled lens profile database.
+#
+# PHASE-23 section 4: "Bundled lens profile database with attribution". The attribution is
+# `ATTRIBUTION.md` beside this file and it is the part to read first, because it says the thing
+# this file cannot say row by row without becoming unreadable: NOTHING HERE WAS MEASURED. Every
+# row is a reference model for a class or a family of lens, every row carries `measured = false`,
+# and `aura_geometry::profiles::LensDatabase::parse` refuses a row that claims otherwise without
+# naming who measured it.
+#
+# WHAT A ROW MEANS
+#
+# `k1`, `k2`, `k3` are the Brown-Conrady radial distortion coefficients, in a radius normalised
+# so that the frame corner sits at 1.0. The correction reads the source at
+#
+#   r_source = r_output * (1 + k1*r^2 + k2*r^4 + k3*r^6)
+#
+# so a NEGATIVE k1 corrects barrel distortion - the wide end of every zoom - and a positive one
+# corrects pincushion, which is what a telephoto does. `crates/aura-render/src/geometry.rs` is
+# the one implementation and `docs/geometry.md` is the same thing in the product own words.
+#
+# `ca_red` and `ca_blue` are lateral chromatic aberration as a fractional radial scale on those
+# two channels, green fixed. Both are small: a thousandth of the half-diagonal is about four
+# pixels of fringe on a 45 MP frame, which is very visible, so these numbers are in the fourth
+# decimal place and belong there.
+#
+# `vignette` is how much of the recipe 0..100 vignette correction this class wants at its widest
+# aperture. It is a PERCENTAGE rather than a falloff polynomial because the recipe frozen `Lens`
+# block carries a percentage - see ADR-0047 section 5, which records that as a known limitation
+# rather than as a design.
+#
+# `focal_min_mm` and `focal_max_mm` bound where the row applies. A lens matched by name whose
+# focal length is outside its rows produces `GeometryCode::LensFocalOutOfRange` and NO
+# CORRECTION, because interpolating past the end of a table is a guess dressed as a measurement.
+#
+# BUMP `profiles_ver` ON ANY CHANGE TO ANY ROW. It is written into `geometry_plan.profile_ver`
+# and `AURA-ML-5109` exists so a plan made under one table is never silently compared with one
+# made under another.
+
+profiles_ver = 1
+
+# ---------------------------------------------------------------------------
+# The eight class rows. One is chosen by focal length when no family matches.
+#
+# These are the fallback, and they are deliberately conservative: a class row corrects the
+# distortion that class of lens certainly has and stops well short of the amount a particular
+# design might. Under-correcting a lens leaves a photograph looking like the lens; over-
+# correcting it leaves a photograph looking like a mistake, and only one of the two is
+# recoverable by a photographer who can see it.
+# ---------------------------------------------------------------------------
+
+[[lens]]
+id           = "class:ultrawide"
+kind         = "class"
+measured     = false
+focal_min_mm = 8.0
+focal_max_mm = 17.0
+k1           = -0.0420
+k2           =  0.0135
+k3           = -0.0022
+ca_red       =  0.00042
+ca_blue      = -0.00051
+vignette     = 72
+note = """
+Strong barrel, strong falloff, visible fringing at the corners. An ultra-wide at a reception is
+usually at f/2.8 or wider and pointed at a room, so the corners carry guests rather than sky and
+the vignette correction earns its keep.
+"""
+
+[[lens]]
+id           = "class:wide"
+kind         = "class"
+measured     = false
+focal_min_mm = 17.0
+focal_max_mm = 28.0
+k1           = -0.0195
+k2           =  0.0048
+k3           =  0.0
+ca_red       =  0.00028
+ca_blue      = -0.00033
+vignette     = 62
+note = """
+The wide end of the 24-70 that most of a wedding is shot on. Barrel, moderate, and the class
+where a straightened frame most often reveals the distortion afterwards - a levelled horizon over
+an uncorrected barrel is a horizon that is level in the middle and bowed at the ends.
+"""
+
+[[lens]]
+id           = "class:normal"
+kind         = "class"
+measured     = false
+focal_min_mm = 28.0
+focal_max_mm = 45.0
+k1           = -0.0062
+k2           =  0.0011
+k3           =  0.0
+ca_red       =  0.00016
+ca_blue      = -0.00019
+vignette     = 48
+note = """
+Near-rectilinear. The correction is small enough that its main value is consistency: a gallery
+where the 35 mm frames are corrected and the 50 mm frames are not has two lens signatures in it.
+"""
+
+[[lens]]
+id           = "class:standard"
+kind         = "class"
+measured     = false
+focal_min_mm = 45.0
+focal_max_mm = 70.0
+k1           = -0.0021
+k2           =  0.0004
+k3           =  0.0
+ca_red       =  0.00011
+ca_blue      = -0.00013
+vignette     = 44
+note = """
+The flattest class there is, which is why portrait lenses live in it. Almost all of this row
+value is the vignette and the fringing; the distortion term is close to nothing and is kept
+rather than zeroed so that the class ladder has no discontinuity in it.
+"""
+
+[[lens]]
+id           = "class:short_tele"
+kind         = "class"
+measured     = false
+focal_min_mm = 70.0
+focal_max_mm = 105.0
+k1           =  0.0034
+k2           = -0.0006
+k3           =  0.0
+ca_red       =  0.00013
+ca_blue      = -0.00015
+vignette     = 46
+note = """
+Pincushion begins here - the sign flips, which is the whole reason the ladder is a ladder rather
+than one number scaled by focal length. An 85 mm couple portrait bows the frame edges inward, and
+the place a photographer notices is a doorway behind somebody shoulder.
+"""
+
+[[lens]]
+id           = "class:tele"
+kind         = "class"
+measured     = false
+focal_min_mm = 105.0
+focal_max_mm = 200.0
+k1           =  0.0071
+k2           = -0.0013
+k3           =  0.0
+ca_red       =  0.00019
+ca_blue      = -0.00022
+vignette     = 52
+note = """
+The long end of the 70-200 that ceremonies are shot on from the back of a room. Pincushion and
+falloff both grow again; the fringing is longitudinal as much as lateral at this length and only
+the lateral half is correctable here.
+"""
+
+[[lens]]
+id           = "class:long_tele"
+kind         = "class"
+measured     = false
+focal_min_mm = 200.0
+focal_max_mm = 400.0
+k1           =  0.0088
+k2           = -0.0016
+k3           =  0.0
+ca_red       =  0.00024
+ca_blue      = -0.00028
+vignette     = 55
+note = """
+Rare at a wedding and present because the ladder must cover every focal length a file can carry.
+A row that stopped at 200 mm would send a 300 mm frame to no correction at all, which is a silent
+gap rather than a decision.
+"""
+
+[[lens]]
+id           = "class:super_tele"
+kind         = "class"
+measured     = false
+focal_min_mm = 400.0
+focal_max_mm = 1200.0
+k1           =  0.0094
+k2           = -0.0018
+k3           =  0.0
+ca_red       =  0.00027
+ca_blue      = -0.00031
+vignette     = 58
+note = """
+The end of the ladder. Beyond 1200 mm nothing is corrected and the plan says
+`geometry_lens_focal_out_of_range`, which is the honest answer for a focal length nobody wrote a
+model for.
+"""
+
+# ---------------------------------------------------------------------------
+# The six family rows. Matched on the lens name in EXIF before the class ladder is consulted.
+#
+# What a family row adds over its class row is SHAPE. Two lenses at 24 mm do not distort the same
+# way: a fast wide prime is close to rectilinear in the middle and falls off sharply at the very
+# edge, and a wide zoom bows evenly across the whole frame. That is the difference between a
+# large k1 with a small k2 and the other way round, and it is what the k2 term is for.
+# ---------------------------------------------------------------------------
+
+[[lens]]
+id           = "family:24-70/2.8"
+kind         = "family"
+measured     = false
+match        = ["24-70", "24-70mm", "EF24-70", "RF24-70", "FE 24-70"]
+focal_min_mm = 24.0
+focal_max_mm = 70.0
+k1           = -0.0168
+k2           =  0.0072
+k3           = -0.0009
+ca_red       =  0.00026
+ca_blue      = -0.00030
+vignette     = 60
+note = """
+The most-used lens at a wedding and therefore the family whose signature is most visible across a
+delivered gallery. Barrel at 24, close to flat by 50, mild pincushion by 70 - and the single row
+here is the wide half of that, because the class ladder covers the rest and a row that averaged
+the whole zoom would correct 70 mm in the wrong direction.
+"""
+
+[[lens]]
+id           = "family:70-200/2.8"
+kind         = "family"
+measured     = false
+match        = ["70-200", "70-200mm", "EF70-200", "RF70-200", "FE 70-200"]
+focal_min_mm = 70.0
+focal_max_mm = 200.0
+k1           =  0.0058
+k2           = -0.0011
+k3           =  0.0
+ca_red       =  0.00016
+ca_blue      = -0.00019
+vignette     = 50
+note = """
+The ceremony lens. Pincushion throughout, which is why a straight aisle photographed from the
+back of a church bows inward at the top and bottom of the frame, and why the correction here is
+worth more than its size suggests: the defect is on the one line in the photograph a viewer eye
+follows.
+"""
+
+[[lens]]
+id           = "family:35/1.4"
+kind         = "family"
+measured     = false
+match        = ["35mm F1.4", "35mm f/1.4", "EF35", "RF35", "FE 35"]
+focal_min_mm = 35.0
+focal_max_mm = 35.0
+k1           = -0.0104
+k2           =  0.0061
+k3           = -0.0012
+ca_red       =  0.00021
+ca_blue      = -0.00025
+vignette     = 68
+note = """
+A fast wide prime: nearly rectilinear across the middle two thirds and falling away hard at the
+edge, which is a small k1 with a large k2 relative to it. Wide open the falloff is heavy, and a
+group at a reception has somebody face in the corner of it.
+"""
+
+[[lens]]
+id           = "family:50/1.2"
+kind         = "family"
+measured     = false
+match        = ["50mm F1.2", "50mm f/1.2", "EF50", "RF50", "FE 50"]
+focal_min_mm = 50.0
+focal_max_mm = 50.0
+k1           = -0.0029
+k2           =  0.0006
+k3           =  0.0
+ca_red       =  0.00010
+ca_blue      = -0.00012
+vignette     = 66
+note = """
+Flat, and heavy in the corners wide open. Almost all of this row is the vignette number, and it
+is the row where leaving the correction at less than 100 is most defensible: darkened corners on
+a 50 mm portrait are as often the look as they are the defect, which is why the recipe carries a
+percentage rather than a switch.
+"""
+
+[[lens]]
+id           = "family:85/1.4"
+kind         = "family"
+measured     = false
+match        = ["85mm F1.4", "85mm f/1.4", "85mm F1.2", "EF85", "RF85", "FE 85"]
+focal_min_mm = 85.0
+focal_max_mm = 85.0
+k1           =  0.0026
+k2           = -0.0004
+k3           =  0.0
+ca_red       =  0.00009
+ca_blue      = -0.00011
+vignette     = 58
+note = """
+The couple portrait lens. Very mild pincushion, and the correction matters here for a reason that
+has nothing to do with the frame edge: this is the family whose frames get cropped to 4:5 and 1:1
+most often, and a crop moves the frame edge inward onto pixels that were previously mid-field.
+"""
+
+[[lens]]
+id           = "family:16-35/2.8"
+kind         = "family"
+measured     = false
+match        = ["16-35", "16-35mm", "EF16-35", "RF15-35", "FE 16-35"]
+focal_min_mm = 16.0
+focal_max_mm = 35.0
+k1           = -0.0388
+k2           =  0.0151
+k3           = -0.0027
+ca_red       =  0.00039
+ca_blue      = -0.00047
+vignette     = 70
+note = """
+The venue and dance-floor lens, and the strongest correction in this file. At 16 mm the barrel is
+large enough that an uncorrected frame of a church interior has visibly curved pillars, which is
+also the frame most likely to want the keystone correction in
+`crates/aura-geometry/src/keystone.rs` - and correcting the perspective of a barrel-distorted
+frame straightens the wrong lines.
+"""

@@ -103,8 +103,17 @@ pub const DENOISE_TILE: &str = include_str!("../shaders/denoise_tile.wgsl");
 /// reference implements.
 pub const DECONV: &str = include_str!("../shaders/deconv.wgsl");
 
+/// PHASE-23. The three geometry resamples: lens distortion, lateral chromatic aberration, and
+/// the crop-rotate-perspective stage.
+///
+/// The one file in this list that took entry points *away* from two others. `stage_geometry` was
+/// in `spatial.wgsl` and the two lens stages were identity pass-throughs in `colour.wgsl`; all
+/// three are here now, because all three are a coordinate map followed by one bilinear read and
+/// splitting them by pipeline position would have put three copies of that read in three files.
+pub const GEOMETRY: &str = include_str!("../shaders/geometry.wgsl");
+
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 16] = [
+pub const SOURCES: [(&str, &str); 17] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
@@ -121,6 +130,7 @@ pub const SOURCES: [(&str, &str); 16] = [
     ("micro_borrow.wgsl", MICRO_BORROW),
     ("denoise_tile.wgsl", DENOISE_TILE),
     ("deconv.wgsl", DECONV),
+    ("geometry.wgsl", GEOMETRY),
 ];
 
 /// The entry point name for a stage. `exposure` becomes `stage_exposure`.

@@ -979,3 +979,55 @@ max_ms_per_unit = 400
 # correction: a budget must not be pinned at its own measurement.
 [size.restore_store_per_1000_images]
 max_bytes = 1000000
+
+# ---------------------------------------------------------------------------
+# PHASE-23 - geometry: lens corrections, straightening and smart crop
+# ---------------------------------------------------------------------------
+#
+# Section 11 has three rows:
+#
+#   | Row                                   | Budget    | This build                        |
+#   |---------------------------------------|-----------|-----------------------------------|
+#   | Geometry decisions per image          | <= 40 ms  | measured on the processor path    |
+#   | Resampling overhead at export (45 MP) | <= 120 ms | waived - no GPU backend           |
+#   | 1,000 selected images                 | <= 45 s   | extrapolated from the per-image   |
+#
+# The resampling row is waived for the reason phases 14, 19, 20, 21 and 22 waive theirs: this
+# build links no `wgpu` (ADR-0029 section 4), and a 45 MP resample on the processor reference path
+# is not what that row is about.
+#
+# What is measured is the **decision**, which is what this phase owns: measuring the horizon, the
+# verticals and the edge profiles once, resolving a lens profile, walking the rotation band, and
+# searching a bounded crop space for each of four aspects against the safety filter. Unlike phases
+# 20, 21 and 22 the decision does **not** render: nothing in this phase has a guard that has to
+# see its own output, because a crop's effect on a protected region is decidable from the
+# rectangle. That is why the per-frame ceiling here is a small multiple of section 11's row rather
+# than the large one those phases needed.
+#
+# The figure is a per-image ceiling on the processor path in release, on the 96 px fixture frames.
+[stage.geometry_plan_frame]
+max_elapsed_ms  = 4000
+max_ms_per_unit = 160
+
+# Section 11 sets no storage row for this phase. One is measured anyway, and it is the second
+# figure in the product above a kilobyte per image - phase 21's was the first, and the reason is
+# the same shape: this schema stores a **list** beside its fixed-width verdict.
+#
+# The measured decomposition on 1,000 photographs of the widest frame the fixtures produce - a
+# corrected, straightened frame with five crop variants and eight reason codes - taken as `dbstat`
+# payload rather than `PRAGMA page_count`, which quantises to 4 KiB:
+#
+#   geometry_plan and its four indexes    790 B/image
+#   geometry_crop and its index           298 B/image   five variants, ~60 B each
+#                                       -------
+#   measured total                       1088 B/image
+#
+# The list is bounded at `MAX_VARIANTS = 5` by the contract and by a CHECK, which is what keeps
+# this from growing the way a per-blemish list can: the widest frame in a wedding stores five
+# rectangles, not fifty.
+#
+# The budget is 1,400 B/image against the measured 1,088, and the headroom is phase 19's
+# correction: a budget must not be pinned at its own measurement. `aura_geometry::store::
+# BYTES_PER_IMAGE` carries the same number, and the phase gate asserts against it.
+[size.geometry_store_per_1000_images]
+max_bytes = 1400000

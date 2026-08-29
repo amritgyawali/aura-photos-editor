@@ -51,6 +51,7 @@ use aura_people::store::PeopleStore;
 use aura_people::vault::BiometricKeyStore;
 use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
+use aura_geometry::{Geometry, GeometryPass, GeometryStore};
 use aura_restore::schedule::Capacity as RestoreCapacity;
 use aura_restore::{Restore, RestorePass, RestoreStore};
 use aura_retouch::micro::{Micro, MicroPass, MicroStore};
@@ -1972,6 +1973,70 @@ impl AppState {
                     target: "restore.pass",
                     code = %err.code,
                     "no scene service; every frame will be planned against the neutral profile row"
+                );
+            }
+        }
+        Ok(pass)
+    }
+
+    /// The geometry store for this catalog. PHASE-23.
+    ///
+    /// Stateless like every decision store since phase 09.
+    #[must_use]
+    pub fn geometry_store(&self) -> Arc<GeometryStore> {
+        Arc::new(GeometryStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `GeometryService` for this catalog. PHASE-23.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5112` when the lens profile table or the crop rules will not load.
+    pub fn geometry(&self, project: &ProjectId) -> AuraResult<Arc<Geometry>> {
+        let _ = project;
+        Ok(Arc::new(Geometry::new(self.geometry_store())?))
+    }
+
+    /// The geometry pass, wired to previews, people, story and composition. PHASE-23.
+    ///
+    /// **Phase 06's faces are attached, and on this build they find nothing.** The detector is a
+    /// placeholder, so `CropSafetyReport::considered` is zero on every frame and section 10.1's
+    /// hard gate - zero auto-crops cut a face - is arithmetic rather than evidence. That is
+    /// condition C1 of the phase 23 exit report, and the number is visible in
+    /// `GeometryOutline::faces_checked` rather than hidden. The port is wired anyway, because the
+    /// day the detector is trained the safety filter starts protecting people with no change here.
+    ///
+    /// **Phase 07's scenes decide whether a crop may be proposed at all.** Without them every
+    /// frame is planned under the neutral row, which forbids automatic cropping entirely - the
+    /// conservative outcome, and the report says how many frames it happened to.
+    ///
+    /// **Phase 11's horizon is what makes any straightening happen.** Without it `Horizon::default`
+    /// has `present = false`, every frame records `geometry_horizon_absent`, and nothing is
+    /// rotated. A refusal rather than a guess: a rotation derived from something other than a
+    /// measured horizon is a tilt somebody has to undo.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5112` when the tables will not load, or whatever opening the preview service
+    /// raised.
+    pub fn geometry_pass(&self, project_id: &str) -> AuraResult<GeometryPass> {
+        let mut pass = GeometryPass::new(
+            self.geometry_store(),
+            self.previews(project_id)?,
+            Arc::clone(&self.clock),
+        )?
+        .with_people(self.people())
+        .with_composition(self.composition());
+        match self.story() {
+            Ok(story) => pass = pass.with_story(story),
+            Err(err) => {
+                tracing::warn!(
+                    target: "geometry.pass",
+                    code = %err.code,
+                    "no scene service; every frame will be planned against the neutral row, which forbids an automatic crop"
                 );
             }
         }

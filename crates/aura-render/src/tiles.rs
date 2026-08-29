@@ -82,20 +82,32 @@ pub fn render_streamed(
     budget_bytes: u64,
 ) -> AuraResult<RenderedImage> {
     let clamped = recipe.clamped();
-    let plan = graph::plan(
-        &clamped,
-        purpose,
-        frame.kind,
-        graph::Capabilities::default(),
-    );
+    // The engine's own capabilities, not the defaults. A tile plan built against a different
+    // capability set from the one `render_frame` will use is a streamed render that silently
+    // omits a stage the whole-frame path applies - which is the same photograph rendered two
+    // ways depending on how large it is.
+    let plan = graph::plan(&clamped, purpose, frame.kind, engine.stage_capabilities());
 
-    // A rotation is not streamable. Say so and render whole.
-    if clamped.geometry.rotate.abs() > f32::EPSILON || clamped.geometry.perspective.is_some() {
+    // A rotation is not streamable. Neither is either lens resample: PHASE-23's distortion and
+    // chromatic aberration models are written against the *frame's* radius, and the displacement
+    // at a corner is a percent or two of the half-diagonal - tens of pixels at export size. No
+    // fixed halo covers that, and one that looked as though it did would be a seam at every tile
+    // boundary rather than an error anybody could see in a test. Say so and render whole.
+    let lens_resample = plan.stages.contains(&Stage::LensDistortion)
+        || plan.stages.contains(&Stage::LensCa);
+    if clamped.geometry.rotate.abs() > f32::EPSILON
+        || clamped.geometry.perspective.is_some()
+        || lens_resample
+    {
         let mut whole = engine.render_frame(frame, &clamped, level, purpose, output)?;
         whole.notes.push(RenderNote {
             stage: Stage::Geometry.as_str().to_string(),
             reason: SkipReason::NotRequested,
-            detail: Some("a rotated frame is rendered whole rather than streamed".to_string()),
+            detail: Some(if lens_resample {
+                "a lens-corrected frame is rendered whole rather than streamed".to_string()
+            } else {
+                "a rotated frame is rendered whole rather than streamed".to_string()
+            }),
         });
         return Ok(whole);
     }
@@ -105,12 +117,7 @@ pub fn render_streamed(
     // The geometry stage must not run inside a tile: the crop *is* the tile grid.
     let mut tile_recipe = clamped.clone();
     tile_recipe.geometry = aura_recipe::Geometry::default();
-    let tile_plan = graph::plan(
-        &tile_recipe,
-        purpose,
-        frame.kind,
-        graph::Capabilities::default(),
-    );
+    let tile_plan = graph::plan(&tile_recipe, purpose, frame.kind, engine.stage_capabilities());
     let halo = tile_plan.halo();
 
     // The crop restricts the tile grid rather than being a stage of its own. Crop commutes

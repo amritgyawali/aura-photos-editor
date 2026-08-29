@@ -112,6 +112,7 @@ dependencies = [
  "aura-core",
  "aura-cull",
  "aura-explain",
+ "aura-geometry",
  "aura-index",
  "aura-infer",
  "aura-ingest",
@@ -122,6 +123,7 @@ dependencies = [
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-restore",
  "aura-retouch",
  "aura-style",
  "aura-vision",
@@ -285,6 +287,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-geometry"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "aura-render",
+ "rusqlite",
+ "serde",
+ "time",
+ "toml 0.8.2",
+ "tracing",
+]
+
+[[package]]
 name = "aura-index"
 version = "0.1.0"
 dependencies = [
@@ -436,6 +454,22 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "time",
+ "toml 0.8.2",
+ "tracing",
+]
+
+[[package]]
+name = "aura-restore"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "aura-render",
+ "rusqlite",
+ "serde",
  "time",
  "toml 0.8.2",
  "tracing",

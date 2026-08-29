@@ -187,6 +187,16 @@ import type {
   SculptLocalInput,
   SetLocalStrengthDto,
   SetLocalStrengthInput,
+  AcceptGeometryInput,
+  CropVariantDto,
+  GeometryPassDto,
+  GeometryPassInput,
+  GeometryPlanDto,
+  GeometryReasonDto,
+  GeometryReviewInput,
+  GeometryStatusDto,
+  RevertGeometryInput,
+  SetGeometryOverrideInput,
 } from './types';
 
 /** True when the shell is present. Storybook-style dev runs fall back to stubs. */
@@ -1017,4 +1027,54 @@ export const local = {
    */
   sculptLocal: (input: SculptLocalInput): Promise<LocalPassDto> =>
     invoke<LocalPassDto>('sculpt_local', { input }),
+};
+
+/**
+ * PHASE-23. Lens corrections, straightening and smart crop.
+ *
+ * Nine calls. Four read, one runs the pass, three record what the photographer decided, and one
+ * is the panel's own legend. None of them returns pixels: the panel renders its preview through
+ * phase 14, and what this surface adds is the rectangle that render should be made with.
+ *
+ * `revertGeometry` is deliberately its own call rather than a flag on `setGeometryOverride`.
+ * "Original framing is always one click away" is an acceptance criterion, and a revert every
+ * caller has to assemble out of six optional fields is a click that eventually gets assembled
+ * wrongly - leaving a frame marked as hand-framed that automation will never revisit.
+ */
+export const geometry = {
+  /** How much of a wedding has a geometry plan, and how much of it was left exactly as shot. */
+  geometryStatus: (projectId: string): Promise<GeometryStatusDto> =>
+    invoke<GeometryStatusDto>('geometry_status', { projectId }),
+
+  /** One photograph's plan, or `null` when nobody has planned it. */
+  imageGeometry: (photoId: string): Promise<GeometryPlanDto | null> =>
+    invoke<GeometryPlanDto | null>('image_geometry', { photoId }),
+
+  /** Every safe crop variant for one photograph. What an album layout asks for. */
+  geometryVariants: (photoId: string): Promise<CropVariantDto[]> =>
+    invoke<CropVariantDto[]>('geometry_variants', { photoId }),
+
+  /** The frames whose framing is worth a look, least confident first. A queue, not a cull. */
+  geometryReviewQueue: (input: GeometryReviewInput): Promise<string[]> =>
+    invoke<string[]>('geometry_review_queue', { input }),
+
+  /** Record that the photographer looked and agrees. Does not set `userEdited`. */
+  acceptGeometry: (input: AcceptGeometryInput): Promise<void> =>
+    invoke<void>('accept_geometry', { input }),
+
+  /** Give a photograph back the framing it was shot at, and let automation resume on it. */
+  revertGeometry: (input: RevertGeometryInput): Promise<GeometryPlanDto> =>
+    invoke<GeometryPlanDto>('revert_geometry', { input }),
+
+  /** Record the framing a photographer chose. Refused if it would cut a protected region. */
+  setGeometryOverride: (input: SetGeometryOverrideInput): Promise<GeometryPlanDto> =>
+    invoke<GeometryPlanDto>('set_geometry_override', { input }),
+
+  /** Run the resumable pass over the project. */
+  geometryPass: (input: GeometryPassInput): Promise<GeometryPassDto> =>
+    invoke<GeometryPassDto>('geometry_pass', { input }),
+
+  /** Every reason code this phase can emit, for the panel's own legend. */
+  geometryReasonCodes: (): Promise<GeometryReasonDto[]> =>
+    invoke<GeometryReasonDto[]>('geometry_reason_codes'),
 };

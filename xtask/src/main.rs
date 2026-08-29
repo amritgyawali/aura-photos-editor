@@ -71,6 +71,13 @@ const EXTRA_CONTRACTS: &[&str] = &[
     "crates/aura-catalog/migrations/0022_restoration.sql",
     "crates/aura-render/shaders/denoise_tile.wgsl",
     "crates/aura-render/shaders/deconv.wgsl",
+    // PHASE-23. The migration, and the shader. The shader carries the distortion, the
+    // chromatic aberration and the rotate/keystone/crop resample that the reference path in
+    // aura_render::geometry also draws; a shader that drifts while no device can run it is a delivered
+    // rectangle that is not the rectangle the photographer approved, on the day a backend first
+    // runs.
+    "crates/aura-catalog/migrations/0023_geometry.sql",
+    "crates/aura-render/shaders/geometry.wgsl",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

@@ -105,6 +105,11 @@ Never load two phase files into one session.
 | Per-camera noise models (versioned, COL-owned) | `crates/aura-restore/config/noise_models/` |
 | Restoration evaluation gates | `tests/eval/restore_eval.rs` + `ml/models/restore/eval_restore.py` |
 | What AURA does to a noisy or soft photograph | `docs/restoration.md` |
+| Geometry decisions | `docs/adr/ADR-0047-geometry-lens-straightening-and-crop-safety.md` |
+| Scene cropping rules (versioned, PM-owned) | `crates/aura-geometry/config/crop_rules.toml` |
+| Lens profile database | `assets/lens_profiles/` (`ATTRIBUTION.md` says what is measured) |
+| Geometry evaluation gates | `tests/eval/geometry_eval.rs` |
+| What AURA does to a photograph's framing | `docs/geometry.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -1087,6 +1092,86 @@ because nothing wrote the field; and a denoise tier alone no longer enables `Sta
 because this phase occupies *two* of phase 14's stages rather than the one named after it.
 Denoising is a sensor-domain operation and belongs at index 6, before every stage that reads
 texture as signal; only face recovery belongs at index 19.
+
+Phase 23 is implemented conditionally: `aura-core::contract::geometry` freezes the four lens
+sources, the correction, the keystone and its stretch cap, the five aspects, the three purposes,
+the crop variant, the five protected kinds, the safety report, thirty reason codes, the plan, the
+outline, the override and `GeometryService` - plus `rotation_crop`, the one function in a contract
+file that computes something, because the solver and the renderer must agree on what an angle
+costs. `aura-geometry` decides. `profiles.rs` resolves a lens through embedded data, then the
+bundled database, then nothing, and refuses a config file that widens a bound the code owns;
+`lens.rs` corrects distortion, vignette and lateral chromatic aberration in linear light and can
+estimate distortion from the frame's own straight edges; `straighten.rs` walks the 0.2 to 8 degree
+band above 0.70 horizon confidence and **reduces or abandons an angle whose crop would cut
+somebody**; `keystone.rs` measures converging verticals from a Sobel field and refuses a
+correction whose measured stretch would exceed 1.12; `safety.rs` is the filter that runs *before*
+the score; `crop.rs` is a four-term geometric-mean objective searched over a bounded space;
+`variants.rs` generates the four aspect alternatives and keeps the refusals; `store.rs` owns
+migration 23 and `api.rs` is the frozen service and the resumable walk. Migration 23 stores two
+tables, two views and two triggers; 23 argued-over scene rows live in editable config, ten of them
+switching automatic cropping off entirely; `aura-render` gains `geometry` plus a shader held to it;
+nine IPC commands (ADR-0048) feed a Framing panel; and `aura-cli verify --phase 23` is the
+executable gate. Its exit report is `docs/progress/PHASE-23-EXIT.md`.
+
+**This phase ships no model** - the third since phase 08 - and the reason is phase 17's rather than
+phase 22's: there is nothing to train. The horizon comes from phase 11, the faces from phase 06,
+and everything this phase does with them has a documented closed form. What is missing is not
+weights but *labels*: section 9's DATA row asks for expert crops on 2,000 frames and this
+repository has none, so every crop number in the gate is a statement about the safety filter and
+the improvement margin rather than about whether a photographer would prefer AURA's rectangle.
+That is condition C2. Condition C1 is the Sev 2: **phase 06's detector finds no faces**, so
+`CropSafetyReport::considered` is zero on every real photograph, section 10.1's hard gate is
+arithmetic rather than evidence, and - because an unidentified subject stops the crop search - a
+real wedding on this build is not auto-cropped at all. It closes with phase 05's C10.
+
+Four rules that phase 23 adds and every later phase inherits:
+
+- **`GeometryService` is the only way to ask which pixels are delivered.** Nineteenth service of
+  its kind. Phase 27 has to be able to say why a frame is tilted, phase 29 picks between the aspect
+  variants this phase generates and phase 30 exports one. Two answers to "what is this photograph's
+  crop" is a gallery whose album does not match it, and unlike a grade it cannot be reconciled
+  afterwards, because the two answers disagree about which pixels exist.
+- **A safety constraint is a filter, never a term in a score.** A penalty is a trade, and any
+  penalty large enough to be safe over four hundred frames loses on the one frame where the
+  composition objective is most confident - which is the couple portrait. `safety::check` runs
+  first, `crop::search` never scores a rectangle that failed it, and the objective has no term for
+  protected content at all, so there is no weight anybody could tune to trade a face against a
+  better composition.
+- **A cost that another decision will pay is computed before that decision, not after it.**
+  Rotation implies cropping, so the rotation is reduced until the rectangle it implies is safe, the
+  keystone does the same, the two bites are intersected, and the crop search runs inside what is
+  left of both. The alternative - crop, then rotate, then discover the crop is no longer legal - is
+  a frame that either cuts somebody or silently gives up its rotation.
+- **A photographer may be stricter than the product; nobody may be laxer.** A person may crop one
+  photograph of their own through a face, because it is their photograph and they are looking at
+  it. `crop_rules.toml` may only tighten the four bounds the contract owns. There is no field
+  anywhere on the surface that says cutting faces is acceptable *in general*, which is the setting
+  that crops the next four hundred frames through people.
+
+Two things phase 23 got wrong first, both found by its own gate, both worth generalising:
+
+**An ordering constraint and a referential constraint can contradict each other, and the database
+takes the referential one.** `geometry_crop` had an immediate foreign key to `geometry_plan` while
+the store deliberately writes variants first - because the insert trigger reads the variants to
+decide whether the incoming plan's delivered index is safe, and a plan written first would be
+checked against the *previous* frame's rectangles. Every single write failed with
+`FOREIGN KEY constraint failed`, and the store's own comment already described the ordering the
+schema forbade. The key is `DEFERRABLE INITIALLY DEFERRED`, the only deferred foreign key in the
+product, and it is documented in the migration as well as in ADR-0047 section 9.
+
+**A refusal must be raised with the code whose runbook matches it.** A crop rectangle outside the
+frame raised `AURA-ML-5112`, whose severity is run-blocking and whose user message says AURA cannot
+read its own settings and will not straighten or crop anything. A photographer who dragged a handle
+too far has not broken their installation. It is `AURA-ML-5111` - an item failure that asks the
+user to try again - and the contract's own doc comment named the wrong code too.
+
+Phase 23 also registered phase 22's seven restoration commands in the desktop shell. They had never
+been wired in, so the phase 22 exit report's condition C5 was wrong about them being reachable from
+the Tauri surface; 92 IPC commands are now registered in `ui/src-tauri/src/main.rs`. **The shell's
+own Rust no longer compiles on this machine** - `dlltool` is absent and the toolchain's
+`self-contained` copy has no assembler to call, which is the same missing-MinGW limitation that
+already forbids a release `xtask` build - so the registration is verified by a symbol cross-check
+rather than by a build. Phase 23 exit report condition C7.
 
 Five rules that phase 13 adds and every later phase inherits:
 

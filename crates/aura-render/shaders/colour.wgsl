@@ -135,21 +135,12 @@ fn stage_lens_vignette(@builtin(global_invocation_id) id: vec3<u32>) {
 // ---------------------------------------------------------------------------
 // lens_distortion, lens_ca
 //
-// Present so the stage table is exhaustive, and deliberately the identity: the models these
-// need arrive with phase 23, and a shader that guessed at a distortion polynomial would be a
-// correction nobody measured. `graph::plan` already refuses to schedule either without a
-// lens profile, and `SkipReason::LensProfileAbsent` is what a caller sees.
+// RETIRED. Both were the identity here until phase 23, present so that the stage table was
+// exhaustive before the models existed. They are real operators now and they live in
+// `geometry.wgsl`, because they are radial resamples rather than point-wise colour maps and
+// they share their bilinear read with `stage_geometry`.
+//
+// Leaving the pass-throughs behind would have left two entry points with each name, one of which
+// did nothing - and `shaders::source_for` returns the first file it finds, so which of the two a
+// backend compiled would have depended on the order of `shaders::SOURCES`.
 // ---------------------------------------------------------------------------
-@compute @workgroup_size(64)
-fn stage_lens_distortion(@builtin(global_invocation_id) id: vec3<u32>) {
-    let index = id.x;
-    if (index >= frame.width * frame.height) { return; }
-    store(index, load(index));
-}
-
-@compute @workgroup_size(64)
-fn stage_lens_ca(@builtin(global_invocation_id) id: vec3<u32>) {
-    let index = id.x;
-    if (index >= frame.width * frame.height) { return; }
-    store(index, load(index));
-}

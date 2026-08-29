@@ -31,6 +31,7 @@ use crate::contract::render::{
     Backend, RenderCaps, RenderLevel, RenderNote, RenderPurpose, RenderRequest, RenderService,
     RenderedImage, SkipReason,
 };
+use crate::geometry;
 use crate::graph::{self, Capabilities, InputKind, Plan, Stage};
 use crate::spatial;
 use crate::tonemap::{self, CurveLut, Tone};
@@ -145,6 +146,17 @@ impl CpuEngine {
     pub const fn with_capabilities(mut self, caps: Capabilities) -> Self {
         self.caps = caps;
         self
+    }
+
+    /// What this engine declares it can do.
+    ///
+    /// Read by `crate::tiles::render_streamed`, which has to build its tile plan against the
+    /// same capability set the whole-frame path would use. It built one against the defaults
+    /// until phase 23, which was inert while every capability was false and would have become a
+    /// streamed render that quietly skipped a stage the moment one was not.
+    #[must_use]
+    pub const fn stage_capabilities(&self) -> Capabilities {
+        self.caps
     }
 
     /// Render a frame that is already in hand, without touching the source.
@@ -293,6 +305,33 @@ impl CpuEngine {
             );
         }
 
+        // PHASE-23. The two resamples, and they run whole-frame or not at all: `graph::plan`
+        // schedules them only with `Capabilities::geometry_models`, and `tiles::render_streamed`
+        // refuses to stream a frame that has either of them. A distortion model is written
+        // against the *frame's* radius and displaces a corner by a percent or two of the
+        // half-diagonal, which is tens of pixels at export size - no fixed tile halo can be
+        // right, and one that looked right would be a seam at every tile boundary.
+        let lens_model = if plan.stages.contains(&Stage::LensDistortion)
+            || plan.stages.contains(&Stage::LensCa)
+        {
+            recipe
+                .lens
+                .profile
+                .as_deref()
+                .and_then(|id| geometry::database().get(id))
+                .copied()
+        } else {
+            None
+        };
+        if let Some(model) = lens_model {
+            if plan.stages.contains(&Stage::LensDistortion) {
+                geometry::correct_distortion(&mut rgb, width as usize, height as usize, &model);
+            }
+            if plan.stages.contains(&Stage::LensCa) {
+                geometry::correct_ca(&mut rgb, width as usize, height as usize, &model);
+            }
+        }
+
         // ---- noise ---------------------------------------------------------------------
         if plan.stages.contains(&Stage::NoiseReduction) {
             spatial::denoise(
@@ -411,6 +450,21 @@ impl CpuEngine {
 
         // ---- geometry ------------------------------------------------------------------
         if plan.stages.contains(&Stage::Geometry) {
+            // PHASE-23. The perspective correction comes first and is its own resample, because
+            // it changes which source pixel every output pixel reads and the crop that follows
+            // is a statement about the *corrected* frame. Folding it into `crop_rotate` would
+            // mean composing a projective map with a rotation, which is one resample rather than
+            // two and is what a device pipeline should do; the processor reference keeps them
+            // apart so that the crop rectangle a plan stored is the rectangle that is taken.
+            if let Some(p) = recipe.geometry.perspective {
+                rgb = geometry::perspective(
+                    &rgb,
+                    width as usize,
+                    height as usize,
+                    p.vertical,
+                    p.horizontal,
+                );
+            }
             let (out, w, h) = spatial::crop_rotate(
                 &rgb,
                 width as usize,

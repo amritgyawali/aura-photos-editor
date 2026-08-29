@@ -6011,3 +6011,373 @@ pub struct RestoreIdentityRefusalDto {
     /// How many faces in it were declined.
     pub faces: u32,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-23. The geometry surface.
+//
+// Nine commands over one frozen service. `ADR-0048-geometry-ipc-surface.md` records the shape and
+// what is deliberately absent from it; three things are worth stating where the types are.
+//
+// **The revert is its own command.** Section 13's fifth acceptance criterion is "original framing
+// is always one click away", and a revert expressed as a field inside an override payload is a
+// click that has to be assembled correctly by every caller. `RevertGeometryInput` carries a
+// photograph and nothing else, so there is no way to send half a revert.
+//
+// **Nothing on this surface can widen a safety rule.** There is no field here that says faces may
+// be cut, no per-project setting that relaxes the resolution floor, and no strength number. A
+// photographer may crop tighter than AURA proposed on one photograph, and that rectangle is
+// checked against that photograph's own protected regions before it is stored.
+//
+// **Both safety numbers are on the wire.** `facesChecked` beside `facesCut`, because "zero faces
+// were cut" over a wedding whose detector found no faces is arithmetic rather than evidence, and
+// on this build that is what it is. Phase 21's rule.
+// ---------------------------------------------------------------------------
+
+/// One crop variant: a rectangle, what it is for, and whether it may be delivered.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CropVariantDto {
+    /// Its position in the photograph's own list. Zero is always the original framing.
+    pub ordinal: u32,
+    /// `original`, `4:5`, `5:4`, `1:1` or `16:9`.
+    pub aspect: String,
+    /// `primary`, `social` or `album`.
+    pub purpose: String,
+    /// The rectangle, normalised, after any rotation and keystone.
+    pub rect: CropRectDto,
+    /// The composition objective at this rectangle, `0..1`.
+    ///
+    /// **Comparable between the rows of one photograph and not between photographs.** Three of its
+    /// four terms are normalised by the rectangle's own size and the frame's own energy, and
+    /// nothing in the product ranks frames by it.
+    pub score: f32,
+    /// True when the safety filter allows this rectangle to be delivered.
+    pub safe: bool,
+    /// Why it may not be, when it may not. Absent on a safe variant.
+    ///
+    /// **A refused variant is a row rather than an absence**: "why is there no square crop of this
+    /// photograph" is a question the panel has to answer, and it cannot answer it from a gap.
+    pub refusal: Option<String>,
+    /// The share of the original long edge this rectangle keeps, `0..1`.
+    ///
+    /// Absent when the catalog does not carry the photograph's pixel dimensions - a normalised
+    /// rectangle cannot say which of its sides is the long one without them, and a guessed frame
+    /// aspect makes this figure plausible and wrong on every portrait frame in a wedding.
+    pub long_edge_fraction: Option<f32>,
+}
+
+/// What the safety filter checked before a rectangle was allowed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CropSafetyDto {
+    /// True when every detected face is fully inside the delivered rectangle.
+    pub faces_intact: bool,
+    /// True when the delivered rectangle keeps enough of the original long edge.
+    pub resolution_ok: bool,
+    /// True when the moment's key content survived.
+    pub content_kept: bool,
+    /// **How many protected regions were checked.** The denominator behind the booleans above.
+    ///
+    /// Zero on every frame in this build, because phase 06's detector is a placeholder.
+    pub considered: u32,
+    /// How many of them the delivered rectangle would cut. **Always zero on a delivered crop.**
+    pub at_risk: u32,
+    /// The share of the original long edge the delivered rectangle keeps, `0..1`.
+    pub long_edge_fraction: f32,
+    /// The regions themselves, so the panel can draw what it protected.
+    pub regions: Vec<ProtectedRegionDto>,
+}
+
+/// One thing a crop may not cut.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProtectedRegionDto {
+    /// `face`, `hands`, `joined_hands`, `primary_body` or `moment_key`.
+    pub kind: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// Where it is, normalised.
+    pub area: CropRectDto,
+    /// Whose it is, when phase 06 knows.
+    pub identity_id: Option<String>,
+}
+
+/// One reason a photograph's geometry came out the way it did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryReasonDto {
+    /// The stable slug.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// How much this reason moved the decision, `-1..1`.
+    pub weight: f32,
+    /// True when this says something did **not** happen.
+    ///
+    /// Most of this phase's vocabulary is refusals, and the panel groups them: a frame with eight
+    /// reasons on it usually had eight things checked and left alone.
+    pub refusal: bool,
+    /// True when the refusal was the safety filter rather than the improvement margin.
+    pub safety: bool,
+    /// Where in the frame, when naming a place helps.
+    pub area: Option<CropRectDto>,
+}
+
+/// A perspective correction, and the stretch it cost.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeystoneDto {
+    /// Vertical correction, `-100..100`.
+    pub vertical: f32,
+    /// Horizontal correction, `-100..100`.
+    pub horizontal: f32,
+    /// **The measured ratio between the two axis scales**, never above 1.12.
+    ///
+    /// Measured rather than derived from the two sliders, because the cap is checked against what
+    /// the correction did rather than against what it asked for.
+    pub stretch: f32,
+    /// How strongly the frame's verticals converged, `0..1`.
+    pub convergence: f32,
+}
+
+/// One photograph's geometry plan.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
+pub struct GeometryPlanDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The scene it was decided under.
+    pub scene: String,
+    /// `embedded`, `database`, `estimated` or `none`.
+    pub lens_source: String,
+    /// The profile that supplied the numbers, when one did.
+    pub lens_profile: Option<String>,
+    /// True when distortion is corrected.
+    pub lens_distortion: bool,
+    /// Vignette correction, `0..=100`.
+    pub lens_vignette: u8,
+    /// True when lateral chromatic aberration is corrected.
+    pub lens_ca: bool,
+    /// True when somebody measured that profile on a real lens.
+    ///
+    /// **False on every row this build writes.** Every row in `assets/lens_profiles/` is a
+    /// reference model for a class or a family, and `ATTRIBUTION.md` says so.
+    pub lens_measured: bool,
+    /// The rotation applied, in degrees. Zero when the frame was left alone.
+    pub rotate_deg: f32,
+    /// How sure the horizon behind it was, `0..1`. **Stored even when nothing was rotated.**
+    pub rotate_conf: f32,
+    /// The perspective correction, when there is one.
+    pub keystone: Option<KeystoneDto>,
+    /// Every variant, original first.
+    pub crops: Vec<CropVariantDto>,
+    /// Which of them is delivered. **Always addresses a safe one.**
+    pub primary_crop: u32,
+    /// What was checked before that rectangle was allowed.
+    pub safety: CropSafetyDto,
+    /// Why, strongest first.
+    pub reasons: Vec<GeometryReasonDto>,
+    /// How much the plan trusts itself, `0..1`.
+    pub confidence: f32,
+    /// True when the photograph is delivered at the framing it was shot at.
+    pub kept_original: bool,
+    /// True when a photographer framed it by hand.
+    pub user_edited: bool,
+    /// True when a photographer has looked at it and agreed.
+    pub reviewed: bool,
+    /// The versions it was decided under: arithmetic, profiles. **Two, because no model shipped.**
+    pub versions: Vec<u16>,
+}
+
+/// What the Geometry panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a plan.
+    pub planned: u32,
+    /// Fraction of the project with a plan, `0..1`. **The denominator is every photograph.**
+    pub coverage: f32,
+    /// Photographs where at least one pixel moves.
+    pub acted_on: u32,
+    /// Photographs delivered at the framing they were shot at.
+    pub kept_original: u32,
+    /// `kept_original / planned`, `0..1`. **Section 10.1's conservatism gate**, at least 0.70.
+    pub conservatism: f32,
+    /// Frames that were straightened.
+    pub straightened: u32,
+    /// The mean absolute rotation over the frames that were rotated, in degrees.
+    pub mean_rotation_deg: f32,
+    /// Frames that got a keystone correction.
+    pub keystoned: u32,
+    /// Frames delivered at something other than their original framing.
+    pub cropped: u32,
+    /// Safe aspect variants generated across the project.
+    pub variants: u32,
+    /// Why crop candidates were refused, commonest first.
+    pub crop_refusals: Vec<GeometryRefusalDto>,
+    /// How many frames carried a profile from each source, in `embedded`, `database`, `estimated`,
+    /// `none` order.
+    pub lens_sources: Vec<u32>,
+    /// The names of those four sources, so the panel never hard-codes the order.
+    pub lens_source_names: Vec<String>,
+    /// **The lenses nothing could be found for**, most frequent first.
+    ///
+    /// The one thing on this header a studio can act on: a lens here is a lens whose distortion
+    /// nobody has measured. Section 11's `geometry.lens_profile_missing`, as a query.
+    pub lenses_missing: Vec<GeometryLensMissDto>,
+    /// **How many protected regions the safety filter checked across the project.**
+    ///
+    /// Zero on this build. The denominator that says whether `facesCut` means anything.
+    pub faces_checked: u32,
+    /// How many delivered crops cut a face. **Must be zero.**
+    pub faces_cut: u32,
+    /// Frames a photographer framed by hand.
+    pub user_edited: u32,
+    /// Frames waiting for somebody to look.
+    pub pending_review: u32,
+}
+
+/// One reason a crop candidate was refused, and how often.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryRefusalDto {
+    /// The stable slug.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// True when it was the safety filter rather than the improvement margin.
+    pub safety: bool,
+    /// How many candidates.
+    pub count: u32,
+}
+
+/// One lens nothing could be found for.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryLensMissDto {
+    /// The lens as the file named it.
+    pub lens: String,
+    /// How many frames were shot on it.
+    pub count: u32,
+}
+
+/// Ask for the frames worth a photographer's attention.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryReviewInput {
+    /// The project.
+    pub project_id: String,
+    /// How many at most.
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Record that a photographer has looked at one plan and agrees.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptGeometryInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Give a photograph back the framing it was shot at.
+///
+/// **Its own input type and its own command.** Section 13: "original framing is always one click
+/// away". A revert also clears the rotation, the keystone and `user_edited`, because a
+/// photographer who asked for the photograph back has asked automation to resume rather than to
+/// stop - which is a different request from "crop this to the whole frame and never touch it
+/// again", and a single boolean on the override payload made the two look alike.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RevertGeometryInput {
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// Record the framing a photographer chose for one photograph.
+///
+/// Every field is optional and absent means "leave what AURA decided alone" rather than "set it to
+/// nothing". **There is no field that widens a safety rule.** A rectangle sent here applies to this
+/// photograph and is stored with `user_edited` set, so nothing re-crops it; what there is nowhere
+/// to say is that cutting faces is acceptable in general, which is the setting that would then
+/// crop the next four hundred frames through people.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetGeometryOverrideInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// The rectangle to deliver, normalised.
+    #[serde(default)]
+    pub crop: Option<CropRectDto>,
+    /// `original`, `4:5`, `5:4`, `1:1` or `16:9`.
+    #[serde(default)]
+    pub aspect: Option<String>,
+    /// The rotation, in degrees.
+    #[serde(default)]
+    pub rotate_deg: Option<f32>,
+    /// Whether to correct lens distortion.
+    #[serde(default)]
+    pub distortion: Option<bool>,
+    /// Vignette correction, `0..=100`.
+    #[serde(default)]
+    pub vignette: Option<u8>,
+    /// Whether to correct lateral chromatic aberration.
+    #[serde(default)]
+    pub ca: Option<bool>,
+}
+
+/// Run the resumable geometry pass.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryPassInput {
+    /// The project.
+    pub project_id: String,
+    /// `visible`, `interactive`, `ai_batch` or `background`.
+    #[serde(default)]
+    pub priority: Option<String>,
+    /// Switch the whole stage off for this run. The kill switch hard rule 8 requires.
+    ///
+    /// A disabled pass still writes a plan per frame - one that does nothing - because a frame
+    /// with no plan and a frame the studio switched off look identical in a coverage report.
+    #[serde(default)]
+    pub enabled: Option<bool>,
+}
+
+/// What one pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeometryPassDto {
+    /// Photographs planned.
+    pub planned: u32,
+    /// Photographs that could not be planned.
+    pub failed: u32,
+    /// Photographs where at least one pixel moves.
+    pub acted_on: u32,
+    /// Photographs delivered at the framing they were shot at.
+    pub kept_original: u32,
+    /// `kept_original / planned`, `0..1`.
+    pub conservatism: f32,
+    /// Frames that were straightened.
+    pub straightened: u32,
+    /// Frames that got a keystone correction.
+    pub keystoned: u32,
+    /// Safe aspect variants generated.
+    pub variants: u32,
+    /// **Frames corrected through a profile nobody measured.** Every corrected frame in this build.
+    pub reference_profiles: u32,
+    /// Frames below the review threshold.
+    pub low_confidence: u32,
+    /// The lenses nothing could be found for.
+    pub lenses_missing: Vec<String>,
+    /// Scenes planned against the neutral row.
+    pub unlisted_scenes: Vec<String>,
+    /// Why crop candidates were refused, commonest first.
+    pub crop_refusals: Vec<GeometryRefusalDto>,
+    /// Milliseconds the pass took.
+    pub elapsed_ms: u64,
+    /// True when the pass stopped early.
+    pub cancelled: bool,
+}

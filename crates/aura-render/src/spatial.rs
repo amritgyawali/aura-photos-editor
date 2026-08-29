@@ -320,18 +320,30 @@ pub fn unsharp(
         });
 }
 
-/// The magnitude of a 3x3 Sobel gradient over a plane.
+/// The two components of a 3x3 Sobel gradient over a plane.
+///
+/// `(gx, gy)`, same size as the input, edge-clamped. [`gradient_plane`] is the magnitude of
+/// this and calls it, so there is one Sobel in the workspace rather than two.
+///
+/// The components rather than the magnitude, because a magnitude has no *orientation* in it and
+/// PHASE-23's keystone solver has to be able to tell the upright lines of a building from the
+/// horizontals of the pews in front of it. A caller that needed orientation and had only a
+/// magnitude would write its own Sobel, which is how two edge detectors end up in one product
+/// disagreeing about which pixels are edges.
 #[must_use]
-pub fn gradient_plane(plane: &[f32], width: usize, height: usize) -> Vec<f32> {
-    let mut out = vec![0.0f32; width * height];
+pub fn sobel_planes(plane: &[f32], width: usize, height: usize) -> (Vec<f32>, Vec<f32>) {
+    let mut gx_out = vec![0.0f32; width * height];
+    let mut gy_out = vec![0.0f32; width * height];
     if width < 3 || height < 3 {
-        return out;
+        return (gx_out, gy_out);
     }
-    out.par_chunks_mut(width)
+    gx_out
+        .par_chunks_mut(width)
+        .zip(gy_out.par_chunks_mut(width))
         .enumerate()
         .take(height)
-        .for_each(|(y, row)| {
-            for (x, slot) in row.iter_mut().enumerate() {
+        .for_each(|(y, (gx_row, gy_row))| {
+            for x in 0..width {
                 let sample = |dx: isize, dy: isize| -> f32 {
                     let sx = (x as isize + dx).clamp(0, width as isize - 1) as usize;
                     let sy = (y as isize + dy).clamp(0, height as isize - 1) as usize;
@@ -345,10 +357,25 @@ pub fn gradient_plane(plane: &[f32], width: usize, height: usize) -> Vec<f32> {
                     + sample(-1, 1)
                     + 2.0 * sample(0, 1)
                     + sample(1, 1);
-                *slot = gx.hypot(gy);
+                if let Some(slot) = gx_row.get_mut(x) {
+                    *slot = gx;
+                }
+                if let Some(slot) = gy_row.get_mut(x) {
+                    *slot = gy;
+                }
             }
         });
-    out
+    (gx_out, gy_out)
+}
+
+/// The magnitude of a 3x3 Sobel gradient over a plane.
+#[must_use]
+pub fn gradient_plane(plane: &[f32], width: usize, height: usize) -> Vec<f32> {
+    let (gx, gy) = sobel_planes(plane, width, height);
+    gx.into_par_iter()
+        .zip(gy.into_par_iter())
+        .map(|(x, y)| x.hypot(y))
+        .collect()
 }
 
 /// Noise reduction: an edge-preserving luminance blend and a chroma blur.

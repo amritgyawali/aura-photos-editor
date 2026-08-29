@@ -1,0 +1,394 @@
+# What may be cropped out of what kind of photograph, and how much better a crop must be.
+#
+# PHASE-23 section 4 asks for `config/crop_rules.toml` holding "aspect options, safety margins,
+# resolution floors". This is that file, in the place every product-owned table in this repository
+# lives - beside the crate that decides from it - and section 9 gives PM the approval of it,
+# including "the conservative default (keep original framing)".
+#
+# Every row carries a written reason. Ninth config file in the product to enforce it, and the one
+# where the rule bites hardest: a scene row here decides whether AURA may recompose somebody's
+# photograph, and a threshold nobody can explain is a product quietly deciding that it frames a
+# wedding better than the photographer who was in the room.
+#
+# WHAT IS AND IS NOT IN THIS FILE
+#
+# The floors and the margins are here and they are BOUNDED BY THE CODE. `CropRules::parse` refuses
+# a file that lowers `min_long_edge` below `MIN_LONG_EDGE_FRACTION`, that lowers `min_improvement`
+# below `MIN_IMPROVEMENT`, that lowers `safety_margin` below `SAFETY_MARGIN`, or that raises
+# `max_rotate_deg` above `ROTATE_MAX_DEG`. A studio may make this phase MORE conservative and
+# nothing here can make it less. That is what makes the promises in `docs/geometry.md` statements
+# about the product rather than descriptions of its defaults, and it is the shape PHASE-21
+# established for `micro_retouch.toml`.
+#
+# There is no way to switch a safety rule off. There is no aspect ratio that is exempt from the
+# face check, no scene that may cut a hand, and no field anywhere in this file that could express
+# either. A photographer may crop tighter than AURA proposed on ONE frame, through the override -
+# what nobody can do is tell AURA in general that cutting people is acceptable, because the next
+# four hundred frames would then be cropped through guests by a setting somebody changed once.
+#
+# There is no per-person, per-ethnicity or per-age row and there never will be one.
+#
+# BUMP `version` ON ANY CHANGE. It is written into `geometry_plan.profile_ver` together with the
+# lens table's own version, and `AURA-ML-5109` exists so that a plan made under one table is never
+# silently compared with a plan made under another.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# The bounds. Each may be tightened by a studio and none may be loosened.
+# ---------------------------------------------------------------------------
+
+[bounds]
+# The smallest share of the original long edge any crop may keep. Bounded BELOW by
+# MIN_LONG_EDGE_FRACTION: a studio that delivers large prints can raise this and nobody can lower
+# it.
+min_long_edge = 0.60
+# How much better a crop must score before it replaces what was shot. Bounded BELOW by
+# MIN_IMPROVEMENT.
+min_improvement = 0.06
+# How far inside the crop's edge a protected region must sit. Bounded BELOW by SAFETY_MARGIN.
+safety_margin = 0.01
+# The largest tilt this build will correct. Bounded ABOVE by ROTATE_MAX_DEG: a studio that shoots
+# a lot of deliberately tilted work can lower this toward zero and nobody can raise it.
+max_rotate_deg = 8.0
+reason = """
+Four numbers and every one of them runs in the conservative direction. The first three are floors
+that a studio may raise and the fourth is a ceiling a studio may lower, so every edit this file
+permits makes AURA do less. That asymmetry is the whole design: the failure mode section 12 lists
+first is an auto-crop that cuts something important, and a configuration file that could widen a
+safety rule is a configuration file that can produce that failure on four hundred frames at once.
+"""
+
+# ---------------------------------------------------------------------------
+# The aspect variants that are generated at all.
+#
+# One list for the whole product rather than a per-scene one, because a variant is a rectangle
+# phase 29 may choose between and a scene that generated no square would be a scene phase 29
+# silently never lays out square. Which of them is DELIVERED is per-scene and lives below.
+# ---------------------------------------------------------------------------
+
+[variants]
+generate = ["4:5", "5:4", "1:1", "16:9"]
+reason = """
+Section 2.1 names exactly these four beside the original: 4:5 and 1:1 for a feed, 5:4 for an
+8x10 and a spread, 16:9 for a cover. They are generated for every frame that can carry them
+safely and they are never delivered in place of the original unless a photographer asks - the
+gallery keeps native framing, which is the second half of the same sentence in section 2.1.
+"""
+
+# ---------------------------------------------------------------------------
+# The scenes.
+#
+# Invariant 7: no threshold is global. `crop` is whether this phase may propose a tighter frame
+# at all, `min_improvement` is how much better it must be, `max_zoom` is the tightest it may go as
+# a share of the long edge, `headroom` is the share of the frame's height this kind of photograph
+# wants above the subject, and `placement` is where the subject wants to sit.
+#
+# `unknown` at the end is the neutral row, and it is the most conservative row in the file.
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id = "getting_ready_bride"
+crop = true
+min_improvement = 0.06
+max_zoom = 0.72
+headroom = 0.10
+placement = "thirds"
+reason = """
+A getting-ready frame is a room with somebody in it and a lot of it is incidental - a mirror, a
+window, a dress on a door. This is one of the two scenes where a tighter frame most often is
+better, so the margin sits at the floor and the search is allowed to go reasonably tight.
+"""
+
+[[scene]]
+id = "getting_ready_groom"
+crop = true
+min_improvement = 0.06
+max_zoom = 0.72
+headroom = 0.10
+placement = "thirds"
+reason = """
+The same room, the same argument. The two rows are kept separate rather than merged because they
+are separate scenes everywhere else in the product and a merged row here would be the one place
+a caller could not tell which of the two a decision was made under.
+"""
+
+[[scene]]
+id = "details"
+crop = true
+min_improvement = 0.06
+max_zoom = 0.65
+headroom = 0.04
+placement = "centre"
+reason = """
+The one scene where recomposition is most clearly welcome and least risky: a flat-lay of rings and
+invitations has no faces in it, no hands, and no moment to lose. It sits AT the contract floor,
+which is the loosest any row in this file can be - `MIN_IMPROVEMENT` is a floor rather than a
+default, and a row asking for less is refused when the file loads. It also carries the tightest
+zoom in the file, and it is still bounded by the resolution floor: a ring shot cropped to nothing
+is a ring shot nobody can print.
+"""
+
+[[scene]]
+id = "first_look"
+crop = false
+min_improvement = 0.12
+max_zoom = 0.85
+headroom = 0.12
+placement = "thirds"
+reason = """
+Crop is OFF. A first look is a reaction, and the space between two people IS the photograph -
+which is exactly the content an objective that rewards subject placement would remove. The margin
+and the zoom are still filled in rather than left blank, because a photographer who switches this
+row on should get a conservative crop rather than an unconfigured one.
+"""
+
+[[scene]]
+id = "ceremony_entrance"
+crop = false
+min_improvement = 0.12
+max_zoom = 0.85
+headroom = 0.14
+placement = "thirds"
+reason = """
+Crop is OFF. An entrance is about the aisle, the doors and the people lining them, and the frame
+was composed around all three by somebody standing there. Nothing in this phase can see that a
+guest at the edge is the bride's grandmother.
+"""
+
+[[scene]]
+id = "ceremony"
+crop = false
+min_improvement = 0.14
+max_zoom = 0.88
+headroom = 0.14
+placement = "centre"
+reason = """
+Crop is OFF, and this is the row that matters most. A ceremony frame is the one photograph of a
+thing that happened once; the officiant at the edge, the parents in the second row and the space
+above the mandap are all content somebody will look for. The most conservative crop is no crop.
+"""
+
+[[scene]]
+id = "ritual"
+crop = false
+min_improvement = 0.14
+max_zoom = 0.88
+headroom = 0.14
+placement = "centre"
+reason = """
+Crop is OFF, and for a stronger reason than `ceremony`: a rite has objects in it whose presence
+is the point - a fire, a garland, a knot, a glass - and this phase cannot tell which object in a
+frame is the one the rite is named after. `moment_key` protects what phase 08 knows about and
+nothing protects what nobody recorded, so the answer is to leave the frame alone.
+"""
+
+[[scene]]
+id = "vows"
+crop = false
+min_improvement = 0.14
+max_zoom = 0.88
+headroom = 0.12
+placement = "thirds"
+reason = """
+Crop is OFF. Two people and the space between them, again, and the same argument as `first_look`.
+"""
+
+[[scene]]
+id = "rings"
+crop = true
+min_improvement = 0.08
+max_zoom = 0.70
+headroom = 0.06
+placement = "centre"
+reason = """
+Crop is on, and the hands rule does the work. A ring exchange is a close photograph of two pairs
+of hands, so `joined_hands` is almost always present as a protected region and the search cannot
+tighten past it. What the crop removes is the room behind, which is what a photographer would
+have cropped too.
+"""
+
+[[scene]]
+id = "kiss"
+crop = false
+min_improvement = 0.14
+max_zoom = 0.85
+headroom = 0.10
+placement = "centre"
+reason = """
+Crop is OFF. One frame, one instant, usually already composed tightly, and the cost of getting it
+wrong is the highest in the wedding.
+"""
+
+[[scene]]
+id = "family_portrait"
+crop = false
+min_improvement = 0.16
+max_zoom = 0.92
+headroom = 0.10
+placement = "centre"
+reason = """
+Crop is OFF and the margin is the second highest in the file. A family formal is a photograph
+whose entire purpose is that everybody in it is in it, and a crop that clipped the person on the
+end would be the single most complained-about output this product could produce. The safety
+filter would catch a cut face; it would not catch a cut elbow, and nobody wants the version of
+this photograph where great-aunt somebody is half in it.
+"""
+
+[[scene]]
+id = "group_portrait"
+crop = false
+min_improvement = 0.16
+max_zoom = 0.92
+headroom = 0.10
+placement = "centre"
+reason = """
+Crop is OFF. The same argument as `family_portrait`, and the same failure.
+"""
+
+[[scene]]
+id = "couple_portrait"
+crop = true
+min_improvement = 0.07
+max_zoom = 0.75
+headroom = 0.12
+placement = "thirds"
+reason = """
+Crop is on. This is the other scene where a tighter frame genuinely helps - a couple in a field
+with a lot of field - and it is also the scene most often delivered at 4:5 and 1:1, so the variant
+work here is worth more than anywhere else. The hands rule is what stops it going wrong, and it is
+the reason `ProtectedContent::Hands` exists as a kind of its own.
+"""
+
+[[scene]]
+id = "golden_hour"
+crop = true
+min_improvement = 0.08
+max_zoom = 0.78
+headroom = 0.14
+placement = "thirds"
+reason = """
+Crop is on with a raised margin. A golden-hour frame is often composed around light rather than
+around a subject - a rim, a flare, a long shadow - and the objective in this phase cannot see any
+of that. The extra two hundredths of margin is what stops it removing the sky the photograph was
+about.
+"""
+
+[[scene]]
+id = "reception_entrance"
+crop = true
+min_improvement = 0.10
+max_zoom = 0.82
+headroom = 0.12
+placement = "thirds"
+reason = """
+Crop is on, cautiously. A reception entrance has a crowd in it and crowds have faces at the edges;
+the safety filter will refuse most tightenings by itself, which is the correct outcome and is why
+this row can be on at all.
+"""
+
+[[scene]]
+id = "speeches"
+crop = true
+min_improvement = 0.09
+max_zoom = 0.78
+headroom = 0.10
+placement = "thirds"
+reason = """
+Crop is on. A speech is one person at a microphone with a room behind them, and the room is
+usually darker and busier than the speaker. This is the scene where edge cleanliness earns its
+place in the objective.
+"""
+
+[[scene]]
+id = "cake"
+crop = true
+min_improvement = 0.08
+max_zoom = 0.75
+headroom = 0.10
+placement = "centre"
+reason = """
+Crop is on. The cake, two people and four hands, and the hands rule bounds it. What comes out is
+the table and the tent pole.
+"""
+
+[[scene]]
+id = "first_dance"
+crop = false
+min_improvement = 0.14
+max_zoom = 0.85
+headroom = 0.16
+placement = "centre"
+reason = """
+Crop is OFF. A first dance is shot wide on purpose: the room, the ring of guests watching and the
+light above are the photograph, and a tighter frame of two people dancing is a different and
+worse photograph that this phase cannot tell it has made.
+"""
+
+[[scene]]
+id = "dance_floor"
+crop = true
+min_improvement = 0.10
+max_zoom = 0.80
+headroom = 0.08
+placement = "thirds"
+reason = """
+Crop is on with a raised margin. A dance floor is chaos and a crop can genuinely help, but it is
+also the scene with the most faces per frame and the most partial faces at the edges - so most
+proposals here are refused by the safety filter rather than by the margin, and that is the design.
+"""
+
+[[scene]]
+id = "candid"
+crop = true
+min_improvement = 0.07
+max_zoom = 0.75
+headroom = 0.10
+placement = "thirds"
+reason = """
+Crop is on. A candid is by definition a frame nobody had time to compose, which is the single best
+argument for this feature existing at all - and it is still held to a margin, because a candid
+that was composed by luck is a candid a crop can only make worse.
+"""
+
+[[scene]]
+id = "venue"
+crop = true
+min_improvement = 0.06
+max_zoom = 0.70
+headroom = 0.06
+placement = "thirds"
+reason = """
+Crop is on, at the floor. A venue frame usually has no people in it, so there is nothing to cut
+and the objective's placement term falls back on the frame's own structure. This is also the scene
+where the keystone correction runs most often, and a keystone costs a crop of its own - the two
+are solved together rather than in sequence.
+"""
+
+[[scene]]
+id = "exit"
+crop = true
+min_improvement = 0.10
+max_zoom = 0.82
+headroom = 0.12
+placement = "thirds"
+reason = """
+Crop is on with a raised margin. An exit is a corridor of people with sparklers, and the corridor
+is the composition. The margin is what stops the crop straightening it into a portrait of two
+people.
+"""
+
+[[scene]]
+id = "unknown"
+crop = false
+min_improvement = 0.18
+max_zoom = 0.90
+headroom = 0.10
+placement = "centre"
+reason = """
+The neutral row, and the most conservative in the file: crop OFF and the highest margin there is.
+A frame this product could not classify is a frame it knows the least about, and the honest
+response to knowing the least is to do the least. Every other row in this file is a decision
+somebody made about a kind of photograph; this one is the absence of that decision, and it must
+never read as permission.
+"""

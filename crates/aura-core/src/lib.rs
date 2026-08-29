@@ -32,6 +32,7 @@ pub mod contract {
     pub mod cull;
     pub mod emotion;
     pub mod error;
+    pub mod geometry;
     pub mod ids;
     pub mod integrity;
     pub mod ledger;
@@ -92,6 +93,11 @@ pub use contract::integrity::{
 pub use contract::ledger::{
     Autonomy, DecisionKind, DecisionSource, DecisionSubject, Evidence, ExplainService, Explainable,
     LedgerDecision, LedgerOutline, LedgerReason,
+};
+pub use contract::geometry::{
+    AspectRatio, CropPurpose, CropSafetyReport, CropVariant, GeometryCode, GeometryOutline,
+    GeometryOverride, GeometryPlan, GeometryReason, GeometryService, Keystone, LensCorrection,
+    LensSource, ProtectedContent, ProtectedRegion,
 };
 pub use contract::local::{
     BackgroundBalanceDelta, DodgeBurnMaps, FaceLightDelta, FaceShaping, FaceZone, LocalCode,

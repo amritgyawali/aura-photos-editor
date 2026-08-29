@@ -98,13 +98,12 @@ fn the_shaders_declare_f32_storage_rather_than_f16() {
 fn the_geometry_shader_uses_pixel_centres() {
     // The half-pixel bug, caught once on the processor path and pinned on both. A crop that
     // resampled by half a pixel would soften every straightened frame.
-    let (_, spatial) = SOURCES
-        .iter()
-        .find(|(name, _)| *name == "spatial.wgsl")
-        .copied()
-        .expect("spatial.wgsl");
+    // PHASE-23 moved `stage_geometry` out of `spatial.wgsl` and into `geometry.wgsl`. The
+    // property is about the entry point rather than about the file, so the test now asks
+    // `source_for` where the stage lives instead of naming a file it used to live in.
+    let (_, source) = shaders::source_for(Stage::Geometry).expect("the geometry stage has a shader");
     assert!(
-        spatial.contains("(left + right - 1.0)"),
+        source.contains("(left + right - 1.0)"),
         "the geometry shader must centre on pixel centres, not edges"
     );
 }
@@ -117,9 +116,12 @@ fn each_stage_entry_point_is_in_the_file_its_subject_belongs_to() {
             Stage::HighlightRecovery
             | Stage::WhiteBalance
             | Stage::CameraMatrix
-            | Stage::LensVignette
-            | Stage::LensDistortion
-            | Stage::LensCa => "colour.wgsl",
+            | Stage::LensVignette => "colour.wgsl",
+            // PHASE-23. The two lens resamples and the crop-rotate-perspective stage are one
+            // file, because all three are a coordinate map followed by one bilinear read. They
+            // were identity pass-throughs in `colour.wgsl` and `spatial.wgsl` until the models
+            // existed; leaving them there would have left two entry points with each name.
+            Stage::LensDistortion | Stage::LensCa | Stage::Geometry => "geometry.wgsl",
             Stage::OutputTransform => "output.wgsl",
             Stage::Exposure
             | Stage::Tone

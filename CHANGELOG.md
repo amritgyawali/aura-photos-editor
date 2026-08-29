@@ -2,6 +2,50 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 23 - Geometry Suite (lens corrections, straightening, smart crop)
+
+The first phase that decides which pixels exist, and the one where almost all of the work is
+deciding not to act.
+
+AURA corrects what the lens did where it has a profile - distortion, vignetting and colour
+fringing, in linear light, before anything creative happens - levels horizons that are off by
+between a fifth of a degree and eight degrees when it is confident about what it is looking at,
+and otherwise leaves the framing exactly as it was shot. A tilt smaller than that is already
+level; one larger than that was a decision, and it is left alone rather than partly corrected.
+
+Levelling costs pixels, so the cost is paid before anything else happens: the rotation is reduced
+until the rectangle it implies cuts nobody and stays above the resolution floor, and abandoned if
+no angle works. The panel shows both numbers, the angle AURA wanted and the angle it used.
+Perspective correction works the same way and is refused entirely when it would stretch the frame
+by more than 12 %.
+
+**A crop has to earn its place, and it has to pass a check that has no override.** Every face
+inside, the couple's hands inside, at least 60 % of the long edge kept, the moment's content
+still in frame - and a rectangle that fails is not scored at all rather than being given a
+penalty and weighed against a nicer composition. Above that, a proposal has to beat the
+photographer's own framing by a written margin; most frames therefore keep the framing they were
+shot at, which is what the phase considers correct rather than cautious. Ten kinds of photograph
+have automatic cropping switched off entirely.
+
+Alongside the delivered framing, AURA works out 4:5, 5:4, square and 16:9 alternatives where they
+are safe, so an album can use one without a second file existing. A variant that could not be made
+without cutting somebody is stored as a refusal with the reason, rather than quietly missing.
+
+Every photograph has one button that hands the original framing back - clearing the crop, the
+rotation and the perspective correction together, and letting automation look at the photograph
+again, which a hand-set full-frame crop deliberately does not.
+
+A photographer may crop any photograph of their own as tightly as they like, including through a
+face. What nobody can do - no user, no studio, no setting - is tell AURA that cutting faces is
+acceptable in general.
+
+Three things this build cannot claim: face detection finds nothing, so the safety filter currently
+has nothing to protect and "no crop cut a face" is arithmetic rather than evidence; hands are
+never protected, because the keypoints that would find them are untrained, and the mitigation is
+that cropping is switched off in the scenes where hands matter; and nobody has compared AURA's
+crops against a photographer's. `docs/geometry.md` says all three in the product's own words and
+`docs/progress/PHASE-23-EXIT.md` has the detail.
+
 ## Phase 22 - Restoration Stack (scene-aware denoise, selective sharpen, face recovery)
 
 The first phase that repairs a photograph rather than deciding something about it, and the one

@@ -1629,3 +1629,87 @@ summary      = "Face recovery was declined to keep somebody looking like themsel
 user_message = "AURA stopped short of recovering detail in some faces, because going further would have started to change what those people look like. Those photographs are unchanged."
 runbook      = "docs/runbooks/AURA-ML-5108.md"
 introduced   = "PHASE-22"
+
+# ---------------------------------------------------------------------------
+# PHASE-23 - the geometry suite.
+# ---------------------------------------------------------------------------
+#
+# Six codes. Four are the shapes phases 09, 11, 15, 19, 20, 21 and 22 use -
+# version drift, one item that could not be done, a refused edit and a refused
+# config file - and two are this phase's own.
+#
+# Both of the two describe **the product declining to act**, which is the
+# characteristic shape of this phase: twenty-three of its thirty reason codes
+# describe something that was not done, because section 10.1 requires that at
+# least seventy per cent of frames keep the framing they were shot at.
+#
+# `AURA-ML-5113` fires when a crop candidate was dropped because it would have
+# cut a face, a pair of hands, or what a moment is of. Section 12's first failure
+# mode is an auto-crop that cuts something important and the mitigation is a hard
+# constraint - so every firing of this code is the mitigation working. It is a
+# warning rather than a failure, and it is registered rather than silent, because
+# "why was this photograph not cropped" is the commonest question this phase gets.
+#
+# `AURA-ML-5114` is the same thing for a rotation. Levelling a frame costs a crop,
+# and a crop that would cut somebody is one this phase will not make, so the only
+# choices are a smaller angle or no angle. Both carry the angle that was wanted
+# beside the angle that survived. `docs/geometry.md` says it in the product's own
+# words.
+#
+# Note that there is no `model_ver` in `AURA-ML-5109`. This phase ships no model -
+# the third since phase 08 - so the two numbers that can move are the arithmetic
+# and the profile tables, and they invalidate different things.
+
+[[error]]
+code         = "AURA-ML-5109"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored geometry plans came from different arithmetic or profile tables"
+user_message = "AURA has improved how it straightens and crops photographs, so it is re-checking this wedding in the background. Any framing you set yourself is kept."
+runbook      = "docs/runbooks/AURA-ML-5109.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5110"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph's geometry could not be worked out"
+user_message = "AURA could not work out how to finish one photograph's framing, and has left that photograph exactly as it was shot. Everything else in this wedding is unaffected."
+runbook      = "docs/runbooks/AURA-ML-5110.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5111"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A change to a photograph's framing was refused"
+user_message = "AURA could not save that change to the framing. Nothing has been altered - try again."
+runbook      = "docs/runbooks/AURA-ML-5111.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5112"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "A lens profile database or crop rule file was refused"
+user_message = "AURA cannot read its lens profile or cropping settings, so it will not straighten or crop anything until they are fixed. Your photographs are untouched."
+runbook      = "docs/runbooks/AURA-ML-5112.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5113"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A crop was dropped because it would have cut something that matters"
+user_message = "AURA did not crop some photographs, because a tighter frame would have cut somebody's face or hands. They are delivered at the framing you shot."
+runbook      = "docs/runbooks/AURA-ML-5113.md"
+introduced   = "PHASE-23"
+
+[[error]]
+code         = "AURA-ML-5114"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A rotation or perspective correction was reduced or abandoned"
+user_message = "AURA levelled some photographs less than it wanted to, or not at all, because levelling them fully would have cropped into somebody."
+runbook      = "docs/runbooks/AURA-ML-5114.md"
+introduced   = "PHASE-23"

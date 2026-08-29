@@ -1,0 +1,64 @@
+[package]
+name         = "aura-geometry"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Geometry: the optics corrected, the world levelled, and a crop that never cuts off what matters (phase 23)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# Two reasons, and the second is the one that matters. The first is `spatial::{luma_plane,
+# gradient_plane, resample}`: this crate measures line structure and it is not going to keep a
+# second Sobel. The second is that section 13's last acceptance criterion is "geometry is applied
+# once, at high quality, inside the render graph" - so the resampler this phase decides *for* is
+# `aura-render`, and the parity tests that hold the reference path to the shader live there.
+aura-render  = { path = "../aura-render" }
+# `contract::pixels` for the proxy buffer. Phase 02 owns colour; this crate moves pixels around
+# inside the space phase 02 defined and converts nothing.
+aura-raw     = { path = "../aura-raw" }
+# The pass reads proxies through phase 02's frozen `PreviewService`, exactly as phases 06 to 22
+# do. Nothing here opens a file: invariant 1 as a property of the dependency list.
+aura-preview = { path = "../aura-preview" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+time         = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+
+# Deliberately absent: `aura-cloud`, `aura-recipe`, `aura-vision` and every brain crate.
+#
+# `aura-cloud` is absent because PHASE-23 section 7 is unambiguous - "No cloud AI call in this
+# phase. The phase must work with the network cable unplugged; the Cloud AI Gateway from Phase 04
+# stays idle here." There is no dependency here that could reach a provider and
+# `tests/boundaries.rs` fails the build if one ever appears. This is the second phase in the
+# product with no cloud path at all, after phase 08.
+#
+# `aura-recipe` is absent because writing a recipe is phase 14's rule and lives in `aura-app`.
+# This crate decides; `aura_recipe::schema::merge` is the only function in the workspace that
+# writes one recipe into another, and `tests/no_recipe_writes.rs` is the grep that keeps this
+# crate away from it - the sixth grep-as-a-test in the repository.
+#
+# `aura-vision` is absent even though this crate measures line structure, because everything it
+# needs about *people* arrives through phase 06's frozen `PeopleService` in `aura-core` and
+# everything it needs about *pixels* is a gradient. A dependency here would put a face detector
+# one import away from a crop solver, and the one thing this phase must never do is find its own
+# faces: a crop is checked against the faces phase 06 found, and a second detector is a second
+# answer to "is there somebody at the edge of this frame".
+#
+# The brain crates are absent for the reason every crate since phase 09 has kept them out:
+# everything this crate needs from phases 06, 07, 08 and 11 arrives through the frozen traits in
+# `aura-core`.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. In `tests/eval/`
+# beside every harness since phase 05, because a gate is a claim about the product and not about
+# a crate.
+[[test]]
+name = "geometry_eval"
+path = "../../tests/eval/geometry_eval.rs"

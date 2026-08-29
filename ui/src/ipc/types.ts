@@ -3207,3 +3207,217 @@ export type RestoreIdentityRefusalDto = {
   worstDrift: number;
   faces: number;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-23. The geometry surface.
+//
+// Nine commands. The panel draws four things from them: the rectangle that will be delivered,
+// the rectangles that must not be cut, the aspect variants an album and a feed can have, and the
+// sentence explaining why almost every frame was left alone.
+//
+// Two fields on this surface are here because a number without its denominator is a claim nobody
+// can check: `facesChecked` beside `facesCut`, and `lensMeasured` beside every correction.
+// ---------------------------------------------------------------------------
+
+/** One crop variant: a rectangle, what it is for, and whether it may be delivered. */
+export type CropVariantDto = {
+  /** Its position in the photograph's own list. Zero is always the original framing. */
+  ordinal: number;
+  /** `original`, `4:5`, `5:4`, `1:1` or `16:9`. */
+  aspect: string;
+  /** `primary`, `social` or `album`. */
+  purpose: string;
+  rect: CropRectDto;
+  /**
+   * The composition objective at this rectangle, `0..1`.
+   *
+   * Comparable between the rows of one photograph and **not** between photographs.
+   */
+  score: number;
+  safe: boolean;
+  /** Why it may not be delivered, when it may not. A refused variant is a row, not a gap. */
+  refusal?: string | null;
+  /** The share of the original long edge this keeps. Absent when the frame's size is unknown. */
+  longEdgeFraction?: number | null;
+};
+
+/** What the safety filter checked before a rectangle was allowed. */
+export type CropSafetyDto = {
+  facesIntact: boolean;
+  resolutionOk: boolean;
+  contentKept: boolean;
+  /** **How many protected regions were checked.** Zero on this build - see `docs/geometry.md`. */
+  considered: number;
+  /** How many the delivered rectangle would cut. Always zero on a delivered crop. */
+  atRisk: number;
+  longEdgeFraction: number;
+  regions: ProtectedRegionDto[];
+};
+
+/** One thing a crop may not cut. */
+export type ProtectedRegionDto = {
+  /** `face`, `hands`, `joined_hands`, `primary_body` or `moment_key`. */
+  kind: string;
+  text: string;
+  area: CropRectDto;
+  identityId?: string | null;
+};
+
+/** One reason a photograph's geometry came out the way it did. */
+export type GeometryReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+  /** True when this says something did **not** happen. Most of this vocabulary is refusals. */
+  refusal: boolean;
+  /** True when the refusal was the safety filter rather than the improvement margin. */
+  safety: boolean;
+  area?: CropRectDto | null;
+};
+
+/** A perspective correction, and the stretch it cost. */
+export type KeystoneDto = {
+  vertical: number;
+  horizontal: number;
+  /** The measured ratio between the two axis scales, never above 1.12. */
+  stretch: number;
+  convergence: number;
+};
+
+/** One photograph's geometry plan. */
+export type GeometryPlanDto = {
+  photoId: string;
+  scene: string;
+  /** `embedded`, `database`, `estimated` or `none`. */
+  lensSource: string;
+  lensProfile?: string | null;
+  lensDistortion: boolean;
+  lensVignette: number;
+  lensCa: boolean;
+  /** True when somebody measured that profile on a real lens. **False everywhere in this build.** */
+  lensMeasured: boolean;
+  rotateDeg: number;
+  /** How sure the horizon was, stored even when nothing was rotated. */
+  rotateConf: number;
+  keystone?: KeystoneDto | null;
+  crops: CropVariantDto[];
+  /** Which variant is delivered. Always addresses a safe one. */
+  primaryCrop: number;
+  safety: CropSafetyDto;
+  reasons: GeometryReasonDto[];
+  confidence: number;
+  keptOriginal: boolean;
+  userEdited: boolean;
+  reviewed: boolean;
+  /** Arithmetic and profiles. Two, because this phase ships no model. */
+  versions: number[];
+};
+
+/** One reason a crop candidate was refused, and how often. */
+export type GeometryRefusalDto = {
+  code: string;
+  text: string;
+  safety: boolean;
+  count: number;
+};
+
+/** One lens nothing could be found for. */
+export type GeometryLensMissDto = {
+  lens: string;
+  count: number;
+};
+
+/** What the Geometry panel's project header shows. */
+export type GeometryStatusDto = {
+  photos: number;
+  planned: number;
+  /** Fraction of the project with a plan. The denominator is every photograph. */
+  coverage: number;
+  actedOn: number;
+  keptOriginal: number;
+  /** `keptOriginal / planned`. The conservatism gate: at least 0.70. */
+  conservatism: number;
+  straightened: number;
+  meanRotationDeg: number;
+  keystoned: number;
+  cropped: number;
+  variants: number;
+  cropRefusals: GeometryRefusalDto[];
+  /** Frames per source, in `embedded`, `database`, `estimated`, `none` order. */
+  lensSources: number[];
+  lensSourceNames: string[];
+  /** The lenses nothing could be found for. The one row here a studio can act on. */
+  lensesMissing: GeometryLensMissDto[];
+  /** How many protected regions were checked across the project. Zero on this build. */
+  facesChecked: number;
+  /** How many delivered crops cut a face. **Must be zero.** */
+  facesCut: number;
+  userEdited: number;
+  pendingReview: number;
+};
+
+/** Ask for the frames worth a photographer's attention. */
+export type GeometryReviewInput = {
+  projectId: string;
+  limit?: number | null;
+};
+
+/** Record that a photographer has looked at one plan and agrees. */
+export type AcceptGeometryInput = {
+  photoId: string;
+};
+
+/**
+ * Give a photograph back the framing it was shot at.
+ *
+ * Its own input and its own command: the revert clears the crop, the rotation, the keystone and
+ * `userEdited` together, so automation resumes on the frame rather than stopping on it forever.
+ */
+export type RevertGeometryInput = {
+  photoId: string;
+};
+
+/**
+ * Record the framing a photographer chose for one photograph.
+ *
+ * Absent means "leave what AURA decided alone". **No field here widens a safety rule.** A
+ * photographer may crop one photograph of their own as tightly as they like - it is stored with
+ * `userEdited` set and never re-cropped - and there is nowhere to say that cutting faces is
+ * acceptable in general.
+ */
+export type SetGeometryOverrideInput = {
+  photoId: string;
+  crop?: CropRectDto | null;
+  aspect?: string | null;
+  rotateDeg?: number | null;
+  distortion?: boolean | null;
+  vignette?: number | null;
+  ca?: boolean | null;
+};
+
+/** Run the resumable geometry pass. */
+export type GeometryPassInput = {
+  projectId: string;
+  priority?: string | null;
+  enabled?: boolean | null;
+};
+
+/** What one pass did. */
+export type GeometryPassDto = {
+  planned: number;
+  failed: number;
+  actedOn: number;
+  keptOriginal: number;
+  conservatism: number;
+  straightened: number;
+  keystoned: number;
+  variants: number;
+  /** Frames corrected through a profile nobody measured. Every corrected frame in this build. */
+  referenceProfiles: number;
+  lowConfidence: number;
+  lensesMissing: string[];
+  unlistedScenes: string[];
+  cropRefusals: GeometryRefusalDto[];
+  elapsedMs: number;
+  cancelled: boolean;
+};

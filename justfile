@@ -317,6 +317,22 @@ restore-eval:
     python ml/models/restore/eval_restore.py --self-test
     python ml/models/restore/export.py --verify models
 
+# The phase 23 gate: migration 23 with its two triggers and its deferred foreign key, the crop
+# rules and the lens database with the four bounds the code owns rather than the files, the
+# rotation band at both ends, the safety filter, the conservatism gate, the keystone stretch cap,
+# the store round trip, and the revert that hands a photograph back and lets automation resume.
+# It prints what it does not prove at the end of every run - see docs/progress/PHASE-23-EXIT.md
+# conditions C1 to C4.
+phase-23-verify:
+    cargo run --release --package aura-cli -- verify --phase 23 --work target/phase23-verify
+
+# The phase 23 contract gates, in Rust rather than Python. This phase ships no model - the third
+# since phase 08 - so there is nothing to train and nothing to export: what there is instead is
+# section 10.1's eight rows as executable tests over synthetic frames whose right answer is known
+# by construction.
+geometry-eval:
+    cargo test --release --package aura-geometry --test geometry_eval
+
 # The calibration metrics, from the Python side. `--self-test` proves the
 # estimator catches an overconfident predictor and that a fit improves held-out
 # ECE; `--outcomes FILE --fit --diagram OUT.svg` reports on real outcomes when
