@@ -29,6 +29,15 @@ If a requested change would break an invariant, stop and write an ADR proposing 
 
 ### How this agent team runs a phase (identical every time)
 
+0. **Cut the branch and publish it (EM), before anything else.** The very first
+   action of a phase - before the kickoff, before a line of code, before the ADR -
+   is `scripts/phase-branch.sh NN <slug>`, which cuts `feat/phase-NN-<slug>` off an
+   up-to-date `origin/main` and **pushes it to origin immediately**. Not on request:
+   by default. Pushing an empty branch costs nothing and buys three things a phase
+   otherwise does without for its whole length - a name everybody can see, a place
+   for the pull request to hang off, and a commit to bisect back to. Until phase 24
+   the push happened at the *end*, which meant a phase existed on exactly one disk
+   for as long as the phase took.
 1. **Kickoff (PM + CTO + EM).** PM restates the feature as user stories, CTO writes/updates the ADR, EM cuts the task list from section 9 into the tracker.
 2. **Design review (CTO + TLC + MLL + COL + UX).** Interfaces from section 5 are frozen before code. Any change after freeze needs an ADR amendment.
 3. **Build in parallel lanes.** Core lane (TLC/SRC/SRG), ML lane (MLL/SRML/MLR/MLOPS), agent lane (AGT), UI lane (SFE/MFE/UX), data lane (DATA), platform lane (DEVOPS/SEC).
@@ -37,19 +46,35 @@ If a requested change would break an invariant, stop and write an ADR proposing 
 6. **QA gate (QAL + QAIQ + PERF).** Unit + integration + golden-image + perceptual + performance suites must be green on the reference weddings.
 7. **Phase gate (CTO + PM + EM).** All acceptance criteria in section 13 pass, telemetry is live, docs updated, demo recorded. Only then does the next phase start.
 8. **Escalation.** Any blocker older than one working day goes to EM; any invariant conflict goes to CTO; any "we should ship it slightly broken" goes to PM and is written down.
-9. **Land it (EM).** Commit on `feat/phase-NN-<slug>` and **push**, always, as the last action of the phase. Not on request - by default. The gate has exited 0, the exit report is written, and until it is pushed the phase exists on exactly one disk.
+9. **Land it (EM).** Commit everything on `feat/phase-NN-<slug>`, push, **open the pull
+   request and merge it into `main`** - all of it from the terminal, all of it as the last
+   action of the phase, none of it on request. One command does the whole of it:
+   `scripts/phase-land.sh --message "feat(<lane>): <what changed>"`. The gate has exited 0
+   and the exit report is written before this runs. A phase is not finished when it is
+   pushed; it is finished when `main` carries it.
 
 ### Branch, commit and PR rules
 
-- Branch: `feat/phase-NN-<slug>`; one PR per task group, never one giant PR per phase.
+- **Branch first, always.** `scripts/phase-branch.sh NN <slug>` is step 0 of the ritual: a
+  phase branch exists on `origin` before its first commit, not after its last.
+- Branch: `feat/phase-NN-<slug>`, cut from `origin/main`. Two digits, kebab-case slug; the
+  script refuses anything else, because a one-digit phase sorts wrong beside the
+  twenty-four branches that already exist.
 - Conventional Commits (`feat(core): ...`, `fix(ml): ...`, `perf(render): ...`, `test(qa): ...`, `docs: ...`).
 - Every PR states: what changed, which acceptance criterion it advances, benchmark delta, and screenshots or golden-image diffs when pixels change.
 - CI must be green: `fmt`, `clippy -D warnings`, `cargo test`, `pytest`, `vitest`, golden-image diff, benchmark regression guard (<= 5 % slower), model-hash check.
-- **Commit and push at the end of every phase, without being asked.** The last action of a
-  phase is `git push` on its `feat/phase-NN-<slug>` branch, after the gate exits 0 and the
-  exit report is written. A phase that exists only in one machine's working tree is a
-  phase nobody else can review, bisect or roll back to - and the work of a whole phase is
-  too much to hold hostage to one disk. This is step 9 of the ritual below.
+- **The whole of landing is one command, and it runs in the terminal.**
+  `scripts/phase-land.sh` commits what is left, pushes, opens the pull request over the
+  GitHub REST API, refuses to merge on a failed check, merges into `main` and leaves the
+  checkout on an up-to-date `main`. `gh` is used for the token when it is installed and is
+  not required - the OS credential manager already holds one on any machine that has
+  pushed this repository. `docs/runbooks/phase-landing.md` is the runbook, including what
+  to do when there is no forge to reach.
+- **A merge is refused on a failed check, not warned about.** `--ignore-check NAME` excuses
+  one named job - `benchmarks` has been red on `main` since the render backend was waived -
+  and `--force-merge` excuses all of them. Reach for the narrow one.
+- **Nothing in this tooling force-pushes.** If `origin` has moved, that is somebody else's
+  work, and a landing script is not where it is decided what happens to it.
 
 ## 4. Definition of Done (every phase)
 

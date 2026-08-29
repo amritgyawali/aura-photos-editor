@@ -2,6 +2,38 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Tooling - the phase ritual becomes branch-first, and landing becomes one command
+
+Not a phase. A change to how every phase after phase 24 is started and finished, recorded
+here because it changes the shape of the repository's history rather than any of its code.
+
+**Step 0 is new.** A phase now cuts its branch and pushes it to `origin` *before* the
+kickoff, the ADR and the first line of code - `scripts/phase-branch.sh NN <slug>`. The rule
+it replaces said "commit and push at the end of the phase", and the consequence was that a
+month of decisions, a migration, a frozen contract and an exit report lived on exactly one
+disk for as long as the phase took. An empty branch costs one round trip and buys a name
+everybody can see, a place for the pull request to hang off from the first commit rather
+than the last, and a commit to bisect back to.
+
+**Step 9 now reaches `main`.** `scripts/phase-land.sh` commits what is left, pushes, opens
+the pull request over the GitHub REST API, reads the checks, merges into `main` and leaves
+the checkout on an up-to-date `main`. A phase used to be finished when it was pushed; it is
+finished now when `main` carries it. `just phase-start` and `just phase-ship` are the two
+commands with less to type, and `docs/runbooks/phase-landing.md` is the runbook.
+
+Three properties of the tooling are deliberate. **It refuses to merge on a failed check**,
+and `--ignore-check NAME` excuses one named job while `--force-merge` excuses all of them -
+`benchmarks` has been red on `main` since the render backend was waived, and naming it is a
+much narrower statement than waving everything through. **It never force-pushes**, in any
+mode: if `origin` has moved, that is somebody else's work and a landing script is not where
+it is decided what happens to it. And **it never runs the phase gate** - the gate is step 7
+and has exited 0 before landing starts; running the suite again here would double a phase's
+slowest hour and hide which of the two runs was the one that counted.
+
+`gh` is not required. The token comes from `GH_TOKEN`, `GITHUB_TOKEN`, `gh auth token` or
+the OS credential manager, in that order, and is never printed, never passed as a
+command-line argument and never written anywhere that outlives the call.
+
 ## Phase 23 - Geometry Suite (lens corrections, straightening, smart crop)
 
 > **Ordering note.** This phase was written on top of phase 19 and reached `main` before
