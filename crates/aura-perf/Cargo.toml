@@ -26,6 +26,7 @@ aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-retouch       = { path = "../aura-retouch" }
 aura-cull          = { path = "../aura-cull" }
 aura-geometry      = { path = "../aura-geometry" }
+aura-generative    = { path = "../aura-generative" }
 aura-explain       = { path = "../aura-explain" }
 aura-people.path   = "../aura-people"
 aura-raw.path      = "../aura-raw"

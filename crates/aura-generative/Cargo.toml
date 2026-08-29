@@ -12,15 +12,21 @@ description  = "Distraction removal bounded by a safety engine: small, extraneou
 aura-core    = { path = "../aura-core" }
 aura-catalog = { path = "../aura-catalog" }
 aura-preview = { path = "../aura-preview" }
+# PHASE-24. The pixel buffer the preview service hands back, and `colour::curve` for the one
+# decode from a proxy's storage form into linear. Nothing here opens a file: `PreviewService` is
+# still the only route to pixels, exactly as it is for phases 09, 20, 21 and 22.
+aura-raw     = { path = "../aura-raw" }
 # PHASE-24. The masks the denylist intersects against, and the only route to them. Phase 18's
 # rule: `MaskService` is the one way to ask what is where in a photograph, and a second answer
 # to "where is her hand" is a removal that disagrees with the retouch about the same pixels.
 aura-vision  = { path = "../aura-vision" }
+blake3       = { workspace = true }
 rusqlite     = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }
 toml         = { workspace = true }
 tracing      = { workspace = true }
+uuid         = { workspace = true }
 
 # Deliberately absent: `aura-people`, `aura-brain-photo`, `aura-brain-wedding`, `aura-render`
 # and `aura-cloud`.

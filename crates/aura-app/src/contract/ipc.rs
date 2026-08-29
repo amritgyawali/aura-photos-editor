@@ -6273,3 +6273,265 @@ pub struct AcceptGeometryInput {
     /// The photograph.
     pub photo_id: String,
 }
+
+// =================================================================================================
+// PHASE-24. The cleanup surface. ADR-0050.
+//
+// Eight commands. Four read - the project coverage, one photograph's proposals, one photograph's
+// refusals, and the delivery report - one runs the resumable pass, and three record what the
+// photographer decided.
+//
+// WHAT IS NOT HERE, AND CANNOT BE ADDED WITHOUT AN ADR
+//
+// **No command carries a strength, a size or a description.** The only things a person can say on
+// this surface are yes, no, and "leave this photograph alone". There is no field a prompt could go
+// in, which is how `docs/generative-policy.md`'s promise that AURA never generates from a
+// description is kept - as a property of the shapes rather than as a default somebody could change.
+//
+// **No command returns pixels.** Phase 13's rule, and the panel renders its before-and-after from
+// `render_image` with and without the recipe's `cleanup[]`, which is the same region asked for
+// twice. What this surface adds is the *rectangle and the method* those two renders differ by.
+//
+// **No command can raise a cap.** The contract owns `AREA_CAP_DEFAULT`, `DENYLIST_OVERLAP_MAX` and
+// `ZERO_TOUCH_CONFIDENCE`, `cleanup_policy.toml` may only tighten them, and nothing on the wire
+// touches any of the three.
+//
+// **`manual_remove` is the one command that acts on a region a person chose**, and it is
+// deliberately the most constrained thing here: it still runs the whole safety engine, it still
+// refuses a person, and it records `manual_removal` so the delivery report can tell a
+// photographer's own removal from AURA's. Section 2.2 makes removing a guest a human decision; it
+// does not make it an unchecked one.
+// =================================================================================================
+
+/// One proposed removal, as the panel renders it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupProposalDto {
+    /// The proposal.
+    pub proposal_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// Where, normalised to the frame.
+    pub region: CropRectDto,
+    /// What it is, from the closed vocabulary. `unclassified` on every frame in this build.
+    pub class: String,
+    /// The words a photographer reads for the class.
+    pub class_text: String,
+    /// The share of the frame the region covers, `0..1`.
+    pub area_frac: f32,
+    /// How much attention it draws, `0..1`.
+    pub salience: f32,
+    /// `borrow`, `fill` or `inpaint`.
+    pub method: String,
+    /// The photograph the pixels would come from, when the method is `borrow`.
+    pub borrowed_from: Option<String>,
+    /// Which model would make them up, when the method is `inpaint`. Never set in this build.
+    pub model: Option<String>,
+    /// How sure the whole proposal is, `0..1`.
+    pub confidence: f32,
+    /// What the self-check measured on the result, `0..1`, lower is cleaner.
+    pub artefact_score: f32,
+    /// Phase 13's band, raised one for this phase and again while nothing is calibrated.
+    pub autonomy: String,
+    /// The scene the thresholds were conditioned on.
+    pub scene: String,
+    /// Why, worst first.
+    pub reasons: Vec<CleanupReasonDto>,
+    /// `true` accepted, `false` rejected, absent undecided.
+    pub accepted: Option<bool>,
+    /// True when the removal has been written into the recipe.
+    pub applied: bool,
+    /// True when this may be applied without anybody looking. False everywhere in this build.
+    pub may_apply_unattended: bool,
+    /// The detector, the safety arithmetic and the policy table it was made under.
+    pub versions: Vec<u16>,
+}
+
+/// One reason, as the panel renders it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupReasonDto {
+    /// The stable code.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// How much this reason contributed, `0..1`.
+    pub weight: f32,
+    /// True when this code records something the product declined to do.
+    pub is_refusal: bool,
+    /// The pixels behind it, when there are any.
+    pub evidence: Option<CropRectDto>,
+}
+
+/// One candidate the safety engine refused, as the panel renders it.
+///
+/// **The panel shows these on request rather than by default**, which is why they are a separate
+/// command: the refused set is usually larger than the proposed one, and a queue that rendered
+/// forty refusals it will not draw would be slower for no benefit. But they are on the surface at
+/// all because teaching a photographer what AURA will never do is most of the trust this feature
+/// needs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupBlockedDto {
+    /// Where.
+    pub region: CropRectDto,
+    /// Which of the five checks stopped it.
+    pub check: String,
+    /// The reason code.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+}
+
+/// One removal that happened, for the delivery report.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupDisclosureDto {
+    /// The proposal.
+    pub proposal_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// `borrow`, `fill` or `inpaint`.
+    pub method: String,
+    /// Where the pixels came from, when the method is `borrow`.
+    pub borrowed_from: Option<String>,
+    /// Which model, when the method is `inpaint`.
+    pub model: Option<String>,
+    /// Where.
+    pub region: CropRectDto,
+    /// True when a person accepted it rather than a mode applying it.
+    pub accepted_by_user: bool,
+    /// What the self-check measured, `0..1`.
+    pub artefact_score: f32,
+}
+
+/// What the Cleanup panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs the pass has examined.
+    pub examined: u32,
+    /// Fraction examined. **The denominator is every photograph.**
+    pub coverage: f32,
+    /// Photographs carrying at least one proposal.
+    pub with_proposals: u32,
+    /// Proposals that were applied.
+    pub applied: u32,
+    /// Candidates the safety engine refused, by check, in `SafetyCheck::ALL` order.
+    pub blocked: Vec<u32>,
+    /// The names of those five checks, in the same order.
+    pub check_names: Vec<String>,
+    /// Applied removals that borrowed real pixels from a sibling frame.
+    pub borrowed: u32,
+    /// Applied removals filled from this photograph's own texture.
+    pub filled: u32,
+    /// Applied removals a diffusion model produced. Zero in this build.
+    pub inpainted: u32,
+    /// Removals the self-check reverted before anybody saw them.
+    pub reverted: u32,
+    /// Fraction of examined frames whose six protected kinds could all be looked for.
+    ///
+    /// **The number to read first.** At zero, every candidate was refused for want of evidence
+    /// rather than for want of safety, and the blocked histogram says nothing about what is in the
+    /// photographs.
+    pub mask_covered: f32,
+    /// Whether a trained distraction detector is installed. False in this build.
+    pub detector_trained: bool,
+    /// Whether a diffusion inpainting model pack is installed. False in this build.
+    pub inpaint_available: bool,
+}
+
+/// Run the cleanup pass over a project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupPassInput {
+    /// The project.
+    pub project_id: String,
+    /// Only these photographs, or all pending ones when empty.
+    ///
+    /// The path the job graph uses, with phase 12's keepers: a distraction in a rejected frame is
+    /// not a distraction. Invariant 3.
+    #[serde(default)]
+    pub photo_ids: Vec<String>,
+}
+
+/// What one pass did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupPassDto {
+    /// Photographs examined.
+    pub examined: u32,
+    /// Photographs carrying at least one proposal.
+    pub with_proposals: u32,
+    /// Proposals produced.
+    pub proposals: u32,
+    /// Candidates refused, by check.
+    pub blocked: Vec<u32>,
+    /// Removals the self-check undid before anybody saw them.
+    pub reverted: u32,
+    /// Cloud editorial judgements made.
+    pub judged: u32,
+    /// How many of those declined a removal.
+    pub declined: u32,
+    /// Photographs that could not be examined.
+    pub failed: u32,
+    /// True when the run was cancelled part way.
+    pub cancelled: bool,
+    /// How long it took.
+    pub elapsed_ms: u64,
+}
+
+/// Accept or reject one proposal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecideCleanupInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// The proposal.
+    pub proposal_id: String,
+    /// Yes or no. There is no third thing a person can say here.
+    pub accept: bool,
+}
+
+/// Switch cleanup off, or back on, for one photograph.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisableCleanupInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// True to leave this photograph alone entirely.
+    pub disabled: bool,
+}
+
+/// Ask for one region of one photograph to be removed, by hand.
+///
+/// Section 2.2's "manual tool with explicit confirmation". It runs the **whole** safety engine:
+/// the size cap, the denylist, the identity check, the structure check and the confidence check,
+/// in that order, on a region a person drew. A person choosing a rectangle is a reason to skip the
+/// *detector*, not a reason to skip the safety filter.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualRemoveInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// The rectangle they drew, normalised to the frame.
+    pub region: CropRectDto,
+    /// Explicit confirmation. The command refuses without it.
+    ///
+    /// A separate field rather than an implication of calling the command, because section 2.2
+    /// asks for explicit confirmation and a call is not one. A UI that forgot the dialog would get
+    /// a refusal rather than a removal.
+    pub confirmed: bool,
+}
+
+/// What a manual removal did, or refused to do.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualRemoveDto {
+    /// The proposal, when one was produced.
+    pub proposal: Option<CleanupProposalDto>,
+    /// Which check refused it, when one did.
+    pub blocked: Option<CleanupBlockedDto>,
+}

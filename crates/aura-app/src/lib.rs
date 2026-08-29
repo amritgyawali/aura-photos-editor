@@ -38,6 +38,7 @@
 //! and streams progress events.
 
 pub mod biometric_keys;
+pub mod cleanup_commands;
 pub mod cloud_commands;
 pub mod colour_commands;
 pub mod commands;
@@ -101,6 +102,10 @@ pub use emotion_commands::{
 pub use explain_commands::{
     compact_ledger, decision_by_id, decision_history, explain_image, export_support_bundle,
     ledger_status, record_decisions, review_queue,
+};
+pub use cleanup_commands::{
+    cleanup_blocked, cleanup_disclosures, cleanup_pass, cleanup_reason_codes, cleanup_status,
+    decide_cleanup, disable_cleanup, image_cleanup, manual_remove,
 };
 pub use geometry_commands::{
     accept_geometry, geometry_review_queue, geometry_status, image_geometry, plan_geometry,

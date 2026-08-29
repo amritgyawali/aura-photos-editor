@@ -3353,3 +3353,149 @@ export type SetFramingDto = {
 export type AcceptGeometryInput = {
   photoId: string;
 };
+
+// =================================================================================================
+// PHASE-24. Distraction cleanup. ADR-0050.
+//
+// Nine calls. Four read, one runs the pass, three record a decision, and one is the manual tool.
+//
+// There is no strength on this surface, no size, and no field a description of what should be
+// generated could go in. `docs/generative-policy.md` promises AURA never generates from a
+// description, and the way that promise is kept is that no type here could carry one.
+// =================================================================================================
+
+/** One reason, with the pixels behind it where there are any. */
+export type CleanupReasonDto = {
+  code: string;
+  text: string;
+  weight: number;
+  /** True when this code records something AURA declined to do. More than half of them do. */
+  isRefusal: boolean;
+  evidence: CropRectDto | null;
+};
+
+/** One proposed removal. */
+export type CleanupProposalDto = {
+  proposalId: string;
+  photoId: string;
+  region: CropRectDto;
+  /** `unclassified` on every frame in this build; there is no trained detector. */
+  class: string;
+  classText: string;
+  areaFrac: number;
+  salience: number;
+  /** `borrow`, `fill` or `inpaint`. */
+  method: string;
+  /** Set only for `borrow`: a removal that moved real pixels says where they came from. */
+  borrowedFrom: string | null;
+  /** Set only for `inpaint`. Never set in this build. */
+  model: string | null;
+  confidence: number;
+  artefactScore: number;
+  autonomy: string;
+  scene: string;
+  reasons: CleanupReasonDto[];
+  /** `true` accepted, `false` rejected, `null` undecided. */
+  accepted: boolean | null;
+  applied: boolean;
+  /** False everywhere in this build: nothing is calibrated, so every band is raised to review. */
+  mayApplyUnattended: boolean;
+  versions: number[];
+};
+
+/** One candidate the safety engine refused. */
+export type CleanupBlockedDto = {
+  region: CropRectDto;
+  /** One of `size_cap`, `denylist`, `identity_protect`, `structure_span`, `confidence`. */
+  check: string;
+  code: string;
+  text: string;
+};
+
+/** One removal that happened, for the delivery report. */
+export type CleanupDisclosureDto = {
+  proposalId: string;
+  photoId: string;
+  method: string;
+  borrowedFrom: string | null;
+  model: string | null;
+  region: CropRectDto;
+  acceptedByUser: boolean;
+  artefactScore: number;
+};
+
+/** What the Cleanup panel's project header shows. */
+export type CleanupStatusDto = {
+  photos: number;
+  examined: number;
+  /** The denominator is every photograph. */
+  coverage: number;
+  withProposals: number;
+  applied: number;
+  /** By check, in `SafetyCheck::ALL` order. */
+  blocked: number[];
+  checkNames: string[];
+  borrowed: number;
+  filled: number;
+  /** Zero in this build. */
+  inpainted: number;
+  reverted: number;
+  /**
+   * The number to read first. At zero, every candidate was refused for want of evidence rather
+   * than for want of safety, and the blocked histogram says nothing about the photographs.
+   */
+  maskCovered: number;
+  detectorTrained: boolean;
+  inpaintAvailable: boolean;
+};
+
+export type CleanupPassInput = {
+  projectId: string;
+  /** Empty runs every pending photograph; a list runs phase 12's keepers only. */
+  photoIds?: string[];
+};
+
+export type CleanupPassDto = {
+  examined: number;
+  withProposals: number;
+  proposals: number;
+  blocked: number[];
+  reverted: number;
+  judged: number;
+  declined: number;
+  failed: number;
+  cancelled: boolean;
+  elapsedMs: number;
+};
+
+export type DecideCleanupInput = {
+  photoId: string;
+  proposalId: string;
+  /** Yes or no. There is no third thing a person can say here. */
+  accept: boolean;
+};
+
+export type DisableCleanupInput = {
+  photoId: string;
+  disabled: boolean;
+};
+
+/**
+ * Ask for one region to be removed by hand.
+ *
+ * It still runs the whole safety engine. A person choosing a rectangle is a reason to skip the
+ * detector, not a reason to skip the filter, and the one thing it can never do - whatever anybody
+ * confirms - is remove a person.
+ */
+export type ManualRemoveInput = {
+  photoId: string;
+  region: CropRectDto;
+  /** The command refuses without it. Section 2.2 asks for explicit confirmation. */
+  confirmed: boolean;
+};
+
+export type ManualRemoveDto = {
+  proposal: CleanupProposalDto | null;
+  /** Which check refused it, when one did. A refusal is a result rather than a failure. */
+  blocked: CleanupBlockedDto | null;
+};

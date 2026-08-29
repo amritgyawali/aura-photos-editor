@@ -182,6 +182,31 @@ impl DistractionClass {
         }
     }
 
+    /// The words a photographer reads.
+    ///
+    /// One sentence per class, in the product's own voice, and every one of them says what the
+    /// thing *is* rather than what AURA will do about it: a panel that read "removable clutter"
+    /// would be telling a photographer the answer before showing them the question.
+    #[must_use]
+    pub const fn user_text(self) -> &'static str {
+        match self {
+            Self::ExitSign => "a building sign, like a fire exit",
+            Self::Bin => "a bin, a crate or a catering tub",
+            Self::Cable => "cabling or a taped-down run",
+            Self::GafferTape => "tape on the floor",
+            Self::Bottle => "a bottle or a cup",
+            Self::Chair => "a chair or a stand at the frame edge",
+            Self::PhoneScreen => "a lit phone screen",
+            Self::StrayHand => "a stray hand or arm entering the frame",
+            Self::BackgroundPerson => {
+                "somebody in the background. AURA never removes a person on its own"
+            }
+            Self::Unclassified => {
+                "something that draws the eye and does not belong to anything AURA recognises"
+            }
+        }
+    }
+
     /// Read a stored slug back. `None` rather than a default, so a row written by a newer build
     /// is a refusal rather than a silent `Unclassified`.
     #[must_use]
@@ -588,6 +613,91 @@ impl CleanupCode {
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|c| c.as_str() == text)
+    }
+
+    /// The sentence a photographer reads.
+    ///
+    /// Thirty-one of them, and **more than half say what AURA declined to do**. That is the phase
+    /// rather than an accident, and the wording follows from it: a refusal is written as a
+    /// decision the product made on purpose, not as an apology for a missing feature. "AURA could
+    /// not tell where people are in this photograph, so it has left it alone" is a different
+    /// sentence from "AURA failed to segment this photograph", and only the first is true.
+    #[must_use]
+    pub const fn user_text(self) -> &'static str {
+        match self {
+            Self::UnexplainedSalience => {
+                "this draws the eye and does not seem to belong to anything in the wedding"
+            }
+            Self::BackgroundPlane => "it sits well behind everybody in the photograph",
+            Self::NearFrameEdge => "it is near the edge of the frame",
+            Self::SiblingAvailable => {
+                "another frame of the same moment shows this background without it, so the \
+                 replacement is real pixels rather than invented ones"
+            }
+            Self::TextureUniform => {
+                "the surroundings are even enough to copy from, so nothing had to be invented"
+            }
+            Self::TooLarge => {
+                "it covers more of the frame than AURA will ever tidy on its own"
+            }
+            Self::OverlapsProtected => {
+                "it overlaps a face, skin, hands, a dress, rings or the cake, so AURA left it alone"
+            }
+            Self::ProtectionUnknown => {
+                "AURA cannot yet tell where people, dresses and rings are in this photograph, so \
+                 it will not tidy anything out of it"
+            }
+            Self::OverlapsIdentity => "it touches somebody this wedding is about",
+            Self::StructureSpanned => {
+                "it crosses a straight line or a repeating pattern, which tidying would bend"
+            }
+            Self::ConfidenceLow => "AURA is not sure enough about this to suggest it",
+            Self::ClassUnknown => {
+                "AURA cannot tell what this is, so it cannot show that it is not part of your \
+                 wedding"
+            }
+            Self::StoryRelevant => "this looks like part of what the wedding was about",
+            Self::PersonPresent => {
+                "this is a person. Removing somebody is your decision and never AURA's"
+            }
+            Self::ProposalCapReached => {
+                "this photograph already has as many suggestions as AURA will make for one frame"
+            }
+            Self::NoAlignedSibling => {
+                "no other frame of this moment could be lined up well enough to borrow from"
+            }
+            Self::TextureStructured => {
+                "the surroundings are too patterned to copy from without inventing something"
+            }
+            Self::InpaintUnavailable => {
+                "this would need AURA to make up new pixels, which this installation cannot do"
+            }
+            Self::ArtefactRepeatedTexture => {
+                "the result repeated a pattern that appears nowhere else in the photograph"
+            }
+            Self::ArtefactWarpedLine => "a straight line bent inside the tidied area",
+            Self::ArtefactGhostEdge => "an edge appeared where the tidied area meets the rest",
+            Self::RevertedOnSelfCheck => {
+                "AURA did not like its own result and put the photograph back exactly as it was"
+            }
+            Self::ReviewRequiredMethod => {
+                "this would need invented pixels, so it always waits for you"
+            }
+            Self::ReviewRequiredConfidence => "this is waiting for you to look at it",
+            Self::AppliedUnattended => "AURA was confident enough to do this without asking",
+            Self::AcceptedByUser => "you accepted this",
+            Self::RejectedByUser => "you turned this down",
+            Self::ManualRemoval => "you asked for this one yourself",
+            Self::JudgementDeclined => {
+                "a second, more cautious review decided this belongs in the photograph"
+            }
+            Self::JudgementUnavailable => {
+                "the second review was not reachable, so AURA kept its own cautious answer"
+            }
+            Self::VersionDrift => {
+                "AURA has improved how it spots distractions and is re-checking this wedding"
+            }
+        }
     }
 
     /// True when this code records something the product declined to do.

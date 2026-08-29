@@ -83,6 +83,7 @@ pub mod audit;
 pub mod budget;
 pub mod cache;
 pub mod cassette;
+pub mod cleanup_judgement;
 pub mod compat;
 pub mod couple_hint;
 pub mod explain_summary;
@@ -108,6 +109,10 @@ pub mod contract {
 pub mod keys;
 
 pub use cassette::{Cassette, CassetteTransport, Matcher};
+pub use cleanup_judgement::{
+    CleanupJudgement, CleanupJudgementInput, CleanupJudgementOutput, CLEANUP_JUDGEMENT_SCHEMA,
+    CLEANUP_JUDGEMENT_SYSTEM,
+};
 pub use contract::cloud::{
     CloudError, CloudResult, CloudTask, ImagePart, PromptSpec, Source, Tier, Validate,
 };

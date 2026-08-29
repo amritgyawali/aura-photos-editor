@@ -110,6 +110,10 @@ Never load two phase files into one session.
 | Bundled lens profiles, with attribution | `assets/lens_profiles/` |
 | Geometry evaluation gates | `tests/eval/geometry_eval.rs` + `ml/eval/crop_agreement.py` |
 | What AURA does to a frame's edges, in the product's own words | `docs/geometry-and-cropping.md` |
+| Generative cleanup decisions | `docs/adr/ADR-0049-generative-cleanup-and-the-safety-engine.md` |
+| Cleanup policy (versioned, PM + SEC co-owned) | `crates/aura-generative/config/cleanup_policy.toml` |
+| Cleanup evaluation gates | `tests/eval/cleanup_eval.rs` + `ml/models/generative/eval_cleanup.py` |
+| What AURA will and will not generate | `docs/generative-policy.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
@@ -1214,6 +1218,96 @@ Phase 23 also amended a frozen contract for the third time in the product's hist
 09's `FaceRef` and phase 16's re-lock: `aura_recipe::Lens` gained `coefficients`. And it added
 the fourth grep-as-a-test, `crates/aura-geometry/tests/no_render_calls.rs`, which fails the build
 if the deciding crate ever reaches a pixel, writes a recipe, or grows a face detector.
+
+Phase 24 is implemented conditionally: `aura-core::contract::cleanup` freezes the ten-class
+distraction vocabulary, the five safety checks, the verdict, the three methods, thirty-one reason
+codes, the proposal, the disclosure, the outline, the override and `CleanupService`, and `ids.rs`
+gains `ProposalId`; `aura-generative` decides. `policy.rs` loads 23 scene rows whose bounds the
+*code* owns rather than the file, `safety.rs` runs the five checks of section 6.2 **before anything
+is scored**, `denylist.rs` intersects against phase 18's regions and treats an absent mask as
+ignorance rather than as safety, `detect.rs` finds unexplained salience and names nothing,
+`borrow.rs` fits an exhaustive least-median homography from a ring of control patches and refuses a
+sibling that still carries the object, `fill.rs` synthesises from exemplars and corrects the seam
+with a harmonic field, `inpaint.rs` declares a diffusion tier and refuses on every call, `source.rs`
+is the one choke point, `selfcheck.rs` measures three artefacts against the rest of the frame and
+reverts, `judgement.rs` is a cloud port whose answer type cannot approve anything, `queue.rs` is one
+photograph in and one plan out, `store.rs` owns migration 24 and `api.rs` is the frozen service and
+the resumable walk. Migration 24 stores four tables, two views and four triggers; `aura-render`
+gains `Stage::Cleanup` at index 18 plus `cleanup_paste.wgsl`; `aura-recipe` gains `Recipe.cleanup[]`;
+nine IPC commands (ADR-0050) feed a proposal queue, a before-and-after and a manual removal tool; and
+`aura-cli verify --phase 24` is the executable gate. Its exit report is
+`docs/progress/PHASE-24-EXIT.md`.
+
+**This phase ships no model** - the fourth since phase 08 - and unlike phases 17 and 23 the reason is
+data rather than there being nothing to train. Section 9's DATA row asks for a labelled
+wedding-distraction vocabulary on ten thousand frames and there are none, so `DISTRACTION_HEAD_TRAINED`
+is false and `detect::candidates` returns `DistractionClass::Unclassified` for everything it finds -
+which cannot be shown to be story-irrelevant, so the safety engine refuses all of it. **This build
+therefore proposes no removals on a real photograph**, which is the correct behaviour for a build
+that cannot tell a bin from a gift. That is condition C2 and a Sev 2 trigger. Condition C1 is the
+other Sev 2 and it is the one to remember: **phase 18's twenty mask classes contain no word for a
+ring or a cake**, so a coverage assembled from them is never complete even with a trained segmenter,
+and `CleanupOutline::mask_covered` is 0 % on every project. Condition C4 is the third gap and it is
+the headline: the *human* adversarial audit of section 9 did not happen, so no claim about
+artefact-free rate on a wedding may be made from this build.
+
+Five rules that phase 24 adds and every later phase inherits:
+
+- **`CleanupService` is the only way to ask what was removed from a photograph.** Twentieth service
+  of its kind. Phase 27 has to be able to say why a background looks smeared; phase 28 must know
+  what ran unattended; the delivery report lists every disclosure. No phase may keep its own
+  distraction detector, its own denylist or its own idea of a safe removal.
+- **The safety filter runs before the score, and the score has no term for safety.** Phase 12 wrote
+  this for coverage guarantees and phase 23 for crop safety; here it is a property of the type
+  system rather than an ordering in a function. `source::select` takes a `SafeCandidate`, which has
+  no public constructor and comes only from `safety::check` returning `Allowed`. A later phase that
+  finds itself scoring an unchecked region cannot obtain the argument.
+- **An absent input is ignorance, not permission.** Phases 19 to 23 *gated* an operation down when
+  an input was missing and the safe direction was less. Here the safe direction is **none**, and
+  "gated to zero" and "blocked" would look identical in a panel while meaning completely different
+  things: one says the product checked and found nothing to worry about, the other says it could not
+  check. `CleanupCode::ProtectionUnknown` and `CleanupCode::OverlapsProtected` are separate codes,
+  separate rows and separate runbooks, and only the second is a claim.
+- **A cloud call that can only make the product do less has no unsafe failure mode.**
+  `aura_generative::judgement::Answer` is `Decline | Stand | Unavailable` and there is no `Approve`.
+  An unreachable provider, an invalid response, a spent budget and a cautious model all leave the
+  photograph in the same state. That is the property phase 12's tie-breaker lacked, and it is why
+  the same repository reaches opposite conclusions about two superficially similar features.
+- **A disclosure is written in the same transaction as the removal and can never be edited.** Three
+  triggers, plus `Recipe.cleanup[]`, because phase 14's rule is that a delivered file is
+  re-creatable from four values and a removal in none of them cannot be audited. `CleanupMethod::
+  Inpaint` in a stored row means a diffusion model ran; there is no build in which it means
+  something else.
+
+Six things phase 24 got wrong first, all found by its own tests, and three of them worth
+generalising:
+
+**A correlation is the wrong instrument for "is this the same object".** Normalised cross-correlation
+is undefined over a flat window and returns zero by design - and a gaffer-taped cable, an exit sign
+and a caterer's crate are all close to flat. So a burst neighbour containing the *identical* object
+correlated at zero, read as "completely different", and the borrow replaced the exit sign with the
+exit sign. It is a mean absolute difference now, scaled by the surrounding texture's own spread.
+
+**Both removal modules feathered toward the object they were removing.** The seam feather ran inward
+from the region's boundary, so blending `original * (1 - w) + replacement * w` over the region
+carried the outermost samples of the replacement back toward the bin. The code that exists to hide a
+seam left a rim of the distraction behind - phase 18's resampler defect in a different module.
+`pixels::feather_out` is the fix: full weight over the whole object, falloff on the band outside it.
+
+**Comparing two maxima compares two unrelated facts.** The repeated-texture check subtracted the
+frame's strongest autocorrelation from the patch's, so a background with a slow twenty-pixel
+undulation excused a patch repeating hard at four. Section 6.4 asks for "a period that occurs nowhere
+else", which is a per-lag comparison. The same file also had phase 22's threshold trap for the third
+time in the repository: a 99th percentile of adjacent-pixel steps is **zero** on a smooth frame,
+because a 256-bucket histogram cannot resolve a step below 1/255, so a hard rectangle edge in a
+studio backdrop scored as no artefact at all.
+
+Phase 24 amended a frozen contract for the fourth time in the product's history, after phase 09's
+`FaceRef`, phase 16's re-lock and phase 23's `Lens::coefficients`: `aura_recipe::Recipe` gained
+`cleanup`. It also added the fifth grep-as-a-test,
+`crates/aura-generative/tests/one_choke_point.rs`, which fails the build if a removal is reached from
+anywhere but `source::select`, if the crate writes a recipe, if it reaches a provider - or if any
+type in it grows a field a text prompt could go in.
 
 Five rules that phase 13 adds and every later phase inherits:
 

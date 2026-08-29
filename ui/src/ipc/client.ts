@@ -2,6 +2,17 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  CleanupBlockedDto,
+  CleanupDisclosureDto,
+  CleanupPassDto,
+  CleanupPassInput,
+  CleanupProposalDto,
+  CleanupReasonDto,
+  CleanupStatusDto,
+  DecideCleanupInput,
+  DisableCleanupInput,
+  ManualRemoveDto,
+  ManualRemoveInput,
   AcceptColourInput,
   ColourDto,
   ColourPassDto,
@@ -1277,4 +1288,65 @@ export const geometry = {
   /** Run the resumable pass, then carry what it decided into the recipes. */
   planGeometry: (input: PlanGeometryInput): Promise<GeometryPassDto> =>
     invoke<GeometryPassDto>('plan_geometry', { input }),
+};
+
+/**
+ * PHASE-24. Distraction cleanup: the exit sign, the gaffer tape and the caterer's crate.
+ *
+ * Nine calls. Four read, one runs the pass, three record a decision, and one is the manual tool.
+ *
+ * **Read `cleanupStatus().maskCovered` before anything else.** Phase 18's mask vocabulary has no
+ * class for a ring or a cake, so it is zero on every build so far - which means every candidate
+ * was refused because AURA could not show the region was clear of people, not because it looked
+ * and found somebody. The two are different rows, different reason codes and different runbooks,
+ * and a panel that rendered them the same way would let a build with no segmenter look like one
+ * that examined every photograph and found them all clear.
+ *
+ * **Nothing here can apply a removal unattended.** Section 6.4 permits a borrow or a fill at
+ * calibrated confidence 0.97 in Zero-Touch; nothing in this build is calibrated, so phase 13's
+ * `uncalibrated_raises` moves every band one further toward review and `mayApplyUnattended` is
+ * false on every proposal.
+ */
+export const cleanup = {
+  /** How much of a wedding has been examined, and what came of it. */
+  cleanupStatus: (projectId: string): Promise<CleanupStatusDto> =>
+    invoke<CleanupStatusDto>('cleanup_status', { projectId }),
+
+  /** One photograph's proposals, strongest first. */
+  imageCleanup: (photoId: string): Promise<CleanupProposalDto[]> =>
+    invoke<CleanupProposalDto[]>('image_cleanup', { photoId }),
+
+  /**
+   * Every candidate the safety engine refused on one photograph.
+   *
+   * A separate call because the refused set is usually larger than the proposed one. It is on the
+   * surface at all because teaching a photographer what AURA will never do is most of the trust
+   * this feature needs.
+   */
+  cleanupBlocked: (photoId: string): Promise<CleanupBlockedDto[]> =>
+    invoke<CleanupBlockedDto[]>('cleanup_blocked', { photoId }),
+
+  /** Everything removed from this project, for the delivery report. */
+  cleanupDisclosures: (projectId: string): Promise<CleanupDisclosureDto[]> =>
+    invoke<CleanupDisclosureDto[]>('cleanup_disclosures', { projectId }),
+
+  /** Run the resumable pass. Killing it costs nothing; the work remaining is a query. */
+  cleanupPass: (input: CleanupPassInput): Promise<CleanupPassDto> =>
+    invoke<CleanupPassDto>('cleanup_pass', { input }),
+
+  /** Accept or reject one proposal. Accepting does not apply it. */
+  decideCleanup: (input: DecideCleanupInput): Promise<void> =>
+    invoke<void>('decide_cleanup', { input }),
+
+  /** Leave one photograph alone entirely. Excluded from every later pass. */
+  disableCleanup: (input: DisableCleanupInput): Promise<void> =>
+    invoke<void>('disable_cleanup', { input }),
+
+  /** Remove one region the photographer drew. Still runs all five safety checks. */
+  manualRemove: (input: ManualRemoveInput): Promise<ManualRemoveDto> =>
+    invoke<ManualRemoveDto>('manual_remove', { input }),
+
+  /** The panel's legend, assembled from the frozen enum rather than from a stored table. */
+  cleanupReasonCodes: (): Promise<CleanupReasonDto[]> =>
+    invoke<CleanupReasonDto[]>('cleanup_reason_codes', {}),
 };

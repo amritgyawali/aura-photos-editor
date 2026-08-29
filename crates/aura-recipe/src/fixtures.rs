@@ -124,6 +124,7 @@ pub fn reference() -> Recipe {
             mask: Some("skin".to_string()),
             borrowed_from: None,
         }],
+        cleanup: Vec::new(),
         restoration: Restoration {
             denoise: "auto".to_string(),
             face_recovery: 20,
@@ -180,6 +181,10 @@ pub fn neutral(content_hash: &str, camera: &str) -> Recipe {
         geometry: Geometry::default(),
         masks: Vec::new(),
         retouch: Vec::new(),
+        // PHASE-24. No fixture removes a distraction: a cleanup operation is a disclosure that
+        // pixels were replaced, and a golden fixture that carried one would be asserting a removal
+        // that never happened.
+        cleanup: Vec::new(),
         restoration: Restoration::default(),
         bw: None,
         provenance: Provenance::default(),
