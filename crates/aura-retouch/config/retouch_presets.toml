@@ -18,7 +18,7 @@
 # phase 15 rule and the reason `docs/skin-fairness.md` can say what it says.
 #
 # BUMP `version` ON ANY CHANGE. It is written into `retouch_plan.preset_ver`, and a plan made
-# under one table is not comparable with a plan made under another - `AURA-ML-5090` exists so
+# under one table is not comparable with a plan made under another - `AURA-ML-5096` exists so
 # that comparison never happens silently.
 
 version = 1
@@ -83,7 +83,7 @@ asking for a different product.
 # ---------------------------------------------------------------------------
 # Per-role weight. Section 6.4: "a full-frame portrait of the bride gets the most careful
 # treatment, a background guest almost none". Role is a GALLERY CONSTANT, which is why the
-# strength model can use it - see ADR-0041 section 6.
+# strength model can use it - see ADR-0043 section 6.
 # ---------------------------------------------------------------------------
 
 [role]

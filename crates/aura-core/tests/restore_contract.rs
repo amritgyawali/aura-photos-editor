@@ -186,7 +186,7 @@ fn every_region_maps_onto_a_spelling_another_projection_already_uses() {
 
 #[test]
 fn only_sky_and_background_are_excluded_from_sharpening() {
-    // Skin is deliberately absent: ADR-0045 section 4 argues it is attenuated rather than
+    // Skin is deliberately absent: ADR-0047 section 4 argues it is attenuated rather than
     // excluded, because a face with literally no sharpening inside a sharpened frame reads as
     // soft rather than as protected. A later build that "protects skin properly" by excluding it
     // fails here and has to read the argument.
@@ -232,7 +232,7 @@ fn the_tier_ladder_is_ordered_and_saturating() {
 
 #[test]
 fn the_mask_port_agrees_with_phase_19_at_both_boundaries() {
-    // ADR-0045 accepts phase 19's three-line gating ramp being written a third time rather than
+    // ADR-0047 accepts phase 19's three-line gating ramp being written a third time rather than
     // widening a frozen enum, and that is only acceptable while the three agree. This is what
     // makes a change to one that did not move the others fail the build.
     let field = |confidence: f32, edge: f32| RestoreField {
@@ -314,7 +314,7 @@ fn an_unreadable_field_is_named_rather_than_used() {
 
 #[test]
 fn an_unmeasured_noise_model_caps_the_tier_below_strong() {
-    // The whole of ADR-0045 section 3's asymmetry, as an assertion. An unmeasured model that
+    // The whole of ADR-0047 section 3's asymmetry, as an assertion. An unmeasured model that
     // over-estimates the noise produces the smeared lace this phase exists to avoid, and there
     // are no camera files in this repository, so every shipped model is unmeasured.
     let reference = NoiseModel::reference();
@@ -412,7 +412,7 @@ fn every_ceiling_refuses_the_value_above_it() {
 
 #[test]
 fn sharpening_may_not_run_without_regions_from_phase_18() {
-    // ADR-0045 section 4, bullet 4, as a structural refusal rather than as an intention. The
+    // ADR-0047 section 4, bullet 4, as a structural refusal rather than as an intention. The
     // obvious alternative - sharpen the whole frame at a lower amount - is what produces a
     // crunchy sky, and it is not representable on a sound plan.
     let mut blind = sharpen();
@@ -582,7 +582,7 @@ fn a_plan_with_no_reason_is_refused() {
 fn a_tier_without_a_spec_and_a_spec_without_a_tier_are_both_refused() {
     // A tier alone is not reproducible - the same `Standard` on two bodies at two ISOs is two
     // different renders - so a stored plan that names one without the numbers it became is a
-    // plan phase 27 cannot audit. ADR-0045 section 2.1.
+    // plan phase 27 cannot audit. ADR-0047 section 2.1.
     let mut bare = plan();
     bare.denoise = DenoiseTier::Standard;
     bare.selfcheck = Some(clean_report());
@@ -646,7 +646,7 @@ fn a_report_that_measured_nothing_cannot_claim_a_violation() {
 
 #[test]
 fn the_frozen_denoise_reason_field_is_still_answerable() {
-    // Section 5 freezes `denoise_reason`; ADR-0045 section 2.1 widens the list to three
+    // Section 5 freezes `denoise_reason`; ADR-0047 section 2.1 widens the list to three
     // decisions and keeps the frozen question answerable. This is that promise.
     let mut acted = plan();
     acted.reasons = vec![
@@ -734,7 +734,7 @@ fn restoration_can_never_be_scheduled_onto_the_interactive_path() {
 
 #[test]
 fn the_cloud_destination_exists_and_is_the_only_one_that_leaves_the_device() {
-    // ADR-0045 section 7: the variant is frozen by section 5 and nothing in this build returns
+    // ADR-0047 section 7: the variant is frozen by section 5 and nothing in this build returns
     // it. What the contract can say is which destination sends the photograph away, so that a
     // consent check has one predicate to read rather than a match somebody could widen.
     for destination in RunWhere::ALL {

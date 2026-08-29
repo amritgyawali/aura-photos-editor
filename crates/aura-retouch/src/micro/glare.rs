@@ -18,7 +18,7 @@
 //! ## The number that decides whether a sheet may be borrowed over
 //!
 //! [`Sheet::clipped_fraction`] is how much of the sheet is past
-//! `aura_render::micro::CLIPPED_FLOOR` - past which the sensor recorded nothing. ADR-0043
+//! `aura_render::micro::CLIPPED_FLOOR` - past which the sensor recorded nothing. ADR-0045
 //! section 4 turns that into the rule this phase is bounded by:
 //!
 //! > You may only borrow pixels that carry no information.
@@ -435,7 +435,7 @@ mod tests {
     #[test]
     fn a_soft_sheen_is_found_and_may_never_be_borrowed_over() {
         // Above the specular floor so it is detected, but below the clipped floor so it still
-        // carries an eye. This is the case ADR-0043 section 4 exists to separate.
+        // carries an eye. This is the case ADR-0045 section 4 exists to separate.
         let (frame, eyes) = with_sheet(0.93);
         let sheets = detect(&frame, &eyes, &[face()]);
         assert!(!sheets.is_empty(), "no sheet was found");

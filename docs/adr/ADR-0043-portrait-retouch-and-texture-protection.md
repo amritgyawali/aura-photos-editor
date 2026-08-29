@@ -1,4 +1,4 @@
-# ADR-0041 - Portrait retouch: temporary versus permanent, the texture floor and per-identity consistency
+# ADR-0043 - Portrait retouch: temporary versus permanent, the texture floor and per-identity consistency
 
 **Status:** accepted · **Date:** 2026-08-20 · **Phase:** 20 · **Supersedes:** nothing
 
@@ -8,7 +8,7 @@ Phase 20 section 4 asks for no ADR by name. It needs two anyway, and this is the
 section 6.4 and section 10.1 ask for two things that cannot both be true of one number, and the
 two heads section 4 asks for cannot be trained here. All four are decisions, and a decision
 nobody wrote down is a decision the next phase re-argues from scratch. The second document is
-[ADR-0042](ADR-0042-retouch-ipc-surface.md), which covers the wire.
+[ADR-0044](ADR-0044-retouch-ipc-surface.md), which covers the wire.
 
 The ADR numbering in this repository is sequential across the whole project rather than aligned
 to phase numbers.
@@ -102,7 +102,7 @@ an absolute protection cannot be cleared by a photographer through
 `RetouchService::set_protection` either. Someone who wants a tattoo altered is asking for a
 different product, and section 11 of `docs/plan/CLAUDE.md` - "we will never build ... any
 operation that changes a person's identity" - is the reason. The refusal carries
-`AURA-ML-5091` and says so.
+`AURA-ML-5097` and says so.
 
 **The default on uncertainty is to leave the skin alone.** Section 6.1's last bullet is
 explicit that removing a client's mole is a far worse error than leaving a pimple, so
@@ -159,7 +159,7 @@ occasionally produces plastic skin.
 
 `POLISHED_FLOOR = 0.80` is a hard bound on the config file rather than a default in it. The
 preset loader refuses a `retouch_presets.toml` whose Polished floor is below it, with
-`AURA-ML-5093`, because section 6.3's "never below 0.80 even in Polished" is a claim the
+`AURA-ML-5099`, because section 6.3's "never below 0.80 even in Polished" is a claim the
 product makes in `docs/retouch.md` and a claim a text file could otherwise quietly retract.
 
 ## 6. Decision: strength is per identity and constant; size and scene decide the op set
@@ -222,7 +222,7 @@ more exist, and each is a thing that would otherwise be smeared across the eight
 
 * `presets.rs` - the config loader and its refusals, which phases 15 to 19 each keep separate
   because a policy file that half-loads is worse than one that does not load;
-* `store.rs` - migration 20 and the codec, kept out of the solvers exactly as phase 19 keeps it;
+* `store.rs` - migration 21 and the codec, kept out of the solvers exactly as phase 19 keeps it;
 * `api.rs` - the frozen `RetouchService` and the resumable pass, the shape phases 06 to 19 all
   settled on.
 
@@ -278,7 +278,7 @@ retouch quality result until they close.**
   ever calls `schema::merge` - writing a recipe is phase 14's rule and stays in `aura-app`.
 * `aura-retouch` does not depend on `aura-cloud`, because section 7 says there is no cloud call
   in this phase, and `tests/no_network.rs` is what keeps that from being a memory.
-* Migration 20 adds three tables and one view, and the protect set is the first table in this
+* Migration 21 adds three tables and one view, and the protect set is the first table in this
   product whose rows a photographer creates directly.
 * The perceptual allowance phase 19 introduced is **shared rather than duplicated**: this
   phase's operations spend against `aura_core::contract::local::PERCEPTUAL_BUDGET` through the

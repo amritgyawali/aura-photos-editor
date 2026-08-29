@@ -1,8 +1,8 @@
-# ADR-0044 - The micro-retouch IPC surface
+# ADR-0046 - The micro-retouch IPC surface
 
 **Status:** accepted · **Date:** 2026-08-21 · **Phase:** 21 · **Supersedes:** nothing
 
-The second of phase 21's two ADRs. [ADR-0043](ADR-0043-micro-retouch-and-cross-frame-borrowing.md)
+The second of phase 21's two ADRs. [ADR-0045](ADR-0045-micro-retouch-and-cross-frame-borrowing.md)
 covers the decisions; this covers the wire. For every phase since 15 that has been a short
 document about shapes. This one is not, for a single reason: **this is the first surface in the
 product that can carry pixels from one photograph into another**, and a delivery whose composites
@@ -65,7 +65,7 @@ The database is what makes the four agree. `micro_op` carries a trigger -
 an undisclosed composite because the storage cannot hold one.
 
 `GlareMethod` being a two-variant enum rather than a nullable field is the same decision one layer
-down, and ADR-0043 section 2 records it.
+down, and ADR-0045 section 2 records it.
 
 ## 4. Decision: the matrix has switches and no strengths, and that is the whole shape
 
@@ -86,7 +86,7 @@ delivers, and collapsing them would make the second unreachable without giving u
 
 A wrong-length list is refused rather than padded. A panel that sends four switches for five
 operations has a bug, and defaulting the fifth is how a studio ends up with an operation running
-that it believes it switched off - `AURA-ML-5098`, and `read_switches` is the one place it is
+that it believes it switched off - `AURA-ML-5104`, and `read_switches` is the one place it is
 checked.
 
 ## 5. Decision: three measurements on the wire, with the sample count beside them

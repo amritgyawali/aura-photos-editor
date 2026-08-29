@@ -25,7 +25,7 @@
 //! config file may only lower, and by a **post-condition measured on the rendered pixels**.
 //! [`ArtefactReport`] is that post-condition, and it carries three numbers rather than one
 //! because the three are fixed by three different parameters.
-//! `docs/adr/ADR-0045-restoration-denoise-sharpen-and-identity.md` section 2.1 has the argument.
+//! `docs/adr/ADR-0047-restoration-denoise-sharpen-and-identity.md` section 2.1 has the argument.
 //!
 //! ## The second thing: the identity constraint can only ever refuse
 //!
@@ -124,7 +124,7 @@ pub const SOFT_FACE_HI: f32 = 0.68;
 /// the estimator cannot resolve. Phase 22 shipped 0.55 first, and a synthetic chequerboard came
 /// back needing sharpening. `aura_restore::kernel`'s own test holds the two numbers apart, so a
 /// change to the estimator that moved its floor fails the build rather than quietly re-opening
-/// this. ADR-0045 section 11.1 records it.
+/// this. ADR-0047 section 11.1 records it.
 pub const SHARPEN_KERNEL_LO: f32 = 1.00;
 
 /// The largest estimated blur kernel this phase will deconvolve, in pixels of Gaussian sigma.
@@ -147,7 +147,7 @@ pub const MAX_SHARPEN_AMOUNT: f32 = 0.50;
 /// Four fifths. Section 6.2 says "explicitly attenuated on skin"; this is what that is as a
 /// number, and it is an attenuation rather than an exclusion deliberately. A face with literally
 /// no sharpening inside a frame that was sharpened reads as soft rather than as protected, which
-/// is the failure mode of every tool that masks skin out entirely. ADR-0045 section 4.
+/// is the failure mode of every tool that masks skin out entirely. ADR-0047 section 4.
 pub const SKIN_ATTENUATION: f32 = 0.80;
 
 /// The most Richardson-Lucy iterations one frame gets.
@@ -396,7 +396,7 @@ impl RestoreField {
     ///
     /// A sentence rather than an [`AuraError`]: `aura-core` owns the shape and `aura-restore`
     /// owns the error registry, the split every phase since 09 has kept.
-    /// `aura_restore::decide` turns a `Some` here into `AURA-ML-5106`.
+    /// `aura_restore::decide` turns a `Some` here into `AURA-ML-5112`.
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         if self.width == 0 || self.height == 0 {
@@ -440,7 +440,7 @@ impl RestoreField {
 /// synthetic figure that is too *low* under-denoises, which a photographer can see and correct;
 /// one that is too *high* over-denoises, which is the smeared lace this phase exists to avoid.
 /// An unmeasured model therefore caps the tier at [`DenoiseTier::Standard`] - the asymmetry
-/// written down, in [`NoiseModel::tier_ceiling`]. ADR-0045 section 3.
+/// written down, in [`NoiseModel::tier_ceiling`]. ADR-0047 section 3.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct NoiseModel {
@@ -465,7 +465,7 @@ impl NoiseModel {
     /// 55,000-electron well, which normalises to `read = 3 / 55_000` and `shot = 1 / 55_000`. The
     /// well is deliberately at the *large* end of the twenty bodies in
     /// `crates/aura-restore/config/noise_models/`, which makes both terms small - and that is the
-    /// conservative direction in the sense ADR-0045 section 3 argues for: a model that
+    /// conservative direction in the sense ADR-0047 section 3 argues for: a model that
     /// under-estimates the noise under-denoises, which a photographer can see and correct, while
     /// one that over-estimates it smears lace, which they cannot.
     #[must_use]
@@ -517,7 +517,7 @@ impl NoiseModel {
 
     /// What is wrong with this model, if anything.
     ///
-    /// `aura_restore::noise_model` turns a `Some` here into `AURA-ML-5105`.
+    /// `aura_restore::noise_model` turns a `Some` here into `AURA-ML-5111`.
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         if self.camera.trim().is_empty() {
@@ -656,7 +656,7 @@ impl fmt::Display for DenoiseTier {
 
 /// The tier as the renderer receives it: three amounts, the sigma they came from, and the model.
 ///
-/// See ADR-0045 section 2.1 for why the plan carries this beside [`RestorePlan::denoise`]. The
+/// See ADR-0047 section 2.1 for why the plan carries this beside [`RestorePlan::denoise`]. The
 /// three amounts are the recipe's own `global.noise.{luminance,colour,detail}` scale, `0..1`,
 /// which the store multiplies by 100 on the way out.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -716,7 +716,7 @@ impl DenoiseSpec {
 
 /// Which regions the deconvolution was withheld from, and how much of the frame it reached.
 ///
-/// Section 5 names [`SharpenSpec::mask`] and does not define it; ADR-0045 section 2.1 argues for
+/// Section 5 names [`SharpenSpec::mask`] and does not define it; ADR-0047 section 2.1 argues for
 /// this shape. **It holds no pixels.** A plan is a decision, and `aura-core` has carried no image
 /// data since phase 01.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -729,7 +729,7 @@ pub struct SharpenMask {
     /// True when phase 18 supplied the regions.
     ///
     /// **The difference between "there was nothing to exclude" and "AURA could not see where the
-    /// sky was".** False means the sharpening was refused rather than applied blind - ADR-0045
+    /// sky was".** False means the sharpening was refused rather than applied blind - ADR-0047
     /// section 4, bullet 4 - so a `SharpenSpec` with this false is not a representable state on a
     /// sound plan, and [`RestorePlan::broken_guarantee`] says so.
     pub from_regions: bool,
@@ -908,7 +908,7 @@ impl RecoveredFace {
 /// one sentence - "No cloud AI call in this phase" - and section 2.1 lists an offload anyway.
 /// The variant is here because section 5 freezes it and a variant that is absent cannot be added
 /// later without a contract change; `aura-restore` does not depend on `aura-cloud` and a test
-/// fails the build if it ever does. ADR-0045 section 7.
+/// fails the build if it ever does. ADR-0047 section 7.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
@@ -1001,7 +1001,7 @@ impl RestoreWhen {
 /// **Three, not one.** Smearing is fixed by lowering the denoise tier, ringing by lowering the
 /// sharpen amount and drift by lowering the face-recovery strength; a single score would leave
 /// the automatic reduction section 6.4 requires with no way to know which lever to pull.
-/// ADR-0045 section 2.1.
+/// ADR-0047 section 2.1.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ArtefactReport {
@@ -1092,7 +1092,7 @@ impl ArtefactReport {
 /// Which of the three decisions a reason is about.
 ///
 /// Section 5 has one `denoise_reason` field; a plan makes three decisions and a photographer
-/// asking "why is this still soft" is asking about one of them. ADR-0045 section 2.1.
+/// asking "why is this still soft" is asking about one of them. ADR-0047 section 2.1.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
@@ -1519,7 +1519,7 @@ impl RestoreReason {
 // ---------------------------------------------------------------------------
 
 /// One photograph's restoration decision. PHASE-22 section 5, plus the five spellings
-/// ADR-0045 section 2.1 argues for.
+/// ADR-0047 section 2.1 argues for.
 ///
 /// **It is not an edit.** The three operations reach the pixels only through
 /// `aura_recipe::schema::merge` writing `global.noise`, `restoration.face_recovery` and
@@ -1611,7 +1611,7 @@ impl RestorePlan {
 
     /// Section 5's `denoise_reason`, as a view over the widened list.
     ///
-    /// The frozen field, still answerable. ADR-0045 section 2.1.
+    /// The frozen field, still answerable. ADR-0047 section 2.1.
     #[must_use]
     pub fn denoise_reasons(&self) -> Vec<&RestoreReason> {
         self.reasons_for(RestoreSubject::Denoise)
@@ -1667,7 +1667,7 @@ impl RestorePlan {
     /// kept face is inside the identity ceiling, a skipped face carries a reason, the self-check
     /// is coherent, and a plan that acted has something to show for it. They live here so the
     /// solver, the store, the IPC layer and the eval harness all refuse the same frames.
-    /// `aura_restore::selfcheck` turns a `Some` here into `AURA-ML-5103`.
+    /// `aura_restore::selfcheck` turns a `Some` here into `AURA-ML-5109`.
     #[must_use]
     pub fn broken_guarantee(&self) -> Option<String> {
         if self.reasons.is_empty() {
@@ -1869,7 +1869,7 @@ impl RestoreOverride {
 
     /// What is wrong with this override, if anything.
     ///
-    /// `aura_restore::store` turns a `Some` here into `AURA-ML-5104`.
+    /// `aura_restore::store` turns a `Some` here into `AURA-ML-5110`.
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         if self.is_empty() {
@@ -1934,7 +1934,7 @@ pub trait RestoreService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5104` when the photograph has no plan.
+    /// `AURA-ML-5110` when the photograph has no plan.
     fn accept(&self, image: ImageId) -> Result<(), AuraError>;
 
     /// Record what the photographer chose for one photograph.
@@ -1950,6 +1950,6 @@ pub trait RestoreService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5104` when the override sets nothing, or the photograph has no plan.
+    /// `AURA-ML-5110` when the override sets nothing, or the photograph has no plan.
     fn set_override(&self, image: ImageId, values: RestoreOverride) -> Result<(), AuraError>;
 }

@@ -1809,7 +1809,7 @@ impl AppState {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5093` when the retouch preset table will not load, or whatever opening the
+    /// `AURA-ML-5099` when the retouch preset table will not load, or whatever opening the
     /// preview service raised.
     pub fn retouch_pass(&self, project_id: &str) -> AuraResult<RetouchPass> {
         let mut pass = RetouchPass::new(
@@ -1849,7 +1849,7 @@ impl AppState {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5099` when the micro-retouch matrix file will not load.
+    /// `AURA-ML-5105` when the micro-retouch matrix file will not load.
     pub fn micro(&self, project: &ProjectId) -> AuraResult<Arc<Micro>> {
         let _ = project;
         Ok(Arc::new(Micro::new(self.micro_store())?))
@@ -1873,7 +1873,7 @@ impl AppState {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5099` when the matrix file will not load, or whatever opening the preview service
+    /// `AURA-ML-5105` when the matrix file will not load, or whatever opening the preview service
     /// raised.
     pub fn micro_pass(&self, project_id: &str) -> AuraResult<MicroPass> {
         let mut pass = MicroPass::new(
@@ -1921,7 +1921,7 @@ impl AppState {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` when the scene profile table or a camera noise model will not load.
+    /// `AURA-ML-5111` when the scene profile table or a camera noise model will not load.
     pub fn restore(&self, project: &ProjectId) -> AuraResult<Arc<Restore>> {
         let _ = project;
         Ok(Arc::new(Restore::new(self.restore_store())?))
@@ -1933,7 +1933,7 @@ impl AppState {
     /// and `RestorePass::with_regions` is the input port; nothing here fills it, so no frame is
     /// sharpened and every plan says `restore_sharpen_no_regions`. That is condition C3 of the
     /// phase 22 exit report and it is visible in `RestoreOutline::region_covered` rather than
-    /// hidden. Sharpening refuses rather than running blind - ADR-0045 section 4.
+    /// hidden. Sharpening refuses rather than running blind - ADR-0047 section 4.
     ///
     /// **No identity probe is attached either**, and the consequence is larger: phase 06's
     /// recogniser is the only thing that can measure whether a face still looks like the same
@@ -1948,13 +1948,13 @@ impl AppState {
     /// `restore_no_noise_reading` and is left alone.
     ///
     /// `Capacity::default()` has `gpu` false, because this build links no `wgpu` backend
-    /// (ADR-0029 section 4), and `cloud_consent` false, which nothing reads: ADR-0045 section 7
+    /// (ADR-0029 section 4), and `cloud_consent` false, which nothing reads: ADR-0047 section 7
     /// records why the offload is not built and `crates/aura-restore/tests/boundaries.rs` fails
     /// the build if the dependency ever appears.
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` when either table will not load, or whatever opening the preview service
+    /// `AURA-ML-5111` when either table will not load, or whatever opening the preview service
     /// raised.
     pub fn restore_pass(&self, project_id: &str) -> AuraResult<RestorePass> {
         let mut pass = RestorePass::new(

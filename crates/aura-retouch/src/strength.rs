@@ -5,7 +5,7 @@
 //! wedding. Read literally those are incompatible: face size varies by an order of magnitude
 //! between a portrait and a dance-floor wide.
 //!
-//! The resolution, argued in `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md`
+//! The resolution, argued in `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md`
 //! section 6, is that all four inputs are taken as **gallery statistics**: a person role, the
 //! preset, the *median* size their face is in the frames they appear in, and the scene they
 //! mostly appear in. The result is one number per identity per project, and section 10.1 gate

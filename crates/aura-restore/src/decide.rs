@@ -25,7 +25,7 @@
 //!
 //! Three, and they invalidate three different things: [`MODEL_VER`] the learned decisions,
 //! [`ANALYSIS_VER`] the arithmetic, and the profile tables' own version the ceilings. Phase 09's
-//! rule for the ninth phase running, and `AURA-ML-5102` is what stops a comparison across any of
+//! rule for the ninth phase running, and `AURA-ML-5108` is what stops a comparison across any of
 //! them happening silently.
 
 use aura_core::contract::composition::Box2;
@@ -50,7 +50,7 @@ use crate::sharpen::{self, SharpenEvidence};
 /// Which learned heads produced the decisions in a stored plan.
 ///
 /// Zero, and it stays zero while neither shipped head is consulted. A build that starts
-/// consulting one bumps this, `AURA-ML-5102` fires, and every stored plan is re-made - which is
+/// consulting one bumps this, `AURA-ML-5108` fires, and every stored plan is re-made - which is
 /// the correct behaviour, because a plan made without a denoiser is not comparable with one made
 /// with it.
 pub const MODEL_VER: u16 = 0;
@@ -144,7 +144,7 @@ impl Analyser {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` when either table will not load.
+    /// `AURA-ML-5111` when either table will not load.
     pub fn embedded(capacity: Capacity) -> AuraResult<Self> {
         Ok(Self {
             profiles: RestoreProfiles::embedded()?,
@@ -186,7 +186,7 @@ impl Analyser {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5103` when the buffer cannot be read as pixels, or when the plan the solver
+    /// `AURA-ML-5109` when the buffer cannot be read as pixels, or when the plan the solver
     /// produced breaks one of the nine guarantees.
     #[allow(clippy::too_many_lines)]
     pub fn plan(
@@ -621,7 +621,7 @@ mod tests {
         let error = analyser()
             .plan(&frame, None, true)
             .expect_err("a truncated buffer is refused");
-        assert_eq!(error.code.0, "AURA-ML-5103");
+        assert_eq!(error.code.0, "AURA-ML-5109");
     }
 
     #[test]

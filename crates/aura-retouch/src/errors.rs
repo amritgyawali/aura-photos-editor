@@ -1,4 +1,4 @@
-//! This crate own error constructors. Codes ML 5090-5095, registered in
+//! This crate own error constructors. Codes ML 5096-5101, registered in
 //! `crates/aura-core/errors.toml`.
 //!
 //! The split every phase since 09 has kept: `aura-core` owns the shapes and the predicates,
@@ -10,17 +10,17 @@
 use aura_core::contract::error::{AuraError, ErrorCode, Recovery, Severity};
 
 /// Stored plans came from different heads, different arithmetic or a different preset table.
-pub const ML_RETOUCH_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5090");
+pub const ML_RETOUCH_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5096");
 /// A retouch override or a protected-feature change was refused.
-pub const ML_RETOUCH_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5091");
+pub const ML_RETOUCH_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5097");
 /// One photograph could not be retouched.
-pub const ML_RETOUCH_FAILED: ErrorCode = ErrorCode("AURA-ML-5092");
+pub const ML_RETOUCH_FAILED: ErrorCode = ErrorCode("AURA-ML-5098");
 /// The retouch preset table was refused.
-pub const ML_PRESETS_REFUSED: ErrorCode = ErrorCode("AURA-ML-5093");
+pub const ML_PRESETS_REFUSED: ErrorCode = ErrorCode("AURA-ML-5099");
 /// A scene has no retouch preset row.
-pub const ML_SCENE_UNPRESET: ErrorCode = ErrorCode("AURA-ML-5094");
+pub const ML_SCENE_UNPRESET: ErrorCode = ErrorCode("AURA-ML-5100");
 /// The texture guarantee forced a gentler retouch, or withdrew one.
-pub const ML_TEXTURE_GUARD: ErrorCode = ErrorCode("AURA-ML-5095");
+pub const ML_TEXTURE_GUARD: ErrorCode = ErrorCode("AURA-ML-5101");
 
 /// Stored plans disagree with the running build about a version.
 ///
@@ -145,26 +145,26 @@ pub fn texture_guard(photo: &str, ratio: f32, floor: f32, withdrawn: bool) -> Au
 }
 
 // ---------------------------------------------------------------------------
-// PHASE-21. The micro-retouch suite, ML 5096-5101.
+// PHASE-21. The micro-retouch suite, ML 5102-5107.
 // ---------------------------------------------------------------------------
 
 /// Stored micro plans came from different heads, different arithmetic or a different matrix.
-pub const ML_MICRO_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5096");
+pub const ML_MICRO_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5102");
 /// One photograph's small fixes could not be planned, or a plan broke a guarantee.
-pub const ML_MICRO_FAILED: ErrorCode = ErrorCode("AURA-ML-5097");
+pub const ML_MICRO_FAILED: ErrorCode = ErrorCode("AURA-ML-5103");
 /// A micro-retouch matrix change was refused.
-pub const ML_MICRO_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5098");
+pub const ML_MICRO_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5104");
 /// The micro-retouch matrix file was refused.
-pub const ML_MICRO_MATRIX_REFUSED: ErrorCode = ErrorCode("AURA-ML-5099");
+pub const ML_MICRO_MATRIX_REFUSED: ErrorCode = ErrorCode("AURA-ML-5105");
 /// A region was unusable, so an operation was skipped.
-pub const ML_MICRO_REGION_UNUSABLE: ErrorCode = ErrorCode("AURA-ML-5100");
+pub const ML_MICRO_REGION_UNUSABLE: ErrorCode = ErrorCode("AURA-ML-5106");
 /// The naturalness guard made an operation gentler, or withdrew a family of them.
-pub const ML_NATURALNESS_GUARD: ErrorCode = ErrorCode("AURA-ML-5101");
+pub const ML_NATURALNESS_GUARD: ErrorCode = ErrorCode("AURA-ML-5107");
 
 /// Stored micro plans disagree with the running build about a version.
 ///
 /// Degraded rather than fatal, as `AURA-ML-5033`, `AURA-ML-5060`, `AURA-ML-5084` and
-/// `AURA-ML-5090` are. Three numbers: the heads, the arithmetic and the matrix file, which
+/// `AURA-ML-5096` are. Three numbers: the heads, the arithmetic and the matrix file, which
 /// invalidate the detections, the measurements and the switches respectively.
 #[must_use]
 pub fn micro_version_mismatch(
@@ -221,7 +221,7 @@ pub fn micro_edit_refused(detail: impl Into<String>) -> AuraError {
 
 /// The matrix file would not load.
 ///
-/// Whole-file refusal, as `AURA-ML-5093`, `AURA-ML-5087` and `AURA-ML-5063` are. Half a matrix
+/// Whole-file refusal, as `AURA-ML-5099`, `AURA-ML-5087` and `AURA-ML-5063` are. Half a matrix
 /// would clean the ceremony against measured ceilings and the reception against nothing, and
 /// that inconsistency is invisible in a delivered gallery.
 #[must_use]

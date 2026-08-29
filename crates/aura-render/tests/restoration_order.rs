@@ -4,7 +4,7 @@
 //! This is that test, and it is a separate file from `stage_order.rs` because the two prove
 //! different things. That file asserts the properties phase 14 froze about its own pipeline; this
 //! one asserts the four properties **phase 22's scope contract requires of it**, plus the two
-//! routing changes ADR-0045 section 2 makes.
+//! routing changes ADR-0047 section 2 makes.
 //!
 //! The reason the file exists at all is that section 2.1's requirement and phase 14's frozen
 //! `ORDER` looked incompatible: `Stage::Restoration` sits at index 19, *after* `Stage::Retouch`
@@ -90,12 +90,12 @@ fn face_recovery_runs_after_retouch_and_before_sharpening() {
 }
 
 // ---------------------------------------------------------------------------
-// ADR-0045 section 2's two routing changes
+// ADR-0047 section 2's two routing changes
 // ---------------------------------------------------------------------------
 
 #[test]
 fn the_denoise_tier_invalidates_from_the_noise_reduction_stage() {
-    // The bug fix half of ADR-0045 section 2. `earliest_affected` answers "from which stage must
+    // The bug fix half of ADR-0047 section 2. `earliest_affected` answers "from which stage must
     // this render be recomputed"; a tier change that answered "from stage 19" would let a cache
     // serve the buffer it had already denoised under the previous tier.
     assert_eq!(
@@ -130,7 +130,7 @@ fn the_other_restoration_fields_still_invalidate_from_the_restoration_stage() {
 
 #[test]
 fn a_tier_alone_does_not_enable_the_restoration_stage() {
-    // The other half of ADR-0045 section 2. Denoising happens at stage 6, so a plan that reported
+    // The other half of ADR-0047 section 2. Denoising happens at stage 6, so a plan that reported
     // `Stage::Restoration` for a denoise-only frame would be reporting a stage that ran and
     // changed nothing - and `RenderNote` exists so a photographer can tell what did and did not
     // happen.

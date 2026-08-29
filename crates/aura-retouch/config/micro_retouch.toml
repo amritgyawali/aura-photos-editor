@@ -16,14 +16,14 @@
 # There is no absolute chromaticity anywhere in this file. `[locus.teeth]` and `[locus.sclera]`
 # are offsets in CIE u'v' FROM THE FRAME'S OWN MEASURED NEUTRAL, which phase 15 produces, and the
 # operators reduce a distance to the boundary rather than moving toward the centre. A frame with
-# no illuminant estimate gets no colour move at all. ADR-0043 section 3 has the argument and the
-# phase gate scans migration 21 for a constant that would break it.
+# no illuminant estimate gets no colour move at all. ADR-0045 section 3 has the argument and the
+# phase gate scans migration 22 for a constant that would break it.
 #
 # There is no per-person, per-ethnicity or per-age row and there never will be one. Every
 # measurement in this phase is against the frame's own content.
 #
 # BUMP `version` ON ANY CHANGE. It is written into `micro_plan.matrix_ver`, and a plan made under
-# one table is not comparable with a plan made under another - `AURA-ML-5096` exists so that
+# one table is not comparable with a plan made under another - `AURA-ML-5102` exists so that
 # comparison never happens silently.
 
 version = 1

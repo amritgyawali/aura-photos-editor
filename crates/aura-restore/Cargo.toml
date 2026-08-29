@@ -32,7 +32,7 @@ tracing      = { workspace = true }
 #
 # `aura-cloud` is absent because PHASE-22 section 7 is one sentence - "No cloud AI call in this
 # phase. The phase must work with the network cable unplugged" - while section 2.1 lists a cloud
-# offload for heavy restoration anyway. ADR-0045 section 7 resolves that in favour of section 7,
+# offload for heavy restoration anyway. ADR-0047 section 7 resolves that in favour of section 7,
 # and this file is the enforcement: `RunWhere::Cloud` exists in the contract because section 5
 # freezes it, and there is no dependency here that could reach a provider.
 # `tests/no_network.rs` fails the build if one ever appears.

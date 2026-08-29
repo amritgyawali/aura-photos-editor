@@ -8,7 +8,7 @@
 //!
 //! As phases 15 to 19 all do, and the reason is sharper here: half a preset table would retouch
 //! the ceremony against measured strengths and the reception against nothing, and that
-//! inconsistency is invisible in a delivered gallery. `AURA-ML-5093` is run-blocking.
+//! inconsistency is invisible in a delivered gallery. `AURA-ML-5099` is run-blocking.
 //!
 //! ## The floors are bounded by the code, not by the file
 //!
@@ -79,7 +79,7 @@ impl PresetTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5093` when the embedded table will not load, which is a build fault rather than
+    /// `AURA-ML-5099` when the embedded table will not load, which is a build fault rather than
     /// an installation one and is therefore never expected to happen in the field.
     pub fn embedded() -> Result<Self, AuraError> {
         Self::parse(EMBEDDED, FILE)
@@ -89,7 +89,7 @@ impl PresetTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5093` naming the key and the rule it broke.
+    /// `AURA-ML-5099` naming the key and the rule it broke.
     #[allow(clippy::too_many_lines)]
     pub fn parse(text: &str, file: &str) -> Result<Self, AuraError> {
         let raw: RawTable = toml::from_str(text)
@@ -271,7 +271,7 @@ impl PresetTable {
 
     /// One scene row, and whether the scene had one of its own.
     ///
-    /// `false` means the neutral row was used, which the caller turns into `AURA-ML-5094` and
+    /// `false` means the neutral row was used, which the caller turns into `AURA-ML-5100` and
     /// [`aura_core::contract::retouch::RetouchCode::SceneLimited`].
     #[must_use]
     pub fn scene(&self, scene: SceneId) -> (&SceneRow, bool) {
@@ -381,7 +381,7 @@ mod tests {
     fn a_floor_below_the_bound_is_refused() {
         let text = EMBEDDED.replace("texture_floor = 0.84", "texture_floor = 0.50");
         let error = PresetTable::parse(&text, FILE).expect_err("refused");
-        assert_eq!(error.code.0, "AURA-ML-5093");
+        assert_eq!(error.code.0, "AURA-ML-5099");
         assert!(error.detail.contains("0.80"));
     }
 
@@ -392,14 +392,14 @@ mod tests {
             r#"reason = """#,
         );
         let error = PresetTable::parse(&text, FILE).expect_err("refused");
-        assert_eq!(error.code.0, "AURA-ML-5093");
+        assert_eq!(error.code.0, "AURA-ML-5099");
     }
 
     #[test]
     fn an_unknown_scene_name_is_refused_rather_than_ignored() {
         let text = EMBEDDED.replace("[scene.cake]", "[scene.cake_cutting]");
         let error = PresetTable::parse(&text, FILE).expect_err("refused");
-        assert_eq!(error.code.0, "AURA-ML-5093");
+        assert_eq!(error.code.0, "AURA-ML-5099");
         assert!(error.detail.contains("cake_cutting"));
     }
 

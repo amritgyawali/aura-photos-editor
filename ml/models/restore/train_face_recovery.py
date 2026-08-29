@@ -10,7 +10,7 @@ defaults.
 `FACE_RECOVERY_HEAD_TRAINED` is false, and unlike every other placeholder in the product there is
 no measured fallback standing in for it - because the measurement that would stand in for a face
 prior is unsharp masking on a face, which is a different operation with a worse result and the
-same name. ADR-0045 section 6.
+same name. ADR-0047 section 6.
 
 ``--self-test`` runs without PyTorch and asserts five properties:
 

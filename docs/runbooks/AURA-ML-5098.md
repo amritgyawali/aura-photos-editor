@@ -1,26 +1,37 @@
-# AURA-ML-5098 - A change to which small fixes are permitted was refused
+# AURA-ML-5098 - One photograph's skin could not be retouched
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 
 ## What the photographer sees
 
-A setting in the Micro-Retouch panel did not take. Nothing was changed.
+One photograph carries no retouch. Everything else in the wedding is unaffected, and the frame
+is still delivered - with phases 15 to 19's work on it and no skin work.
 
 ## What actually happened
 
-`MicroService::set_matrix` refused the override. There is one cause in the shipped code: the
-override set nothing at all - every field was absent - which is refused rather than treated as a
-no-op, because a caller that meant to send a change and sent an empty one has a bug that would
-otherwise be silent.
+Either the proxy would not decode, or the plan the solver produced broke one of the seven
+guarantees `RetouchPlan::broken_guarantee` checks:
 
-`MicroService::accept` emits the same code when the photograph has no plan.
+1. it carries no reason (invariant 2);
+2. it carries more than `MAX_OPS` operations;
+3. an operation is outside its own bounds - an under-eye lift above `MAX_UNDEREYE_LUMA_EV`, an
+   evening operation naming a band other than the mid band, a strength outside `0..1`;
+4. it carries phase 19's `ShineReduce`, which this phase never emits;
+5. an operation overlaps a protected feature;
+6. the texture report is incoherent - a pass below its own floor, a floor below
+   `POLISHED_FLOOR`, more re-solves than allowed;
+7. a withdrawn retouch still carries operations.
+
+**A refused plan is stored as no plan rather than as a weak one**, and the next pass tries
+again. Three of the seven describe a photograph that would look visibly retouched, which is the
+failure this phase exists to avoid; the other four are ways a stored row would lie to phases 21,
+25 and 27.
 
 ## What to do
 
-1. Check what the panel sent. An override with no operations, no clothing switches and no
-   borrowing flag is the refusal above.
-2. Remember what this surface deliberately cannot do: **there is no strength field and no ceiling
-   field.** A photographer chooses *which* operations run; how far each may go is bounded by the
-   contract, and a surface that could raise a ceiling would make `docs/retouch-ethics.md` a
-   description of the defaults rather than a promise. A request to "turn the teeth up" is not a
-   bug in this code path.
+1. Re-run the pass. The work remaining is a query, so a retry costs one frame.
+2. If one frame fails repeatedly, the detail on the error names the guarantee. Number 5 in
+   particular usually means the protect set and the detector disagree about a region, which is
+   the conservative outcome working as intended rather than a bug.
+3. If it is a decode failure, an `AURA-RAW-2xxx` code will be in the log beside it, and that is
+   the real fault.

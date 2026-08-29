@@ -511,7 +511,7 @@ fn correct_teeth(
 /// **There is no path through this function that moves a chromaticity toward the locus centre.**
 /// A colour already inside comes back unchanged; one outside travels `share` of its own excess
 /// and no further. That is what makes the locus a bound rather than a target, and it is the whole
-/// of ADR-0043 section 3 as three lines of arithmetic.
+/// of ADR-0045 section 3 as three lines of arithmetic.
 ///
 /// The move is at constant luminance: the corrected chromaticity is turned back into a linear
 /// colour and re-normalised onto the input's own `Y`.
@@ -1021,7 +1021,7 @@ pub fn teeth_excursion(
 
 /// What fraction of a region is clipped past [`CLIPPED_FLOOR`].
 ///
-/// **The number a borrow is permitted by.** ADR-0043 section 4: you may only borrow pixels that
+/// **The number a borrow is permitted by.** ADR-0045 section 4: you may only borrow pixels that
 /// carry no information, and this is how much of a region carries none. Lives here rather than in
 /// the decision crate because it is a statement about the pixels the renderer works on, and
 /// because the guard measures the same quantity after the composite.

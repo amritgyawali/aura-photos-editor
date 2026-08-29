@@ -1,4 +1,4 @@
--- Migration 21 - the small fixes, and the one place this product composites two photographs.
+-- Migration 22 - the small fixes, and the one place this product composites two photographs.
 --
 -- PHASE-21 section 4 names no table: its file list is seven decision modules, four Python
 -- scripts, a config file, a panel and an ethics document. It needs three tables, a view and two
@@ -7,7 +7,7 @@
 -- Explain panel so it is never a hidden composite". A recipe records what happened to a
 -- photograph; it does not record what was *refused*, which is most of this phase, and it cannot
 -- answer "did anything in this gallery get composited" without opening four hundred files.
--- `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md` records the rest.
+-- `docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md` records the rest.
 --
 -- ---------------------------------------------------------------------------
 -- WHAT THIS MIGRATION IS FOR
@@ -272,7 +272,7 @@ CREATE INDEX idx_micro_op_borrow ON micro_op(borrowed_from) WHERE borrowed_from 
 -- See note 1. The promise, enforced by the database rather than by the application.
 --
 -- There is no code path in `aura-retouch` that attempts this, which is the point: this catches
--- the path somebody adds in phase 24 or phase 30 without reading ADR-0043. `ON DELETE RESTRICT`
+-- the path somebody adds in phase 24 or phase 30 without reading ADR-0045. `ON DELETE RESTRICT`
 -- on `borrowed_from` is the third layer - deleting the source photograph of a borrow fails
 -- rather than silently orphaning the disclosure.
 CREATE TRIGGER micro_op_borrow_disclosed

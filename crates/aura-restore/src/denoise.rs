@@ -27,7 +27,7 @@
 //!
 //! ## An unmeasured camera lowers the ceiling
 //!
-//! [`aura_core::contract::restore::NoiseModel::tier_ceiling`], and ADR-0045 section 3 for the
+//! [`aura_core::contract::restore::NoiseModel::tier_ceiling`], and ADR-0047 section 3 for the
 //! asymmetry: a model that under-estimates the noise under-denoises, which a photographer can see
 //! and correct, while one that over-estimates it smears lace, which they cannot. Every noise
 //! model in this build is unmeasured, so no frame in this build reaches [`DenoiseTier::Strong`].
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn an_unmeasured_camera_can_never_reach_the_strongest_tier() {
-        // ADR-0045 section 3, at the decision rather than at the type. Every model in this build
+        // ADR-0047 section 3, at the decision rather than at the type. Every model in this build
         // is unmeasured, so no frame in this build is denoised at `Strong`.
         let table = NoiseTable::embedded().expect("the embedded noise models load");
         let profiles = profiles();

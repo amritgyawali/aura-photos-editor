@@ -31,7 +31,7 @@ The classes are not equal:
 | Class | What follows from it |
 |---|---|
 | `mole`, `freckle`, `birthmark`, `scar`, `dimple` | protected by default; a photographer may clear the protection |
-| `tattoo` | **absolute**. `ProtectedKind::is_absolute` is true, `RetouchService::set_protection` refuses to clear it, and migration 20 carries a trigger that aborts the delete |
+| `tattoo` | **absolute**. `ProtectedKind::is_absolute` is true, `RetouchService::set_protection` refuses to clear it, and migration 21 carries a trigger that aborts the delete |
 
 ## Architecture
 
@@ -122,11 +122,11 @@ plus the cross-frame accumulation described above. Uncertainty leaves the mark a
 ## Rollback
 
 As `blemish_detector`: `models.lock` pins the sha256, the manifest is signed, and a rollback bumps
-`model_ver`, raises `AURA-ML-5090` and re-plans in the background. **A rollback does not clear the
+`model_ver`, raises `AURA-ML-5096` and re-plans in the background. **A rollback does not clear the
 protect set** - `retouch_protected` rows written by a photographer survive every re-analysis.
 
 ## Related
 
-- `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md`
+- `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md`
 - `docs/model-cards/blemish_detector.md`
 - `docs/retouch.md`

@@ -1,4 +1,4 @@
-# ADR-0043 - Micro-retouch: reduction rather than removal, measured naturalness, and the one thing a borrow may do
+# ADR-0045 - Micro-retouch: reduction rather than removal, measured naturalness, and the one thing a borrow may do
 
 **Status:** accepted · **Date:** 2026-08-20 · **Phase:** 21 · **Supersedes:** nothing
 
@@ -8,7 +8,7 @@ that would be a fairness hazard if it were read the obvious way; section 6.3 ask
 cross-frame borrowing, which is the first time this product composites two photographs and
 therefore the first time it can produce a delivered image of a moment that did not happen; and
 the three detectors section 4 asks for cannot be trained in this repository. The second document
-is [ADR-0044](ADR-0044-micro-ipc-surface.md), which covers the wire.
+is [ADR-0046](ADR-0046-micro-ipc-surface.md), which covers the wire.
 
 The ADR numbering in this repository is sequential across the whole project rather than aligned
 to phase numbers.
@@ -91,7 +91,7 @@ neutral**, which phase 15's `ToneService` already produces, and the operator is 
   no origin without one.
 
 The same shape covers the sclera. There is no absolute chromaticity constant anywhere in
-`micro_retouch.toml`, in migration 21 or in the contract, and the phase gate scans the schema for
+`micro_retouch.toml`, in migration 22 or in the contract, and the phase gate scans the schema for
 one on every run — the check phase 15 introduced, running for the third time.
 
 The luminance half has the same shape. `teeth_max_luma` is a lift in **stops**, capped by

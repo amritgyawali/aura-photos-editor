@@ -1,35 +1,25 @@
-# AURA-ML-5100 - A region was unusable, so a small fix was skipped
+# AURA-ML-5100 - A scene has no retouch preset row
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 
 ## What the photographer sees
 
-Some photographs have fewer small fixes than others, and those frames carry
-`micro_region_unavailable` or `micro_region_doubtful` in the panel.
+Photographs of that kind are retouched very gently, and the plan says `scene_limited`. Nothing
+is broken and nothing is skipped.
 
 ## What actually happened
 
-Phase 21 has exactly one route to a region - the `MicroField` port that phase 18 fills - and
-**no geometric fallback**. That is deliberate, and it is phase 19's argument inherited twice: a
-rectangle's edge does not follow a person, and a teeth correction through one whitens a lip.
+`retouch_presets.toml` carries one row per scene in the phase 07 vocabulary. A scene with no row
+falls back to the **neutral** row, which is deliberately the most conservative in the table, and
+the plan's confidence is reduced so the frame surfaces in the review queue.
 
-Three states produce this code:
-
-* **No region arrived at all.** On a build with no mask generator wired in, this is every frame,
-  and `MicroOutline::region_covered` is zero. That is the honest reading of such a build.
-* **The region arrived and is unreadable** - a side of zero, an alpha length that does not match
-  the dimensions, a confidence outside its range. This is a bug in the producer.
-* **The region arrived and is too doubtful.** `MicroField::strength_scale` is zero below
-  `MIN_MASK_CONFIDENCE`, and the operation is skipped rather than run gently.
-
-The difference between the first and "there was nothing to fix" is the whole point of this code.
-Those two look identical in a coverage report otherwise, and they send a support engineer to two
-different places.
+This is the same shape as `AURA-ML-5088` and `AURA-ML-5064`, and the direction of the fallback
+is the part that matters: an unknown kind of photograph gets *less* retouching rather than the
+average amount, because the cost of under-retouching is a frame somebody adjusts and the cost of
+over-retouching is a frame somebody's client notices.
 
 ## What to do
 
-1. Check `MicroOutline::region_covered` against `MicroOutline::planned`. A low ratio is a phase 18
-   problem, not a phase 21 problem.
-2. If the field is unreadable rather than absent, the producer is at fault: see
-   `docs/runbooks/AURA-ML-5086.md` and phase 18's own gates.
-3. Nothing to do per frame. A frame nobody could locate a region in ships as it was.
+1. `RetouchOutline::unpreset_scenes` lists every scene this happened for.
+2. Adding a row is a product decision: it needs a strength, a per-operation limit and a written
+   reason, and it bumps `preset_ver`, which re-plans the affected frames on the next pass.

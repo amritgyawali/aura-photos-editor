@@ -56,7 +56,7 @@
 //! | [`texture_guard`] | whether the skin kept its own texture, measured through the renderer |
 //! | [`ops`] | one decoded frame in, one plan out |
 //! | [`guard`] | which plans this phase refuses to store |
-//! | [`store`] | the four tables migration 20 adds |
+//! | [`store`] | the four tables migration 21 adds |
 //! | [`api`] | the frozen `RetouchService` and the resumable project walk |
 //!
 //! Plus [`fixtures`], the synthetic ground truth every section 10.1 gate is measured against,
@@ -68,7 +68,7 @@
 //! [`ops`] removes every candidate that touches one *before* strength, preset or texture guard
 //! is consulted. There is no value of any parameter at which a mole is partially inpainted,
 //! and [`aura_core::contract::retouch::ProtectedKind::is_absolute`] marks the one kind - a
-//! tattoo - that a photographer cannot switch off either. Migration 20 carries a trigger that
+//! tattoo - that a photographer cannot switch off either. Migration 21 carries a trigger that
 //! aborts the delete, so the promise survives a caller nobody has written yet.
 //!
 //! **The texture guarantee is measured, not asserted.** [`texture_guard`] applies the plan
@@ -81,7 +81,7 @@
 //! **Strength belongs to a person, not to a photograph.** [`strength`] computes one number per
 //! identity per project from four gallery statistics, and every frame in the wedding uses it.
 //! The frame own face size and scene decide *which operations run*, never how strong they are.
-//! `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 6 has the argument,
+//! `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 6 has the argument,
 //! and section 10.1 cross-frame consistency gate is what forces it.
 //!
 //! ## What this phase decides, and what it refuses to
@@ -91,7 +91,7 @@
 //! not touch hair, teeth, eyes, clothing or glare (phase 21), it does not denoise or sharpen
 //! (phase 22), and it does not reshape a body - which is not a scope note but a permanent
 //! product decision, recorded in section 11 of `docs/plan/CLAUDE.md` and enforced by there
-//! being nowhere in [`aura_core::contract::retouch`] or in migration 20 to put one.
+//! being nowhere in [`aura_core::contract::retouch`] or in migration 21 to put one.
 //!
 //! ## The rule this phase adds, which every later phase inherits
 //!
@@ -104,7 +104,7 @@
 //! ## What this build does not have
 //!
 //! The two shipped heads are untrained placeholders and neither is consulted, so what runs is
-//! the measured detector described in ADR-0041 section 7. Phase 06 face detector is a
+//! the measured detector described in ADR-0043 section 7. Phase 06 face detector is a
 //! placeholder too, so on a real photograph there are no faces to retouch and no cross-frame
 //! correspondence to protect anybody with. Every gate in section 10.1 is measured against
 //! synthetic faces whose marks are painted into the pixels and read back through the real

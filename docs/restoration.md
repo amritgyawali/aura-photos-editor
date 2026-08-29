@@ -142,7 +142,7 @@ while you work is already denoised.
   may not raise one.
 - What each camera's sensor does: `crates/aura-restore/config/noise_models/`.
 - The arguments behind all of it:
-  `docs/adr/ADR-0045-restoration-denoise-sharpen-and-identity.md`.
+  `docs/adr/ADR-0047-restoration-denoise-sharpen-and-identity.md`.
 - What this build cannot yet prove about any of it: `docs/progress/PHASE-22-EXIT.md`.
 
 ## One simplification worth knowing about

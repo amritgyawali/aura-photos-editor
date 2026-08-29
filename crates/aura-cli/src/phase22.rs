@@ -1,6 +1,6 @@
 //! The phase 22 mechanical gate.
 //!
-//! This is the assembly proof for the restoration stack: migration 22 and its objects, the scene
+//! This is the assembly proof for the restoration stack: migration 23 and its objects, the scene
 //! profile table and the twenty camera noise models, the bounds the code owns rather than the
 //! files, the evidence-driven tier ladder, the four sharpening preconditions, the identity
 //! constraint end to end, the self-check and its two levers, the store, and the promise the
@@ -50,7 +50,7 @@ pub fn verify(args: &[String]) -> ExitCode {
     let clock: Arc<dyn Clock> = Arc::new(SystemClock::default());
     let mut failures = 0usize;
 
-    // 1. Migration 22 and every object it owns.
+    // 1. Migration 23 and every object it owns.
     let catalog_path = work.join("phase22.sqlite");
     drop(std::fs::remove_file(&catalog_path));
     let catalog = match Catalog::open(&catalog_path, Arc::clone(&clock), crate::APP_VERSION) {
@@ -104,11 +104,11 @@ pub fn verify(args: &[String]) -> ExitCode {
     // The way a phase quietly acquires either is by growing a column for it.
     match forbidden_columns(&catalog) {
         Ok(found) if found.is_empty() => {
-            println!("  no upscale, synthesis or skin-tone-target column in migration 22");
+            println!("  no upscale, synthesis or skin-tone-target column in migration 23");
         }
         Ok(found) => {
             eprintln!(
-                "  migration 22 grew a forbidden column: {}",
+                "  migration 23 grew a forbidden column: {}",
                 found.join(", ")
             );
             failures += 1;
@@ -197,7 +197,7 @@ pub fn verify(args: &[String]) -> ExitCode {
         let measured = table.bodies().iter().filter(|m| m.measured).count();
         if measured == 0 {
             println!(
-                "  none of the {} bodies is measured, so none may reach `strong` (ADR-0045 s3)",
+                "  none of the {} bodies is measured, so none may reach `strong` (ADR-0047 s3)",
                 table.len()
             );
         } else {
@@ -344,7 +344,7 @@ pub fn verify(args: &[String]) -> ExitCode {
     }
 
     // The estimator's own floor sits below the contract's, which is phase 22's own defect as a
-    // permanent check. ADR-0045 section 11.1.
+    // permanent check. ADR-0047 section 11.1.
     let perfect = fixtures::edge_plate(96, 96, 8);
     let measured = kernel::estimate(&perfect, 96, 96);
     if measured.is_reliable() && measured.sigma < SHARPEN_KERNEL_LO {
@@ -543,7 +543,7 @@ pub fn verify(args: &[String]) -> ExitCode {
         }
     }
 
-    // The promise the database keeps. See migration 22, note 1.
+    // The promise the database keeps. See migration 23, note 1.
     println!();
     println!("what the database refuses:");
     if let Some(photo) = photos.first() {
@@ -629,7 +629,7 @@ fn schema_object(catalog: &Catalog, kind: &str, name: &str) -> AuraResult<bool> 
     })
 }
 
-/// Any column in migration 22's tables that would let this phase do what section 2.2 forbids.
+/// Any column in migration 23's tables that would let this phase do what section 2.2 forbids.
 fn forbidden_columns(catalog: &Catalog) -> AuraResult<Vec<String>> {
     catalog.read(move |conn| {
         let mut found = Vec::new();
@@ -686,7 +686,7 @@ enum Attempt {
 
 /// Insert a skipped face, then try to deliver it with its drift still above the ceiling.
 ///
-/// The trigger in migration 22 is what has to stop the second statement. This is the exact shape
+/// The trigger in migration 23 is what has to stop the second statement. This is the exact shape
 /// of the change a well-meaning "recover this one anyway" button would make.
 fn deliver_a_drifted_face(catalog: &Catalog, photo: &PhotoId) -> AuraResult<Attempt> {
     let photo_key = photo.to_db();

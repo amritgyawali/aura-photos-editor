@@ -21,7 +21,7 @@
 //! | [`eyes`] | how much redness is in the sclera and how much definition the iris has lost |
 //! | [`guard`] | what the plan did to the catchlights, the hairline and the teeth, measured |
 //! | [`ops`] | one decoded frame in, one plan out |
-//! | [`store`] | the three tables migration 21 adds |
+//! | [`store`] | the three tables migration 22 adds |
 //! | [`api`] | the frozen `MicroService` and the resumable project walk |
 //!
 //! Plus [`fixtures`], the synthetic ground truth every section 10.1 gate is measured against.
@@ -54,12 +54,12 @@
 //! it and `MicroRegion::Skin` is read-only here), it does not denoise or sharpen (phase 22), it
 //! does not remove objects (phase 24), and it does not reshape anybody - which is not a scope
 //! note but a permanent product decision, recorded in `docs/retouch-ethics.md` and enforced by
-//! there being nowhere in `aura_core::contract::micro` or in migration 21 to put one.
+//! there being nowhere in `aura_core::contract::micro` or in migration 22 to put one.
 //!
 //! ## What this build does not have
 //!
 //! The three shipped heads are untrained placeholders and none is consulted, so what runs is the
-//! measured detection described in ADR-0043 section 6. Phase 06's face detector is a placeholder
+//! measured detection described in ADR-0045 section 6. Phase 06's face detector is a placeholder
 //! and phase 18's segmenter is one too, so on a real photograph there are no regions to work
 //! through and no faces to work on. Every gate in section 10.1 is measured against synthetic
 //! frames whose flyaways, glare sheets, lint and teeth were painted into the pixels and read back

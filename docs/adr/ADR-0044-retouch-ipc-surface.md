@@ -1,8 +1,8 @@
-# ADR-0042 - The retouch IPC surface
+# ADR-0044 - The retouch IPC surface
 
 **Status:** accepted · **Date:** 2026-08-20 · **Phase:** 20 · **Supersedes:** nothing
 
-The second of phase 20's two ADRs. [ADR-0041](ADR-0041-portrait-retouch-and-texture-protection.md)
+The second of phase 20's two ADRs. [ADR-0043](ADR-0043-portrait-retouch-and-texture-protection.md)
 covers the decisions; this covers the wire, which for this phase is not a formality: it is the
 first command surface in the product whose subject is a **person** rather than a photograph, and
 the first where a wrongly shaped field would be a feature this product has promised never to
@@ -58,7 +58,7 @@ through that frame's own eye landmarks into the face frame - origin between the 
 eye-to-eye line, unit the inter-ocular distance - because that is what makes the protection follow
 the person.
 
-A face with no landmarks is **refused** rather than approximated, with `AURA-ML-5091`. Phase 09's
+A face with no landmarks is **refused** rather than approximated, with `AURA-ML-5097`. Phase 09's
 rule is that `[[0,0],[0,0]]` means unknown and must never be read as the top-left corner, and a
 protect row written in a coordinate system nobody can reproduce would protect a random part of
 every other photograph of that person - which is worse than not protecting anything, because it
@@ -85,7 +85,7 @@ The last is the one a reviewer would cut, and it is the one that keeps the rest 
 measured over eleven samples of skin is arithmetic rather than evidence, and a panel that printed
 `0.94` either way would be presenting a guess with three decimal places.
 
-`withdrawn` is separate from `passed` for the reason ADR-0041 section 2 gives: "we re-solved twice
+`withdrawn` is separate from `passed` for the reason ADR-0043 section 2 gives: "we re-solved twice
 and got there" and "we gave up and applied nothing" are two different outcomes and a photographer
 needs to be told which one happened.
 

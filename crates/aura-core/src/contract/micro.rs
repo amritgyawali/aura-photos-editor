@@ -19,7 +19,7 @@
 //! the veto is a **ceiling enforced on the pixel**: [`NaturalnessGuard`] holds three floors that
 //! are measured on the rendered result and not on the parameter that was solved, and an
 //! operation family that misses its floor after three re-solves is withdrawn rather than
-//! attenuated. `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md` section 5 has the
+//! attenuated. `docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md` section 5 has the
 //! argument.
 //!
 //! ## The second thing: a borrow may only replace pixels that carry no information
@@ -39,7 +39,7 @@
 //! neutral**, which phase 15 produces, and the operators reduce a distance to it rather than
 //! moving toward its centre. A chromaticity already inside is not moved at all. Phase 15 wrote
 //! the rule this follows - a target is measured, never assumed, and the schema cannot express an
-//! alternative - and the phase gate scans migration 21 for a constant that would break it.
+//! alternative - and the phase gate scans migration 22 for a constant that would break it.
 //!
 //! ## What this contract cannot express
 //!
@@ -148,7 +148,7 @@ pub const MAX_BORROW_AREA: f32 = 0.002;
 /// How much of a borrow region must be blown specular in the target frame, `0..1`.
 ///
 /// **The rule the whole borrowing design rests on.** Fifty-five per cent. See the module header
-/// and ADR-0043 section 4: you may only borrow pixels that carry no information, and a region
+/// and ADR-0045 section 4: you may only borrow pixels that carry no information, and a region
 /// that is more than half at the sensor's ceiling carries none. Below this the conservative
 /// highlight reduction runs instead and the plan says which.
 pub const MIN_SPECULAR_FRACTION: f32 = 0.55;
@@ -242,7 +242,7 @@ pub const MAX_OPS: usize = 80;
 ///
 /// **Not a second vocabulary.** [`MicroRegion::as_mask_str`] is total onto phase 18's own
 /// spellings, the shape [`crate::contract::local::MaskKind::as_recipe_str`] uses, so this is a
-/// view of one answer rather than a competing one. ADR-0043 section 7 records why it is not
+/// view of one answer rather than a competing one. ADR-0045 section 7 records why it is not
 /// phase 19's enum widened and not a dependency on `aura-vision`.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
@@ -367,7 +367,7 @@ impl fmt::Display for MicroRegion {
 /// **The input port, and the whole of it.** Phase 18 fills these; this phase has no other route
 /// to a region and no way to make one. Same shape and same semantics as phase 19's
 /// [`crate::contract::local::MaskField`], with this phase's wider region vocabulary - see
-/// ADR-0043 section 7 for why that is a projection rather than a duplicate.
+/// ADR-0045 section 7 for why that is a projection rather than a duplicate.
 ///
 /// The two quality numbers are two numbers for phase 18's reason: confidence is how sure the
 /// class is and edge quality is how well determined the boundary is. They fail independently, and
@@ -449,7 +449,7 @@ impl MicroField {
     ///
     /// A sentence rather than an [`AuraError`]: `aura-core` owns the shape and `aura-retouch`
     /// owns the error registry, the split every phase since 09 has kept.
-    /// `aura_retouch::micro::guard` turns a `Some` here into `AURA-ML-5100`.
+    /// `aura_retouch::micro::guard` turns a `Some` here into `AURA-ML-5106`.
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         if self.width == 0 || self.height == 0 {
@@ -483,7 +483,7 @@ impl MicroField {
 
 /// A bounded region of chromaticity, **relative to the frame's own measured neutral**.
 ///
-/// Section 5 names the type and does not define it; ADR-0043 section 3 argues for this shape.
+/// Section 5 names the type and does not define it; ADR-0045 section 3 argues for this shape.
 /// The centre is an offset in CIE `u'v'` from whatever phase 15 measured the illuminant to be,
 /// so the same locus describes plausible teeth under tungsten and under an overcast sky without
 /// containing a single absolute colour.
@@ -761,7 +761,7 @@ impl MicroOp {
 
     /// Which naturalness measurement holds this operation.
     ///
-    /// The mapping the guard withdraws by - see [`NaturalnessReport`] and ADR-0043 section 5.
+    /// The mapping the guard withdraws by - see [`NaturalnessReport`] and ADR-0045 section 5.
     /// Clothing has no family because no naturalness floor covers fabric: its guarantee is the
     /// area cap and the fabric-texture test in the eval harness, which are checks on the
     /// *operation* rather than on the rendered region.
@@ -831,7 +831,7 @@ impl MicroOp {
     ///
     /// Every ceiling in section 5 is checked here, so the solver, the store, the IPC layer and
     /// the eval harness all refuse the same operations. `aura_retouch::micro::guard` turns a
-    /// `Some` into `AURA-ML-5097`.
+    /// `Some` into `AURA-ML-5103`.
     #[must_use]
     #[allow(clippy::too_many_lines)]
     pub fn problem(&self) -> Option<String> {
@@ -983,7 +983,7 @@ impl MicroOp {
 
 /// Which naturalness floor holds a family of operations.
 ///
-/// Three families, three measurements, three independent withdrawals. ADR-0043 section 5.
+/// Three families, three measurements, three independent withdrawals. ADR-0045 section 5.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
@@ -1076,7 +1076,7 @@ impl NaturalnessGuard {
     /// What is wrong with this guard, if anything.
     ///
     /// Five ceilings that may not be raised and one floor that may not be lowered. A `Some` here
-    /// is `AURA-ML-5099` and it is run-blocking: half a ceiling table would even the ceremony
+    /// is `AURA-ML-5105` and it is run-blocking: half a ceiling table would even the ceremony
     /// against measured limits and the reception against nothing, and that inconsistency is
     /// invisible in a delivered gallery.
     #[must_use]
@@ -1165,7 +1165,7 @@ pub struct NaturalnessReport {
     ///
     /// **Per family rather than whole-plan**, which is where this departs from phase 20's
     /// texture report: the three measurements are over three disjoint regions, so a frame whose
-    /// teeth could not be evened safely still gets its lint removed. ADR-0043 section 5.
+    /// teeth could not be evened safely still gets its lint removed. ADR-0045 section 5.
     pub withdrawn: [bool; OpFamily::COUNT],
 }
 
@@ -1645,7 +1645,7 @@ pub struct MicroPlan {
     ///
     /// **Phase 19's allowance, shared for the third time.** Twelve operations across three
     /// phases that each stay inside their own budget still add up to a photograph that looks
-    /// worked on. ADR-0043 section 8.
+    /// worked on. ADR-0045 section 8.
     pub budget_used: f32,
     /// True when a photographer changed what may run on this frame.
     pub user_edited: bool,
@@ -1726,7 +1726,7 @@ impl MicroPlan {
     /// family really is empty, the naturalness report is coherent, and a composite frame really
     /// does carry a disclosed source. They live here so the solver, the store, the IPC layer and
     /// the eval harness all refuse the same frames. `aura_retouch::micro::guard` turns a `Some`
-    /// here into `AURA-ML-5097`.
+    /// here into `AURA-ML-5103`.
     #[must_use]
     pub fn broken_guarantee(&self) -> Option<String> {
         if self.reasons.is_empty() {
@@ -1881,7 +1881,7 @@ impl MicroOverride {
 
     /// What is wrong with this override, if anything.
     ///
-    /// `aura_retouch::micro::guard` turns a `Some` here into `AURA-ML-5098`.
+    /// `aura_retouch::micro::guard` turns a `Some` here into `AURA-ML-5104`.
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         if self.is_empty() {
@@ -1951,7 +1951,7 @@ pub trait MicroService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5098` when the photograph has no plan.
+    /// `AURA-ML-5104` when the photograph has no plan.
     fn accept(&self, image: ImageId) -> Result<(), AuraError>;
 
     /// Record which operations the photographer allows on this project.
@@ -1966,6 +1966,6 @@ pub trait MicroService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5098` when the override sets nothing.
+    /// `AURA-ML-5104` when the override sets nothing.
     fn set_matrix(&self, project: ProjectId, values: MicroOverride) -> Result<(), AuraError>;
 }

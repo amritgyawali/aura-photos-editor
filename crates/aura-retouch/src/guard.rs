@@ -16,7 +16,7 @@ use crate::errors;
 ///
 /// # Errors
 ///
-/// `AURA-ML-5092` naming the photograph and the guarantee.
+/// `AURA-ML-5098` naming the photograph and the guarantee.
 pub fn check_plan(plan: &RetouchPlan) -> Result<(), AuraError> {
     match plan.broken_guarantee() {
         None => Ok(()),
@@ -28,7 +28,7 @@ pub fn check_plan(plan: &RetouchPlan) -> Result<(), AuraError> {
 ///
 /// # Errors
 ///
-/// `AURA-ML-5091` naming the problem.
+/// `AURA-ML-5097` naming the problem.
 pub fn check_override(values: &RetouchOverride) -> Result<(), AuraError> {
     match values.problem() {
         None => Ok(()),
@@ -41,13 +41,13 @@ pub fn check_override(values: &RetouchOverride) -> Result<(), AuraError> {
 /// Two refusals, and the second is the one that matters: **an absolute protection cannot be
 /// cleared.** Section 10.1 gates tattoo removal at zero per cent and section 11 of
 /// `docs/plan/CLAUDE.md` forbids operations that change a person identity permanently, so this
-/// is a property of the kind rather than a setting. Migration 20 carries the same refusal as a
+/// is a property of the kind rather than a setting. Migration 21 carries the same refusal as a
 /// trigger, because a promise enforced in one layer is a promise until somebody writes a second
 /// caller.
 ///
 /// # Errors
 ///
-/// `AURA-ML-5091` when the rectangle is empty, or when clearing an absolute feature.
+/// `AURA-ML-5097` when the rectangle is empty, or when clearing an absolute feature.
 pub fn check_protection(feature: &ProtectedFeature, protect: bool) -> Result<(), AuraError> {
     if feature.area.w <= 0.0 || feature.area.h <= 0.0 {
         return Err(errors::retouch_edit_refused(
@@ -99,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sound_plan_passes_and_an_unsound_one_is_5092() {
+    fn a_sound_plan_passes_and_an_unsound_one_is_5098() {
         let good = RetouchPlan::nothing(
             photo(),
             SceneId::Ceremony,
@@ -110,13 +110,13 @@ mod tests {
         let mut bad = good;
         bad.reasons.clear();
         let err = check_plan(&bad).expect_err("refused");
-        assert_eq!(err.code.0, "AURA-ML-5092");
+        assert_eq!(err.code.0, "AURA-ML-5098");
     }
 
     #[test]
-    fn an_empty_override_is_5091() {
+    fn an_empty_override_is_5097() {
         let err = check_override(&RetouchOverride::default()).expect_err("refused");
-        assert_eq!(err.code.0, "AURA-ML-5091");
+        assert_eq!(err.code.0, "AURA-ML-5097");
         assert!(check_override(&RetouchOverride::preset(RetouchPreset::Light)).is_ok());
     }
 
@@ -125,7 +125,7 @@ mod tests {
         let tattoo = feature(ProtectedKind::Tattoo);
         assert!(check_protection(&tattoo, true).is_ok());
         let err = check_protection(&tattoo, false).expect_err("refused");
-        assert_eq!(err.code.0, "AURA-ML-5091");
+        assert_eq!(err.code.0, "AURA-ML-5097");
         assert!(err.detail.contains("tattoo"));
 
         let mole = feature(ProtectedKind::Mole);

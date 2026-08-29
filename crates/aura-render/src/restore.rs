@@ -12,7 +12,7 @@
 //! PHASE-22 section 2.1 requires denoise before local retouch and sharpening last. Both are
 //! satisfied by putting this phase's denoise at stage 6 and its deconvolution at stage 20, with
 //! only face recovery at `Stage::Restoration` in between.
-//! `docs/adr/ADR-0045-restoration-denoise-sharpen-and-identity.md` section 2 has the argument,
+//! `docs/adr/ADR-0047-restoration-denoise-sharpen-and-identity.md` section 2 has the argument,
 //! and `crates/aura-render/tests/restoration_order.rs` is section 10.1's render-graph test.
 //!
 //! ## Why the decision phase calls into the renderer
@@ -95,7 +95,7 @@ pub struct RestoreContext {
     /// Per-pixel coverage per region, `0..1`, each `width * height` long.
     ///
     /// A missing region is a region the deconvolution may not act through. Same gating as phases
-    /// 19, 20 and 21, and here it is a refusal rather than an attenuation - ADR-0045 section 4.
+    /// 19, 20 and 21, and here it is a refusal rather than an attenuation - ADR-0047 section 4.
     pub regions: BTreeMap<RestoreRegion, Vec<f32>>,
     /// The predicted noise sigma at diffuse white, in linear working-space units.
     ///
@@ -499,7 +499,7 @@ fn deconvolve(
 /// fixtures. It exists so that the identity constraint, the self-check and the store are
 /// exercised end to end by something that really does move a face's pixels - which is the only
 /// way to know they would catch a model that moved them too far.
-/// ADR-0045 section 6 records why there is deliberately no measured fallback for this operation
+/// ADR-0047 section 6 records why there is deliberately no measured fallback for this operation
 /// in the product.
 fn recover_face(
     pixels: &mut [f32],

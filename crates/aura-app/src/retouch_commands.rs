@@ -23,7 +23,7 @@
 //! words appear in the crate. Section 11 of `docs/plan/CLAUDE.md` forbids them permanently.
 //!
 //! **No command can clear a tattoo protection.** `set_protection` refuses it with
-//! `AURA-ML-5091`, the store refuses it again, and migration 20 carries a trigger that aborts
+//! `AURA-ML-5097`, the store refuses it again, and migration 21 carries a trigger that aborts
 //! the delete. Three layers, because section 10.1 gates tattoo removal at zero rather than at a
 //! small number.
 //!
@@ -148,7 +148,7 @@ pub fn retouch_review_queue(
 ///
 /// # Errors
 ///
-/// `AURA-ML-5091` when the photograph has no plan.
+/// `AURA-ML-5097` when the photograph has no plan.
 pub fn accept_retouch(state: &AppState, input: &AcceptRetouchInput) -> IpcResult<RetouchPlanDto> {
     let photo = parse_photo(&input.photo_id)?;
     let project = state.project_of(photo)?;
@@ -169,7 +169,7 @@ pub fn accept_retouch(state: &AppState, input: &AcceptRetouchInput) -> IpcResult
 ///
 /// # Errors
 ///
-/// `AURA-ML-5091` when the photograph has no plan, the preset is not one of the four, or the
+/// `AURA-ML-5097` when the photograph has no plan, the preset is not one of the four, or the
 /// strength is outside `0..1`; `AURA-RENDER-8002` when the merged recipe will not validate.
 pub fn set_retouch(state: &AppState, input: &SetRetouchInput) -> IpcResult<SetRetouchDto> {
     let project = parse_project(&input.project_id)?;
@@ -229,7 +229,7 @@ pub fn set_retouch(state: &AppState, input: &SetRetouchInput) -> IpcResult<SetRe
 ///
 /// # Errors
 ///
-/// `AURA-ML-5091` when the kind is unknown, when the face has no landmarks to project through,
+/// `AURA-ML-5097` when the kind is unknown, when the face has no landmarks to project through,
 /// or when the feature is absolute and the caller asked to clear it.
 pub fn set_protection(
     state: &AppState,
@@ -297,7 +297,7 @@ pub fn set_protection(
 ///
 /// # Errors
 ///
-/// `AURA-ML-5093` when the preset table will not load, or whatever building the preview service
+/// `AURA-ML-5099` when the preset table will not load, or whatever building the preview service
 /// raised. Per-photograph failures are counted rather than returned.
 pub fn retouch_pass(state: &AppState, input: &RetouchPassInput) -> IpcResult<RetouchPassDto> {
     let project = parse_project(&input.project_id)?;

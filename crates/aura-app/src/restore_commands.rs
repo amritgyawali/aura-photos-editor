@@ -2,12 +2,12 @@
 //!
 //! Seven commands. Four read - the project coverage, one photograph's plan, the identity
 //! refusals and the review queue - one runs the resumable pass, and two record what the
-//! photographer decided. ADR-0046 records the shape and what is deliberately absent from it.
+//! photographer decided. ADR-0048 records the shape and what is deliberately absent from it.
 //!
 //! # What this module does that the micro-retouch one does not
 //!
 //! **Its override carries a number.** Phase 21's matrix was switches all the way down and
-//! ADR-0044 could say there was no strength field anywhere. Here there is a genuine four-way
+//! ADR-0046 could say there was no strength field anywhere. Here there is a genuine four-way
 //! choice, because "how much noise reduction" is a question a photographer legitimately has an
 //! opinion about and "how much may AURA whiten teeth" is not. The line is between *which of four*
 //! and *how far each goes*: a tier is on the wire and `DenoiseSpec`'s three amounts are not,
@@ -58,7 +58,7 @@ use crate::state::AppState;
 ///
 /// # Errors
 ///
-/// `AURA-DB-3006` when the stored plans cannot be read, and `AURA-ML-5105` when the profile
+/// `AURA-DB-3006` when the stored plans cannot be read, and `AURA-ML-5111` when the profile
 /// tables will not load.
 pub fn restore_status(state: &AppState, project_id: &str) -> IpcResult<RestoreStatusDto> {
     let project = parse_project(project_id)?;
@@ -175,7 +175,7 @@ pub fn restore_review_queue(
 ///
 /// # Errors
 ///
-/// `AURA-ML-5104` when the photograph has no plan.
+/// `AURA-ML-5110` when the photograph has no plan.
 pub fn accept_restore(state: &AppState, input: &AcceptRestoreInput) -> IpcResult<()> {
     let photo = parse_photo(&input.photo_id)?;
     let project = project_of(state, photo)?;
@@ -185,11 +185,11 @@ pub fn accept_restore(state: &AppState, input: &AcceptRestoreInput) -> IpcResult
 
 /// Record what a photographer chose for one photograph.
 ///
-/// **A tier and two switches, and no other number.** See the module header and ADR-0046 section 3.
+/// **A tier and two switches, and no other number.** See the module header and ADR-0048 section 3.
 ///
 /// # Errors
 ///
-/// `AURA-ML-5104` when the override sets nothing, when the tier is not one of the four, or when
+/// `AURA-ML-5110` when the override sets nothing, when the tier is not one of the four, or when
 /// the photograph has no plan.
 pub fn set_restore_override(
     state: &AppState,
@@ -234,7 +234,7 @@ pub fn set_restore_override(
 ///
 /// # Errors
 ///
-/// `AURA-DB-3006` when the pending set cannot be read, and `AURA-ML-5105` when the tables will
+/// `AURA-DB-3006` when the pending set cannot be read, and `AURA-ML-5111` when the tables will
 /// not load. Per-photograph failures are counted in the report rather than returned.
 pub fn restore_pass(state: &AppState, input: &RestorePassInput) -> IpcResult<RestorePassDto> {
     let project = parse_project(&input.project_id)?;

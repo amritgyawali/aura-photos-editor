@@ -80,13 +80,13 @@ Synthetic noise alone was considered and rejected. The noise models in
 `crates/aura-restore/config/noise_models/` are themselves derived from published specifications
 rather than measured, so a network trained on noise synthesised from them would be a network
 trained to invert a function this repository wrote. Its gates would measure the round trip.
-ADR-0045 section 10 records the argument.
+ADR-0047 section 10 records the argument.
 
 `aura_restore::decide::MODEL_VER` is therefore `0` and **this head is never consulted**. What runs
 is the noise-model-conditioned edge-preserving filter in `aura_render::restore::denoise`, which is
 a measurement rather than a model: it compares each local step against the sensor's own predicted
 sigma and blends toward the neighbourhood only where the step is smaller than the sensor could
-have produced by noise. ADR-0045 section 6 records why that is worth shipping - its failure mode
+have produced by noise. ADR-0047 section 6 records why that is worth shipping - its failure mode
 is leaving noise behind, which a photographer can see and correct.
 
 ## Latency
@@ -115,7 +115,7 @@ all need real photographs. Conditions C1 and C4 of `docs/progress/PHASE-22-EXIT.
 
 The denoiser has no per-person, per-ethnicity or per-age behaviour and no way to acquire one: it
 reads a tile and a predicted sigma, and neither carries an identity. There is no skin-tone target
-anywhere in this phase - phase 15's rule, and the phase gate scans migration 22 for a constant
+anywhere in this phase - phase 15's rule, and the phase gate scans migration 23 for a constant
 that would break it.
 
 There is one fairness consideration and it is worth stating rather than assuming away. Denoising
@@ -140,7 +140,7 @@ phases that touch skin.
   `selfcheck` exists to catch on the rendered result rather than in the head.
 - **An unmeasured camera's model is systematically wrong for that body**, in the same direction
   for every frame from it. `NoiseModel::tier_ceiling` caps such a body at `DenoiseTier::Standard`
-  and `restore_plan.denoise_measured` records it per row; ADR-0045 section 3 has the asymmetry.
+  and `restore_plan.denoise_measured` records it per row; ADR-0047 section 3 has the asymmetry.
 - **A frame with no phase 09 verdict is not denoised at all.** The plan records
   `restore_no_noise_reading` rather than guessing.
 
@@ -161,7 +161,7 @@ consults this head, a rollback of this entry changes no stored decision in this 
 
 ## Related
 
-- `docs/adr/ADR-0045-restoration-denoise-sharpen-and-identity.md` - sections 3, 6 and 10.
+- `docs/adr/ADR-0047-restoration-denoise-sharpen-and-identity.md` - sections 3, 6 and 10.
 - `docs/restoration.md` - what this does, in the product's own words.
 - `docs/model-cards/face_recovery.md` - the other head this phase registers, and the one with no
   measured fallback at all.

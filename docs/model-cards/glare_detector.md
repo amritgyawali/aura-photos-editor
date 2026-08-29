@@ -77,7 +77,7 @@ them. There is no such corpus in this repository and no GPU backend to train on.
 What runs instead is the measurement in `aura_retouch::micro::glare`, and here that is not a
 compromise: a specular sheet *is* a connected region of near-clipped, near-neutral pixels over an
 eye. The measurement is the definition, and a placeholder head would add nothing to it.
-`docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md` section 6 records the argument.
+`docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md` section 6 records the argument.
 
 `ml/models/micro/train_glare.py --self-test` runs without PyTorch and proves four properties,
 including that a catchlight is never scored as a sheet at any accuracy, and that a model reporting
@@ -137,11 +137,11 @@ conservative highlight reduction bounded by `MAX_GLARE_REDUCE` when no sibling f
 
 `models.lock` pins this version by sha256 and the manifest is signed. Rolling back is a
 `models.lock` edit plus `cargo xtask models`; the stored `model_ver` on every plan changes with it,
-`AURA-ML-5096` is raised, and the affected frames are re-planned in the background.
+`AURA-ML-5102` is raised, and the affected frames are re-planned in the background.
 
 ## Related
 
-- `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md`
-- `docs/adr/ADR-0044-micro-ipc-surface.md`
+- `docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md`
+- `docs/adr/ADR-0046-micro-ipc-surface.md`
 - `docs/model-cards/flyaway_detector.md`
 - `docs/retouch-ethics.md`

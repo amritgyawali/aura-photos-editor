@@ -1,4 +1,4 @@
-//! This crate's own error constructors. Codes ML 5102-5108, registered in
+//! This crate's own error constructors. Codes ML 5108-5114, registered in
 //! `crates/aura-core/errors.toml`.
 //!
 //! The split every phase since 09 has kept: `aura-core` owns the shapes and the predicates, and
@@ -17,24 +17,24 @@
 use aura_core::contract::error::{AuraError, ErrorCode, Recovery, Severity};
 
 /// Stored restoration plans came from different heads, arithmetic or profile tables.
-pub const ML_RESTORE_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5102");
+pub const ML_RESTORE_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5108");
 /// One photograph could not be restored, or a plan broke a guarantee.
-pub const ML_RESTORE_FAILED: ErrorCode = ErrorCode("AURA-ML-5103");
+pub const ML_RESTORE_FAILED: ErrorCode = ErrorCode("AURA-ML-5109");
 /// A restoration override was refused.
-pub const ML_RESTORE_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5104");
+pub const ML_RESTORE_EDIT_REFUSED: ErrorCode = ErrorCode("AURA-ML-5110");
 /// A restoration profile or camera noise-model file was refused.
-pub const ML_RESTORE_PROFILE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5105");
+pub const ML_RESTORE_PROFILE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5111");
 /// A region was unusable, so sharpening was skipped.
-pub const ML_RESTORE_REGION_UNUSABLE: ErrorCode = ErrorCode("AURA-ML-5106");
+pub const ML_RESTORE_REGION_UNUSABLE: ErrorCode = ErrorCode("AURA-ML-5112");
 /// The artefact self-check made a restoration gentler, or withdrew one.
-pub const ML_RESTORE_SELF_CHECK: ErrorCode = ErrorCode("AURA-ML-5107");
+pub const ML_RESTORE_SELF_CHECK: ErrorCode = ErrorCode("AURA-ML-5113");
 /// Face recovery was declined to keep somebody looking like themselves.
-pub const ML_RESTORE_IDENTITY_DECLINED: ErrorCode = ErrorCode("AURA-ML-5108");
+pub const ML_RESTORE_IDENTITY_DECLINED: ErrorCode = ErrorCode("AURA-ML-5114");
 
 /// Stored restoration plans disagree with the running build about a version.
 ///
-/// Degraded rather than fatal, as `AURA-ML-5033`, `AURA-ML-5060`, `AURA-ML-5084`, `AURA-ML-5090`
-/// and `AURA-ML-5096` are. Three numbers: the heads, the arithmetic and the profile tables,
+/// Degraded rather than fatal, as `AURA-ML-5033`, `AURA-ML-5060`, `AURA-ML-5084`, `AURA-ML-5096`
+/// and `AURA-ML-5102` are. Three numbers: the heads, the arithmetic and the profile tables,
 /// which invalidate the learned decisions, the measurements and the ceilings respectively.
 #[must_use]
 pub fn restore_version_mismatch(
@@ -91,7 +91,7 @@ pub fn restore_edit_refused(detail: impl Into<String>) -> AuraError {
 
 /// A profile or noise-model file would not load.
 ///
-/// Whole-file refusal, as `AURA-ML-5087`, `AURA-ML-5093` and `AURA-ML-5099` are. Half a profile
+/// Whole-file refusal, as `AURA-ML-5087`, `AURA-ML-5099` and `AURA-ML-5105` are. Half a profile
 /// table would denoise the ceremony against measured ceilings and the reception against nothing,
 /// and that inconsistency is invisible in the delivered gallery until somebody prints it.
 #[must_use]
@@ -111,7 +111,7 @@ pub fn profile_refused(file: &str, key: &str, rule: &str) -> AuraError {
 /// A region arrived from phase 18 that could not be used, or none arrived at all.
 ///
 /// A warning rather than a failure. Denoising and face recovery do not need a region; only the
-/// deconvolution does, and it refuses rather than running blind - ADR-0045 section 4.
+/// deconvolution does, and it refuses rather than running blind - ADR-0047 section 4.
 #[must_use]
 pub fn region_unusable(photo: &str, detail: impl Into<String>) -> AuraError {
     AuraError::new(

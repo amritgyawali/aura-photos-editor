@@ -92,15 +92,15 @@ Never load two phase files into one session.
 | Local light policy (versioned, PM-owned) | `crates/aura-brain-photo/config/local_light.toml` |
 | Local light evaluation gates | `tests/eval/local_eval.rs` + `ml/models/local/eval_local.py` |
 | What the local light adjustments do, in the product's own words | `docs/local-light.md` |
-| Portrait retouch decisions | `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` |
+| Portrait retouch decisions | `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` |
 | Retouch presets and per-scene limits (versioned, PM-owned) | `crates/aura-retouch/config/retouch_presets.toml` |
 | Retouch evaluation gates | `tests/eval/retouch_eval.rs` + `ml/models/retouch/eval_retouch.py` |
 | What AURA does to skin, in the product's own words | `docs/retouch.md` |
-| Micro-retouch and cross-frame borrowing decisions | `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md` |
+| Micro-retouch and cross-frame borrowing decisions | `docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md` |
 | The opt-in matrix, ceilings and loci (versioned, PM-owned) | `crates/aura-retouch/config/micro_retouch.toml` |
 | Micro-retouch evaluation gates | `tests/eval/micro_eval.rs` + `ml/models/micro/eval_micro.py` |
 | What AURA will and will not do to somebody's appearance | `docs/retouch-ethics.md` |
-| Restoration decisions | `docs/adr/ADR-0045-restoration-denoise-sharpen-and-identity.md` |
+| Restoration decisions | `docs/adr/ADR-0047-restoration-denoise-sharpen-and-identity.md` |
 | Scene ceilings for restoration (versioned, PM-owned) | `crates/aura-restore/config/restore_profiles.toml` |
 | Per-camera noise models (versioned, COL-owned) | `crates/aura-restore/config/noise_models/` |
 | Restoration evaluation gates | `tests/eval/restore_eval.rs` + `ml/models/restore/eval_restore.py` |
@@ -854,10 +854,10 @@ calls a mark permanent only when it appears on four frames across forty-five min
 `undereye.rs` and `evening.rs` measure against the skin around them and are capped by the
 contract, `texture_guard.rs` runs the plan through the real renderer, re-solves at three quarters
 strength up to three times and **withdraws the retouch entirely** rather than shipping one that
-failed its floor, `ops.rs` is one frame in and one plan out, `store.rs` owns migration 20 and
-`api.rs` is the frozen service and the resumable walk. Migration 20 stores four tables, one view
+failed its floor, `ops.rs` is one frame in and one plan out, `store.rs` owns migration 21 and
+`api.rs` is the frozen service and the resumable walk. Migration 21 stores four tables, one view
 and two triggers; `aura-render` gains `bands` and `retouch` plus three shaders held to them;
-two models are signed with cards; eight IPC commands (ADR-0042) feed a Retouch panel; and
+two models are signed with cards; eight IPC commands (ADR-0044) feed a Retouch panel; and
 `aura-cli verify --phase 20` is the executable gate. Its exit report is
 `docs/progress/PHASE-20-EXIT.md`.
 
@@ -866,7 +866,7 @@ whole story.** `BLEMISH_HEAD_TRAINED` and `PERMANENT_HEAD_TRAINED` are false, an
 15, 16 and 18 - which refuse to consult a placeholder and fall back on a reference *model* - this
 phase would have nothing underneath if it did the same, so what ships is a **measurement**: a
 difference-of-Gaussians with a colour test, whose failure mode is finding fewer marks rather than
-confidently wrong ones. ADR-0041 section 7 records the argument. Every gate in section 10.1 is
+confidently wrong ones. ADR-0043 section 7 records the argument. Every gate in section 10.1 is
 measured against synthetic faces whose marks were painted into the pixels and read back through
 the real detector, the real operators and the real renderer, which proves the arithmetic and says
 nothing about a wedding photograph. That is condition C1 and a Sev 2 trigger; it closes with
@@ -929,16 +929,16 @@ fabric entirely, `glare.rs` finds specular sheets over an iris, `borrow.rs` sear
 frame for an alignment and **refuses to composite anything that still carries information**,
 `guard.rs` runs the plan through the real renderer and measures the catchlights, the hairline and
 the teeth, re-solving at three quarters strength up to three times and withdrawing a family that
-still misses, `ops.rs` is one frame in and one plan out, `store.rs` owns migration 21 and `api.rs`
-is the frozen service and the resumable walk. Migration 21 stores three tables, two views and two
+still misses, `ops.rs` is one frame in and one plan out, `store.rs` owns migration 22 and `api.rs`
+is the frozen service and the resumable walk. Migration 22 stores three tables, two views and two
 triggers; 22 argued-over scene rows and a neutral one live in editable config; two shaders ship with the processor
-reference they are held to; three models are signed with cards; nine IPC commands (ADR-0044) feed
+reference they are held to; three models are signed with cards; nine IPC commands (ADR-0046) feed
 a Micro-Retouch panel; and `aura-cli verify --phase 21` is the executable gate. Its exit report is
 `docs/progress/PHASE-21-EXIT.md`.
 
 **All three shipped heads are placeholders and none is consulted.** `FLYAWAY_HEAD_TRAINED`,
 `GLARE_HEAD_TRAINED` and `LINT_HEAD_TRAINED` are false, so what runs is the measured detection
-ADR-0043 section 6 argues for - and the argument is not the same for all three: glare and lint are
+ADR-0045 section 6 argues for - and the argument is not the same for all three: glare and lint are
 *measurements by definition*, and the flyaway detector is deliberately the most conservative of
 them because a measurement cannot tell a strand from a twig. Every gate in section 10.1 is
 measured against synthetic frames whose strands, sheets, marks and teeth were painted into the
@@ -1012,9 +1012,9 @@ narrow softness band before any model is consulted and then holds every face to 
 ceiling measured through the real renderer, `selfcheck.rs` measures texture retention and ringing
 on the rendered result and steps two independent levers, `schedule.rs` keeps the work off the
 interactive path and can never reach a provider, `decide.rs` is one frame in and one plan out,
-`store.rs` owns migration 22 and `api.rs` is the frozen service and the resumable walk. Migration
-22 stores two tables, two views and one trigger; `aura-render` gains `restore` plus two shaders
-held to it; two models are signed with cards; seven IPC commands (ADR-0046) feed a Restore panel;
+`store.rs` owns migration 23 and `api.rs` is the frozen service and the resumable walk. Migration
+23 stores two tables, two views and one trigger; `aura-render` gains `restore` plus two shaders
+held to it; two models are signed with cards; seven IPC commands (ADR-0048) feed a Restore panel;
 and `aura-cli verify --phase 22` is the executable gate. Its exit report is
 `docs/progress/PHASE-22-EXIT.md`.
 
@@ -1024,7 +1024,7 @@ edge-preserving filter whose failure mode is leaving noise behind, which a photo
 correct. Face recovery falls back on **nothing**: `FACE_RECOVERY_HEAD_TRAINED` is false,
 `solve` returns `None` on every frame, and no face in this build is recovered - because the
 measurement that would stand in for a face prior is unsharp masking on a face, which is a different
-operation with a worse result and the same name. ADR-0045 section 6 has the argument. Every gate in
+operation with a worse result and the same name. ADR-0047 section 6 has the argument. Every gate in
 section 10.1 is measured against synthetic frames whose noise, blur and structure were painted into
 the pixels and read back through the real detectors, the real operators and the real renderer.
 That is condition C1 and a Sev 2 trigger. Condition C2 is the second Sev 2 and it is the one to be
@@ -1080,7 +1080,7 @@ raising the gain made the before and after vectors both point along that compone
 between them collapsing toward zero. A broken constraint would have passed. The response is an
 angle now. Any test that turns a magnitude into a direction has this trap.
 
-Phase 22 also makes two changes to phase 14's render graph, both recorded in ADR-0045 section 2 and
+Phase 22 also makes two changes to phase 14's render graph, both recorded in ADR-0047 section 2 and
 neither to a frozen file. **`restoration.denoise` now invalidates from `Stage::NoiseReduction`
 rather than from `Stage::Restoration`**, which is a latent cache-invalidation bug nothing had hit
 because nothing wrote the field; and a denoise tier alone no longer enables `Stage::Restoration`,

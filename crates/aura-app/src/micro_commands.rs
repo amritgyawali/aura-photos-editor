@@ -145,7 +145,7 @@ pub fn micro_matrix(state: &AppState, project_id: &str) -> IpcResult<MicroMatrix
 ///
 /// # Errors
 ///
-/// `AURA-ML-5098` when the override sets nothing, or when a list is the wrong length.
+/// `AURA-ML-5104` when the override sets nothing, or when a list is the wrong length.
 pub fn set_micro_matrix(
     state: &AppState,
     input: &SetMicroMatrixInput,
@@ -175,7 +175,7 @@ pub fn set_micro_matrix(
 ///
 /// # Errors
 ///
-/// `AURA-ML-5098` when the photograph has no plan.
+/// `AURA-ML-5104` when the photograph has no plan.
 pub fn accept_micro(state: &AppState, input: &AcceptMicroInput) -> IpcResult<()> {
     let photo = parse_photo(&input.photo_id)?;
     let project = state.project_of(photo)?;

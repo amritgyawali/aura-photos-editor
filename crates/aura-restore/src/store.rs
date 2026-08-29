@@ -1,4 +1,4 @@
-//! The two tables migration 22 adds, and the three rules that live in the SQL rather than around
+//! The two tables migration 23 adds, and the three rules that live in the SQL rather than around
 //! it.
 //!
 //! ## A delivered face never moved further than the ceiling
@@ -174,7 +174,7 @@ impl RestoreStore {
     ///
     /// # Errors
     ///
-    /// `AURA-DB-3006` when the write fails, and `AURA-ML-5103` when the plan breaks a guarantee -
+    /// `AURA-DB-3006` when the write fails, and `AURA-ML-5109` when the plan breaks a guarantee -
     /// checked here as well as in the solver, because the store is the last place a bad row can be
     /// stopped and a caller nobody has written yet will reach this function.
     #[allow(clippy::too_many_lines)]
@@ -726,7 +726,7 @@ impl RestoreStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5104` when the photograph has no plan.
+    /// `AURA-ML-5110` when the photograph has no plan.
     pub fn accept(&self, image: ImageId) -> Result<(), AuraError> {
         let photo = image.to_db();
         let changed = self.catalog.writer().transact(move |conn| {
@@ -750,7 +750,7 @@ impl RestoreStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5104` when the override sets nothing or the photograph has no plan.
+    /// `AURA-ML-5110` when the override sets nothing or the photograph has no plan.
     pub fn set_override(&self, image: ImageId, values: &RestoreOverride) -> Result<(), AuraError> {
         if let Some(problem) = values.problem() {
             return Err(errors::restore_edit_refused(problem));

@@ -602,7 +602,7 @@ fn generate() -> ExitCode {
         // false. Unlike phases 15, 16 and 18, what runs instead is not a
         // reference *model* but a measurement - a difference-of-Gaussians with a
         // colour test - because a retoucher that consulted nothing and had
-        // nothing underneath would find no marks at all. ADR-0041 section 7.
+        // nothing underneath would find no marks at all. ADR-0043 section 7.
         build_entry(
             &directory,
             &Placeholder {
@@ -692,7 +692,7 @@ fn generate() -> ExitCode {
                 // a *share*, and `MIN_SPECULAR_FRACTION` turns it into permission
                 // to composite two photographs. A quantisation that moves it by a
                 // few hundredths is a borrow that happens on a frame where the
-                // record was never destroyed - which is the failure ADR-0043
+                // record was never destroyed - which is the failure ADR-0045
                 // section 4 exists to make impossible.
                 precision_policy: PrecisionPolicy::no_int8(),
             },

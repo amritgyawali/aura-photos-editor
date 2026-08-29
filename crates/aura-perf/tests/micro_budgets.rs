@@ -233,7 +233,7 @@ fn the_storage_cost_of_one_plan_is_measured_rather_than_assumed() {
     }
 }
 
-/// The tables migration 21 stores a plan in, with their indexes.
+/// The tables migration 22 stores a plan in, with their indexes.
 ///
 /// `micro_matrix` is deliberately absent: it is one row per *project*, so including it would put
 /// a constant into a per-image figure and make the number smaller on a larger wedding.

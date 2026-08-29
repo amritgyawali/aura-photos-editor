@@ -1,49 +1,38 @@
-# AURA-ML-5101 - The naturalness guard made an operation gentler, or withdrew a family
+# AURA-ML-5101 - The texture guarantee forced a gentler retouch, or withdrew one
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 
 ## What the photographer sees
 
-Some photographs have their small fixes applied more gently than elsewhere, and a few have one
-family of them missing entirely. Those frames carry `micro_hair_energy_lost`,
-`micro_catchlight_at_risk` or `micro_teeth_off_locus` in the panel, with the measured number
-beside them.
+Some photographs are retouched more gently than the preset asked for, and a few may not be
+retouched at all. Those frames carry `texture_resolved` or `texture_floor_unreachable` in the
+retouch panel, with the measured band ratio beside them.
 
 ## What actually happened
 
-**This is the mechanism working.** It is registered as an error so that it is visible, not because
-something is wrong.
+**This is the mechanism working.** It is registered as an error so that it is visible, not
+because something is wrong.
 
-`micro::guard::enforce` applies the plan through the real renderer and measures three quantities
-on the result:
+`texture_guard::measure` band-decomposes the frame's skin, applies the plan through the real
+renderer, decomposes the result, and divides the high-band energies. If the ratio is below the
+preset's floor - 0.90 for Light and Natural, never below 0.80 for Polished - the solver gives up
+a quarter of the strength and measures again, up to three times. If three re-solves do not reach
+the floor, the retouch is **withdrawn entirely** and the frame ships unretouched.
 
-| Measurement | Held to | What it protects |
-|---|---|---|
-| `catchlight_ratio` | `CATCHLIGHT_FLOOR` | the highlight that makes an eye look alive |
-| `hair_energy_ratio` | `HAIR_ENERGY_FLOOR` | the hairline, against a bald patch |
-| `teeth_excursion` | `TEETH_EXCURSION_CEILING` | teeth staying inside the measured locus |
-
-A family that misses its bound gives up a quarter of its strength and is measured again, up to
-three times. If three re-solves do not reach it, **that family is withdrawn** and the rest of the
-plan ships.
-
-Withdrawal is **per family**, unlike phase 20's texture guard, which withdraws the whole plan. The
-three measurements are over three disjoint regions and map to three disjoint operation families,
-so a frame whose teeth could not be evened safely still gets its lint removed. ADR-0043 section 5.
+A frame that could not be retouched safely is a much smaller failure than a frame that ships
+with plastic skin, and a texture floor that can be exceeded "just this once" is not a floor.
 
 Frames that trigger this are usually one of:
 
-* rim light through hair, where a flyaway and the photograph's own subject are the same structure;
-* a very small face, where the iris is a handful of pixels and the catchlight is one of them;
-* strongly coloured light with no illuminant estimate, where the teeth locus has no origin - that
-  case reports `micro_no_illuminant` instead and no colour move is attempted at all.
+* very high ISO, where the high band is largely noise and the retouch removes some of it;
+* a face that fills the frame, where a blemish is large in absolute terms;
+* a skin region measured over very few samples - see `TextureReport::is_well_measured`.
 
 ## What to do
 
-1. Nothing, usually. `MicroOutline::mean_catchlight_ratio` and `mean_hair_energy_ratio` are the
-   numbers to watch across a project.
-2. If a whole scene triggers the hair family, check that scene's row in `micro_retouch.toml`. The
-   background gate is what should be deciding, not a threshold - if it is withdrawing everywhere,
-   the gate is doing its job on busy backgrounds.
-3. If one specific frame matters, doing that fix by hand is the right answer, and the panel says
-   what the measured number was so the choice is an informed one.
+1. Nothing, usually. `RetouchOutline::mean_band_ratio` and `texture_resolved` are the numbers to
+   watch across a project.
+2. If the whole wedding triggers it, the frames are probably noisy enough that phase 22's
+   denoising should run first; the retouch pass will then reach its floor comfortably.
+3. If one specific frame matters, retouching it by hand is the right answer, and the panel says
+   what the measured ratio was so the choice is an informed one.

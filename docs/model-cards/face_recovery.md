@@ -89,7 +89,7 @@ deliberate. Phases 15, 16 and 18 refuse to consult a placeholder and fall back o
 face - and that is not a weaker version of face recovery. It is a different operation, with a
 worse result, wearing the same name. A photographer told "AURA improved this soft face" who
 received a sharpened soft face has been lied to about the one thing this phase promised not to lie
-about. ADR-0045 section 6 records the argument.
+about. ADR-0047 section 6 records the argument.
 
 Every face still gets a row in `restore_face`, carrying
 `RestoreCode::RecoveryHeadUntrained` - so a photographer can see that AURA looked and why it did
@@ -120,7 +120,7 @@ SELECT MAX(identity_drift) FROM restore_face WHERE skipped = 0;
 ```
 
 `v_restore_identity` exposes it per project, `RestoreService::identity_refusals` lists the frames
-it fired on, and migration 22 refuses a row that would break it - a `restore_face` row with
+it fired on, and migration 23 refuses a row that would break it - a `restore_face` row with
 `skipped = 0` and a drift above the ceiling does not insert, and a trigger aborts the UPDATE that
 would un-skip one.
 
@@ -165,7 +165,7 @@ own words.
 
 ## Fallback
 
-**There is none, and that is the decision.** See "Training data" and ADR-0045 section 6. When no
+**There is none, and that is the decision.** See "Training data" and ADR-0047 section 6. When no
 identity probe is supplied, `aura_restore::decide::Analyser::plan` skips every face rather than
 recovering any without a measurement.
 
@@ -173,13 +173,13 @@ recovering any without a measurement.
 
 `models.lock` pins the digest and `models/manifest.sig` signs the manifest. Because `MODEL_VER` is
 `0` and nothing consults this head, a rollback of this entry changes no stored decision in this
-build. When a trained version arrives, `MODEL_VER` bumps, `AURA-ML-5102` fires and every stored
+build. When a trained version arrives, `MODEL_VER` bumps, `AURA-ML-5108` fires and every stored
 plan is re-made - which is correct, because a plan made without a face prior is not comparable
 with one made with it.
 
 ## Related
 
-- `docs/adr/ADR-0045-restoration-denoise-sharpen-and-identity.md` - sections 5 and 6.
+- `docs/adr/ADR-0047-restoration-denoise-sharpen-and-identity.md` - sections 5 and 6.
 - `docs/restoration.md` - the identity guarantee, in the product's own words.
-- `docs/runbooks/AURA-ML-5108.md` - what a photographer sees when a face is declined.
+- `docs/runbooks/AURA-ML-5114.md` - what a photographer sees when a face is declined.
 - `docs/retouch-ethics.md` - the wider promise this head sits inside.

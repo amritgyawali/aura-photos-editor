@@ -9,7 +9,7 @@
 //! area caps, the locus arithmetic, the catchlight protection, the information rule that
 //! separates a repairable sheet from a closed eye, the alignment floor, the disclosure and every
 //! contract ceiling. It is not evidence about a wedding photograph, for the reasons
-//! `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md` section 6 lists and
+//! `docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md` section 6 lists and
 //! `docs/progress/PHASE-21-EXIT.md` carries as conditions.
 //!
 //! Three of section 10.1's rows cannot be met by a test at all and are recorded rather than

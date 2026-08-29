@@ -1,34 +1,31 @@
-# AURA-ML-5102 - Stored restoration plans came from different heads, arithmetic or profile tables
+# AURA-ML-5102 - Stored micro-retouch plans came from different heads, arithmetic or matrix
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 
 ## What the photographer sees
 
-A progress line saying AURA is re-checking the wedding, and nothing else. Existing edits stay.
+A short "re-checking the small fixes" progress line on a project that was analysed by an earlier
+build. Nothing they changed by hand is lost.
 
 ## What actually happened
 
-Three version numbers key every stored `restore_plan` row:
+`micro_plan` carries three version columns and they invalidate three different things:
 
-| Column | Invalidates |
-|---|---|
-| `model_ver` | every learned decision - the denoiser and the face-recovery head |
-| `analysis_ver` | the tier arithmetic, the kernel estimate, the self-check measurements |
-| `profile_ver` | the scene ceilings and the per-camera noise models |
+* `model_ver` - the flyaway, glare and lint heads. Every detection is stale.
+* `analysis_ver` - this build's arithmetic: a threshold, a cap, a measurement or the way
+  confidence is combined. Every magnitude is stale.
+* `matrix_ver` - `crates/aura-retouch/config/micro_retouch.toml`. Every switch and every ceiling
+  is stale.
 
-A build whose numbers differ from the stored ones is a build that would be comparing its own
-tier against a tier chosen under different rules. Phase 05 wrote the rule and this is the ninth
-code enforcing it: a comparison across a version boundary returns a plausible number that means
-nothing, and it must never happen silently.
-
-`RestoreStore::pending` is a query over exactly these three columns, so the re-check is the
-ordinary resumable pass rather than a special path. Rows a photographer has edited keep
-`user_edited = 1` and are not overwritten.
+`Micro::outline` compares the stored triple against the running build's and reports this code
+when they differ. It is **degraded rather than fatal**: the stale plans keep working while the
+background pass replaces them, and a caller about to draw a conclusion over a mixed set finds out
+before it draws it.
 
 ## What to do
 
-1. Nothing. Let the background pass finish.
-2. If it does not finish, `aura-cli verify --phase 22` reports the stored versions and the
-   running ones side by side.
-3. If the drift is `profile_ver` alone, the change was to `restore_profiles.toml` or to a file
-   under `config/noise_models/`. Both are editable and both bump the version deliberately.
+1. Nothing. `MicroPass::run` treats a version mismatch as pending work - the resumable pass is a
+   query rather than a journal, so a `matrix_ver` bump heals itself.
+2. If it persists after a full pass, check that `MicroTable::embedded` is loading the table you
+   think it is: a table that fails to parse is `AURA-ML-5105` and blocks the pass entirely.
+3. Never compare a metric across a version boundary. That is what this code exists to prevent.

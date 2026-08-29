@@ -13,7 +13,7 @@
 //!
 //! A single score would make a plan that over-sharpened and a plan that over-smoothed
 //! indistinguishable, and the automatic reduction section 6.4 asks for would not know which lever
-//! to pull. Phase 21 settled this argument for its three families and ADR-0045 section 2.1 reaches
+//! to pull. Phase 21 settled this argument for its three families and ADR-0047 section 2.1 reaches
 //! the same conclusion from the same place.
 //!
 //! The third measurement is not taken here. It is taken by [`crate::face_recovery::enforce`],

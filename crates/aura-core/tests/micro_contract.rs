@@ -7,7 +7,7 @@
 //! ceilings in section 5 actually refuse what they name, and that this phase's mask port agrees
 //! with phase 19's about how much a doubtful region may do.
 //!
-//! The last one is worth stating: ADR-0043 section 7 accepts a three-line duplication of phase
+//! The last one is worth stating: ADR-0045 section 7 accepts a three-line duplication of phase
 //! 19's gating ramp in exchange for not widening a frozen enum, and it is only acceptable while
 //! the two agree. This file is what makes a change to one that did not move the other fail the
 //! build.
@@ -716,7 +716,7 @@ fn mask_field(confidence: f32, edge: f32) -> MaskField {
 
 #[test]
 fn the_micro_port_gates_exactly_as_phase_19s_does() {
-    // ADR-0043 section 7 accepts a three-line duplication in exchange for not widening a frozen
+    // ADR-0045 section 7 accepts a three-line duplication in exchange for not widening a frozen
     // enum, and it is only acceptable while the two agree. This is the assertion that makes a
     // change to one that did not move the other fail the build.
     for confidence in [
@@ -772,7 +772,7 @@ fn an_empty_override_is_refused_and_borrowing_is_separate_from_glare() {
 
 #[test]
 fn the_specular_floor_is_what_separates_a_repair_from_a_composite() {
-    // Not arithmetic - a statement about the numbers. ADR-0043 section 4: you may only borrow
+    // Not arithmetic - a statement about the numbers. ADR-0045 section 4: you may only borrow
     // pixels that carry no information, so more than half the region has to be blown.
     //
     // Read through bindings so the compiler compares values rather than folding three constant

@@ -1,6 +1,6 @@
 //! The phase 21 mechanical gate.
 //!
-//! This is the assembly proof for the micro-retouch suite: migration 21 and its objects, the
+//! This is the assembly proof for the micro-retouch suite: migration 22 and its objects, the
 //! opt-in matrix and the bound the code owns rather than the file, the four measured detectors,
 //! the naturalness guard and its per-family withdrawal, the borrow rule and its five disclosures,
 //! the store, and the two promises the database keeps rather than the application - a composite
@@ -48,7 +48,7 @@ pub fn verify(args: &[String]) -> ExitCode {
     let clock: Arc<dyn Clock> = Arc::new(SystemClock::default());
     let mut failures = 0usize;
 
-    // 1. Migration 21 and every object it owns.
+    // 1. Migration 22 and every object it owns.
     let catalog_path = work.join("phase21.sqlite");
     drop(std::fs::remove_file(&catalog_path));
     let catalog = match Catalog::open(&catalog_path, Arc::clone(&clock), crate::APP_VERSION) {
@@ -104,12 +104,12 @@ pub fn verify(args: &[String]) -> ExitCode {
     match forbidden_columns(&catalog) {
         Ok(found) if found.is_empty() => {
             println!(
-                "  no reshaping, enlarging, swapping or skin-tone-target column in migration 21"
+                "  no reshaping, enlarging, swapping or skin-tone-target column in migration 22"
             );
         }
         Ok(found) => {
             eprintln!(
-                "  migration 21 grew a forbidden column: {}",
+                "  migration 22 grew a forbidden column: {}",
                 found.join(", ")
             );
             failures += 1;
@@ -634,7 +634,7 @@ fn schema_object(catalog: &Catalog, kind: &str, name: &str) -> AuraResult<bool> 
     })
 }
 
-/// Any column in migration 21 whose name would be a feature this product does not build.
+/// Any column in migration 22 whose name would be a feature this product does not build.
 fn forbidden_columns(catalog: &Catalog) -> AuraResult<Vec<String>> {
     catalog.read(|conn| {
         let mut found = Vec::new();
@@ -673,7 +673,7 @@ fn forbidden_columns(catalog: &Catalog) -> AuraResult<Vec<String>> {
     })
 }
 
-/// What an attempt to defeat one of migration 21 two triggers did.
+/// What an attempt to defeat one of migration 22 two triggers did.
 ///
 /// Three outcomes rather than two, deliberately. A check that reports "the statement failed" as a
 /// pass cannot tell a working trigger from a broken fixture, and this is exactly the place where
@@ -691,7 +691,7 @@ enum Attempt {
 
 /// Insert a borrow directly, then try to take its source away.
 ///
-/// The trigger in migration 21 is what has to stop the second statement: a promise enforced in
+/// The trigger in migration 22 is what has to stop the second statement: a promise enforced in
 /// one layer is a promise until somebody writes a second caller, and this is the promise the
 /// whole borrowing feature rests on.
 fn strip_borrow_source(

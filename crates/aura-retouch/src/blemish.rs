@@ -17,7 +17,7 @@
 //!   makes a spot visible is inflammation rather than darkness.
 //!
 //! The fourth is what carries most of the temporary-versus-permanent decision in a single
-//! frame, and `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 7 records
+//! frame, and `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 7 records
 //! why this is a measurement rather than a network: the shipped detector head is untrained, and
 //! a phase that refused to consult its placeholder *and* had nothing underneath would ship a
 //! retoucher that finds nothing. A difference-of-Gaussians with a colour test finds fewer marks

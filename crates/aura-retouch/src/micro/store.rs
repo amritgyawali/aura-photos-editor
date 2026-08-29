@@ -1,4 +1,4 @@
-//! The three tables migration 21 adds, and the three rules that live in the SQL rather than
+//! The three tables migration 22 adds, and the three rules that live in the SQL rather than
 //! around it.
 //!
 //! ## A borrow always names its source
@@ -59,7 +59,7 @@ use crate::errors;
 /// This one stores a *list*: up to [`aura_core::contract::micro::MAX_OPS`] operations, each
 /// carrying its own rectangle and its own magnitudes. The alternative - packing the five
 /// operators' magnitudes into one shared column - was rejected in the schema for the reason
-/// ADR-0044 section 5 gives about the wire: somebody whose complaint is that the teeth look wrong
+/// ADR-0046 section 5 gives about the wire: somebody whose complaint is that the teeth look wrong
 /// needs to find out whether it was the lift or the colour, and a shared column cannot say.
 ///
 /// A typical frame carries three or four operations rather than seven and costs about 1.1 KB.
@@ -221,7 +221,7 @@ impl MicroStore {
     ///
     /// # Errors
     ///
-    /// `AURA-DB-3006` when the write fails, and `AURA-ML-5097` when the plan breaks a guarantee -
+    /// `AURA-DB-3006` when the write fails, and `AURA-ML-5103` when the plan breaks a guarantee -
     /// checked here as well as in the pass, because the store is the last place a bad row can be
     /// stopped and a caller nobody has written yet will reach this function.
     #[allow(clippy::too_many_lines)]
@@ -702,7 +702,7 @@ impl MicroStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5098` when the photograph has no plan.
+    /// `AURA-ML-5104` when the photograph has no plan.
     pub fn accept(&self, image: ImageId) -> Result<(), AuraError> {
         let photo = image.to_db();
         let changed = self.catalog.writer().transact(move |conn| {
@@ -784,7 +784,7 @@ impl MicroStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5098` when the override sets nothing.
+    /// `AURA-ML-5104` when the override sets nothing.
     pub fn set_matrix(
         &self,
         project: &ProjectId,

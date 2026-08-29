@@ -8,7 +8,7 @@
 //! **What that proves and what it does not.** It proves the arithmetic: the detector geometry,
 //! the protect veto, the band separation, the texture floor, the re-solve, the withdrawal and
 //! the per-identity constancy. It is not evidence about a wedding photograph, for the four
-//! reasons `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 10 lists and
+//! reasons `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 10 lists and
 //! `docs/progress/PHASE-20-EXIT.md` carries as conditions.
 //!
 //! Two of section 10.1 seven rows cannot be met by a test at all and are recorded rather than
@@ -123,7 +123,7 @@ fn gate_2_recall_is_complete_and_no_permanent_feature_is_removed() {
 /// Gate 3. The same person is retouched at the same strength across the gallery.
 ///
 /// Section 10.1 asks for a spread of five per cent or less. It is **zero** by construction: the
-/// strength is one number per identity per project and every frame reads it. See ADR-0041
+/// strength is one number per identity per project and every frame reads it. See ADR-0043
 /// section 6 for why the four inputs section 6.4 lists are taken as gallery statistics.
 #[test]
 fn gate_3_one_identity_is_retouched_identically_everywhere() {
@@ -255,7 +255,7 @@ fn gate_5_the_protect_set_is_a_veto() {
     };
     assert!(tattoo.is_absolute());
     let refused = aura_retouch::guard::check_protection(&tattoo, false).expect_err("refused");
-    assert_eq!(refused.code.0, "AURA-ML-5091");
+    assert_eq!(refused.code.0, "AURA-ML-5097");
 }
 
 /// Gate 6. The proxy preview and the full-resolution export agree.

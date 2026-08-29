@@ -1,4 +1,4 @@
-# ADR-0045 - Restoration: two stages rather than one, evidence-chosen strength, and an identity constraint that can only skip
+# ADR-0047 - Restoration: two stages rather than one, evidence-chosen strength, and an identity constraint that can only skip
 
 **Status:** accepted · **Date:** 2026-08-21 · **Phase:** 22 · **Supersedes:** nothing
 
@@ -7,7 +7,7 @@ Phase 22 section 4 asks for no ADR by name. It needs two anyway, and this is the
 order-of-operations requirement that the render graph phase 14 froze cannot satisfy if
 restoration is one stage; section 2.1 also asks for a cloud offload that section 7 forbids in
 the same document; and the two models section 4 asks for cannot be trained in this repository.
-The second document is [ADR-0046](ADR-0046-restore-ipc-surface.md), which covers the wire.
+The second document is [ADR-0048](ADR-0048-restore-ipc-surface.md), which covers the wire.
 
 The ADR numbering in this repository is sequential across the whole project rather than aligned
 to phase numbers.
@@ -190,7 +190,7 @@ ships is synthetic and every one of them is marked `measured = false`. A synthet
 figure that is too low tells the denoiser there is less noise than there is, and the result is
 under-denoising, which is recoverable. A synthetic figure that is too high tells it there is
 more, and `Strong` on a body whose real noise is a third of the model's is the smeared lace this
-phase exists to avoid. The cap is the asymmetry written down. `AURA-ML-5103` says so, and
+phase exists to avoid. The cap is the asymmetry written down. `AURA-ML-5109` says so, and
 `docs/restoration.md` says it to a photographer.
 
 This is phase 14's rule for camera profiles, reached independently: every real body renders
@@ -392,7 +392,7 @@ and every ceiling that bounds them is in the contract.
 
 ## 11. Amendments made during implementation
 
-Amendments are appended here with the defect that prompted them, as ADR-0043 section 11 does.
+Amendments are appended here with the defect that prompted them, as ADR-0045 section 11 does.
 
 ### 11.1 A threshold on a measurement must sit above the instrument's own floor
 

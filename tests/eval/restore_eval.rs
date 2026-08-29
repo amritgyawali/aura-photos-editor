@@ -212,7 +212,7 @@ fn sharpening_never_rings_above_the_ceiling() {
 #[test]
 fn sky_and_out_of_focus_background_are_bit_identical_after_sharpening() {
     // "skin and bokeh measurably unaffected", in the strongest form the phase can offer for two
-    // of the three: an excluded region is not attenuated, it is untouched. ADR-0045 section 4.
+    // of the three: an excluded region is not attenuated, it is untouched. ADR-0047 section 4.
     let width = 64;
     let height = 32;
     let plate = fixtures::edge_plate(width, height, 6);
@@ -331,7 +331,7 @@ fn the_kernel_band_is_above_the_estimator_own_floor() {
     // Phase 22's own defect, as a gate rather than only as a unit test. A Sobel gradient ridge
     // across a perfect step edge is two samples wide, so a contract floor below sigma 0.849 is a
     // floor no photograph is ever under - and every frame in every wedding would be deconvolved.
-    // ADR-0045 section 11.1.
+    // ADR-0047 section 11.1.
     let perfect = fixtures::edge_plate(96, 96, 8);
     let measured = kernel::estimate(&perfect, 96, 96);
     assert!(measured.is_reliable());
@@ -432,7 +432,7 @@ fn a_stored_plan_is_never_outside_its_own_bounds() {
 fn nothing_in_this_build_reaches_a_provider() {
     // Section 10.1's last row, and section 7's one sentence. `RunWhere::Cloud` exists because
     // section 5 freezes it; nothing returns it, and the decisions a frame gets are identical
-    // whether or not a photographer has consented to anything. ADR-0045 section 7.
+    // whether or not a photographer has consented to anything. ADR-0047 section 7.
     for gpu in [false, true] {
         for cloud_consent in [false, true] {
             let capacity = Capacity { gpu, cloud_consent };
@@ -464,7 +464,7 @@ fn nothing_in_this_build_reaches_a_provider() {
 
 #[test]
 fn no_frame_in_this_build_reaches_the_strongest_tier() {
-    // ADR-0045 section 3, as a gate. Every noise model that ships is derived from a specification
+    // ADR-0047 section 3, as a gate. Every noise model that ships is derived from a specification
     // rather than measured, so `Strong` is unreachable - and a build where it became reachable
     // without a photographed reference arriving is a build that lost the asymmetry.
     let cameras = NoiseTable::embedded().expect("the camera table loads");

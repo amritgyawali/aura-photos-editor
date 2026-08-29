@@ -171,7 +171,7 @@ fn micro_from_uv(uv: vec2<f32>) -> vec3<f32> {
 
 // Move one colour a bounded share of the way from OUTSIDE a locus to its boundary.
 //
-// The whole of ADR-0043 section 3, as arithmetic. A colour already inside comes back unchanged; a
+// The whole of ADR-0045 section 3, as arithmetic. A colour already inside comes back unchanged; a
 // colour outside travels `share` of its own excess and no further. There is no branch that moves
 // a colour toward the centre, and the move is at constant luminance.
 fn micro_pull_toward_locus(rgb: vec3<f32>, share: f32) -> vec3<f32> {

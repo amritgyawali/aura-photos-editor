@@ -1,33 +1,37 @@
-# AURA-ML-5103 - One photograph could not have its restoration worked out
+# AURA-ML-5103 - One photograph's small fixes could not be worked out
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 
 ## What the photographer sees
 
-One photograph with no restoration decision on it. Everything else in the wedding is unaffected,
-and the frame still renders - it simply renders without denoising or sharpening.
+One photograph has no micro-retouch plan. It is delivered exactly as phases 14 to 20 left it, and
+the rest of the wedding is unaffected.
 
 ## What actually happened
 
-One of five things:
+Either the proxy would not decode, or `MicroPlan::broken_guarantee` refused the plan the solver
+produced. **A refused plan is stored as no plan rather than as a weak one**, because every
+guarantee it checks describes either a photograph that would look worked on or a stored row that
+would lie to phases 25, 27 and 28 about what happened to somebody's face.
 
-* the 2048 px proxy would not decode, which is a phase 02 problem rather than a phase 22 one;
-* phase 09 has no integrity verdict for the frame, so there is no measured noise to choose a
-  tier from - the plan records `restore_no_noise_reading` and does nothing rather than guessing;
-* the plan the solver produced broke one of the nine checks in
-  `RestorePlan::broken_guarantee`, which is a defect in this crate and is refused rather than
-  stored;
-* the self-check could not be measured, because the render the plan was applied through failed;
-* the catalog write failed, which surfaces as `AURA-DB-3006` underneath this code.
+The guarantees, and what each one means when it fires:
 
-**No row is written in any of the five cases.** A written-but-empty plan would read to phases 25,
-27 and 28 as "AURA decided this photograph needed nothing", which is a different and much worse
-statement than "AURA has not looked at this photograph yet". The next pass tries again.
+| Guarantee | What went wrong |
+|---|---|
+| a plan with no reason | invariant 2 was broken; a solver path returned without recording why |
+| operations above `MAX_OPS` | eighty small fixes on one frame is a frame that needed a different exposure |
+| budget outside `0..1` | the shared allowance accounting is wrong |
+| an operation outside its own bounds | a solver produced a magnitude above a contract ceiling |
+| an operation the matrix forbade | **the most serious one**: a delivery a studio did not agree to |
+| a withdrawn family still carrying operations | the guard and the plan disagree about what shipped |
+| an incoherent naturalness report | a measurement is outside its own range |
 
 ## What to do
 
-1. Re-run the pass. The failure is per-frame and the pass is resumable.
-2. If the same frame fails twice, check whether it has a phase 09 verdict:
-   `aura-cli verify --phase 09` reports coverage.
-3. If the message names a broken guarantee, that is a defect in `aura-restore`, and the sentence
-   in the log names which of the nine checks failed.
+1. Read the detail line. It names exactly one of them.
+2. "an operation ran while the matrix forbade it" is a **bug, not configuration**. It should be
+   unrepresentable; if it appears, the plan-building path has a branch that skips the matrix, and
+   it needs a fix rather than a retry.
+3. The others are safe to retry: the pass is resumable and the frame is pending by definition.
+4. If a whole project fails, the proxies are the more likely cause - check `AURA-CACHE-*` and
+   `AURA-RAW-*` in the same run.

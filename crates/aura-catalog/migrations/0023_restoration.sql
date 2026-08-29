@@ -1,4 +1,4 @@
--- Migration 22 - what was repaired in a photograph, and the distance a face was allowed to move.
+-- Migration 23 - what was repaired in a photograph, and the distance a face was allowed to move.
 --
 -- PHASE-22 section 4 names no table: its file list is eight decision modules, four Python
 -- scripts, a directory of camera noise models, two shaders, a panel and two model cards. It
@@ -6,7 +6,7 @@
 -- "This is the guarantee that the product never changes what someone looks like". A guarantee
 -- that lives only in a solver is a guarantee until somebody writes a second caller, and a
 -- guarantee nobody can query is a guarantee nobody can find out they have lost.
--- `docs/adr/ADR-0045-restoration-denoise-sharpen-and-identity.md` records the rest.
+-- `docs/adr/ADR-0047-restoration-denoise-sharpen-and-identity.md` records the rest.
 --
 -- ---------------------------------------------------------------------------
 -- WHAT THIS MIGRATION IS FOR
@@ -44,7 +44,7 @@
 --    eleven samples is arithmetic rather than evidence - phase 21's rule.
 --
 -- 5. **A sharpened frame had regions.** `sharpen_amount > 0` requires `region_covered = 1`, as a
---    CHECK. ADR-0045 section 4: an unmasked global sharpen spends its whole artefact budget on
+--    CHECK. ADR-0047 section 4: an unmasked global sharpen spends its whole artefact budget on
 --    skin, sky and bokeh, so this phase refuses rather than reduces. The database says so too.
 --
 -- 6. **There is no image data and nowhere to put a scale.** Phase 13's rule, ninth migration
@@ -121,7 +121,7 @@ CREATE TABLE restore_plan (
   sharpen_reduced     INTEGER NOT NULL DEFAULT 0 CHECK (sharpen_reduced IN (0,1)),
 
   -- Where and when the heavy pixels were pushed. `run_where` has a 'cloud' spelling that nothing
-  -- in this build writes: ADR-0045 section 7 keeps the variant because section 5 freezes it, and
+  -- in this build writes: ADR-0047 section 7 keeps the variant because section 5 freezes it, and
   -- keeps the code path absent because section 7 of the phase document says the Cloud AI Gateway
   -- stays idle here.
   run_where           TEXT    NOT NULL DEFAULT 'local_cpu'
@@ -153,7 +153,7 @@ CREATE TABLE restore_plan (
   -- detail anybody wants and luminance noise is half a stop from being grain, so a row that
   -- inverted the two would be smearing fabric in order to remove grain.
   CHECK (denoise_colour >= denoise_luminance),
-  -- An unmeasured noise model may not have produced the strongest tier. ADR-0045 section 3.
+  -- An unmeasured noise model may not have produced the strongest tier. ADR-0047 section 3.
   CHECK (denoise_measured = 1 OR denoise_tier <> 'strong'),
 
   -- See note 5. A sharpened frame had regions, and a kernel, and iterations.
@@ -247,7 +247,7 @@ CREATE INDEX idx_restore_face_refused ON restore_face(skipped_because, identity_
 -- See note 1. The promise, enforced by the database rather than by the application.
 --
 -- There is no code path in `aura-restore` that attempts this, which is the point: it catches the
--- path somebody adds in phase 24 or phase 28 without reading ADR-0045. An UPDATE that un-skips a
+-- path somebody adds in phase 24 or phase 28 without reading ADR-0047. An UPDATE that un-skips a
 -- face without also bringing its drift inside the ceiling is aborted rather than obeyed - which
 -- is the exact shape of the change a well-meaning "recover this one anyway" button would make.
 CREATE TRIGGER restore_face_drift_disclosed

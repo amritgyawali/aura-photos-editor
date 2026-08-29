@@ -36,7 +36,7 @@
 //!
 //! [`FLYAWAY_HEAD_TRAINED`], [`GLARE_HEAD_TRAINED`] and [`LINT_HEAD_TRAINED`] are all false, so
 //! none of the three shipped heads is consulted. What runs is the measured detection in
-//! [`super::hair`], [`super::glare`] and [`super::clothing`], and ADR-0043 section 6 records why
+//! [`super::hair`], [`super::glare`] and [`super::clothing`], and ADR-0045 section 6 records why
 //! that is a decision rather than a fallback. Every plan carries
 //! [`MicroCode::HeadUntrained`] so nothing downstream can describe this output as learned.
 
@@ -68,7 +68,7 @@ use crate::texture_guard::Frame;
 ///
 /// Bumped on any change to a detector threshold, a cap, a measurement or the way confidence is
 /// combined. Written into `micro_plan.analysis_ver`; two plans made under different values of it
-/// are not comparable, and `AURA-ML-5096` exists so that comparison never happens silently.
+/// are not comparable, and `AURA-ML-5102` exists so that comparison never happens silently.
 pub const ANALYSIS_VER: u16 = 1;
 
 /// The version stamped on every `micro_plan.model_ver`.
@@ -209,7 +209,7 @@ impl Analyser {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5099` when the table will not load.
+    /// `AURA-ML-5105` when the table will not load.
     pub fn new() -> Result<Self, AuraError> {
         Ok(Self {
             table: MicroTable::embedded()?,
@@ -232,7 +232,7 @@ impl Analyser {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5097` when the buffer cannot be read as pixels.
+    /// `AURA-ML-5103` when the buffer cannot be read as pixels.
     #[allow(clippy::too_many_lines)]
     pub fn analyse(
         &self,

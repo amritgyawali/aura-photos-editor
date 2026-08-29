@@ -28,7 +28,7 @@
 // Which is what makes the mask a mask. `weights` is zero over sky and out-of-focus background and
 // `1 - skin_attenuation` over skin, and the final blend is `weight * amount`, so an excluded sky
 // is genuinely untouched rather than deconvolved and then mostly blended back. "Mostly" is where
-// a crunchy sky comes from. ADR-0045 section 4.
+// a crunchy sky comes from. ADR-0047 section 4.
 //
 // WHAT THIS FILE CANNOT DO
 //

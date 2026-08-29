@@ -8,7 +8,7 @@
 //!
 //! As phases 15 to 20 all do. Half a matrix would clean the ceremony against measured ceilings
 //! and the reception against nothing, and that inconsistency is invisible in a delivered gallery.
-//! `AURA-ML-5099` is run-blocking.
+//! `AURA-ML-5105` is run-blocking.
 //!
 //! ## A studio may lower a ceiling and may never raise one
 //!
@@ -84,7 +84,7 @@ impl MicroTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5099` when the embedded table will not load, which is a build fault rather than
+    /// `AURA-ML-5105` when the embedded table will not load, which is a build fault rather than
     /// an installation one and is therefore never expected in the field.
     pub fn embedded() -> Result<Self, AuraError> {
         Self::parse(EMBEDDED, FILE)
@@ -94,7 +94,7 @@ impl MicroTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5099` naming the key and the rule it broke.
+    /// `AURA-ML-5105` naming the key and the rule it broke.
     #[allow(clippy::too_many_lines)]
     pub fn parse(text: &str, file: &str) -> Result<Self, AuraError> {
         let raw: RawTable = toml::from_str(text)
@@ -458,7 +458,7 @@ mod tests {
             "teeth_max_luma        = 0.40",
         );
         let error = MicroTable::parse(&text, "test").expect_err("refused");
-        assert_eq!(error.code.0, "AURA-ML-5099");
+        assert_eq!(error.code.0, "AURA-ML-5105");
         assert!(error.detail.contains("teeth_max_luma"), "{}", error.detail);
         // And the ceiling it was compared against is the contract's, not the file's. Read
         // through a binding so the compiler compares a value rather than folding the assertion
@@ -474,7 +474,7 @@ mod tests {
             "[clothing.strap]\ndefault_on = true",
         );
         let error = MicroTable::parse(&text, "test").expect_err("refused");
-        assert_eq!(error.code.0, "AURA-ML-5099");
+        assert_eq!(error.code.0, "AURA-ML-5105");
         assert!(error.detail.contains("strap"), "{}", error.detail);
     }
 
@@ -482,7 +482,7 @@ mod tests {
     fn a_row_with_no_written_reason_is_refused() {
         let text = blank_first_reason_after(&MicroTable::embedded_text(), "[op.teeth]");
         let error = MicroTable::parse(&text, "test").expect_err("an empty reason is refused");
-        assert_eq!(error.code.0, "AURA-ML-5099");
+        assert_eq!(error.code.0, "AURA-ML-5105");
         assert!(error.detail.contains("teeth"), "{}", error.detail);
     }
 

@@ -1,4 +1,4 @@
-//! The four tables migration 20 adds, and the three rules that live in the SQL rather than
+//! The four tables migration 21 adds, and the three rules that live in the SQL rather than
 //! around it.
 //!
 //! ## `user_edited` is re-applied inside the statement
@@ -730,7 +730,7 @@ impl RetouchStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5091` when the photograph has no plan.
+    /// `AURA-ML-5097` when the photograph has no plan.
     pub fn accept(&self, image: ImageId) -> Result<(), AuraError> {
         let key = image.to_db();
         let changed = self.catalog.writer().transact(move |conn| {
@@ -756,7 +756,7 @@ impl RetouchStore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5091` when the photograph has no plan or the override is empty.
+    /// `AURA-ML-5097` when the photograph has no plan or the override is empty.
     pub fn set_override(
         &self,
         image: ImageId,
@@ -909,12 +909,12 @@ impl RetouchStore {
     /// Add or clear one protected feature.
     ///
     /// **An absolute protection cannot be cleared**, and the refusal happens twice: here, and in
-    /// the trigger migration 20 installs. A promise enforced in one layer is a promise until
+    /// the trigger migration 21 installs. A promise enforced in one layer is a promise until
     /// somebody writes a second caller.
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5091` when the feature is absolute or the rectangle is empty.
+    /// `AURA-ML-5097` when the feature is absolute or the rectangle is empty.
     pub fn set_protection(
         &self,
         project: &ProjectId,
@@ -983,7 +983,7 @@ impl RetouchStore {
     ///
     /// `source <> 'user'` inside the `DELETE`, which is the ninth time this rule has been
     /// written into a store. A tattoo survives the delete whatever its source, because the
-    /// trigger in migration 20 aborts it.
+    /// trigger in migration 21 aborts it.
     ///
     /// # Errors
     ///

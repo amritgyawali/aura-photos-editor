@@ -13,7 +13,7 @@
 //! ## The cloud arm is unreachable, and this module is where that is true
 //!
 //! [`where_to_run`] has no arm that produces [`RunWhere::Cloud`]. Section 7 of PHASE-22 says the
-//! Cloud AI Gateway stays idle in this phase; section 2.1 lists an offload anyway; ADR-0045
+//! Cloud AI Gateway stays idle in this phase; section 2.1 lists an offload anyway; ADR-0047
 //! section 7 resolves it in favour of section 7 and records why - an offload needs a provider that
 //! can accept a 45 MP linear buffer, a measured cost, a cassette and a local GPU figure to be
 //! faster than, and this build has none of the four.
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn nothing_in_this_build_schedules_a_frame_into_the_cloud() {
-        // ADR-0045 section 7, as an exhaustive assertion rather than as an intention. Every
+        // ADR-0047 section 7, as an exhaustive assertion rather than as an intention. Every
         // combination of the two capacity flags and a range of frame sizes.
         for gpu in [false, true] {
             for cloud_consent in [false, true] {

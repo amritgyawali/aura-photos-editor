@@ -79,7 +79,7 @@ What runs instead is the measured detector in `aura_retouch::micro::hair`: thin 
 structures adjacent to the hair alpha, scored against the detail of the background immediately
 behind them, capped by area and by strength.
 
-`docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md` section 6 records why this phase
+`docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md` section 6 records why this phase
 ships measurements underneath its placeholders, and why this one is deliberately the most
 conservative of the three: a measurement cannot tell a strand from a twig, so where the background
 is busy the operation is skipped rather than guessed.
@@ -143,11 +143,11 @@ a guess.
 
 `models.lock` pins this version by sha256 and the manifest is signed. Rolling back is a
 `models.lock` edit plus `cargo xtask models`; the stored `model_ver` on every plan changes with it,
-`AURA-ML-5096` is raised, and the affected frames are re-planned in the background.
+`AURA-ML-5102` is raised, and the affected frames are re-planned in the background.
 
 ## Related
 
-- `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md`
+- `docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md`
 - `docs/model-cards/glare_detector.md`
 - `docs/model-cards/lint_detector.md`
 - `docs/retouch-ethics.md`

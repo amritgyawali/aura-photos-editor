@@ -1,8 +1,8 @@
-# ADR-0046 - The restoration IPC surface
+# ADR-0048 - The restoration IPC surface
 
 **Status:** accepted · **Date:** 2026-08-21 · **Phase:** 22 · **Supersedes:** nothing
 
-The second of phase 22's two ADRs. [ADR-0045](ADR-0045-restoration-denoise-sharpen-and-identity.md)
+The second of phase 22's two ADRs. [ADR-0047](ADR-0047-restoration-denoise-sharpen-and-identity.md)
 covers the decisions; this covers the wire.
 
 `crates/aura-app/src/contract/ipc.rs` is a frozen contract, so every shape here is in
@@ -18,7 +18,7 @@ override, preview."
 Three things make this surface different from phase 21's.
 
 **The photographer chooses a tier, and a tier is a number in a way a switch is not.** Phase 21's
-matrix was switches all the way down, and ADR-0044 section 4 could say "there is no strength field
+matrix was switches all the way down, and ADR-0046 section 4 could say "there is no strength field
 anywhere". Here there is a genuine four-way choice, because "how much noise reduction" is a
 question a photographer legitimately has an opinion about and "how much may AURA whiten teeth" is
 not.
@@ -165,6 +165,6 @@ be setting a number that means something different on their other body, and the 
 to explain a photon transfer curve to justify the units.
 
 **Reporting one "restoration quality" number instead of `texture_retention` and `ringing`.**
-Rejected for the reason ADR-0045 section 2.1 gives: the two are fixed by two different levers, and
+Rejected for the reason ADR-0047 section 2.1 gives: the two are fixed by two different levers, and
 a photographer whose complaint is that an edge looks crunchy needs to see the ringing figure
 rather than a score that averaged it with something else.

@@ -51,7 +51,7 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // entry point phase 14 left as a pass-through in `spatial.wgsl`, and the other two are
     // libraries it calls; a shader that drifts while no device can run it is a retouch that
     // differs from the preview a photographer approved, on the day a backend first runs.
-    "crates/aura-catalog/migrations/0020_retouch.sql",
+    "crates/aura-catalog/migrations/0021_retouch.sql",
     "crates/aura-render/shaders/freq_bands.wgsl",
     "crates/aura-render/shaders/inpaint_patch.wgsl",
     "crates/aura-render/shaders/retouch_apply.wgsl",
@@ -60,7 +60,7 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // a composite is; `micro_apply.wgsl` carries the five operators the reference path in
     // `aura_render::micro` also draws, and a shader that drifts while no device can run it is a
     // pair of teeth that look different on the day a backend first runs.
-    "crates/aura-catalog/migrations/0021_micro_retouch.sql",
+    "crates/aura-catalog/migrations/0022_micro_retouch.sql",
     "crates/aura-render/shaders/micro_apply.wgsl",
     "crates/aura-render/shaders/micro_borrow.wgsl",
     // PHASE-22. The migration, and the two shaders. `denoise_tile.wgsl` reads a noise-model plane
@@ -68,7 +68,7 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // wedding denoised by a different rule from the one that produced its preview;
     // `deconv.wgsl` is the only iterative operator in the product and its damping guard is what
     // stands between a recovered edge and a drawn one.
-    "crates/aura-catalog/migrations/0022_restoration.sql",
+    "crates/aura-catalog/migrations/0023_restoration.sql",
     "crates/aura-render/shaders/denoise_tile.wgsl",
     "crates/aura-render/shaders/deconv.wgsl",
     "ui/src/ipc/types.ts",

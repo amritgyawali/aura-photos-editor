@@ -17,14 +17,14 @@ What is real:
   preconditions, the artefact self-check with its two independent levers, and the identity
   constraint - all of them measured on the rendered pixels rather than on the parameters;
 - the tier ladder driven by phase 09's measured evidence, with no preference anywhere in the crate;
-- migration 22, the store, the seven IPC commands, the panel, and the database trigger that
+- migration 23, the store, the seven IPC commands, the panel, and the database trigger that
   refuses to deliver a face past the identity ceiling.
 
 What is not:
 
 - **the two shipped heads are untrained, and one of them ships as a refusal.** The denoiser is
   replaced by a measurement whose failure mode is leaving noise behind; the face-recovery head is
-  replaced by *nothing at all*, and no face in this build is recovered. ADR-0045 section 6.
+  replaced by *nothing at all*, and no face in this build is recovered. ADR-0047 section 6.
 - **there is no expert preference study**, so section 0's headline KPI is unmeasured and no claim
   about how a restored photograph looks may be made from this build;
 - **there is no photographed reference for any camera**, so every noise model is derived from a
@@ -44,14 +44,14 @@ guarantees. It says nothing about a wedding.
 | Frozen contract | `crates/aura-core/src/contract/restore.rs` (30 codes, 7 regions, 4 tiers) |
 | Decision engine | `crates/aura-restore/src/{profiles,denoise,kernel,sharpen,face_recovery,selfcheck,schedule,decide,store,api,errors,fixtures}.rs` |
 | Renderer | `crates/aura-render/src/restore.rs`, `shaders/{denoise_tile,deconv}.wgsl` |
-| Schema | `crates/aura-catalog/migrations/0022_restoration.sql` (2 tables, 2 views, 1 trigger) |
+| Schema | `crates/aura-catalog/migrations/0023_restoration.sql` (2 tables, 2 views, 1 trigger) |
 | Config | `crates/aura-restore/config/restore_profiles.toml` (22 scenes), `config/noise_models/*.toml` (20 bodies) |
 | Models | `denoise` and `face_recovery`, signed, carded, **both untrained** |
 | ML | `ml/models/restore/{train_denoise,train_face_recovery,eval_restore,export}.py` |
-| IPC | `crates/aura-app/src/restore_commands.rs`, 7 commands, ADR-0046 |
+| IPC | `crates/aura-app/src/restore_commands.rs`, 7 commands, ADR-0048 |
 | UI | `ui/src/components/develop/RestorePanel.tsx` |
-| Errors | `AURA-ML-5102` to `AURA-ML-5108`, one runbook each |
-| Docs | `docs/restoration.md`, ADR-0045, ADR-0046 |
+| Errors | `AURA-ML-5108` to `AURA-ML-5114`, one runbook each |
+| Docs | `docs/restoration.md`, ADR-0047, ADR-0048 |
 | Gate | `crates/aura-cli/src/phase22.rs`, `just phase-22-verify` |
 
 ## 2. Acceptance criteria (section 13)
@@ -115,7 +115,7 @@ a real identity change is condition C2.
 Sobel gradient ridge, and a mathematically perfect step edge produces a ridge two samples wide -
 a sigma of 0.849. Nothing can measure below that, so every frame in every wedding would have
 passed the kernel precondition and been deconvolved. Found by a synthetic chequerboard coming back
-as needing sharpening. ADR-0045 section 11.1; the floor is now 1.00 and a test holds it against
+as needing sharpening. ADR-0047 section 11.1; the floor is now 1.00 and a test holds it against
 the estimator's own floor rather than asserting either alone.
 
 Phase 19 met the same shape from the other direction - its edge-gradient halo test could not be
@@ -138,7 +138,7 @@ is now an angle.
 ## 7. What was deliberately not built
 
 **The cloud offload.** Section 2.1 lists it and section 7 of the same document forbids it.
-ADR-0045 section 7 resolves it in favour of section 7: there is no provider, no measured cost, no
+ADR-0047 section 7 resolves it in favour of section 7: there is no provider, no measured cost, no
 cassette and no local GPU figure to be faster than, and the data an offload would send is the
 photograph rather than a derivative of it. `RunWhere::Cloud` exists because section 5 freezes it;
 nothing returns it and no dependency could.
@@ -190,13 +190,13 @@ identical in a coverage report.
 Model rollback: both entries are pinned by digest in `models.lock` and signed. `MODEL_VER` is `0`
 and nothing consults either head, so rolling one back changes no stored decision in this build.
 
-Migration rollback: the four `DROP` statements at the top of `0022_restoration.sql`, then
+Migration rollback: the four `DROP` statements at the top of `0023_restoration.sql`, then
 `DELETE FROM schema_version WHERE version = 22`. Everything is recomputable **except**
 `restore_plan` rows with `user_edited = 1`; the runbook says to export those first.
 
 Render-graph rollback: the two edits in `graph.rs` are independent of everything else in this
 phase and reverting them restores phase 14's routing. Doing so re-opens the cache-invalidation
-bug ADR-0045 section 2 describes.
+bug ADR-0047 section 2 describes.
 
 ## 10. What phase 23 inherits
 

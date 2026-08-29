@@ -2620,7 +2620,7 @@ pub const PERMANENT_PATCH_SIDE: usize = 64;
 /// `crop [N, 3, 256, 256] -> anomalies [N, 2, 32, 32]`
 ///
 /// **Untrained in this build**, and `aura_retouch::ops::BLEMISH_HEAD_TRAINED` is false, so it is
-/// never consulted: what runs is the measured detector in `aura_retouch::blemish`. ADR-0041
+/// never consulted: what runs is the measured detector in `aura_retouch::blemish`. ADR-0043
 /// section 7 records why this phase ships a measurement underneath its placeholder rather than
 /// refusing to detect anything, which is what phases 15, 16 and 18 do.
 ///
@@ -2793,7 +2793,7 @@ pub const LINT_CLASSES: usize = 4;
 ///
 /// **Untrained in this build**, and `aura_retouch::micro::ops::FLYAWAY_HEAD_TRAINED` is false, so
 /// it is never consulted: what runs is the measured detector in `aura_retouch::micro::hair`,
-/// whose background gate is what makes it safe without a learned model. ADR-0043 section 6
+/// whose background gate is what makes it safe without a learned model. ADR-0045 section 6
 /// records why two of this phase's three placeholders are backed by a measurement, and why the
 /// third is backed by the most conservative measurement of the three.
 ///
@@ -2998,7 +2998,7 @@ pub const FACE_RECOVERY_CHANNELS: usize = 1;
 /// `tile [N, 4, 128, 128] -> residual [N, 3, 128, 128]`
 ///
 /// **Untrained in this build**, and `aura_restore::decide::MODEL_VER` is zero, so it is never
-/// consulted: what runs is the noise-model-conditioned filter in `aura_render::restore`. ADR-0045
+/// consulted: what runs is the noise-model-conditioned filter in `aura_render::restore`. ADR-0047
 /// section 6 records why that is a measurement worth shipping rather than a compromise - its
 /// failure mode is leaving noise behind, which a photographer can see and correct.
 ///
@@ -3053,7 +3053,7 @@ pub fn denoise() -> OnnxModel {
 ///
 /// **Untrained in this build, and unlike every other placeholder in this file there is no
 /// measurement standing in for it.** `aura_restore::face_recovery::FACE_RECOVERY_HEAD_TRAINED` is
-/// false and `solve` returns `None` on every frame. ADR-0045 section 6 records why: the
+/// false and `solve` returns `None` on every frame. ADR-0047 section 6 records why: the
 /// measurement that would stand in for a face prior is unsharp masking on a face, and that is not
 /// a weaker version of face recovery - it is a different operation with a worse result and the
 /// same name.

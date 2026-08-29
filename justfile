@@ -262,7 +262,7 @@ local-light-eval:
     python ml/models/local/train_light_targets.py --self-test
     python ml/models/local/eval_local.py --self-test
 
-# The phase 20 gate: migration 20, the preset table and the floor bound the code owns rather
+# The phase 20 gate: migration 21, the preset table and the floor bound the code owns rather
 # than the file, the detector, the protect veto, the texture guard and its withdrawal, the
 # store, a photographer's preset surviving a re-analysis, and a tattoo that neither the service
 # nor the database will delete. It prints what it does not prove at the end of every run - see
@@ -280,7 +280,7 @@ retouch-eval:
     python ml/models/retouch/eval_retouch.py --self-test
     python ml/models/retouch/export.py --verify models
 
-# The phase 21 gate: migration 21 and its two triggers, the opt-in matrix and the ceilings the
+# The phase 21 gate: migration 22 and its two triggers, the opt-in matrix and the ceilings the
 # code owns rather than the file, the four measured detectors, the naturalness guard, the borrow
 # rule and its disclosure end to end, and a studio switch that survives. It prints what it does
 # not prove at the end of every run - see docs/progress/PHASE-21-EXIT.md conditions C1 to C5.
@@ -298,7 +298,7 @@ micro-eval:
     python ml/models/micro/eval_micro.py --self-test
     python ml/models/micro/export.py --verify models
 
-# The phase 22 gate: migration 22 and its trigger, the scene profiles and the twenty camera noise
+# The phase 22 gate: migration 23 and its trigger, the scene profiles and the twenty camera noise
 # models, the bounds the code owns rather than the files, the evidence-driven tier ladder, the four
 # sharpening preconditions, the identity constraint end to end, the self-check and its two levers,
 # and a recovered face the database will not deliver past the identity ceiling. It prints what it

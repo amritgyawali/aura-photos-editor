@@ -463,7 +463,7 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         recipe.retouch.first().map(|op| op.op.clone()),
     );
 
-    // PHASE-22, ADR-0045 section 2. `restoration.denoise` deliberately does **not** appear here.
+    // PHASE-22, ADR-0047 section 2. `restoration.denoise` deliberately does **not** appear here.
     // Denoising is a sensor-domain operation and runs at `Stage::NoiseReduction`, index 6, thirteen
     // stages earlier - which is what satisfies section 2.1's "denoise before local retouch and
     // sharpening" without moving anything in `ORDER`. The field carries the *tier name* for audit
@@ -561,7 +561,7 @@ pub fn stage_for(path: &str) -> Option<Stage> {
             } else if path.starts_with("bw") {
                 Some(Stage::Monochrome)
             } else if path == "restoration.denoise" {
-                // PHASE-22, ADR-0045 section 2. The tier decides `global.noise.*`, which
+                // PHASE-22, ADR-0047 section 2. The tier decides `global.noise.*`, which
                 // `Stage::NoiseReduction` reads at index 6, so a cache told the change is valid
                 // from index 19 would serve the buffer it had already denoised under the previous
                 // tier. Routing it to the earlier stage is conservative and correct; the previous

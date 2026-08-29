@@ -26,7 +26,7 @@
 //!
 //! [`BLEMISH_HEAD_TRAINED`] and [`PERMANENT_HEAD_TRAINED`] are both false, so neither shipped
 //! head is consulted. What runs is the measured detector in [`crate::blemish`], and
-//! `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 7 records why that is
+//! `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 7 records why that is
 //! a decision rather than a fallback. Every plan carries
 //! [`RetouchCode::HeadUntrained`] so that nothing anywhere describes this output as learned.
 
@@ -57,7 +57,7 @@ use crate::undereye;
 ///
 /// Bumped on any change to a detector threshold, a cap, a measurement or the way confidence is
 /// combined. Written into `retouch_plan.analysis_ver`, and two plans made under different values
-/// of it are not comparable: `AURA-ML-5090` exists so that comparison never happens silently.
+/// of it are not comparable: `AURA-ML-5096` exists so that comparison never happens silently.
 pub const ANALYSIS_VER: u16 = 1;
 
 /// The version stamped on every `retouch_plan.model_ver`.
@@ -200,7 +200,7 @@ impl Analyser {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5093` when the table will not load.
+    /// `AURA-ML-5099` when the table will not load.
     pub fn new() -> Result<Self, AuraError> {
         Ok(Self {
             presets: PresetTable::embedded()?,
@@ -223,7 +223,7 @@ impl Analyser {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5092` when the buffer cannot be read as pixels.
+    /// `AURA-ML-5098` when the buffer cannot be read as pixels.
     #[allow(clippy::too_many_lines)]
     pub fn analyse(
         &self,

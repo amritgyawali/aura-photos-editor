@@ -11,7 +11,7 @@ full-well capacity - and the loader normalises them into `variance = read^2 + sh
 the units the renderer works in. **Every one is `measured = false`**: there are no camera files in
 this repository, so all twenty are derived from published specifications exactly as phase 09's
 calibration table is. `NoiseModel::tier_ceiling` turns that into a cap at `DenoiseTier::Standard`,
-and ADR-0045 section 3 records why the asymmetry runs that way rather than the other. Condition C7.
+and ADR-0047 section 3 records why the asymmetry runs that way rather than the other. Condition C7.
 Tests: 8 unit tests in `profiles.rs`, plus `boundaries.rs` checking that a file on disk cannot be
 missing from `EMBEDDED_NOISE`.
 
@@ -52,7 +52,7 @@ drag the estimate. Richardson-Lucy at three iterations with edge-aware damping c
 gradient ridge across a mathematically perfect step edge is two samples wide, which is a sigma of
 0.849. Nothing can measure below that, so every frame in every wedding would have passed the kernel
 precondition. Found by the phase's own fixtures - a synthetic chequerboard came back needing
-sharpening. ADR-0045 section 11.1, and
+sharpening. ADR-0047 section 11.1, and
 `kernel::tests::the_contract_floor_sits_above_the_estimator_own_floor` holds the two numbers
 against each other so a change to the estimator fails rather than re-opening it.
 
@@ -61,7 +61,7 @@ against each other so a change to the estimator fails rather than re-opening it.
 Files: `crates/aura-restore/src/face_recovery.rs`, `ml/models/restore/train_face_recovery.py`,
 `docs/model-cards/face_recovery.md`, `crates/aura-infer/src/onnx/fixtures.rs`. One head registered,
 signed and carded; untrained, **not consulted, and with no measured fallback** - the only
-placeholder in the product that ships as a refusal rather than as a measurement. ADR-0045 section 6
+placeholder in the product that ships as a refusal rather than as a measurement. ADR-0047 section 6
 records why: the measurement that would stand in for a face prior is unsharp masking on a face,
 which is a different operation with the same name.
 
@@ -110,7 +110,7 @@ Tests: 5 schedule unit tests, plus `restoration_order.rs` (10).
 
 **Deliberately not built.** Section 2.1 lists a cloud offload and section 7 of the same document
 says "No cloud AI call in this phase. The phase must work with the network cable unplugged."
-ADR-0045 section 7 resolves it in favour of section 7 and records the two arguments: there is no
+ADR-0047 section 7 resolves it in favour of section 7 and records the two arguments: there is no
 provider, no measured cost, no cassette and no local GPU figure to be faster than, and the data an
 offload would send is not a thumbnail or a crop but the photograph. `RunWhere::Cloud` exists in the
 contract because section 5 freezes it; nothing returns it, `aura-restore` has no dependency that
@@ -121,7 +121,7 @@ sweep over capability and consent in `schedule.rs` and again in `restore_eval.rs
 
 Files: `ui/src/components/develop/RestorePanel.tsx`, `ui/src/ipc/types.ts`,
 `crates/aura-app/src/restore_commands.rs`, `crates/aura-app/src/contract/ipc.rs`,
-`docs/adr/ADR-0046-restore-ipc-surface.md`. Seven commands. Four tiers as buttons and **no slider
+`docs/adr/ADR-0048-restore-ipc-surface.md`. Seven commands. Four tiers as buttons and **no slider
 anywhere on the component** - a test asserts there is no range or number input. A face declined to
 keep somebody looking like themselves gets its own block, its own wording and the measured
 distance. Tests: 12 vitest cases.
@@ -154,7 +154,7 @@ No previous-phase budget moved. Two new rows in `perf/budgets.toml`
 
 ## Two changes outside this phase's file list
 
-**`crates/aura-render/src/graph.rs`.** ADR-0045 section 2: `restoration.denoise` now invalidates
+**`crates/aura-render/src/graph.rs`.** ADR-0047 section 2: `restoration.denoise` now invalidates
 from `Stage::NoiseReduction` rather than from `Stage::Restoration`, and a denoise tier alone no
 longer enables `Stage::Restoration`. The first of those is a latent cache-invalidation bug that
 nothing had hit because nothing wrote the field.

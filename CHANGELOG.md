@@ -123,16 +123,16 @@ conditions C1 to C3 of `docs/progress/PHASE-20-EXIT.md`.
 - **`aura-render::bands` and `aura_render::retouch`**: the three-band separation, moved out of
   phase 19 for its second consumer, and the processor reference for the retouch stage. Three new
   WGSL files, and the phase 14 pass-through `stage_retouch` retired from `spatial.wgsl`.
-- **Migration 20**: `retouch_plan`, `retouch_identity`, `retouch_protected`, `retouch_op` and
+- **Migration 21**: `retouch_plan`, `retouch_identity`, `retouch_protected`, `retouch_op` and
   `v_retouch_coverage`. The first table in this product whose rows a photographer creates
   directly and whose subject is a person, plus two triggers that abort any attempt to delete a
   protected tattoo.
 - **Two signed models with cards** - `blemish_detector` and `permanent_features` - both untrained
   and neither consulted, and four Python scripts that self-test without PyTorch.
-- **Eight IPC commands** (ADR-0042) and a retouch panel that shows what was left alone as
+- **Eight IPC commands** (ADR-0044) and a retouch panel that shows what was left alone as
   prominently as what was done.
-- **Six error codes** `AURA-ML-5090` to `5095`, with runbooks. One of them,
-  `AURA-ML-5095`, is registered so the texture guard is *visible* when it fires rather than
+- **Six error codes** `AURA-ML-5096` to `5101`, with runbooks. One of them,
+  `AURA-ML-5101`, is registered so the texture guard is *visible* when it fires rather than
   because anything is wrong.
 - **`docs/retouch.md`**, the product's own account, including every one of the twenty-six reason
   sentences - which two gates assert.
@@ -143,7 +143,7 @@ conditions C1 to C3 of `docs/progress/PHASE-20-EXIT.md`.
   nothing wires a phase 18 matte into the render graph yet.
 - `perf/budgets.toml` gains `retouch_plan_frame` (57.6 ms per image measured, including at least
   one full render) and `retouch_store_per_1000_images` (659 B per image measured against 1,000).
-- `contracts.lock` gains migration 20 and the three new shaders.
+- `contracts.lock` gains migration 21 and the three new shaders.
 
 ### Known gaps
 

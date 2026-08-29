@@ -14,13 +14,13 @@
 //! The cloud check matters more here than it did in phase 20, and the reason is what an offload
 //! would *send*. Phase 20 would have sent a face crop. This phase would send the photograph - a
 //! 45 MP linear buffer, which is a derivative of a RAW in the same sense that a print is. Section
-//! 9 of `docs/plan/CLAUDE.md` says to send derivative data and never originals, and ADR-0045
+//! 9 of `docs/plan/CLAUDE.md` says to send derivative data and never originals, and ADR-0047
 //! section 7 records why the consent design that would make it acceptable is larger than this
 //! phase.
 //!
 //! The third check is this phase's own. Section 2.2 puts **upscaling beyond native resolution**
 //! and **generative reconstruction** out of scope for V1, and both exclusions are structural: the
-//! contract has nowhere to put a scale factor or a synthesised region and migration 22 has no
+//! contract has nowhere to put a scale factor or a synthesised region and migration 23 has no
 //! column for either. This is a third line rather than the only one - but it is the line that
 //! catches a helper function added inside a solver.
 
@@ -140,7 +140,7 @@ fn this_crate_never_opens_a_socket() {
 #[test]
 fn nothing_in_this_crate_can_upscale_or_synthesise() {
     // Section 2.2's two exclusions, as a grep. The contract has nowhere to put either and
-    // migration 22 has no column for either; this catches the helper somebody adds inside a
+    // migration 23 has no column for either; this catches the helper somebody adds inside a
     // solver, which is the layer neither of those two reaches.
     //
     // `resample` is on the list and `upsample` is not: `decide::upsample` turns phase 18's

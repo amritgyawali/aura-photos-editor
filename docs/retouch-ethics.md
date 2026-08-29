@@ -41,7 +41,7 @@ phase since has inherited the list:
 | **Inferring anything about a person** - gender, ethnicity, religion, age, attractiveness | Phase 06's rule, and the shapes have nowhere to put such a value. |
 
 **These are enforced in code, not remembered.** There is no field in
-`aura_core::contract::micro`, no column in migration 21 and no parameter on the IPC surface that
+`aura_core::contract::micro`, no column in migration 22 and no parameter on the IPC surface that
 could express any of them, and `crates/aura-retouch/tests/boundaries.rs` fails the build if the
 words appear in the crate. Adding one is a visible contract change requiring a CTO-role ADR - not
 a commit.
@@ -75,7 +75,7 @@ Every operation has a hard maximum. Those maxima live in
 
 A studio may make AURA gentler. **Nothing can make it stronger** - not a config file, not an
 override, not an IPC call, not a preset. The matrix loader refuses a file that tries, with
-`AURA-ML-5099`, and refuses it whole rather than partially.
+`AURA-ML-5105`, and refuses it whole rather than partially.
 
 This asymmetry is the whole design. A ceiling a text file can raise is a description of the
 defaults; a ceiling only a signed release can raise is a promise. CI attempts to exceed each one

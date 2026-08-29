@@ -40,7 +40,7 @@
 //! deliberately no measured fallback, unlike phase 20's blemish detector: the measurement that
 //! would stand in for a face prior is unsharp masking on a face, and that is not a weaker version
 //! of face recovery - it is a different operation with a worse result and the same name.
-//! ADR-0045 section 6.
+//! ADR-0047 section 6.
 
 use std::fmt;
 
@@ -54,7 +54,7 @@ use aura_render::restore::{self, RestoreContext, RestoreOps};
 
 /// Whether a trained face-recovery head is registered and trusted in this build.
 ///
-/// **False, and it is not a placeholder for a fallback.** See the module header and ADR-0045
+/// **False, and it is not a placeholder for a fallback.** See the module header and ADR-0047
 /// section 6: the operation that would stand in for a face prior is a different operation. When a
 /// trained head arrives, this becomes true, `solve` starts returning a strength, and nothing else
 /// in this module changes - the constraint below it was written to hold a model rather than to

@@ -57,7 +57,7 @@
 //! | [`selfcheck`] | what the plan did to the texture and the edges, measured through the renderer |
 //! | [`schedule`] | where the heavy pixels are pushed, and when |
 //! | [`decide`] | one decoded frame in, one plan out |
-//! | [`store`] | the two tables migration 22 adds |
+//! | [`store`] | the two tables migration 23 adds |
 //! | [`api`] | the frozen `RestoreService` and the resumable project walk |
 //!
 //! Plus [`fixtures`], the synthetic ground truth every section 10.1 gate is measured against,
@@ -98,7 +98,7 @@
 //! ## What this build does not have
 //!
 //! Two models are registered and **neither is consulted**, but for two different reasons and with
-//! two different consequences, which ADR-0045 section 6 records.
+//! two different consequences, which ADR-0047 section 6 records.
 //!
 //! Denoising ships as a *measurement* - a noise-model-conditioned edge-preserving filter over
 //! separated luminance and chroma planes - whose failure mode is leaving noise behind rather than

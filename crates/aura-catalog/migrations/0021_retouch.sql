@@ -1,4 +1,4 @@
--- Migration 20 - what was done to somebody's skin, and what will never be done to it.
+-- Migration 21 - what was done to somebody's skin, and what will never be done to it.
 --
 -- PHASE-20 section 4 names no table: its file list is eight decision modules, three shaders,
 -- four Python scripts, a preset file, a panel and two model cards. It needs three tables and a
@@ -6,7 +6,7 @@
 -- as a reversible retouch op". A recipe is reversible; it is not *explicable*, because a
 -- recipe says a blemish op removed something at (0.41, 0.33) and says nothing about the mark
 -- that was left alone beside it, the mole that vetoed a third one, or the band ratio the whole
--- thing was measured against. `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md`
+-- thing was measured against. `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md`
 -- records the rest.
 --
 -- ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@
 --    per identity per project, and `retouch_plan` stores no per-face strength at all. Section
 --    10.1's cross-frame consistency gate - one identity varying by no more than five per cent
 --    across a gallery - is then true by construction rather than by measurement, which is a
---    stronger guarantee than the one asked for. ADR-0041 section 6.
+--    stronger guarantee than the one asked for. ADR-0043 section 6.
 --
 -- ROLLBACK. Every object here is new and nothing outside this file references it:
 --
@@ -241,7 +241,7 @@ CREATE INDEX idx_retouch_protected_project ON retouch_protected(project_id, sour
 -- Two statements because SQLite triggers are per operation: a DELETE that would remove an
 -- absolute row, and an UPDATE that would move one out of `tattoo` and thereby make it
 -- deletable. There is no code path in `aura-retouch` that attempts either, which is the point:
--- this catches the path somebody adds in phase 24 without reading ADR-0041.
+-- this catches the path somebody adds in phase 24 without reading ADR-0043.
 CREATE TRIGGER retouch_protected_absolute
 BEFORE DELETE ON retouch_protected
 WHEN OLD.kind = 'tattoo'

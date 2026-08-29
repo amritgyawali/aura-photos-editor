@@ -1,33 +1,35 @@
-# AURA-ML-5106 - A region was unusable, so sharpening was skipped
+# AURA-ML-5106 - A region was unusable, so a small fix was skipped
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 
 ## What the photographer sees
 
-Photographs that were not sharpened, carrying `restore_sharpen_no_regions` or
-`restore_region_unusable` in the panel.
+Some photographs have fewer small fixes than others, and those frames carry
+`micro_region_unavailable` or `micro_region_doubtful` in the panel.
 
 ## What actually happened
 
-Deconvolution sharpening in this phase requires regions from phase 18 and has **no fallback**
-that sharpens the whole frame at a lower amount. That is a deliberate decision, and ADR-0045
-section 4 records the argument: skin, sky and out-of-focus background are not regions where
-sharpening is less welcome, they are the three regions where it is *visible as damage*, so an
-unmasked global sharpen spends its whole artefact budget on the three places a photographer
-looks first.
+Phase 21 has exactly one route to a region - the `MicroField` port that phase 18 fills - and
+**no geometric fallback**. That is deliberate, and it is phase 19's argument inherited twice: a
+rectangle's edge does not follow a person, and a teeth correction through one whitens a lip.
 
-Two causes:
+Three states produce this code:
 
-* **no field arrived at all**, which on this build is the ordinary case - phase 18 segmenter is
-  an untrained placeholder and `AppState` wires no generator into this pass;
-* **a field arrived and could not be read** - a zero side, a length that does not match the
-  dimensions, or a confidence outside `0..1`. `RestoreField::problem` names which.
+* **No region arrived at all.** On a build with no mask generator wired in, this is every frame,
+  and `MicroOutline::region_covered` is zero. That is the honest reading of such a build.
+* **The region arrived and is unreadable** - a side of zero, an alpha length that does not match
+  the dimensions, a confidence outside its range. This is a bug in the producer.
+* **The region arrived and is too doubtful.** `MicroField::strength_scale` is zero below
+  `MIN_MASK_CONFIDENCE`, and the operation is skipped rather than run gently.
 
-Denoising and face recovery are unaffected. Neither needs a region.
+The difference between the first and "there was nothing to fix" is the whole point of this code.
+Those two look identical in a coverage report otherwise, and they send a support engineer to two
+different places.
 
 ## What to do
 
-1. On this build, nothing. `RestoreOutline::region_covered` is zero, and condition C3 of
-   `docs/progress/PHASE-22-EXIT.md` is what closes it.
-2. When a mask generator is wired in, a project with low `region_covered` is a phase 18 problem:
-   `aura-cli verify --phase 18` reports its own coverage.
+1. Check `MicroOutline::region_covered` against `MicroOutline::planned`. A low ratio is a phase 18
+   problem, not a phase 21 problem.
+2. If the field is unreadable rather than absent, the producer is at fault: see
+   `docs/runbooks/AURA-ML-5086.md` and phase 18's own gates.
+3. Nothing to do per frame. A frame nobody could locate a region in ships as it was.

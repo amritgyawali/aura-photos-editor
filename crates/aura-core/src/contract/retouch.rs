@@ -39,7 +39,7 @@
 //! strength vary by no more than five per cent across a wedding; those two are only
 //! simultaneously satisfiable if the four inputs are read as *gallery* statistics, which is
 //! what `aura_retouch::strength` does. What the individual frame decides is which operations
-//! run at all. `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 6 has
+//! run at all. `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 6 has
 //! the argument.
 //!
 //! ## What this contract cannot express
@@ -77,7 +77,7 @@ pub const TEXTURE_FLOOR: f32 = 0.90;
 ///
 /// Section 6.3: "configurable per preset, never below 0.80 even in Polished". A bound on the
 /// *config file* rather than a default inside it - `aura_retouch::presets` refuses a table that
-/// sets a floor below this with `AURA-ML-5093`, because a claim the product makes in
+/// sets a floor below this with `AURA-ML-5099`, because a claim the product makes in
 /// `docs/retouch.md` must not be retractable by editing a text file.
 pub const POLISHED_FLOOR: f32 = 0.80;
 
@@ -341,7 +341,7 @@ impl fmt::Display for InpaintMethod {
 ///
 /// Section 5's own enum, with `box` spelled `area` because `box` is a reserved word and with
 /// `ShineReduce` present and never emitted here - see
-/// `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 2.
+/// `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 2.
 ///
 /// A closed set, because these operations spend against a budget shared with phase 19 and a
 /// budget with an open-ended list of spenders is not a budget.
@@ -550,7 +550,7 @@ impl ProtectedKind {
     /// Section 10.1 gates tattoo removal at **zero** per cent, and a zero implemented as a very
     /// small threshold is a promise that expires the next time somebody retrains a detector. So
     /// it is a property of the kind: [`RetouchService::set_protection`] refuses to clear one
-    /// with `AURA-ML-5091`, and no strength multiplies it down.
+    /// with `AURA-ML-5097`, and no strength multiplies it down.
     #[must_use]
     pub const fn is_absolute(self) -> bool {
         matches!(self, Self::Tattoo)
@@ -619,7 +619,7 @@ impl fmt::Display for ProtectedSource {
 /// One thing about a person that this product will not remove.
 ///
 /// Section 5's `{ box, kind, identity }` plus the three fields that make it explicable - see
-/// `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 2. The rectangle is
+/// `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 2. The rectangle is
 /// in **face-normalised coordinates** rather than frame coordinates, which is what lets one row
 /// protect the same mole in four hundred photographs: the origin is the midpoint between the
 /// eyes, the x axis is the eye-to-eye line and the unit is the inter-ocular distance.
@@ -690,7 +690,7 @@ impl ProtectedFeature {
 /// What the retouch did to the skin's own texture, measured rather than promised.
 ///
 /// Section 5's `{ band_ratio, floor, passed }` plus the three fields that say *how* it passed -
-/// see `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 2. The
+/// see `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 2. The
 /// measurement is taken by running the plan through the real renderer, which is phase 16's rule
 /// applied to texture instead of to colour: a guarantee about a pixel that is enforced on a
 /// parameter is not a guarantee.
@@ -1117,7 +1117,7 @@ impl RetouchReason {
 /// Everything phase 20 decided about one photograph's skin.
 ///
 /// PHASE-20 section 5's frozen shape, with the additions this module's header and
-/// `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 2 argue for: the
+/// `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 2 argue for: the
 /// scene it was decided under, the three version columns, and the two flags that record a
 /// photographer's involvement.
 ///
@@ -1230,7 +1230,7 @@ impl RetouchPlan {
     /// is coherent, a withdrawn retouch really is empty, and the plan is inside the shared
     /// allowance. They live here so the solver, the store, the IPC layer and the eval harness
     /// all refuse the same frames. `aura_retouch::guard` turns a `Some` here into
-    /// `AURA-ML-5092`.
+    /// `AURA-ML-5098`.
     #[must_use]
     pub fn broken_guarantee(&self) -> Option<String> {
         if self.reasons.is_empty() {
@@ -1427,7 +1427,7 @@ impl RetouchOverride {
 
     /// What is wrong with this override, if anything.
     ///
-    /// `aura_retouch::guard` turns a `Some` here into `AURA-ML-5091`.
+    /// `aura_retouch::guard` turns a `Some` here into `AURA-ML-5097`.
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         if self.is_empty() {
@@ -1504,7 +1504,7 @@ pub trait RetouchService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5091` when the photograph has no plan.
+    /// `AURA-ML-5097` when the photograph has no plan.
     fn accept(&self, image: ImageId) -> Result<(), AuraError>;
 
     /// Record what the photographer set instead.
@@ -1520,7 +1520,7 @@ pub trait RetouchService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5091` when the photograph has no plan, when the override is empty, or when a
+    /// `AURA-ML-5097` when the photograph has no plan, when the override is empty, or when a
     /// strength is outside `0..1`.
     fn set_override(&self, image: ImageId, values: RetouchOverride) -> Result<(), AuraError>;
 
@@ -1532,7 +1532,7 @@ pub trait RetouchService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5091` when the feature is absolute, when the identity is unknown, or when the
+    /// `AURA-ML-5097` when the feature is absolute, when the identity is unknown, or when the
     /// rectangle is empty.
     fn set_protection(&self, feature: ProtectedFeature, protect: bool) -> Result<(), AuraError>;
 }

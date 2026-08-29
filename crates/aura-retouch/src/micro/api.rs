@@ -26,7 +26,7 @@
 //!
 //! ## No silent failure, invariant 9
 //!
-//! A frame whose proxy will not decode is counted, coded `AURA-ML-5097` and reported. The run
+//! A frame whose proxy will not decode is counted, coded `AURA-ML-5103` and reported. The run
 //! continues and **no row is written**, so the next pass tries again - a written-but-empty plan
 //! would read to phases 25, 27 and 28 as "AURA decided this face needed nothing".
 
@@ -105,7 +105,7 @@ impl Micro {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5099` when the embedded matrix will not load.
+    /// `AURA-ML-5105` when the embedded matrix will not load.
     pub fn new(store: Arc<MicroStore>) -> Result<Self, AuraError> {
         Ok(Self {
             store,
@@ -117,7 +117,7 @@ impl Micro {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5099` when the embedded matrix will not load.
+    /// `AURA-ML-5105` when the embedded matrix will not load.
     pub fn current_versions() -> Result<(u16, u16, u16), AuraError> {
         Ok((MODEL_VER, ANALYSIS_VER, MicroTable::embedded()?.version()))
     }
@@ -142,7 +142,7 @@ impl Micro {
 impl MicroService for Micro {
     fn outline(&self, project: ProjectId) -> AuraResult<MicroOutline> {
         let outline = self.store.outline(&project, self.table.unlisted())?;
-        // Reported rather than enforced. `AURA-ML-5096` is degraded: stale plans keep working
+        // Reported rather than enforced. `AURA-ML-5102` is degraded: stale plans keep working
         // while the background pass replaces them, and a caller about to draw a conclusion over a
         // mixed set finds out before it draws it.
         let current = (MODEL_VER, ANALYSIS_VER, self.table.version());
@@ -228,7 +228,7 @@ impl MicroPass {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5099` when the embedded matrix will not load.
+    /// `AURA-ML-5105` when the embedded matrix will not load.
     pub fn new(
         store: Arc<MicroStore>,
         previews: Arc<dyn PreviewService>,

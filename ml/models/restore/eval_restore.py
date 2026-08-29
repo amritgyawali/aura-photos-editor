@@ -25,7 +25,7 @@ Phase 21 shipped an agreement gate that a perfect panel could not pass: it requi
 0.10 above chance, and at a 97 % marginal rate chance agreement is already 0.92, leaving eight
 points of headroom for a ten-point margin. The fix was to make the margin a share of the available
 headroom, which is Scott's pi. Phase 22 has the same shape of measurement and inherits the fix
-rather than the defect. ADR-0043 section 11 and phase 21's exit report record it.
+rather than the defect. ADR-0045 section 11 and phase 21's exit report record it.
 
 WHAT THIS FILE CANNOT DO
 

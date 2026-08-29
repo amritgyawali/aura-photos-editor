@@ -1,6 +1,6 @@
 //! The phase 20 mechanical gate.
 //!
-//! This is the assembly proof for portrait retouch: migration 20 and its objects, the preset
+//! This is the assembly proof for portrait retouch: migration 21 and its objects, the preset
 //! table, the detector, the protect veto, the cross-frame permanence rule, the two operators,
 //! the texture guard and its withdrawal, the per-identity strength, the store and its two
 //! protections - a photographer preset and a tattoo that cannot be cleared.
@@ -46,7 +46,7 @@ pub fn verify(args: &[String]) -> ExitCode {
     let clock: Arc<dyn Clock> = Arc::new(SystemClock::default());
     let mut failures = 0usize;
 
-    // 1. Migration 20 and every object it owns.
+    // 1. Migration 21 and every object it owns.
     let catalog_path = work.join("phase20.sqlite");
     drop(std::fs::remove_file(&catalog_path));
     let catalog = match Catalog::open(&catalog_path, Arc::clone(&clock), crate::APP_VERSION) {
@@ -101,12 +101,12 @@ pub fn verify(args: &[String]) -> ExitCode {
     match forbidden_columns(&catalog) {
         Ok(found) if found.is_empty() => {
             println!(
-                "  no reshaping, slimming or skin-tone-target column anywhere in migration 20"
+                "  no reshaping, slimming or skin-tone-target column anywhere in migration 21"
             );
         }
         Ok(found) => {
             eprintln!(
-                "  migration 20 grew a forbidden column: {}",
+                "  migration 21 grew a forbidden column: {}",
                 found.join(", ")
             );
             failures += 1;
@@ -169,7 +169,7 @@ pub fn verify(args: &[String]) -> ExitCode {
     let lowered = include_str!("../../aura-retouch/config/retouch_presets.toml")
         .replace("texture_floor = 0.84", "texture_floor = 0.55");
     match PresetTable::parse(&lowered, "gate") {
-        Err(err) if err.code.0 == "AURA-ML-5093" => {
+        Err(err) if err.code.0 == "AURA-ML-5099" => {
             println!("  a preset file that lowered the floor to 0.55 was refused");
         }
         Err(err) => {
@@ -379,8 +379,8 @@ pub fn verify(args: &[String]) -> ExitCode {
         failures += 1;
     }
     match service.set_protection(tattoo, false) {
-        Err(err) if err.code.0 == "AURA-ML-5091" => {
-            println!("  a tattoo cannot be unprotected, and the refusal is AURA-ML-5091");
+        Err(err) if err.code.0 == "AURA-ML-5097" => {
+            println!("  a tattoo cannot be unprotected, and the refusal is AURA-ML-5097");
         }
         Err(err) => {
             eprintln!(
@@ -459,7 +459,7 @@ fn schema_object(catalog: &Catalog, kind: &str, name: &str) -> AuraResult<bool> 
     })
 }
 
-/// Any column in migration 20 whose name would be a feature this product does not build.
+/// Any column in migration 21 whose name would be a feature this product does not build.
 fn forbidden_columns(catalog: &Catalog) -> AuraResult<Vec<String>> {
     catalog.read(|conn| {
         let mut found = Vec::new();
@@ -494,7 +494,7 @@ fn forbidden_columns(catalog: &Catalog) -> AuraResult<Vec<String>> {
 
 /// Try to delete a protected tattoo without going through the service.
 ///
-/// Returns whether the row went. The trigger in migration 20 is what has to stop it: a promise
+/// Returns whether the row went. The trigger in migration 21 is what has to stop it: a promise
 /// enforced in one layer is a promise until somebody writes a second caller.
 fn delete_tattoo_directly(catalog: &Catalog) -> AuraResult<bool> {
     let removed = catalog.writer().transact(|conn| {

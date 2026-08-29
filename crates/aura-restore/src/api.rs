@@ -23,7 +23,7 @@
 //!
 //! ## No silent failure, invariant 9
 //!
-//! A frame whose proxy will not decode is counted, coded `AURA-ML-5103` and reported. The run
+//! A frame whose proxy will not decode is counted, coded `AURA-ML-5109` and reported. The run
 //! continues and **no row is written**, so the next pass tries again - a written-but-empty plan
 //! would read to phases 25, 27 and 28 as "AURA decided this photograph needed nothing", which is
 //! a different and much worse statement than "AURA has not looked at this photograph yet".
@@ -105,7 +105,7 @@ impl Restore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` when the embedded tables will not load.
+    /// `AURA-ML-5111` when the embedded tables will not load.
     pub fn new(store: Arc<crate::store::RestoreStore>) -> Result<Self, AuraError> {
         let analyser = Analyser::embedded(Capacity::default())?;
         Ok(Self {
@@ -118,7 +118,7 @@ impl Restore {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` when the embedded tables will not load.
+    /// `AURA-ML-5111` when the embedded tables will not load.
     pub fn current_versions() -> Result<(u16, u16, u16), AuraError> {
         Ok(Analyser::embedded(Capacity::default())?.versions())
     }
@@ -205,7 +205,7 @@ impl RestorePass {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` when the embedded tables will not load.
+    /// `AURA-ML-5111` when the embedded tables will not load.
     pub fn new(
         previews: Arc<dyn PreviewService>,
         store: Arc<crate::store::RestoreStore>,
@@ -691,7 +691,7 @@ pub fn to_linear(buffer: &PixelBuffer) -> Option<(Vec<f32>, usize, usize)> {
 ///
 /// # Errors
 ///
-/// `AURA-ML-5105` when the embedded tables will not load.
+/// `AURA-ML-5111` when the embedded tables will not load.
 pub fn versions() -> Result<(u16, u16, u16), AuraError> {
     let _ = (MODEL_VER, ANALYSIS_VER, RESTORE_LEVEL);
     Restore::current_versions()

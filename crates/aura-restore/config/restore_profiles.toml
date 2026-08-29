@@ -25,7 +25,7 @@
 # There is no per-person, per-ethnicity or per-age row and there never will be one.
 #
 # BUMP `version` ON ANY CHANGE. It is written into `restore_plan.profile_ver`, and a plan made
-# under one table is not comparable with a plan made under another - `AURA-ML-5102` exists so
+# under one table is not comparable with a plan made under another - `AURA-ML-5108` exists so
 # that comparison never happens silently.
 
 version = 1
@@ -330,6 +330,6 @@ reason = """
 The neutral row, used for any scene with no row of its own and for a frame phase 07 could not
 classify. It is the most conservative row in the file deliberately: a photograph AURA cannot
 describe is a photograph it should barely touch, and every other row in this file is an argument
-for doing more than this. `AURA-ML-5102` is not raised for a frame planned here - the plan simply
+for doing more than this. `AURA-ML-5108` is not raised for a frame planned here - the plan simply
 records `restore_tier_capped_by_scene` and the outline lists the scene as unlisted.
 """

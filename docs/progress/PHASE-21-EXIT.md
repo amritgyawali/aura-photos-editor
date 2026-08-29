@@ -21,7 +21,7 @@ four different times:
   `region_unavailable`. That is a wiring task rather than a missing phase - the same state phases
   19 and 20 are in, and for the same reason.
 * **All three shipped heads are untrained and none is consulted.** What runs is the measured
-  detection in `hair.rs`, `glare.rs` and `clothing.rs`. ADR-0043 section 6 records why the
+  detection in `hair.rs`, `glare.rs` and `clothing.rs`. ADR-0045 section 6 records why the
   argument for shipping a measurement is not the same for all three.
 * **The naturalness audit does not exist.** Section 0's headline KPI - corrections judged natural
   at or above 95 % - needs four hundred frames and a panel of retouchers, and there are neither.
@@ -51,18 +51,18 @@ excluded by construction. `clothing` finds small anomalies inside the garment, c
 shape, and refuses patterned fabric entirely. `glare` finds specular sheets over an iris. `borrow`
 searches a sibling frame for an alignment and refuses to composite anything that still carries
 information. `guard` measures the result through the renderer and withdraws per family. `ops` is
-one frame in and one plan out; `store` owns migration 21; `api` is the frozen service and the
+one frame in and one plan out; `store` owns migration 22; `api` is the frozen service and the
 resumable walk; `fixtures` is the synthetic ground truth.
 
 **The pixels.** `aura_render::micro` is the processor reference for all five operators plus the
 borrow composite, and `micro_apply.wgsl` and `micro_borrow.wgsl` are the GPU halves, held to the
 reference by `shader_parity.rs` and to review by `contracts.lock`.
 
-**The storage.** Migration 21 adds `micro_plan`, `micro_matrix` and `micro_op`, two views and two
+**The storage.** Migration 22 adds `micro_plan`, `micro_matrix` and `micro_op`, two views and two
 triggers. One trigger aborts any statement that would take a borrow's source away; the other
 aborts an insert of a strap or a crease into a project that has not switched it on.
 
-**The wire.** Nine IPC commands (ADR-0044), a Micro-Retouch panel with per-operation switches, and
+**The wire.** Nine IPC commands (ADR-0046), a Micro-Retouch panel with per-operation switches, and
 a disclosure that appears in four places on the surface and five in the product.
 
 **The models.** `flyaway_detector`, `glare_detector` and `lint_detector` are registered, signed and
@@ -160,7 +160,7 @@ than sloppy, and it is the thing to carry forward: every phase from 09 to 20 sto
 fixed-width verdict** per photograph, and this stores a **list** whose length is the number of
 things that were wrong with the frame. It is the first per-image figure in the product above a
 kilobyte, `perf/budgets.toml` now carries the decomposition and the argument, and the alternative -
-packing five operators' magnitudes into shared columns - was rejected for the reason ADR-0044
+packing five operators' magnitudes into shared columns - was rejected for the reason ADR-0046
 section 5 gives about the wire.
 
 **A refusal check that cannot fail proves nothing.** The phase gate's two trigger checks originally
@@ -171,13 +171,13 @@ of every negative test in the product and is worth checking the next time one is
 
 ## 7. What was deliberately not built
 
-**Borrowing for a closed eye, behind a flag.** Section 2.2 excludes it and ADR-0043 section 4
+**Borrowing for a closed eye, behind a flag.** Section 2.2 excludes it and ADR-0045 section 4
 records why it is excluded permanently rather than deferred: a flag is a default waiting to be
 changed. The rule that separates it from the glare repair is not about the mechanism - a specular
 sheet has destroyed the record, and a closed eye *is* the record.
 
 **A strength on the IPC surface.** A studio switches operations on and off; the ceilings belong to
-the contract. ADR-0044 section 4.
+the contract. ADR-0046 section 4.
 
 **Crease removal by default.** It is opt-in in the contract, off in the schema default, refused by
 a trigger, and absent from the lint head's class list so there is no accuracy at which it starts
@@ -229,10 +229,10 @@ it was skipped. `micro_matrix` switches every operator off independently, and sw
 off leaves glare reduction working.
 
 The models roll back through `models.lock` plus `cargo xtask models`; the stored `model_ver` moves
-with them, `AURA-ML-5096` is raised, and the affected frames are re-planned in the background.
+with them, `AURA-ML-5102` is raised, and the affected frames are re-planned in the background.
 `ANALYSIS_VER` and `matrix_ver` do the same for the arithmetic and the table.
 
-Migration 21 is additive: three tables, two views, two triggers and no change to any earlier
+Migration 22 is additive: three tables, two views, two triggers and no change to any earlier
 object. Dropping them leaves every phase up to 20 intact.
 
 ## 10. What phase 22 inherits

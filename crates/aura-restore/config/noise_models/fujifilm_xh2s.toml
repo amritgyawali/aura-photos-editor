@@ -12,7 +12,7 @@
 # sensor specification and from the physics that relates photosite area to full-well capacity,
 # exactly as phase 09's `camera_calibration.toml` derives its own. That is honest and it is not a
 # measurement, so `measured = false`, and an unmeasured model **caps the denoise tier at
-# `standard`** - `NoiseModel::tier_ceiling`, and ADR-0045 section 3 for why the asymmetry runs
+# `standard`** - `NoiseModel::tier_ceiling`, and ADR-0047 section 3 for why the asymmetry runs
 # that way. A model that under-estimates the noise under-denoises, which a photographer can see
 # and correct; one that over-estimates it smears lace, which they cannot.
 #

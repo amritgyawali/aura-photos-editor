@@ -1,31 +1,36 @@
-# AURA-ML-5096 - Stored micro-retouch plans came from different heads, arithmetic or matrix
+# AURA-ML-5096 - Stored retouch plans came from a different build
 
 **Severity / recovery:** see `crates/aura-core/errors.toml` for the registered values.
 
 ## What the photographer sees
 
-A short "re-checking the small fixes" progress line on a project that was analysed by an earlier
-build. Nothing they changed by hand is lost.
+Nothing blocking. A background pass re-checks the wedding, and the retouch panel keeps working
+from whatever is stored while it does. Anything set by hand is kept.
 
 ## What actually happened
 
-`micro_plan` carries three version columns and they invalidate three different things:
+A retouch plan carries three version columns and they invalidate three different things:
 
-* `model_ver` - the flyaway, glare and lint heads. Every detection is stale.
-* `analysis_ver` - this build's arithmetic: a threshold, a cap, a measurement or the way
-  confidence is combined. Every magnitude is stale.
-* `matrix_ver` - `crates/aura-retouch/config/micro_retouch.toml`. Every switch and every ceiling
-  is stale.
+| Column | Invalidates |
+|---|---|
+| `model_ver` | every blemish and permanent-feature detection |
+| `analysis_ver` | every measurement, cap, band ratio and confidence |
+| `preset_ver` | the strengths, the per-scene limits and the texture floors |
 
-`Micro::outline` compares the stored triple against the running build's and reports this code
-when they differ. It is **degraded rather than fatal**: the stale plans keep working while the
-background pass replaces them, and a caller about to draw a conclusion over a mixed set finds out
-before it draws it.
+`Retouch::outline` compares the stored triple against the running build and logs this code when
+they differ. It is **degraded rather than blocking**, exactly as `AURA-ML-5033`, `AURA-ML-5060`
+and `AURA-ML-5084` are: a stale plan is still a usable plan, and the alternative is a product
+that refuses to show a wedding because it has improved.
+
+The comparison is the point. A band ratio measured under one analysis version and one measured
+under another are not the same quantity, and a mean over a mixed set is a number that looks fine
+and means nothing.
 
 ## What to do
 
-1. Nothing. `MicroPass::run` treats a version mismatch as pending work - the resumable pass is a
-   query rather than a journal, so a `matrix_ver` bump heals itself.
-2. If it persists after a full pass, check that `MicroTable::embedded` is loading the table you
-   think it is: a table that fails to parse is `AURA-ML-5099` and blocks the pass entirely.
-3. Never compare a metric across a version boundary. That is what this code exists to prevent.
+1. Let the pass finish. `RetouchPass::run` selects the frames whose versions do not match, so
+   resuming and healing are the same operation.
+2. If it does not clear, check that `retouch_presets.toml` loads - see `AURA-ML-5099`. A refused
+   preset table leaves `preset_ver` at zero and every row stale.
+3. Overridden rows are never overwritten. `user_edited = 1` is checked inside the statement that
+   would replace the row.

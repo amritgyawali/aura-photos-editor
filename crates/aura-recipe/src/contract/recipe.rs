@@ -456,7 +456,7 @@ pub struct RetouchOp {
     pub mask: Option<String>,
     /// The photograph these pixels were borrowed from, for a cross-frame repair.
     ///
-    /// **Added by PHASE-21; see ADR-0044 section 3.** Optional and absent on every operation any
+    /// **Added by PHASE-21; see ADR-0046 section 3.** Optional and absent on every operation any
     /// earlier build wrote, so the change is additive in both directions: an older reader ignores
     /// it and a newer reader defaults it to `None`.
     ///

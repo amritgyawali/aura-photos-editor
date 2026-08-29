@@ -5386,7 +5386,7 @@ pub struct SetRetouchDto {
 /// Add or clear one protected feature.
 ///
 /// `protect = false` clears a feature. **It cannot clear an absolute one**: a tattoo is always
-/// protected, `AURA-ML-5091` says so, and the panel renders it without a control rather than
+/// protected, `AURA-ML-5097` says so, and the panel renders it without a control rather than
 /// with a disabled one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -5695,7 +5695,7 @@ pub struct MicroCompositeDto {
 
 /// What happened to one face the restoration pass considered.
 ///
-/// **Every face gets one of these, whether it was recovered or not.** ADR-0046 section 4: a panel
+/// **Every face gets one of these, whether it was recovered or not.** ADR-0048 section 4: a panel
 /// that only listed what happened would make a careful product look like a careless one, and two
 /// thirds of this phase's reason codes are refusals.
 ///
@@ -5724,7 +5724,7 @@ pub struct RestoreFaceDto {
 
 /// What the artefact self-check measured on the rendered result.
 ///
-/// Three numbers rather than one score, and ADR-0045 section 2.1 has the argument: smearing is
+/// Three numbers rather than one score, and ADR-0047 section 2.1 has the argument: smearing is
 /// fixed by lowering the denoise tier, ringing by reducing the sharpen amount, and drift by the
 /// identity constraint. A photographer whose complaint is that an edge looks crunchy needs the
 /// ringing figure rather than a score that averaged it with something else.
@@ -5853,7 +5853,7 @@ pub struct RestoreStatusDto {
     /// Why sharpening was refused, as `(code, count)` pairs, commonest first.
     ///
     /// A histogram rather than a count: "AURA sharpened nothing in this wedding" has six causes
-    /// and five of them are somebody else's bug. ADR-0046 section 7.
+    /// and five of them are somebody else's bug. ADR-0048 section 7.
     pub sharpen_refusals: Vec<RestoreRefusalDto>,
     /// Faces recovered across the project.
     pub faces_recovered: u32,
@@ -5876,7 +5876,7 @@ pub struct RestoreStatusDto {
     /// Camera bodies denoised against a synthetic noise model, by name.
     ///
     /// **Every body in this build.** A studio that sees its main camera here knows why its
-    /// dance-floor frames are capped at `standard`. ADR-0046 section 7.
+    /// dance-floor frames are capped at `standard`. ADR-0048 section 7.
     pub unmeasured_cameras: Vec<String>,
     /// Scenes with no row in the profile file.
     pub unlisted_scenes: Vec<String>,
@@ -5917,7 +5917,7 @@ pub struct AcceptRestoreInput {
 
 /// Record what a photographer chose for one photograph.
 ///
-/// **A tier and two switches, and no other number.** ADR-0046 section 3: the line is between
+/// **A tier and two switches, and no other number.** ADR-0048 section 3: the line is between
 /// *which of four* and *how far each goes*. A photographer choosing `standard` on a frame AURA put
 /// at `light` is making a judgement about their own photograph; one setting a luminance amount is
 /// overriding a decision conditioned on the camera's noise model, and the number would mean
@@ -6000,7 +6000,7 @@ pub struct RestorePassDto {
 ///
 /// **The guarantee's own list**, and it is on the surface deliberately. Section 10.1 gates
 /// identity preservation at 100 %, and a gate that can only be checked by opening four hundred
-/// plans one at a time is a gate nobody checks. ADR-0046 section 4.
+/// plans one at a time is a gate nobody checks. ADR-0048 section 4.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RestoreIdentityRefusalDto {

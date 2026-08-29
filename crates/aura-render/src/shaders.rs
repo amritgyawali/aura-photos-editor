@@ -90,7 +90,7 @@ pub const MICRO_BORROW: &str = include_str!("../shaders/micro_borrow.wgsl");
 /// PHASE-22. The noise-model-conditioned denoiser, tiled.
 ///
 /// A library rather than a stage, for the reason [`MICRO_APPLY`] is: denoising runs inside
-/// `Stage::NoiseReduction`, which phase 14 already owns. ADR-0045 section 2 records why this
+/// `Stage::NoiseReduction`, which phase 14 already owns. ADR-0047 section 2 records why this
 /// phase occupies two of phase 14 stages rather than the one named after it.
 pub const DENOISE_TILE: &str = include_str!("../shaders/denoise_tile.wgsl");
 

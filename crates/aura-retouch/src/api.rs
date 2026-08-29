@@ -28,7 +28,7 @@
 //!
 //! ## No silent failure, invariant 9
 //!
-//! A frame whose proxy will not decode is counted, coded `AURA-ML-5092` and reported. The run
+//! A frame whose proxy will not decode is counted, coded `AURA-ML-5098` and reported. The run
 //! continues and **no row is written**, so the next pass tries again - a written-but-empty plan
 //! would read to phases 21, 25 and 27 as "AURA decided this skin needed nothing".
 
@@ -117,7 +117,7 @@ impl Retouch {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5093` when the embedded preset table will not load.
+    /// `AURA-ML-5099` when the embedded preset table will not load.
     pub fn current_versions() -> Result<(u16, u16, u16), AuraError> {
         Ok((MODEL_VER, ANALYSIS_VER, PresetTable::embedded()?.version()))
     }
@@ -135,7 +135,7 @@ impl RetouchService for Retouch {
             .map(|table| table.unpreset())
             .unwrap_or_default();
         let outline = self.store.outline(&project, unpreset)?;
-        // Reported rather than enforced. `AURA-ML-5090` is degraded: stale plans keep working
+        // Reported rather than enforced. `AURA-ML-5096` is degraded: stale plans keep working
         // while the background pass replaces them, and a caller about to draw a conclusion over
         // a mixed set finds out before it draws it.
         if let Ok(current) = Self::current_versions() {
@@ -214,7 +214,7 @@ impl RetouchPass {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5093` when the embedded preset table will not load.
+    /// `AURA-ML-5099` when the embedded preset table will not load.
     pub fn new(
         previews: Arc<dyn PreviewService>,
         store: Arc<RetouchStore>,
@@ -522,7 +522,7 @@ impl RetouchPass {
     ///
     /// Computed once per pass and stored, which is what makes it a constant: every frame in the
     /// wedding reads the same number, and section 10.1 cross-frame consistency gate is
-    /// satisfied by construction. See ADR-0041 section 6.
+    /// satisfied by construction. See ADR-0043 section 6.
     fn identity_strengths(
         &self,
         project: &ProjectId,

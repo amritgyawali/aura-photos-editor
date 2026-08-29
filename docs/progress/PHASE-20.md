@@ -5,7 +5,7 @@ benchmark delta.
 
 ## T1 - PM/CTO: the retouch ethics policy (section 8 step 1)
 
-Files: `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md`, `docs/retouch.md`,
+Files: `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md`, `docs/retouch.md`,
 `crates/aura-retouch/config/retouch_presets.toml`. The policy is not a paragraph: it is a veto
 that removes a candidate rather than scaling it, a kind of feature that no setting can
 unprotect, a conservative default written as an asymmetric pair of floors, and a preset table
@@ -75,7 +75,7 @@ re-solve scales both halves of an under-eye correction. 5 unit tests.
 ## T8 - SRC: per-identity strength and gallery consistency (section 8 step 8)
 
 Files: `crates/aura-retouch/src/strength.rs`, `crates/aura-retouch/src/store.rs`,
-`crates/aura-catalog/migrations/0020_retouch.sql`. One number per person per project, from four
+`crates/aura-catalog/migrations/0021_retouch.sql`. One number per person per project, from four
 gallery statistics, multiplied rather than averaged so no term can rescue another. Tests: the
 bride in portraits beats a guest on the dance floor, `off` gives everybody zero, a face below the
 floor is never retouched, a person who is always small keeps half their strength, no single term
@@ -87,7 +87,7 @@ gate 3.
 Files: `ui/src/components/develop/RetouchPanel.tsx`, `ui/src/ipc/types.ts`,
 `crates/aura-app/src/retouch_commands.rs`, `crates/aura-app/src/contract/ipc.rs`,
 `crates/aura-app/src/state.rs`, `ui/src-tauri/src/main.rs`,
-`docs/adr/ADR-0042-retouch-ipc-surface.md`. Eight commands, and a panel that shows what was left
+`docs/adr/ADR-0044-retouch-ipc-surface.md`. Eight commands, and a panel that shows what was left
 alone as prominently as what was done. Tests: 10 panel tests, 3 command tests.
 
 ## T10 - QAIQ: the blind expert comparison (section 8 step 10)

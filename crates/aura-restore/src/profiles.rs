@@ -13,7 +13,7 @@
 //!
 //! As phases 15 to 21 all do. Half a profile table would denoise the ceremony against measured
 //! ceilings and the reception against nothing, and that inconsistency is invisible in a delivered
-//! gallery until somebody prints it. `AURA-ML-5105` is run-blocking.
+//! gallery until somebody prints it. `AURA-ML-5111` is run-blocking.
 //!
 //! ## A studio may lower a ceiling and may never raise one - except one, which runs the other way
 //!
@@ -28,7 +28,7 @@
 //! There are no camera files in this repository, so all twenty rows are derived from published
 //! specifications - as phase 09's calibration table is. Every one carries `measured = false`, and
 //! [`aura_core::contract::restore::NoiseModel::tier_ceiling`] turns that into a cap at
-//! [`DenoiseTier::Standard`]. ADR-0045 section 3 has the argument for why the asymmetry runs that
+//! [`DenoiseTier::Standard`]. ADR-0047 section 3 has the argument for why the asymmetry runs that
 //! way rather than the other.
 
 use std::collections::BTreeMap;
@@ -172,7 +172,7 @@ impl RestoreProfiles {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` when the embedded table will not load, which is a build fault rather than
+    /// `AURA-ML-5111` when the embedded table will not load, which is a build fault rather than
     /// an installation one and is therefore never expected in the field.
     pub fn embedded() -> Result<Self, AuraError> {
         Self::parse(EMBEDDED_PROFILES, PROFILE_FILE)
@@ -182,7 +182,7 @@ impl RestoreProfiles {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` naming the key and the rule it broke.
+    /// `AURA-ML-5111` naming the key and the rule it broke.
     #[allow(clippy::too_many_lines)]
     pub fn parse(text: &str, file: &str) -> Result<Self, AuraError> {
         let raw: RawProfiles = toml::from_str(text)
@@ -428,7 +428,7 @@ impl NoiseTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` when one of the embedded files will not load.
+    /// `AURA-ML-5111` when one of the embedded files will not load.
     pub fn embedded() -> Result<Self, AuraError> {
         let mut models = BTreeMap::new();
         let mut version = 0u16;
@@ -452,7 +452,7 @@ impl NoiseTable {
     ///
     /// # Errors
     ///
-    /// `AURA-ML-5105` naming the key and the rule it broke.
+    /// `AURA-ML-5111` naming the key and the rule it broke.
     pub fn parse_one(text: &str, file: &str) -> Result<(String, NoiseModel), AuraError> {
         let raw: RawNoise = toml::from_str(text)
             .map_err(|error| errors::profile_refused(file, "table", &error.to_string()))?;
@@ -677,7 +677,7 @@ mod tests {
         let raised = text.replace("max_sharpen      = 0.50", "max_sharpen      = 0.90");
         let error = RestoreProfiles::parse(&raised, PROFILE_FILE)
             .expect_err("a raised sharpening ceiling is refused");
-        assert_eq!(error.code.0, "AURA-ML-5105");
+        assert_eq!(error.code.0, "AURA-ML-5111");
 
         let lowered = text.replace("max_sharpen      = 0.50", "max_sharpen      = 0.20");
         assert!(
@@ -718,7 +718,7 @@ mod tests {
                 "{} claims to be measured, and there are no camera files in this repository",
                 model.camera
             );
-            // Which means none of them may reach the strongest tier. ADR-0045 section 3.
+            // Which means none of them may reach the strongest tier. ADR-0047 section 3.
             assert_eq!(model.tier_ceiling(), DenoiseTier::Standard);
             assert!(model.problem().is_none(), "{:?}", model.problem());
         }

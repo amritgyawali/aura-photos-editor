@@ -21,7 +21,7 @@ four different times:
   `mask_unavailable`. That is a wiring task rather than a missing phase - the same state phase 19
   is in, and for the same reason.
 * **Both shipped heads are untrained and neither is consulted.** What runs is the measured
-  detector in `blemish.rs`. ADR-0041 section 7 records why this phase ships a measurement
+  detector in `blemish.rs`. ADR-0043 section 7 records why this phase ships a measurement
   underneath its placeholder rather than refusing to detect at all, which is what phases 15, 16
   and 18 do.
 * **No blind study and no per-skin-tone parity study exist.** Section 10.1's last two rows are
@@ -36,7 +36,7 @@ four different times:
 inpainting methods, the two bands an operator may name, the four presets, the six protected kinds
 and their three sources, the protected feature, the texture report, twenty-six reason codes, the
 plan, the outline, the override and `RetouchService`. Six spellings differ from section 5 and
-ADR-0041 section 2 records each one.
+ADR-0043 section 2 records each one.
 
 **The decision crate.** `aura-retouch`, eleven modules plus fixtures, errors and guard:
 
@@ -50,16 +50,16 @@ ADR-0041 section 2 records each one.
 | `evening` | mid-band unevenness, calmed without reaching the high band |
 | `texture_guard` | the guarantee, measured through the real renderer, with re-solve and withdrawal |
 | `ops` | one decoded frame in, one plan out |
-| `store` | migration 20 and the codec |
+| `store` | migration 21 and the codec |
 | `api` | the frozen service, the resumable pass and the second pass that settles permanence |
-| `guard` | the three refusals this crate turns into `AURA-ML-5091` and `5092` |
+| `guard` | the three refusals this crate turns into `AURA-ML-5097` and `5098` |
 
 **The renderer half.** `aura_render::bands` - the three-band separation, moved here for its second
 consumer - and `aura_render::retouch`, the processor reference for the stage, plus three WGSL
 files held to it by `shader_parity.rs`. Phase 14's pass-through `stage_retouch` in `spatial.wgsl`
 retired.
 
-**Migration 20.** Four tables, one view, two triggers. `retouch_protected` is the first table in
+**Migration 21.** Four tables, one view, two triggers. `retouch_protected` is the first table in
 this product whose rows a photographer creates directly and whose subject is a person; its
 `is_absolute` column is generated rather than supplied, and a trigger aborts any delete of a
 protected tattoo.
@@ -162,7 +162,7 @@ freezes it and phases 21 and 22 will want it; this phase never emits one, and
 `RetouchPlan::broken_guarantee` refuses a plan that carries one. Two phases reducing the same hot
 spot is a forehead brought down twice.
 
-**A ledger row per anomaly.** ADR-0041 section 9: these codes do not enter phase 13's reason
+**A ledger row per anomaly.** ADR-0043 section 9: these codes do not enter phase 13's reason
 registry, for the reason phase 19 gave and with one addition - a protect row is recorded where a
 person can see it, which is the part that actually matters.
 
@@ -198,13 +198,13 @@ still writes a plan per frame - one that does nothing - because a frame with no 
 the photographer switched off must not look the same in a coverage report.
 
 Migration: reversible, and the rollback statements are at the top of
-`crates/aura-catalog/migrations/0020_retouch.sql`. **Export `retouch_protected` where
+`crates/aura-catalog/migrations/0021_retouch.sql`. **Export `retouch_protected` where
 `source = 'user'` and `retouch_identity` where `user_edited = 1` first.** Everything else in the
 migration is recomputable from pixels; those two are not derivable from anything, and a
 photographer telling the product to keep somebody's beauty mark is the most expensive data in it.
 
 Models: `models.lock` pins both heads by sha256 and the manifest is signed. A rollback bumps
-`model_ver`, raises `AURA-ML-5090` and re-plans in the background. It does **not** clear the
+`model_ver`, raises `AURA-ML-5096` and re-plans in the background. It does **not** clear the
 protect set.
 
 ## 10. What phase 21 inherits

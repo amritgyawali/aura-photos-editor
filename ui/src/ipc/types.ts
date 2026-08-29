@@ -2823,7 +2823,7 @@ export type SetRetouchDto = {
  * Add or clear one protected feature.
  *
  * `area` arrives in **frame** coordinates, as the panel drew it, and the backend projects it onto
- * the face. Clearing an absolute feature - a tattoo - is refused with `AURA-ML-5091`.
+ * the face. Clearing an absolute feature - a tattoo - is refused with `AURA-ML-5097`.
  */
 export type SetProtectionInput = {
   projectId: string;

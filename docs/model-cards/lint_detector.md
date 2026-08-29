@@ -74,7 +74,7 @@ them. There is no such corpus in this repository and no GPU backend to train on.
 runs instead is the measured detector in `aura_retouch::micro::clothing`: a small high-frequency
 anomaly inside the clothing region whose colour departs from the fabric immediately around it,
 which is phase 20's blemish shape one region up.
-`docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md` section 6 records why.
+`docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md` section 6 records why.
 
 `ml/models/micro/train_lint.py --self-test` runs without PyTorch and proves, among other
 properties, that the head cannot produce `strap` or `crease` and that a model firing on patterned
@@ -126,11 +126,11 @@ garment above `MAX_FABRIC_TEXTURE` produces `MicroCode::FabricTooTextured` and n
 
 `models.lock` pins this version by sha256 and the manifest is signed. Rolling back is a
 `models.lock` edit plus `cargo xtask models`; the stored `model_ver` on every plan changes with it,
-`AURA-ML-5096` is raised, and the affected frames are re-planned in the background.
+`AURA-ML-5102` is raised, and the affected frames are re-planned in the background.
 
 ## Related
 
-- `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md`
+- `docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md`
 - `docs/model-cards/flyaway_detector.md`
 - `docs/model-cards/glare_detector.md`
 - `docs/retouch-ethics.md`

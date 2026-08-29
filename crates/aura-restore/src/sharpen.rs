@@ -19,7 +19,7 @@
 //! three regions where it is **visible as damage** and nowhere else, so an unmasked global
 //! sharpen concentrates its entire artefact budget on the three places a photographer looks
 //! first. Phase 19 wrote the general rule - a phase that consumes another phase's output owns no
-//! fallback for it - and ADR-0045 section 4 records this as the sharpest case of it in the
+//! fallback for it - and ADR-0047 section 4 records this as the sharpest case of it in the
 //! product.
 //!
 //! ## Skin is the exception to the exception
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn no_regions_means_no_sharpening_rather_than_a_weaker_sharpening() {
-        // ADR-0045 section 4, bullet 4. The whole argument of this module, as one assertion.
+        // ADR-0047 section 4, bullet 4. The whole argument of this module, as one assertion.
         let choice = choose(estimate(1.2), clean(), &[], true, &profiles());
         assert!(choice.spec.is_none(), "a blind sharpen was planned");
         assert_eq!(choice.reasons[0].code, RestoreCode::SharpenNoRegions);

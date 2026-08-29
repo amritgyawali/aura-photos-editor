@@ -10,7 +10,7 @@
 // reaches this shader, and the patch arrives as pixels rather than as a source image and a
 // transform precisely so that the decision cannot be re-made here by accident.
 //
-// The rule those decisions implement, from ADR-0043 section 4: **you may only borrow pixels that
+// The rule those decisions implement, from ADR-0045 section 4: **you may only borrow pixels that
 // carry no information.** `MIN_SPECULAR_FRACTION` of the target region has to sit at or above
 // `MICRO_CLIPPED_FLOOR` before a borrow is permitted at all, and `MIN_ALIGNMENT` is the floor on
 // how well the sibling matched. Both constants are here so that a backend that re-derived the

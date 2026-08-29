@@ -35,7 +35,7 @@
 //! failure to one operation. Here the three regions are disjoint - iris, hair, teeth - and each
 //! measurement is moved by exactly one family, so withdrawing all three because the hairline lost
 //! energy would be throwing away a lint removal for a reason that has nothing to do with it.
-//! ADR-0043 section 5 has the argument.
+//! ADR-0045 section 5 has the argument.
 //!
 //! ## The re-solve weakens, it does not re-detect
 //!
@@ -357,7 +357,7 @@ fn ratio(after: f32, before: f32) -> f32 {
 ///
 /// # Errors
 ///
-/// `AURA-ML-5097` naming the photograph and the guarantee.
+/// `AURA-ML-5103` naming the photograph and the guarantee.
 pub fn check_plan(plan: &MicroPlan) -> Result<(), AuraError> {
     match plan.broken_guarantee() {
         None => Ok(()),
@@ -369,7 +369,7 @@ pub fn check_plan(plan: &MicroPlan) -> Result<(), AuraError> {
 ///
 /// # Errors
 ///
-/// `AURA-ML-5098` naming the problem.
+/// `AURA-ML-5104` naming the problem.
 pub fn check_override(values: &MicroOverride) -> Result<(), AuraError> {
     match values.problem() {
         None => Ok(()),
@@ -381,7 +381,7 @@ pub fn check_override(values: &MicroOverride) -> Result<(), AuraError> {
 ///
 /// # Errors
 ///
-/// `AURA-ML-5099` naming the problem.
+/// `AURA-ML-5105` naming the problem.
 pub fn check_locus(locus: ColourLocus, key: &str) -> Result<(), AuraError> {
     match locus.problem() {
         None => Ok(()),
@@ -556,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn a_plan_with_no_reason_is_5097_and_a_sound_one_passes() {
+    fn a_plan_with_no_reason_is_5103_and_a_sound_one_passes() {
         let good = MicroPlan::nothing(
             photo(),
             SceneId::Ceremony,
@@ -566,13 +566,13 @@ mod tests {
         let mut bad = good;
         bad.reasons.clear();
         let err = check_plan(&bad).expect_err("refused");
-        assert_eq!(err.code.0, "AURA-ML-5097");
+        assert_eq!(err.code.0, "AURA-ML-5103");
     }
 
     #[test]
-    fn an_empty_override_is_5098() {
+    fn an_empty_override_is_5104() {
         let err = check_override(&MicroOverride::default()).expect_err("refused");
-        assert_eq!(err.code.0, "AURA-ML-5098");
+        assert_eq!(err.code.0, "AURA-ML-5104");
         assert!(check_override(&MicroOverride {
             borrowing: Some(false),
             ..MicroOverride::default()

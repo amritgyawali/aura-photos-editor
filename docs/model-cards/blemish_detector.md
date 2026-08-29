@@ -74,7 +74,7 @@ runs instead is the measured detector in `aura_retouch::blemish`: a difference-o
 the mid band of the face, split by sign, with a colour test against the median chromaticity of
 that face's own skin.
 
-`docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md` section 7 records why this phase
+`docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md` section 7 records why this phase
 ships a measurement underneath its placeholder rather than doing what phases 15, 16 and 18 do and
 simply refusing to detect. In those phases a reference model existed below the head; here, a
 phase that consulted nothing and had nothing underneath would ship a retoucher that finds no
@@ -137,11 +137,11 @@ no detections at all produces a plan that says `no_blemish_found` rather than no
 
 `models.lock` pins this version by sha256 and the manifest is signed. Rolling back is a
 `models.lock` edit plus `cargo xtask models`; the stored `model_ver` on every plan changes with
-it, `AURA-ML-5090` is raised, and the affected frames are re-planned in the background.
+it, `AURA-ML-5096` is raised, and the affected frames are re-planned in the background.
 
 ## Related
 
-- `docs/adr/ADR-0041-portrait-retouch-and-texture-protection.md`
+- `docs/adr/ADR-0043-portrait-retouch-and-texture-protection.md`
 - `docs/model-cards/permanent_features.md`
 - `docs/retouch.md`
 - `docs/skin-fairness.md`

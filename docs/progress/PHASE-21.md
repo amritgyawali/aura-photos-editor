@@ -5,7 +5,7 @@ benchmark delta.
 
 ## T1 - PM/CTO: the ethics policy, published before implementation (section 8 step 1)
 
-Files: `docs/retouch-ethics.md`, `docs/adr/ADR-0043-micro-retouch-and-cross-frame-borrowing.md`,
+Files: `docs/retouch-ethics.md`, `docs/adr/ADR-0045-micro-retouch-and-cross-frame-borrowing.md`,
 `crates/aura-retouch/config/micro_retouch.toml`. The policy is not a paragraph: it is a list of
 operations this product will never build, a ceiling on every operation it does build that a
 config file can lower and never raise, and one rule that decides what a borrow may replace - a
@@ -20,7 +20,7 @@ wire to express any of them. Tests: `crates/aura-core/tests/micro_contract.rs` (
 glare, lint; hair-type diversity coverage" and four for "measure natural teeth/sclera loci". There
 is no consented wedding photography in this repository. What shipped instead is
 `crates/aura-retouch/src/micro/fixtures.rs` - synthetic frames whose strands, sheets, marks, teeth
-and catchlights are painted in at known amplitudes - and a **relative** locus: ADR-0043 section 3
+and catchlights are painted in at known amplitudes - and a **relative** locus: ADR-0045 section 3
 records why the teeth locus is centred on the frame's own neutral rather than on a measured
 absolute, which is the difference between a colour target and a distance from one. Condition C3.
 
@@ -64,7 +64,7 @@ Tests: 6 unit tests, `micro_eval.rs` gate 6.
 ## T7 - SRG/SRC: glare reduction and cross-frame borrowing (section 8 step 7)
 
 Files: `crates/aura-retouch/src/micro/{glare,borrow}.rs`,
-`crates/aura-render/shaders/micro_borrow.wgsl`, `crates/aura-catalog/migrations/0021_micro_retouch.sql`.
+`crates/aura-render/shaders/micro_borrow.wgsl`, `crates/aura-catalog/migrations/0022_micro_retouch.sql`.
 A specular sheet is a connected region of near-clipped, near-neutral pixels overlapping an iris.
 Where the record is destroyed - `MIN_SPECULAR_FRACTION` of it at or above the clipped floor - a
 sibling frame from the same moment may repair it, if the alignment search clears `MIN_ALIGNMENT`
@@ -87,7 +87,7 @@ the two modules, `micro_eval.rs` gate 9, phase gate sections 3 and 4.
 
 Files: `ui/src/components/develop/MicroRetouchPanel.tsx`, `ui/src/ipc/types.ts`,
 `crates/aura-app/src/{micro_commands.rs,contract/ipc.rs,state.rs}`,
-`docs/adr/ADR-0044-micro-ipc-surface.md`. Nine commands, five operator switches, five clothing
+`docs/adr/ADR-0046-micro-ipc-surface.md`. Nine commands, five operator switches, five clothing
 switches and one for borrowing - and **no strength field anywhere on the wire**, which is what
 keeps `docs/retouch-ethics.md` a promise about the product rather than a description of the
 defaults. A borrowed region is drawn with a visible marker and the project header carries the
@@ -126,7 +126,7 @@ useful half were the same shape: pixel-neighbourhood arithmetic written by casti
 to the frame rather than allowed to go negative and then rejected - which is shorter, has no
 platform-width caveat, and puts the frame edge in one place per loop. The contract also lost a
 narrowing cast: `NATURALNESS_MAX_RESOLVES * OpFamily::COUNT as u8` is now a constant of its own
-with an assertion that keeps it in step (ADR-0043 section 11.4).
+with an assertion that keeps it in step (ADR-0045 section 11.4).
 
 **`ui/src-tauri/src/main.rs` had no `fn main`.** It was lost in the phase 19 to 20 merge and the
 crate is outside the workspace, so nothing had compiled it since. Restored here rather than left
