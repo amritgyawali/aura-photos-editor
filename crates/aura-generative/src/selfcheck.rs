@@ -188,8 +188,12 @@ fn repetition(image: &Image, rect: &Rect) -> f32 {
     for (fx, fy) in [(0.2, 0.2), (0.8, 0.2), (0.2, 0.8), (0.8, 0.8)] {
         let cx = (image.w as f32 * fx) as usize;
         let cy = (image.h as f32 * fy) as usize;
-        let x = cx.saturating_sub(rect.w / 2).min(image.w.saturating_sub(rect.w));
-        let y = cy.saturating_sub(rect.h / 2).min(image.h.saturating_sub(rect.h));
+        let x = cx
+            .saturating_sub(rect.w / 2)
+            .min(image.w.saturating_sub(rect.w));
+        let y = cy
+            .saturating_sub(rect.h / 2)
+            .min(image.h.saturating_sub(rect.h));
         let window = Rect {
             x,
             y,
@@ -344,8 +348,10 @@ fn orientation(image: &Image, window: &Rect, skip: Option<&Rect>) -> (f32, f32) 
             if skip.is_some_and(|r| r.contains(x, y)) {
                 continue;
             }
-            let gx = image.luma(x as isize + 1, y as isize) - image.luma(x as isize - 1, y as isize);
-            let gy = image.luma(x as isize, y as isize + 1) - image.luma(x as isize, y as isize - 1);
+            let gx =
+                image.luma(x as isize + 1, y as isize) - image.luma(x as isize - 1, y as isize);
+            let gy =
+                image.luma(x as isize, y as isize + 1) - image.luma(x as isize, y as isize - 1);
             jxx += f64::from(gx * gx);
             jyy += f64::from(gy * gy);
             jxy += f64::from(gx * gy);
@@ -429,8 +435,11 @@ fn seam_excursion(image: &Image, rect: &Rect) -> (f32, u32) {
     if samples == 0 {
         return (0.0, 0);
     }
-    (f32::from(u16::try_from(exceeded).unwrap_or(u16::MAX))
-        / f32::from(u16::try_from(samples).unwrap_or(u16::MAX)).max(1.0), samples)
+    (
+        f32::from(u16::try_from(exceeded).unwrap_or(u16::MAX))
+            / f32::from(u16::try_from(samples).unwrap_or(u16::MAX)).max(1.0),
+        samples,
+    )
 }
 
 /// The given percentile of adjacent-sample luminance steps across the whole frame.
@@ -451,7 +460,7 @@ fn step_percentile(image: &Image, percentile: f32, skip: &Rect) -> f32 {
     for y in 1..image.h {
         for x in 1..image.w {
             index += 1;
-            if index % stride != 0 {
+            if !index.is_multiple_of(stride) {
                 continue;
             }
             // The patch, and the row and column immediately outside it, are the thing being judged.
@@ -463,7 +472,8 @@ fn step_percentile(image: &Image, percentile: f32, skip: &Rect) -> f32 {
             let dy =
                 (image.luma(x as isize, y as isize) - image.luma(x as isize, y as isize - 1)).abs();
             for step in [dx, dy] {
-                let bucket = ((step.clamp(0.0, 1.0) * (BUCKETS - 1) as f32) as usize).min(BUCKETS - 1);
+                let bucket =
+                    ((step.clamp(0.0, 1.0) * (BUCKETS - 1) as f32) as usize).min(BUCKETS - 1);
                 if let Some(slot) = histogram.get_mut(bucket) {
                     *slot += 1;
                 }
@@ -523,9 +533,7 @@ mod tests {
     /// arithmetic rather than the rule - the trap phases 19, 21 and 22 each hit - and here it was
     /// the fixture that was wrong rather than the code.
     fn hash01(x: usize, y: usize) -> f32 {
-        let mut h = (x as u32)
-            .wrapping_mul(0x9E37_79B1)
-            ^ (y as u32).wrapping_mul(0x85EB_CA77);
+        let mut h = (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77);
         h ^= h >> 15;
         h = h.wrapping_mul(0x2545_F491);
         h ^= h >> 13;
@@ -564,10 +572,7 @@ mod tests {
             "repetition was {}",
             report.repeated_texture
         );
-        assert_eq!(
-            report.failure(),
-            Some(CleanupCode::ArtefactRepeatedTexture)
-        );
+        assert_eq!(report.failure(), Some(CleanupCode::ArtefactRepeatedTexture));
     }
 
     #[test]

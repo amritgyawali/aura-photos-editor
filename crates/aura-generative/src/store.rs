@@ -93,7 +93,7 @@ pub const BYTES_PER_IMAGE: usize = 3_200;
 /// The five safety checks as the five characters of a stored `checks` column.
 const ALL_PASSED: &str = "11111";
 
-/// A length as SQLite's integer, saturating rather than wrapping.
+/// A length as `SQLite`'s integer, saturating rather than wrapping.
 fn count_of(value: usize) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
@@ -131,7 +131,11 @@ impl CleanupStore {
     /// # Errors
     ///
     /// `AURA-DB-3006` when the query fails.
-    pub fn pending(&self, project: &ProjectId, versions: (u16, u16, u16)) -> AuraResult<Vec<PhotoId>> {
+    pub fn pending(
+        &self,
+        project: &ProjectId,
+        versions: (u16, u16, u16),
+    ) -> AuraResult<Vec<PhotoId>> {
         let key = project.to_db();
         self.catalog.read(move |conn| {
             let mut statement = conn
@@ -269,8 +273,11 @@ impl CleanupStore {
                 params![photo],
             )
             .map_err(|e| statement_failed("could not clear the previous proposals", &e))?;
-            conn.execute("DELETE FROM cleanup_blocked WHERE photo_id = ?1", params![photo])
-                .map_err(|e| statement_failed("could not clear the previous refusals", &e))?;
+            conn.execute(
+                "DELETE FROM cleanup_blocked WHERE photo_id = ?1",
+                params![photo],
+            )
+            .map_err(|e| statement_failed("could not clear the previous refusals", &e))?;
 
             for prepared in &prepared {
                 let proposal = &prepared.proposal;
@@ -484,7 +491,8 @@ impl CleanupStore {
                 .next()
                 .map_err(|e| statement_failed("could not read a disclosure", &e))?
             {
-                let Ok(proposal_id) = ProposalId::from_db(&row.get::<_, String>(0).unwrap_or_default())
+                let Ok(proposal_id) =
+                    ProposalId::from_db(&row.get::<_, String>(0).unwrap_or_default())
                 else {
                     continue;
                 };
@@ -787,7 +795,9 @@ fn method_from_columns(
     model: Option<&str>,
 ) -> Option<CleanupMethod> {
     match kind {
-        "borrow" => PhotoId::from_db(source?).ok().map(CleanupMethod::BorrowFrom),
+        "borrow" => PhotoId::from_db(source?)
+            .ok()
+            .map(CleanupMethod::BorrowFrom),
         "fill" => Some(CleanupMethod::ClassicalFill),
         "inpaint" => Some(CleanupMethod::Inpaint {
             model: model?.to_string(),
@@ -828,7 +838,8 @@ impl StoredProposal {
     fn rebuild(&self, image: ImageId) -> Option<CleanupProposal> {
         let id = ProposalId::from_db(&self.id).ok()?;
         let class = DistractionClass::parse(&self.class)?;
-        let method = method_from_columns(&self.kind, self.source.as_deref(), self.model.as_deref())?;
+        let method =
+            method_from_columns(&self.kind, self.source.as_deref(), self.model.as_deref())?;
         let reasons: Vec<CleanupReason> = self
             .reasons
             .split(',')

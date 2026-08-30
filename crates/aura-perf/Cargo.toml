@@ -21,6 +21,7 @@ aura-catalog.path  = "../aura-catalog"
 aura-cloud.path    = "../aura-cloud"
 aura-index.path    = "../aura-index"
 aura-infer.path    = "../aura-infer"
+aura-brain-gallery = { path = "../aura-brain-gallery" }
 aura-brain-wedding = { path = "../aura-brain-wedding" }
 aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-retouch       = { path = "../aura-retouch" }

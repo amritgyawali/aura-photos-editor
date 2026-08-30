@@ -263,7 +263,7 @@ pub fn manual_remove(state: &AppState, input: ManualRemoveInput) -> IpcResult<Ma
         return Ok(ManualRemoveDto {
             proposal: None,
             blocked: Some(CleanupBlockedDto {
-                region: input.region.clone(),
+                region: input.region,
                 check: SafetyCheck::SizeCap.as_str().to_string(),
                 code: CleanupCode::ProposalCapReached.as_str().to_string(),
                 text: "AURA has no tidying guidance recorded for this kind of photograph yet"
@@ -429,9 +429,7 @@ fn to_dto(proposal: &CleanupProposal) -> CleanupProposalDto {
 
 fn method_parts(method: &CleanupMethod) -> (String, Option<String>, Option<String>) {
     match method {
-        CleanupMethod::BorrowFrom(source) => {
-            ("borrow".to_string(), Some(source.to_db()), None)
-        }
+        CleanupMethod::BorrowFrom(source) => ("borrow".to_string(), Some(source.to_db()), None),
         CleanupMethod::ClassicalFill => ("fill".to_string(), None, None),
         CleanupMethod::Inpaint { model } => ("inpaint".to_string(), None, Some(model.clone())),
     }

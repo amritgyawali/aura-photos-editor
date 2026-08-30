@@ -304,3 +304,47 @@ pub fn cleanup_override_refused(detail: impl Into<String>) -> AuraError {
         "AURA could not record that decision about tidying this photograph. The photograph is          unchanged.",
     )
 }
+
+/// A photographer's anchor decision could not be recorded.
+pub const ML_GALLERY_ANCHOR_REFUSED: ErrorCode = ErrorCode("AURA-ML-5124");
+
+/// A photographer's gallery override could not be recorded.
+pub const ML_GALLERY_OVERRIDE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5125");
+
+/// A photographer's anchor decision could not be recorded.
+///
+/// The frozen `GalleryService` documents this on `pin_anchor` and `reject_anchor`, so it lives here
+/// rather than in `aura-brain-gallery`: a contract cannot depend on the crate that implements it.
+/// The same split phases 16, 22, 23 and 24 made.
+///
+/// Three ways to reach it, and all three are the panel and the catalog disagreeing about the tree
+/// rather than anything a photographer did wrong: the node is gone, the photograph is no longer in
+/// it, or pinning would leave the node with more anchors than `MAX_ANCHORS`.
+#[must_use]
+pub fn gallery_anchor_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_GALLERY_ANCHOR_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        detail,
+        "AURA could not record that choice of reference photograph. Nothing about this part of \
+         the wedding has changed; reopen the panel and try again.",
+    )
+}
+
+/// A photographer's gallery override could not be recorded.
+///
+/// The values on this surface are five movements, every one of them bounded by the contract, so a
+/// refused override is one of three things: the photograph has no delta, the override asked for
+/// nothing, or a value was outside its bound. There is no strength field and no way to raise a
+/// bound, which is phase 21's rule applied to a surface a photographer touches.
+#[must_use]
+pub fn gallery_override_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_GALLERY_OVERRIDE_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        detail,
+        "AURA could not record that adjustment. The photograph is unchanged.",
+    )
+}

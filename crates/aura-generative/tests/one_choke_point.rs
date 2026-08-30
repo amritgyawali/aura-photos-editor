@@ -206,7 +206,8 @@ fn the_five_checks_run_before_anything_is_scored() {
     ]
     .iter()
     .map(|needle| {
-        body.as_str().find(needle)
+        body.as_str()
+            .find(needle)
             .unwrap_or_else(|| panic!("safety.rs must run {needle}"))
     })
     .collect();

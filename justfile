@@ -364,6 +364,28 @@ phase-24-verify:
 cleanup-eval CATALOG:
     python ml/models/generative/eval_cleanup.py {{CATALOG}}
 
+# The phase 25 gate. Migration 25 and its three triggers, the policy table a product
+# manager owns and the widened bound it refuses, a whole synthetic wedding through the
+# real pass, the second pass that must change nothing, the five bounds on every stored
+# row, the intentionally-lit frames it must leave alone, a pin that survives a re-pass,
+# the skin arithmetic on authored readings and the one stray it has to find. It prints
+# what it does not prove at the end of every run - see docs/progress/PHASE-25-EXIT.md
+# conditions C1 to C4.
+phase-25-verify:
+    cargo run --release --package aura-cli -- verify --phase 25 --work target/phase25-verify
+
+# The phase 25 gate from the catalog side. Reads a real project read-only and reports the
+# two spreads, the per-identity skin spread and the frames that would not come. It is the
+# one check that can catch a catalog written by a build whose bounds had widened, which is
+# invisible from inside that build.
+consistency-eval CATALOG:
+    python ml/eval/consistency_eval.py {{CATALOG}}
+
+# The same, against a chosen answer. There are no weddings in this repository, so this is
+# what CI runs.
+consistency-selftest:
+    python ml/eval/consistency_eval.py --self-test
+
 # The phase 23 gate from the Python side. There are no expert crop labels here,
 # so `--self-test` runs the whole computation against an authored answer.
 crop-eval:

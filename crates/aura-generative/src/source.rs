@@ -101,7 +101,10 @@ pub struct Selection {
 ///
 /// The reasons every method failed, in the order they were tried. An empty vector is impossible:
 /// three methods are always attempted and each one either succeeds or names a code.
-pub fn select(sources: &Sources<'_>, safe: &SafeCandidate) -> Result<Selection, Vec<CleanupReason>> {
+pub fn select(
+    sources: &Sources<'_>,
+    safe: &SafeCandidate,
+) -> Result<Selection, Vec<CleanupReason>> {
     let candidate = safe.candidate();
     let region = candidate.region;
     let mut tried: Vec<CleanupReason> = Vec::new();
@@ -141,7 +144,11 @@ pub fn select(sources: &Sources<'_>, safe: &SafeCandidate) -> Result<Selection, 
             // Unreachable in this build and deliberately written out rather than left as an
             // `unreachable!`: the day a pack ships, this arm is the one that has to be filled in,
             // and a panic macro here would be a panic in a background pass.
-            tried.push(CleanupReason::at(CleanupCode::InpaintUnavailable, 0.60, region));
+            tried.push(CleanupReason::at(
+                CleanupCode::InpaintUnavailable,
+                0.60,
+                region,
+            ));
         }
         Err(code) => tried.push(CleanupReason::at(code, 0.60, region)),
     }
@@ -161,7 +168,10 @@ fn from_borrow(
     // cannot rescue a candidate nobody was sure about. Phases 09, 11, 12 and 18, and the same
     // reason every time: no signal may stand in for another.
     let confidence = (alignment * removability.clamp(0.0, 1.0)).sqrt() * BORROW_CEILING;
-    reasons.insert(0, CleanupReason::at(CleanupCode::SiblingAvailable, 1.0, region));
+    reasons.insert(
+        0,
+        CleanupReason::at(CleanupCode::SiblingAvailable, 1.0, region),
+    );
     Selection {
         method: CleanupMethod::BorrowFrom(found.source),
         result: found.result.clone(),
@@ -183,7 +193,10 @@ fn from_fill(
         + filled.texture.uniformity.clamp(0.0, 1.0) * 0.3)
         .clamp(0.0, 1.0);
     let confidence = (texture * removability.clamp(0.0, 1.0)).sqrt() * FILL_CEILING;
-    reasons.insert(0, CleanupReason::at(CleanupCode::TextureUniform, 1.0, region));
+    reasons.insert(
+        0,
+        CleanupReason::at(CleanupCode::TextureUniform, 1.0, region),
+    );
     Selection {
         method: CleanupMethod::ClassicalFill,
         result: filled.result.clone(),
@@ -282,7 +295,9 @@ mod tests {
         };
         match safety::check(&candidate, &policy, &Coverage::known_empty()) {
             Outcome::Allowed(safe) => *safe,
-            Outcome::Blocked { check, .. } => panic!("the fixture must be safe, blocked by {check:?}"),
+            Outcome::Blocked { check, .. } => {
+                panic!("the fixture must be safe, blocked by {check:?}")
+            }
         }
     }
 

@@ -16,8 +16,8 @@ use std::sync::Arc;
 use aura_catalog::Catalog;
 use aura_core::clock::{Clock, FixedClock};
 use aura_core::contract::cleanup::{
-    Box2, CleanupCode, CleanupMethod, CleanupProposal, CleanupReason, DistractionClass, SafetyCheck,
-    SafetyVerdict,
+    Box2, CleanupCode, CleanupMethod, CleanupProposal, CleanupReason, DistractionClass,
+    SafetyCheck, SafetyVerdict,
 };
 use aura_core::contract::ids::ProposalId;
 use aura_core::contract::ledger::Autonomy;
@@ -141,13 +141,22 @@ fn a_pass_writes_proposals_refusals_and_an_examination_row() {
     );
 
     store
-        .put(&project, photo, SceneId::ReceptionEntrance, &plan, (1, 1, 1))
+        .put(
+            &project,
+            photo,
+            SceneId::ReceptionEntrance,
+            &plan,
+            (1, 1, 1),
+        )
         .expect("the plan is stored");
 
     let read = store.proposals(photo).expect("proposals read back");
     assert_eq!(read.len(), 1);
     assert_eq!(read.first().map(|p| p.id), Some(id));
-    assert_eq!(read.first().map(|p| p.method.clone()), Some(CleanupMethod::ClassicalFill));
+    assert_eq!(
+        read.first().map(|p| p.method.clone()),
+        Some(CleanupMethod::ClassicalFill)
+    );
 
     let blocked = store.blocked(photo).expect("refusals read back");
     assert_eq!(blocked.len(), 1, "a refusal is a row");
@@ -318,11 +327,7 @@ fn insert_raw(
     photo: &str,
     class: &str,
 ) -> Result<(), aura_core::AuraError> {
-    let (project, photo, class) = (
-        project.to_string(),
-        photo.to_string(),
-        class.to_string(),
-    );
+    let (project, photo, class) = (project.to_string(), photo.to_string(), class.to_string());
     let id = ProposalId::new().to_db();
     catalog.writer().transact(move |conn| {
         conn.execute(
@@ -366,11 +371,7 @@ fn insert_raw_checks(
     photo: &str,
     checks: &str,
 ) -> Result<(), aura_core::AuraError> {
-    let (project, photo, checks) = (
-        project.to_string(),
-        photo.to_string(),
-        checks.to_string(),
-    );
+    let (project, photo, checks) = (project.to_string(), photo.to_string(), checks.to_string());
     let id = ProposalId::new().to_db();
     catalog.writer().transact(move |conn| {
         conn.execute(
@@ -458,7 +459,9 @@ fn a_photographers_decision_survives_a_re_analysis() {
         )
         .expect("stored");
 
-    store.decide(photo, id, false).expect("rejected by a person");
+    store
+        .decide(photo, id, false)
+        .expect("rejected by a person");
 
     // The pass runs again and produces the same proposal, because the id is a digest of what the
     // proposal *is*.

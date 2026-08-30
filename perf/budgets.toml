@@ -1137,3 +1137,73 @@ max_ms_per_unit = 120
 # measurement, which is phase 19's correction: a budget must not be pinned at its own measurement.
 [size.cleanup_store_per_1000_images]
 max_bytes = 3200000
+
+# ---------------------------------------------------------------------------
+# PHASE-25 - gallery consistency
+# ---------------------------------------------------------------------------
+#
+# Section 11's four rows. Three of them are measured in
+# `crates/aura-perf/tests/gallery_budgets.rs`; the fourth - the strips render - is a browser
+# measurement and belongs to the UI suite, so what is measured in its place is the **query** a strip
+# is drawn from, which is the half that scales with a wedding.
+#
+# The pass is fast for a structural reason worth writing down: it opens no pixels. Every number it
+# works on was stored by phases 07, 15 and 16, so a thousand-image wedding is a thousand rows read,
+# ten trees built and ten targets solved. Measured at 74 ms against a 60 s budget - three orders of
+# magnitude of headroom, which is not a sign the budget is wrong but a sign this phase is arithmetic
+# over other phases' answers rather than a pass over photographs.
+#
+# The skin half will not be free in the same way, and the budget below is written knowing that:
+# when phase 18's segmenter is trained, every selected frame gains one proxy decode and one masked
+# statistic. That is why the pass row keeps the whole 60 s rather than being re-based onto the
+# measurement - phase 22's rule about waived rows read forwards.
+[stage.gallery_pass_1000]
+max_elapsed_ms  = 60000
+max_ms_per_unit = 60
+
+# One anchor change re-solves that node and no other. Measured at 1 ms.
+[stage.gallery_anchor_resolve]
+max_elapsed_ms  = 6000
+max_ms_per_unit = 6000
+
+# The query one timeline strip is drawn from. Measured at under a millisecond for a 100-frame node.
+[stage.gallery_strip_query]
+max_elapsed_ms  = 400
+max_ms_per_unit = 400
+
+# Section 11's storage row, and the second tightest figure in the product after phase 09's 1 KB.
+#
+# **Measured before it was written down.** Phase 21 shipped a per-image figure that had been written
+# first and was wrong by a factor of two and a half; phase 19's correction is the other half of the
+# rule, that a budget must not be pinned at its own measurement either.
+#
+# Measured over 1,000 photographs of a ten-chapter wedding, as the change in `dbstat` payload rather
+# than in `PRAGMA page_count`, which quantises to 4 KiB - phase 09's correction:
+#
+#   gallery_delta                227 B/image   one row per photograph, the whole phase in it
+#   idx_gallery_delta_project     46 B/image
+#   idx_gallery_delta_node        44 B/image
+#   gallery_anchor                 3 B/image   four rows per node, ten nodes
+#   idx_gallery_anchor_photo       3 B/image
+#   gallery_node                   3 B/image
+#                               --------
+#   measured total               330 B/image
+#
+# Two decisions are why this is 330 rather than about 500.
+#
+# **Node membership is the delta table.** Section 5's `SceneNode::image_ids` is not a join table:
+# every placed frame gets a delta row, including the ones that moved by nothing, so `WHERE node_id =
+# ?` is the membership query. A separate table would have cost about 85 B per image - a sixth of the
+# whole budget - to store a fact already on the row beside it.
+#
+# **A reason set is one integer.** Twenty-six codes in a bitmask over `GalleryCode::ALL`, 8 B where a
+# list of slugs would have been about sixty. Phase 09's rule - a reason stores its code rather than
+# its sentence - taken one step further, and the *weight* is a property of the code rather than of
+# the frame so it is rendered on read like the sentence is.
+#
+# The measured figure carries no outlier rows, because the perf fixture's chapters drift within what
+# the bounds can reach and produce none. An outlier row is about 110 B and a real wedding produces
+# them on a small percentage of frames, so the true figure is a few bytes higher than 330 - well
+# inside the headroom, and named here rather than discovered later.
+[size.gallery_store_per_1000_images]
+max_bytes = 500000

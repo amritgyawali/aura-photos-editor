@@ -1,0 +1,59 @@
+[package]
+name         = "aura-brain-gallery"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Gallery intelligence: a wedding matched to itself, scene node by scene node, with anchors chosen rather than averaged and every movement damped, bounded and idempotent (phase 25)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# PHASE-25. The one route to pixels, for the skin readings section 6.3's per-identity targets are
+# built from. Phases 09, 20, 21, 22 and 24 all reach a photograph the same way; nothing in this
+# crate opens a file.
+aura-preview = { path = "../aura-preview" }
+# PHASE-25. The pixel buffer the preview service hands back, plus `colour::illuminant` for the
+# `u'v'` arithmetic and `colour::de2000` for the dE00 section 6.3's promise is measured in. Both
+# already exist in the lowest crate that owns colour maths, which is where phase 23 put the lens
+# polynomial for the same reason: two copies of a colour conversion is two answers to what a
+# person's skin looks like.
+aura-raw     = { path = "../aura-raw" }
+# PHASE-25. The identity-scoped skin regions a correction applies inside, and the only route to
+# them. Phase 18's rule: `MaskService` is the one way to ask what is where in a photograph.
+aura-vision  = { path = "../aura-vision" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+
+# Deliberately absent: `aura-recipe`, `aura-render`, `aura-cloud`, `aura-brain-photo` and
+# `aura-brain-wedding`.
+#
+# `aura-recipe` and `aura-render` are absent for the reason they are absent from `aura-geometry`
+# and `aura-generative`: this crate decides five numbers and something else applies them, from
+# `edit_recipes` through `aura_recipe::schema::merge` only. A dependency in this direction would
+# let a gallery delta reach a pixel without going through the merge, which is the one function
+# permitted to honour `user_edited_fields`.
+#
+# `aura-cloud` is absent because section 7 says no cloud call happens in this phase and the gateway
+# stays idle. A rule enforced by the dependency graph is a rule nobody has to remember.
+#
+# `aura-brain-photo` and `aura-brain-wedding` are absent because everything this phase needs from
+# them - the tone estimate, the colour decision, the scene, the segments - it takes through the
+# frozen traits in `aura-core`. `ToneService`, `ColourService` and `StoryService` are the only ways
+# any phase may ask what colour the light was, how a frame should be graded and what a chapter is.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+aura-catalog = { path = "../aura-catalog", features = [] }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
+# `tests/eval/` beside the phase 05 to 24 harnesses rather than in this crate's own `tests/`,
+# because a gate is a claim about the product and not about a crate.
+[[test]]
+name = "consistency_eval"
+path = "../../tests/eval/consistency_eval.rs"

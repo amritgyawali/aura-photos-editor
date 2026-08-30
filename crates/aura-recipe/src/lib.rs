@@ -92,9 +92,8 @@ pub mod xmp;
 
 pub use contract::recipe::{
     Bw, CleanupOp, Curve, EditSource, Geometry, Global, HslShift, ImageRef, Lens, LensCoefficients,
-    Mask,
-    MaskKind, MaskParams, Noise, Perspective, Provenance, Recipe, Restoration, RetouchOp, Sharpen,
-    ENGINE, HSL_BANDS, SCHEMA_VERSION,
+    Mask, MaskKind, MaskParams, Noise, Perspective, Provenance, Recipe, Restoration, RetouchOp,
+    Sharpen, ENGINE, HSL_BANDS, SCHEMA_VERSION,
 };
 pub use hash::{canonical, recipe_hash};
 pub use history::{History, HistoryEntry, Snapshot};

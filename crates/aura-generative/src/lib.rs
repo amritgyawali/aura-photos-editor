@@ -18,7 +18,22 @@
     clippy::module_name_repetitions,
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss
+    clippy::cast_sign_loss,
+    // Added in phase 25, not phase 24. Every module in this crate converts between pixel
+    // coordinates and signed offsets on every sample - a homography maps a `usize` grid into a
+    // plane that has negative values just outside it - and spelling out a `try_from` and an error
+    // path for each of those would bury the arithmetic that matters. `aura-raw` allows the same
+    // family for the same reason and has since phase 02, as do `aura-retouch` and `aura-restore`.
+    //
+    // Every cast that could genuinely lose information is clamped at the point it happens;
+    // `pixels::Image::luma` takes signed coordinates precisely so an out-of-frame read is a
+    // decision rather than a wrap.
+    clippy::cast_possible_wrap,
+    // `sum_t` beside `sum_ts` and `sx` beside `sy` in `borrow.rs`. The names are the ones the
+    // homography literature uses, and renaming them to satisfy a lint would make the arithmetic
+    // harder to check against the paper it comes from.
+    clippy::similar_names,
+    clippy::many_single_char_names
 )]
 // The panic family and slice indexing are banned in library code and are how a test asserts.
 // An inline `#[cfg(test)]` module is not compiled into the library at all, so nothing it does

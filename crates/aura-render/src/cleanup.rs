@@ -120,13 +120,7 @@ pub fn resolve(region: &[f32; 4], w: usize, h: usize) -> Option<(usize, usize, u
 /// cannot overlap - the safety engine caps a region at 4 % of the frame and the proposal cap is
 /// three - but the order is fixed anyway, because a rendered file that depended on a map's
 /// iteration order would not be byte-identical across two runs. Invariant 4.
-pub fn apply(
-    rgb: &mut [f32],
-    w: usize,
-    h: usize,
-    ops: &[CleanupOp],
-    patches: &[Patch],
-) -> Applied {
+pub fn apply(rgb: &mut [f32], w: usize, h: usize, ops: &[CleanupOp], patches: &[Patch]) -> Applied {
     let mut out = Applied::default();
     if rgb.len() != w * h * 3 {
         // A frame that is not the size it says it is. Every operation is skipped and named, rather
@@ -243,7 +237,13 @@ mod tests {
         let (w, h) = (40, 40);
         let mut rgb = frame(w, h, 0.10);
         let before = rgb.clone();
-        let done = apply(&mut rgb, w, h, &[op("prp_a", [0.25, 0.25, 0.25, 0.25], "fill")], &[]);
+        let done = apply(
+            &mut rgb,
+            w,
+            h,
+            &[op("prp_a", [0.25, 0.25, 0.25, 0.25], "fill")],
+            &[],
+        );
         assert_eq!(done.pasted, 0);
         assert_eq!(done.skipped, vec!["prp_a".to_string()]);
         assert_eq!(rgb, before, "the frame must be untouched");

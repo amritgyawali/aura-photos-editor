@@ -22,6 +22,7 @@ aura-cloud   = { path = "../aura-cloud" }
 aura-index   = { path = "../aura-index" }
 aura-vision  = { path = "../aura-vision" }
 aura-people  = { path = "../aura-people" }
+aura-brain-gallery = { path = "../aura-brain-gallery" }
 aura-brain-wedding = { path = "../aura-brain-wedding" }
 aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-restore       = { path = "../aura-restore" }

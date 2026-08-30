@@ -186,11 +186,17 @@ fn the_two_waived_rows_are_named_rather_than_silently_absent() {
     // A waiver with no test is a waiver nobody reads. These two have nothing to measure, and
     // saying so here means a build that gained either would fail this test rather than quietly
     // keep the waiver.
-    assert!(
-        !aura_generative::INPAINT_PACK_INSTALLED,
-        "a diffusion pack is installed, so section 11's 3 s inpaint row is no longer waived: \
+    // A constant assertion, deliberately: it is a **tripwire on a waiver**, not a test of runtime
+    // behaviour. The whole point is that it stops compiling in the build where the constant flips,
+    // which is the build where section 11's waived inpaint row has to be measured.
+    #[allow(clippy::assertions_on_constants)]
+    {
+        assert!(
+            !aura_generative::INPAINT_PACK_INSTALLED,
+            "a diffusion pack is installed, so section 11's 3 s inpaint row is no longer waived: \
          measure it and delete this test"
-    );
+        );
+    }
     println!("waived: diffusion inpaint per region (<= 3 s) - no tier exists, exit report C3");
     println!(
         "waived: cleanup share of a 1,000-image export (<= 12 min) - nothing is applied on this \
@@ -216,7 +222,13 @@ fn the_store_stays_inside_its_per_image_budget() {
     for photo in &photos {
         let plan = widest_plan(*photo);
         store
-            .put(&project, *photo, SceneId::ReceptionEntrance, &plan, (1, 1, 1))
+            .put(
+                &project,
+                *photo,
+                SceneId::ReceptionEntrance,
+                &plan,
+                (1, 1, 1),
+            )
             .unwrap_or_else(|err| panic!("put: {}", err.detail));
     }
 
@@ -225,7 +237,10 @@ fn the_store_stays_inside_its_per_image_budget() {
     // figure before measuring it and was wrong by a factor of two; this phase did the same thing
     // and this is what caught it.
     for (name, bytes) in payload_by_object(&catalog) {
-        println!("  {name:<34} {:.0} B/image", bytes as f64 / STORAGE_FRAMES as f64);
+        println!(
+            "  {name:<34} {:.0} B/image",
+            bytes as f64 / STORAGE_FRAMES as f64
+        );
     }
 
     let after = payload_bytes(&catalog);

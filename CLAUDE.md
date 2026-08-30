@@ -114,6 +114,10 @@ Never load two phase files into one session.
 | Cleanup policy (versioned, PM + SEC co-owned) | `crates/aura-generative/config/cleanup_policy.toml` |
 | Cleanup evaluation gates | `tests/eval/cleanup_eval.rs` + `ml/models/generative/eval_cleanup.py` |
 | What AURA will and will not generate | `docs/generative-policy.md` |
+| Gallery consistency decisions | `docs/adr/ADR-0051-gallery-consistency-and-normalisation.md` |
+| Consistency policy (versioned, PM-owned) | `crates/aura-brain-gallery/config/consistency.toml` |
+| Consistency evaluation gates | `tests/eval/consistency_eval.rs` + `ml/eval/consistency_eval.py` |
+| How AURA makes a wedding look like one gallery | `docs/gallery-consistency.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
@@ -1308,6 +1312,98 @@ Phase 24 amended a frozen contract for the fourth time in the product's history,
 `crates/aura-generative/tests/one_choke_point.rs`, which fails the build if a removal is reached from
 anywhere but `source::select`, if the crate writes a recipe, if it reaches a provider - or if any
 type in it grows a field a text prompt could go in.
+
+Phase 25 is implemented conditionally: `aura-core::contract::gallery` freezes the scene node, the
+node target, the normalisation delta, the per-identity skin target, the skin correction, the five
+bounds, twenty-six reason codes, the outlier, the outline, the override and `GalleryService`, and
+`ids.rs` gains `NodeId`; `aura-brain-gallery` matches a wedding to itself. `policy.rs` loads 23
+argued-over scene rows whose bounds the *code* owns rather than the file, `tree.rs` builds a tree of
+lighting groups from phase 07's chapters and sub-clusters the long ones on time, `changepoint.rs`
+splits a node wherever the light genuinely changed - a step its own trend does not explain, or a
+span no single target can cover - `stats.rs` is the robust arithmetic every target is built from,
+`anchors.rs` ranks three to five reference frames by a **product** of four terms and honours a
+photographer's pin over all of them, `normalise.rs` damps then bounds each frame's movement toward
+its node, `skin_consistency.rs` builds each person's appearance from their own well-lit frames and
+corrects toward it under a cap that falls with the mood of the room, `scene_consistency.rs`
+harmonises contrast and character where a scene's variation is not the point, `outlier.rs` reports
+what is left *after* the correction, `store.rs` owns migration 25 and `api.rs` is the frozen service
+and the pass. Migration 25 stores five tables, two views and three triggers at 330 bytes a
+photograph; nine IPC commands (ADR-0052) feed a consistency view, before-and-after timeline strips,
+an anchor picker and an outlier list; and `aura-cli verify --phase 25` is the executable gate. Its
+exit report is `docs/progress/PHASE-25-EXIT.md`.
+
+**This phase ships no model** - the fifth since phase 08 - and the reason is phase 17's and phase
+23's rather than phase 24's: there is nothing to train. Anchor selection is a ranking over numbers
+other phases already produced, the solver has a closed form, the change-point detector is a
+two-sample statistic and the outlier detector is a threshold. What is missing is not weights but
+**weddings**: section 9's DATA row asks for labelled intentional lighting transitions and there are
+none, so every gate is measured against synthetic galleries whose drift was authored and whose
+transitions are known by construction. That is condition C1 and a Sev 2 trigger, and it closes with
+phase 05's C10 rather than separately - the anchor ranking multiplies phase 15's white-balance
+confidence by phase 06's identity prominence and both are placeholder-backed. Condition C2 is the
+second Sev 2 and it is the one to be careful about: `SKIN_FIELD_AVAILABLE` is false, no photograph in
+this build has an identity-scoped skin region, and section 6.3's promise about a person's skin ran on
+**authored readings rather than on people**. Condition C3 is the headline gap: the perceptual audit
+of five weddings did not happen, and the failure it exists to catch - a gallery that is more uniform
+and less alive - would show as a *better* number on every gate in the phase.
+
+Five rules that phase 25 adds and every later phase inherits:
+
+- **`GalleryService` is the only way to ask what a wedding looks like as one body of work.**
+  Twenty-first service of its kind and the first whose subject is a **set** of photographs. Phase 26
+  matches a second camera into these nodes, 27 reads these outliers as its QC input, 28 acts on them
+  unattended and 29 builds albums out of a gallery this phase has already made coherent. No phase may
+  keep its own scene-node tree, its own anchor selection or its own idea of a consistent gallery.
+- **A gallery decision is a residual, and the thing it is a residual from is immutable with respect
+  to it.** `normalise::solve` reads phase 15's and phase 16's stored answers and never reads its own
+  output, which is what makes running the pass twice a no-op. Idempotence here is not convergence and
+  not a "have we run" flag; it is a property of where the delta is measured from. Any later phase
+  that adds a layer on top of this one inherits the shape: read the layer below, never your own row.
+- **Anchors, not averages - and a node that cannot be anchored normalises nothing.** An average over
+  a chapter includes the chapter's mistakes at their true weight. `GalleryCode::NodeUnanchored` and
+  `GalleryCode::AlreadyConsistent` both produce five zeroes and mean opposite things, and they are
+  separate codes, separate rows and separate runbooks. Phase 24's rule - an absent input is
+  ignorance, not permission - in the phase where the two are easiest to confuse.
+- **A correction is damped, then bounded, and the order is the guarantee.** Bounding first would make
+  the bound a *target*: every distant frame would land at `damping * bound` exactly and a gallery
+  would grow a visible band of identically-corrected frames at the edge of every transition. And a
+  clamped frame is **less** confident rather than more, because the clamp says the frame and the node
+  disagree about what room they are in.
+- **A promise about a person is measured per person, from their own frames, and stored.**
+  `gallery_skin_target.spread_after` makes "the same person's skin varies by no more than 2.0 dE00
+  across the gallery" a `SELECT MAX(...)` rather than a sentence. There is no ideal-skin constant in
+  the contract, the config, the migration or the code; the phase gate scans the schema for one on
+  every run and `tests/no_recipe_writes.rs` scans the source. Phase 15 wrote this rule and this is
+  its second application at gallery scale.
+
+Two things phase 25 got wrong first, both worth generalising:
+
+**A statistic with a trend in it splits the drift it exists to normalise.** The obvious change-point
+test divides the difference between two runs' robust means by the spread *within* the runs. On a
+flash that works. On a slow drift it also fires, because a chapter that warms 500 K over forty frames
+has a tiny frame-to-frame spread and a large difference between its halves - which is the definition
+of drift, and drift is what the whole phase exists to remove. The first implementation cut a
+forty-frame ceremony into six unanchorable nodes and reported six lighting changes, with every unit
+test passing. The divisor is the **trend** now. Phase 22's rule in its second half: a threshold on a
+measurement is a statement about the instrument as well as about the world, and the instrument had a
+slope in it. The first fix was itself half wrong - it divided by the *shorter* run's length rather
+than by the distance between the two runs' midpoints, which scored a smooth ramp at six.
+
+**A reduction gate is only meetable while the thing being reduced is inside the bound.** Section
+10.1 asks for the exposure spread to halve, and a within-node drift of a full stop cannot halve when
+the bound is 0.35 EV - fifty-three per cent of the frames clamp, and the arithmetic does not care
+what the gate says. That is not a solver failure and not a threshold to lower: it is a *fixture* that
+authored a lighting change and called it drift. The gate measures a realistic third of a stop now,
+and a second test asserts that a wider drift is **reported as outliers** rather than silently
+half-corrected. Same family as phase 19's edge-gradient halo test, phase 21's chance-corrected margin
+and phase 22's sharpening kernel floor - and this is the fourth time, which is enough to state it
+generally: **when a gate cannot be met, work out whether the fixture, the threshold or the code is
+the thing that does not match reality, and fix that one.**
+
+Phase 25 also added the sixth grep-as-a-test,
+`crates/aura-brain-gallery/tests/no_recipe_writes.rs`, which fails the build if this crate writes a
+recipe, opens a file, reaches a provider, grows its own tone solver, or acquires a constant it could
+compare a person's skin against.
 
 Five rules that phase 13 adds and every later phase inherits:
 

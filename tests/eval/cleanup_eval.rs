@@ -22,9 +22,8 @@
 //! a property of migration 24's triggers and a harness that stubbed them would prove nothing.
 
 use aura_core::contract::cleanup::{
-    CleanupCode, CleanupMethod, CleanupProposal, DistractionClass, SafetyCheck,
-    SafetyVerdict, AREA_CAP_DEFAULT, DENYLIST_OVERLAP_MAX, MAX_PROPOSALS_PER_IMAGE,
-    ZERO_TOUCH_CONFIDENCE,
+    CleanupCode, CleanupMethod, CleanupProposal, DistractionClass, SafetyCheck, SafetyVerdict,
+    AREA_CAP_DEFAULT, DENYLIST_OVERLAP_MAX, MAX_PROPOSALS_PER_IMAGE, ZERO_TOUCH_CONFIDENCE,
 };
 use aura_core::contract::ids::ProposalId;
 use aura_core::contract::integrity::CropRect;
@@ -642,7 +641,8 @@ fn gate_10b_a_failed_removal_reverts_itself_before_anybody_sees_it() {
     // so the answer is known by construction, and the check must catch each of them.
     let cases: [(Image, Box2, &str); 3] = [
         {
-            let (image, region) = fixtures::with_repeat_artefact(Background::Busy, fixtures::CENTRE);
+            let (image, region) =
+                fixtures::with_repeat_artefact(Background::Busy, fixtures::CENTRE);
             (image, region, "repeated texture")
         },
         {
@@ -730,12 +730,8 @@ fn gate_11_an_adversarial_sweep_cannot_make_the_engine_damage_a_photograph() {
                 .unwrap_or(Protected::Face);
             let candidate = fixtures::candidate(region, DistractionClass::Bin);
             attempts += 1;
-            if safety::check(
-                &candidate,
-                &policy,
-                &Coverage::known(vec![(kind, region)]),
-            )
-            .is_allowed()
+            if safety::check(&candidate, &policy, &Coverage::known(vec![(kind, region)]))
+                .is_allowed()
             {
                 damaged += 1;
             }

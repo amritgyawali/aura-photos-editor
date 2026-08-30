@@ -138,7 +138,10 @@ pub fn verify(args: &[String]) -> ExitCode {
                     || row.denylist_overlap_max > DENYLIST_OVERLAP_MAX
                     || row.zero_touch_confidence < ZERO_TOUCH_CONFIDENCE
                 {
-                    eprintln!("policy: {} relaxes a bound the contract owns", scene.as_str());
+                    eprintln!(
+                        "policy: {} relaxes a bound the contract owns",
+                        scene.as_str()
+                    );
                     failures += 1;
                 }
                 if row.reason.trim().is_empty() {
@@ -263,8 +266,7 @@ pub fn verify(args: &[String]) -> ExitCode {
     // 4. The source ordering, and the tier that must always refuse.
     // ---------------------------------------------------------------------------------------
     let clean = fixtures::clean(fixtures::Background::Busy);
-    let (target, region) =
-        fixtures::with_object(fixtures::Background::Busy, fixtures::CORNER);
+    let (target, region) = fixtures::with_object(fixtures::Background::Busy, fixtures::CORNER);
     let safe = match safety::check(
         &fixtures::candidate(region, DistractionClass::Bin),
         &permissive,
@@ -406,7 +408,13 @@ pub fn verify(args: &[String]) -> ExitCode {
         judged: 0,
         declined: 0,
     };
-    if let Err(err) = store.put(&project, first, SceneId::ReceptionEntrance, &plan, (1, 1, 1)) {
+    if let Err(err) = store.put(
+        &project,
+        first,
+        SceneId::ReceptionEntrance,
+        &plan,
+        (1, 1, 1),
+    ) {
         eprintln!("store: [{}] {}", err.code, err.detail);
         failures += 1;
     }
@@ -421,7 +429,10 @@ pub fn verify(args: &[String]) -> ExitCode {
             println!("store: the delivery report lists the one removal that happened");
         }
         Ok(rows) => {
-            eprintln!("store: the delivery report lists {} rows, expected 1", rows.len());
+            eprintln!(
+                "store: the delivery report lists {} rows, expected 1",
+                rows.len()
+            );
             failures += 1;
         }
         Err(err) => {
@@ -437,11 +448,9 @@ pub fn verify(args: &[String]) -> ExitCode {
         "a disclosure cannot be edited",
         // The control: reading it works.
         |conn| {
-            conn.query_row(
-                "SELECT COUNT(*) FROM cleanup_disclosure",
-                [],
-                |row| row.get::<_, i64>(0),
-            )
+            conn.query_row("SELECT COUNT(*) FROM cleanup_disclosure", [], |row| {
+                row.get::<_, i64>(0)
+            })
             .map(|count| count > 0)
             .unwrap_or(false)
         },
@@ -471,11 +480,9 @@ pub fn verify(args: &[String]) -> ExitCode {
         &catalog,
         "a person can never be stored as a proposal",
         |conn| {
-            conn.query_row(
-                "SELECT COUNT(*) FROM cleanup_proposal",
-                [],
-                |row| row.get::<_, i64>(0),
-            )
+            conn.query_row("SELECT COUNT(*) FROM cleanup_proposal", [], |row| {
+                row.get::<_, i64>(0)
+            })
             .map(|count| count > 0)
             .unwrap_or(false)
         },

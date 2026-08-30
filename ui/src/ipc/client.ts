@@ -9,6 +9,16 @@ import type {
   CleanupProposalDto,
   CleanupReasonDto,
   CleanupStatusDto,
+  DisableGalleryInput,
+  GalleryDeltaDto,
+  GalleryOutlierDto,
+  GalleryOverrideInput,
+  GalleryPassDto,
+  GalleryPassInput,
+  GalleryReasonDto,
+  GalleryStatusDto,
+  PinAnchorInput,
+  SceneNodeDto,
   DecideCleanupInput,
   DisableCleanupInput,
   ManualRemoveDto,
@@ -1348,5 +1358,75 @@ export const cleanup = {
 
   /** The panel's legend, assembled from the frozen enum rather than from a stored table. */
   cleanupReasonCodes: (): Promise<CleanupReasonDto[]> =>
-    invoke<CleanupReasonDto[]>('cleanup_reason_codes', {}),
+    invoke<CleanupReasonDto[]>('cleanup_reason_codes', {})
+};
+
+/**
+ * PHASE-25. The gallery consistency surface: nine commands whose subject is a wedding rather than a
+ * photograph.
+ *
+ * **Read `galleryStatus().anchoredNodes` beside `nodes`, always.** A project at 100 % coverage with
+ * 20 % anchored has had almost nothing done to it: an unanchored node produces a zero delta for
+ * every frame in it, and a zero delta is still a row. A panel that led with coverage alone would
+ * render a wedding nobody could judge as a wedding that needed no work.
+ *
+ * And **never render a skin claim while `skinFieldAvailable` is false.** Phase 18's segmenter is a
+ * placeholder, so nothing about anybody's skin was measured on this build.
+ */
+export const gallery = {
+  /** What the Consistency panel's project header shows. Two denominators; read both. */
+  galleryStatus: (projectId: string): Promise<GalleryStatusDto> =>
+    invoke<GalleryStatusDto>('gallery_status', { projectId }),
+
+  /** The node tree, in capture order of each node's first frame. */
+  galleryNodes: (projectId: string): Promise<SceneNodeDto[]> =>
+    invoke<SceneNodeDto[]>('gallery_nodes', { projectId }),
+
+  /**
+   * One node's deltas, in capture order. What a timeline strip draws.
+   *
+   * A separate call from `galleryNodes` because a wedding has forty nodes and four thousand
+   * frames, and a header that pulled every delta would pull the whole gallery to draw a summary.
+   */
+  galleryNodeStrip: (nodeId: string): Promise<GalleryDeltaDto[]> =>
+    invoke<GalleryDeltaDto[]>('gallery_node_strip', { nodeId }),
+
+  /** One photograph's delta. `null` is a gap in coverage, never a zero delta. */
+  imageGallery: (photoId: string): Promise<GalleryDeltaDto | null> =>
+    invoke<GalleryDeltaDto | null>('image_gallery', { photoId }),
+
+  /** Every frame still out of line, worst first. What phase 27's QC queue reads. */
+  galleryOutliers: (projectId: string, limit: number): Promise<GalleryOutlierDto[]> =>
+    invoke<GalleryOutlierDto[]>('gallery_outliers', { projectId, limit }),
+
+  /**
+   * Run the consistency pass.
+   *
+   * Runs to completion and returns what it did rather than a job id: a node half-solved against one
+   * target and half against another has a target that describes neither, so there is no partial
+   * state to poll that would not be a lie about what the catalog holds.
+   */
+  galleryPass: (input: GalleryPassInput): Promise<GalleryPassDto> =>
+    invoke<GalleryPassDto>('gallery_pass', { input }),
+
+  /** Pin or reject one anchor. Both survive every later pass. */
+  pinGalleryAnchor: (input: PinAnchorInput): Promise<void> =>
+    invoke<void>('pin_gallery_anchor', { input }),
+
+  /**
+   * Record what the photographer set instead, on one frame.
+   *
+   * Records the disagreement; it does not move a pixel. A value outside its bound is refused rather
+   * than clamped.
+   */
+  setGalleryOverride: (input: GalleryOverrideInput): Promise<void> =>
+    invoke<void>('set_gallery_override', { input }),
+
+  /** Leave one photograph out of the gallery match entirely. */
+  disableGallery: (input: DisableGalleryInput): Promise<void> =>
+    invoke<void>('disable_gallery', { input }),
+
+  /** The panel's legend, assembled from the frozen enum rather than from a stored table. */
+  galleryReasonCodes: (): Promise<GalleryReasonDto[]> =>
+    invoke<GalleryReasonDto[]>('gallery_reason_codes', {}),
 };

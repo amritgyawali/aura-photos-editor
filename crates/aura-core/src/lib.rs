@@ -33,6 +33,7 @@ pub mod contract {
     pub mod cull;
     pub mod emotion;
     pub mod error;
+    pub mod gallery;
     pub mod geometry;
     pub mod ids;
     pub mod integrity;
@@ -88,14 +89,18 @@ pub use contract::emotion::{
     ImageEmotion, Interaction, MomentPeak, PeakKind, Preference, ReactionLink,
 };
 pub use contract::error::{AuraError, AuraResult, ErrorCode, Recovery, Severity};
+pub use contract::gallery::{
+    Bound, GalleryCode, GalleryOutline, GalleryOverride, GalleryReason, GalleryService, NodeTarget,
+    NormalisationDelta, Outlier, SceneNode, SkinCorrection, SkinTarget,
+};
 pub use contract::geometry::{
     Aspect, CropPurpose, CropSafetyReport, CropVariant, GeometryCode, GeometryOutline,
     GeometryOverride, GeometryPlan, GeometryReason, GeometryService, Keystone, LensCorrection,
     LensSource, ProtectedKind, ProtectedRegion,
 };
 pub use contract::ids::{
-    ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MaskId, MomentId, PhotoId,
-    ProfileId, ProjectId, ProposalId, RunId, SegmentId,
+    ContentHash, DecisionId, FaceId, FileId, IdentityId, ImportId, MaskId, MomentId, NodeId,
+    PhotoId, ProfileId, ProjectId, ProposalId, RunId, SegmentId,
 };
 pub use contract::integrity::{
     CropRect, ExposureVerdict, EyeOpenness, EyeState, IntegrityFlags, IntegrityOutline,
