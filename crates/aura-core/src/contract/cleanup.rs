@@ -637,9 +637,7 @@ impl CleanupCode {
             Self::TextureUniform => {
                 "the surroundings are even enough to copy from, so nothing had to be invented"
             }
-            Self::TooLarge => {
-                "it covers more of the frame than AURA will ever tidy on its own"
-            }
+            Self::TooLarge => "it covers more of the frame than AURA will ever tidy on its own",
             Self::OverlapsProtected => {
                 "it overlaps a face, skin, hands, a dress, rings or the cake, so AURA left it alone"
             }

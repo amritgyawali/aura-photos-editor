@@ -3499,3 +3499,187 @@ export type ManualRemoveDto = {
   /** Which check refused it, when one did. A refusal is a result rather than a failure. */
   blocked: CleanupBlockedDto | null;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-25 - gallery consistency
+// ---------------------------------------------------------------------------
+//
+// Two things about these shapes that a panel has to get right, both of them recorded in ADR-0052.
+//
+// **Both denominators are here.** `nodes` and `anchoredNodes`. A project at 100 % coverage with
+// 20 % anchored has had almost nothing done to it, because an unanchored node produces a zero delta
+// for every frame in it and a zero delta is still a row.
+//
+// **`target: null` is not a neutral target.** It means AURA could not judge that part of the
+// wedding. Rendering it as zeroes turns "we could not tell" into "it needed nothing".
+
+/** One reason a frame moved, or did not. */
+export type GalleryReasonDto = {
+  /** The stable slug a filter matches on. Never localised. */
+  code: string;
+  /** The sentence a photographer reads. */
+  text: string;
+  /** True when this code says AURA declined to act. */
+  withdraws: boolean;
+};
+
+/** What a node's anchors say it should look like. */
+export type NodeTargetDto = {
+  cctK: number;
+  cctTol: number;
+  tint: number;
+  tintTol: number;
+  subjectLuma: number;
+  lumaTol: number;
+  contrast: number;
+  saturation: number;
+  anchorCount: number;
+  /** How much the anchors agree, 0..1. */
+  cohesion: number;
+};
+
+/** One lighting group inside one chapter. */
+export type SceneNodeDto = {
+  nodeId: string;
+  parentId: string | null;
+  segmentId: string;
+  /** "Ceremony (2 of 3)". */
+  label: string;
+  scene: string;
+  imageCount: number;
+  anchors: string[];
+  /** Null when the node could not be anchored. **Not** a neutral target. */
+  target: NodeTargetDto | null;
+  reasons: GalleryReasonDto[];
+};
+
+/**
+ * How far one frame moves toward its node.
+ *
+ * Every `d` field is a residual on top of phases 15 and 16; the three `from` fields say what it is
+ * a residual from, so a strip can draw an arrow between them.
+ */
+export type GalleryDeltaDto = {
+  photoId: string;
+  nodeId: string;
+  dExposure: number;
+  dCct: number;
+  dTint: number;
+  dContrast: number;
+  dSaturation: number;
+  fromExposureEv: number;
+  fromCctK: number;
+  fromTint: number;
+  damping: number;
+  /** `cct`, `tint`, `exposure`, `contrast` or `saturation`. */
+  boundedBy: string | null;
+  /** How much of the bounds this movement used, 0..1. */
+  magnitude: number;
+  skinIdentity: string | null;
+  skinDe00Before: number | null;
+  skinDe00After: number | null;
+  confidence: number;
+  reasons: GalleryReasonDto[];
+  userEdited: boolean;
+};
+
+/** A frame that is still out of line after normalising. */
+export type GalleryOutlierDto = {
+  photoId: string;
+  nodeId: string;
+  /** "+310 K warmer than the anchors, skin cast 4.2 dE00", assembled from the residuals. */
+  description: string;
+  residualCct: number;
+  residualTint: number;
+  residualExposure: number;
+  residualSkinDe00: number;
+  deviation: number;
+  reasons: GalleryReasonDto[];
+};
+
+/** What the Consistency panel's project header shows. */
+export type GalleryStatusDto = {
+  photos: number;
+  normalised: number;
+  /** The first denominator. */
+  coverage: number;
+  nodes: number;
+  /** The second denominator, and the one that matters when it is low. */
+  anchoredNodes: number;
+  splitNodes: number;
+  pinnedAnchors: number;
+  bounded: number;
+  moodPreserved: number;
+  userEdited: number;
+  outliers: number;
+  skinTargeted: number;
+  identities: number;
+  spreadBeforeCct: number;
+  spreadAfterCct: number;
+  spreadBeforeEv: number;
+  spreadAfterEv: number;
+  worstSkinSpread: number;
+  untargetedScenes: string[];
+  /**
+   * False on this build. Phase 18's segmenter is a placeholder, so no photograph has an
+   * identity-scoped skin region and nothing about anybody's skin was measured.
+   *
+   * A panel must never render "everybody's skin is consistent" while this is false.
+   */
+  skinFieldAvailable: boolean;
+  policyVer: number;
+};
+
+export type GalleryPassInput = {
+  projectId: string;
+};
+
+/** What one consistency pass did. */
+export type GalleryPassDto = {
+  nodes: number;
+  anchored: number;
+  split: number;
+  normalised: number;
+  outliers: number;
+  skinTargets: number;
+  spreadBeforeCct: number;
+  spreadAfterCct: number;
+  spreadBeforeEv: number;
+  spreadAfterEv: number;
+  decisionsKept: number;
+  cancelled: boolean;
+  elapsedMs: number;
+};
+
+/** Pin or reject one photograph as an anchor of its node. */
+export type PinAnchorInput = {
+  nodeId: string;
+  photoId: string;
+  /** True to pin, false to reject. There is no third thing a person can say here. */
+  pinned: boolean;
+};
+
+/**
+ * What the photographer set instead, on one frame.
+ *
+ * Every value is bounded by the frozen contract and one outside its bound is **refused rather than
+ * clamped**. There is no strength field and no way to raise a bound.
+ */
+export type GalleryOverrideInput = {
+  photoId: string;
+  /** Kelvin, within 450. */
+  dCct?: number;
+  /** Tint units, within 12. */
+  dTint?: number;
+  /** Stops, within 0.35. */
+  dExposure?: number;
+  /** Recipe units, within 8. */
+  dContrast?: number;
+  /** Recipe units, within 6. */
+  dSaturation?: number;
+};
+
+export type DisableGalleryInput = {
+  photoId: string;
+  disabled: boolean;
+};

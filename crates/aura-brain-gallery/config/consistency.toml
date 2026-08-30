@@ -1,0 +1,341 @@
+# Gallery consistency policy. PHASE-25, section 9's PM deliverable.
+#
+# Every row here is a product decision with a written reason. Section 9 asks PM to "approve
+# consistency.toml damping and bounds; define the 'preserve mood' rule", and the preserve-mood rule
+# is spread across three columns rather than being one setting: `damping` decides how much of the
+# distance a frame travels, `harmonise_grade` decides whether the colour character of a scene is
+# something to make uniform at all, and the tolerances decide what already counts as consistent.
+#
+# ---------------------------------------------------------------------------
+# THE ONE RULE ABOUT EDITING THIS FILE
+# ---------------------------------------------------------------------------
+#
+# **A ceiling can be lowered here and raised by nobody.** The five bounds below are checked against
+# `Bound::ceiling` in the frozen contract on every load, and a value wider than the contract's own
+# is refused outright with `AURA-ML-5129` rather than clamped. Phase 21 wrote this rule for its
+# retouch matrix and phase 22 for its restoration profiles; a studio that wants AURA to move a
+# photograph less may say so, and a studio that wants it to move one further is asking the product
+# to break a promise it makes in `docs/gallery-consistency.md`.
+#
+# Bump `version` on any change. It is stored on every node, anchor, delta and outlier this pass
+# writes, and a row at a different version is re-solved rather than compared against.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# The bounds. How far a single frame may ever be moved to match the rest.
+# ---------------------------------------------------------------------------
+#
+# These are the numbers section 6.2 names and they are here so a studio can tighten them, not so
+# anybody can find out what they are - the contract owns them and `docs/gallery-consistency.md`
+# publishes them.
+[bounds]
+# 450 K. About the largest shift that still reads as "the same room" rather than "a different white
+# balance". Past it the correction is more visible than the drift it corrects, which is the whole
+# failure this phase exists to avoid.
+max_d_cct_k = 450.0
+
+# 12 tint units. Scaled from the temperature bound at the sensitivity phase 15's own tolerances
+# imply - it calls 200 K and 4 tint units equivalent, which puts 450 K at 9 - and then raised to
+# 12, because a green cast under fluorescent light is the one axis where the drift within a room is
+# routinely larger than the temperature drift beside it.
+max_d_tint = 12.0
+
+# 0.35 EV. A third of a stop is at the edge of what reads as a difference between two adjacent
+# frames, which is the comparison a client makes when they scroll.
+max_d_exposure_ev = 0.35
+
+# 8 units of the recipe's -100..100 contrast. An eighth of the subtlety ceiling phase 16 already
+# enforces on a whole grade: a consistency pass is the third thing to touch contrast on a frame and
+# it gets the smallest share.
+max_d_contrast = 8.0
+
+# 6 units. Lower than contrast, because a saturation move is the one most visible on skin - and
+# phase 16's skin guard is measuring while this runs.
+max_d_saturation = 6.0
+
+[anchors]
+# Four, the middle of section 2.1's "3-5". Three is the floor the contract enforces and five is the
+# ceiling; four is what a node aims for, because the fourth anchor is what lets a trimmed mean drop
+# one and still have three.
+target = 4
+
+[outliers]
+# 0.75 of a bound. A frame that is three quarters of the way to the limit after being corrected is
+# a frame the correction could not reach, and phase 27's QC queue is exactly the list of those.
+residual = 0.75
+
+[changepoint]
+# Three within-run spreads. A two-sample statistic rather than a fixed step, because the frame-to-
+# frame spread of a candle-lit vow and that of an outdoor ceremony differ by an order of magnitude
+# and a fixed number is right for exactly one of them.
+sigma = 3.0
+
+# ---------------------------------------------------------------------------
+# The scenes. Twenty-three rows, one per SceneId.
+# ---------------------------------------------------------------------------
+#
+# `damping` is how much of the distance to the node's target a frame actually travels. Higher is
+# more uniform. The number is a judgement about how much of a scene's frame-to-frame variation is
+# the photographer's intent and how much is the camera's inconsistency.
+#
+# `harmonise_grade` decides whether contrast, saturation and colour character are pulled together
+# at all. It is **off** in the four scenes where the variation is the point, and turning it on in
+# any of them would be the "flattened mood" failure section 12 names first.
+#
+# `correct_skin` is on almost everywhere, because a person's skin is what a client notices drifting.
+
+[[scene]]
+scene = "getting_ready_bride"
+# A prep room is one window and one lamp for an hour. The drift is nearly all camera, not intent,
+# so this is one of the highest damping factors in the table.
+damping = 0.80
+cct_tol = 180.0
+tint_tol = 4.0
+luma_tol = 0.05
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "getting_ready_groom"
+# The same room logic, and usually a darker one - so a slightly wider luminance tolerance, because
+# a groom's prep is often shot at the edge of what the room gives.
+damping = 0.80
+cct_tol = 180.0
+tint_tol = 4.0
+luma_tol = 0.06
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "details"
+# Rings, shoes, invitations. Shot deliberately at different exposures for effect, often on a
+# windowsill and then on a dark surface, so the exposure variation is intent. Warmth still matches.
+damping = 0.65
+cct_tol = 220.0
+tint_tol = 5.0
+luma_tol = 0.12
+harmonise_grade = true
+# Almost never a person in frame; when there is a hand, its skin should still match.
+correct_skin = true
+
+[[scene]]
+scene = "first_look"
+# A staged moment, usually in one light, usually a handful of frames. High damping: these frames
+# sit next to each other in every gallery ever delivered.
+damping = 0.80
+cct_tol = 160.0
+tint_tol = 4.0
+luma_tol = 0.05
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "ceremony_entrance"
+# A processional walks from a foyer into a ceremony space, which is a genuine lighting transition
+# in the middle of one scene. The change-point detector handles the split; the damping is moderate
+# so the two halves are each internally matched without either being dragged toward the other.
+damping = 0.70
+cct_tol = 220.0
+tint_tol = 5.0
+luma_tol = 0.07
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "ceremony"
+# The scene this phase exists for: hundreds of frames of one room over forty minutes, where every
+# per-frame estimate can be within tolerance and the sequence still visibly drifts.
+damping = 0.80
+cct_tol = 150.0
+tint_tol = 4.0
+luma_tol = 0.05
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "ritual"
+# A named rite, often lit by fire. The mood is the point and the illuminant is frequently one phase
+# 15 calls intentional - in which case the frame is excluded from normalisation entirely, before
+# this row is consulted. Lower damping for the frames that are not.
+damping = 0.60
+cct_tol = 300.0
+tint_tol = 7.0
+luma_tol = 0.09
+harmonise_grade = false
+correct_skin = true
+
+[[scene]]
+scene = "vows"
+# Section 2.1's own example: "a candle-lit vow inside a bright ceremony must not be flattened".
+# Wide tolerances and modest damping, and the change-point detector is what actually protects it.
+damping = 0.65
+cct_tol = 280.0
+tint_tol = 6.0
+luma_tol = 0.09
+harmonise_grade = false
+correct_skin = true
+
+[[scene]]
+scene = "rings"
+# A close frame of hands in the ceremony's own light. Skin is nearly the whole frame, so this is
+# the scene where the skin half matters most.
+damping = 0.80
+cct_tol = 150.0
+tint_tol = 4.0
+luma_tol = 0.05
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "kiss"
+# Two or three frames that will sit beside the ceremony frames on either side of them.
+damping = 0.80
+cct_tol = 150.0
+tint_tol = 4.0
+luma_tol = 0.05
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "family_portrait"
+# The highest damping in the table, and the easiest argument in it. Thirty groups shot in fifteen
+# minutes in one spot, delivered as a block, where any drift at all is visible as an error.
+damping = 0.90
+cct_tol = 120.0
+tint_tol = 3.0
+luma_tol = 0.04
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "group_portrait"
+damping = 0.90
+cct_tol = 120.0
+tint_tol = 3.0
+luma_tol = 0.04
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "couple_portrait"
+# High, but not family-portrait high: a couple session moves around a venue on purpose, and two
+# backgrounds in two lights is a photographer's decision rather than a drift.
+damping = 0.80
+cct_tol = 180.0
+tint_tol = 4.0
+luma_tol = 0.06
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "golden_hour"
+# The light is changing by the minute and that is the entire reason the frames exist. Normalising a
+# golden hour toward its own mean removes the sunset. Low damping, wide tolerances, no grade
+# harmonisation - and the change-point detector will usually have split it into runs already.
+damping = 0.45
+cct_tol = 400.0
+tint_tol = 8.0
+luma_tol = 0.12
+harmonise_grade = false
+correct_skin = true
+
+[[scene]]
+scene = "reception_entrance"
+# Often a flash frame against a dark room, which is a step the change-point detector sees in
+# temperature and subject luminance together.
+damping = 0.70
+cct_tol = 250.0
+tint_tol = 6.0
+luma_tol = 0.08
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "speeches"
+# One person at a time, in one spot, over half an hour, usually under mixed room light. The
+# ceremony's argument in a harder light.
+damping = 0.80
+cct_tol = 180.0
+tint_tol = 5.0
+luma_tol = 0.06
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "cake"
+damping = 0.75
+cct_tol = 200.0
+tint_tol = 5.0
+luma_tol = 0.07
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "first_dance"
+# Uplighters, a spotlight and a moving couple. The colour of the room is a design choice somebody
+# paid for. Modest damping on warmth, no grade harmonisation.
+damping = 0.55
+cct_tol = 350.0
+tint_tol = 9.0
+luma_tol = 0.11
+harmonise_grade = false
+correct_skin = true
+
+[[scene]]
+scene = "dance_floor"
+# The lowest damping in the table. Four hundred frames whose contrast is a property of where the
+# lights happened to be pointing; harmonising them makes a party look like one long exposure. Skin
+# is still corrected, because a face that goes green under a wash is not a mood.
+damping = 0.40
+cct_tol = 450.0
+tint_tol = 11.0
+luma_tol = 0.15
+harmonise_grade = false
+correct_skin = true
+
+[[scene]]
+scene = "candid"
+# Unposed and unassigned, which means the frames in one node were shot in one place over a few
+# minutes. Moderate everything.
+damping = 0.70
+cct_tol = 220.0
+tint_tol = 5.0
+luma_tol = 0.07
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "venue"
+# The room without the people, usually shot deliberately at two exposures. Low damping on
+# brightness, and no faces to correct - but `correct_skin` stays true because a venue frame with a
+# person walking through it should still have that person's skin match.
+damping = 0.55
+cct_tol = 250.0
+tint_tol = 6.0
+luma_tol = 0.14
+harmonise_grade = true
+correct_skin = true
+
+[[scene]]
+scene = "exit"
+# Sparklers, a car, headlights, night. Every light source in frame is intentional and half of them
+# are the subject.
+damping = 0.50
+cct_tol = 380.0
+tint_tol = 9.0
+luma_tol = 0.13
+harmonise_grade = false
+correct_skin = true
+
+[[scene]]
+scene = "unknown"
+# A row rather than a gap, so `untargeted_scenes` is empty on a fully classified wedding and a
+# genuinely missing row is visible. The most careful settings the table has: an unclassified frame
+# is a frame nobody argued about, and the safe direction for an unargued frame is to do less.
+damping = 0.50
+cct_tol = 300.0
+tint_tol = 7.0
+luma_tol = 0.10
+harmonise_grade = false
+correct_skin = true

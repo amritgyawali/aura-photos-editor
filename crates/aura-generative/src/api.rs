@@ -237,8 +237,15 @@ impl fmt::Debug for CleanupPass {
             .field("has_composition", &self.composition.is_some())
             .field("has_moments", &self.moments.is_some())
             .field("has_judge", &self.judge.is_some())
+            // Added in phase 25. It was missing, and it is the flag that decides whether the cloud
+            // judge may be consulted at all - a debug line that hides it makes a support bundle
+            // less useful than it looks.
+            .field("studio_opted_in", &self.studio_opted_in)
             .field("enabled", &self.enabled)
-            .finish()
+            // `previews` and `masks` are services rather than values; printing them would print a
+            // whole cache. `finish_non_exhaustive` says so rather than implying the struct is fully
+            // described.
+            .finish_non_exhaustive()
     }
 }
 
@@ -340,7 +347,11 @@ impl CleanupPass {
     /// The three versions this pass writes.
     #[must_use]
     pub const fn versions(&self) -> (u16, u16, u16) {
-        (crate::DETECTOR_VER, crate::ANALYSIS_VER, self.policy.version)
+        (
+            crate::DETECTOR_VER,
+            crate::ANALYSIS_VER,
+            self.policy.version,
+        )
     }
 
     /// Examine everything in a project that has not been examined at these versions.
@@ -447,11 +458,7 @@ impl CleanupPass {
                 continue;
             };
 
-            let coverage = self
-                .coverage
-                .get(id)
-                .cloned()
-                .unwrap_or(Coverage::Absent);
+            let coverage = self.coverage.get(id).cloned().unwrap_or(Coverage::Absent);
             if !coverage.is_known() {
                 // Raised where it happens rather than inferred from a histogram, so a photographer
                 // reading the problems panel learns that AURA could not tell where people are
@@ -522,10 +529,12 @@ impl CleanupPass {
             report.judged += plan.judged;
             report.declined += plan.declined;
             for block in &plan.blocked {
-                if let Some(slot) = report
-                    .blocked
-                    .get_mut(SafetyCheck::ALL.iter().position(|c| *c == block.check).unwrap_or(4))
-                {
+                if let Some(slot) = report.blocked.get_mut(
+                    SafetyCheck::ALL
+                        .iter()
+                        .position(|c| *c == block.check)
+                        .unwrap_or(4),
+                ) {
                     *slot += 1;
                 }
             }
@@ -617,7 +626,10 @@ impl CleanupPass {
         // four candidates and they are still its closest neighbours.
         let mut order: Vec<PhotoId> = Vec::new();
         for step in 1..moment.image_ids.len() {
-            if let Some(id) = position.checked_sub(step).and_then(|i| moment.image_ids.get(i)) {
+            if let Some(id) = position
+                .checked_sub(step)
+                .and_then(|i| moment.image_ids.get(i))
+            {
                 order.push(*id);
             }
             if let Some(id) = moment.image_ids.get(position + step) {

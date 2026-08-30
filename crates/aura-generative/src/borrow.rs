@@ -158,7 +158,8 @@ impl Alignment {
         }
         let support = (self.inliers as f32 / self.offered as f32).clamp(0.0, 1.0);
         let geometry = (1.0 - self.residual_px / MAX_RESIDUAL_PX).clamp(0.0, 1.0);
-        let photometric = ((self.patch_ncc - MIN_PATCH_NCC) / (1.0 - MIN_PATCH_NCC)).clamp(0.0, 1.0);
+        let photometric =
+            ((self.patch_ncc - MIN_PATCH_NCC) / (1.0 - MIN_PATCH_NCC)).clamp(0.0, 1.0);
         (support * geometry * photometric).clamp(0.0, 1.0)
     }
 }
@@ -235,7 +236,13 @@ pub fn borrow(
 
     // Refusal 3: the object is in the sibling too. See the module header and
     // `SAME_OBJECT_DIFFERENCE`.
-    if !differs_enough(target, &warped, rect_ring_spread(target, &rect), &rect, &outer) {
+    if !differs_enough(
+        target,
+        &warped,
+        rect_ring_spread(target, &rect),
+        &rect,
+        &outer,
+    ) {
         return Err(CleanupCode::NoAlignedSibling);
     }
 
@@ -275,20 +282,16 @@ fn rect_ring_spread(image: &Image, rect: &Rect) -> f32 {
         return MIN_RING_SPREAD;
     }
     let mean = sum / n;
-    ((sum_sq / n - mean * mean).max(0.0)).sqrt().max(MIN_RING_SPREAD)
+    ((sum_sq / n - mean * mean).max(0.0))
+        .sqrt()
+        .max(MIN_RING_SPREAD)
 }
 
 /// True when the aligned sibling shows something different from what is in the region.
 ///
 /// A mean absolute luminance difference, scaled by what the surroundings vary by. See
 /// [`SAME_OBJECT_DIFFERENCE`] for why this is not a correlation.
-fn differs_enough(
-    target: &Image,
-    warped: &Image,
-    spread: f32,
-    rect: &Rect,
-    outer: &Rect,
-) -> bool {
+fn differs_enough(target: &Image, warped: &Image, spread: f32, rect: &Rect, outer: &Rect) -> bool {
     let mut n = 0.0f32;
     let mut sum = 0.0f32;
     for y in rect.y..rect.bottom() {
@@ -324,10 +327,7 @@ fn control_points(image: &Image, rect: &Rect) -> Vec<(f32, f32)> {
         // would put two control points at the same place, and two identical rows make the eight
         // by eight solve singular.
         let pad = PATCH_RADIUS as f32;
-        if x - pad >= 0.0
-            && y - pad >= 0.0
-            && x + pad < image.w as f32
-            && y + pad < image.h as f32
+        if x - pad >= 0.0 && y - pad >= 0.0 && x + pad < image.w as f32 && y + pad < image.h as f32
         {
             out.push((x, y));
         }
@@ -382,7 +382,15 @@ fn fit(points: &[Correspondence]) -> Option<Alignment> {
         for b in (a + 1)..n {
             for c in (b + 1)..n {
                 for d in (c + 1)..n {
-                    let subset = [points[a], points[b], points[c], points[d]];
+                    // `get` rather than indexing, so `clippy::indexing_slicing` stays denied in
+                    // this crate. The four indices are provably inside `0..n`, and the whole point
+                    // of the deny is that a reader should not have to prove that.
+                    let (Some(pa), Some(pb), Some(pc), Some(pd)) =
+                        (points.get(a), points.get(b), points.get(c), points.get(d))
+                    else {
+                        continue;
+                    };
+                    let subset = [*pa, *pb, *pc, *pd];
                     let Some(matrix) = homography_from_four(&subset) else {
                         continue;
                     };
@@ -659,14 +667,14 @@ fn composite(
             let source = warped.at((x - outer.x) as isize, (y - outer.y) as isize);
             let original = target.at(x as isize, y as isize);
             let mut blended = [0.0f32; 3];
-            for channel in 0..3 {
+            for (channel, slot) in blended.iter_mut().enumerate() {
                 let corrected = (source
                     .get(channel)
                     .copied()
                     .unwrap_or(0.0)
                     .mul_add(gain, offset))
                 .max(0.0);
-                blended[channel] = original.get(channel).copied().unwrap_or(0.0) * (1.0 - weight)
+                *slot = original.get(channel).copied().unwrap_or(0.0) * (1.0 - weight)
                     + corrected * weight;
             }
             out.put(x, y, blended);

@@ -9,6 +9,7 @@ import { ImportWizard } from './components/ImportWizard';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
 import { CompositionCard } from './components/explain/CompositionCard';
+import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
 import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
@@ -229,6 +230,10 @@ export function App(): JSX.Element {
         <CacheSettings projectId={activeProjectId} onError={setError} />
         <HardwarePanel onError={setError} />
         <AiKeysPanel projectId={activeProjectId} onError={setError} />
+        {/* PHASE-25. The one panel in the sidebar whose subject is the whole wedding rather
+            than the selected photograph, which is why it renders nothing until a project is
+            open rather than showing an empty frame. */}
+        <GalleryPanel projectId={activeProjectId} onError={setError} />
       </aside>
 
       <main className="main">

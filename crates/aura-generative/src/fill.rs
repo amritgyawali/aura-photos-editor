@@ -413,11 +413,7 @@ fn seam_correct(result: &mut Image, original: &Image, rect: &Rect) {
                     if rect.contains(nx as usize, ny as usize) {
                         continue;
                     }
-                    sum += original
-                        .at(nx, ny)
-                        .get(channel)
-                        .copied()
-                        .unwrap_or(0.0);
+                    sum += original.at(nx, ny).get(channel).copied().unwrap_or(0.0);
                     count += 1.0;
                 }
                 if count <= 0.0 {
@@ -497,8 +493,10 @@ fn ring_texture(image: &Image, rect: &Rect) -> TextureReport {
             if rect.contains(x, y) {
                 continue;
             }
-            let gx = image.luma(x as isize + 1, y as isize) - image.luma(x as isize - 1, y as isize);
-            let gy = image.luma(x as isize, y as isize + 1) - image.luma(x as isize, y as isize - 1);
+            let gx =
+                image.luma(x as isize + 1, y as isize) - image.luma(x as isize - 1, y as isize);
+            let gy =
+                image.luma(x as isize, y as isize + 1) - image.luma(x as isize, y as isize - 1);
             jxx += f64::from(gx * gx);
             jyy += f64::from(gy * gy);
             jxy += f64::from(gx * gy);
@@ -716,7 +714,7 @@ mod tests {
         let filled = fill(&frame, &hole(40, 40, 12, 12, 100, 100)).expect("fills");
         for y in 0..100 {
             for x in 0..100 {
-                if x >= 40 && x < 52 && y >= 40 && y < 52 {
+                if (40..52).contains(&x) && (40..52).contains(&y) {
                     continue;
                 }
                 assert_eq!(

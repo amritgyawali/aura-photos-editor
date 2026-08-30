@@ -57,7 +57,7 @@ impl Background {
             }
             Self::Wall => [0.42, 0.41, 0.40],
             Self::Railing => {
-                let v = if ((y as f32 / 7.0) as usize) % 2 == 0 {
+                let v = if ((y as f32 / 7.0) as usize).is_multiple_of(2) {
                     0.62
                 } else {
                     0.18
@@ -198,7 +198,7 @@ pub fn with_warp_artefact(rect: Rect) -> (Image, Box2) {
     let mut image = clean(Background::Railing);
     for y in rect.y..rect.bottom() {
         for x in rect.x..rect.right() {
-            let v = if ((x as f32 / 7.0) as usize) % 2 == 0 {
+            let v = if ((x as f32 / 7.0) as usize).is_multiple_of(2) {
                 0.62
             } else {
                 0.18

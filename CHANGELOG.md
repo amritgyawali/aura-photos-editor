@@ -2,6 +2,117 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 25 - Gallery intelligence: a wedding matched to itself
+
+Twenty-four phases decided things about **one photograph at a time**. This one decides about a
+wedding, and that is a different problem rather than a bigger version of the same one.
+
+Phase 15 can be inside its own 200 K tolerance on every frame of a ceremony and still produce a
+ceremony that visibly warms and cools as somebody scrolls, because 200 K of independent error either
+side of a mean is a 400 K swing between two adjacent frames. **Every per-frame gate in this product
+can be green while the thing a client actually looks at is wrong.**
+
+**The delta is measured from the un-normalised world, and that is what makes it idempotent.**
+`normalise::solve` reads phase 15's `ToneEstimate` and phase 16's `ColourDecision` and never reads a
+`NormalisationDelta`. Its input is immutable with respect to its own output, so a second run
+computes the same number and writing it again is a no-op. Not achieved by detecting a second run and
+not by convergence - a solver that iterated to a fixed point would converge toward the *mean* of the
+node, which is the mediocrity section 6.1 exists to avoid, at a rate that depends on floating-point
+ordering. The gate is a regression guard; the purity is the mechanism.
+
+**Anchors, not averages.** An average over a ceremony includes the ceremony's mistakes at their true
+weight: if a quarter of the frames are half a stop dark, the average is an eighth of a stop dark and
+matching everything to it makes the other three quarters worse. Three to five anchors per node,
+ranked by a *product* of four terms so no signal rescues another, with a trimmed mean for the
+scalars and a component-wise median for anything chromatic - because trimming `u'` and `v'`
+independently can produce a point no anchor was anywhere near.
+
+**A change point splits a node before its anchors are chosen.** Section 2.1's candle-lit vow inside
+a bright ceremony has exactly two outcomes if it shares a group with the ceremony - the vow is
+flattened, or the ceremony is dragged toward it - and no damping factor avoids both; damping makes
+both happen a little. So the split runs first, and each side gets its own target. Solving first and
+un-moving the frames that went furthest was rejected for the reason phase 23 rejected nudging a
+failed crop back inside the safety filter: a correction applied afterwards leaves the frames that
+did *not* trip the threshold still normalised toward the wrong target.
+
+**Damping first, bound second**, and the wrong order is subtle: bounding first would make the bound
+a *target* rather than a limit, so every distant frame would land at `damping * bound` exactly and a
+gallery would grow a visible band of identically-corrected frames at the edge of every transition.
+
+**A clamped frame is less confident, not more.** The instinct is that a big correction is a
+confident one; it is the opposite. The bound bit because the frame and the node disagree about what
+room they are in, and the likely explanations are a missed change point or a bad anchor - so
+`bounded_by` lowers the delta's confidence and makes the frame a candidate for the outlier queue on
+the same evidence.
+
+**A node the product could not judge is a different row from one it judged and left alone.**
+`NodeUnanchored` and `AlreadyConsistent` both produce five zeroes and mean opposite things. Phase
+24's rule - an absent input is ignorance, not permission - in the phase where the two are easiest to
+confuse, because both look like nothing happened.
+
+**The skin promise is measured, not asserted.** `gallery_skin_target.spread_after` is a stored
+column, so "the same person's skin varies by no more than 2.0 dE00 across the gallery" is
+`SELECT MAX(spread_after)` rather than a sentence. The target is that person's own frames; there is
+no ideal-skin constant in the contract, the config, the migration or the code, the phase gate scans
+the schema for one on every run, and `tests/no_recipe_writes.rs` scans the source.
+
+**Outliers are measured on the residual, never on the raw deviation.** A frame 900 K from its node
+that the bound could only move 450 K is an outlier; a frame 300 K away that was corrected in full is
+not, even though its raw deviation was larger. Getting this backwards produces a QC queue full of
+frames the product already fixed, which is the fastest way to make a photographer stop opening it.
+
+Also here: `GalleryService`, the twenty-first frozen service and the first whose subject is a *set*
+of photographs; `NodeId`, the fourteenth typed id; migration 25 with five tables, two views and
+three triggers at 330 B per image against a 500 B budget; twenty-three argued-over scene rows in
+`consistency.toml`; nine IPC commands (ADR-0052) feeding a consistency view, before-and-after
+timeline strips, an anchor picker and an outlier list; `ml/eval/consistency_eval.py` for the catalog
+side; and `aura-cli verify --phase 25` as the executable gate.
+
+### Two things this phase got wrong first
+
+**A change-point statistic with a trend in it splits the drift it exists to normalise.** The obvious
+statistic divides the difference between two runs' robust means by the spread *within* the runs. On
+a flash that works. On a slow drift it also fires, because a chapter that warms 500 K over forty
+frames has a tiny frame-to-frame spread and a large difference between its halves - which is the
+definition of drift, and drift is what this whole phase exists to remove. The first implementation
+cut a forty-frame ceremony into six unanchorable nodes and reported six lighting changes. The
+divisor is the **trend** now - the median adjacent-frame difference times the distance between the
+two runs' midpoints - so a pure ramp scores about one and a flash scores about forty. Phase 22's
+rule, in its second half: a threshold on a measurement is a statement about the instrument as well
+as about the world, and the instrument had a slope in it.
+
+And the first fix was half right: the divisor used the *shorter* run's length, so a six-frame head
+against a thirty-four-frame tail was divided by three when its medians were twenty frames apart, and
+a smooth ramp scored six. It is the distance between the midpoints.
+
+**A spread-reduction gate is only meetable while the spread is inside the bound.** Section 10.1 asks
+for the exposure spread to halve. A within-node drift of a full stop cannot halve, because the bound
+is 0.35 EV and the arithmetic does not care what the gate says - fifty-three per cent of the frames
+clamp. That is not a solver failure and it is not a threshold to lower: it is a *fixture* that
+authored a lighting change and called it drift. The gate now measures a realistic third-of-a-stop
+drift, and a second test asserts that a wider one is **reported as outliers** rather than silently
+half-corrected. Same family as phase 19's edge-gradient halo test, phase 21's chance-corrected
+margin and phase 22's sharpening kernel floor.
+
+### What this build cannot claim
+
+**Every gate is measured on synthetic galleries whose drift was authored.** There are no weddings in
+this repository and no labelled lighting transitions, so what is proved is the tree, the
+change-point detector, the anchor ranking, the robust statistics, the solver, the bounds, the
+idempotence, the skin arithmetic and the outlier threshold - the algorithms. That is condition C1
+and a Sev 2 trigger, and it closes with phase 05's C10 rather than separately, because the anchor
+ranking reads phase 15's white-balance confidence and phase 06's face detector.
+
+**`SKIN_FIELD_AVAILABLE` is false.** Phase 18's segmentation head is untrained, so no photograph in
+this build has an identity-scoped skin region, every frame records `SkinMaskAbsent`, and section
+6.3's promise ran on authored readings. It is a measurement of the mechanism on five wanderings of a
+chromaticity, not on five people. Condition C2, and the panel says so in a sentence rather than
+showing a zero that reads as "no problems found".
+
+**No photographer has looked at a before-and-after gallery from this build.** Section 9's QAIQ audit
+of five weddings did not happen, so the phase's own headline - that a wedding reads as one coherent
+body of work - is unmeasured. Condition C3.
+
 ## Phase 24 - Generative cleanup: distraction removal, bounded by a safety engine
 
 The first code in the product that removes something the camera got right. Phase 22 removed

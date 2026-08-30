@@ -1779,3 +1779,66 @@ summary      = "Nothing could be shown safe to remove, because the regions that 
 user_message = "AURA cannot yet tell where people, dresses and rings are in some photographs, so it will not tidy anything out of them. They are all still usable and nothing has been changed."
 runbook      = "docs/runbooks/AURA-ML-5122.md"
 introduced   = "PHASE-24"
+
+[[error]]
+code         = "AURA-ML-5123"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One wedding's consistency pass could not run"
+user_message = "AURA could not match this wedding together as one gallery. Every photograph still has the edit it was given on its own, and nothing has been lost."
+runbook      = "docs/runbooks/AURA-ML-5123.md"
+introduced   = "PHASE-25"
+
+[[error]]
+code         = "AURA-ML-5124"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A photographer's choice of reference photograph could not be recorded"
+user_message = "AURA could not record that choice of reference photograph. Nothing about this part of the wedding has changed; reopen the panel and try again."
+runbook      = "docs/runbooks/AURA-ML-5124.md"
+introduced   = "PHASE-25"
+
+[[error]]
+code         = "AURA-ML-5125"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A photographer's gallery adjustment could not be recorded"
+user_message = "AURA could not record that adjustment. The photograph is unchanged."
+runbook      = "docs/runbooks/AURA-ML-5125.md"
+introduced   = "PHASE-25"
+
+[[error]]
+code         = "AURA-ML-5126"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A scene has no gallery consistency policy row"
+user_message = "AURA has no matching guidance recorded for this kind of photograph yet, so it has used its most careful settings on them. They are all still usable."
+runbook      = "docs/runbooks/AURA-ML-5126.md"
+introduced   = "PHASE-25"
+
+[[error]]
+code         = "AURA-ML-5127"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored gallery rows came from different arithmetic or a different policy"
+user_message = "AURA has improved how it matches a wedding together, so it is re-checking this one in the background. Anything you pinned or set yourself is kept."
+runbook      = "docs/runbooks/AURA-ML-5127.md"
+introduced   = "PHASE-25"
+
+[[error]]
+code         = "AURA-ML-5128"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A person's gallery skin target could not be built"
+user_message = "AURA has not seen one of the people in this wedding in enough well-lit photographs to know how their skin should look, so it has left their skin exactly as it was."
+runbook      = "docs/runbooks/AURA-ML-5128.md"
+introduced   = "PHASE-25"
+
+[[error]]
+code         = "AURA-ML-5129"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The gallery consistency policy table was refused"
+user_message = "AURA could not load the settings that decide how far it may move a photograph to match the rest of a wedding, so it has not matched anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5129.md"
+introduced   = "PHASE-25"

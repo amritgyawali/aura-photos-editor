@@ -20,6 +20,25 @@
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
+// The panic family is banned in library code and is how a test asserts. An inline `#[cfg(test)]`
+// module is not compiled into the library at all, so nothing it does can reach a photographer; the
+// lints stay denied everywhere else in the crate. The same exemption phases 14, 19, 23, 24 and 25
+// took in their own crates.
+//
+// Added in phase 25, not phase 24: `cleanup_judgement.rs` arrived with the first inline test module
+// in this crate and the crate root had never needed the exemption before, so
+// `cargo clippy --workspace --all-targets -- -D warnings` has been red on `main` since it landed.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+        clippy::disallowed_methods
+    )
+)]
 
 //! The governed cloud AI gateway: one door, and the only crate in AURA allowed
 //! to open a socket.

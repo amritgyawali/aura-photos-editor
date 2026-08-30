@@ -6535,3 +6535,299 @@ pub struct ManualRemoveDto {
     /// Which check refused it, when one did.
     pub blocked: Option<CleanupBlockedDto>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-25 - gallery consistency
+// ---------------------------------------------------------------------------
+//
+// Nine commands and eight DTOs. ADR-0052 records the shape and what is deliberately absent from
+// it; three things are worth repeating here because they are properties of these types rather than
+// of the commands.
+//
+// **Both denominators are on the wire.** `GalleryStatusDto` carries `nodes` and `anchoredNodes`,
+// and a project at 100 % coverage with 20 % anchored has had almost nothing done to it. Phase 05's
+// rule at its most consequential: this is the phase where a green number and an untouched gallery
+// look identical.
+//
+// **The spreads are sent, not the reduction.** A panel that received "77 % reduced" could not tell
+// 500 K down to 115 K from 20 K down to 4.6 K, and only one of those is worth showing anybody.
+//
+// **There is no strength field, no damping field and no way to raise a bound.** Five optional
+// movements, every one bounded by the frozen contract, refused rather than clamped when it is
+// outside. A frame that needs to move further than 450 K is a frame whose *per-frame* estimate is
+// wrong, and phase 15's own override is where that is fixed.
+
+/// One reason a frame moved, or did not.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryReasonDto {
+    /// The stable slug a filter matches on. Never localised.
+    pub code: String,
+    /// The sentence a photographer reads. Rendered from the code, never stored.
+    pub text: String,
+    /// True when this code says the product declined to act.
+    pub withdraws: bool,
+}
+
+/// What a node's anchors say it should look like.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeTargetDto {
+    /// Kelvin.
+    pub cct_k: f32,
+    /// How far a frame may sit from it and still be consistent, in kelvin.
+    pub cct_tol: f32,
+    /// Tint units.
+    pub tint: f32,
+    /// How far a frame may sit, in tint units.
+    pub tint_tol: f32,
+    /// Subject luminance, `0..1`.
+    pub subject_luma: f32,
+    /// How far a frame may sit, `0..1`.
+    pub luma_tol: f32,
+    /// Contrast, in the recipe's units.
+    pub contrast: f32,
+    /// Saturation, in the recipe's units.
+    pub saturation: f32,
+    /// How many anchors it came from.
+    pub anchor_count: u16,
+    /// How much they agree, `0..1`.
+    pub cohesion: f32,
+}
+
+/// One lighting group inside one chapter.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneNodeDto {
+    /// The node.
+    pub node_id: String,
+    /// What it was split or sub-clustered out of.
+    pub parent_id: Option<String>,
+    /// The chapter.
+    pub segment_id: String,
+    /// What a photographer reads: "Ceremony (2 of 3)".
+    pub label: String,
+    /// The scene it was built under.
+    pub scene: String,
+    /// How many frames it holds.
+    pub image_count: u32,
+    /// Its anchors, best first.
+    pub anchors: Vec<String>,
+    /// What the anchors say, or `null` when the node could not be anchored.
+    ///
+    /// **Null is not a neutral target.** A panel that rendered it as one would turn "AURA could
+    /// not judge this part of the wedding" into "this part needed nothing".
+    pub target: Option<NodeTargetDto>,
+    /// Why the node is shaped the way it is.
+    pub reasons: Vec<GalleryReasonDto>,
+}
+
+/// How far one frame moves toward its node.
+///
+/// Every `d` field is a **residual** on top of phases 15 and 16, and the three `from` fields say
+/// what it is a residual from - so a strip can draw an arrow from one to the other.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryDeltaDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Its node.
+    pub node_id: String,
+    /// Stops.
+    pub d_exposure: f32,
+    /// Kelvin.
+    pub d_cct: f32,
+    /// Tint units.
+    pub d_tint: f32,
+    /// Recipe units.
+    pub d_contrast: f32,
+    /// Recipe units.
+    pub d_saturation: f32,
+    /// What the exposure movement is measured from, in stops.
+    pub from_exposure_ev: f32,
+    /// What the temperature movement is measured from, in kelvin.
+    pub from_cct_k: f32,
+    /// What the tint movement is measured from.
+    pub from_tint: f32,
+    /// How much of the distance was travelled.
+    pub damping: f32,
+    /// Which bound clamped it: `cct`, `tint`, `exposure`, `contrast` or `saturation`.
+    pub bounded_by: Option<String>,
+    /// How much of the bounds this movement used, `0..1`.
+    pub magnitude: f32,
+    /// Whose skin was corrected, when any was.
+    pub skin_identity: Option<String>,
+    /// The dE00 before the skin correction.
+    pub skin_de00_before: Option<f32>,
+    /// The dE00 after it.
+    pub skin_de00_after: Option<f32>,
+    /// Invariant 2.
+    pub confidence: f32,
+    /// Why.
+    pub reasons: Vec<GalleryReasonDto>,
+    /// True when the photographer set these values.
+    pub user_edited: bool,
+}
+
+/// A frame that is still out of line after normalising.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryOutlierDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// The node it should have matched.
+    pub node_id: String,
+    /// The sentence section 6.4 asks for, assembled from the residuals.
+    ///
+    /// On the wire rather than assembled in the panel, so this and phase 27's QC ticket say the
+    /// same thing about the same frame.
+    pub description: String,
+    /// What is left, in kelvin. Signed: positive is warmer.
+    pub residual_cct: f32,
+    /// What is left, in tint units.
+    pub residual_tint: f32,
+    /// What is left, in stops.
+    pub residual_exposure: f32,
+    /// What is left on the worst identity's skin, in dE00.
+    pub residual_skin_de00: f32,
+    /// How far out overall, `0..1`.
+    pub deviation: f32,
+    /// Why.
+    pub reasons: Vec<GalleryReasonDto>,
+}
+
+/// What the Consistency panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs with a delta.
+    pub normalised: u32,
+    /// The first denominator, `0..1`.
+    pub coverage: f32,
+    /// Nodes in the tree.
+    pub nodes: u32,
+    /// Nodes with a usable target. **The second denominator, and the one that matters when it is
+    /// low.**
+    pub anchored_nodes: u32,
+    /// Nodes a change point split.
+    pub split_nodes: u32,
+    /// Anchors a photographer pinned.
+    pub pinned_anchors: u32,
+    /// Frames a bound clamped.
+    pub bounded: u32,
+    /// Frames left alone because their light is intentional.
+    pub mood_preserved: u32,
+    /// Frames the photographer set by hand.
+    pub user_edited: u32,
+    /// Frames still out of line.
+    pub outliers: u32,
+    /// Identities with a gallery skin target.
+    pub skin_targeted: u32,
+    /// Identities seen at all.
+    pub identities: u32,
+    /// The within-node temperature spread before, in kelvin.
+    pub spread_before_cct: f32,
+    /// And after.
+    pub spread_after_cct: f32,
+    /// The within-node exposure spread before, in stops.
+    pub spread_before_ev: f32,
+    /// And after.
+    pub spread_after_ev: f32,
+    /// The worst per-identity skin spread after correction, in dE00.
+    pub worst_skin_spread: f32,
+    /// Scenes with no policy row.
+    pub untargeted_scenes: Vec<String>,
+    /// Whether this build can read a per-frame skin region.
+    ///
+    /// False. On the wire rather than inferred: a panel that guessed from `skinTargeted == 0`
+    /// would eventually say "everybody's skin is consistent across this wedding" for a build that
+    /// cannot look at skin, which is a promise about people.
+    pub skin_field_available: bool,
+    /// Which policy table the stored rows were bounded by.
+    pub policy_ver: u16,
+}
+
+/// Run the consistency pass over a project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryPassInput {
+    /// The project.
+    pub project_id: String,
+}
+
+/// What one consistency pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryPassDto {
+    /// Nodes built.
+    pub nodes: u32,
+    /// Nodes with a usable target.
+    pub anchored: u32,
+    /// Nodes a change point split.
+    pub split: u32,
+    /// Frames with a delta.
+    pub normalised: u32,
+    /// Frames still out of line.
+    pub outliers: u32,
+    /// Identities with a skin target.
+    pub skin_targets: u32,
+    /// The within-node temperature spread before, in kelvin.
+    pub spread_before_cct: f32,
+    /// And after.
+    pub spread_after_cct: f32,
+    /// The within-node exposure spread before, in stops.
+    pub spread_before_ev: f32,
+    /// And after.
+    pub spread_after_ev: f32,
+    /// Photographer decisions carried across the re-pass.
+    pub decisions_kept: u32,
+    /// True when the run was cancelled part way. Nothing was written.
+    pub cancelled: bool,
+    /// How long it took.
+    pub elapsed_ms: u64,
+}
+
+/// Pin or reject one photograph as an anchor of its node.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PinAnchorInput {
+    /// The node.
+    pub node_id: String,
+    /// The photograph.
+    pub photo_id: String,
+    /// True to pin it, false to reject it. There is no third thing a person can say here.
+    pub pinned: bool,
+}
+
+/// What the photographer set instead, on one frame.
+///
+/// Every field is optional and at least one must be present. Every one is bounded by the frozen
+/// contract and a value outside its bound is **refused rather than clamped** - see the block header.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GalleryOverrideInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// Kelvin, within 450.
+    pub d_cct: Option<f32>,
+    /// Tint units, within 12.
+    pub d_tint: Option<f32>,
+    /// Stops, within 0.35.
+    pub d_exposure: Option<f32>,
+    /// Recipe units, within 8.
+    pub d_contrast: Option<f32>,
+    /// Recipe units, within 6.
+    pub d_saturation: Option<f32>,
+}
+
+/// Switch the consistency pass off for one photograph, or back on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisableGalleryInput {
+    /// The photograph.
+    pub photo_id: String,
+    /// True to leave this photograph out of the gallery match entirely.
+    pub disabled: bool,
+}

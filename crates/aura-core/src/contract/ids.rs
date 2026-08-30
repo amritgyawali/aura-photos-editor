@@ -195,6 +195,23 @@ typed_id!(MaskId, "msk");
 // See docs/adr/ADR-0049-generative-cleanup-and-the-safety-engine.md decision 10.
 typed_id!(ProposalId, "prp");
 
+// PHASE-25. Section 5 writes `NodeId` into the frozen `SceneNode` shape, so a lighting group
+// inside a chapter is an id of the same kind as the thirteen above.
+//
+// It is the third id in this file that names a *part of* something rather than a whole thing,
+// after `MaskId` and `ProposalId`. A node is a sub-range of a phase 07 segment: the frames of one
+// chapter that were shot under one light, which is not the same set as the chapter and not a set
+// anybody named.
+//
+// It is not `(segment_id, ordinal)`, and the alternative was real: an ordinal inside a segment
+// would name a node with no new id at all. It is not here because a node is split by a change
+// point, merged by a photographer and re-parented as the tree grows, and an ordinal renumbers on
+// every one of those - while an anchor row, a delta row and an outlier row all have to keep
+// pointing at the same node across a re-analysis.
+//
+// See docs/adr/ADR-0051-gallery-consistency-and-normalisation.md section 10.
+typed_id!(NodeId, "nod");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

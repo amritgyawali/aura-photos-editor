@@ -82,6 +82,16 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // into a delivered file from the ones the self-check passed.
     "crates/aura-catalog/migrations/0024_cleanup.sql",
     "crates/aura-render/shaders/cleanup_paste.wgsl",
+    // PHASE-25. The migration only: this phase ships no shader, because nothing in it moves a
+    // pixel. `consistency.toml` is deliberately *not* frozen - it is a file a studio is meant to
+    // edit, and `Consistency::load` is what holds it to the contract's bounds rather than a digest.
+    //
+    // Migration 25 is here for a reason the four before it did not have: it carries the five bounds
+    // as CHECK constraints. `NormalisationDelta::within_bounds` refuses first, but that lives in
+    // Rust a future caller could route around with a raw INSERT, and section 10.1 makes "no frame
+    // exceeds the documented maximum movement" a gate. A digest is what stops the second layer
+    // being quietly widened to match a first layer somebody had already changed.
+    "crates/aura-catalog/migrations/0025_gallery.sql",
     // PHASE-23. The migration, and the shader: `geometry.wgsl` is the GPU half of a resample
     // the reference path also performs, and a shader that drifts while no device can run it is
     // a soft frame edge nobody finds until one arrives. `shader_parity.rs` holds it to the

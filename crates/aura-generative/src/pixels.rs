@@ -102,10 +102,11 @@ impl Image {
         let p01 = self.at(ix, iy + 1);
         let p11 = self.at(ix + 1, iy + 1);
         let mut out = [0.0f32; 3];
-        for channel in 0..3 {
-            let top = p00[channel] * (1.0 - tx) + p10[channel] * tx;
-            let bottom = p01[channel] * (1.0 - tx) + p11[channel] * tx;
-            out[channel] = top * (1.0 - ty) + bottom * ty;
+        for (channel, slot) in out.iter_mut().enumerate() {
+            let at = |corner: &[f32; 3]| corner.get(channel).copied().unwrap_or(0.0);
+            let top = at(&p00) * (1.0 - tx) + at(&p10) * tx;
+            let bottom = at(&p01) * (1.0 - tx) + at(&p11) * tx;
+            *slot = top * (1.0 - ty) + bottom * ty;
         }
         out
     }
@@ -465,7 +466,10 @@ mod tests {
             *sample = *sample * 1.7 + 0.05;
         }
         let score = ncc(&a, 16, 16, &b, 16, 16, 4);
-        assert!(score > 0.99, "an exposure change is not a mismatch: {score}");
+        assert!(
+            score > 0.99,
+            "an exposure change is not a mismatch: {score}"
+        );
     }
 
     #[test]
@@ -527,7 +531,10 @@ mod tests {
         assert!(paste(&mut blank, &patch, &rect));
         for y in rect.y..rect.bottom() {
             for x in rect.x..rect.right() {
-                assert_eq!(blank.at(x as isize, y as isize), image.at(x as isize, y as isize));
+                assert_eq!(
+                    blank.at(x as isize, y as isize),
+                    image.at(x as isize, y as isize)
+                );
             }
         }
     }

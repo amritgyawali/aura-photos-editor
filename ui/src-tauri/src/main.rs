@@ -33,6 +33,15 @@ use aura_app::contract::ipc::{
     SetProjectProfileInput, StyleComparisonDto, StylePairDto, StyleProfileDto, StyleStatusDto,
     TrainProfileDto, TrainProfileInput,
 };
+// PHASE-25. The gallery consistency surface: nine commands whose subject is a wedding
+// rather than a photograph. `GalleryStatusDto` carries two denominators and a panel has to
+// read both: a project at 100 % coverage with 20 % anchored has had almost nothing done to
+// it, because an unanchored node produces a zero delta for every frame in it.
+use aura_app::contract::ipc::{
+    DisableGalleryInput, GalleryDeltaDto, GalleryOutlierDto, GalleryOverrideInput,
+    GalleryPassDto, GalleryPassInput, GalleryReasonDto, GalleryStatusDto, PinAnchorInput,
+    SceneNodeDto,
+};
 // PHASE-19.
 use aura_app::contract::ipc::{
     AcceptLocalInput, LocalPassDto, LocalPlanDto, LocalReviewInput, LocalStatusDto,
@@ -2077,6 +2086,117 @@ async fn cleanup_reason_codes(state: State<'_, AppState>) -> IpcResult<Vec<Clean
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-25. Nine commands, all of them off the UI thread. The pass is the one that takes real time
+// - it walks every photograph in a project through three services and solves a tree - and it runs
+// to completion rather than returning a job id, because a half-solved tree has no state a reader
+// could make sense of. ADR-0052 section 5.
+#[tauri::command]
+async fn gallery_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<GalleryStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::gallery_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn gallery_nodes(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<SceneNodeDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::gallery_nodes(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn gallery_node_strip(
+    state: State<'_, AppState>,
+    node_id: String,
+) -> IpcResult<Vec<GalleryDeltaDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::gallery_node_strip(&app, &node_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn image_gallery(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<GalleryDeltaDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::image_gallery(&app, &photo_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn gallery_outliers(
+    state: State<'_, AppState>,
+    project_id: String,
+    limit: usize,
+) -> IpcResult<Vec<GalleryOutlierDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::gallery_outliers(&app, &project_id, limit)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn gallery_pass(
+    state: State<'_, AppState>,
+    input: GalleryPassInput,
+) -> IpcResult<GalleryPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::gallery_pass(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn pin_gallery_anchor(state: State<'_, AppState>, input: PinAnchorInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::pin_gallery_anchor(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_gallery_override(
+    state: State<'_, AppState>,
+    input: GalleryOverrideInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_gallery_override(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn disable_gallery(
+    state: State<'_, AppState>,
+    input: DisableGalleryInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::disable_gallery(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn gallery_reason_codes(state: State<'_, AppState>) -> IpcResult<Vec<GalleryReasonDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::gallery_reason_codes(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -2215,6 +2335,16 @@ fn main() {
             disable_cleanup,
             manual_remove,
             cleanup_reason_codes,
+            gallery_status,
+            gallery_nodes,
+            gallery_node_strip,
+            image_gallery,
+            gallery_outliers,
+            gallery_pass,
+            pin_gallery_anchor,
+            set_gallery_override,
+            disable_gallery,
+            gallery_reason_codes,
             set_framing,
             plan_geometry,
             analyse_integrity,

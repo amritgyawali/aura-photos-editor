@@ -29,7 +29,18 @@
     )
 )]
 #![warn(clippy::pedantic)]
-#![allow(clippy::module_name_repetitions)]
+#![allow(
+    clippy::module_name_repetitions,
+    // Every command on this surface takes its input DTO **by value**, because that is what the
+    // Tauri handler has: it deserialises the payload off the wire and owns it. Taking a reference
+    // would make every handler in `ui/src-tauri/src/main.rs` hold a binding alive across an
+    // `await` for no reason, and it would make the CLI construct a value only to lend it.
+    //
+    // Added in phase 25, and it applies to the whole surface: phase 24's cleanup commands are what
+    // clippy names, but `set_framing`, `plan_geometry` and a dozen others have the same shape and
+    // are only silent because their DTOs happen to be moved into a call.
+    clippy::needless_pass_by_value
+)]
 
 //! The application layer: one typed command surface, used by the Tauri shell and
 //! by the CLI, so the UI can never reach into a crate directly.
@@ -45,6 +56,7 @@ pub mod commands;
 pub mod composition_commands;
 pub mod cull_commands;
 pub mod develop_commands;
+pub mod gallery_commands;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.
@@ -71,6 +83,10 @@ pub mod story_commands;
 pub mod style_commands;
 pub mod tone_commands;
 
+pub use cleanup_commands::{
+    cleanup_blocked, cleanup_disclosures, cleanup_pass, cleanup_reason_codes, cleanup_status,
+    decide_cleanup, disable_cleanup, image_cleanup, manual_remove,
+};
 pub use cloud_commands::{
     check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend, cloud_status,
     purge_cloud_cache, set_ai_key, set_cloud_budget, set_cloud_privacy,
@@ -103,9 +119,9 @@ pub use explain_commands::{
     compact_ledger, decision_by_id, decision_history, explain_image, export_support_bundle,
     ledger_status, record_decisions, review_queue,
 };
-pub use cleanup_commands::{
-    cleanup_blocked, cleanup_disclosures, cleanup_pass, cleanup_reason_codes, cleanup_status,
-    decide_cleanup, disable_cleanup, image_cleanup, manual_remove,
+pub use gallery_commands::{
+    disable_gallery, gallery_node_strip, gallery_nodes, gallery_outliers, gallery_pass,
+    gallery_reason_codes, gallery_status, image_gallery, pin_gallery_anchor, set_gallery_override,
 };
 pub use geometry_commands::{
     accept_geometry, geometry_review_queue, geometry_status, image_geometry, plan_geometry,

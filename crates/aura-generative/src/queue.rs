@@ -167,6 +167,7 @@ impl Plan {
 /// `judge` is optional and `None` behaves exactly as an unreachable judge does, which is invariant
 /// 6: the product completes a wedding with no network.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn plan(
     context: &Context<'_>,
     candidates: &[Candidate],
@@ -313,15 +314,11 @@ pub fn plan(
         proposal.analysis_ver = context.analysis_ver;
         proposal.policy_ver = context.policy_ver;
 
-        let patch = pixels::resolve(
-            &candidate.region,
-            selection.result.w,
-            selection.result.h,
-        )
-        .map_or_else(
-            || Image::black(1, 1),
-            |rect| pixels::extract(&selection.result, &rect),
-        );
+        let patch = pixels::resolve(&candidate.region, selection.result.w, selection.result.h)
+            .map_or_else(
+                || Image::black(1, 1),
+                |rect| pixels::extract(&selection.result, &rect),
+            );
 
         out.prepared.push(Prepared {
             proposal,
@@ -365,7 +362,12 @@ pub fn plan(
 /// So on this build nothing reaches an unattended band at all, and that is the composition of two
 /// rules neither of which was written for this phase.
 #[must_use]
-pub fn band(method: &CleanupMethod, confidence: f32, zero_touch: f32, calibrated: bool) -> Autonomy {
+pub fn band(
+    method: &CleanupMethod,
+    confidence: f32,
+    zero_touch: f32,
+    calibrated: bool,
+) -> Autonomy {
     let base = if method.tier_one() && confidence >= zero_touch {
         Autonomy::Auto
     } else if method.tier_one() && confidence >= ZERO_TOUCH_FLOOR {
@@ -546,7 +548,11 @@ mod tests {
         PhotoId::from_db("pht_00000000-0000-4000-8000-0000000000f0").unwrap_or_default()
     }
 
-    fn context<'a>(sources: Sources<'a>, coverage: &'a Coverage, policy: &'a ScenePolicy) -> Context<'a> {
+    fn context<'a>(
+        sources: Sources<'a>,
+        coverage: &'a Coverage,
+        policy: &'a ScenePolicy,
+    ) -> Context<'a> {
         Context {
             image: fixed_photo(),
             scene: SceneId::ReceptionEntrance,
@@ -684,10 +690,17 @@ mod tests {
 
         let mut moved = bin();
         moved.region.x += 0.05;
-        assert_ne!(base, proposal_id(&context, &moved, &CleanupMethod::ClassicalFill));
         assert_ne!(
             base,
-            proposal_id(&context, &bin(), &CleanupMethod::BorrowFrom(PhotoId::default()))
+            proposal_id(&context, &moved, &CleanupMethod::ClassicalFill)
+        );
+        assert_ne!(
+            base,
+            proposal_id(
+                &context,
+                &bin(),
+                &CleanupMethod::BorrowFrom(PhotoId::default())
+            )
         );
     }
 
@@ -699,9 +712,7 @@ mod tests {
         assert_eq!(band(&borrow, 0.99, 0.97, true), Autonomy::AutoZeroTouch);
         assert_eq!(band(&borrow, 0.99, 0.97, false), Autonomy::Suggest);
         // An inpaint is never tier one, so it can never reach either.
-        let inpaint = CleanupMethod::Inpaint {
-            model: "x".into(),
-        };
+        let inpaint = CleanupMethod::Inpaint { model: "x".into() };
         assert_eq!(band(&inpaint, 0.99, 0.97, true), Autonomy::RequireReview);
     }
 

@@ -500,7 +500,9 @@ mod tests {
             confidence: 0.45,
             reasons: vec!["it might be a bin".into()],
         };
-        let err = uncertain.validate().expect_err("an uncertain yes is refused");
+        let err = uncertain
+            .validate()
+            .expect_err("an uncertain yes is refused");
         assert!(err.contains("uncertain"), "{err}");
     }
 

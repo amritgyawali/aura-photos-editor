@@ -205,7 +205,10 @@ mod tests {
             .code(),
             Some(CleanupCode::JudgementDeclined)
         );
-        assert_eq!(Answer::Unavailable.code(), Some(CleanupCode::JudgementUnavailable));
+        assert_eq!(
+            Answer::Unavailable.code(),
+            Some(CleanupCode::JudgementUnavailable)
+        );
         assert_eq!(Answer::Stand.code(), None);
     }
 

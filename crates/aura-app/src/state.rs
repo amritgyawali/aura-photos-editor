@@ -5,6 +5,9 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use aura_brain_gallery::api::{ConsistencyPass, Gallery};
+use aura_brain_gallery::store::GalleryStore;
+use aura_brain_gallery::tree::Frame as GalleryFrame;
 use aura_brain_photo::colour::api::FrameExif as ColourExif;
 use aura_brain_photo::colour::{Colour, ColourPass, ColourStore};
 use aura_brain_photo::composition::{Composition, CompositionPass, CompositionStore};
@@ -36,6 +39,8 @@ use aura_cull::gather::Gatherer;
 use aura_cull::store::CullStore;
 use aura_cull::Cull;
 use aura_explain::{Explain, Ledger};
+use aura_generative::denylist::Coverage as CleanupCoverage;
+use aura_generative::{Cleanup, CleanupPass, CleanupStore};
 use aura_geometry::Geometry;
 use aura_index::hnsw::{HnswIndex, HnswParams};
 use aura_index::snapshot::Snapshot;
@@ -52,8 +57,6 @@ use aura_people::store::PeopleStore;
 use aura_people::vault::BiometricKeyStore;
 use aura_people::{FaceScanner, People};
 use aura_preview::{CatalogSource, PreviewConfig, PreviewSource, Previews};
-use aura_generative::denylist::Coverage as CleanupCoverage;
-use aura_generative::{Cleanup, CleanupPass, CleanupStore};
 use aura_restore::schedule::Capacity as RestoreCapacity;
 use aura_restore::{Restore, RestorePass, RestoreStore};
 use aura_retouch::micro::{Micro, MicroPass, MicroStore};
@@ -2022,6 +2025,116 @@ impl AppState {
         Ok(Arc::new(Cleanup::new(self.cleanup_store())?))
     }
 
+    /// The gallery store for this catalog. PHASE-25.
+    ///
+    /// Stateless, like every store since phase 09.
+    #[must_use]
+    pub fn gallery_store(&self) -> Arc<GalleryStore> {
+        Arc::new(GalleryStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `GalleryService` for this catalog. PHASE-25.
+    ///
+    /// Infallible, unlike `cleanup()`: `consistency.toml` is bundled and `Consistency::default`
+    /// falls back on the compiled-in table, so a service always exists to answer questions about
+    /// rows that are already stored. A *pass* that could not load a studio's own table would be a
+    /// different matter, and `gallery_pass` raises `AURA-ML-5129` for it.
+    #[must_use]
+    pub fn gallery(&self) -> Arc<Gallery> {
+        Arc::new(Gallery::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The consistency pass. PHASE-25.
+    ///
+    /// **No skin field is attached, and that is the phase's condition C2 rather than an
+    /// oversight.** Phase 18's `MaskService` is the only route to an identity-scoped skin region,
+    /// its segmenter is a placeholder, and without a region there is nothing for a correction to
+    /// apply inside. Every frame therefore records `GalleryCode::SkinMaskAbsent`, which is a
+    /// different row from "this person's skin was already consistent" - phase 24's rule, and the
+    /// distinction that keeps this build from claiming a promise about people that nothing
+    /// measured.
+    #[must_use]
+    pub fn gallery_pass(&self) -> ConsistencyPass {
+        ConsistencyPass::new(Arc::clone(&self.catalog), Arc::clone(&self.clock))
+    }
+
+    /// Assemble one project's frames for the consistency pass. PHASE-25.
+    ///
+    /// The one place this product reads phases 07, 15 and 16 together, and it reads all three
+    /// through their frozen services. A photograph with no segment is left out of the tree - it
+    /// belongs to no chapter, so it belongs to no lighting group - and one with no tone estimate is
+    /// kept with its fields `None`, because a frame nobody has looked at is a gap in coverage and a
+    /// frame that vanished here would be an invisible one.
+    ///
+    /// # Errors
+    ///
+    /// Whatever the three services raised.
+    pub fn gallery_frames(&self, project: &ProjectId) -> AuraResult<Vec<GalleryFrame>> {
+        let story = self.story()?;
+        let tone = self.tone();
+        let colour = self.colour();
+
+        // Capture order, with phase 08's sub-second fraction folded in. EXIF's `DateTimeOriginal`
+        // has whole-second resolution, so fourteen frames of a 10 fps burst would otherwise sort
+        // arbitrarily - which would make the change-point detector's signal depend on map order.
+        let key = project.to_db();
+        let images = self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare(
+                    "SELECT photo_id, timeline_time, COALESCE(sub_sec, 0)
+                       FROM photo WHERE project_id = ?1
+                      ORDER BY timeline_time, COALESCE(sub_sec, 0), photo_id",
+                )
+                .map_err(|err| aura_core::errors::db::statement_failed("gallery frames", &err))?;
+            let rows = statement
+                .query_map(rusqlite::params![key], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, i64>(2)?,
+                    ))
+                })
+                .map_err(|err| aura_core::errors::db::statement_failed("gallery frames", &err))?;
+            let mut out = Vec::new();
+            for row in rows {
+                let (id, time, sub) =
+                    row.map_err(|err| aura_core::errors::db::statement_failed("photo", &err))?;
+                let Ok(photo) = PhotoId::from_db(&id) else {
+                    continue;
+                };
+                out.push((photo, time.unwrap_or_default(), sub));
+            }
+            Ok(out)
+        })?;
+
+        let mut ordered: Vec<(PhotoId, i64)> = Vec::with_capacity(images.len());
+        for (index, (photo, _, sub)) in images.iter().enumerate() {
+            // The ordinal is the timeline, and the sub-second fraction breaks ties inside one
+            // second. Milliseconds rather than the raw text, because the change-point detector's
+            // signal is a sequence and the tree sorts on a number.
+            let ms = i64::try_from(index).unwrap_or(0) * 1_000 + (*sub).clamp(0, 999);
+            ordered.push((*photo, ms));
+        }
+
+        aura_brain_gallery::api::collect_frames(
+            *project,
+            &ordered,
+            &aura_brain_gallery::api::Context {
+                story: story.as_ref(),
+                tone: tone.as_ref(),
+                colour: Some(colour.as_ref()),
+                // Condition C2. See `gallery_pass`.
+                skin: None,
+            },
+        )
+    }
+
     /// The distraction-cleanup pass, wired to previews, composition, people, moments and story.
     /// PHASE-24.
     ///
@@ -2057,7 +2170,10 @@ impl AppState {
         .with_composition(self.composition())
         .with_people(self.people())
         // Empty, deliberately. See the doc comment.
-        .with_masks(std::collections::BTreeMap::<aura_core::PhotoId, CleanupCoverage>::new());
+        .with_masks(std::collections::BTreeMap::<
+            aura_core::PhotoId,
+            CleanupCoverage,
+        >::new());
 
         match self.moments() {
             Ok(moments) => pass = pass.with_moments(moments),
