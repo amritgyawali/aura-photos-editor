@@ -24,6 +24,12 @@ aura-raw     = { path = "../aura-raw" }
 # PHASE-25. The identity-scoped skin regions a correction applies inside, and the only route to
 # them. Phase 18's rule: `MaskService` is the one way to ask what is where in a photograph.
 aura-vision  = { path = "../aura-vision" }
+# PHASE-26. Phase 05's stored descriptors - the 8x8x8 HSV histogram, the luminance percentiles and
+# the edge energy - which are what a matched pair's background verification compares. Migration 5's
+# own header names this consumer: "the histogram and the luminance percentiles are what phases 25
+# and 26 use for gallery colour consistency and multi-camera matching". `EmbeddingStore` owns that
+# table, so reading it through anything else would be a second answer to what a frame looks like.
+aura-index   = { path = "../aura-index" }
 rusqlite     = { workspace = true }
 serde        = { workspace = true }
 serde_json   = { workspace = true }
@@ -57,3 +63,10 @@ aura-catalog = { path = "../aura-catalog", features = [] }
 [[test]]
 name = "consistency_eval"
 path = "../../tests/eval/consistency_eval.rs"
+
+# PHASE-26's gates, run as an ordinary test so a red gate is a red build. Beside the phase 05 to 25
+# harnesses in `tests/eval/` rather than in this crate's own `tests/`, because a gate is a claim
+# about the product and not about a crate.
+[[test]]
+name = "camera_eval"
+path = "../../tests/eval/camera_eval.rs"

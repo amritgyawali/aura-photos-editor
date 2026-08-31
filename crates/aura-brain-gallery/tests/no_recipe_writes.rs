@@ -105,12 +105,20 @@ fn this_crate_never_opens_a_file_of_its_own() {
                 path.display()
             );
         }
-        // `fs::read_to_string` is legitimate in exactly one place: the policy loader reading
-        // `consistency.toml`, which is a settings file rather than a photograph.
+        // `fs::read_to_string` is legitimate in exactly two places, and both of them read a
+        // *settings* file rather than a photograph: phase 25's policy loader reading
+        // `consistency.toml`, phase 26's reading `camera_match.toml`, and phase 26's baseline
+        // loader reading a studio's own `assets/camera_baselines/<brand>.toml`. None of them can
+        // reach a pixel - a TOML file has no image in it - and the ban this test enforces is about
+        // a second decoder.
         if code.contains("read_to_string") {
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("");
             assert!(
-                path.ends_with("policy.rs"),
-                "{} reads a file. Only the policy loader may, and only `consistency.toml`.",
+                matches!(name, "policy.rs" | "baseline.rs"),
+                "{} reads a file. Only the two settings loaders may, and only their own tables.",
                 path.display()
             );
         }
@@ -148,7 +156,6 @@ fn this_crate_keeps_no_tone_solver_of_its_own() {
             "aura_brain_wedding",
             "grey_world",
             "white_patch",
-            "cct_to_uv",
             "estimate_illuminant",
         ] {
             assert!(
@@ -156,6 +163,22 @@ fn this_crate_keeps_no_tone_solver_of_its_own() {
                 "{} mentions `{needle}`. What colour the light was comes through `ToneService` \
                  and through nothing else; a second estimator here is a second answer to \
                  'what temperature was this room'. Phase 15's rule.",
+                path.display()
+            );
+        }
+        // The locus *conversions* are a different thing from a locus *estimator*, and phase 26 is
+        // where that distinction had to be drawn. `cct_to_uv` and `cct_from_uv` turn one
+        // representation of a chromaticity into another; a camera transform has to move a
+        // chromaticity along the Planckian locus, and the alternative to calling the shared
+        // conversion is writing a second copy of it - which is the thing this file exists to
+        // prevent rather than an example of it. What stays banned is *defining* one here.
+        for needle in ["fn cct_to_uv", "fn cct_from_uv", "fn uv_to_cct"] {
+            assert!(
+                !code.contains(needle),
+                "{} defines `{needle}`. The locus arithmetic has one implementation, in \
+                 `aura_raw::colour::illuminant`, beside the camera matrices and the monotone \
+                 curve - phase 23's rule for the lens polynomial, and two copies of a colour \
+                 conversion is two answers about the same photograph.",
                 path.display()
             );
         }

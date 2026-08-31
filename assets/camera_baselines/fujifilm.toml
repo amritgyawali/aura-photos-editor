@@ -1,0 +1,77 @@
+# Fujifilm - bundled brand baseline. PHASE-26, section 8 step 1.
+#
+# ---------------------------------------------------------------------------
+# THESE NUMBERS ARE NOT MEASUREMENTS
+# ---------------------------------------------------------------------------
+#
+# `measured = false`, and it is false in every file in this directory. There is no photographed
+# ColorChecker in this repository, no lab and no body: phase 02's exit condition C2 and phase 14's
+# condition C2 are both still open, and this phase inherits them. The values below were **chosen to
+# be plausible** from published behaviour of the manufacturer's own rendering, and they are a
+# structure for a measurement rather than one.
+#
+# What that means in the product is deliberately visible rather than hidden. A body matched from
+# this file carries `CameraCode::BaselineOnly` in its reason set, the per-camera report leads with
+# the sentence "the correction is what AURA knows about this brand, because there was nothing in
+# this wedding to measure from", and `docs/camera-matching.md` says the same thing in the product's
+# own voice. **The first measured baseline reopens phase 26's acceptance criteria whatever phase is
+# in flight**, exactly as the first real camera file reopens phase 02's - and
+# `baseline::tests::nothing_in_this_build_was_measured` is the test that fails on the day it lands.
+#
+# ---------------------------------------------------------------------------
+# HOW TO READ A DEPARTURE
+# ---------------------------------------------------------------------------
+#
+# Every number here is this brand's departure from a **neutral reference rendering**, never from
+# another brand. The correction from a Canon to a Sony is Sony's departure minus Canon's, composed
+# by `baseline::between`. Stating it this way is what makes a brand composed with itself exactly the
+# identity, so two bodies of one make are never corrected toward each other by a baseline.
+#
+#   d_cct          kelvin from neutral; positive is warmer
+#   d_tint         tint units from neutral; positive is magenta
+#   d_exposure     stops from neutral; positive is brighter
+#   channel_gain   linear R, G, B gains around one, in the working space
+#   d_saturation   recipe saturation units from neutral
+#   contrast_shape shadow, mid and highlight multipliers around one
+#   skin_uv        CIE 1976 u'v' from neutral, where this brand puts skin
+#   skin_luma      0..1 from neutral, how bright this brand renders skin
+#
+# A *declared* departure must sit inside **half** of each contract ceiling, and the loader refuses a
+# file that does not. The reason is composition: two brands each at a full ceiling in opposite
+# directions would compose to twice it and be clamped, which would silently turn a measurement into
+# a bound. Half is the largest declaration that can never do that.
+#
+# `ambient` and `flash` are two independent measurements and not a scaled copy of one. Section 6.1's
+# whole argument for splitting the populations is that the difference between brands is not the same
+# under a strobe as it is under a room, and a file whose two tables were identical would make the
+# flash key ceremony rather than mechanism.
+
+brand    = "fujifilm"
+version  = 1
+measured = false
+
+# Fujifilm's rendering is the most shaped of the eight: more saturated, with a deliberate S in
+# the tone response that lifts highlights and holds shadows. That shape is the reason people
+# buy the bodies, and it is also the reason a Fujifilm second shooter is the hardest one to
+# match - the difference is a curve rather than an offset, which is what contrast_shape is for.
+[ambient]
+d_cct          = 90.0
+d_tint         = 0.8
+d_exposure     = 0.0
+channel_gain   = [1.008, 1.0, 0.99]
+d_saturation   = 3.5
+contrast_shape = [0.965, 1.01, 1.045]
+skin_uv        = [0.0018, 0.001]
+skin_luma      = 0.006
+
+# The curve survives the strobe almost unchanged, which is the point: it is baked into the
+# manufacturer's rendering rather than being a response to the light.
+[flash]
+d_cct          = 50.0
+d_tint         = 0.6
+d_exposure     = 0.0
+channel_gain   = [1.006, 1.0, 0.993]
+d_saturation   = 3.2
+contrast_shape = [0.97, 1.008, 1.04]
+skin_uv        = [0.0014, 0.0008]
+skin_luma      = 0.005

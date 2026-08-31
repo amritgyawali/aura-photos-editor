@@ -1842,3 +1842,57 @@ summary      = "The gallery consistency policy table was refused"
 user_message = "AURA could not load the settings that decide how far it may move a photograph to match the rest of a wedding, so it has not matched anything. Restore the file or reinstall."
 runbook      = "docs/runbooks/AURA-ML-5129.md"
 introduced   = "PHASE-25"
+
+[[error]]
+code         = "AURA-ML-5130"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One project's camera matching pass could not run"
+user_message = "AURA could not match the cameras at this wedding to each other. Every photograph still has the edit it was given on its own, and nothing has been lost."
+runbook      = "docs/runbooks/AURA-ML-5130.md"
+introduced   = "PHASE-26"
+
+[[error]]
+code         = "AURA-ML-5131"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A photographer's camera-matching decision could not be recorded"
+user_message = "AURA could not record that camera choice. Nothing about the photographs from that camera has changed; reopen the panel and try again."
+runbook      = "docs/runbooks/AURA-ML-5131.md"
+introduced   = "PHASE-26"
+
+[[error]]
+code         = "AURA-ML-5132"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored camera fingerprints or transforms came from different arithmetic or a different policy"
+user_message = "AURA has improved how it matches cameras to each other, so it is re-checking this wedding in the background. Anything you chose or set yourself is kept."
+runbook      = "docs/runbooks/AURA-ML-5132.md"
+introduced   = "PHASE-26"
+
+[[error]]
+code         = "AURA-ML-5133"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The camera matching policy table was refused"
+user_message = "AURA could not load the settings that decide how far it may correct a camera, so it has not matched anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5133.md"
+introduced   = "PHASE-26"
+
+[[error]]
+code         = "AURA-ML-5134"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A bundled brand baseline could not be loaded"
+user_message = "AURA could not read what it knows about this camera's manufacturer, so it has changed nothing about that camera rather than guess."
+runbook      = "docs/runbooks/AURA-ML-5134.md"
+introduced   = "PHASE-26"
+
+[[error]]
+code         = "AURA-ML-5135"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A solved camera transform failed held-out verification"
+user_message = "The correction for this camera did not hold up when AURA checked it against photographs it had not used, so it fell back on what it knows about the brand."
+runbook      = "docs/runbooks/AURA-ML-5135.md"
+introduced   = "PHASE-26"

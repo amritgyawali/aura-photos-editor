@@ -348,3 +348,29 @@ pub fn gallery_override_refused(detail: impl Into<String>) -> AuraError {
         "AURA could not record that adjustment. The photograph is unchanged.",
     )
 }
+
+/// A photographer's camera-matching decision could not be recorded.
+pub const ML_CAMERA_DECISION_REFUSED: ErrorCode = ErrorCode("AURA-ML-5131");
+
+/// A photographer's camera-matching decision could not be recorded.
+///
+/// The frozen `CameraMatchService` documents this on `set_reference`, `set_enabled` and
+/// `set_override`, so it lives here rather than in `aura-brain-gallery`: a contract cannot depend on
+/// the crate that implements it. The same split phases 16, 22, 23, 24 and 25 made.
+///
+/// Four ways to reach it, and none of them is anything a photographer did wrong: the body is not
+/// in the project, the body shot no photographs and so cannot be a reference, the body has no
+/// transform to override, or a value was outside its documented bound. There is no strength field
+/// on the surface and no way to raise a bound - phase 21's rule, applied where a photographer
+/// touches it.
+#[must_use]
+pub fn camera_decision_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_CAMERA_DECISION_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        detail,
+        "AURA could not record that camera choice. Nothing about the photographs from that camera \
+         has changed; reopen the panel and try again.",
+    )
+}

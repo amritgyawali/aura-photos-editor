@@ -1,0 +1,326 @@
+# Multi-camera and second-shooter matching policy. PHASE-26, section 9's PM deliverable.
+#
+# Every row here is a product decision with a written reason. Section 9 asks PM to "decide default
+# reference-camera policy and how much shooter style may be normalised", and the second half of
+# that is the hardest decision in the phase: a share of one makes the gallery perfectly uniform and
+# deletes the second photographer from their own work, and a share of zero ships a gallery where
+# every fourth frame is a third of a stop darker than the ones either side of it.
+#
+# ---------------------------------------------------------------------------
+# TWO RULES ABOUT EDITING THIS FILE
+# ---------------------------------------------------------------------------
+#
+# **A ceiling can be lowered here and raised by nobody.** The seven bounds below are checked
+# against `TransformBound::ceiling` in the frozen contract on every load, and a value wider than
+# the contract's own is refused outright with `AURA-ML-5133` rather than clamped. It matters more
+# here than in phase 21's retouch matrix or phase 25's consistency table, because a bound in this
+# file governs *every photograph a body shot*: a widened ceiling is not a bolder edit on one frame,
+# it is a systematic shift across four thousand of them that nobody notices frame by frame.
+#
+# **An evidence threshold moves the other way: it can be raised here and lowered by nobody.**
+# `min_pairs` is the number of verified matched pairs before AURA trusts a correction it worked out
+# from this wedding rather than blending it toward what it knows about the brand. Lowering it is a
+# way of widening every bound at once without touching one, so the loader refuses it.
+#
+# Bump `version` on any change. It is stored on every fingerprint, transform and shooter row this
+# pass writes, and a row at a different version is re-solved rather than compared against.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# The bounds. How far a whole camera may ever be moved.
+# ---------------------------------------------------------------------------
+#
+# These are the numbers section 6.2 means by "bounds prevent the solver from making a Canon file
+# look broken to satisfy a metric". The contract owns them; `docs/camera-matching.md` publishes
+# them; this file is where a studio may tighten them.
+[bounds]
+# 900 K, which is twice phase 25's within-room bound, and the difference is the point: a gallery
+# delta corrects drift inside one room, where 450 K is already more than the eye forgives, and this
+# corrects a brand's colour science, where the honest difference between two popular bodies under
+# tungsten reaches 700 K. A bound below the effect makes this phase a no-operation dressed as a
+# feature.
+max_cct_k = 900.0
+
+# 20 tint units. Scaled from the temperature bound at phase 15's own equivalence - it calls 200 K
+# and 4 tint units comparable, which puts 900 K at 18 - and then raised to 20, because the
+# green-magenta axis is where two brands' matrices differ most under fluorescent and LED light,
+# which is most of a modern reception.
+max_tint = 20.0
+
+# Two thirds of a stop. Large enough to absorb both a metering difference between two bodies and an
+# exposure habit difference between two people; small enough that matching cannot rescue a frame
+# that is simply wrong, which is phase 15's job and phase 15's row.
+max_exposure_ev = 0.60
+
+# Ten per cent, and this is the tightest bound in the phase relative to what it controls. A channel
+# gain is the one parameter here that can make a photograph look *broken* rather than merely
+# different: pushing red by a quarter to satisfy a measurement made on somebody's cheek takes every
+# red in the frame with it - the roses, the sari, the exit sign.
+max_channel_gain = 0.10
+
+# 12 saturation units on the recipe's -100..100 scale. Below the tint bound in relative terms
+# because a saturation move is the one most visible on skin, and skin is what phase 16's guard is
+# measuring while this runs.
+max_saturation = 12.0
+
+# Fifteen per cent on each of the three tonal thirds. About where a highlight roll-off correction
+# stops reading as a correction and starts reading as a different photograph.
+max_contrast_shape = 0.15
+
+# 0.012 in CIE 1976 u'v', which is *below* phase 25's per-frame skin cap of 0.018 and is not a typo.
+# A camera skin correction applies to every frame that body shot, so an error here is an error four
+# thousand times over, and the two corrections compose - this one runs first and phase 25's runs on
+# what is left. The conservative half is the one that cannot be inspected frame by frame.
+max_skin_uv = 0.012
+
+# ---------------------------------------------------------------------------
+# Evidence. What AURA needs before it trusts a correction it worked out here.
+# ---------------------------------------------------------------------------
+[evidence]
+# Twelve verified pairs, which is section 6.1's own default. The transform vector has nine free
+# parameters, and a fit with fewer observations than twice its own dimension is a fit that describes
+# the pairs rather than the cameras. Below twelve the answer is blended toward the brand baseline in
+# proportion to how much evidence there was, and the share is written on the row.
+min_pairs = 12
+
+# Ninety seconds between the two frames of a pair. The binding constraint is not the ceremony but
+# the light: a room lit by late-afternoon sun through one window measurably changes inside three
+# minutes, and a pair straddling that change teaches AURA that a Sony is warmer than a Canon when
+# what actually happened is that the sun moved.
+max_gap_ms = 90000
+
+# The embedding similarity two frames need before they are even candidates. Deliberately permissive:
+# the subjects being similar is a cheap pre-filter, and `background_agreement` below is the check
+# that actually decides.
+min_similarity = 0.55
+
+# ---------------------------------------------------------------------------
+# The second shooter. How much of somebody's own way of working survives.
+# ---------------------------------------------------------------------------
+#
+# This is the row a product manager should re-read before changing. Section 6.3 asks for the
+# correction to be capped "so a deliberately moodier second shooter is harmonised, not erased", and
+# these two numbers are what that sentence means arithmetically.
+[shooter]
+# Sixty per cent of the measured habit. Two thirds of the way is where a gallery stops looking like
+# two people shot it and a second shooter can still be picked out of a contact sheet by somebody who
+# knows their work. Raising it toward one is section 12's second failure mode - "erasing a second
+# shooter's legitimate style" - written as a setting, and the loader refuses one.
+share = 0.60
+
+# A third of a stop, absolutely, whatever the share works out at. The two caps are not redundant:
+# the share bounds the correction relative to the habit and this bounds it outright, so a second
+# shooter who works a stop and a half darker is moved by a third of a stop rather than by nine
+# tenths of one.
+max_ev = 0.30
+
+# ---------------------------------------------------------------------------
+# The scenes. Twenty-three rows, one per SceneId, each argued over.
+# ---------------------------------------------------------------------------
+#
+# Two decisions per scene, and they are about *evidence* rather than about how far a camera may
+# move - the bounds above are global because a camera's colour science is, and a scene cannot make
+# a Sony more Sony.
+#
+#   pairable             - may two frames of this scene be used as proof that two bodies were in
+#                          the same light? False wherever the light moves *within* the scene, so
+#                          that two frames ninety seconds apart were not in the same light however
+#                          similar they look.
+#   background_agreement - how closely the surroundings of two frames must agree before the pair is
+#                          believed. May be raised above the contract's 0.70 floor and never
+#                          lowered.
+#   correct_shooter      - is a systematic exposure offset in this scene a *habit*, or is it the
+#                          photograph? False wherever the exposure is the point.
+
+# --- getting ready ---------------------------------------------------------
+
+# A hotel room with one big window. The most stable light at a whole wedding and the place two
+# shooters most often work side by side, so this is the scene most likely to supply the twelve
+# pairs the solver wants. Shooter habit is real here and worth correcting.
+[[scene]]
+scene = "getting_ready_bride"
+pairable = true
+background_agreement = 0.70
+correct_shooter = true
+
+[[scene]]
+scene = "getting_ready_groom"
+pairable = true
+background_agreement = 0.70
+correct_shooter = true
+
+# Rings on a windowsill, shoes on a chair, the invitation suite. Two photographers shooting details
+# are shooting *different objects*, so a high subject similarity here is often two different flat
+# lays that happen to embed alike - hence the raised agreement floor. Exposure on a detail is a
+# choice about the object rather than a habit.
+[[scene]]
+scene = "details"
+pairable = true
+background_agreement = 0.82
+correct_shooter = false
+
+# --- the first look --------------------------------------------------------
+
+# Almost always both photographers, almost always outdoors, and almost always four minutes long.
+# Excellent pairing evidence. The exposure is frequently a deliberate silhouette or a backlit
+# flare, which is why the habit half is off.
+[[scene]]
+scene = "first_look"
+pairable = true
+background_agreement = 0.75
+correct_shooter = false
+
+# --- the ceremony ----------------------------------------------------------
+
+# The aisle. Both cameras, one room, one light, minutes apart: the single best source of matched
+# pairs at a wedding, and the scene section 6.1 is written about.
+[[scene]]
+scene = "ceremony_entrance"
+pairable = true
+background_agreement = 0.70
+correct_shooter = true
+
+[[scene]]
+scene = "ceremony"
+pairable = true
+background_agreement = 0.70
+correct_shooter = true
+
+# A havan fire, a unity candle, a hand-fasting. The light genuinely changes as the rite proceeds -
+# a fire grows - so the agreement floor is raised rather than the scene made unpairable: two frames
+# whose surroundings still agree were still in the same light.
+[[scene]]
+scene = "ritual"
+pairable = true
+background_agreement = 0.80
+correct_shooter = true
+
+[[scene]]
+scene = "vows"
+pairable = true
+background_agreement = 0.75
+correct_shooter = true
+
+# Both photographers on the rings, both close, both at whatever exposure the hands needed. Good
+# colour evidence and bad habit evidence.
+[[scene]]
+scene = "rings"
+pairable = true
+background_agreement = 0.78
+correct_shooter = false
+
+[[scene]]
+scene = "kiss"
+pairable = true
+background_agreement = 0.75
+correct_shooter = true
+
+# --- portraits -------------------------------------------------------------
+
+# Family formals are the most controlled light of the day and the second shooter is usually beside
+# the lead rather than roaming. Strong evidence on both counts.
+[[scene]]
+scene = "family_portrait"
+pairable = true
+background_agreement = 0.72
+correct_shooter = true
+
+[[scene]]
+scene = "group_portrait"
+pairable = true
+background_agreement = 0.72
+correct_shooter = true
+
+# A couple session is where two photographers deliberately shoot differently - one wide and clean,
+# one long and flared - so exposure differences here are taste rather than habit.
+[[scene]]
+scene = "couple_portrait"
+pairable = true
+background_agreement = 0.75
+correct_shooter = false
+
+# The sun sets during golden hour. That is what it is. Ninety seconds is a real colour change here
+# in a way it is not indoors, so the agreement floor is the highest in the table.
+[[scene]]
+scene = "golden_hour"
+pairable = true
+background_agreement = 0.88
+correct_shooter = false
+
+# --- the reception ---------------------------------------------------------
+
+# Usually the room lights are down and the flashes are up. Pairable, and the flash population is
+# where most of this evidence lands - which is exactly why fingerprints and transforms are keyed on
+# the flash state.
+[[scene]]
+scene = "reception_entrance"
+pairable = true
+background_agreement = 0.75
+correct_shooter = true
+
+# One person at a microphone, two photographers on them for ten minutes from two angles. Reliable
+# pairs and a reliable habit measurement.
+[[scene]]
+scene = "speeches"
+pairable = true
+background_agreement = 0.72
+correct_shooter = true
+
+[[scene]]
+scene = "cake"
+pairable = true
+background_agreement = 0.75
+correct_shooter = true
+
+# A spotlight that moves and often changes colour. Not pairable: two frames of a first dance ninety
+# seconds apart were lit by two different things, and a pair from here would teach the solver that
+# one brand is magenta.
+[[scene]]
+scene = "first_dance"
+pairable = false
+background_agreement = 0.90
+correct_shooter = false
+
+# Six moving heads, a haze machine and a DJ with a colour palette. The single worst place in a
+# wedding to measure a camera against another camera.
+[[scene]]
+scene = "dance_floor"
+pairable = false
+background_agreement = 0.90
+correct_shooter = false
+
+# --- everything else -------------------------------------------------------
+
+# Candids happen everywhere, which is the problem: the scene label says nothing about the room. The
+# agreement floor is raised and the habit half is on, because a candid exposure is the least
+# deliberate exposure at a wedding and therefore the best evidence of how somebody works.
+[[scene]]
+scene = "candid"
+pairable = true
+background_agreement = 0.82
+correct_shooter = true
+
+# An empty marquee, the church exterior, the table settings before anybody arrives. Stable light,
+# and both photographers shoot it while waiting. Good pairs.
+[[scene]]
+scene = "venue"
+pairable = true
+background_agreement = 0.75
+correct_shooter = true
+
+# Sparklers and confetti at night. The exposure is the photograph; the light is a hand-held flame.
+[[scene]]
+scene = "exit"
+pairable = false
+background_agreement = 0.90
+correct_shooter = false
+
+# The row a frame gets when phase 07 could not say what it is of. Pairable, because an unclassified
+# frame is usually an ordinary one, but at the strictest agreement in the table and with the habit
+# half off - an unargued scene is one where the safe direction is to do less.
+[[scene]]
+scene = "unknown"
+pairable = true
+background_agreement = 0.88
+correct_shooter = false

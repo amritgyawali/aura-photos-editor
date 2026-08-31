@@ -38,9 +38,18 @@ use aura_app::contract::ipc::{
 // read both: a project at 100 % coverage with 20 % anchored has had almost nothing done to
 // it, because an unanchored node produces a zero delta for every frame in it.
 use aura_app::contract::ipc::{
-    DisableGalleryInput, GalleryDeltaDto, GalleryOutlierDto, GalleryOverrideInput,
-    GalleryPassDto, GalleryPassInput, GalleryReasonDto, GalleryStatusDto, PinAnchorInput,
-    SceneNodeDto,
+    DisableGalleryInput, GalleryDeltaDto, GalleryOutlierDto, GalleryOverrideInput, GalleryPassDto,
+    GalleryPassInput, GalleryReasonDto, GalleryStatusDto, PinAnchorInput, SceneNodeDto,
+};
+// PHASE-26. The multi-camera matching surface: eleven commands whose subject is a camera body
+// rather than a photograph or a wedding. `CameraStatusDto` carries the evidence beside every
+// number and `baselinesMeasured` beside the whole thing, because a body corrected from twenty
+// pairs of its own ceremony and one corrected from a fabricated brand setting are the same
+// arithmetic and completely different claims.
+use aura_app::contract::ipc::{
+    CameraFingerprintDto, CameraOverrideInput, CameraPassDto, CameraPassInput, CameraReasonDto,
+    CameraReportDto, CameraStatusDto, CameraTransformDto, DisableCameraInput, MatchedPairDto,
+    SetCameraReferenceInput, ShooterBiasDto,
 };
 // PHASE-19.
 use aura_app::contract::ipc::{
@@ -2086,6 +2095,127 @@ async fn cleanup_reason_codes(state: State<'_, AppState>) -> IpcResult<Vec<Clean
         .map_err(|_| background_request_failed())?
 }
 
+// PHASE-26. Eleven commands, all of them off the UI thread. The pass is the one that takes real
+// time - it fingerprints every body, pairs two cameras across a whole wedding and solves a bounded
+// descent per body - and it runs to completion rather than returning a job id, because a project
+// half solved against one reference and half against another has been matched to nothing.
+// ADR-0054 section 5.
+#[tauri::command]
+async fn camera_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<CameraStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::camera_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn camera_transforms(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<CameraTransformDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::camera_transforms(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn camera_fingerprints(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<CameraFingerprintDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::camera_fingerprints(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn camera_reports(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<CameraReportDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::camera_reports(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn camera_pairs(
+    state: State<'_, AppState>,
+    project_id: String,
+    camera_id: String,
+    limit: usize,
+) -> IpcResult<Vec<MatchedPairDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::camera_pairs(&app, &project_id, &camera_id, limit)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn camera_shooter_bias(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<ShooterBiasDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::camera_shooter_bias(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn camera_pass(
+    state: State<'_, AppState>,
+    input: CameraPassInput,
+) -> IpcResult<CameraPassDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::camera_pass(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_camera_reference(
+    state: State<'_, AppState>,
+    input: SetCameraReferenceInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_camera_reference(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn disable_camera(state: State<'_, AppState>, input: DisableCameraInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::disable_camera(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_camera_override(
+    state: State<'_, AppState>,
+    input: CameraOverrideInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_camera_override(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn camera_reason_codes() -> IpcResult<Vec<CameraReasonDto>> {
+    Ok(aura_app::camera_reason_codes())
+}
+
 // PHASE-25. Nine commands, all of them off the UI thread. The pass is the one that takes real time
 // - it walks every photograph in a project through three services and solves a tree - and it runs
 // to completion rather than returning a job id, because a half-solved tree has no state a reader
@@ -2179,10 +2309,7 @@ async fn set_gallery_override(
 }
 
 #[tauri::command]
-async fn disable_gallery(
-    state: State<'_, AppState>,
-    input: DisableGalleryInput,
-) -> IpcResult<()> {
+async fn disable_gallery(state: State<'_, AppState>, input: DisableGalleryInput) -> IpcResult<()> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::disable_gallery(&app, input))
         .await
@@ -2345,6 +2472,17 @@ fn main() {
             set_gallery_override,
             disable_gallery,
             gallery_reason_codes,
+            camera_status,
+            camera_transforms,
+            camera_fingerprints,
+            camera_reports,
+            camera_pairs,
+            camera_shooter_bias,
+            camera_pass,
+            set_camera_reference,
+            disable_camera,
+            set_camera_override,
+            camera_reason_codes,
             set_framing,
             plan_geometry,
             analyse_integrity,
@@ -2399,6 +2537,11 @@ fn main() {
             moment_of_image,
             moment_peak,
             moment_status,
+            // Registered by PHASE-26. It has been defined and unregistered since phase 10,
+            // so `within_moment` reached a window that did not answer to it - the same class of
+            // defect the phase 20-22 merge found ninety of, in the one place the count had
+            // stayed at ninety-nine per cent ever since.
+            within_moment,
             move_chapter_boundary,
             people_status,
             prefer_frame,

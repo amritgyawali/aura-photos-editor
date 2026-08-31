@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aura_brain_gallery::api::{ConsistencyPass, Gallery};
+use aura_brain_gallery::camera::store::CameraStore;
+use aura_brain_gallery::camera::{CameraFrame, CameraMatching, Field, MatchingPass};
 use aura_brain_gallery::store::GalleryStore;
 use aura_brain_gallery::tree::Frame as GalleryFrame;
 use aura_brain_photo::colour::api::FrameExif as ColourExif;
@@ -2064,6 +2066,217 @@ impl AppState {
         ConsistencyPass::new(Arc::clone(&self.catalog), Arc::clone(&self.clock))
     }
 
+    /// The camera-matching store for this catalog. PHASE-26.
+    ///
+    /// Stateless, like every store since phase 09.
+    #[must_use]
+    pub fn camera_store(&self) -> CameraStore {
+        CameraStore::new(Arc::clone(&self.catalog), Arc::clone(&self.clock))
+    }
+
+    /// The frozen `CameraMatchService` for this catalog. PHASE-26.
+    ///
+    /// Infallible, for the reason `gallery()` is: `camera_match.toml` and the eight brand baselines
+    /// are bundled, and both loaders fall back on the compiled-in copy, so a service always exists
+    /// to answer questions about rows that are already stored. A *pass* that could not load a
+    /// studio's own table would be a different matter, and `camera_pass` raises `AURA-ML-5133`
+    /// for it.
+    #[must_use]
+    pub fn camera_matching(&self) -> Arc<CameraMatching> {
+        Arc::new(CameraMatching::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The camera-matching pass. PHASE-26.
+    ///
+    /// **No skin locus set is attached here**; the caller passes phase 15's own loci to
+    /// `MatchingPass::run`. In this build there are none on a real photograph, so section 6.2's
+    /// hard constraint admits every candidate and `CameraCode::FingerprintThin` is what says the
+    /// fingerprint rested on less than it wanted - a constraint that never fired and a constraint
+    /// that never ran are different facts, and only the reason set can tell them apart.
+    #[must_use]
+    pub fn camera_pass(&self) -> MatchingPass {
+        MatchingPass::new(Arc::clone(&self.catalog), Arc::clone(&self.clock))
+    }
+
+    /// Assemble one project's frames for the camera-matching pass. PHASE-26.
+    ///
+    /// The one place this product reads a photograph's **body** together with what phases 05, 07,
+    /// 15, 16 and 25 decided about it. Every one of the five is read through its own store or its
+    /// own frozen service and none of them is re-derived here.
+    ///
+    /// A photograph whose body cannot be named is still included, under `CameraId::UNKNOWN`: a
+    /// wedding shot on one unidentified camera must still be fingerprinted, and phase 08 made the
+    /// same call for its own grouping. What excludes a frame from *pairing* is the absence of a
+    /// scene node, because two frames in different nodes were shot under different light by
+    /// construction.
+    ///
+    /// # Errors
+    ///
+    /// Whatever the services and stores raised.
+    pub fn camera_frames(&self, project: &ProjectId) -> AuraResult<Vec<CameraFrame>> {
+        use aura_brain_gallery::camera::fingerprint::BackgroundStats;
+        use aura_core::contract::camera::{Brand, FlashState};
+        use aura_core::contract::colour::ColourService;
+        use aura_core::contract::gallery::GalleryService;
+        use aura_core::contract::moment::CameraId;
+        use aura_core::contract::scene::StoryService;
+        use aura_core::contract::tone::ToneService;
+
+        let story = self.story()?;
+        let tone = self.tone();
+        let colour = self.colour();
+        let gallery = self.gallery();
+        let embeddings = self.embedding_store();
+        let key = project.to_db();
+
+        // One query for the body of every photograph, ordered the way the timeline is. The join is
+        // on `body_serial` because that is what `camera` is keyed by; a photograph whose serial is
+        // absent joins to nothing and gets `CameraId::UNKNOWN`, which is a real value rather than
+        // a gap.
+        let rows: Vec<(
+            String,
+            i64,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+        )> = self.catalog.read({
+            let key = key.clone();
+            move |conn| {
+                let mut statement = conn
+                    .prepare(
+                        "SELECT p.photo_id,
+                                    COALESCE(p.sub_sec, 0),
+                                    c.camera_id,
+                                    p.camera_make,
+                                    c.shooter_label,
+                                    p.flash_fired
+                               FROM photo p
+                               LEFT JOIN camera c
+                                      ON c.project_id = p.project_id
+                                     AND c.body_serial = COALESCE(p.camera_serial, '')
+                              WHERE p.project_id = ?1
+                              ORDER BY COALESCE(p.timeline_time, p.capture_time), p.photo_id",
+                    )
+                    .map_err(|err| {
+                        aura_core::errors::db::statement_failed("camera frames", &err)
+                    })?;
+                let mapped = statement
+                    .query_map(rusqlite::params![key], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                            row.get::<_, Option<String>>(3)?,
+                            row.get::<_, Option<String>>(4)?,
+                            row.get::<_, Option<i64>>(5)?,
+                        ))
+                    })
+                    .map_err(|err| {
+                        aura_core::errors::db::statement_failed("camera frames", &err)
+                    })?;
+                let mut out = Vec::new();
+                for row in mapped {
+                    out.push(
+                        row.map_err(|err| aura_core::errors::db::statement_failed("photo", &err))?,
+                    );
+                }
+                Ok(out)
+            }
+        })?;
+
+        let mut frames = Vec::with_capacity(rows.len());
+        for (index, (id, sub, camera, make, shooter, flash)) in rows.iter().enumerate() {
+            let Ok(photo) = PhotoId::from_db(id) else {
+                continue;
+            };
+            // The ordinal is the timeline and the sub-second fraction breaks ties inside one
+            // second - phase 08's `sub_sec_ms`, which is what stops fourteen frames of a 10 fps
+            // burst sorting arbitrarily. The pairing reads this as a distance.
+            let timeline_ms = i64::try_from(index).unwrap_or(0) * 1_000 + (*sub).clamp(0, 999);
+
+            let estimate = tone.of_image(photo)?;
+            let decision = colour.of_image(photo)?;
+            let scene = story
+                .scene(photo)?
+                .map(|result| result.scene)
+                .unwrap_or_default();
+            let white_uv = estimate.as_ref().and_then(|e| {
+                e.dominant_on_subject
+                    .and_then(|dominant| e.illuminants.get(dominant).map(|light| light.uv))
+            });
+            let stored = embeddings.load_one(&key, photo)?;
+            let background = stored.as_ref().map(|row| {
+                let luma = row.descriptors.luma;
+                BackgroundStats::from_descriptors(
+                    &row.descriptors.hsv_hist,
+                    [luma.mean, luma.p1, luma.p50, luma.p99],
+                    row.descriptors.edge_energy,
+                )
+            });
+            let embedding = stored.as_ref().map(|row| row.embedding.to_f32());
+
+            frames.push(CameraFrame {
+                image: photo,
+                camera: CameraId::new(camera.clone().unwrap_or_default()),
+                brand: make.as_deref().map(Brand::from_make).unwrap_or_default(),
+                shooter: shooter.clone().unwrap_or_else(|| "primary".to_string()),
+                flash: FlashState::of(flash.map(|fired| fired == 1)),
+                node: gallery.node_of(photo)?,
+                scene,
+                timeline_ms,
+                cct_k: estimate.as_ref().map(|e| e.temperature_k),
+                tint: estimate.as_ref().map(|e| e.tint),
+                exposure_ev: estimate.as_ref().map(|e| e.exposure_ev),
+                subject_luma: estimate.as_ref().map(|e| e.subject_luma_target),
+                wb_conf: estimate.as_ref().map_or(0.0, |e| e.wb_conf),
+                white_uv,
+                // Condition C3. Phase 25's `SKIN_FIELD_AVAILABLE` is false, so no photograph in
+                // this build carries an identity-scoped skin region and the skin term of the
+                // appearance distance is unmeasured rather than met. `CameraOutline`'s two skin
+                // figures are zero, and `report::summary` says "skin was not measured at this
+                // wedding" rather than reporting a promise nothing tested.
+                skin_uv: None,
+                skin_luma: None,
+                contrast: decision.as_ref().map(|d| d.contrast),
+                saturation: decision.as_ref().map(|d| d.saturation),
+                signature: decision.as_ref().map(aura_brain_gallery::api::signature_of),
+                embedding,
+                background,
+            });
+        }
+        Ok(frames)
+    }
+
+    /// The camera corrections that apply to one project's photographs. PHASE-26 section 6.4.
+    ///
+    /// **The one route by which a camera transform reaches phase 25**, and therefore the one place
+    /// the ordering the phase document requires is enforced. An empty field is a consistency pass
+    /// that runs exactly as it did before phase 26 existed, which is what makes that phase additive
+    /// rather than a change to this one.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the transforms cannot be read.
+    pub fn camera_field(&self, project: &ProjectId) -> AuraResult<Field> {
+        use aura_core::contract::camera::CameraMatchService;
+
+        let matching = self.camera_matching();
+        let transforms = matching.transforms(*project)?;
+        if transforms.is_empty() {
+            return Ok(Field::empty());
+        }
+        let frames: Vec<_> = self
+            .camera_frames(project)?
+            .into_iter()
+            .map(|frame| (frame.image, frame.camera, frame.flash))
+            .collect();
+        Ok(Field::from_transforms(&transforms, &frames))
+    }
+
     /// Assemble one project's frames for the consistency pass. PHASE-25.
     ///
     /// The one place this product reads phases 07, 15 and 16 together, and it reads all three
@@ -2122,7 +2335,21 @@ impl AppState {
             ordered.push((*photo, ms));
         }
 
-        aura_brain_gallery::api::collect_frames(
+        // PHASE-26 section 6.4, and this is where the ordering lives. The camera corrections are
+        // folded into every frame *before* the consistency pass builds its tree, so its nodes, its
+        // change points, its anchors and its targets are computed over numbers that are already
+        // comparable across bodies. A project that has never been matched has an empty field and
+        // this call is exactly what it was before phase 26 existed.
+        let camera = self.camera_field(project).unwrap_or_else(|err| {
+            tracing::warn!(
+                error = %err.code,
+                "camera transforms could not be read; the consistency pass runs on unmatched \
+                 frames, which is what it did before phase 26"
+            );
+            Field::empty()
+        });
+
+        aura_brain_gallery::api::collect_frames_with_camera(
             *project,
             &ordered,
             &aura_brain_gallery::api::Context {
@@ -2132,6 +2359,7 @@ impl AppState {
                 // Condition C2. See `gallery_pass`.
                 skin: None,
             },
+            &camera,
         )
     }
 

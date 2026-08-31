@@ -6831,3 +6831,356 @@ pub struct DisableGalleryInput {
     /// True to leave this photograph out of the gallery match entirely.
     pub disabled: bool,
 }
+
+// ---------------------------------------------------------------------------
+// Multi-camera and second-shooter matching. PHASE-26, ADR-0054.
+// ---------------------------------------------------------------------------
+//
+// Ten commands, and the shape of the block below is decided by one sentence in section 13: "the
+// per-camera report explains what was corrected and on what evidence." Three consequences.
+//
+// **The evidence is on the wire beside every number, and never as a summary.** `CameraTransformDto`
+// carries `source`, `blend`, `evidencePairs`, `heldoutPairs` and both held-out distances. A panel
+// that received only "corrected by 300 K" could not tell a body matched from twenty pairs of its
+// own ceremony from one matched from a bundled brand setting, and those are the same arithmetic and
+// completely different claims.
+//
+// **`baselinesMeasured` is a field rather than an inference.** It is false in this build, because
+// every file in `assets/camera_baselines/` was fabricated rather than measured. A panel that had to
+// guess would eventually render a brand fallback as though it were a laboratory measurement. Phase
+// 24 put `detectorTrained` on the wire for the same reason and phase 25 `skinFieldAvailable`.
+//
+// **The measured habit and the applied correction are separate fields.** `ShooterBiasDto` carries
+// both, so a photographer can see that their second shooter works two thirds of a stop darker and
+// has been moved by a third of one. A surface that sent only the second could not explain the cap
+// that is the whole point of section 6.3.
+//
+// What is *not* here and cannot be added without an ADR: no strength, no share, no way to raise a
+// bound, no pixels, no apply, and nothing that would let a caller ask for a correction larger than
+// the frozen contract's ceilings.
+
+/// One reason a camera was matched the way it was.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraReasonDto {
+    /// The stable slug a filter matches on. Never localised.
+    pub code: String,
+    /// The sentence a photographer reads. Rendered from the code, never stored.
+    pub text: String,
+    /// True when this code says AURA declined to correct, or corrected on less evidence.
+    pub withdraws: bool,
+}
+
+/// How one body rendered this wedding, in one flash state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraFingerprintDto {
+    /// The catalog camera id.
+    pub camera_id: String,
+    /// `ambient` or `flash`.
+    pub flash: String,
+    /// The manufacturer slug, for the baseline lookup only.
+    pub brand: String,
+    /// Where this body puts skin, in CIE 1976 u'v'.
+    pub skin_chroma: [f32; 2],
+    /// Where it puts a neutral.
+    pub white_point: [f32; 2],
+    /// How gently the highlights roll off, `0..1`.
+    pub highlight_rolloff: f32,
+    /// The robust subject luminance its frames sit at.
+    pub subject_luma: f32,
+    /// How many frames it was measured from.
+    pub samples: u32,
+    /// What the measurement is worth, `0..1`.
+    pub confidence: f32,
+    /// Why it is what it is.
+    pub reasons: Vec<CameraReasonDto>,
+}
+
+/// What one body needs to look like the reference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraTransformDto {
+    /// The body being corrected.
+    pub camera_id: String,
+    /// `ambient` or `flash`.
+    pub flash: String,
+    /// The body it is corrected toward.
+    pub reference_id: String,
+    /// Kelvin, within 900.
+    pub d_cct: f32,
+    /// Tint units, within 20.
+    pub d_tint: f32,
+    /// Stops, within 0.6.
+    pub d_exposure: f32,
+    /// Recipe units, within 12.
+    pub d_saturation: f32,
+    /// Linear R, G, B gains around one.
+    pub channel_gain: [f32; 3],
+    /// Shadow, mid and highlight multipliers around one.
+    pub contrast_shape: [f32; 3],
+    /// Cross-camera skin dE00 before the correction.
+    pub skin_de00_before: f32,
+    /// And after it. The number the phase's headline promise is measured on.
+    pub skin_de00_after: f32,
+    /// True when a skin cap bit.
+    pub skin_capped: bool,
+    /// True when phase 15's skin locus admitted the corrected chromaticity.
+    pub skin_locus_valid: bool,
+    /// `matched_pairs`, `blended` or `brand_baseline`.
+    pub source: String,
+    /// The share of the solved answer in the blend, `0..1`.
+    pub blend: f32,
+    /// Verified pairs the correction was fitted on.
+    pub evidence_pairs: u32,
+    /// Pairs held back and used only to check it.
+    pub heldout_pairs: u32,
+    /// The held-out appearance distance before the correction.
+    pub heldout_before: f32,
+    /// And after it. Equal to the first when the check did not run.
+    pub heldout_after: f32,
+    /// `true`, `false` or absent - the third being "there was nothing to check against".
+    pub heldout_improved: Option<bool>,
+    /// Which bound stopped it going further, when one did.
+    pub bounded_by: Option<String>,
+    /// How far the body moved, `0..1`, as the worst of its axes.
+    pub magnitude: f32,
+    /// What the correction is worth, `0..1`.
+    pub confidence: f32,
+    /// True when matching is switched on for this body.
+    pub enabled: bool,
+    /// True when the photographer set these values by hand.
+    pub user_edited: bool,
+    /// Why it is what it is, strongest first.
+    pub reasons: Vec<CameraReasonDto>,
+}
+
+/// Two photographs, from two bodies, of the same conditions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MatchedPairDto {
+    /// This pair.
+    pub pair_id: String,
+    /// The reference body's photograph.
+    pub left_photo_id: String,
+    /// The other body's.
+    pub right_photo_id: String,
+    /// `ambient` or `flash`.
+    pub flash: String,
+    /// How far apart in time they were taken, in milliseconds.
+    pub gap_ms: i64,
+    /// How alike the subjects are, `0..1`.
+    pub subject_similarity: f32,
+    /// How much the **backgrounds** agree, `0..1`. The number that decides.
+    pub background_agreement: f32,
+    /// True when the pair passed background verification.
+    pub verified: bool,
+    /// True when it was held out of the fit and used only to check it.
+    pub held_out: bool,
+}
+
+/// How differently one photographer exposes, in one kind of photograph.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShooterBiasDto {
+    /// The shooter label.
+    pub shooter: String,
+    /// The body they were carrying.
+    pub camera_id: String,
+    /// The scene slug.
+    pub scene: String,
+    /// The systematic offset that was **measured**, in stops.
+    pub measured_ev: f32,
+    /// The part of it that is **applied**, in stops, opposite in sign.
+    pub applied_ev: f32,
+    /// How many photographs the median was taken over.
+    pub frames: u32,
+    /// True when a cap reduced the correction.
+    pub capped: bool,
+    /// Why it is what it is.
+    pub reasons: Vec<CameraReasonDto>,
+}
+
+/// One body's report, in a photographer's own words.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraReportDto {
+    /// The body.
+    pub camera_id: String,
+    /// `ambient` or `flash`.
+    pub flash: String,
+    /// The shooter label, when the catalog carries one.
+    pub shooter: Option<String>,
+    /// True when this body is the one everything else is matched to.
+    pub is_reference: bool,
+    /// The one line a collapsed row shows.
+    pub headline: String,
+    /// Where the correction came from.
+    pub evidence: String,
+    /// One line per thing that was corrected.
+    pub corrections: Vec<String>,
+    /// One line per thing that was deliberately not done.
+    pub withdrawals: Vec<String>,
+    /// The cross-camera skin difference left after matching, in dE00.
+    pub skin_de00_after: f32,
+    /// True when this body meets the headline promise.
+    pub meets_promise: bool,
+    /// How far it moved, `0..1`.
+    pub magnitude: f32,
+    /// What the correction is worth, `0..1`.
+    pub confidence: f32,
+}
+
+/// What the Camera Match panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs whose body carries a correction.
+    pub matched: u32,
+    /// The denominator, `0..1`. Every photograph, as phases 09, 10, 15 and 25 count it.
+    pub coverage: f32,
+    /// Bodies seen.
+    pub cameras: u32,
+    /// Bodies fingerprinted from this wedding's own frames.
+    pub fingerprinted: u32,
+    /// Corrections solved on this wedding's own pairs. **The number that matters when it is low.**
+    pub solved_from_pairs: u32,
+    /// Corrections blended between this wedding and a brand baseline.
+    pub blended: u32,
+    /// Corrections that are a brand baseline alone.
+    pub baseline_only: u32,
+    /// Verified pairs found.
+    pub pairs: u32,
+    /// Candidate pairs rejected because their backgrounds disagreed.
+    pub pairs_rejected: u32,
+    /// Pairs held out of every fit.
+    pub heldout_pairs: u32,
+    /// Bodies whose flash and ambient halves were both fingerprinted.
+    pub flash_separated: u32,
+    /// Photographers whose exposure habit was measured.
+    pub shooters_measured: u32,
+    /// Habit corrections a cap reduced.
+    pub shooters_capped: u32,
+    /// Bodies a photographer switched matching off for.
+    pub disabled: u32,
+    /// Bodies a photographer set by hand.
+    pub user_edited: u32,
+    /// Mean cross-camera skin dE00 before matching. Zero when skin was not measured at all.
+    pub skin_de00_before: f32,
+    /// And after.
+    pub skin_de00_after: f32,
+    /// The worst body's, which is what the promise is checked against.
+    pub worst_skin_de00: f32,
+    /// The reference body, when one was chosen.
+    pub reference_id: Option<String>,
+    /// `user`, `primary_shooter` or `frame_count`.
+    pub reference_source: String,
+    /// Manufacturers this build has no baseline for.
+    pub unknown_brands: Vec<String>,
+    /// **False in this build.** Every bundled brand baseline was fabricated rather than measured.
+    pub baselines_measured: bool,
+    /// **False in this build.** No photograph carries an identity-scoped skin region, so the skin
+    /// term of the appearance distance is unmeasured rather than met.
+    pub skin_field_available: bool,
+    /// Which policy table the stored rows were bounded by.
+    pub policy_ver: u16,
+}
+
+/// Ask for a project's cameras to be matched.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraPassInput {
+    /// The project.
+    pub project_id: String,
+}
+
+/// What one matching pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraPassDto {
+    /// Bodies seen.
+    pub cameras: u32,
+    /// The reference body.
+    pub reference_id: Option<String>,
+    /// How it was chosen.
+    pub reference_source: String,
+    /// Verified pairs found.
+    pub pairs: u32,
+    /// Candidate pairs rejected on their backgrounds.
+    pub pairs_rejected: u32,
+    /// Pairs held out of every fit.
+    pub heldout_pairs: u32,
+    /// Corrections solved from this wedding's own pairs.
+    pub solved: u32,
+    /// Corrections blended toward a baseline.
+    pub blended: u32,
+    /// Corrections that are a baseline alone.
+    pub baseline_only: u32,
+    /// Fits thrown away because they did not improve held-out evidence.
+    pub heldout_failures: u32,
+    /// The mean appearance distance before matching.
+    pub distance_before: f32,
+    /// And after.
+    pub distance_after: f32,
+    /// The mean grade-signature distance before.
+    pub signature_before: f32,
+    /// And after.
+    pub signature_after: f32,
+    /// The worst per-body skin dE00 after matching.
+    pub worst_skin_de00: f32,
+    /// Photographers whose habit was measured.
+    pub shooters_measured: u32,
+    /// Habit corrections a cap reduced.
+    pub shooters_capped: u32,
+    /// One paragraph, in the product's own words.
+    pub summary: String,
+}
+
+/// Choose the body everything else is matched to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCameraReferenceInput {
+    /// The project.
+    pub project_id: String,
+    /// The body.
+    pub camera_id: String,
+}
+
+/// Switch matching off for one body, or back on. Both flash states move together.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisableCameraInput {
+    /// The project.
+    pub project_id: String,
+    /// The body.
+    pub camera_id: String,
+    /// True to leave this camera out of matching entirely.
+    pub disabled: bool,
+}
+
+/// What the photographer set instead, for one body in one flash state.
+///
+/// Four optional movements, every one bounded by the frozen contract, **refused rather than
+/// clamped** when it is outside. There is no strength field and no way to raise a bound: a camera
+/// that needs to move further than 900 K is a camera whose per-frame estimates are wrong, and phase
+/// 15's own override is where that is fixed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraOverrideInput {
+    /// The project.
+    pub project_id: String,
+    /// The body.
+    pub camera_id: String,
+    /// `ambient` or `flash`.
+    pub flash: String,
+    /// Kelvin, within 900.
+    pub d_cct: Option<f32>,
+    /// Tint units, within 20.
+    pub d_tint: Option<f32>,
+    /// Stops, within 0.6.
+    pub d_exposure: Option<f32>,
+    /// Recipe units, within 12.
+    pub d_saturation: Option<f32>,
+}
