@@ -92,6 +92,17 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // exceeds the documented maximum movement" a gate. A digest is what stops the second layer
     // being quietly widened to match a first layer somebody had already changed.
     "crates/aura-catalog/migrations/0025_gallery.sql",
+    // PHASE-26. The migration only; this phase ships no shader either. `camera_match.toml` is not
+    // frozen for the reason `consistency.toml` is not - a studio is meant to edit it, and
+    // `Matching::load` holds it to the contract's bounds rather than a digest.
+    //
+    // The eight files in `assets/camera_baselines/` are not frozen either, and that is the
+    // interesting half: every one of them carries `measured = false`, and the *point* of the phase
+    // is that they are replaced when somebody measures a body. Freezing them would make the first
+    // real measurement a contract change. What is frozen instead is the loader's refusal - a file
+    // claiming `measured = true` without a `measured_by` and a `measured_at` is rejected - and that
+    // lives in `contract/camera.rs`, which is.
+    "crates/aura-catalog/migrations/0026_camera_match.sql",
     // PHASE-23. The migration, and the shader: `geometry.wgsl` is the GPU half of a resample
     // the reference path also performs, and a shader that drifts while no device can run it is
     // a soft frame edge nobody finds until one arrives. `shader_parity.rs` holds it to the

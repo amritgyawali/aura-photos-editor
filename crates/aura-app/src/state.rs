@@ -178,6 +178,21 @@ struct InferSlot {
     engine: Option<Arc<InferEngine>>,
 }
 
+/// One photograph's camera row, as the join in [`AppState::camera_frames`] returns it.
+///
+/// The photograph, its sub-second fraction, the body id, the make, the shooter label and whether
+/// the flash fired. A named alias rather than the six-element tuple written inline, so a reader
+/// counting positions has something to count against - and so `clippy::type_complexity` is
+/// satisfied by naming the thing rather than by silencing the lint.
+type CameraRow = (
+    String,
+    i64,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<i64>,
+);
+
 impl AppState {
     /// Open a catalog and build the state around it.
     ///
@@ -2116,6 +2131,10 @@ impl AppState {
     /// # Errors
     ///
     /// Whatever the services and stores raised.
+    // One function: it reads five services and the catalog's own EXIF into one shape, and every
+    // field of that shape comes from a different place. Splitting it would mean passing five
+    // intermediate maps between private helpers with no other caller.
+    #[allow(clippy::too_many_lines)]
     pub fn camera_frames(&self, project: &ProjectId) -> AuraResult<Vec<CameraFrame>> {
         use aura_brain_gallery::camera::fingerprint::BackgroundStats;
         use aura_core::contract::camera::{Brand, FlashState};
@@ -2136,14 +2155,7 @@ impl AppState {
         // on `body_serial` because that is what `camera` is keyed by; a photograph whose serial is
         // absent joins to nothing and gets `CameraId::UNKNOWN`, which is a real value rather than
         // a gap.
-        let rows: Vec<(
-            String,
-            i64,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<i64>,
-        )> = self.catalog.read({
+        let rows: Vec<CameraRow> = self.catalog.read({
             let key = key.clone();
             move |conn| {
                 let mut statement = conn

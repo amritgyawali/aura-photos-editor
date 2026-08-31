@@ -386,6 +386,28 @@ consistency-eval CATALOG:
 consistency-selftest:
     python ml/eval/consistency_eval.py --self-test
 
+# The phase 26 gate. Migration 26 and its three triggers, the policy table a product
+# manager owns, the eight bundled brand baselines and the identity an unknown make
+# composes to, a whole synthetic two-camera wedding through the real pass, the ordering
+# that puts a camera correction into a frame before phase 25 builds its tree, the
+# fallback when two bodies never overlapped, the shooter cap, and a photographer's
+# reference choice surviving a re-pass. It prints what it does not prove at the end of
+# every run - see docs/progress/PHASE-26-EXIT.md conditions C1 to C4.
+phase-26-verify:
+    cargo run --release --package aura-cli -- verify --phase 26 --work target/phase26-verify
+
+# The phase 26 gate from the catalog side. Reads a real project read-only and reports the
+# cross-camera skin dE00, the grade distance, the source mix and each shooter's habit. It
+# is the one check that can catch a catalog written by a build whose bounds had widened,
+# and a shooter corrected by more than the whole of their own habit.
+camera-eval CATALOG:
+    python ml/eval/camera_match_eval.py {{CATALOG}}
+
+# The same, against a chosen answer. There are no multi-camera weddings in this
+# repository, so this is what CI runs.
+camera-selftest:
+    python ml/eval/camera_match_eval.py --self-test
+
 # The phase 23 gate from the Python side. There are no expert crop labels here,
 # so `--self-test` runs the whole computation against an authored answer.
 crop-eval:

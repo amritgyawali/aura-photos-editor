@@ -119,8 +119,14 @@ jobs:
       - name: crop agreement self-test
         run: python ml/eval/crop_agreement.py --self-test
 
+      - name: phase 26 verify - fingerprints, pairs, solver, ordering, fallback, shooter cap
+        run: cargo run --release --package aura-cli -- verify --phase 26 --work target/phase26-verify
+
       - name: consistency self-test
         run: python ml/eval/consistency_eval.py --self-test
+
+      - name: camera matching self-test
+        run: python ml/eval/camera_match_eval.py --self-test
 
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
@@ -229,6 +235,12 @@ jobs:
 
       - name: gallery budgets
         run: cargo test --release --package aura-perf --test gallery_budgets -- --test-threads=1 --nocapture
+
+      - name: camera matching evaluation gates
+        run: cargo test --release --package aura-brain-gallery --test camera_eval -- --nocapture
+
+      - name: camera budgets
+        run: cargo test --release --package aura-perf --test camera_budgets -- --test-threads=1 --nocapture
 
       # PHASE-19 section 11. The render row is waived twice over - no GPU backend
       # and no phase 18 matte reaching the pass - so what is asserted is the

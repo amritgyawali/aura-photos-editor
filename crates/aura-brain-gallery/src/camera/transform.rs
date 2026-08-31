@@ -276,14 +276,19 @@ pub fn measure(
     let mut contrast = 0.0_f32;
 
     for reading in readings {
-        let (right_white, right_signature, right_contrast, right_skin) = match transform {
+        let Corrected {
+            white: right_white,
+            signature: right_signature,
+            contrast: right_contrast,
+            skin: right_skin,
+        } = match transform {
             Some(t) => corrected(reading, t),
-            None => (
-                reading.right_white,
-                reading.right_signature,
-                reading.right_contrast,
-                reading.right_skin,
-            ),
+            None => Corrected {
+                white: reading.right_white,
+                signature: reading.right_signature,
+                contrast: reading.right_contrast,
+                skin: reading.right_skin,
+            },
         };
 
         if let (Some((left_uv, left_luma)), Some((right_uv, right_luma))) =
@@ -319,11 +324,26 @@ pub fn measure(
     }
 }
 
+/// One half of a pair, after a transform has been applied to it.
+///
+/// A named struct rather than a four-tuple: `(white, signature, contrast, skin)` read at a call
+/// site is four positions a reader has to count, and the skin half is itself an optional pair -
+/// so the tuple was a `([f32; 2], [f32; 8], f32, Option<([f32; 2], f32)>)` that nobody could check
+/// at a glance.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Corrected {
+    /// The white point, in CIE 1976 `u'v'`.
+    white: [f32; 2],
+    /// The eight-number grade signature.
+    signature: [f32; 8],
+    /// The contrast reading, in the recipe's units.
+    contrast: f32,
+    /// The skin chromaticity and luminance, when this half carries a skin reading at all.
+    skin: Option<([f32; 2], f32)>,
+}
+
 /// What a transform does to the non-reference half of one reading.
-fn corrected(
-    reading: &PairReading,
-    transform: &CameraTransform,
-) -> ([f32; 2], [f32; 8], f32, Option<([f32; 2], f32)>) {
+fn corrected(reading: &PairReading, transform: &CameraTransform) -> Corrected {
     let white = shift_uv(reading.right_white, transform.d_cct, transform.d_tint);
     let mut signature = reading.right_signature;
     apply_to_signature(transform, &mut signature);
@@ -339,7 +359,12 @@ fn corrected(
             (luma * transform.d_exposure.exp2() + transform.skin_correction.d_luma).clamp(0.0, 1.0),
         )
     });
-    (white, signature, contrast, skin)
+    Corrected {
+        white,
+        signature,
+        contrast,
+        skin,
+    }
 }
 
 /// The distance between two grade signatures, `0..1`.

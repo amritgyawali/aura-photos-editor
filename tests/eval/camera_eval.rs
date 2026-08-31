@@ -441,7 +441,7 @@ fn gate_5_camera_transforms_precede_within_scene_normalisation() {
     let raw_cct = second[0].cct_k.expect("a temperature");
 
     let field = Field::from_transforms(
-        &[solved.transform.clone()],
+        std::slice::from_ref(&solved.transform),
         &[(image, CameraId::new(Body::SECOND.id), FlashState::Ambient)],
     );
     let mut gallery = vec![aura_brain_gallery::camera::fixtures::plain_gallery_frame(

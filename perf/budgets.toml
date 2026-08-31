@@ -1207,3 +1207,61 @@ max_ms_per_unit = 400
 # inside the headroom, and named here rather than discovered later.
 [size.gallery_store_per_1000_images]
 max_bytes = 500000
+
+# ---------------------------------------------------------------------------
+# PHASE-26 - camera and shooter matching
+# ---------------------------------------------------------------------------
+#
+# Section 11's three rows, all of them per *wedding* rather than per photograph - the second phase in
+# a row whose budgets have that shape, and for the same reason phase 25's do: a fingerprint is an
+# aggregate over everything a body shot, a pair is a relationship between two frames, and a transform
+# is solved once per body. There is no per-frame unit to divide by that would mean anything.
+#
+# Measured in `crates/aura-perf/tests/camera_budgets.rs` over a two-body, thousand-frame synthetic
+# wedding: discovery 1 ms, the whole pass 35 ms, 17 ms per camera. Three orders of magnitude inside
+# every row, for the reason phase 25's pass is: **it opens no pixels.** Every number it works on was
+# stored by phases 15, 16 and 25.
+#
+# The budgets keep their full section 11 values rather than being re-based onto the measurement, and
+# the reason is named rather than left to be discovered: this build measures **no skin**, because
+# phase 18's segmenter is untrained. When it is, every fingerprint gains one masked statistic per
+# contributing frame and the fingerprinting stage stops being arithmetic over stored rows. Phase 22's
+# rule about waived rows, read forwards.
+[stage.camera_discovery]
+max_elapsed_ms  = 18000
+max_ms_per_unit = 18000
+
+[stage.camera_solve]
+max_elapsed_ms  = 1000
+max_ms_per_unit = 1000
+
+[stage.camera_pass]
+max_elapsed_ms  = 25000
+max_ms_per_unit = 25000
+
+# Section 11 names no storage row. One is measured anyway, and it is the first in the product whose
+# shape is **bounded rather than proportional**.
+#
+# `pairs::find` truncates at `MAX_PAIRS_PER_CAMERA` verified pairs and the same number again of
+# rejected ones, so a two-body wedding stores a fixed number of pairs whether it is 200 frames or
+# 4,000. Everything else is one row per body per flash state, one per shooter and one per project.
+# Measured:
+#
+#   camera_pair                     44 B/image   capped, not proportional
+#   idx_camera_pair_camera          10 B/image
+#   camera_transform                 2 B/image   two bodies, two flash states
+#   camera_fingerprint              <1 B/image
+#   camera_shooter_bias             <1 B/image
+#   camera_reference                <1 B/image
+#                                 --------
+#   measured total                  57 B/image over 1,000 photographs
+#
+# 57,724 B over a thousand frames and 57,729 B over two thousand - which is the property the test
+# asserts, because a size assertion alone would pass on a build that had quietly removed the cap and
+# happened to be measured on a small fixture.
+#
+# **The first version of this note said the pair table grew with the square of the overlap.** It was
+# written before the measurement and was wrong about the *shape* rather than the size. Phase 21's
+# rule covers the sentence as well as the number.
+[size.camera_store_per_1000_images]
+max_bytes = 150000

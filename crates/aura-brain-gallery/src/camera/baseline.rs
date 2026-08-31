@@ -205,7 +205,9 @@ impl Departure {
             uv_len > SKIN_UV_CAP || self.skin_luma.abs() > SKIN_LUMA_CAP,
         );
 
-        let skin_scale = if uv_len > SKIN_UV_CAP && uv_len > 1e-9 {
+        // No epsilon guard beside this: `SKIN_UV_CAP` is a positive constant, so the test
+        // already excludes a zero divisor. The second condition read as a guard and was not one.
+        let skin_scale = if uv_len > SKIN_UV_CAP {
             SKIN_UV_CAP / uv_len
         } else {
             1.0

@@ -207,7 +207,7 @@ fn truncate(pairs: Vec<MatchedPair>) -> Vec<MatchedPair> {
 /// 26 has the same rule as a CHECK.
 pub fn split_heldout(pairs: &mut [MatchedPair]) {
     for pair in pairs.iter_mut() {
-        pair.held_out = pair.verified && heldout_hash(pair) % HELDOUT_DIVISOR == 0;
+        pair.held_out = pair.verified && heldout_hash(pair).is_multiple_of(HELDOUT_DIVISOR);
     }
 }
 
@@ -271,11 +271,17 @@ mod tests {
     use super::super::fingerprint::BackgroundStats;
     use super::*;
 
+    #[allow(clippy::large_types_passed_by_value)]
     fn frame(
         camera: &str,
         node: NodeId,
         ms: i64,
         scene: SceneId,
+        // By value, and the lint is allowed rather than obeyed: this is a test helper called from
+        // a dozen places with a literal, and threading a reference through all of them to save a
+        // 512-byte copy in a `#[cfg(test)]` module would make the fixtures harder to read for no
+        // measurable gain. `fixtures::frame_for`, which the real gates call per frame, does take a
+        // reference.
         hist: [u8; 512],
         luma: [f32; 4],
     ) -> CameraFrame {

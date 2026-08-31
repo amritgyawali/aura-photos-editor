@@ -657,6 +657,9 @@ impl CameraCode {
     /// Phase 09's rule, inherited for the eighteenth time: a stored sentence is copy a release can
     /// change, and a catalog full of English cannot be translated.
     #[must_use]
+    // Thirty-two codes, one sentence each. The length is the vocabulary rather than a function that
+    // grew: splitting it would put half a photographer's sentences in one place and half in another.
+    #[allow(clippy::too_many_lines)]
     pub const fn user_text(self) -> &'static str {
         match self {
             Self::Fingerprinted => {
@@ -1904,7 +1907,8 @@ impl CameraOutline {
         if self.cameras == 0 {
             return 0.0;
         }
-        f64::from(self.solved_from_pairs + self.blended) as f32 / f64::from(self.cameras) as f32
+        f32::from(u16::try_from(self.solved_from_pairs + self.blended).unwrap_or(u16::MAX))
+            / f32::from(u16::try_from(self.cameras).unwrap_or(u16::MAX))
     }
 }
 
@@ -2373,9 +2377,10 @@ mod tests {
             CameraFingerprint::sample_weight(FULL_FINGERPRINT_SAMPLES),
             1.0
         );
-        let mid = CameraFingerprint::sample_weight(
-            (MIN_FINGERPRINT_SAMPLES + FULL_FINGERPRINT_SAMPLES) / 2,
-        );
+        let mid = CameraFingerprint::sample_weight(u32::midpoint(
+            MIN_FINGERPRINT_SAMPLES,
+            FULL_FINGERPRINT_SAMPLES,
+        ));
         assert!(mid > 0.4 && mid < 0.6, "{mid}");
     }
 }

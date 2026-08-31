@@ -45,9 +45,9 @@ use std::sync::Arc;
 use aura_catalog::Catalog;
 use aura_core::clock::Clock;
 use aura_core::contract::camera::{
-    CameraCode, CameraFingerprint, CameraMatchService, CameraOutline, CameraOverride, CameraReason,
-    CameraTransform, FlashState, MatchedPair, Reference, ReferenceSource, ShooterBias,
-    TransformSource, MIN_MATCHED_PAIRS,
+    Brand, CameraCode, CameraFingerprint, CameraMatchService, CameraOutline, CameraOverride,
+    CameraReason, CameraTransform, FlashState, MatchedPair, Reference, ReferenceSource,
+    ShooterBias, TransformSource, MIN_MATCHED_PAIRS,
 };
 use aura_core::contract::gallery::ImageId;
 use aura_core::contract::moment::CameraId;
@@ -352,7 +352,10 @@ impl fmt::Debug for MatchingPass {
         f.debug_struct("MatchingPass")
             .field("policy_ver", &self.policy.version)
             .field("baselines", &self.library.len())
-            .finish()
+            // `store` is a catalog handle; printing it would print a connection pool.
+            // `finish_non_exhaustive` says the struct is not fully described rather than implying
+            // it is.
+            .finish_non_exhaustive()
     }
 }
 
@@ -427,6 +430,12 @@ impl MatchingPass {
     /// # Errors
     ///
     /// `AURA-ML-5130` when the pass cannot run; `AURA-DB-3006` when a statement fails.
+    // One function, deliberately, and for phase 25's reason: every stage reads what the stage
+    // before it produced - the fingerprints feed the pairing, the pairs feed the solve, the solve
+    // feeds the blend, the blend feeds the shooter correction - and splitting it would mean passing
+    // eight intermediate collections between private functions with no other caller. The modules are
+    // where this phase is decomposed.
+    #[allow(clippy::too_many_lines)]
     pub fn run(
         &self,
         project: ProjectId,
@@ -468,9 +477,7 @@ impl MatchingPass {
                 .iter()
                 .filter_map(|index| frames.get(*index))
                 .collect();
-            let brand = subset
-                .first()
-                .map_or(Default::default(), |frame| frame.brand);
+            let brand = subset.first().map_or(Brand::default(), |frame| frame.brand);
             if let Some(print) = fingerprint::measure(camera, *flash, brand, &subset, split) {
                 fingerprints.push(print);
             }
@@ -499,7 +506,7 @@ impl MatchingPass {
         let reference_brand = fingerprints
             .iter()
             .find(|print| print.camera_id == reference.camera_id)
-            .map_or(Default::default(), |print| print.brand);
+            .map_or(Brand::default(), |print| print.brand);
 
         let mut distance_before = 0.0_f32;
         let mut distance_after = 0.0_f32;
@@ -542,7 +549,7 @@ impl MatchingPass {
                 let body_brand = fingerprints
                     .iter()
                     .find(|print| print.camera_id == camera && print.flash == flash)
-                    .map_or(Default::default(), |print| print.brand);
+                    .map_or(Brand::default(), |print| print.brand);
 
                 let (fitting, heldout) = readings_for(frames, &body_pairs, flash);
                 let mut solved = self.solve_one(
@@ -679,6 +686,10 @@ impl MatchingPass {
 
     /// Solve one body in one flash state: fit, verify, blend, in that order.
     #[allow(clippy::too_many_arguments)]
+    // The whole of one body's answer: fingerprint, pairs, fit, held-out check, blend and reasons.
+    // Splitting it would separate the fit from the check that decides whether to keep it, which is
+    // the one pairing in this phase that must be read together.
+    #[allow(clippy::too_many_lines)]
     fn solve_one(
         &self,
         camera: &CameraId,

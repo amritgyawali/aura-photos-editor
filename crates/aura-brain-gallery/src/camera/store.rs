@@ -269,6 +269,10 @@ impl CameraStore {
     /// `AURA-DB-3006` when a statement fails, including when a CHECK refuses a movement outside a
     /// contract ceiling - which is the second layer under `CameraTransform::within_bounds` and is
     /// meant to be unreachable.
+    // Six DELETEs and six INSERTs whose *order* is the correctness argument - a pair points at a
+    // transform's evidence and a transform points at a reference. Extracting them would put that
+    // order in six places. Phase 25's store made the same call.
+    #[allow(clippy::too_many_lines)]
     pub fn write_pass(&self, project: ProjectId, write: &PassWrite) -> AuraResult<()> {
         let key = project.to_db();
         let now = aura_catalog::rfc3339(self.clock.now_utc());
@@ -391,7 +395,7 @@ impl CameraStore {
                         encode_distance(&transform.heldout_before),
                         encode_distance(&transform.heldout_after),
                         i64::from(transform.heldout_pairs),
-                        transform.bounded.map(|bound| bound.as_str()),
+                        transform.bounded.map(TransformBound::as_str),
                         f64::from(transform.confidence),
                         i64::from(CameraReason::to_bits(&transform.reasons)),
                         i64::from(transform.enabled),
@@ -834,6 +838,9 @@ impl CameraStore {
     /// # Errors
     ///
     /// `AURA-DB-3006` when a query fails.
+    // One query per counter, and the counters are the outline. Splitting it would put half a
+    // project's header in one function and half in another.
+    #[allow(clippy::too_many_lines)]
     pub fn outline(
         &self,
         project: ProjectId,
@@ -1006,46 +1013,49 @@ fn read_transforms(
         .prepare(sql)
         .map_err(|err| statement_failed("camera_transform select", &err))?;
     let rows = statement
-        .query_map(params![project, camera, flash.map(|f| f.as_str())], |row| {
-            Ok(CameraTransform {
-                camera_id: CameraId::new(row.get::<_, String>(0)?),
-                flash: FlashState::from_str_or_ambient(&row.get::<_, String>(1)?),
-                reference: CameraId::new(row.get::<_, String>(2)?),
-                d_cct: row.get::<_, f64>(3)? as f32,
-                d_tint: row.get::<_, f64>(4)? as f32,
-                d_exposure: row.get::<_, f64>(5)? as f32,
-                d_saturation: row.get::<_, f64>(6)? as f32,
-                channel_gain: decode3(&row.get::<_, String>(7)?),
-                contrast_shape: decode3(&row.get::<_, String>(8)?),
-                skin_correction: SkinCorrection {
-                    d_uv: [row.get::<_, f64>(9)? as f32, row.get::<_, f64>(10)? as f32],
-                    d_luma: row.get::<_, f64>(11)? as f32,
-                    de00_before: row.get::<_, f64>(12)? as f32,
-                    de00_after: row.get::<_, f64>(13)? as f32,
-                    locus_valid: row.get::<_, i64>(14)? == 1,
-                    capped: row.get::<_, i64>(15)? == 1,
-                },
-                source: TransformSource::from_str_or_baseline(&row.get::<_, String>(16)?),
-                blend: row.get::<_, f64>(17)? as f32,
-                evidence_pairs: u32::try_from(row.get::<_, i64>(18)?).unwrap_or(0),
-                distance_before: decode_distance(&row.get::<_, String>(19)?),
-                distance_after: decode_distance(&row.get::<_, String>(20)?),
-                heldout_before: decode_distance(&row.get::<_, String>(21)?),
-                heldout_after: decode_distance(&row.get::<_, String>(22)?),
-                heldout_pairs: u32::try_from(row.get::<_, i64>(23)?).unwrap_or(0),
-                bounded: row
-                    .get::<_, Option<String>>(24)?
-                    .map(|text| TransformBound::from_str_or_cct(&text)),
-                confidence: row.get::<_, f64>(25)? as f32,
-                reasons: CameraReason::from_bits(
-                    u32::try_from(row.get::<_, i64>(26)?).unwrap_or(0),
-                ),
-                enabled: row.get::<_, i64>(27)? == 1,
-                user_edited: row.get::<_, i64>(28)? == 1,
-                analysis_ver: u16::try_from(row.get::<_, i64>(29)?).unwrap_or(0),
-                policy_ver: u16::try_from(row.get::<_, i64>(30)?).unwrap_or(0),
-            })
-        })
+        .query_map(
+            params![project, camera, flash.map(FlashState::as_str)],
+            |row| {
+                Ok(CameraTransform {
+                    camera_id: CameraId::new(row.get::<_, String>(0)?),
+                    flash: FlashState::from_str_or_ambient(&row.get::<_, String>(1)?),
+                    reference: CameraId::new(row.get::<_, String>(2)?),
+                    d_cct: row.get::<_, f64>(3)? as f32,
+                    d_tint: row.get::<_, f64>(4)? as f32,
+                    d_exposure: row.get::<_, f64>(5)? as f32,
+                    d_saturation: row.get::<_, f64>(6)? as f32,
+                    channel_gain: decode3(&row.get::<_, String>(7)?),
+                    contrast_shape: decode3(&row.get::<_, String>(8)?),
+                    skin_correction: SkinCorrection {
+                        d_uv: [row.get::<_, f64>(9)? as f32, row.get::<_, f64>(10)? as f32],
+                        d_luma: row.get::<_, f64>(11)? as f32,
+                        de00_before: row.get::<_, f64>(12)? as f32,
+                        de00_after: row.get::<_, f64>(13)? as f32,
+                        locus_valid: row.get::<_, i64>(14)? == 1,
+                        capped: row.get::<_, i64>(15)? == 1,
+                    },
+                    source: TransformSource::from_str_or_baseline(&row.get::<_, String>(16)?),
+                    blend: row.get::<_, f64>(17)? as f32,
+                    evidence_pairs: u32::try_from(row.get::<_, i64>(18)?).unwrap_or(0),
+                    distance_before: decode_distance(&row.get::<_, String>(19)?),
+                    distance_after: decode_distance(&row.get::<_, String>(20)?),
+                    heldout_before: decode_distance(&row.get::<_, String>(21)?),
+                    heldout_after: decode_distance(&row.get::<_, String>(22)?),
+                    heldout_pairs: u32::try_from(row.get::<_, i64>(23)?).unwrap_or(0),
+                    bounded: row
+                        .get::<_, Option<String>>(24)?
+                        .map(|text| TransformBound::from_str_or_cct(&text)),
+                    confidence: row.get::<_, f64>(25)? as f32,
+                    reasons: CameraReason::from_bits(
+                        u32::try_from(row.get::<_, i64>(26)?).unwrap_or(0),
+                    ),
+                    enabled: row.get::<_, i64>(27)? == 1,
+                    user_edited: row.get::<_, i64>(28)? == 1,
+                    analysis_ver: u16::try_from(row.get::<_, i64>(29)?).unwrap_or(0),
+                    policy_ver: u16::try_from(row.get::<_, i64>(30)?).unwrap_or(0),
+                })
+            },
+        )
         .map_err(|err| statement_failed("camera_transform rows", &err))?;
     let mut out = Vec::new();
     for row in rows {
@@ -1098,7 +1108,7 @@ fn decode_n<const N: usize>(text: &str, fallback: [f32; N]) -> [f32; N] {
         return fallback;
     };
     let mut out = fallback;
-    for (slot, value) in out.iter_mut().zip(values.into_iter()) {
+    for (slot, value) in out.iter_mut().zip(values) {
         if value.is_finite() {
             *slot = value;
         }

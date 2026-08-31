@@ -17,6 +17,10 @@ doc-valid-idents = [
   # literature and in the phase document, and named on nearly every page of the mask
   # engine and its model cards.
   "IoU", "mIoU", "LEB128", "SSIM",
+  # PHASE-26. Product and standard names this phase writes as prose on nearly every page of the
+  # camera-matching engine and its baselines. `ColorChecker` is a Calibrite product, `TOML` is a
+  # format, and the four brands are companies.
+  "ColorChecker", "TOML", "Canon", "Nikon", "Fujifilm", "Panasonic",
 ]
 
 # Ban the APIs that break determinism or panic silently

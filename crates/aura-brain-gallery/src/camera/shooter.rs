@@ -114,11 +114,11 @@ pub fn measure(
             continue;
         }
 
-        let enough_here = frames_seen >= MIN_SHOOTER_FRAMES;
-        let enough_there = reference_values
-            .map(|v| u32::try_from(v.len()).unwrap_or(u32::MAX) >= MIN_SHOOTER_FRAMES)
-            .unwrap_or(false);
-        if !enough_here || !enough_there {
+        let measured_enough = frames_seen >= MIN_SHOOTER_FRAMES;
+        let reference_enough = reference_values.is_some_and(|values| {
+            u32::try_from(values.len()).unwrap_or(u32::MAX) >= MIN_SHOOTER_FRAMES
+        });
+        if !measured_enough || !reference_enough {
             out.push(ShooterBias {
                 shooter,
                 camera_id: camera,

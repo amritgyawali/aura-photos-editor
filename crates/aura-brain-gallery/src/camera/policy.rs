@@ -140,6 +140,7 @@ impl Matching {
     /// `AURA-ML-5133` when the file will not parse, when a bound is wider than the contract's own
     /// ceiling, when an evidence threshold is looser than the contract's, when the shooter share is
     /// outside `0.05..=` [`MAX_SHOOTER_SHARE`], or when a scene is not one of the twenty-two.
+    #[allow(clippy::too_many_lines)]
     pub fn load(text: &str) -> Result<Self, AuraError> {
         let raw: RawTable =
             toml::from_str(text).map_err(|err| errors::policy_refused(err.to_string()))?;

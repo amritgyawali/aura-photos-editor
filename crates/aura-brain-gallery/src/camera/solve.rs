@@ -457,13 +457,17 @@ pub fn blend(transform: &mut CameraTransform, toward: Departure, weight: f32) {
     transform.d_tint = mix(transform.d_tint, toward.d_tint);
     transform.d_exposure = mix(transform.d_exposure, toward.d_exposure);
     transform.d_saturation = mix(transform.d_saturation, toward.d_saturation);
-    for index in 0..3 {
-        transform.channel_gain[index] = mix(
-            transform.channel_gain.get(index).copied().unwrap_or(1.0),
+    // Iterate the arrays rather than index them, so `clippy::indexing_slicing` stays denied in this
+    // crate. Three channels, both arrays, in the same pass.
+    for (index, gain) in transform.channel_gain.iter_mut().enumerate() {
+        *gain = mix(
+            *gain,
             toward.channel_gain.get(index).copied().unwrap_or(1.0),
         );
-        transform.contrast_shape[index] = mix(
-            transform.contrast_shape.get(index).copied().unwrap_or(1.0),
+    }
+    for (index, shape) in transform.contrast_shape.iter_mut().enumerate() {
+        *shape = mix(
+            *shape,
             toward.contrast_shape.get(index).copied().unwrap_or(1.0),
         );
     }
@@ -491,7 +495,7 @@ pub fn blend(transform: &mut CameraTransform, toward: Departure, weight: f32) {
 /// What is derived is small and defensible: the two bodies' white points are converted to linear
 /// RGB, the ratio is taken channel by channel, the result is normalised so the green channel is one
 /// - a gain triple is only meaningful up to a scale, and letting all three drift together would be
-/// an exposure change wearing a colour change's clothes - and then bounded.
+///   an exposure change wearing a colour change's clothes - and then bounded.
 #[must_use]
 pub fn channel_gain(
     reference: &CameraFingerprint,
@@ -759,7 +763,7 @@ mod tests {
         assert_eq!(evidence_weight(MIN_SOLVE_PAIRS - 1, &policy), 0.0);
         assert_eq!(evidence_weight(policy.min_pairs, &policy), 1.0);
         assert_eq!(evidence_weight(policy.min_pairs + 100, &policy), 1.0);
-        let mid = evidence_weight((MIN_SOLVE_PAIRS + policy.min_pairs) / 2, &policy);
+        let mid = evidence_weight(u32::midpoint(MIN_SOLVE_PAIRS, policy.min_pairs), &policy);
         assert!(mid > 0.2 && mid < 0.8, "{mid}");
     }
 

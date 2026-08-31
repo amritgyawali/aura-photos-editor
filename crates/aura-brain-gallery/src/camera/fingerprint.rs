@@ -175,7 +175,7 @@ impl BackgroundStats {
     ///
     /// The number section 6.1's verification turns on. Three terms, multiplied rather than averaged
     /// - a **product**, so no term can rescue another, which is the shape phase 12 established for
-    /// its keep score and phase 25 for its anchor ranking:
+    ///   its keep score and phase 25 for its anchor ranking:
     ///
     /// * histogram intersection over the twelve hue bins: were these two frames looking at the same
     ///   things,

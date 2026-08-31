@@ -159,7 +159,7 @@ pub fn wedding(bodies: &[Body], shape: Shape) -> Vec<CameraFrame> {
                     shape,
                     ms,
                     nominal + jitter,
-                    hist,
+                    &hist,
                     luma,
                 ));
             }
@@ -177,7 +177,10 @@ fn frame_for(
     shape: Shape,
     timeline_ms: i64,
     nominal_cct: f32,
-    hist: [u8; 512],
+    // Borrowed rather than copied: a 512-byte histogram by value on a function called once per
+    // frame per body is half a kilobyte of memcpy per fixture frame, and a fixture that is slow for
+    // no reason makes every gate slower.
+    hist: &[u8; 512],
     luma: [f32; 4],
 ) -> CameraFrame {
     use aura_raw::colour::illuminant::cct_to_uv;
@@ -225,7 +228,7 @@ fn frame_for(
         saturation: Some(6.0 + body.d_saturation),
         signature: Some(signature_for(body)),
         embedding: Some(vec![1.0, 0.15, 0.05, 0.0]),
-        background: Some(BackgroundStats::from_descriptors(&hist, luma, 0.22)),
+        background: Some(BackgroundStats::from_descriptors(hist, luma, 0.22)),
     }
 }
 
@@ -354,7 +357,7 @@ pub fn wedding_with_no_overlap(bodies: &[Body], shape: Shape) -> Vec<CameraFrame
     for frame in &mut frames {
         let node = *per_body
             .entry(frame.camera.as_str().to_string())
-            .or_insert_with(NodeId::new);
+            .or_default();
         frame.node = Some(node);
     }
     frames

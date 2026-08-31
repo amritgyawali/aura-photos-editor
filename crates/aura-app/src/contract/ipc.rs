@@ -6900,6 +6900,7 @@ pub struct CameraFingerprintDto {
 /// What one body needs to look like the reference.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct CameraTransformDto {
     /// The body being corrected.
     pub camera_id: String,
