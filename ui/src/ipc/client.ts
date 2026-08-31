@@ -249,6 +249,18 @@ import type {
   PlanGeometryInput,
   SetFramingDto,
   SetFramingInput,
+  CameraFingerprintDto,
+  CameraOverrideInput,
+  CameraPassDto,
+  CameraPassInput,
+  CameraReasonDto,
+  CameraReportDto,
+  CameraStatusDto,
+  CameraTransformDto,
+  DisableCameraInput,
+  MatchedPairDto,
+  SetCameraReferenceInput,
+  ShooterBiasDto,
 } from './types';
 
 /** True when the shell is present. Storybook-style dev runs fall back to stubs. */
@@ -1429,4 +1441,93 @@ export const gallery = {
   /** The panel's legend, assembled from the frozen enum rather than from a stored table. */
   galleryReasonCodes: (): Promise<GalleryReasonDto[]> =>
     invoke<GalleryReasonDto[]>('gallery_reason_codes', {}),
+};
+
+/**
+ * Multi-camera and second-shooter matching. PHASE-26, ADR-0054.
+ *
+ * Eleven commands whose subject is a **camera body** rather than a photograph or a wedding. Two
+ * rules for anything that renders them, and both are about not overstating what was measured.
+ *
+ * **Read `source` before any number.** A body corrected by 300 K from thirty-four verified pairs of
+ * its own ceremony and a body corrected by 300 K from a bundled brand setting are the same
+ * arithmetic and completely different claims. `cameraReports()` is the same facts as sentences and
+ * it already leads with the evidence; a panel that renders `cameraTransforms()` directly has to do
+ * the same ordering itself.
+ *
+ * **Never render a measurement claim while `baselinesMeasured` is false.** It is false in this
+ * build: every file in `assets/camera_baselines/` was chosen to be plausible rather than measured
+ * from a photographed colour target. A body whose `source` is `brand_baseline` on this build has
+ * been corrected by a fabricated number, and the panel must say so rather than presenting it as a
+ * laboratory result.
+ *
+ * And `heldoutImproved` has **three** states. `null` means there were too few spare pairs to check
+ * the correction against, which is not the same as a check that passed and not the same as one that
+ * failed.
+ */
+export const camera = {
+  /** The project header: how many cameras, on what evidence, and what is left over. */
+  cameraStatus: (projectId: string): Promise<CameraStatusDto> =>
+    invoke<CameraStatusDto>('camera_status', { projectId }),
+
+  /** Every body's correction, by body and then by flash state. */
+  cameraTransforms: (projectId: string): Promise<CameraTransformDto[]> =>
+    invoke<CameraTransformDto[]>('camera_transforms', { projectId }),
+
+  /** Every body's measured colour response, by body and then by flash state. */
+  cameraFingerprints: (projectId: string): Promise<CameraFingerprintDto[]> =>
+    invoke<CameraFingerprintDto[]>('camera_fingerprints', { projectId }),
+
+  /**
+   * The per-camera report, worst evidence first.
+   *
+   * What section 13's third acceptance criterion asks for: what was corrected, and on what
+   * evidence, in sentences a photographer reads rather than numbers they interpret.
+   */
+  cameraReports: (projectId: string): Promise<CameraReportDto[]> =>
+    invoke<CameraReportDto[]>('camera_reports', { projectId }),
+
+  /**
+   * The matched pairs behind one body's correction, best first.
+   *
+   * **Rejected pairs come back too.** "Both cameras shot the whole ceremony and AURA still used a
+   * brand baseline" is answered by a list of candidates whose backgrounds disagreed, and by nothing
+   * else.
+   */
+  cameraPairs: (projectId: string, cameraId: string, limit: number): Promise<MatchedPairDto[]> =>
+    invoke<MatchedPairDto[]>('camera_pairs', { projectId, cameraId, limit }),
+
+  /** Every measured exposure habit, per photographer and per kind of photograph. */
+  cameraShooterBias: (projectId: string): Promise<ShooterBiasDto[]> =>
+    invoke<ShooterBiasDto[]>('camera_shooter_bias', { projectId }),
+
+  /**
+   * Match a project's cameras to each other.
+   *
+   * Runs to completion rather than returning a job id: a project half solved against one reference
+   * and half against another has been matched to nothing.
+   */
+  cameraPass: (input: CameraPassInput): Promise<CameraPassDto> =>
+    invoke<CameraPassDto>('camera_pass', { input }),
+
+  /** Choose the body everything else is matched to, and re-solve against it. Durable. */
+  setCameraReference: (input: SetCameraReferenceInput): Promise<void> =>
+    invoke<void>('set_camera_reference', { input }),
+
+  /** Leave one camera out of matching entirely. Both flash states move together. */
+  disableCamera: (input: DisableCameraInput): Promise<void> =>
+    invoke<void>('disable_camera', { input }),
+
+  /**
+   * Record what the photographer set instead, for one body in one flash state.
+   *
+   * Records the disagreement; it does not move a pixel. A value outside its bound is refused rather
+   * than clamped.
+   */
+  setCameraOverride: (input: CameraOverrideInput): Promise<void> =>
+    invoke<void>('set_camera_override', { input }),
+
+  /** The panel's legend, assembled from the frozen enum rather than from a stored table. */
+  cameraReasonCodes: (): Promise<CameraReasonDto[]> =>
+    invoke<CameraReasonDto[]>('camera_reason_codes', {}),
 };

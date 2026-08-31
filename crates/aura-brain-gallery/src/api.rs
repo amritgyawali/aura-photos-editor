@@ -690,6 +690,30 @@ pub fn collect_frames(
     images: &[(ImageId, i64)],
     context: &Context<'_>,
 ) -> AuraResult<Vec<Frame>> {
+    collect_frames_with_camera(project, images, context, &crate::camera::Field::empty())
+}
+
+/// The same, with phase 26's camera corrections folded in first.
+///
+/// **This is PHASE-26 section 6.4's ordering, and it is a data dependency rather than a
+/// convention.** Every camera transform is applied to a frame's readings *before* the frame reaches
+/// [`tree::build`], so this pass's nodes, its change points, its anchors and its targets are all
+/// computed over numbers that are already comparable across bodies. Reversing the two produces a
+/// gallery in which every node's target is the average of two brands' colour science and every
+/// frame is normalised toward a look neither camera can produce.
+///
+/// An empty field is exactly what this function did before phase 26 existed, which is what makes
+/// that phase additive rather than a change to this one.
+///
+/// # Errors
+///
+/// Whatever the three frozen services return.
+pub fn collect_frames_with_camera(
+    project: ProjectId,
+    images: &[(ImageId, i64)],
+    context: &Context<'_>,
+    camera: &crate::camera::Field,
+) -> AuraResult<Vec<Frame>> {
     let story = context.story.outline(project)?;
     let mut frames = Vec::with_capacity(images.len());
     for (image, timeline_ms) in images {
@@ -743,6 +767,11 @@ pub fn collect_frames(
         });
     }
     let _ = story;
+    // PHASE-26 section 6.4. The one place a camera correction reaches this pass, and it is here -
+    // at the end of assembly and before anything is grouped - rather than inside the loop above,
+    // so that a reader of that loop is never in doubt about whether a field is being consulted per
+    // frame in a way that could differ between frames of one body.
+    camera.apply_to_gallery_frames(&mut frames);
     Ok(frames)
 }
 

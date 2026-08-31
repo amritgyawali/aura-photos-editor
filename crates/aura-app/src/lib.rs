@@ -49,6 +49,7 @@
 //! and streams progress events.
 
 pub mod biometric_keys;
+pub mod camera_commands;
 pub mod cleanup_commands;
 pub mod cloud_commands;
 pub mod colour_commands;
@@ -83,6 +84,11 @@ pub mod story_commands;
 pub mod style_commands;
 pub mod tone_commands;
 
+pub use camera_commands::{
+    camera_fingerprints, camera_pairs, camera_pass, camera_reason_codes, camera_reports,
+    camera_shooter_bias, camera_status, camera_transforms, disable_camera, set_camera_override,
+    set_camera_reference,
+};
 pub use cleanup_commands::{
     cleanup_blocked, cleanup_disclosures, cleanup_pass, cleanup_reason_codes, cleanup_status,
     decide_cleanup, disable_cleanup, image_cleanup, manual_remove,

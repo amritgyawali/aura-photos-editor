@@ -26,6 +26,7 @@ pub mod clock;
 
 /// Frozen contracts. Changing anything in here requires an ADR.
 pub mod contract {
+    pub mod camera;
     pub mod cleanup;
     pub mod colour;
     pub mod composition;

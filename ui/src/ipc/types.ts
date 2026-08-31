@@ -3683,3 +3683,216 @@ export type DisableGalleryInput = {
   photoId: string;
   disabled: boolean;
 };
+
+// ---------------------------------------------------------------------------
+// Multi-camera and second-shooter matching. PHASE-26, ADR-0054.
+// ---------------------------------------------------------------------------
+//
+// The rule for every panel that renders these types: **read the evidence before the number.**
+// `dCct: -300` from `source: 'matched_pairs'` with `evidencePairs: 34` and `dCct: -300` from
+// `source: 'brand_baseline'` with `evidencePairs: 0` are the same arithmetic and completely
+// different claims, and only the second needs a photographer to look at it.
+//
+// And never render a measurement claim while `baselinesMeasured` is false. Every bundled brand
+// baseline in this build was fabricated rather than measured from a photographed target.
+
+/** One reason a camera was matched the way it was. */
+export type CameraReasonDto = {
+  /** The stable slug a filter matches on. Never localised. */
+  code: string;
+  /** The sentence a photographer reads. Rendered from the code, never stored. */
+  text: string;
+  /** True when this code says AURA declined to correct, or corrected on less evidence. */
+  withdraws: boolean;
+};
+
+/** How one body rendered this wedding, in one flash state. */
+export type CameraFingerprintDto = {
+  cameraId: string;
+  /** `ambient` or `flash`. */
+  flash: string;
+  brand: string;
+  /** Where this body puts skin, in CIE 1976 u'v'. */
+  skinChroma: [number, number];
+  /** Where it puts a neutral. */
+  whitePoint: [number, number];
+  highlightRolloff: number;
+  subjectLuma: number;
+  samples: number;
+  confidence: number;
+  reasons: CameraReasonDto[];
+};
+
+/** What one body needs to look like the reference. */
+export type CameraTransformDto = {
+  cameraId: string;
+  /** `ambient` or `flash`. */
+  flash: string;
+  referenceId: string;
+  /** Kelvin, within 900. */
+  dCct: number;
+  /** Tint units, within 20. */
+  dTint: number;
+  /** Stops, within 0.6. */
+  dExposure: number;
+  /** Recipe units, within 12. */
+  dSaturation: number;
+  channelGain: [number, number, number];
+  contrastShape: [number, number, number];
+  skinDe00Before: number;
+  /** The number the headline promise is measured on. */
+  skinDe00After: number;
+  skinCapped: boolean;
+  skinLocusValid: boolean;
+  /** `matched_pairs`, `blended` or `brand_baseline`. Read this before any number above. */
+  source: string;
+  /** The share of the solved answer in the blend, `0..1`. */
+  blend: number;
+  evidencePairs: number;
+  heldoutPairs: number;
+  heldoutBefore: number;
+  heldoutAfter: number;
+  /** `null` is the third state: there was nothing to check the correction against. */
+  heldoutImproved: boolean | null;
+  boundedBy: string | null;
+  magnitude: number;
+  confidence: number;
+  enabled: boolean;
+  userEdited: boolean;
+  reasons: CameraReasonDto[];
+};
+
+/** Two photographs, from two bodies, of the same conditions. */
+export type MatchedPairDto = {
+  pairId: string;
+  leftPhotoId: string;
+  rightPhotoId: string;
+  flash: string;
+  gapMs: number;
+  subjectSimilarity: number;
+  /** How much the **backgrounds** agree. The number that decides whether a pair is evidence. */
+  backgroundAgreement: number;
+  verified: boolean;
+  heldOut: boolean;
+};
+
+/** How differently one photographer exposes, in one kind of photograph. */
+export type ShooterBiasDto = {
+  shooter: string;
+  cameraId: string;
+  scene: string;
+  /** The systematic offset that was measured, in stops. */
+  measuredEv: number;
+  /** The part of it that is applied, in stops, opposite in sign. Always smaller. */
+  appliedEv: number;
+  frames: number;
+  capped: boolean;
+  reasons: CameraReasonDto[];
+};
+
+/** One body's report, in a photographer's own words. */
+export type CameraReportDto = {
+  cameraId: string;
+  flash: string;
+  shooter: string | null;
+  isReference: boolean;
+  /** The one line a collapsed row shows. Reads the reasons, never the magnitude. */
+  headline: string;
+  evidence: string;
+  corrections: string[];
+  withdrawals: string[];
+  skinDe00After: number;
+  meetsPromise: boolean;
+  magnitude: number;
+  confidence: number;
+};
+
+/** What the Camera Match panel's project header shows. */
+export type CameraStatusDto = {
+  photos: number;
+  matched: number;
+  coverage: number;
+  cameras: number;
+  fingerprinted: number;
+  /** The number that matters when it is low: how many corrections rest on this wedding's own. */
+  solvedFromPairs: number;
+  blended: number;
+  baselineOnly: number;
+  pairs: number;
+  pairsRejected: number;
+  heldoutPairs: number;
+  flashSeparated: number;
+  shootersMeasured: number;
+  shootersCapped: number;
+  disabled: number;
+  userEdited: number;
+  skinDe00Before: number;
+  skinDe00After: number;
+  worstSkinDe00: number;
+  referenceId: string | null;
+  referenceSource: string;
+  unknownBrands: string[];
+  /** **False in this build.** Every bundled brand baseline was fabricated. */
+  baselinesMeasured: boolean;
+  /** **False in this build.** No photograph carries an identity-scoped skin region. */
+  skinFieldAvailable: boolean;
+  policyVer: number;
+};
+
+/** Ask for a project's cameras to be matched. */
+export type CameraPassInput = {
+  projectId: string;
+};
+
+/** What one matching pass did. */
+export type CameraPassDto = {
+  cameras: number;
+  referenceId: string | null;
+  referenceSource: string;
+  pairs: number;
+  pairsRejected: number;
+  heldoutPairs: number;
+  solved: number;
+  blended: number;
+  baselineOnly: number;
+  heldoutFailures: number;
+  distanceBefore: number;
+  distanceAfter: number;
+  signatureBefore: number;
+  signatureAfter: number;
+  worstSkinDe00: number;
+  shootersMeasured: number;
+  shootersCapped: number;
+  /** One paragraph, in the product's own words. */
+  summary: string;
+};
+
+/** Choose the body everything else is matched to. */
+export type SetCameraReferenceInput = {
+  projectId: string;
+  cameraId: string;
+};
+
+/** Switch matching off for one body, or back on. Both flash states move together. */
+export type DisableCameraInput = {
+  projectId: string;
+  cameraId: string;
+  disabled: boolean;
+};
+
+/**
+ * What the photographer set instead, for one body in one flash state.
+ *
+ * Four optional movements, every one bounded by the frozen contract and refused rather than clamped
+ * when it is outside. There is no strength field and no way to raise a bound.
+ */
+export type CameraOverrideInput = {
+  projectId: string;
+  cameraId: string;
+  /** `ambient` or `flash`. */
+  flash: string;
+  dCct?: number | null;
+  dTint?: number | null;
+  dExposure?: number | null;
+  dSaturation?: number | null;
+};

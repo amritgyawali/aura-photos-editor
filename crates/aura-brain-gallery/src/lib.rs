@@ -123,6 +123,12 @@
 
 pub mod anchors;
 pub mod api;
+/// PHASE-26. Multi-camera and second-shooter matching: two brands and two people, one visual
+/// result. It lives inside this crate rather than beside it because a camera transform is the
+/// layer *underneath* a gallery normalisation - section 6.4 requires the first to be applied
+/// before the second, and separating them into two crates would put that ordering across a
+/// dependency edge instead of inside one function.
+pub mod camera;
 pub mod changepoint;
 pub mod errors;
 pub mod fixtures;

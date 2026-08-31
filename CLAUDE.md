@@ -118,6 +118,11 @@ Never load two phase files into one session.
 | Consistency policy (versioned, PM-owned) | `crates/aura-brain-gallery/config/consistency.toml` |
 | Consistency evaluation gates | `tests/eval/consistency_eval.rs` + `ml/eval/consistency_eval.py` |
 | How AURA makes a wedding look like one gallery | `docs/gallery-consistency.md` |
+| Camera matching decisions | `docs/adr/ADR-0053-camera-matching-and-appearance-distance.md` |
+| Camera matching policy (versioned, PM-owned) | `crates/aura-brain-gallery/config/camera_match.toml` |
+| Bundled brand baselines, none of them measured | `assets/camera_baselines/` |
+| Camera matching evaluation gates | `tests/eval/camera_eval.rs` + `ml/eval/camera_match_eval.py` |
+| How AURA matches two cameras and two shooters | `docs/camera-matching.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
@@ -1312,6 +1317,77 @@ Phase 24 amended a frozen contract for the fourth time in the product's history,
 `crates/aura-generative/tests/one_choke_point.rs`, which fails the build if a removal is reached from
 anywhere but `source::select`, if the crate writes a recipe, if it reaches a provider - or if any
 type in it grows a field a text prompt could go in.
+
+Phase 26 is implemented conditionally: `aura-core::contract::camera` freezes the flash state, the
+brand table, the appearance distance, the fingerprint, the transform, the matched pair, the shooter
+bias, the reference, thirty-two reason codes, the outline, the override and `CameraMatchService`, and
+`ids.rs` gains `PairId`; `aura-brain-gallery::camera` matches two bodies to one visual result.
+`policy.rs` loads a table whose bounds the *code* owns, `baseline.rs` holds eight bundled brand
+transforms and the refusal that keeps a fabricated one from claiming to be measured,
+`fingerprint.rs` measures each body's colour response from the wedding's own frames in two flash
+states, `pairs.rs` finds two cameras that photographed the same conditions and verifies them on
+**backgrounds rather than subjects**, `solve.rs` runs a bounded coordinate descent with phase 15's
+skin locus as a hard constraint and a deterministic held-out split, `transform.rs` owns the
+appearance distance and derives the three per-channel gains in closed form, `shooter.rs` corrects an
+exposure habit by strictly less than the whole of it, `report.rs` assembles the sentence a
+photographer reads, `store.rs` owns migration 26 and `api.rs` is the frozen service and the pass.
+Migration 26 stores five tables, two views and three triggers at 57 bytes a photograph; eleven IPC
+commands (ADR-0054) feed a camera match panel; and `aura-cli verify --phase 26` is the executable
+gate. Its exit report is `docs/progress/PHASE-26-EXIT.md`.
+
+**This phase ships no model** - the sixth since phase 08 - and the reason is phase 17's, 23's and
+25's: there is nothing to train. What is missing is not weights but **multi-camera weddings**.
+Section 9's DATA row asks for Sony+Canon, Canon+Nikon and Fuji fixtures with matched scenes and there
+are none, so every per-brand colour response in every fixture was authored and read back through the
+real code. That is condition C1 and a Sev 2 trigger, and it closes with phase 05's C10 because the
+pair finder's subject-similarity term reads the placeholder embedding. Condition C2 is the second Sev
+2 and it is the one to be careful about: **all eight bundled baselines were fabricated**, every one
+carries `measured = false`, and the fallback path is the *common* one - a wedding where the second
+shooter worked a different room all afternoon has no matched pairs at all, and every correction on it
+comes from that table. What is proved is that the path runs, reports itself honestly, and leaves an
+unknown manufacturer alone. Condition C3 is that the skin term - **weighted 3.0, the heaviest of the
+four** - is unmeasured, because phase 25's `SKIN_FIELD_AVAILABLE` is false. Condition C4 is the
+headline: section 9's blind study did not happen, so "frames from different brands look like they
+came from one camera" is unmeasured.
+
+Four rules that phase 26 adds and every later phase inherits:
+
+- **`CameraMatchService` is the only way to ask what a camera body does to colour.** Twenty-second
+  service of its kind and the first whose subject is a **device**. Phase 27 reads a camera transform
+  when it explains why a frame looks unlike its neighbours, 28 acts on one unattended and 30's
+  delivery report lists which bodies were matched from evidence and which from a baseline. No phase
+  may keep its own camera fingerprint or its own idea of what two bodies agreeing means.
+- **Match appearance, never parameters.** Two bodies can solve to the same 5,200 K and render skin
+  two dE00 apart, because a temperature answers "what light was this" and a rendering answers "what
+  does this sensor do with it". Every term of the appearance distance measures a *frame*; nothing in
+  it reads a recipe. Any later phase that finds itself comparing two cameras' slider values has
+  re-created the problem this phase exists to solve.
+- **A parameter that is not identifiable from the evidence is derived, not fitted.** A matched pair
+  supplies a chromaticity, a white point, a grade signature and a contrast reading, and **none of them
+  separates a hot red channel from a cold green one**. A least squares over ten parameters with an
+  eight-dimensional observation converges, reports a small residual and returns whichever point its
+  initial conditions were nearest. The three gains come from the two fingerprints in closed form and
+  the descent runs over the seven that are identified. Phase 17 found the same defect from the other
+  side - a fitted slope not identified where it was applied - and this is the general statement:
+  **count the dimensions of the observation before fitting the vector.**
+- **Correcting a machine completely is the feature; correcting a person completely is not.** A
+  sensor's colour response is not a decision anybody made, so it is removed in full. A shooter's
+  exposure is, so `SHOOTER_HARMONY` is strictly below one and there is no configuration that removes
+  a habit entirely. Any later phase that normalises something a person chose inherits the asymmetry.
+
+Two things phase 26 got wrong first:
+
+**A storage note written before the measurement was wrong about the *shape*, not the size.** It said
+the pair table grew with the square of a wedding's overlap; `pairs::find` truncates at
+`MAX_PAIRS_PER_CAMERA`, so a two-body wedding stores 57,724 B at a thousand frames and 57,729 B at
+two thousand. The test asserts the bound now as well as the number, by running the same pass over a
+doubled wedding - a size assertion alone would pass on a build that had removed the cap and happened
+to be measured on a small fixture. Phase 21's rule covers the sentence as much as the figure.
+
+**A fixture that seeds a project but not its rows passes every unit test.** The gate's first run
+failed on `camera_pair`'s foreign keys onto `photo`, and phase 25's gate had failed the same way on a
+skin correction naming an identity that did not exist. Twice in two phases: a store test is handed
+ids rather than making them, so nothing below the gate ever exercises a referential constraint.
 
 Phase 25 is implemented conditionally: `aura-core::contract::gallery` freezes the scene node, the
 node target, the normalisation delta, the per-identity skin target, the skin correction, the five

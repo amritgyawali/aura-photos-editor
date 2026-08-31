@@ -2,6 +2,98 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 26 - Camera and shooter matching: appearance, not sliders
+
+Twenty-five phases decided about one photograph, then about one wedding. This one decides about a
+**camera body** - a property of a device, inferred from the photographs it took - and about the
+person holding it.
+
+**The objective is an appearance distance and every term measures a frame rather than a recipe.**
+`3.0 * skin_dE00 + 1.5 * white_point + 1.0 * grade_signature + 0.5 * contrast`, section 6.2's own
+weights, over background-verified matched pairs. Matching the *sliders* is what a photographer does
+by hand and is why it takes hours: they adjust one thing and judge another. Two bodies can solve to
+the same 5,200 K and render skin two dE00 apart, because the temperature answers "what light was
+this" and the rendering answers "what does this sensor do with it".
+
+**The three per-channel gains are derived, not fitted, and that is a correction rather than a
+shortcut.** Section 5 carries `channel_gain: [f32; 3]` and section 6.2 asks for a bounded least
+squares over the whole vector. A matched pair supplies a chromaticity, a white point, a grade
+signature and a contrast reading - **none of which separates "the red channel is 3 % hot" from "the
+green channel is 3 % cold"**. A least squares over ten parameters with an eight-dimensional
+observation has a two-dimensional null space, and a solver run inside it returns whichever point its
+initial conditions were nearest: it converges, reports a small residual, and means nothing. The gains
+come from the two fingerprints' white points in closed form, and the descent runs over the seven
+parameters that are identifiable. Phase 17's defect reached from the other direction.
+
+**A pair is verified on its backgrounds.** Section 6.1's sharpest sentence, and it is right because
+two frames of the same face from two bodies differ in exactly the way this phase exists to measure -
+scoring a candidate on how alike its subjects look would be scoring the thing under test, and would
+reject precisely the pairs that carry the most information. **A rejected pair is written rather than
+dropped**, phase 17's rule in its second application: here the rejection is the evidence a
+photographer needs when they ask why their second camera was matched from a brand baseline in a
+wedding both cameras shot all day.
+
+**Evidence blending is continuous and a held-out set decides.** `weight = pairs / (pairs + half)`
+rather than section 6.1's threshold at twelve, because a cliff makes two neighbouring weddings with
+eleven and twelve pairs receive materially different corrections for no reason a photographer could
+see. A transform that does not improve the appearance distance on pairs it never saw is **discarded**
+in favour of the baseline, with `HeldOutRegressed` on the row. The split is by pair id rather than by
+a shuffle: invariant 4 needs the same wedding to produce the same transform, and a random split makes
+a body's correction depend on a seed.
+
+**A shooter's habit is corrected by less than the whole of it, and the type cannot express one.**
+`SHOOTER_HARMONY` is strictly below one and there is no configuration that removes a habit entirely.
+The asymmetry with the camera correction is deliberate: a sensor's colour response is not a decision
+anybody made and correcting it completely is what the feature is for, while a person's exposure is,
+and correcting that completely edits them out of their own work.
+
+**The ordering is a data dependency, not a convention.** Section 6.4 puts camera transforms before
+phase 25's within-scene normalisation. `api::field_for` returns a correction that
+`collect_frames` **adds to a frame's tone values before phase 25 builds its tree**, so there is no
+code path that could run them the other way round - the other way round has nothing to read. The
+gate asserts the observable consequence: a frame entering phase 25 at 5,442 K where phase 15 stored
+5,200 K.
+
+**Flash and ambient are two populations and a pair never crosses the boundary.** Two frames four
+seconds apart in the same node, one flash-lit and one ambient, were shot under two different lights -
+phase 25's change-point argument applied to a property the camera records rather than one the product
+has to detect.
+
+Also here: `CameraMatchService`, the twenty-second frozen service and the first whose subject is a
+device; `PairId`, the fifteenth typed id and the first that names a *relationship* rather than a
+thing either photograph owns; migration 26 with five tables, two views and three triggers at 57 B per
+image over a thousand frames - **bounded rather than proportional**, which is a first; eight bundled
+brand baselines with `measured = false`; eleven IPC commands (ADR-0054) feeding a camera match panel;
+and `aura-cli verify --phase 26` as the executable gate.
+
+### What the storage measurement corrected
+
+The budget note said the pair table grew with the square of a wedding's overlap. It was written
+before the measurement and was wrong about the **shape** rather than the size: `pairs::find`
+truncates at `MAX_PAIRS_PER_CAMERA`, so a two-body wedding stores the same number of pairs at 200
+frames and at 4,000. Measured 57,724 B over a thousand photographs and 57,729 B over two thousand,
+and the test now asserts that rather than only the size - a size assertion alone would pass on a
+build that had quietly removed the cap and happened to be measured on a small fixture. Phase 21's
+rule covers the sentence as much as the number.
+
+### What this build cannot claim
+
+**Every number came from a synthetic wedding whose per-brand colour response was authored.** There
+are no multi-camera weddings in this repository. Condition C1, Sev 2.
+
+**All eight bundled baselines were fabricated.** Every one carries `measured = false`, no camera was
+measured, and the fallback path is proved to run and to report itself honestly while nothing is
+proved about the numbers it falls back on. The first measured baseline reopens this phase's criteria
+whatever phase is in flight, exactly as the first real camera file reopens phase 02's and the first
+measured lens profile reopens phase 23's. Condition C2, Sev 2.
+
+**The skin term of the appearance distance is unmeasured rather than met.** Phase 25's
+`SKIN_FIELD_AVAILABLE` is false, so no photograph in this build carries an identity-scoped skin
+region. Condition C3, and the report says so in a sentence rather than printing a zero.
+
+**Section 9's blind study did not happen** - can a photographer pick out the second camera after
+matching - so the phase's own headline acceptance criterion is unmeasured. Condition C4.
+
 ## Phase 25 - Gallery intelligence: a wedding matched to itself
 
 Twenty-four phases decided things about **one photograph at a time**. This one decides about a

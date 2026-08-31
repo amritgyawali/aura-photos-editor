@@ -212,6 +212,19 @@ typed_id!(ProposalId, "prp");
 // See docs/adr/ADR-0051-gallery-consistency-and-normalisation.md section 10.
 typed_id!(NodeId, "nod");
 
+// PHASE-26. Section 4 gives matched pairs their own table and section 9 gives SFE a matched-pair
+// viewer, so a pair is a thing a photographer looks at rather than a tuple inside a solver.
+//
+// It is the fourth id in this file that names a *relationship* rather than a thing, and the first
+// that names one between two photographs. It is not `(left, right)` for the reason `NodeId` is not
+// `(segment_id, ordinal)`: a pair is re-formed on every pass as the scene tree moves under it,
+// while its held-out flag has to stay attached to the same pair across a re-solve - otherwise the
+// held-out split changes between the fit and the check, which is the one thing that would make
+// section 6.2's verification meaningless while looking like it ran.
+//
+// See docs/adr/ADR-0053-camera-matching-and-appearance-transforms.md section 2.
+typed_id!(PairId, "pai");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
