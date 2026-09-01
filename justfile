@@ -413,6 +413,16 @@ camera-eval CATALOG:
 phase-27-verify:
     cargo run --release --package aura-cli -- verify --phase 27 --work target/phase27-verify
 
+# The phase 28 gate. Migration 28 and its objects, the DAG's shape and its refusals, the checklist
+# and the bounds it may not widen, a whole synthetic wedding through the real orchestrator, the
+# autonomy gate under every band, the governor's one-way action, the four blocking pre-flight rows,
+# degraded completion, the retry budget, the storage figure, and the three IPC files agreeing.
+#
+# Every stage in it is a fixture. Section 11's wall-clock budgets are waived on this machine and
+# the gate prints the six conditions it did not prove at the end of every run.
+phase-28-verify:
+    cargo run --release --package aura-cli -- verify --phase 28 --work target/phase28-verify
+
 # The phase 27 gate from the catalog side. Reads a real project read-only and reports the
 # inspection completeness, the false-ticket rate against findings somebody actually reviewed,
 # what the re-edit loop kept, and any stored row that broke a bound the contract owns. It is

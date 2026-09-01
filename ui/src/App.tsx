@@ -8,6 +8,7 @@ import { HardwarePanel } from './components/HardwarePanel';
 import { ImportWizard } from './components/ImportWizard';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
+import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
 import { CompositionCard } from './components/explain/CompositionCard';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
@@ -238,6 +239,7 @@ export function App(): JSX.Element {
         {/* PHASE-27. The second whole-wedding panel, and it sits under the first deliberately:
             phase 25 makes a gallery coherent and this checks whether it is. It is the last thing
             a photographer looks at before they deliver, so it is the last thing in the sidebar. */}
+        <AutopilotPanel projectId={activeProjectId} onError={setError} />
         <QcPanel projectId={activeProjectId} onError={setError} />
       </aside>
 

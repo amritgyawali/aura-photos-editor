@@ -1,0 +1,319 @@
+# What the Zero-Touch checklist offers, and how hard AURA is allowed to push a machine.
+#
+# PHASE-28 section 4. This file is a product decision, owned by the PM role, and it is the
+# fourteenth configuration table in the product to carry a written reason on every row. A
+# threshold nobody can explain is a threshold nobody can defend to a photographer whose laptop
+# it cooked, or whose wedding it queued for review.
+#
+# ## What this file may and may not do
+#
+# It may switch a stage off by default, and it may make the governor *more* cautious. It may not
+# reorder the pipeline, change what depends on what, raise a thermal ceiling, raise the video
+# memory share, or grant any stage more autonomy than phase 13's bands allow.
+#
+# That last one is worth being explicit about, because it is the one somebody will try. There is
+# no autonomy field anywhere in this file and there is no autonomy field on the IPC surface. The
+# only thing a photographer sets is whether Zero-Touch is on, and `Autonomy::acts` decides what
+# that unlocks. Phase 21's rule: a ceiling can be lowered by a studio and raised by nobody.
+#
+# The four bounds the *code* owns are `THERMAL_REDUCE_C` (85 C), `THERMAL_PAUSE_C` (95 C),
+# `VRAM_CEILING` (0.80) and `BATTERY_FLOOR` (0.30), all in `aura_jobs::contract::autopilot`.
+# `policy.rs` refuses this file if it widens one of them, and the phase 28 gate proves the refusal.
+#
+# ## Bumping `version`
+#
+# `version` is recorded on every run this file configured, so a support case can tell a run made
+# under today's defaults from one made under last year's. Change any number below and bump it in
+# the same commit.
+
+version = 1
+
+# -----------------------------------------------------------------------------
+# The checklist
+# -----------------------------------------------------------------------------
+#
+# One row per stage a photographer can switch off, in pipeline order. A stage that is not listed
+# here is on and cannot be switched off - which is exactly the four mandatory ones, because a
+# wedding with no import is not a wedding and a wedding with no cull is four thousand files.
+#
+# `default_on = false` is not a judgement about the feature. It is a judgement about what should
+# happen on a machine nobody has configured, when the person who pressed the button has gone to
+# bed.
+
+[[stage]]
+id         = "faces"
+default_on = true
+reason = """
+On. Seven of phase 10's nine ranker features come from faces, phase 12's identity minimums are a
+coverage guarantee rather than a preference, and phase 20 has nobody to retouch without it. A
+wedding run with this off is a wedding ranked on very nearly nothing, and the run summary says so
+- but it is still a wedding, which is why the switch exists at all.
+"""
+
+[[stage]]
+id         = "story"
+default_on = true
+reason = """
+On. Invariant 7 is that no threshold is global, and almost every threshold below this stage is a
+function of the scene. Running without it does not disable the rest of the pipeline; it makes
+every later stage compare against the neutral profile, which is the same wedding judged as though
+every frame were a portrait in even light.
+"""
+
+[[stage]]
+id         = "moments"
+default_on = true
+reason = """
+On. Phase 12's coverage guarantee is written against phase 08's grouping: 'the best frame of each
+moment' has no meaning without moments, and the cull falls back on per-frame scoring, which is how
+a gallery ends up with fourteen frames of the same burst.
+"""
+
+[[stage]]
+id         = "integrity"
+default_on = true
+reason = """
+On. The cheapest veto in the product. Phase 12's three hard vetoes are all phase 09 readings, and
+a cull run without them delivers out-of-focus frames that a photographer then has to find.
+"""
+
+[[stage]]
+id         = "emotion"
+default_on = true
+reason = """
+On. It is what decides which of six frames of the same moment is the one, and it is the difference
+between a gallery and a contact sheet.
+"""
+
+[[stage]]
+id         = "composition"
+default_on = true
+reason = """
+On. Cheap, and it is the only reading phase 23 has about whether a crop would improve a frame.
+"""
+
+[[stage]]
+id         = "masks"
+default_on = true
+reason = """
+On, and it is the stage with the widest blast radius when it is off: six later stages gate their
+operations on a region they cannot get, so switching this off does not make the wedding faster by
+one stage - it quietly makes six stages do much less. The stage list shows that as six
+`awaiting a region` rows rather than as a faster run.
+"""
+
+[[stage]]
+id         = "tone"
+default_on = true
+reason = """
+On. Everything in the editing half is a residual from this. A wedding with this off is a wedding
+delivered at the camera's own white balance, which is what the product exists not to do.
+"""
+
+[[stage]]
+id         = "colour"
+default_on = true
+reason = """
+On.
+"""
+
+[[stage]]
+id         = "style"
+default_on = true
+reason = """
+On, and it does nothing at all when the photographer has no profile - an empty profile produces
+exactly what phases 15 and 16 decided, which phase 17's own gate asserts. Leaving it on therefore
+costs a studio that has never trained a profile about forty milliseconds a frame and no change to
+any pixel, and it means the first thing that happens after they *do* train one is that it gets
+used.
+"""
+
+[[stage]]
+id         = "local_light"
+default_on = true
+reason = """
+On.
+"""
+
+[[stage]]
+id         = "retouch"
+default_on = true
+reason = """
+On, and this row is the one a studio is most likely to change. It is on because a wedding
+photographer retouching four hundred faces by hand is the specific labour this product exists to
+remove, and because phase 20's texture guard withdraws a retouch it cannot do safely rather than
+shipping a plastic one. A studio whose brand is unretouched skin turns it off here, and every
+strength the stage would have used is a stored gallery constant they can read afterwards.
+"""
+
+[[stage]]
+id         = "micro"
+default_on = false
+reason = """
+**Off by default, and it is the only editing stage that is.** Phase 21's own condition C2 is that
+the naturalness audit did not happen, so the phase's headline KPI - corrections judged natural at
+or above 95 % - is unmeasured. A flyaway strand and a twig look identical to a measurement, and
+the failure mode of getting it wrong is a photograph with a piece of somebody's hair removed.
+
+That is not a reason to withhold the feature. It is a reason not to run it on a machine nobody
+configured while the photographer is asleep. A studio that has looked at the results turns it on.
+"""
+
+[[stage]]
+id         = "restoration"
+default_on = true
+reason = """
+On. Denoising falls back on a noise-model-conditioned filter whose failure mode is leaving noise
+behind, which a photographer can see and correct. Face recovery does not run at all in this
+release, and the stage reports that rather than substituting unsharp masking on a face.
+"""
+
+[[stage]]
+id         = "geometry"
+default_on = true
+reason = """
+On. The safety filter runs before the objective, so a crop that cannot be proven safe is not a
+candidate rather than a low-scoring one.
+"""
+
+[[stage]]
+id         = "cleanup"
+default_on = false
+reason = """
+**Off by default.** Phase 24 ships no distraction model, so on this build it proposes nothing on a
+real photograph and turning it on changes no pixel - which is precisely why leaving it on would be
+worse than useless: it would be a checklist row that costs 240 ms a frame and does nothing, and
+the day a model ships it would become a generative operation that a photographer had switched on
+years earlier for a build where it was inert.
+
+A stage that removes things from photographs is a stage somebody says yes to on the build that can
+actually do it.
+"""
+
+[[stage]]
+id         = "camera_match"
+default_on = true
+reason = """
+On, and it does nothing on a single-camera wedding - the pass finds one body, has nothing to match
+it against, and records that. A second shooter is the common case at a wedding and the correction
+is the difference between a gallery and two galleries interleaved.
+"""
+
+[[stage]]
+id         = "consistency"
+default_on = true
+reason = """
+On.
+"""
+
+[[stage]]
+id         = "qc"
+default_on = true
+reason = """
+On, always, and this is the row that should be hardest to change. The whole argument for a
+zero-touch button is that the product checks its own work; a run with QC switched off is a run
+that made four thousand decisions and inspected none of them. It is listed here rather than made
+mandatory because a studio re-running an already-delivered wedding to fix one thing should not
+have to re-inspect the other 3,999 frames - and that is the only reason.
+"""
+
+[[stage]]
+id         = "curation"
+default_on = true
+reason = """
+On, and it does not exist in this release. Phase 29 builds it; until then the stage reports
+`phase_not_built` and the run finishes degraded rather than pretending an album was made. Leaving
+it on means the row is visible in the checklist with an honest explanation beside it, which is
+better than a checklist that quietly omits what the product cannot yet do.
+"""
+
+[[stage]]
+id         = "export"
+default_on = true
+reason = """
+On, and it does not exist in this release either. Phase 30 builds it. The same argument as
+curation, and it matters more here: a photographer whose run finished with nothing written needs
+to read why on the run summary, not discover it in an empty folder.
+"""
+
+# -----------------------------------------------------------------------------
+# Resource budgets
+# -----------------------------------------------------------------------------
+#
+# Every one of these may be tightened by a studio and none of them may be widened. `policy.rs`
+# compares against the constants in `aura_jobs::contract::autopilot` and refuses the file with
+# AURA-JOB-7008 rather than clamping quietly - a clamped value is a studio believing it configured
+# something it did not.
+
+[resources]
+
+# The share of video memory a run may occupy. The code's ceiling is 0.80 and this may only be
+# lower.
+vram_ceiling = 0.80
+reason_vram = """
+Section 11's budget. The remaining fifth is what keeps the photographer's desktop compositor,
+browser and catalog application alive while a two-hour run happens - and a run that took the last
+of the video memory would not crash AURA, it would crash whatever the photographer opened next,
+which is a much worse experience to diagnose.
+"""
+
+# Degrees Celsius. The code's ceilings are 85 to reduce and 95 to pause; these may only be lower.
+thermal_reduce_c = 85.0
+thermal_pause_c  = 95.0
+reason_thermal = """
+Consumer laptops throttle themselves somewhere above these numbers, and the product reducing its
+own concurrency first is the difference between a run that slows down and a machine that becomes
+unusable while it does. Section 6.2 asks for the UI to say 'reducing speed to protect your
+machine' rather than silently slowing, and `GovernorAction::user_text` is that sentence.
+
+95 rather than 100 for the pause, because by the time a sensor reads 100 the throttling has
+already happened and the product is no longer the thing deciding.
+"""
+
+# The battery share below which heavy stages do not start on battery power. Code floor is 0.30 and
+# this may only be higher, because higher is more cautious.
+battery_floor = 0.30
+reason_battery = """
+Section 6.2: 'on battery power, heavy stages pause by default with a clear prompt'. Thirty per
+cent because that is roughly the point at which a modern laptop has less than an hour left, and a
+two-hour run started at that point is a run that will not finish - so pausing is not caution, it
+is arithmetic.
+
+`allow_on_battery` on the run's own settings is what a photographer sets when they know better
+than the arithmetic. It is a per-run choice rather than a stored default on purpose: 'yes, run it
+on battery' is a thing somebody means once, on one aeroplane.
+"""
+
+# Free disk required before a run starts, as a multiple of the estimated output. Code floor is 1.6
+# and this may only be higher.
+disk_headroom = 1.6
+reason_disk = """
+The estimate covers the delivered files; a run also writes proxies, checkpoints, catalog pages and
+a report. 1.6 is section 6.2's own number and the margin is deliberately generous, because a disk
+that fills at 90 % of a two-hour run is the single most expensive failure this phase can have -
+every stage is resumable, but the twenty minutes spent finding out are not.
+"""
+
+# How many stages may run at once when nothing is under pressure.
+max_parallel_stages = 2
+reason_parallel = """
+Two. Section 6.1 permits independent stages to run concurrently 'only when resources allow', and
+on the reference laptop the useful pair is one CPU-bound stage beside one GPU-bound one. Three
+does not help: the pipeline's shape is nearly a chain, so at most two stages are ready at once for
+most of a run, and the times when three are ready are the cheap analysis stages where the disk is
+the bottleneck anyway.
+
+A studio may lower this to one. Raising it is permitted - it is a scheduling preference rather
+than a machine safety bound - and the governor halves it under pressure regardless.
+"""
+
+# Photographs per batch for the stages that checkpoint per batch.
+batch_size = 16
+reason_batch = """
+Sixteen frames. Large enough that a per-batch checkpoint is not a transaction per photograph, small
+enough that a kill loses at most sixteen frames of work - which at 380 ms a frame is six seconds,
+comfortably inside section 11's 20 s resume budget.
+
+The governor halves it under video-memory pressure, to a floor of one. That is section 6.2's
+documented OOM fallback: smaller batch, then CPU, never a crash.
+"""

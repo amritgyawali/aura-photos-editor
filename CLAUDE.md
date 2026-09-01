@@ -127,6 +127,10 @@ Never load two phase files into one session.
 | QC thresholds (versioned, PM-owned) | `crates/aura-qc/config/qc_thresholds.toml` |
 | QC evaluation gates | `tests/eval/qc_eval.rs` + `ml/eval/qc_agreement.py` |
 | How AURA checks its own work | `docs/how-qc-works.md` |
+| Autopilot decisions | `docs/adr/ADR-0057-autopilot-orchestration-and-autonomy.md` |
+| The checklist and the resource budgets (versioned, PM-owned) | `crates/aura-jobs/config/autopilot.toml` |
+| Autopilot gates | `tests/e2e/autopilot_chaos.rs`, `tests/e2e/autopilot_run.rs` |
+| One button, in the product's own words | `docs/autopilot.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
@@ -1581,6 +1585,101 @@ by hand, and left nothing behind. Section 11 of the phase 27 gate reads the thre
 agree - the `#[tauri::command]` definitions, the `generate_handler!` list, and the typed client's own
 string literals - and compares them. It proves the names and the syntax and **not the types**,
 because the shell's Rust does not compile on this machine, and it currently reports 220 = 220 = 220.
+
+Phase 28 is implemented conditionally: `aura-jobs::contract::autopilot` freezes the twenty-five
+stages and their declarations, the run and its five statuses, the eight skip causes, the four stage
+verdicts, the four governor actions, the machine state, the eight pre-flight checks, the progress
+watch, the handle, the summary, the outline, the override and `AutopilotService`, and `ids.rs` gains
+`RunId`; `aura-jobs` runs a wedding. `dag.rs` builds one deterministic order from a compile-time
+table and refuses a cycle, `policy.rs` loads a checklist whose five bounds the *code* owns and a
+studio may only tighten, `checkpoint.rs` keys a stage's completion on a hash of what it read,
+`resume.rs` decides what a second life repeats, `governor.rs` folds seven readings with `max` and
+has no action that makes the product do more, `preflight.rs` answers eight questions before a
+two-hour job and blocks on four of them, `retry.rs` tries an optional stage three times and then
+isolates it, `summary.rs` says what did not happen and why, `store.rs` owns migration 28 and
+`api.rs` is the frozen service and the run. Migration 28 stores four tables plus settings, two views
+and three triggers at 1,760 bytes a thousand photographs; 25 argued-over checklist rows live in
+editable config; nine IPC commands (ADR-0058) feed a checklist, a progress panel, a pre-flight
+dialog and a run summary; and `aura-cli verify --phase 28` is the executable gate. Its exit report
+is `docs/progress/PHASE-28-EXIT.md`.
+
+**This phase ships no model** - the eighth since phase 08 - and the reason is none of the three the
+earlier seven gave. There is nothing here a model could do: the orchestrator's whole job is to
+decide what runs next, and that is a topological order over a compile-time table. A phase that
+trained something to schedule would be a phase that had given a scheduler an opinion. What it also
+ships no measurement of is a **wedding**: section 11's four wall-clock rows are waived because this
+machine has no GPU backend, no trained model and no camera file, so every stage in every gate is a
+`ScriptedRunner` and what is measured is the *scheduler*. That is condition C1 and a Sev 2 trigger.
+Condition C6 is the second Sev 2 and it is the headline: **the intervention rate is unmeasured**, so
+no claim about how much work this product saves may be made from this build. Condition C7 is the one
+to say out loud: **this build writes no files**, because phases 29 and 30 do not exist, so a
+completed run leaves a chosen and edited gallery in the catalog and nothing on disk.
+
+Five rules that phase 28 adds and every later phase inherits:
+
+- **`AutopilotService` is the only way to ask what the product did to a whole wedding.**
+  Twenty-fourth service of its kind and the first whose subject is a **run**. Phase 29 adds a
+  curation stage to this DAG, phase 30 adds an export stage and reads these summaries as its
+  learning signal. No phase may keep its own pipeline runner, its own checkpoint format or its own
+  idea of what a finished wedding is.
+- **A scheduler decides nothing, and the manifest is only the first lock.** `aura-jobs` depends on
+  none of the twenty-two deciding crates, and `crates/aura-jobs/tests/no_decisions.rs` - the eighth
+  grep-as-a-test - fails the build if any type in it grows a field that could hold a keep, a
+  rejection, a strength, a threshold or a confidence about a photograph. Two locks because the
+  manifest catches a dependency and the grep catches the version where somebody adds the dependency
+  and the call in one commit. The corollary is the shape of every stage arm: **one call into the
+  command that phase already ships**, so the autopilot runs a wedding through exactly the code path
+  a photographer clicking each panel's button would.
+- **Every resource action makes the product do less, and only one reading stops a run.**
+  `GovernorAction` has no variant that raises concurrency, enlarges a batch or disables a check, so
+  a sensor that is broken, absent or lying cannot cause anything worse than the run going at the
+  speed it would have gone at anyway. A full disk is the only pressure that does not clear on its
+  own, so it is the only one that stops. ADR-0050 gave phase 24's cloud judgement this property;
+  this is the same shape applied to hardware, and it is why the governor is safe on a machine that
+  exposes no telemetry at all - which is this one.
+- **An optional stage that fails does not fail the wedding, and the summary says what did not
+  happen.** Three attempts, then isolation, then `CompletedDegraded` with the stage named and a
+  sentence. Only ingest, previews, embed and cull can end a run. `degraded_stages` is a list rather
+  than a count, because the count is not what a photographer needs at one in the morning.
+- **A checkpoint is keyed by what a stage read, and a delivered run's record cannot be rewritten.**
+  Keying on anything else resumes onto stale work silently. `RunStatus::is_resumable` continues a
+  stopped run and mints a new one for a delivered wedding, and `autopilot_run_no_reopen` enforces
+  the second half in the database - because a correction is a new run rather than an edit to what a
+  photographer was told happened to their wedding.
+
+Four things phase 28 got wrong first, all worth generalising:
+
+**A terminal status is not the same question as an unfinished one.** Treating every terminal state
+as final forced a resume to mint a new run id, and because checkpoints are keyed `(run_id, stage)`
+that found no checkpoints and repeated every finished stage - two hours of a photographer's evening,
+lost to a bookkeeping rule rather than to a bug. Phase 27 hit the same shape from the other side,
+where `TicketStatus::is_open()` answered "is this outstanding" and was spent on "may automation
+still act". **One predicate, one question.**
+
+**A value that has already absorbed the thing you are testing for cannot test for it.** `plan_stage`
+wrote the freshly computed `inputs_hash` before the comparison read it, so every checkpoint always
+matched and no stage was ever re-run, with every unit test passing because each exercised one life.
+Phase 19's converged-target defect in a third place.
+
+**A budget written before it was measured was wrong about the shape as well as the size.** The
+storage note quoted a per-table breakdown nothing had measured; `dbstat` reports 5,281 B, and the
+number does not grow with the wedding at all - the first migration since phase 01 with that shape.
+The bound is asserted as well as the number now, by running the same orchestrator over ten times the
+units. Phase 21 wrote this rule and phase 26 wrote its second half.
+
+**A gate that reads a wall clock on a fixture measures the fixture.** The first phase gate printed
+the run's elapsed time beside section 11's budget, which on a `ScriptedRunner` is a number that looks
+like a wall clock and is a measurement of the test harness. Four of five rows are waived now and the
+gate prints the seven conditions it did **not** prove on every run, rather than leaving them in a
+document nobody opens.
+
+Phase 28 also closed a lock gap of its own making before it could become one: **migration 28 was not
+in `EXTRA_CONTRACTS`**, which `docs/plan/CLAUDE.md` has required of every migration since phase 01
+and which phase 16 found missing for migration 15 the same way. `contracts.lock` now carries 76
+entries. And it **mounted its own panel**, which the develop panels from phase 12 onward still do
+not have: `ui/src/App.tsx` renders `AutopilotPanel` beside the gallery and QC panels, and the
+container-plus-pure-views split phase 25 established is what made the five views testable without a
+window.
 
 Five rules that phase 13 adds and every later phase inherits:
 

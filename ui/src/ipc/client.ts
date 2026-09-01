@@ -2,6 +2,15 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
+  // PHASE-28.
+  AutopilotEventDto,
+  AutopilotPreflightDto,
+  AutopilotProgressDto,
+  AutopilotSettingsInput,
+  AutopilotStageDto,
+  AutopilotStartInput,
+  AutopilotStatusDto,
+  AutopilotSummaryDto,
   // PHASE-17.,
   // PHASE-19.,
   // PHASE-20.,
@@ -1637,4 +1646,71 @@ export const qc = {
    */
   qcDecideBulk: (input: QcDecideBulkInput): Promise<number> =>
     invoke<number>('qc_decide_bulk', { input }),
+
+};
+
+/**
+ * PHASE-28. One button: EDIT COMPLETE WEDDING.
+ *
+ * Nine commands. `autopilotStart` returns as soon as the run is planned and the work continues on
+ * a worker thread, because a command that returned when the wedding finished would hold this
+ * surface for two hours. `autopilotProgress` is what the panel polls while it runs.
+ *
+ * There is no command here that runs one stage on its own, and that is a decision rather than an
+ * omission: a surface that could run the retouch without the cull could edit four thousand frames
+ * nobody is delivering. Every individual pass already has its own command from its own phase, and
+ * those are where a photographer re-runs one step. ADR-0058 section 5.
+ */
+export const autopilot = {
+  /** What the Autopilot panel's header shows. */
+  autopilotStatus: (projectId: string): Promise<AutopilotStatusDto> =>
+    invoke<AutopilotStatusDto>('autopilot_status', { projectId }),
+
+  /**
+   * What would happen if the run started now.
+   *
+   * Eight checks. Four can block - a wedding that will not open, a wedding with no photographs, a
+   * disk that cannot hold the output, and a missing model a mandatory stage needs - and every row
+   * carries a sentence saying what to do about it.
+   */
+  autopilotPreflight: (projectId: string): Promise<AutopilotPreflightDto> =>
+    invoke<AutopilotPreflightDto>('autopilot_preflight', { projectId }),
+
+  /**
+   * Start or continue this wedding's run.
+   *
+   * Pressing this on a wedding that was stopped continues that run rather than starting a new one:
+   * a checkpoint is keyed on the run, so a fresh id would repeat every finished stage.
+   */
+  autopilotStart: (input: AutopilotStartInput): Promise<AutopilotProgressDto> =>
+    invoke<AutopilotProgressDto>('autopilot_start', { input }),
+
+  /** What the run in flight is doing right now, or null when nothing is running. */
+  autopilotProgress: (projectId: string): Promise<AutopilotProgressDto | null> =>
+    invoke<AutopilotProgressDto | null>('autopilot_progress', { projectId }),
+
+  /**
+   * Stop this wedding's run.
+   *
+   * The token is polled between units, never inside a write, so a stopped run leaves the catalog
+   * exactly as consistent as a finished one and picks up where it left off.
+   */
+  autopilotCancel: (projectId: string): Promise<boolean> =>
+    invoke<boolean>('autopilot_cancel', { projectId }),
+
+  /** Every stage of the newest run, with what happened to it. */
+  autopilotStages: (projectId: string): Promise<AutopilotStageDto[]> =>
+    invoke<AutopilotStageDto[]>('autopilot_stages', { projectId }),
+
+  /** What the newest finished run did. */
+  autopilotSummary: (projectId: string): Promise<AutopilotSummaryDto | null> =>
+    invoke<AutopilotSummaryDto | null>('autopilot_summary', { projectId }),
+
+  /** Everything the governor did during the newest run. */
+  autopilotEvents: (projectId: string): Promise<AutopilotEventDto[]> =>
+    invoke<AutopilotEventDto[]>('autopilot_events', { projectId }),
+
+  /** Record what the photographer chose in the checklist. */
+  autopilotSetSettings: (input: AutopilotSettingsInput): Promise<void> =>
+    invoke<void>('autopilot_set_settings', { input }),
 };

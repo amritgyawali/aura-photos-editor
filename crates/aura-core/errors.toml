@@ -1967,3 +1967,78 @@ summary      = "Stored quality-control findings came from different arithmetic o
 user_message = "AURA has improved how it checks finished photographs, so it is re-checking this wedding in the background. Anything you accepted or dismissed yourself is kept."
 runbook      = "docs/runbooks/AURA-ML-5141.md"
 introduced   = "PHASE-27"
+
+# ---------------------------------------------------------------------------
+# PHASE-28 - the zero-touch autopilot orchestrator
+# ---------------------------------------------------------------------------
+#
+# Six codes, JOB 7004-7009, beside phase 01's cancellation, lease and retry codes rather than in
+# the ML range every phase since 15 has used. Nothing in this phase is a model: these are the ways
+# a *run* goes wrong, and a photographer's support bundle already groups them under the same
+# heading as the task failures underneath them.
+#
+# Two of them are worth reading twice.
+#
+# AURA-JOB-7006 is `degraded` rather than `run_blocking`, and that is the honest severity: the
+# governor stops a run at a checkpoint with everything before it committed, which is a run that can
+# be continued rather than a run that failed. The only reading that reaches it is a full disk,
+# because a full disk is the only pressure that does not clear on its own.
+#
+# AURA-JOB-7007 is an error at all so that a resumed run can *say* a stage was re-planned. Its
+# recovery is `fallback`, and the fallback is re-running the stage - which is the correct outcome
+# rather than a failure. Without it, a photographer whose resumed run took as long as a fresh one
+# would have no way to find out why.
+
+[[error]]
+code         = "AURA-JOB-7004"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "The pre-flight found something that stops a run before it starts"
+user_message = "AURA has not started, because something needs your attention first. Each item that needs fixing says what to do about it."
+runbook      = "docs/runbooks/AURA-JOB-7004.md"
+introduced   = "PHASE-28"
+
+[[error]]
+code         = "AURA-JOB-7005"
+severity     = "run_blocking"
+recovery     = "retry"
+summary      = "A stage the wedding cannot be delivered without could not finish"
+user_message = "One step AURA cannot skip did not finish. Everything up to that point is saved, and starting again will pick up where it left off."
+runbook      = "docs/runbooks/AURA-JOB-7005.md"
+introduced   = "PHASE-28"
+
+[[error]]
+code         = "AURA-JOB-7006"
+severity     = "degraded"
+recovery     = "ask_user"
+summary      = "The resource governor ended a run to protect the machine"
+user_message = "AURA stopped so your machine would keep working. Everything finished so far is saved, and starting again will carry on from there."
+runbook      = "docs/runbooks/AURA-JOB-7006.md"
+introduced   = "PHASE-28"
+
+[[error]]
+code         = "AURA-JOB-7007"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A stored checkpoint no longer describes work this build would do"
+user_message = "Something this step depends on changed since last time, so AURA is doing that step again. Nothing else has to be repeated."
+runbook      = "docs/runbooks/AURA-JOB-7007.md"
+introduced   = "PHASE-28"
+
+[[error]]
+code         = "AURA-JOB-7008"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The autopilot checklist and resource budgets were refused"
+user_message = "AURA could not load the settings that decide what runs on its own and how hard it may push your machine, so it has not started anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-JOB-7008.md"
+introduced   = "PHASE-28"
+
+[[error]]
+code         = "AURA-JOB-7009"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A run is already going for this wedding, or the one named is already delivered"
+user_message = "This wedding is already being worked on. Stop that run first, or wait for it to finish."
+runbook      = "docs/runbooks/AURA-JOB-7009.md"
+introduced   = "PHASE-28"

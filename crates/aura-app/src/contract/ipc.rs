@@ -7497,3 +7497,244 @@ pub struct QcDecideBulkInput {
     /// One sentence, applied to all of them.
     pub note: Option<String>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-28. The zero-touch autopilot.
+// ---------------------------------------------------------------------------
+//
+// Nine commands and eight shapes. The primary object is a **run**, which is the first subject on
+// this surface that is not a photograph, a person, a camera or a gallery - and the first that a
+// photographer starts and then walks away from.
+//
+// That changes what every shape here has to carry. A panel about a photograph can afford to say
+// less, because the photograph is on the screen. A panel about a run has to answer, to somebody
+// who has come back two hours later: what did you do, what did you not do, and why. So
+// `AutopilotStageDto` carries `skipCause` and `skipText` beside the outcome, `AutopilotSummaryDto`
+// carries `degradedStages` as a list rather than a count, and `AutopilotStatusDto` carries
+// `calibrated` - because on this build the answer to "why did it queue four hundred frames" is
+// that phase 13's calibration has not been fitted, and a photographer is owed that sentence rather
+// than left to infer it.
+//
+// What is deliberately absent: any autonomy field, any threshold, any per-stage strength, any way
+// to reorder the pipeline, and any command that runs one stage on its own. ADR-0058 section 8.
+
+/// What the Autopilot panel's header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotStatusDto {
+    /// Runs this wedding has had.
+    pub runs: u32,
+    /// The newest run's id, when there is one.
+    pub latest_run: Option<String>,
+    /// Its status slug, from `RunStatus::as_str`.
+    pub status: Option<String>,
+    /// Stages the photographer asked for.
+    pub stages_enabled: u32,
+    /// Stages that did their work.
+    pub stages_completed: u32,
+    /// Stages that could not.
+    pub stages_degraded: u32,
+    /// `stagesCompleted / stagesEnabled`, or zero when nothing has run.
+    pub completeness: f32,
+    /// Whether the newest run was unattended.
+    pub zero_touch: bool,
+    /// Whether this build's confidences have been calibrated.
+    ///
+    /// False on every build shipped so far, and the most consequential field on this shape: it is
+    /// why the panel says AURA is being careful rather than leaving a photographer to wonder.
+    pub calibrated: bool,
+    /// How many times the governor asked the run to slow down.
+    pub resource_events: u32,
+    /// Bytes migration 28 holds for this wedding.
+    pub bytes: u64,
+    /// The checklist file's version.
+    pub policy_ver: i64,
+    /// The orchestrator's own version.
+    pub orchestrator_ver: i64,
+}
+
+/// One pre-flight row.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotPreflightRowDto {
+    /// Which check, from `PreflightCheck::as_str`.
+    pub check: String,
+    /// The words a photographer reads.
+    pub title: String,
+    /// `pass`, `warn` or `block`.
+    pub verdict: String,
+    /// What to do about it. Never empty - section 2.1 asks for actionable messages, and a row that
+    /// said only "disk space: block" would send somebody to a runbook to find out how many
+    /// gigabytes they need.
+    pub detail: String,
+}
+
+/// Everything the pre-flight found.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotPreflightDto {
+    /// The strongest verdict in the report.
+    pub verdict: String,
+    /// Whether the run may start.
+    pub permits_start: bool,
+    /// How many photographs the run would work on.
+    pub images: u32,
+    /// Bytes the run expects to write.
+    pub estimated_output_bytes: u64,
+    /// The whole run's estimate, from the declared per-item estimates.
+    pub estimated_ms: u64,
+    /// Every row, in `PreflightCheck::ALL` order.
+    pub rows: Vec<AutopilotPreflightRowDto>,
+}
+
+/// What the run in flight is doing right now.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotProgressDto {
+    /// The run.
+    pub run_id: String,
+    /// Its status slug.
+    pub status: String,
+    /// The stage slug.
+    pub stage: String,
+    /// The words a photographer reads.
+    pub stage_title: String,
+    /// Its position in the plan, from zero.
+    pub stage_index: u32,
+    /// How many stages are in the plan.
+    pub stage_total: u32,
+    /// Units finished in this stage.
+    pub items_done: u32,
+    /// Units this stage has to do.
+    pub items_total: u32,
+    /// Seconds left for the whole run.
+    pub eta_s: u32,
+    /// Units per second, measured over this stage.
+    pub throughput_per_s: f32,
+    /// What the run has spent on cloud calls.
+    pub spend_usd: f32,
+    /// Anything worth saying that is not a failure.
+    pub warnings: Vec<String>,
+    /// The photograph being worked on, for the thumbnail.
+    pub current_image: Option<String>,
+    /// Whether a stop has been asked for.
+    pub cancelled: bool,
+}
+
+/// One stage of one run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotStageDto {
+    /// The stage slug.
+    pub stage: String,
+    /// The words a photographer reads.
+    pub title: String,
+    /// `completed`, `partial`, `skipped`, `failed`, or `running`.
+    pub outcome: String,
+    /// Why it did not run, when it did not.
+    ///
+    /// Present exactly when `outcome` is `skipped`, and separate from it because "skipped" and
+    /// "skipped because you turned it off" are the difference between a degraded run and a
+    /// complete one. Phase 27's rule about `Clean` and `Skipped`, one level up.
+    pub skip_cause: Option<String>,
+    /// The same, in the photographer's own words.
+    pub skip_text: Option<String>,
+    /// What the autonomy gate said: `act`, `act_and_review` or `hold`.
+    pub verdict: String,
+    /// Units finished.
+    pub items_done: u32,
+    /// Units it had to do.
+    pub items_total: u32,
+    /// Milliseconds of wall clock.
+    pub elapsed_ms: u64,
+    /// How many attempts it took.
+    pub attempts: u32,
+    /// The reason codes attached to it.
+    pub reasons: Vec<String>,
+}
+
+/// What a finished run did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotSummaryDto {
+    /// The run.
+    pub run_id: String,
+    /// Its status slug.
+    pub status: String,
+    /// The words a photographer reads.
+    pub status_title: String,
+    /// How many photographs were selected.
+    pub selected: u32,
+    /// How many files were written.
+    pub exported: u32,
+    /// How many frames a person is being asked to look at.
+    pub needs_review: u32,
+    /// Total wall clock across every stage.
+    pub total_ms: u64,
+    /// What the run spent on cloud calls.
+    pub spend_usd: f32,
+    /// Where the delivered files are.
+    pub output_path: String,
+    /// How long each stage took, in execution order.
+    pub stage_timings: Vec<(String, u64)>,
+    /// Every stage that did not do what it was meant to, with the reason.
+    ///
+    /// A list rather than a count, because the count is not what a photographer needs at one in
+    /// the morning.
+    pub degraded_stages: Vec<(String, String)>,
+}
+
+/// One thing the governor noticed, and what it did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotEventDto {
+    /// `vram`, `ram`, `thermal`, `battery`, `disk`, `quiet` or `device_lost`.
+    pub kind: String,
+    /// `reduce`, `pause` or `stop`. Never `proceed` - a governor that recorded every reading that
+    /// was fine would write a table nobody can read.
+    pub action: String,
+    /// The sentence a photographer reads.
+    pub action_text: String,
+    /// The reading, in the kind's own units.
+    pub reading: f32,
+    /// What it was compared against.
+    pub threshold: f32,
+    /// The stage that was running.
+    pub stage: String,
+}
+
+/// Start a run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotStartInput {
+    /// The wedding.
+    pub project_id: String,
+    /// Stage slugs the photographer switched off.
+    pub disabled: Vec<String>,
+    /// Whether the run may act unattended where phase 13's bands allow.
+    ///
+    /// The only autonomy field on this surface, and it is a boolean rather than a level: what it
+    /// unlocks is decided by `Autonomy::acts`, not here. A field that could name a band would be a
+    /// field that routed around phase 13.
+    pub zero_touch: bool,
+    /// Whether heavy stages may run on battery power.
+    pub allow_on_battery: bool,
+    /// Whether the run yields to foreground work.
+    pub quiet_mode: bool,
+}
+
+/// Record what the photographer chose in the checklist.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopilotSettingsInput {
+    /// The wedding.
+    pub project_id: String,
+    /// Stage slugs to switch off.
+    pub disabled: Vec<String>,
+    /// Whether the run may act unattended.
+    pub zero_touch: bool,
+    /// Whether heavy stages may run on battery power.
+    pub allow_on_battery: bool,
+    /// Whether the run yields to foreground work.
+    pub quiet_mode: bool,
+}
