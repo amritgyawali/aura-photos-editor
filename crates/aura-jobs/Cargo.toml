@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace      = true
 authors.workspace      = true
 publish.workspace      = true
-description = "AURA job graph: tasks, dependencies, leases and heartbeats."
+description = "AURA job graph and the zero-touch autopilot: tasks, leases, the twenty-five-stage DAG, checkpoints, resume, the resource governor and the run summary (phases 01 and 28)"
 
 [dependencies]
 aura-core    = { path = "../aura-core" }
@@ -18,6 +18,37 @@ time.workspace        = true
 tracing.workspace     = true
 uuid.workspace        = true
 parking_lot.workspace = true
+# PHASE-28. `autopilot.toml`: the checklist and the resource budgets, loaded by `policy.rs`.
+toml.workspace        = true
+# PHASE-28. `Checkpoint::inputs_hash`. The same digest the rest of the product uses for content
+# addressing, so a reader who has met `aura-cache` already knows what this column is.
+blake3.workspace      = true
+
+# Deliberately absent: every one of the twenty-two deciding crates.
+#
+# A stage is executed through `StageRunner`, a band comes from `AutonomyGate` and the machine is
+# read through `MachineProbe` - three ports this crate defines and `aura-app` implements over
+# `AppState`, which already owns every pass. Phase 27 used the same indirection for its readings
+# and the reason is sharper here: a scheduler that depended on every phase would be a crate every
+# phase could reach back into, and the thing it would eventually reach for is an opinion about a
+# photograph. `tests/no_decisions.rs` fails the build if this crate grows one.
+#
+# `aura-explain` is the one whose absence is most easily mistaken for an oversight. This crate
+# consumes phase 13's `Autonomy` - it is in `aura-core` - and must not consume phase 13's
+# *calibration*, because a scheduler that knew how a confidence was calibrated would be a
+# scheduler one edit away from computing its own band.
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# PHASE-28. The end-to-end suite of section 10.1, run as an ordinary test so a red chaos run is a
+# red build. It lives in `tests/e2e/` beside `tests/eval/`'s per-phase harnesses rather than in
+# this crate's own `tests/`, because a claim about a whole wedding is a claim about the product
+# and not about a crate.
+[[test]]
+name = "autopilot_run"
+path = "../../tests/e2e/autopilot_run.rs"
+
+[[test]]
+name = "autopilot_chaos"
+path = "../../tests/e2e/autopilot_chaos.rs"

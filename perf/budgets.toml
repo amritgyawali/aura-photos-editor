@@ -1330,3 +1330,65 @@ max_ms_per_unit = 3000
 # check over a frame nobody is delivering is not an inspection anybody asked for.
 [size.qc_store_per_1000_images]
 max_bytes = 1500000
+
+# ---------------------------------------------------------------------------
+# PHASE-28 - the zero-touch autopilot orchestrator
+# ---------------------------------------------------------------------------
+#
+# **Section 11's four wall-clock rows are waived, and the waiver is the phase's headline gap.**
+#
+# The budgets are "3,000 images end to end in <= 2.5 h on an RTX 4070 laptop" and "<= 4 h on an M3
+# Pro". This machine has no GPU backend (ADR-0029 section 4), no trained model in any of the
+# twenty-two deciding phases, and no camera file, so there is nothing to time: a run over a
+# synthetic wedding measures the scheduler and would be a number that looked like a wall clock
+# while being a fixture's. Publishing it would be worse than publishing nothing.
+#
+# What is measured instead is the *orchestrator's own overhead* - the part that is real on this
+# machine and would still be real on a reference laptop. Two rows, and they matter because they are
+# what a photographer pays on top of the work itself.
+
+# Twenty-five stage transitions: the availability question, the band lookup, the unit count, the
+# input hash, the checkpoint read, the resume decision, the governor poll, and two catalog writes
+# per stage. Measured at 1,363 ms for a whole twenty-five-stage run over a 24-unit fixture, of
+# which the fixture's own work is nearly all of it.
+#
+# The budget is 5,000 ms for the plan, which is the orchestrator's share of a two-hour run: 0.07 %.
+# A scheduler that cost more than a tenth of a per cent of the work it schedules would be a
+# scheduler worth replacing.
+[stage.autopilot_plan]
+max_elapsed_ms  = 5000
+max_ms_per_unit = 5000
+
+# Section 11's own row: "resume overhead <= 20 s". The whole of a resume is twenty-five checkpoint
+# reads, twenty-five input hashes and one ready-set rebuild - and it is bounded by the *stage
+# count* rather than by the photograph count, which is why a 6,000-frame wedding resumes as fast as
+# a 300-frame one.
+#
+# `tests/e2e/autopilot_chaos.rs::a_resume_is_well_inside_the_twenty_second_budget` asserts it after
+# a real kill, with the stages doing nothing, because the stages' own time is their phases' budget
+# rather than this one's.
+[stage.autopilot_resume]
+max_elapsed_ms  = 20000
+max_ms_per_unit = 20000
+
+# Section 11 names no storage row. One is measured anyway, and this phase's shape is unlike every
+# migration from 09 to 27: **nothing here scales with the number of photographs.** One
+# `autopilot_run` row per run, twenty-five `autopilot_stage` rows, a bounded number of reasons, and
+# at most 500 `autopilot_event` rows - capped by a trigger rather than by hope.
+#
+# So the per-image figure is a division rather than a measurement, and it falls as a wedding grows.
+# Measured on the phase gate's own run:
+#
+#   autopilot_run                220 B     one row
+#   autopilot_stage            3,450 B     twenty-three planned stages
+#   autopilot_reason             380 B
+#   autopilot_event                0 B     the fixture machine reports nothing
+#                            ---------
+#   measured total             4,050 B  =  1.35 B/image over 3,000 photographs
+#
+# The budget is 10 B/image and the headroom is structural rather than generous: the only row that
+# could grow is the event table, and `autopilot_event_cap` bounds it at 500 per run. Phase 26's
+# lesson is why the gate asserts the *bound* as well as the number - a size check alone would pass
+# on a build that had removed the cap and happened to be measured on a quiet machine.
+[size.autopilot_store_per_1000_images]
+max_bytes = 10000

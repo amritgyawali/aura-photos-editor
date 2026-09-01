@@ -91,6 +91,18 @@ pub struct AppState {
     catalog: Arc<Catalog>,
     clock: Arc<dyn Clock>,
     jobs: Arc<Mutex<BTreeMap<String, CancelToken>>>,
+    // PHASE-28. The autopilot run in flight for each project, so the progress panel can read a
+    // watch that a worker thread is writing to.
+    //
+    // A handle rather than a thread join handle: the run's *state* is its rows, written in the
+    // same transactions as the work, so there is nothing here worth waiting on. What is held is
+    // the cancel token a photographer's stop button needs and the progress watch the panel polls -
+    // both cheap clones, both dropped when the run finishes.
+    //
+    // At most one entry per project, which is the same guarantee
+    // `idx_autopilot_run_one_in_flight` makes in the catalog. Two places rather than one because
+    // this map is what a *panel* reads and the index is what a second process would collide with.
+    runs: Arc<Mutex<BTreeMap<String, aura_jobs::contract::autopilot::RunHandle>>>,
     /// One preview service per project, created on first use. Keeping them
     /// separate keeps each wedding's cache accounting - and its budget - its
     /// own, which is what a photographer expects when they archive one job.
@@ -207,6 +219,7 @@ impl AppState {
             catalog: Arc::new(catalog),
             clock,
             jobs: Arc::new(Mutex::new(BTreeMap::new())),
+            runs: Arc::new(Mutex::new(BTreeMap::new())),
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             cache_root,
             models_root: default_models_root(),
@@ -227,6 +240,7 @@ impl AppState {
             catalog,
             clock,
             jobs: Arc::new(Mutex::new(BTreeMap::new())),
+            runs: Arc::new(Mutex::new(BTreeMap::new())),
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             cache_root,
             models_root: default_models_root(),
@@ -2855,6 +2869,29 @@ impl AppState {
     /// Forget a finished job.
     pub fn finish_job(&self, job_id: &str) {
         self.jobs.lock().remove(job_id);
+    }
+
+    /// Remember the autopilot run in flight for a project. PHASE-28.
+    pub fn register_run(
+        &self,
+        project: aura_core::ProjectId,
+        handle: aura_jobs::contract::autopilot::RunHandle,
+    ) {
+        self.runs.lock().insert(project.to_db(), handle);
+    }
+
+    /// The autopilot run in flight for a project, when there is one. PHASE-28.
+    #[must_use]
+    pub fn run_of(
+        &self,
+        project: aura_core::ProjectId,
+    ) -> Option<aura_jobs::contract::autopilot::RunHandle> {
+        self.runs.lock().get(&project.to_db()).cloned()
+    }
+
+    /// Forget a finished autopilot run. PHASE-28.
+    pub fn finish_run(&self, project: aura_core::ProjectId) {
+        self.runs.lock().remove(&project.to_db());
     }
 }
 

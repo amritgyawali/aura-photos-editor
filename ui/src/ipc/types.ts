@@ -4185,3 +4185,220 @@ export type QcDecideBulkInput = {
   /** One sentence, applied to all of them. */
   note?: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-28. The zero-touch autopilot.
+// ---------------------------------------------------------------------------
+//
+// The primary object here is a **run**, which is the first subject on this surface that a
+// photographer starts and then walks away from. Every earlier panel answers a question about a
+// photograph that is on the screen; this one has to answer, to somebody who has come back two
+// hours later: what did you do, what did you not do, and why.
+//
+// That is why `AutopilotStageDto` carries `skipCause` and `skipText` beside the outcome, why the
+// summary carries `degradedStages` as a list rather than a count, and why `calibrated` is on the
+// wire at all.
+
+/** What the Autopilot panel's header shows. */
+export type AutopilotStatusDto = {
+  /** Runs this wedding has had. */
+  runs: number;
+  /** The newest run's id, when there is one. */
+  latestRun: string | null;
+  /** Its status slug: `running`, `completed`, `completed_degraded`, `cancelled` or `failed`. */
+  status: string | null;
+  /** Stages the photographer asked for. */
+  stagesEnabled: number;
+  /** Stages that did their work. */
+  stagesCompleted: number;
+  /** Stages that could not. */
+  stagesDegraded: number;
+  /** `stagesCompleted / stagesEnabled`, or zero when nothing has run. */
+  completeness: number;
+  /** Whether the newest run was unattended. */
+  zeroTouch: boolean;
+  /**
+   * Whether this build's confidences have been calibrated.
+   *
+   * False on every build shipped so far, and the most consequential field on this shape: it is why
+   * the panel says AURA is being careful, rather than leaving a photographer to wonder why
+   * Zero-Touch queued four hundred frames.
+   */
+  calibrated: boolean;
+  /** How many times the governor asked the run to slow down. */
+  resourceEvents: number;
+  /** Bytes migration 28 holds for this wedding. */
+  bytes: number;
+  /** The checklist file's version. */
+  policyVer: number;
+  /** The orchestrator's own version. */
+  orchestratorVer: number;
+};
+
+/** One pre-flight row. */
+export type AutopilotPreflightRowDto = {
+  /** Which check. */
+  check: string;
+  /** The words a photographer reads. */
+  title: string;
+  /** `pass`, `warn` or `block`. */
+  verdict: string;
+  /** What to do about it. Never empty. */
+  detail: string;
+};
+
+/** Everything the pre-flight found. */
+export type AutopilotPreflightDto = {
+  /** The strongest verdict in the report. */
+  verdict: string;
+  /** Whether the run may start. */
+  permitsStart: boolean;
+  /** How many photographs the run would work on. */
+  images: number;
+  /** Bytes the run expects to write. */
+  estimatedOutputBytes: number;
+  /** The whole run's estimate, from the declared per-item estimates. */
+  estimatedMs: number;
+  /** Every row, in check order. */
+  rows: AutopilotPreflightRowDto[];
+};
+
+/** What the run in flight is doing right now. */
+export type AutopilotProgressDto = {
+  /** The run. */
+  runId: string;
+  /** Its status slug. */
+  status: string;
+  /** The stage slug. */
+  stage: string;
+  /** The words a photographer reads. */
+  stageTitle: string;
+  /** Its position in the plan, from zero. */
+  stageIndex: number;
+  /** How many stages are in the plan. */
+  stageTotal: number;
+  /** Units finished in this stage. */
+  itemsDone: number;
+  /** Units this stage has to do. */
+  itemsTotal: number;
+  /** Seconds left for the whole run. */
+  etaS: number;
+  /** Units per second, measured over this stage. */
+  throughputPerS: number;
+  /** What the run has spent on cloud calls. */
+  spendUsd: number;
+  /** Anything worth saying that is not a failure. */
+  warnings: string[];
+  /** The photograph being worked on, for the thumbnail. */
+  currentImage: string | null;
+  /** Whether a stop has been asked for. */
+  cancelled: boolean;
+};
+
+/** One stage of one run. */
+export type AutopilotStageDto = {
+  /** The stage slug. */
+  stage: string;
+  /** The words a photographer reads. */
+  title: string;
+  /** `completed`, `partial`, `skipped`, `failed` or `running`. */
+  outcome: string;
+  /**
+   * Why it did not run, when it did not.
+   *
+   * Present exactly when `outcome` is `skipped`, and separate from it because "skipped" and
+   * "skipped because you turned it off" are the difference between a degraded run and a complete
+   * one.
+   */
+  skipCause: string | null;
+  /** The same, in the photographer's own words. */
+  skipText: string | null;
+  /** What the autonomy gate said: `act`, `act_and_review` or `hold`. */
+  verdict: string;
+  /** Units finished. */
+  itemsDone: number;
+  /** Units it had to do. */
+  itemsTotal: number;
+  /** Milliseconds of wall clock. */
+  elapsedMs: number;
+  /** How many attempts it took. */
+  attempts: number;
+  /** The reason codes attached to it. */
+  reasons: string[];
+};
+
+/** What a finished run did. */
+export type AutopilotSummaryDto = {
+  /** The run. */
+  runId: string;
+  /** Its status slug. */
+  status: string;
+  /** The words a photographer reads. */
+  statusTitle: string;
+  /** How many photographs were selected. */
+  selected: number;
+  /** How many files were written. */
+  exported: number;
+  /** How many frames a person is being asked to look at. */
+  needsReview: number;
+  /** Total wall clock across every stage. */
+  totalMs: number;
+  /** What the run spent on cloud calls. */
+  spendUsd: number;
+  /** Where the delivered files are. */
+  outputPath: string;
+  /** How long each stage took, in execution order. */
+  stageTimings: [string, number][];
+  /** Every stage that did not do what it was meant to, with the reason. */
+  degradedStages: [string, string][];
+};
+
+/** One thing the governor noticed, and what it did. */
+export type AutopilotEventDto = {
+  /** `vram`, `ram`, `thermal`, `battery`, `disk`, `quiet` or `device_lost`. */
+  kind: string;
+  /** `reduce`, `pause` or `stop`. Never `proceed`. */
+  action: string;
+  /** The sentence a photographer reads. */
+  actionText: string;
+  /** The reading, in the kind's own units. */
+  reading: number;
+  /** What it was compared against. */
+  threshold: number;
+  /** The stage that was running. */
+  stage: string;
+};
+
+/** Start a run. */
+export type AutopilotStartInput = {
+  /** The wedding. */
+  projectId: string;
+  /** Stage slugs the photographer switched off. */
+  disabled: string[];
+  /**
+   * Whether the run may act unattended where phase 13's bands allow.
+   *
+   * The only autonomy field on this surface, and a boolean rather than a level: what it unlocks is
+   * decided by the bands, not here. A field that could name a band would be a field that routed
+   * around phase 13.
+   */
+  zeroTouch: boolean;
+  /** Whether heavy stages may run on battery power. */
+  allowOnBattery: boolean;
+  /** Whether the run yields to foreground work. */
+  quietMode: boolean;
+};
+
+/** Record what the photographer chose in the checklist. */
+export type AutopilotSettingsInput = {
+  /** The wedding. */
+  projectId: string;
+  /** Stage slugs to switch off. */
+  disabled: string[];
+  /** Whether the run may act unattended. */
+  zeroTouch: boolean;
+  /** Whether heavy stages may run on battery power. */
+  allowOnBattery: boolean;
+  /** Whether the run yields to foreground work. */
+  quietMode: boolean;
+};

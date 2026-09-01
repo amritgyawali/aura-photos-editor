@@ -43,6 +43,10 @@ aura-style         = { path = "../aura-style" }
 # depending on the crate that judges it.
 aura-qc            = { path = "../aura-qc" }
 blake3.workspace      = true
+# PHASE-28. `AppProbe::sample` reads how much room is left on the volume the project lives on.
+# It is the only one of the machine probe's seven readings this build can honestly fill; the
+# other six need platform APIs this product does not link, and are `None`.
+fs4.workspace         = true
 rusqlite.workspace    = true
 serde.workspace       = true
 serde_json.workspace  = true

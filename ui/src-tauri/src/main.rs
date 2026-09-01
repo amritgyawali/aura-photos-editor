@@ -6,6 +6,9 @@
 use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
+    // PHASE-28.
+    AutopilotEventDto, AutopilotPreflightDto, AutopilotProgressDto, AutopilotSettingsInput,
+    AutopilotStageDto, AutopilotStartInput, AutopilotStatusDto, AutopilotSummaryDto,
     AcceptToneInput, CleanupBlockedDto, CleanupDisclosureDto, CleanupPassDto, CleanupPassInput,
     CleanupProposalDto, CleanupReasonDto, CleanupStatusDto, DecideCleanupInput,
     DisableCleanupInput, EstimateToneInput, ManualRemoveDto, ManualRemoveInput, ReferenceFrameDto,
@@ -2446,6 +2449,114 @@ async fn gallery_reason_codes(state: State<'_, AppState>) -> IpcResult<Vec<Galle
         .await
         .map_err(|_| background_request_failed())?
 }
+// ---------------------------------------------------------------------------
+// PHASE-28. The zero-touch autopilot.
+// ---------------------------------------------------------------------------
+//
+// Nine commands, all of them off the UI thread. `autopilot_start` is the one that matters: it
+// returns as soon as the run is planned and the wedding continues on a worker thread inside
+// `aura-app`, because a command that returned when the run finished would hold this surface for
+// two hours.
+//
+// `autopilot_cancel` reaches the run's cancel token, which is polled between units and never
+// inside a write - so a stopped run leaves the catalog exactly as consistent as a finished one.
+
+#[tauri::command]
+async fn autopilot_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<AutopilotStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn autopilot_preflight(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<AutopilotPreflightDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_preflight(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn autopilot_start(
+    state: State<'_, AppState>,
+    input: AutopilotStartInput,
+) -> IpcResult<AutopilotProgressDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_start(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn autopilot_progress(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<AutopilotProgressDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_progress(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn autopilot_cancel(state: State<'_, AppState>, project_id: String) -> IpcResult<bool> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_cancel(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn autopilot_stages(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<AutopilotStageDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_stages(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn autopilot_summary(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<AutopilotSummaryDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_summary(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn autopilot_events(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<AutopilotEventDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_events(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn autopilot_set_settings(
+    state: State<'_, AppState>,
+    input: AutopilotSettingsInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::autopilot_set_settings(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 
 fn main() {
     tracing_subscriber::fmt()
@@ -2714,6 +2825,15 @@ fn main() {
             undo_moment_edit,
             warmup_models,
             within_moment
+                    autopilot_status,
+            autopilot_preflight,
+            autopilot_start,
+            autopilot_progress,
+            autopilot_cancel,
+            autopilot_stages,
+            autopilot_summary,
+            autopilot_events,
+            autopilot_set_settings,
         ])
         .run(tauri::generate_context!());
 
