@@ -164,7 +164,16 @@ fn the_query_event_carries_the_filter_kind_and_not_the_filter() {
         .find("export type IndexEvent =")
         .expect("IndexEvent is missing");
     let block = &ts[start..];
-    let end = block.find("\n\n").unwrap_or(block.len());
+    // The declaration ends at the first blank line, and "blank" has to mean blank on a CRLF
+    // working tree too. `types.ts` is `text=auto eol=lf` in .gitattributes and is still CRLF in a
+    // Windows checkout, so a search for "\n\n" alone never matched, ran past the end of the
+    // declaration, and read the rest of the file as part of it - failing on a `cameraId` three
+    // hundred lines away that has nothing to do with the query event. A separator that only
+    // exists on one platform is not a separator.
+    let end = block
+        .find("\n\r\n")
+        .or_else(|| block.find("\n\n"))
+        .unwrap_or(block.len());
     let declaration = &block[..end];
 
     assert!(declaration.contains("filterKind"));

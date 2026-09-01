@@ -2,6 +2,110 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 27 - The AI QC agent: a product that checks its own work
+
+Twenty-six phases decided. This one asks whether those decisions were any good, on the frames that
+are about to be delivered, and it is the first thing in the product whose primary object is a
+**problem** rather than a photograph, a wedding or a camera.
+
+**Clean and skipped are different values, and the whole phase is built around it.** Ten checks, and
+each one returns `Clean`, `Found` or `Skipped` - never a bare boolean and never a count. A wedding
+whose masks are absent must not report zero mask artefacts and read as a clean bill of health, and
+in this build that is the *common* case rather than the exotic one: phase 06's detector finds no
+faces, phase 18's segmenter is untrained, phase 22's face recovery never runs. `QcOutline::
+inspection_completeness` is on the wire, the panel renders a category that found nothing and skipped
+everything as "not checked" in grey, `QcReport.test.tsx` asserts a clean gallery is never claimed
+while anything was skipped, and the report leads with what was looked at rather than with what was
+found. Every earlier phase reported coverage; this is the first where reporting it *wrong* would
+make the product actively dangerous.
+
+**Improvement is measured against what the ticket opened with, not against the threshold.** Phase
+19's lesson - a converged target cannot detect its own constraints - applied to the loop that would
+most easily have shipped it. A remedy that closed 90 % of the gap but landed just outside the
+threshold is a remedy that worked, and one that crossed the threshold because the threshold moved is
+not. `QcRound` stores `deviation_before`, `deviation_after` and `expected_gain` and the loop decides
+on `realised_share`, which is what the panel and the archived report both show.
+
+**A ticket's sentence is rendered, never stored.** Phase 09's rule - a reason stores its code, never
+its copy - taken to its conclusion: migration 27 has no `diagnosis` column and no free-text field
+automation can write into, `QcTicket::render_diagnosis` composes the sentence from the code, the
+deviation, the threshold and the unit on read, and the phase gate scans the schema for one on every
+run. A stored sentence is copy a release can change, a catalog full of English cannot be translated,
+and a free-text column is a place a planner's answer could end up being quoted back as a
+measurement.
+
+**The planner cannot act, and that is a property of the types rather than a rule in a comment.**
+`QcPlanOutput` carries `ProposedStep`, which is deliberately *not* a `Remedy`: it has no
+constructor path into `remedy::validate`, `Remedy` derives no serde traits at all, and a test binds
+`remedy::validate` as a function pointer to assert the only route in is the one choke point. The
+cloud task is `Tier::Reasoning`, capped at $0.06, sees no pixels and no identity, and its
+`local_fallback` is an escalation - so an unreachable provider, an invalid answer, a spent budget
+and a cautious model all leave the photograph in exactly the same state. Phase 24's rule about a
+cloud call whose every failure mode equals its most conservative answer, in its second application.
+
+**A replacement is refused by a filter, before anything is scored.** Phase 12's rule, phase 23's and
+phase 24's: four gates in order - the finding must be frame-solvable, the candidate must beat it by
+a clear margin on the metric that raised it, confidence must clear 0.85, and **a coverage guarantee
+holding the original must be carried by the alternative**. The fourth is a filter rather than a term,
+so there is no rectangle to nudge and no score to trade against a bride's only photograph of the ring
+exchange.
+
+**A photographer's verdict is unbeatable, and it takes a trigger to guarantee it.**
+`qc_ticket_keep_user_status` is formulated as "a user-set status may only become another user-set
+status", which is the form that survives a re-pass, a thresholds bump and a future caller nobody has
+written yet. `accepted` and `dismissed` are the whole of what a person may write; `open`, `fixed`,
+`reverted` and `escalated` are automation's record of what happened, and a surface that let somebody
+set `fixed` would let them record a measurement they had not made. `qc_round_no_update` and
+`qc_replacement_is_immutable` make the record of what AURA did to a photograph unable to be edited
+afterwards.
+
+**Bulk actions record verdicts and never authorise remedies.** Agreeing that forty findings are real
+is a statement about the findings; instructing AURA to act on forty frames unattended is a statement
+about the remedies, and the two are different judgements made with different amounts of attention.
+`QcDecideBulkInput` has no `applyRemedy` field, `TicketQueue.test.tsx` asserts the bulk callback
+takes two arguments, and per-ticket authorisation lives beside the before and after. ADR-0056
+section 5.
+
+**`TicketStatus::Dismissed` amends a frozen contract, for the fifth time in the product's history**
+after phase 09's `FaceRef`, phase 16's re-lock, phase 23's `Lens::coefficients` and phase 24's
+`Recipe::cleanup`. A finding a photographer disagreed with must not come back on the next pass, and
+there was no state that could express it. ADR-0055 section 9 has the argument.
+
+Two things this phase got wrong first, both found by its own gates, both worth generalising:
+
+**An escalated ticket was still eligible for a second round.** `TicketStatus::is_open()` includes
+`Escalated` and `Reverted`, and the triage read it - so a finding already handed to a person was
+re-remediated, consuming both attempts, which is exactly what the bound exists to prevent. Gate 6
+caught it. The filter is `status == TicketStatus::Open` now, in three places. **A predicate named for
+one question was reused for a second one it answers wrongly**, and the two questions were "is this
+finding outstanding" and "may automation still act on it".
+
+**Two greps matched the prose that documented the rule they enforce.** A test asserting the module
+holds no fixed skin target failed on its own test name; a gate scanning the schema for a `diagnosis`
+column failed on migration 27's four paragraphs explaining why there is not one - `sqlite_master`
+stores a migration verbatim, comments and all. Both strip comments before scanning now. **A check
+that reads documentation as if it were code will fail exactly on the codebases that document
+themselves best.**
+
+And one gap this phase closed that belonged to no phase: **no gate anywhere checked that the IPC
+surface was reachable.** Phase 21's exit report found ninety client calls reaching a window that did
+not answer to them, fixed them by hand, and left nothing behind to stop it happening again. Section
+11 of the phase 27 gate reads the three files that have to agree - the command definitions, the
+`generate_handler!` list, the typed client's own string literals - and compares them. It proves the
+names and the syntax and not the types, because the shell's Rust does not compile on this machine,
+and it currently reports 220 = 220 = 220.
+
+Ten commands, ten checks, four panels, 227 unit tests, 7 architectural tests, 12 evaluation gates,
+6 budget tests, and a store measured at 421 B per image against a 1,500 B budget.
+
+**What it does not prove.** Every fixture is a set of *readings* this repository authored, and the
+numbers phases 09 to 26 would produce on a real photograph come from placeholder heads - C1, Sev 2,
+closing with phase 05's C10. The photographer-agreement study did not happen, so the headline KPI of
+the phase is unmeasured and the false-ticket rate is measured against frames this repository
+authored as clean rather than against a person's judgement - C2, Sev 2. `DETECTOR_TRAINED` is false
+and every check is a measurement rather than a model - C3, and a deliberate choice. The planner has
+never reached a provider - C4.
+
 ## Phase 26 - Camera and shooter matching: appearance, not sliders
 
 Twenty-five phases decided about one photograph, then about one wedding. This one decides about a

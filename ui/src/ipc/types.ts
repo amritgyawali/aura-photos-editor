@@ -3896,3 +3896,292 @@ export type CameraOverrideInput = {
   dExposure?: number | null;
   dSaturation?: number | null;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-27 - quality control
+// ---------------------------------------------------------------------------
+//
+// The first surface in this product whose primary object is a **problem**. Every earlier panel
+// answers "what did AURA decide about this photograph"; this one answers "what does AURA think is
+// wrong with what it decided", so the reader arrives sceptical and every number that would let
+// them check a finding travels beside the sentence.
+//
+// Read `QcStatusDto.completeness` first. A QC panel is the only place in this product where an
+// empty result is genuinely ambiguous - zero findings means either "AURA looked at everything and
+// it is fine" or "AURA could not look" - and in this build the second is the common case, because
+// phase 06's detector finds no faces and phase 18's segmenter is untrained. `inspectionsSkipped`
+// is on the wire beside it, and `detectorTrained` is false.
+
+/** What the QC panel's project header shows. */
+export type QcStatusDto = {
+  /** Photographs in the delivered gallery. Phase 18's denominator, not the project's. */
+  selected: number;
+  /** Photographs the pass reached. */
+  checked: number;
+  /** Fraction of the gallery inspected, 0..1. */
+  coverage: number;
+  /** Inspections that ran. */
+  inspections: number;
+  /**
+   * Inspections that could not run because something they needed was absent.
+   *
+   * The number that makes the rest honest. A category with zero findings and four hundred skips
+   * is not a clean category.
+   */
+  inspectionsSkipped: number;
+  /** Fraction of attempted inspections that actually ran, 0..1. */
+  completeness: number;
+  /** Findings still wanting somebody's attention. */
+  open: number;
+  /** Findings a photographer agreed with. */
+  accepted: number;
+  /** Findings a photographer rejected. The false-ticket numerator. */
+  dismissed: number;
+  /**
+   * Fraction of reviewed findings a photographer disagreed with, 0..1.
+   *
+   * The denominator is findings somebody looked at, not findings that exist: a queue nobody has
+   * opened has no disagreement rate, and reporting one as zero would read as unanimous agreement.
+   */
+  falseTicketRate: number;
+  /** Frames replaced by a better alternative. */
+  replaced: number;
+  /** Remediation rounds run. */
+  rounds: number;
+  /** Planner calls made, out of forty. */
+  plannerCalls: number;
+  /** Findings in each category, in QcCategory::ALL order. */
+  byCategory: number[];
+  /** Findings in each status, in TicketStatus::ALL order. */
+  byStatus: number[];
+  /** Bytes this phase occupies for the project. */
+  bytes: number;
+  /** Which thresholds table. */
+  thresholdsVer: number;
+  /** Which arithmetic. */
+  analysisVer: number;
+  /**
+   * False in this build. No defect-detection model ships and every check is a measurement against
+   * another phase's stored number.
+   */
+  detectorTrained: boolean;
+};
+
+/** One finding, as a photographer reads it. */
+export type QcTicketDto = {
+  /** The finding. */
+  ticketId: string;
+  /** The photograph. */
+  imageId: string;
+  /** Which inspection. */
+  category: string;
+  /** What exactly. */
+  code: string;
+  /** The senior retoucher's note, rendered from the numbers rather than stored. */
+  diagnosis: string;
+  /** How far from acceptable. */
+  deviation: number;
+  /** What acceptable was. */
+  threshold: number;
+  /** What both are measured in. */
+  unit: string;
+  /** How far past the threshold, as a multiple of it. What the queue sorts on. */
+  severity: number;
+  /** What should be done, as one of the five remedy slugs. */
+  remedyKind: string;
+  /** What it acts on. */
+  remedyTarget: string;
+  /** How much the deviation should fall if it is applied. */
+  expectedGain: number;
+  /** How sure, 0..1. */
+  confidence: number;
+  /** What the product is allowed to do about it. */
+  autonomy: string;
+  /** True when the confidence and the band both permit acting without a person. */
+  mayActUnattended: boolean;
+  /** Which round it is on, out of two. */
+  round: number;
+  /** Where it stands. */
+  status: string;
+  /** What happened to it, when something has. */
+  outcomeCode?: string | null;
+  /** The scene, for the panel's own grouping. */
+  scene: string;
+  /** What to look at: none | crop | frames | anchors | params. */
+  evidenceKind: string;
+  /** The frames the finding was measured against, when it names any. */
+  evidenceFrames: string[];
+  /** The region of this frame, as [x, y, w, h] normalised, when it names one. */
+  evidenceCrop?: number[] | null;
+  /** The reasons, strongest first, as sentences. */
+  reasons: string[];
+};
+
+/** One category's findings, worst first. */
+export type QcGroupDto = {
+  /** Which inspection. */
+  category: string;
+  /** The worst severity in the group, which is what orders the groups themselves. */
+  worst: number;
+  /** The findings. */
+  tickets: QcTicketDto[];
+};
+
+/** One remediation attempt, and whether it worked. */
+export type QcRoundDto = {
+  /** Which round, one or two. */
+  round: number;
+  /** What was tried. */
+  remedyKind: string;
+  /** What it acted on. */
+  remedyTarget: string;
+  /** The deviation before. */
+  deviationBefore: number;
+  /** And after. */
+  deviationAfter: number;
+  /** What was predicted. */
+  expectedGain: number;
+  /** The share of that prediction actually realised. The number the loop decided on. */
+  realisedShare: number;
+  /** The worst movement in another check, as a share of that check's own threshold. */
+  collateral: number;
+  /** Which check took it. */
+  collateralCategory?: string | null;
+  /** Whether the change survived. */
+  kept: boolean;
+  /** What happened, as a code. */
+  outcome: string;
+  /** How long, in milliseconds. */
+  ms: number;
+};
+
+/** One frame swapped for another. */
+export type QcReplacementDto = {
+  /** The finding that caused it. */
+  ticketId: string;
+  /** The frame that was in the gallery. */
+  replaced: string;
+  /** The frame that is in it now. */
+  replacement: string;
+  /** Which metric decided it. */
+  category: string;
+  /** What the replaced frame measured. */
+  metricBefore: number;
+  /**
+   * What the replacement measures.
+   *
+   * Both, never the difference: a photographer looking at a swap wants to know what each frame
+   * measured, and a stored subtraction cannot be read back as two numbers.
+   */
+  metricAfter: number;
+  /** How sure. Never below 0.85 on an automatic swap. */
+  confidence: number;
+  /** True on every stored swap: coverage was re-validated and held. */
+  coverageHeld: boolean;
+  /** One sentence about why. */
+  note: string;
+};
+
+/** One category's tally in the report. */
+export type QcTallyDto = {
+  /** Which inspection. */
+  category: string;
+  /** Findings opened. */
+  found: number;
+  /** Findings a remedy fixed and re-inspection confirmed. */
+  fixed: number;
+  /** Findings handed to a person. */
+  escalated: number;
+  /** Frames this check could not run on. */
+  skipped: number;
+};
+
+/** What one QC pass did. */
+export type QcReportDto = {
+  /** Photographs inspected. */
+  images: number;
+  /** Photographs the pass did not reach before its time ran out. */
+  imagesUnreached: number;
+  /** True when it reached every frame it was asked to. */
+  complete: boolean;
+  /** Inspections that ran. */
+  checksRun: number;
+  /** Inspections that could not. */
+  skipped: number;
+  /** One row per category. */
+  byCategory: QcTallyDto[];
+  /** Findings opened, across every category. */
+  found: number;
+  /** Remedies applied and kept. */
+  fixed: number;
+  /** Remedies applied and put back. */
+  reverted: number;
+  /** Findings handed to a person. */
+  escalated: number;
+  /** Every swap, with its before and after. */
+  replacements: QcReplacementDto[];
+  /** Planner calls made. */
+  plannerCalls: number;
+  /** True when the planner was reached at all. */
+  cloudUsed: boolean;
+  /** How long, in milliseconds. */
+  durationMs: number;
+  /** Which thresholds table. */
+  thresholdsVer: number;
+  /** Which arithmetic. */
+  analysisVer: number;
+};
+
+/** Ask for a QC pass. */
+export type QcPassInput = {
+  /** The project. */
+  projectId: string;
+  /**
+   * True to apply remedies the autonomy bands permit; false to inspect and report only.
+   *
+   * The safe default is false, and phase 28 is the caller that sets it true. A pass that only
+   * inspects changes nothing, which is what makes it the thing to run before a delivery.
+   */
+  remediate: boolean;
+};
+
+/**
+ * What a photographer decided about one finding.
+ *
+ * `status` may only be `accepted` or `dismissed`. Automation owns `open`, `fixed`, `reverted` and
+ * `escalated`, which are a record of what happened rather than an opinion about it.
+ */
+export type QcDecideInput = {
+  /** The finding. */
+  ticketId: string;
+  /** `accepted` or `dismissed`. */
+  status: string;
+  /**
+   * Apply the proposed remedy now, whatever the autonomy band said.
+   *
+   * A photographer overruling a review requirement upward is the one direction that is safe: they
+   * have looked. There is no field that overrules it downward.
+   */
+  applyRemedy: boolean;
+  /** One sentence, kept for the studio's record. At most 280 characters. */
+  note?: string | null;
+};
+
+/**
+ * What a photographer decided about many findings at once.
+ *
+ * There is no `applyRemedy` here, and that is the decision rather than an omission. Agreeing that
+ * forty findings are real is a statement about the findings; instructing AURA to act on forty
+ * frames unattended is a statement about the remedies, and the two are different judgements made
+ * with different amounts of attention. ADR-0056 section 5.
+ */
+export type QcDecideBulkInput = {
+  /** The project, for the audit trail. */
+  projectId: string;
+  /** The findings. */
+  ticketIds: string[];
+  /** `accepted` or `dismissed`. */
+  status: string;
+  /** One sentence, applied to all of them. */
+  note?: string | null;
+};

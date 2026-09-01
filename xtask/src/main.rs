@@ -109,6 +109,17 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // reference; this holds it to a review.
     "crates/aura-catalog/migrations/0020_geometry.sql",
     "crates/aura-render/shaders/geometry.wgsl",
+    // PHASE-27. The migration only; this phase ships no shader, because nothing in it moves a
+    // pixel. `qc_thresholds.toml` is deliberately *not* frozen - it is a file a studio is meant to
+    // edit, and `Thresholds::parse` holds it to the ceilings the code owns rather than a digest.
+    //
+    // Migration 27 is here for the reason migration 25 is: it carries guarantees as constraints
+    // rather than as Rust. `qc_ticket_keep_user_status` is what stops automation overwriting a
+    // photographer's verdict, `qc_round_no_update` and `qc_replacement_is_immutable` are what make
+    // the record of what AURA did to a photograph unable to be edited afterwards, and all three
+    // are the second layer under a refusal that also lives in `aura-qc`. A digest is what stops
+    // the second layer being quietly widened to match a first layer somebody had already changed.
+    "crates/aura-catalog/migrations/0027_qc.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

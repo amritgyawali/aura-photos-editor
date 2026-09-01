@@ -123,6 +123,10 @@ Never load two phase files into one session.
 | Bundled brand baselines, none of them measured | `assets/camera_baselines/` |
 | Camera matching evaluation gates | `tests/eval/camera_eval.rs` + `ml/eval/camera_match_eval.py` |
 | How AURA matches two cameras and two shooters | `docs/camera-matching.md` |
+| Quality-control decisions | `docs/adr/ADR-0055-quality-control-tickets-and-the-re-edit-loop.md` |
+| QC thresholds (versioned, PM-owned) | `crates/aura-qc/config/qc_thresholds.toml` |
+| QC evaluation gates | `tests/eval/qc_eval.rs` + `ml/eval/qc_agreement.py` |
+| How AURA checks its own work | `docs/how-qc-works.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
@@ -1480,6 +1484,103 @@ Phase 25 also added the sixth grep-as-a-test,
 `crates/aura-brain-gallery/tests/no_recipe_writes.rs`, which fails the build if this crate writes a
 recipe, opens a file, reaches a provider, grows its own tone solver, or acquires a constant it could
 compare a person's skin against.
+
+Phase 27 is implemented conditionally: `aura-core::contract::qc` freezes the ten inspections, 43
+codes, the reason, the evidence, the five remedies, the six ticket statuses, the ticket, the round,
+the replacement, the report, the outline, the override and `QcService`, and `ids.rs` gains
+`TicketId`; `aura-qc` judges what every phase before it decided. `policy.rs` loads a thresholds
+table whose nineteen ceilings the *code* owns and a studio may only tighten, `checks/` holds ten
+pure inspections that each return `Clean`, `Found` or **`Skipped`**, `ticket.rs` gives every finding
+a code, a number, a threshold, a reason and an autonomy band, `triage.rs` works root causes before
+their symptoms and asks for a second opinion on a frame with several at once, `remedy.rs` is the one
+choke point a remedy can be built through, `reedit.rs` applies one, re-inspects, and keeps the
+change only if it delivered half of what it promised and broke nothing else, `replace.rs` swaps a
+frame through four gates of which the coverage guarantee is a filter rather than a term,
+`planner.rs` is a bounded reasoning-tier call whose output type cannot become a remedy, `report.rs`
+leads with what was checked, `store.rs` owns migration 27 and `api.rs` is the frozen service and the
+resumable pass. Migration 27 stores four tables, two views and four triggers at 421 bytes a
+photograph; 23 argued-over scene rows live in editable config; nine IPC commands (ADR-0056) feed a
+report, category chips, a grouped queue and a before-and-after; and `aura-cli verify --phase 27` is
+the executable gate. Its exit report is `docs/progress/PHASE-27-EXIT.md`.
+
+**This phase ships no model, and for the first time that is a decision about the *feature* rather
+than about the data.** Phases 17, 23 and 25 shipped none because there was nothing to train; phase
+24 because there was no data. Here `DETECTOR_TRAINED` is false because a QC agent that guesses at
+defects is worse than one that measures them: every check is a comparison between numbers phases 08
+to 26 already stored, whose failure mode is finding fewer problems rather than inventing them, and a
+false ticket is the one failure that makes a photographer close the queue and stop reading it.
+ADR-0055 section 3. Every gate in section 10.1 is measured against galleries whose **readings** this
+repository authored - not photographs - so what is proved is the arithmetic, the triage, the loop's
+bounds, the refusals and the store. That is condition C1, it is a Sev 2 trigger, and it closes with
+phase 05's C10. Condition C2 is the second Sev 2 and it is the headline: **the photographer-agreement
+study did not happen**, so the false-ticket rate is measured against two hundred frames this
+repository authored as clean, which is a test of the thresholds against themselves.
+
+Five rules that phase 27 adds and every later phase inherits:
+
+- **`QcService` is the only way to ask whether the product's own work is any good.** Twenty-third
+  service of its kind and the first whose subject is a **problem**. Phase 28 reads these tickets to
+  decide what may run unattended, phase 29 must not build an album out of frames this phase flagged,
+  and phase 30's learning loop reads the dismissals. No phase may keep its own idea of a defect, its
+  own thresholds table, or its own re-edit loop.
+- **Clean and skipped are different values, and a phase that collapses them is dangerous rather than
+  imprecise.** Every earlier phase reported coverage as a number beside a result; here the number
+  *is* the result. A gallery whose masks are absent reporting zero mask artefacts reads as a clean
+  bill of health, and on this build that is the common case rather than the exotic one. `Outcome`
+  has three variants, `QcOutline::inspection_completeness` is on the wire, and the panel renders a
+  category that found nothing and skipped everything in grey. Phase 24's rule - an absent input is
+  ignorance, not permission - in the phase where the two are most expensive to confuse.
+- **Improvement is measured against what the finding opened with, never against the threshold.**
+  Phase 19's lesson, applied to the loop that would most easily have shipped it: a remedy that
+  closed 90 % of the gap and landed just outside is a remedy that worked, and one that crossed
+  because the threshold moved is not. `QcRound` stores both deviations and the expected gain, and
+  `realised_share` is what the loop, the panel and the archived report all decide on.
+- **A ticket's sentence is rendered, never stored.** Phase 09's rule at its conclusion: there is no
+  `diagnosis` column in migration 27 and no free-text field automation can write into, so a stored
+  sentence cannot become copy a release has to maintain, a catalog full of English, or a place a
+  cloud answer gets quoted back as a measurement. The gate scans the schema for one on every run.
+- **Agreeing is not authorising, and the two are separate shapes on the wire.**
+  `QcDecideBulkInput` has no `applyRemedy` field. Agreeing that forty findings are real is a
+  statement about the findings; instructing AURA to act on forty frames unattended is a statement
+  about the remedies, and they are different judgements made with different amounts of attention.
+  Any later phase that adds a bulk action which changes photographs has re-created the failure this
+  rule exists to prevent.
+
+Phase 27 amended a frozen contract for the fifth time in the product's history, after phase 09's
+`FaceRef`, phase 16's re-lock, phase 23's `Lens::coefficients` and phase 24's `Recipe::cleanup`:
+`TicketStatus` gained `Dismissed`. A finding a photographer disagreed with must not come back on the
+next pass, and no existing status could express it. ADR-0055 section 9.
+
+Three things phase 27 got wrong first, all found by its own gates, all worth generalising:
+
+**A predicate named for one question was reused for a second one it answers wrongly.**
+`TicketStatus::is_open()` is true for `Open`, `Escalated` and `Reverted`, and both the triage and
+the retry check read it - so a finding already handed to a person was remediated again and consumed
+the second attempt the bound exists to protect. Every unit test passed, because each exercised a
+single round. "Is this finding outstanding" and "may automation still act on it" are not the same
+question, and a predicate that answers the first must not be spent on the second.
+
+**A check that reads documentation as if it were code fails hardest on the codebases that document
+themselves best.** Twice in one phase: a grep asserting the skin module holds no fixed skin target
+matched its own test name, and the gate's schema scan matched migration 27's four paragraphs about
+why there is no `diagnosis` column - `sqlite_master.sql` stores a migration verbatim, comments
+included. Both strip comments before scanning now, which is what `tests/no_pixel_ops.rs` already
+did.
+
+**A reading that cannot be honestly filled must be an `Option`, and the third time is the rule.**
+`NodeReading::frame_signature`, then `ExposureReading::subject_luma` and
+`ExposureReading::shadow_headroom`: nothing in the product stores the luminance a finished frame
+landed on - phase 15 stores the band it solved *toward* and phase 25 the move it still *owes* - and
+no frozen contract carries a finished frame's remaining shadow room. A proxy in any of the three
+would have reported every frame as sitting exactly on its target, on every frame nobody measured.
+
+Phase 27 also added the seventh grep-as-a-test, `crates/aura-qc/tests/no_pixel_ops.rs`, and closed a
+gap that belonged to no phase: **no gate anywhere checked that the IPC surface was reachable.** Phase
+21's exit report found ninety client calls reaching a window that did not answer to them, fixed them
+by hand, and left nothing behind. Section 11 of the phase 27 gate reads the three files that have to
+agree - the `#[tauri::command]` definitions, the `generate_handler!` list, and the typed client's own
+string literals - and compares them. It proves the names and the syntax and **not the types**,
+because the shell's Rust does not compile on this machine, and it currently reports 220 = 220 = 220.
 
 Five rules that phase 13 adds and every later phase inherits:
 

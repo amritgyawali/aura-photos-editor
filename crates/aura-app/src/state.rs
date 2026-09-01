@@ -1,6 +1,6 @@
 //! Process-wide state: one open catalog, plus the cancel tokens of running jobs.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -3056,5 +3056,572 @@ impl FrameSource for ProxyFrames {
                 "the proxy is tiled or truncated",
             )
         })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PHASE-27 - quality control
+// ---------------------------------------------------------------------------
+//
+// The QC pass judges what phases 08 to 26 decided, and it must not depend on any of them.
+// `aura-qc` therefore takes its readings through `aura_qc::api::Field`, and this is the half of
+// that port which knows how to read thirteen frozen services. `AppField` in `qc_commands` is the
+// other half.
+//
+// **Every `None` below is a skipped check rather than a passed one.** A service with no row for a
+// photograph produces an absent reading, `Outcome::Skipped` carries that through the pass, and
+// `QcOutline::inspection_completeness` is what a photographer reads before they believe a clean
+// report. In this build most readings are absent - phase 06's detector finds no faces, phase 18's
+// segmenter is untrained, phase 22's face recovery never runs - and saying so is the point.
+//
+// Two kinds of reading are deliberately split. The per-frame ones are read one photograph at a
+// time in [`AppState::qc_frame`]; the ones that are facts about the *set* - the nearest delivered
+// neighbour, the removals, which frames a guarantee is holding - are gathered once in
+// [`AppState::qc_set_readings`], because a nearest-neighbour search run per frame is a thousand
+// scans of the same table inside a ninety-second budget.
+
+/// The project-scoped readings a QC frame needs, gathered once per pass.
+///
+/// Phase 18's rule about denominators applies to the whole struct: every map here is keyed by a
+/// photograph in the **delivered gallery**, because a duplicate of a rejected frame is phase 12
+/// working rather than a QC finding.
+#[derive(Debug, Default)]
+pub struct QcSetReadings {
+    /// The best alternative in the same moment, per delivered frame.
+    pub runner_up: BTreeMap<PhotoId, PhotoId>,
+    /// The frames a coverage guarantee is holding in the gallery.
+    pub coverage_protected: BTreeSet<PhotoId>,
+    /// Per frame: each removal's measured artefact score and whether it is disclosed.
+    pub cleanup: BTreeMap<PhotoId, Vec<(f32, bool)>>,
+    /// Per frame: the nearest other delivered frame, its difference-hash distance, and whether
+    /// phase 08 put the two in one moment.
+    pub duplicate: BTreeMap<PhotoId, (PhotoId, u32, bool)>,
+    /// Per frame: the aspect ratio of the original file, when the catalog knows it.
+    pub aspect: BTreeMap<PhotoId, f32>,
+}
+
+impl AppState {
+    /// Gather the readings that are facts about the gallery rather than about one photograph.
+    ///
+    /// Every lookup here degrades to an empty map rather than to an error, and an empty map is a
+    /// skipped check downstream. A pass that halted because phase 24 had never run would report
+    /// nothing about exposure either, which is a much worse answer than reporting exposure and
+    /// saying the cleanup check could not run.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the selected set itself cannot be read. That one *is* fatal: without it
+    /// there is no gallery to inspect and no honest denominator to report against.
+    #[allow(clippy::too_many_lines)]
+    pub fn qc_set_readings(&self, project: ProjectId) -> AuraResult<QcSetReadings> {
+        use aura_core::contract::cleanup::CleanupService as _;
+        use aura_core::contract::cull::CullService as _;
+        use aura_core::contract::moment::MomentService as _;
+
+        let mut out = QcSetReadings::default();
+        let Some(selection) = self.cull()?.selection(project)? else {
+            return Ok(out);
+        };
+
+        let mut selected = Vec::with_capacity(selection.selected.len());
+        for keeper in &selection.selected {
+            selected.push(keeper.image_id);
+            if let Some(runner_up) = keeper.runner_up {
+                out.runner_up.insert(keeper.image_id, runner_up);
+            }
+            if keeper.coverage_role.is_some() {
+                out.coverage_protected.insert(keeper.image_id);
+            }
+        }
+        if selected.is_empty() {
+            return Ok(out);
+        }
+        let members: BTreeSet<PhotoId> = selected.iter().copied().collect();
+
+        // Phase 24's removals. One project-wide read rather than one per frame: a disclosure is
+        // written in the same transaction as the removal, so a removal that is not here does not
+        // exist. The `true` is therefore structural rather than optimistic.
+        match self
+            .cleanup()
+            .and_then(|cleanup| cleanup.disclosures(project))
+        {
+            Ok(disclosures) => {
+                for row in disclosures {
+                    if members.contains(&row.image_id) {
+                        out.cleanup
+                            .entry(row.image_id)
+                            .or_default()
+                            .push((row.artefact_score, true));
+                    }
+                }
+                // A delivered frame phase 24 removed nothing from has an empty list, which the
+                // cleanup check reads as clean. A frame absent from the map entirely has no
+                // reading at all and skips. Those are different answers, and this is where they
+                // diverge, so every delivered frame gets a list once the pass has run.
+                for image in &selected {
+                    out.cleanup.entry(*image).or_default();
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    error = %err.code,
+                    "phase 24's disclosures could not be read; the cleanup check skips rather \
+                     than reporting every delivered frame as free of removal artefacts"
+                );
+            }
+        }
+
+        // The aspect ratios and the difference hashes, in two reads over the project.
+        let key = project.to_db();
+        let dimensions = self.catalog.read({
+            let key = key.clone();
+            move |conn| {
+                let mut statement = conn
+                    .prepare(
+                        "SELECT photo_id, width_px, height_px FROM photo WHERE project_id = ?1",
+                    )
+                    .map_err(|err| {
+                        aura_core::errors::db::statement_failed("qc frame dimensions", &err)
+                    })?;
+                let rows = statement
+                    .query_map(rusqlite::params![key], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, Option<i64>>(1)?,
+                            row.get::<_, Option<i64>>(2)?,
+                        ))
+                    })
+                    .map_err(|err| {
+                        aura_core::errors::db::statement_failed("qc frame dimensions", &err)
+                    })?;
+                Ok(rows.flatten().collect::<Vec<_>>())
+            }
+        })?;
+        for (id, width, height) in dimensions {
+            // No dimensions is no aspect, and no aspect skips the crop check's resolution half
+            // rather than assuming 3:2. Guessing here would report a legitimate 4:5 album crop of
+            // a portrait frame as a resolution failure.
+            let (Some(width), Some(height)) = (width, height) else {
+                continue;
+            };
+            if width <= 0 || height <= 0 {
+                continue;
+            }
+            let Ok(photo) = PhotoId::from_db(&id) else {
+                continue;
+            };
+            if members.contains(&photo) {
+                #[allow(clippy::cast_precision_loss)]
+                out.aspect.insert(photo, width as f32 / height as f32);
+            }
+        }
+
+        let hashes = self.catalog.read(move |conn| {
+            let mut statement = conn
+                .prepare("SELECT photo_id, dhash FROM embeddings WHERE project_id = ?1")
+                .map_err(|err| aura_core::errors::db::statement_failed("qc frame hashes", &err))?;
+            let rows = statement
+                .query_map(rusqlite::params![key], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+                })
+                .map_err(|err| aura_core::errors::db::statement_failed("qc frame hashes", &err))?;
+            Ok(rows.flatten().collect::<Vec<_>>())
+        })?;
+
+        let mut delivered: Vec<(PhotoId, u64)> = Vec::with_capacity(hashes.len());
+        for (id, hash) in hashes {
+            let Ok(photo) = PhotoId::from_db(&id) else {
+                continue;
+            };
+            if members.contains(&photo) {
+                #[allow(clippy::cast_sign_loss)]
+                delivered.push((photo, hash as u64));
+            }
+        }
+
+        // The nearest *delivered* neighbour, which is the whole check: two near-identical frames
+        // that both survived the cull are a leak, and a near-identical frame phase 12 rejected is
+        // phase 12 working. A frame with no embedding is absent from this map and skips - phase
+        // 05's coverage gap reported where it belongs rather than as a QC pass.
+        if delivered.len() > 1 {
+            let moments = self.moments().ok();
+            let mut moment_of: BTreeMap<PhotoId, String> = BTreeMap::new();
+            if let Some(moments) = moments.as_ref() {
+                for (photo, _) in &delivered {
+                    if let Ok(Some(moment)) = moments.moment_of(*photo) {
+                        moment_of.insert(*photo, moment.id.to_db());
+                    }
+                }
+            }
+            for (index, (photo, hash)) in delivered.iter().enumerate() {
+                let mut best: Option<(PhotoId, u32)> = None;
+                for (other_index, (other, other_hash)) in delivered.iter().enumerate() {
+                    if other_index == index {
+                        continue;
+                    }
+                    let distance = (hash ^ other_hash).count_ones();
+                    if best.is_none_or(|(_, current)| distance < current) {
+                        best = Some((*other, distance));
+                    }
+                }
+                if let Some((neighbour, distance)) = best {
+                    let same_moment = match (moment_of.get(photo), moment_of.get(&neighbour)) {
+                        (Some(left), Some(right)) => left == right,
+                        // An unknown grouping is not "different moments". The check treats a
+                        // cross-moment pair as the stronger finding, and inferring one from an
+                        // absent moment would raise a confidence on evidence nobody has.
+                        _ => true,
+                    };
+                    out.duplicate
+                        .insert(*photo, (neighbour, distance, same_moment));
+                }
+            }
+        }
+
+        Ok(out)
+    }
+
+    /// Assemble one photograph's readings from the frozen services.
+    ///
+    /// Infallible by construction. Every service is consulted independently and a failure or an
+    /// absent row leaves its reading `None`, which the check reads as a skip. The alternative -
+    /// failing the frame - would let one unmigrated table hide nine working inspections.
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    pub fn qc_frame(
+        &self,
+        project: ProjectId,
+        image: PhotoId,
+        set: &QcSetReadings,
+    ) -> aura_qc::checks::Frame {
+        use aura_core::contract::colour::ColourService as _;
+        use aura_core::contract::gallery::GalleryService as _;
+        use aura_core::contract::geometry::GeometryService as _;
+        use aura_core::contract::integrity::IntegrityService as _;
+        use aura_core::contract::local::LocalService as _;
+        use aura_core::contract::micro::MicroService as _;
+        use aura_core::contract::restore::RestoreService as _;
+        use aura_core::contract::retouch::RetouchService as _;
+        use aura_core::contract::scene::StoryService as _;
+        use aura_core::contract::tone::ToneService as _;
+        use aura_qc::checks::{
+            CleanupReading, CropReading, DuplicateReading, ExposureReading, Frame, MaskReading,
+            MaskRegion, NodeReading, RetouchReading, SharpnessReading, SkinReading,
+        };
+        use aura_vision::contract::mask::MaskService as _;
+
+        let scene = self
+            .story()
+            .ok()
+            .and_then(|story| story.scene(image).ok().flatten())
+            .map_or(aura_core::contract::scene::SceneId::Unknown, |result| {
+                result.scene
+            });
+
+        let mut frame = Frame::empty(image, scene);
+        frame.runner_up = set.runner_up.get(&image).copied();
+        frame.coverage_protected = set.coverage_protected.contains(&image);
+
+        let gallery = self.gallery();
+        let delta = gallery.delta(image).ok().flatten();
+        let tone = self.tone().of_image(image).ok().flatten();
+        let colour = self.colour().of_image(image).ok().flatten();
+
+        // Phase 12's rule about a photographer's own decision, read across three phases: any of
+        // them having been edited by hand makes this a frame nothing here may re-solve.
+        frame.user_edited = delta.as_ref().is_some_and(|row| row.user_edited)
+            || tone.as_ref().is_some_and(|row| row.user_edited)
+            || colour.as_ref().is_some_and(|row| row.user_edited);
+
+        // -- phase 25, the lighting group ------------------------------------------------
+        if let Some(node_id) = gallery.node_of(image).ok().flatten() {
+            if let Some(node) = gallery.node(node_id).ok().flatten() {
+                // An unanchored node has no target, and the reading says so rather than
+                // presenting zeroes the check would read as a perfect match. Phase 25's own rule -
+                // `NodeUnanchored` and `AlreadyConsistent` both produce five zeroes upstream and
+                // mean opposite things - consumed at the one place the two could be confused.
+                frame.node = Some(match node.target.as_ref() {
+                    Some(target) => {
+                        // Where the frame sits is where phase 25 says it must move *from*: the
+                        // delta stores `from_cct_k`, `from_tint` and `from_exposure_ev`, which are
+                        // this frame's own readings rather than the node's.
+                        let (frame_cct_k, frame_tint, frame_luma) = delta.as_ref().map_or(
+                            (target.cct_k, target.tint, target.subject_luma),
+                            |row| {
+                                (
+                                    row.from_cct_k,
+                                    row.from_tint,
+                                    // The delta's exposure is in EV and the target's luminance is
+                                    // `0..1`. Five stops is the working range phase 15's targets
+                                    // are expressed over, and the same conversion the exposure
+                                    // check states its own findings in.
+                                    (target.subject_luma + row.from_exposure_ev / 5.0)
+                                        .clamp(0.0, 1.0),
+                                )
+                            },
+                        );
+                        NodeReading {
+                            target_cct_k: target.cct_k,
+                            cct_tol: target.cct_tol,
+                            target_tint: target.tint,
+                            tint_tol: target.tint_tol,
+                            target_luma: target.subject_luma,
+                            luma_tol: target.luma_tol,
+                            target_signature: target.grade_signature,
+                            // Nothing stores a delivered frame's own grade signature, so that half
+                            // of the consistency check skips. Defaulting it to the node's target
+                            // would report a perfect match on every frame nobody measured.
+                            frame_signature: None,
+                            frame_cct_k,
+                            frame_tint,
+                            frame_luma,
+                            anchors: node.anchors.clone(),
+                            anchored: node.is_anchored(),
+                        }
+                    }
+                    None => NodeReading {
+                        target_cct_k: 0.0,
+                        cct_tol: 0.0,
+                        target_tint: 0.0,
+                        tint_tol: 0.0,
+                        target_luma: 0.0,
+                        luma_tol: 0.0,
+                        target_signature: [0.0; 8],
+                        frame_signature: None,
+                        frame_cct_k: 0.0,
+                        frame_tint: 0.0,
+                        frame_luma: 0.0,
+                        anchors: node.anchors.clone(),
+                        anchored: false,
+                    },
+                });
+            }
+        }
+
+        // -- phases 16 and 25, skin ------------------------------------------------------
+        let per_identity_de00 = delta
+            .as_ref()
+            .and_then(|row| row.skin_correction.as_ref())
+            .map(|correction| vec![(correction.identity, correction.de00_after)])
+            .unwrap_or_default();
+        if let Some(colour) = colour.as_ref() {
+            frame.skin = Some(SkinReading {
+                per_identity_de00,
+                guard_hue_shift_deg: colour.skin_guard.max_hue_shift_deg,
+                guard_chroma_change: colour.skin_guard.max_chroma_change,
+                // Phase 16's own flag. A report with `measured = false` carries zeroes, and zeroes
+                // read as a perfect result - so the guard half skips instead.
+                guard_measured: colour.skin_guard.measured,
+            });
+        } else if !per_identity_de00.is_empty() {
+            frame.skin = Some(SkinReading {
+                per_identity_de00,
+                guard_hue_shift_deg: 0.0,
+                guard_chroma_change: 0.0,
+                guard_measured: false,
+            });
+        }
+
+        // -- phases 09, 15 and 16, exposure ----------------------------------------------
+        if let (Some(tone), Some(colour)) = (tone.as_ref(), colour.as_ref()) {
+            frame.exposure = Some(ExposureReading {
+                // Not measured anywhere. See `ExposureReading::subject_luma`.
+                subject_luma: None,
+                target_luma: tone.subject_luma_target,
+                clip_hi_after: colour.clipping_after.0,
+                clip_lo_after: colour.clipping_after.1,
+                clip_hi_before: colour.clipping_before.0,
+                clip_lo_before: colour.clipping_before.1,
+                // Not measured anywhere either. See `ExposureReading::shadow_headroom`.
+                shadow_headroom: None,
+            });
+        }
+
+        // -- phases 09 and 22, detail ----------------------------------------------------
+        let integrity = self.integrity().of_image(image).ok().flatten();
+        let restore = self
+            .restore(&project)
+            .ok()
+            .and_then(|restore| restore.of_image(image).ok().flatten());
+        if let Some(integrity) = integrity.as_ref() {
+            let report = restore.as_ref().and_then(|plan| plan.selfcheck.as_ref());
+            frame.sharpness = Some(SharpnessReading {
+                subject_sharpness: integrity.subject_sharpness,
+                relative_sharpness: integrity.relative_sharpness,
+                // One is nothing lost, and a frame phase 22 never denoised has lost nothing. The
+                // `measured_on` count beside it is what separates that from a self-check that did
+                // not run, and the check reads it rather than inferring from the ratio.
+                texture_retention: report.map_or(1.0, |row| row.texture_retention),
+                ringing: report.map_or(0.0, |row| row.ringing),
+                identity_drift: report.map_or(0.0, |row| row.identity_drift),
+                selfcheck_measured_on: report.map_or(0, |row| row.measured_on),
+            });
+        }
+
+        // -- phases 19, 20 and 21, skin and shaping --------------------------------------
+        let local = self.local().of_image(image).ok().flatten();
+        let retouch = self.retouch(&project).of_image(image).ok().flatten();
+        let micro = self
+            .micro(&project)
+            .ok()
+            .and_then(|micro| micro.of_image(image).ok().flatten());
+        if retouch.is_some() || micro.is_some() {
+            let texture = retouch.as_ref().map(|plan| &plan.texture_report);
+            let natural = micro.as_ref().map(|plan| &plan.naturalness);
+            frame.retouch = Some(RetouchReading {
+                texture_band_ratio: texture.map_or(1.0, |row| row.band_ratio),
+                texture_floor: texture.map_or(0.0, |row| row.floor),
+                texture_withdrawn: texture.is_some_and(|row| row.withdrawn),
+                // Phase 20 counts the regions it measured on; zero means the guard never ran, and
+                // an unrun guard reporting a ratio of one is the failure this flag exists to stop.
+                texture_measured: texture.is_some_and(|row| row.measured_on > 0),
+                catchlight_ratio: natural.map_or(1.0, |row| row.catchlight_ratio),
+                hair_energy_ratio: natural.map_or(1.0, |row| row.hair_energy_ratio),
+                teeth_excursion: natural.map_or(0.0, |row| row.teeth_excursion),
+                // Phase 19's allowance is shared, so what was spent is the sum of what the three
+                // phases that draw on it each recorded.
+                allowance_used: local.as_ref().map_or(0.0, |plan| plan.total_budget_used)
+                    + retouch.as_ref().map_or(0.0, |plan| plan.budget_used)
+                    + micro.as_ref().map_or(0.0, |plan| plan.budget_used),
+            });
+        }
+
+        // -- phase 18, regions -----------------------------------------------------------
+        if let Ok(masks) = self.masks_for(&project.to_db()) {
+            let found = masks.masks(image);
+            if !found.is_empty() {
+                let gated: Vec<aura_vision::contract::mask::MaskKind> = local
+                    .as_ref()
+                    .map(|plan| {
+                        plan.gated_by_mask_quality
+                            .iter()
+                            .map(|(_, kind)| gated_kind(*kind))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let regions = found
+                    .iter()
+                    .map(|mask| MaskRegion {
+                        kind: mask.kind,
+                        confidence: mask.confidence,
+                        edge_quality: mask.edge_quality,
+                        applied_strength: applied_strength(mask.kind, local.as_ref()),
+                    })
+                    .collect();
+                frame.mask = Some(MaskReading { regions, gated });
+            }
+        }
+
+        // -- phase 23, edges -------------------------------------------------------------
+        if let Some(plan) = self
+            .geometry()
+            .ok()
+            .and_then(|geometry| geometry.of_image(image).ok().flatten())
+        {
+            let primary = plan.crops.get(plan.primary_crop);
+            // No aspect is no resolution reading. A zero floor is how the check is told to skip
+            // that half, rather than a floor every crop trivially clears.
+            let (long_edge_fraction, long_edge_floor) = match (primary, set.aspect.get(&image)) {
+                (Some(crop), Some(aspect)) => (
+                    crop.long_edge_fraction(*aspect),
+                    aura_core::contract::geometry::RESOLUTION_FLOOR,
+                ),
+                _ => (1.0, 0.0),
+            };
+            frame.crop = Some(CropReading {
+                faces_intact: plan.safety.faces_intact,
+                resolution_ok: plan.safety.resolution_ok,
+                content_kept: plan.safety.content_kept,
+                long_edge_fraction,
+                long_edge_floor,
+                // Zero here is the check's own signal that phase 06 found nothing to protect, and
+                // `faces_intact = true` beside it is not a frame whose faces survived.
+                faces_checked: plan.safety.faces_checked,
+            });
+        }
+
+        // -- phase 24, removals, and phase 08, the nearest neighbour ---------------------
+        if let Some(removals) = set.cleanup.get(&image) {
+            frame.cleanup = Some(CleanupReading {
+                removals: removals.clone(),
+            });
+        }
+        if let Some((neighbour, hamming, same_moment)) = set.duplicate.get(&image) {
+            frame.duplicate = Some(DuplicateReading {
+                neighbour: *neighbour,
+                hamming: *hamming,
+                same_moment: *same_moment,
+            });
+        }
+
+        frame
+    }
+}
+
+/// How much strength phase 19 applied through a region of this kind.
+///
+/// Phase 19 records a strength per *operation* and phase 18 a quality per *region*, and the mask
+/// check's deviation is what separates them: how far what ran exceeded what the boundary supported.
+/// The mapping is the operations' own subjects - face lighting and shine control act on skin, the
+/// subject enhancement and the two dodge-and-burn maps on the subject, the balance on the
+/// background - and a region no operation names has nothing applied through it, which is a clean
+/// reading rather than an absent one.
+fn applied_strength(
+    kind: aura_vision::contract::mask::MaskKind,
+    plan: Option<&aura_core::contract::local::LocalLightPlan>,
+) -> f32 {
+    use aura_core::contract::local::LocalOp;
+    use aura_vision::contract::mask::MaskKind;
+
+    let Some(plan) = plan else {
+        return 0.0;
+    };
+    let ops: &[LocalOp] = match kind {
+        MaskKind::Skin | MaskKind::Face | MaskKind::SkinSafe => {
+            &[LocalOp::FaceLight, LocalOp::ShineControl]
+        }
+        MaskKind::Eyes
+        | MaskKind::Sclera
+        | MaskKind::Iris
+        | MaskKind::Teeth
+        | MaskKind::Lips
+        | MaskKind::Eyebrows
+        | MaskKind::FacialHair => &[LocalOp::FaceLight],
+        MaskKind::Subject | MaskKind::Hair | MaskKind::Clothing | MaskKind::Dress => &[
+            LocalOp::SubjectEnhance,
+            LocalOp::DodgeBurnLow,
+            LocalOp::DodgeBurnMid,
+        ],
+        MaskKind::Background
+        | MaskKind::Sky
+        | MaskKind::Greenery
+        | MaskKind::Water
+        | MaskKind::Floor
+        | MaskKind::Window => &[LocalOp::BackgroundBalance],
+    };
+    ops.iter()
+        .filter_map(|op| plan.strengths.get(*op as usize))
+        .copied()
+        .fold(0.0_f32, f32::max)
+        .clamp(0.0, 1.0)
+}
+
+/// Phase 19's six-word mask vocabulary, in phase 18's twenty-word one.
+///
+/// Two enums exist because `aura-core` depends on no workspace crate, so phase 19's `MaskField`
+/// port could not name phase 18's `MaskKind`. This is the one place they meet, and the mapping is
+/// total: every word phase 19 can gate with has an exact counterpart in phase 18's vocabulary.
+const fn gated_kind(
+    kind: aura_core::contract::local::MaskKind,
+) -> aura_vision::contract::mask::MaskKind {
+    use aura_core::contract::local::MaskKind as Local;
+    use aura_vision::contract::mask::MaskKind as Region;
+    match kind {
+        Local::Face => Region::Face,
+        Local::Subject => Region::Subject,
+        Local::Background => Region::Background,
+        Local::Skin => Region::Skin,
+        Local::Hair => Region::Hair,
+        Local::Sky => Region::Sky,
     }
 }

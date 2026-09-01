@@ -1,0 +1,63 @@
+[package]
+name         = "aura-qc"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "The autonomous inspector: ten quantified checks over a delivered gallery, a bounded re-edit loop that must prove its own improvement, and a planner that cannot execute (phase 27)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# PHASE-27. The bounded agentic planner of section 7. `CloudTask` is the only route to a model
+# provider in this product - phase 04's rule, enforced by `scripts/check-banned.sh` - and the task
+# defined in `planner.rs` implements it. Its `Output` type has no variant that can approve an
+# action, which is what makes an unreachable provider and a cautious model the same outcome.
+aura-cloud   = { path = "../aura-cloud" }
+# PHASE-27. `MaskKind`, for naming which region an edge artefact was found along. Phase 18's rule:
+# `MaskService` is the one way to ask what is where in a photograph, and this crate does not ask -
+# it reads the quality numbers the mask check is handed and names the region they came from.
+aura-vision  = { path = "../aura-vision" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+
+# Deliberately absent: `aura-recipe`, `aura-render`, `aura-preview`, `aura-raw`, `aura-brain-photo`,
+# `aura-brain-gallery`, `aura-brain-wedding`, `aura-cull`, `aura-geometry`, `aura-generative`,
+# `aura-retouch` and `aura-restore`.
+#
+# `aura-recipe` and `aura-render` are absent for the reason they are absent from `aura-geometry`,
+# `aura-generative` and `aura-brain-gallery`, and the reason is sharper here than in any of the
+# three: this is the first phase permitted to *undo* another phase's work, so it is the phase with
+# the strongest reason to reach for a recipe writer. It decides a remedy; `aura_recipe::schema::
+# merge` executes it, and that function is the only one in the workspace that honours
+# `user_edited_fields`. `tests/no_pixel_ops.rs` fails the build if this crate ever calls it.
+#
+# `aura-preview` and `aura-raw` are absent because **no check in this phase opens a photograph**.
+# Every inspection is a comparison between numbers other phases already measured and stored, which
+# is what makes ten checks over a thousand frames affordable inside section 11's 90 s budget - and
+# what makes the checks pure functions a test can drive without a catalog.
+#
+# The nine deciding crates are absent because everything this phase needs from them it takes through
+# the frozen traits in `aura-core`. `ToneService`, `ColourService`, `IntegrityService`,
+# `RestoreService`, `RetouchService`, `MicroService`, `LocalService`, `GeometryService`,
+# `CleanupService`, `MomentService`, `CullService`, `GalleryService` and `CameraMatchService` are
+# the only ways any phase may ask what those phases decided. A dependency in this direction would
+# also be a cycle: `aura-brain-photo` would then depend on the crate that judges it.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+# PHASE-27. `tests/eval/qc_eval.rs` drives the planner's schema validation directly, which is the
+# only place outside `planner.rs` that touches the cloud contract.
+aura-cloud   = { path = "../aura-cloud" }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
+# `tests/eval/` beside the phase 05 to 26 harnesses rather than in this crate's own `tests/`,
+# because a gate is a claim about the product and not about a crate.
+[[test]]
+name = "qc_eval"
+path = "../../tests/eval/qc_eval.rs"

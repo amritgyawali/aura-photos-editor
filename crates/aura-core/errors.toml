@@ -1896,3 +1896,74 @@ summary      = "A solved camera transform failed held-out verification"
 user_message = "The correction for this camera did not hold up when AURA checked it against photographs it had not used, so it fell back on what it knows about the brand."
 runbook      = "docs/runbooks/AURA-ML-5135.md"
 introduced   = "PHASE-26"
+
+# ---------------------------------------------------------------------------
+# PHASE-27 - quality control, remediation and the bounded re-edit loop
+# ---------------------------------------------------------------------------
+#
+# Six codes, ML 5136-5141. Three are the shapes every phase since 15 has needed - the pass that
+# could not run, the policy table that was refused, and the version drift that stops a stale
+# comparison happening silently - and three are refusals raised by migration 27's own triggers.
+#
+# The three refusals are what makes this phase's promises properties rather than intentions.
+# AURA-ML-5137 is a photographer's verdict surviving a pass that disagrees with it, which is the
+# one place in the product where the disagreement is about a *judgement* rather than a value and
+# therefore the one place automation is most tempted to be right anyway. AURA-ML-5138 is the
+# remediation history refusing to be rewritten, because a bound of two rounds whose evidence a
+# later pass can edit is not a bound. And AURA-ML-5139 is a frame replacement refusing to be
+# un-disclosed: the delivered gallery holds a photograph the photographer never chose, and that row
+# is the only way anybody finds out afterwards.
+
+[[error]]
+code         = "AURA-ML-5136"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One project's quality-control pass could not run"
+user_message = "AURA could not check this wedding's finished photographs. Every edit is exactly as it was and nothing has been changed or lost."
+runbook      = "docs/runbooks/AURA-ML-5136.md"
+introduced   = "PHASE-27"
+
+[[error]]
+code         = "AURA-ML-5137"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A photographer's quality-control verdict could not be recorded, or automation tried to overwrite one"
+user_message = "AURA could not record what you decided about that finding. Nothing about the photograph has changed; reopen the review queue and try again."
+runbook      = "docs/runbooks/AURA-ML-5137.md"
+introduced   = "PHASE-27"
+
+[[error]]
+code         = "AURA-ML-5138"
+severity     = "item_failed"
+recovery     = "halt"
+summary      = "Something tried to edit or remove a recorded remediation round"
+user_message = "AURA keeps a permanent record of every correction it tried on a photograph, and something attempted to change that record. The record was left as it was."
+runbook      = "docs/runbooks/AURA-ML-5138.md"
+introduced   = "PHASE-27"
+
+[[error]]
+code         = "AURA-ML-5139"
+severity     = "item_failed"
+recovery     = "halt"
+summary      = "Something tried to edit a recorded frame replacement"
+user_message = "AURA keeps a permanent record of every photograph it swapped for a better one, and something attempted to change that record. The record was left as it was."
+runbook      = "docs/runbooks/AURA-ML-5139.md"
+introduced   = "PHASE-27"
+
+[[error]]
+code         = "AURA-ML-5140"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The quality-control thresholds table was refused"
+user_message = "AURA could not load the settings that decide what counts as a problem in a finished photograph, so it has not checked anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5140.md"
+introduced   = "PHASE-27"
+
+[[error]]
+code         = "AURA-ML-5141"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored quality-control findings came from different arithmetic or different thresholds"
+user_message = "AURA has improved how it checks finished photographs, so it is re-checking this wedding in the background. Anything you accepted or dismissed yourself is kept."
+runbook      = "docs/runbooks/AURA-ML-5141.md"
+introduced   = "PHASE-27"
