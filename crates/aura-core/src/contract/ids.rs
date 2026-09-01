@@ -245,6 +245,27 @@ typed_id!(PairId, "pai");
 // See docs/adr/ADR-0055-quality-control-tickets-and-the-re-edit-loop.md section 2.
 typed_id!(TicketId, "tkt");
 
+// PHASE-29. Section 5 gives an album a sequence of spreads and section 13 requires that a
+// photographer's reordering is remembered, so a spread is a thing that has to survive being moved.
+//
+// It is the first id in this file that names a *place* rather than a thing, a part of a thing, a
+// relationship or a problem. A spread is two pages of an album, and what makes it need an id is
+// that neither of the two obvious alternatives survives an edit. Its position renumbers the moment
+// anybody drags a frame - which is the operation the panel exists for - and its contents are
+// exactly what a photographer changes, so `(left, right)` names a different spread after every
+// edit while the pairing note attached to it, the photographer's acceptance of it and phase 30's
+// record of what was exported all have to keep pointing at the same one.
+//
+// It is not a `CurationId` on the whole result, and the alternative was real: one id per curation
+// run would make every table in migration 29 a child of one row. It is not here because the run is
+// not a thing anybody refers to - a project has exactly one current curation, re-running replaces
+// it, and a photographer never says "the album from the second run". `NodeId` made the same call
+// from the other side and `RunId` made the opposite one, because an autopilot run *is* something a
+// photographer refers to.
+//
+// See docs/adr/ADR-0059-curation-selection-and-album-composition.md section 4.
+typed_id!(SpreadId, "spr");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

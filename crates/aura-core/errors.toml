@@ -2042,3 +2042,58 @@ summary      = "A run is already going for this wedding, or the one named is alr
 user_message = "This wedding is already being worked on. Stop that run first, or wait for it to finish."
 runbook      = "docs/runbooks/AURA-JOB-7009.md"
 introduced   = "PHASE-28"
+
+# ---------------------------------------------------------------------------
+# PHASE-29 - curation: monochrome, heroes, the album, social and the teaser
+# ---------------------------------------------------------------------------
+#
+# Four codes, ML 5142-5145. Three are the shapes every phase since 15 has needed - the pass that
+# could not run, the policy table that was refused, and the version drift that stops a stale
+# comparison happening silently - and one is the refusal a photographer meets when this surface
+# will not record what they asked for.
+#
+# AURA-ML-5143 is the interesting one, because of what it refuses rather than what it permits. This
+# is a taste-heavy phase and almost everything a photographer does on its panels is accepted
+# without argument; the three things that are not are an album order that reorders chapters, a pick
+# that is not in this project, and a note longer than the contract's bound. A wedding album whose
+# ceremony follows its reception is not an album with an unusual sequence, and this is where the
+# product says so.
+#
+# AURA-ML-5142 is a *degraded* rather than an item failure, because it names a reason code a newer
+# release wrote: the honest response is to re-curate rather than to refuse to draw the panel.
+
+[[error]]
+code         = "AURA-ML-5142"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "Stored curation notes came from a build with a different reason vocabulary"
+user_message = "AURA found curation notes it does not recognise, which usually means this wedding was curated by a newer version. Re-running curation will refresh them."
+runbook      = "docs/runbooks/AURA-ML-5142.md"
+introduced   = "PHASE-29"
+
+[[error]]
+code         = "AURA-ML-5143"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A curation choice could not be recorded"
+user_message = "AURA could not record that choice. Nothing about your photographs has changed; reopen the panel and try again."
+runbook      = "docs/runbooks/AURA-ML-5143.md"
+introduced   = "PHASE-29"
+
+[[error]]
+code         = "AURA-ML-5144"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One project's curation pass could not run"
+user_message = "AURA could not work out an album, a portfolio or a set of posts for this wedding. Your gallery and every edit in it are exactly as they were."
+runbook      = "docs/runbooks/AURA-ML-5144.md"
+introduced   = "PHASE-29"
+
+[[error]]
+code         = "AURA-ML-5145"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The curation policy table was refused"
+user_message = "AURA could not load the settings that decide album sizes, rhythm and social formats, so it has not curated anything. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-ML-5145.md"
+introduced   = "PHASE-29"
