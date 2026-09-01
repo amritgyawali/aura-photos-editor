@@ -2,6 +2,69 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 28 - The zero-touch autopilot: twenty-seven phases as one button
+
+Twenty-seven phases decided things about a photograph, a person, a camera body or a gallery. None of
+them is worth anything to a photographer at one in the morning unless it runs as one reliable job.
+This is the job, and it is the first thing in the product whose primary object is a **run** - the
+first subject a photographer starts and then walks away from.
+
+**The scheduler decides nothing, and that is enforced by a manifest and a grep.** The moment the
+orchestrator can express an opinion about a photograph, the product has two answers to "why was this
+frame delivered" and one of them belongs to the scheduler - unfixable afterwards, because nothing
+records which of the two a gallery came from. So `aura-jobs` depends on none of the twenty-two
+deciding crates, `crates/aura-jobs/tests/no_decisions.rs` is the eighth grep-as-a-test in the
+repository, and there is no field anywhere in the frozen contract that could hold a keep, a
+rejection, a strength, a threshold or a confidence about a frame. Each of the twenty-five stage arms
+in `aura-app` is **one call into the command that phase already ships**, so the autopilot runs a
+wedding through exactly the code path a photographer clicking each panel's button would.
+
+**Zero-Touch is honest about what it does on this build, in three places.** Phase 13 built the
+autonomy bands and shipped with `calibration_ver = 0`, which raises every decision one step toward
+review - so the headline feature of this phase arrives into a build where, by its predecessor's
+design, almost nothing may act quietly. `StageVerdict::from_band` reads `Suggest` as *act and queue
+for review* rather than as *hold*, because holding it would ship a Zero-Touch button that does
+nothing at all on every irreversible stage. `RequireReview` still holds in every mode, and
+`AutopilotStatusDto.calibrated` is on the wire so the pre-flight, the panel and `docs/autopilot.md`
+cannot quietly stop saying what this build actually does.
+
+**Checkpoints are keyed by a hash of what a stage read.** The alternative - keying on time, on a run
+id, or on nothing - resumes happily onto stale work, silently: a wedding whose scene profiles were
+re-tuned between two halves of a run would deliver half a gallery graded one way and half the other,
+with every unit test passing. Twenty kills at twenty points all resume to the same finished wedding,
+in 88 ms against a 20 s budget, and the resume is bounded by the **stage count** rather than by the
+photograph count - so a 6,000-frame wedding resumes as fast as a 300-frame one.
+
+**Every governor action makes the product do less.** `GovernorAction` is
+`Proceed | Reduce | Pause | Stop` with no variant that raises concurrency or disables a check, so an
+unreadable sensor, a machine on battery and a thermally throttled laptop all reach the same
+conservative state - and a governor that is wrong is a run that is slow rather than a run that
+cooked somebody's laptop. **A full disk is the only reading that stops a run**, because it is the
+only pressure that does not clear on its own. ADR-0050 gave phase 24's editorial judgement this
+property; this is the same shape applied to hardware.
+
+**An optional stage that fails does not fail the wedding.** Three attempts with a doubling backoff,
+then the stage is isolated, the run carries on, and it finishes as `CompletedDegraded` with that
+stage named and a sentence saying why. Only four stages can end a run - ingest, previews, embed and
+cull - because without those there is no wedding to deliver, there are four thousand unsorted files.
+`AutopilotSummaryDto.degradedStages` is a list rather than a count, because the count is not what a
+photographer needs at one in the morning.
+
+**A skipped step never looks like a finished one.** `skipCause` sits beside `outcome` on the wire,
+because "skipped" and "skipped because you turned it off" are the difference between a degraded run
+and a complete one - phase 27's rule about `Clean` and `Skipped` one level up, where the subject is
+a whole step rather than one inspection.
+
+Nine IPC commands (229 handlers = 229 definitions = 229 client wrappers), six React components
+mounted in `App.tsx`, migration 28 with three triggers that make a delivered run's record unable to
+be rewritten, six error codes with six runbooks, and `aura-cli verify --phase 28` as the gate.
+
+**What this release cannot do, said plainly:** it writes no files (phases 29 and 30 do not exist),
+it cannot read this machine's temperature, battery or memory, its time estimates come from a
+specification rather than from a measurement until the run is a tenth done, and nobody has measured
+how often a photographer will need to step in. `docs/progress/PHASE-28-EXIT.md` carries all seven
+conditions and the gate prints them on every run.
+
 ## Phase 27 - The AI QC agent: a product that checks its own work
 
 Twenty-six phases decided. This one asks whether those decisions were any good, on the frames that

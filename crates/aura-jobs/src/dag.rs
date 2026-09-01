@@ -127,20 +127,16 @@ impl Dag {
                         .get(stage)
                         .is_some_and(|needs| needs.iter().all(|need| done.contains(need)))
             });
-            match next {
-                Some(stage) => {
-                    done.insert(stage);
-                    order.push(stage);
-                }
-                None => {
-                    let stuck = declaration_order
-                        .iter()
-                        .copied()
-                        .filter(|stage| !done.contains(stage))
-                        .collect();
-                    return Err(DagError::Cycle { stuck });
-                }
-            }
+            let Some(stage) = next else {
+                let stuck = declaration_order
+                    .iter()
+                    .copied()
+                    .filter(|stage| !done.contains(stage))
+                    .collect();
+                return Err(DagError::Cycle { stuck });
+            };
+            done.insert(stage);
+            order.push(stage);
         }
 
         Ok(Self {

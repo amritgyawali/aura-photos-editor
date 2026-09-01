@@ -33,7 +33,13 @@ use crate::stages;
 /// A struct of readings rather than a set of ports, because every one of these is something
 /// `aura-app` already knows and nothing here needs to be mocked independently. The `Option`s are
 /// the readings a machine may not expose.
+///
+/// The five booleans are five independent facts - a catalog that opened, a hardware plan that
+/// resolved, a calibration that was fitted, a machine on battery, and a photographer who said to
+/// go ahead anyway. They are not a state machine and no two of them are alternatives, so the enum
+/// clippy asks for here would claim a mutual exclusion that does not exist.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Facts {
     /// Whether the project's catalog opened and its schema is current.
     pub project_opens: bool,
@@ -176,7 +182,16 @@ fn disk_row(facts: &Facts) -> PreflightRow {
              losing work.",
         );
     };
-    #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
+    // The one number in this file that can leave `u64`. Rust's float-to-integer `as` saturates
+    // rather than wrapping, so an absurd headroom multiple produces `u64::MAX` - a disk that is
+    // never big enough, which blocks - rather than a small number, which would report a full disk
+    // as roomy. That is the reading this check exists to refuse, so the direction of the failure
+    // matters more than the precision.
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation
+    )]
     let needed = (facts.estimated_output_bytes as f32 * facts.disk_headroom) as u64;
     if free >= needed {
         return row(

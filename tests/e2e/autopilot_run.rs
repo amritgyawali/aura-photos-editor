@@ -28,6 +28,20 @@ use aura_jobs::fixtures::{ports, Behaviour, FixedGate, FixedProbe, ScriptedRunne
 use aura_jobs::preflight::Facts;
 use rusqlite::params;
 
+/// The plan a directly-opened run is opened with.
+///
+/// These tests reach `AutopilotStore` rather than `Autopilot` in two places, to prove a refusal
+/// that the orchestrator would never let them reach.
+fn new_run() -> aura_jobs::store::NewRun {
+    aura_jobs::store::NewRun {
+        zero_touch: true,
+        calibrated: true,
+        stages_enabled: 25,
+        policy_ver: 1,
+        orchestrator_ver: 1,
+    }
+}
+
 const UNITS: u32 = 24;
 
 struct Harness {
@@ -484,7 +498,7 @@ fn two_runs_of_the_same_wedding_cannot_be_in_flight_at_once() {
     harness
         .autopilot
         .store()
-        .open_run(first.run_id, harness.project, true, true, 25, 1, 1)
+        .open_run(first.run_id, harness.project, &new_run())
         .expect("the first run opens");
 
     let err = harness

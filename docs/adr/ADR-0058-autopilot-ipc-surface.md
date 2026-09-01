@@ -86,10 +86,16 @@ photographer to look for files that are not there.
 ## 6. Consequences
 
 - Nine commands, bringing the surface to 229 handlers, 229 definitions and 229 typed client
-  wrappers. The phase 28 gate asserts the three-way equality, as phase 27's does.
+  wrappers, under an `autopilot` namespace in the client beside the twenty that came before it. The
+  phase 28 gate asserts the three-way equality, as phase 27's does.
 - Eight DTOs and two inputs in `crates/aura-app/src/contract/ipc.rs`, which is a frozen contract and
   is re-locked by this phase.
-- Five React components in `ui/src/components/autopilot/`, all props-driven, with 33 tests.
-- The panel is not yet mounted in `ui/src/App.tsx`. That is the same gap every develop panel from
-  phase 12 onward has - the commands answer, the components exist, and no view puts the two together
-  - and it is a UI-shell task rather than this phase's. Condition C7 of the exit report.
+- Six React components in `ui/src/components/autopilot/`, with 42 tests. Five are props-driven and
+  testable without a window; `AutopilotPanel` is the one that talks to the shell, which is the split
+  phase 25 established and phases 26 and 27 followed. It is mounted in `ui/src/App.tsx`.
+- **The panel polls one command rather than five.** `autopilotProgress` is the only thing that
+  changes while a stage is working, and the other four are re-read once when the run ends - which is
+  also when three of them are first written. A panel that patched its own state would show a
+  photographer the run it predicted rather than the one that happened, which on a phase whose whole
+  subject is what did and did not happen while nobody was looking is the one mistake worth
+  engineering against.

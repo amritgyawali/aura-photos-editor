@@ -103,141 +103,24 @@ impl Governor {
     }
 
     /// What to do about the machine right now.
+    ///
+    /// Seven independent readings, folded with `max`, because `GovernorAction` is ordered by how
+    /// much it holds the product back and the strictest reading wins. Each reading is its own
+    /// method for the reason section 6.2 gives them one row each: they fail independently, they
+    /// are fixed by different things, and a reader chasing "why did this run slow down" wants one
+    /// of them rather than all seven.
     #[must_use]
-    pub fn rule(&self, state: &MachineState, stage: StageId) -> Ruling {
+    pub fn rule(&self, machine: &MachineState, stage: StageId) -> Ruling {
         let mut events = Vec::new();
         let mut action = GovernorAction::Proceed;
 
-        // Video memory. Over the ceiling reduces; a device that has stopped answering is a
-        // different reading and is handled below.
-        if let Some(used) = state.vram_used {
-            let candidate = if used > self.budgets.vram_ceiling {
-                GovernorAction::Reduce
-            } else {
-                GovernorAction::Proceed
-            };
-            action = action.max(consider(
-                &mut events,
-                stage,
-                ResourceKind::Vram,
-                candidate,
-                used,
-                self.budgets.vram_ceiling,
-            ));
-        }
-
-        // Host memory. Pauses rather than reduces past 0.95, because a machine that is swapping is
-        // a machine where reducing the batch size does not help fast enough.
-        if let Some(used) = state.ram_used {
-            let candidate = if used > 0.95 {
-                GovernorAction::Pause
-            } else if used > 0.85 {
-                GovernorAction::Reduce
-            } else {
-                GovernorAction::Proceed
-            };
-            action = action.max(consider(
-                &mut events,
-                stage,
-                ResourceKind::Ram,
-                candidate,
-                used,
-                0.85,
-            ));
-        }
-
-        // Temperature.
-        if let Some(temperature) = state.temperature_c {
-            let candidate = if temperature >= self.budgets.thermal_pause_c {
-                GovernorAction::Pause
-            } else if temperature >= self.budgets.thermal_reduce_c {
-                GovernorAction::Reduce
-            } else {
-                GovernorAction::Proceed
-            };
-            action = action.max(consider(
-                &mut events,
-                stage,
-                ResourceKind::Thermal,
-                candidate,
-                temperature,
-                self.budgets.thermal_reduce_c,
-            ));
-        }
-
-        // Battery. Only when actually on battery: a laptop plugged in reports a charge and it is
-        // not a reason to do anything.
-        if state.on_battery && !self.mode.allow_on_battery {
-            let charge = state.battery.unwrap_or(0.0);
-            let candidate = if charge < self.budgets.battery_floor {
-                GovernorAction::Pause
-            } else {
-                GovernorAction::Reduce
-            };
-            action = action.max(consider(
-                &mut events,
-                stage,
-                ResourceKind::Battery,
-                candidate,
-                charge,
-                self.budgets.battery_floor,
-            ));
-        }
-
-        // Disk. The only reading that can stop a run, because it is the only one that does not
-        // clear on its own: a hot machine cools and a busy foreground goes away, and a full disk
-        // stays full until somebody does something about it. Continuing would be writing until the
-        // write fails, which is the failure this whole phase exists to avoid at 90 % of a run.
-        if let (Some(free), Some(needed)) = (state.disk_free_bytes, state.disk_needed_bytes) {
-            #[allow(clippy::cast_precision_loss)]
-            let ratio = if needed == 0 {
-                f32::INFINITY
-            } else {
-                free as f32 / needed as f32
-            };
-            let candidate = if ratio < 1.0 {
-                GovernorAction::Stop
-            } else if ratio < self.budgets.disk_headroom {
-                GovernorAction::Reduce
-            } else {
-                GovernorAction::Proceed
-            };
-            action = action.max(consider(
-                &mut events,
-                stage,
-                ResourceKind::Disk,
-                candidate,
-                ratio,
-                self.budgets.disk_headroom,
-            ));
-        }
-
-        // The photographer is working. Section 6.2's quiet mode: yield rather than compete, so an
-        // overnight run is not required.
-        if self.mode.quiet_mode && state.foreground_busy {
-            action = action.max(consider(
-                &mut events,
-                stage,
-                ResourceKind::Quiet,
-                GovernorAction::Reduce,
-                1.0,
-                0.0,
-            ));
-        }
-
-        // A lost device reduces rather than stops: section 6.3 asks for the run to continue on the
-        // CPU where feasible, and that is a *smaller* run rather than no run. The stage that
-        // wanted the GPU decides whether it can; this only says the run may keep going.
-        if state.device_lost {
-            action = action.max(consider(
-                &mut events,
-                stage,
-                ResourceKind::DeviceLost,
-                GovernorAction::Reduce,
-                1.0,
-                0.0,
-            ));
-        }
+        action = action.max(self.vram(&mut events, machine, stage));
+        action = action.max(Self::ram(&mut events, machine, stage));
+        action = action.max(self.thermal(&mut events, machine, stage));
+        action = action.max(self.battery(&mut events, machine, stage));
+        action = action.max(self.disk(&mut events, machine, stage));
+        action = action.max(self.quiet(&mut events, machine, stage));
+        action = action.max(Self::device(&mut events, machine, stage));
 
         let (parallel_stages, batch_size) = self.apply(action);
         Ruling {
@@ -246,6 +129,188 @@ impl Governor {
             parallel_stages,
             batch_size,
         }
+    }
+
+    /// Video memory. Over the ceiling reduces; a device that has stopped answering is a different
+    /// reading and is `Self::device`.
+    fn vram(
+        &self,
+        events: &mut Vec<ResourceEvent>,
+        machine: &MachineState,
+        stage: StageId,
+    ) -> GovernorAction {
+        let Some(used) = machine.vram_used else {
+            return GovernorAction::Proceed;
+        };
+        let candidate = if used > self.budgets.vram_ceiling {
+            GovernorAction::Reduce
+        } else {
+            GovernorAction::Proceed
+        };
+        consider(
+            events,
+            stage,
+            ResourceKind::Vram,
+            candidate,
+            used,
+            self.budgets.vram_ceiling,
+        )
+    }
+
+    /// Host memory. Pauses rather than reduces past 0.95, because a machine that is swapping is a
+    /// machine where reducing the batch size does not help fast enough.
+    ///
+    /// An associated function rather than a method, and the same for `Self::device`: these two
+    /// readings are the ones a studio cannot tune, so they hold no budget and take no `self`.
+    fn ram(
+        events: &mut Vec<ResourceEvent>,
+        machine: &MachineState,
+        stage: StageId,
+    ) -> GovernorAction {
+        let Some(used) = machine.ram_used else {
+            return GovernorAction::Proceed;
+        };
+        let candidate = if used > 0.95 {
+            GovernorAction::Pause
+        } else if used > 0.85 {
+            GovernorAction::Reduce
+        } else {
+            GovernorAction::Proceed
+        };
+        consider(events, stage, ResourceKind::Ram, candidate, used, 0.85)
+    }
+
+    /// Temperature.
+    fn thermal(
+        &self,
+        events: &mut Vec<ResourceEvent>,
+        machine: &MachineState,
+        stage: StageId,
+    ) -> GovernorAction {
+        let Some(temperature) = machine.temperature_c else {
+            return GovernorAction::Proceed;
+        };
+        let candidate = if temperature >= self.budgets.thermal_pause_c {
+            GovernorAction::Pause
+        } else if temperature >= self.budgets.thermal_reduce_c {
+            GovernorAction::Reduce
+        } else {
+            GovernorAction::Proceed
+        };
+        consider(
+            events,
+            stage,
+            ResourceKind::Thermal,
+            candidate,
+            temperature,
+            self.budgets.thermal_reduce_c,
+        )
+    }
+
+    /// Battery. Only when actually on battery: a laptop plugged in reports a charge and it is not
+    /// a reason to do anything.
+    fn battery(
+        &self,
+        events: &mut Vec<ResourceEvent>,
+        machine: &MachineState,
+        stage: StageId,
+    ) -> GovernorAction {
+        if !machine.on_battery || self.mode.allow_on_battery {
+            return GovernorAction::Proceed;
+        }
+        let charge = machine.battery.unwrap_or(0.0);
+        let candidate = if charge < self.budgets.battery_floor {
+            GovernorAction::Pause
+        } else {
+            GovernorAction::Reduce
+        };
+        consider(
+            events,
+            stage,
+            ResourceKind::Battery,
+            candidate,
+            charge,
+            self.budgets.battery_floor,
+        )
+    }
+
+    /// Disk. The only reading that can stop a run, because it is the only one that does not clear
+    /// on its own: a hot machine cools and a busy foreground goes away, and a full disk stays full
+    /// until somebody does something about it. Continuing would be writing until the write fails,
+    /// which is the failure this whole phase exists to avoid at 90 % of a run.
+    fn disk(
+        &self,
+        events: &mut Vec<ResourceEvent>,
+        machine: &MachineState,
+        stage: StageId,
+    ) -> GovernorAction {
+        let (Some(free), Some(needed)) = (machine.disk_free_bytes, machine.disk_needed_bytes)
+        else {
+            return GovernorAction::Proceed;
+        };
+        #[allow(clippy::cast_precision_loss)]
+        let ratio = if needed == 0 {
+            f32::INFINITY
+        } else {
+            free as f32 / needed as f32
+        };
+        let candidate = if ratio < 1.0 {
+            GovernorAction::Stop
+        } else if ratio < self.budgets.disk_headroom {
+            GovernorAction::Reduce
+        } else {
+            GovernorAction::Proceed
+        };
+        consider(
+            events,
+            stage,
+            ResourceKind::Disk,
+            candidate,
+            ratio,
+            self.budgets.disk_headroom,
+        )
+    }
+
+    /// The photographer is working. Section 6.2's quiet mode: yield rather than compete, so an
+    /// overnight run is not required.
+    fn quiet(
+        &self,
+        events: &mut Vec<ResourceEvent>,
+        machine: &MachineState,
+        stage: StageId,
+    ) -> GovernorAction {
+        if !self.mode.quiet_mode || !machine.foreground_busy {
+            return GovernorAction::Proceed;
+        }
+        consider(
+            events,
+            stage,
+            ResourceKind::Quiet,
+            GovernorAction::Reduce,
+            1.0,
+            0.0,
+        )
+    }
+
+    /// A lost device reduces rather than stops: section 6.3 asks for the run to continue on the
+    /// CPU where feasible, and that is a *smaller* run rather than no run. The stage that wanted
+    /// the GPU decides whether it can; this only says the run may keep going.
+    fn device(
+        events: &mut Vec<ResourceEvent>,
+        machine: &MachineState,
+        stage: StageId,
+    ) -> GovernorAction {
+        if !machine.device_lost {
+            return GovernorAction::Proceed;
+        }
+        consider(
+            events,
+            stage,
+            ResourceKind::DeviceLost,
+            GovernorAction::Reduce,
+            1.0,
+            0.0,
+        )
     }
 
     /// What the concurrency becomes under an action.

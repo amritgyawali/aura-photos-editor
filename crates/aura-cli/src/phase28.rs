@@ -724,6 +724,13 @@ pub fn verify(args: &[String]) -> ExitCode {
     println!("      RTX 4070, 4 h on an M3 Pro - are waived: this machine has no GPU backend, no");
     println!("      trained model and no camera file, so there is nothing to time.");
     println!(
+        "      The same condition covers autonomy: phase 13's confidences are unfitted, so every"
+    );
+    println!(
+        "      band is raised one step and this build's Zero-Touch does the work and asks about"
+    );
+    println!("      everything it cannot take back.");
+    println!(
         "  C2  Ingest and previews are driven by the import wizard; the autopilot's own arms for"
     );
     println!("      them count what is already in the catalog rather than walking a card.");
@@ -741,6 +748,13 @@ pub fn verify(args: &[String]) -> ExitCode {
         "  C6  Nothing here is a claim about the intervention rate. Section 13's 8 % target needs"
     );
     println!("      ten real weddings and a person.");
+    println!(
+        "  C7  This build writes no files. Curation and export are `PhaseNotBuilt`, so a completed"
+    );
+    println!(
+        "      run leaves a chosen and edited gallery in the catalog and nothing on disk - which"
+    );
+    println!("      makes half of section 10.1's cancellation gate vacuous rather than passed.");
 
     if failures == 0 {
         println!();

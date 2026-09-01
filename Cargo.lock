@@ -466,6 +466,7 @@ dependencies = [
  "aura-geometry",
  "aura-index",
  "aura-infer",
+ "aura-jobs",
  "aura-people",
  "aura-qc",
  "aura-raw",

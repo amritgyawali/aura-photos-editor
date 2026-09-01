@@ -25,6 +25,26 @@ use crate::contract::autopilot::{
     StageVerdict,
 };
 
+/// What a run is opened with, beside its own id and its wedding.
+///
+/// A struct rather than five more arguments: the two booleans next to each other on a call site
+/// were `open_run(id, project, true, true, ...)`, which is a pair a reader has to count positions
+/// to tell apart, and swapping them would open an uncalibrated run claiming to be calibrated with
+/// nothing failing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NewRun {
+    /// Whether the run may act unattended where the bands allow.
+    pub zero_touch: bool,
+    /// Whether this build's confidences have been fitted.
+    pub calibrated: bool,
+    /// How many stages the photographer asked for.
+    pub stages_enabled: u32,
+    /// The checklist file's version.
+    pub policy_ver: i64,
+    /// The orchestrator's own version.
+    pub orchestrator_ver: i64,
+}
+
 /// Reads and writes the autopilot's rows.
 #[derive(Debug, Clone)]
 pub struct AutopilotStore {
@@ -60,16 +80,14 @@ impl AutopilotStore {
     ///
     /// `AURA-JOB-7009` when another run is in flight or this one is already delivered,
     /// `AURA-DB-3006` when the statement fails.
-    pub fn open_run(
-        &self,
-        run_id: RunId,
-        project: ProjectId,
-        zero_touch: bool,
-        calibrated: bool,
-        stages_enabled: u32,
-        policy_ver: i64,
-        orchestrator_ver: i64,
-    ) -> AuraResult<()> {
+    pub fn open_run(&self, run_id: RunId, project: ProjectId, plan: &NewRun) -> AuraResult<()> {
+        let NewRun {
+            zero_touch,
+            calibrated,
+            stages_enabled,
+            policy_ver,
+            orchestrator_ver,
+        } = *plan;
         let run = run_id.to_db();
         if let Some(existing) = self.in_flight(project)? {
             if existing != run {

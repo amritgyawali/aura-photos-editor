@@ -15,6 +15,26 @@
 )]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
+// The panic family and slice indexing are banned in library code and are how a test asserts. An
+// inline `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
+// reach a photographer; the lints stay denied everywhere else in the crate. The same exemption
+// phases 14, 19, 23, 24, 25, 26 and 27 took, for the same reason - this crate is only acquiring it
+// now because phase 01 wrote it before the idiom existed and phase 28 is the first to add inline
+// tests here.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+        clippy::disallowed_methods,
+        clippy::assertions_on_constants,
+        clippy::uninlined_format_args,
+        clippy::too_many_lines
+    )
+)]
 
 //! The job graph and the zero-touch autopilot: tasks, dependencies, leases, and the orchestrator
 //! that turns twenty-seven phases into one button.

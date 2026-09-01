@@ -130,14 +130,20 @@ pub fn reasons(finished: &[Finished], status: RunStatus, calibrated: bool) -> Ve
     for row in finished {
         let code = match &row.outcome {
             StageOutcome::Completed { .. } => continue,
-            StageOutcome::Partial { .. } => AutopilotCode::StageIsolated,
-            StageOutcome::Failed { .. } => AutopilotCode::StageIsolated,
+            // A stage that ran out of attempts and a stage that finished some of its units are
+            // the same fact to a reader of the summary: the run carried on without it. What
+            // separates them is on the stage's own row, which carries the counts and the error.
+            StageOutcome::Partial { .. } | StageOutcome::Failed { .. } => {
+                AutopilotCode::StageIsolated
+            }
             StageOutcome::Skipped(cause) => match cause {
                 SkipCause::TurnedOff => continue,
                 SkipCause::PhaseNotBuilt => AutopilotCode::StageUnbuilt,
-                SkipCause::ServiceAbsent => AutopilotCode::StageUnavailable,
+                // Absent and starved are one code and two causes. The cause is what the panel
+                // renders and what `SkipCause::as_str` stores; this code is what the *ledger*
+                // groups on, and both mean the same thing there - AURA could not check.
+                SkipCause::ServiceAbsent | SkipCause::NoInput => AutopilotCode::StageUnavailable,
                 SkipCause::ModelUntrained => AutopilotCode::StageUntrained,
-                SkipCause::NoInput => AutopilotCode::StageUnavailable,
                 SkipCause::AwaitingReview => AutopilotCode::StageHeld,
                 SkipCause::ResourceStopped => AutopilotCode::ResourceStopped,
                 SkipCause::Cancelled => AutopilotCode::RunCancelled,

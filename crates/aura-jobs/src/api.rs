@@ -250,11 +250,13 @@ impl Autopilot {
         self.store.open_run(
             handle.run_id,
             project,
-            settings.zero_touch,
-            calibrated,
-            stage_total,
-            self.policy.version(),
-            ORCHESTRATOR_VER,
+            &crate::store::NewRun {
+                zero_touch: settings.zero_touch,
+                calibrated,
+                stages_enabled: stage_total,
+                policy_ver: self.policy.version(),
+                orchestrator_ver: ORCHESTRATOR_VER,
+            },
         )?;
 
         let run_key = handle.run_id.to_db();

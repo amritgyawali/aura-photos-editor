@@ -64,10 +64,10 @@ use crate::state::AppState;
 ///
 /// ## What question this answers, and what it deliberately does not
 ///
-/// It answers **"could a decision of this kind ever act unattended on this build"** - the ceiling
-/// - rather than "what band will this particular decision get". The confidence handed to
-/// `preview_band` is 1.0, which is the most permissive input there is, so a band that still comes
-/// back needing review is a band no decision of that kind can beat.
+/// It answers **"could a decision of this kind ever act unattended on this build"**, which is a
+/// ceiling, rather than "what band will this particular decision get". The confidence handed to
+/// `preview_band` is 1.0, the most permissive input there is, so a band that still comes back
+/// needing review is a band no decision of that kind can beat.
 ///
 /// That is the right question for a *stage* gate and it is important that it is not the other one.
 /// Each phase still bands each of its own decisions through phase 13 as it makes them, with that
@@ -487,12 +487,6 @@ impl AppRunner {
                 ))?;
                 report.selected
             }
-            // Phase 18's masks are generated lazily, per photograph, by the phases that consume
-            // them. There is no project-wide mask command and there deliberately is not one: a
-            // pass that segmented every selected frame up front would spend 320 ms a frame on
-            // regions six later stages may never ask for. The stage exists so the checklist can
-            // switch masking off as a whole, and so the run summary can say it was off.
-            StageId::Masks => self.selected_count(project)?,
 
             StageId::Tone => {
                 let report = lift(crate::tone_commands::estimate_tone(
@@ -514,11 +508,19 @@ impl AppRunner {
                 ))?;
                 report.decided
             }
-            // Phase 17's inference is three map lookups and an addition, applied *inside* the tone
-            // and colour solves rather than as a walk of its own - which is phase 17's own rule
-            // that a style is a residual and the baseline is never re-derived. There is nothing
-            // here to run, and the count is the frames the profile reached.
-            StageId::Style => self.selected_count(project)?,
+            // Two stages with nothing of their own to run, for two different reasons, counted the
+            // same way because the count means the same thing: the survivors this stage reached.
+            //
+            // **Masks.** Phase 18's regions are generated lazily, per photograph, by the phases
+            // that consume them. There is no project-wide mask command and there deliberately is
+            // not one: a pass that segmented every selected frame up front would spend 320 ms a
+            // frame on regions six later stages may never ask for. The stage exists so the
+            // checklist can switch masking off as a whole, and so the summary can say it was off.
+            //
+            // **Style.** Phase 17's inference is three map lookups and an addition, applied
+            // *inside* the tone and colour solves rather than as a walk of its own - which is
+            // phase 17's own rule that a style is a residual and the baseline is never re-derived.
+            StageId::Masks | StageId::Style => self.selected_count(project)?,
 
             StageId::LocalLight => {
                 let report = lift(crate::local_commands::sculpt_local(

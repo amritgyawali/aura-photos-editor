@@ -4,6 +4,7 @@ import type {
   AutopilotProgressDto,
   AutopilotStageDto,
   AutopilotStatusDto,
+  AutopilotSummaryDto,
 } from '../../ipc/types';
 import { PreflightDialog } from './PreflightDialog';
 import { ProgressPanel } from './ProgressPanel';
@@ -41,7 +42,7 @@ export type AutopilotProps = {
   /** What the run in flight is doing, or null when nothing is running. */
   progress: AutopilotProgressDto | null;
   /** The newest finished run. */
-  summary: AutopilotSummaryLike | null;
+  summary: AutopilotSummaryDto | null;
   /** Everything the governor did. */
   events: AutopilotEventDto[];
   /** The pre-flight, when the dialog is open. */
@@ -63,9 +64,6 @@ export type AutopilotProps = {
   /** Turn Zero-Touch on or off. */
   onZeroTouch: (on: boolean) => void;
 };
-
-/** The summary shape, re-declared so this file does not depend on the import order. */
-type AutopilotSummaryLike = Parameters<typeof RunSummary>[0]['summary'];
 
 export function Autopilot(props: AutopilotProps) {
   const {
@@ -90,7 +88,7 @@ export function Autopilot(props: AutopilotProps) {
   return (
     <div className="autopilot" aria-label="Autopilot">
       <header className="autopilot-header">
-        <h1>Edit complete wedding</h1>
+        <h2>Edit complete wedding</h2>
         <p>
           Import the RAWs, click once, come back to a delivered gallery. Everything below is
           saved as it goes, so stopping loses nothing.

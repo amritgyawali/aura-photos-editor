@@ -151,10 +151,12 @@ impl StageRunner for ScriptedRunner {
                     });
                 }
                 drop(attempts);
-                self.finish(request, progress, cancel, None)
+                Ok(self.finish(request, progress, cancel, None))
             }
-            Behaviour::CancelAfter(after) => self.finish(request, progress, cancel, Some(after)),
-            Behaviour::Succeed => self.finish(request, progress, cancel, None),
+            Behaviour::CancelAfter(after) => {
+                Ok(self.finish(request, progress, cancel, Some(after)))
+            }
+            Behaviour::Succeed => Ok(self.finish(request, progress, cancel, None)),
         }
     }
 
@@ -173,21 +175,27 @@ impl StageRunner for ScriptedRunner {
 }
 
 impl ScriptedRunner {
+    /// Walk the scripted units, honouring cancellation.
+    ///
+    /// Returns a `StageOutcome` rather than a `Result` of one: this fixture cannot fail in the
+    /// way a real stage can - a scripted failure is `Behaviour::AlwaysFail`, which is an
+    /// *outcome* - and a `Result` that is always `Ok` teaches a reader that there is an error
+    /// path to think about when there is not.
     fn finish(
         &self,
         request: &StageRequest,
         progress: &RunWatch,
         cancel: &CancelToken,
         cancel_after: Option<u32>,
-    ) -> AuraResult<StageOutcome> {
+    ) -> StageOutcome {
         let mut done = request.resume_from;
         while done < self.units {
             if cancel.is_cancelled() {
-                return Ok(StageOutcome::Partial {
+                return StageOutcome::Partial {
                     items: done,
                     failed: 0,
                     detail: "cancelled".to_string(),
-                });
+                };
             }
             done += 1;
             self.units_done.fetch_add(1, Ordering::SeqCst);
@@ -198,7 +206,7 @@ impl ScriptedRunner {
                 }
             }
         }
-        Ok(StageOutcome::Completed { items: done })
+        StageOutcome::Completed { items: done }
     }
 }
 

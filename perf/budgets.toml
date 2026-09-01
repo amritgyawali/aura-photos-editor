@@ -1376,19 +1376,22 @@ max_ms_per_unit = 20000
 # `autopilot_run` row per run, twenty-five `autopilot_stage` rows, a bounded number of reasons, and
 # at most 500 `autopilot_event` rows - capped by a trigger rather than by hope.
 #
-# So the per-image figure is a division rather than a measurement, and it falls as a wedding grows.
-# Measured on the phase gate's own run:
+# So the per-image figure is a division rather than a measurement, and it *falls* as a wedding
+# grows. Measured by `crates/aura-perf/tests/autopilot_budgets.rs` over one complete twenty-five
+# stage run: **5,281 B of `dbstat` payload across every `autopilot%` table and index**, which is
+# 1,760 B per 1,000 photographs, or 1.76 B an image over a 3,000-frame wedding.
 #
-#   autopilot_run                220 B     one row
-#   autopilot_stage            3,450 B     twenty-three planned stages
-#   autopilot_reason             380 B
-#   autopilot_event                0 B     the fixture machine reports nothing
-#                            ---------
-#   measured total             4,050 B  =  1.35 B/image over 3,000 photographs
+# The budget is 10,000 B per 1,000 images and the headroom is structural rather than generous: the
+# only table that could grow with the work is `autopilot_event`, and the `autopilot_event_cap`
+# trigger bounds it at the newest 500 rows per run. That number lives in the migration and nowhere
+# else on purpose: a Rust constant beside it that nothing read would be a second copy free to drift
+# from the one actually enforcing the bound.
 #
-# The budget is 10 B/image and the headroom is structural rather than generous: the only row that
-# could grow is the event table, and `autopilot_event_cap` bounds it at 500 per run. Phase 26's
-# lesson is why the gate asserts the *bound* as well as the number - a size check alone would pass
-# on a build that had removed the cap and happened to be measured on a quiet machine.
+# **The bound is asserted as well as the number**, by running the same orchestrator over ten times
+# the units and checking the store did not grow with them - it measures 5,269 B, which is inside
+# the noise of one row's page allocation. A size assertion alone would pass on a build that had
+# removed the cap and happened to be measured on a machine with no sensors, which is this one.
+# Phase 26 learned that from the other side, when a note about a table growing with the square of a
+# wedding's overlap turned out to describe a table that was capped.
 [size.autopilot_store_per_1000_images]
 max_bytes = 10000

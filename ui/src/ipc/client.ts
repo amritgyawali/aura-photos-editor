@@ -1647,12 +1647,21 @@ export const qc = {
   qcDecideBulk: (input: QcDecideBulkInput): Promise<number> =>
     invoke<number>('qc_decide_bulk', { input }),
 
-  // -- PHASE-28. The zero-touch autopilot ------------------------------------
-  //
-  // Nine commands. `autopilotStart` returns as soon as the run is planned and the work continues
-  // on a worker thread, because a command that returned when the wedding finished would block the
-  // surface for two hours. `autopilotProgress` is what the panel polls while it runs.
+};
 
+/**
+ * PHASE-28. One button: EDIT COMPLETE WEDDING.
+ *
+ * Nine commands. `autopilotStart` returns as soon as the run is planned and the work continues on
+ * a worker thread, because a command that returned when the wedding finished would hold this
+ * surface for two hours. `autopilotProgress` is what the panel polls while it runs.
+ *
+ * There is no command here that runs one stage on its own, and that is a decision rather than an
+ * omission: a surface that could run the retouch without the cull could edit four thousand frames
+ * nobody is delivering. Every individual pass already has its own command from its own phase, and
+ * those are where a photographer re-runs one step. ADR-0058 section 5.
+ */
+export const autopilot = {
   /** What the Autopilot panel's header shows. */
   autopilotStatus: (projectId: string): Promise<AutopilotStatusDto> =>
     invoke<AutopilotStatusDto>('autopilot_status', { projectId }),

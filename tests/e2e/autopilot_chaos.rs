@@ -36,6 +36,20 @@ use aura_jobs::contract::autopilot::{
 use aura_jobs::fixtures::{ports, Behaviour, FixedGate, FixedProbe, ScriptedRunner};
 use rusqlite::params;
 
+/// The plan a directly-opened run is opened with.
+///
+/// These tests reach `AutopilotStore` rather than `Autopilot` in two places, to prove a refusal
+/// that the orchestrator would never let them reach.
+fn new_run() -> aura_jobs::store::NewRun {
+    aura_jobs::store::NewRun {
+        zero_touch: true,
+        calibrated: true,
+        stages_enabled: 25,
+        policy_ver: 1,
+        orchestrator_ver: 1,
+    }
+}
+
 const UNITS: u32 = 20;
 
 struct World {
@@ -540,6 +554,6 @@ fn a_delivered_run_cannot_be_reopened_through_the_store_either() {
 
     let refused = autopilot
         .store()
-        .open_run(run_id, world.project, true, true, 25, 1, 1);
+        .open_run(run_id, world.project, &new_run());
     assert!(refused.is_err(), "a delivered run was reopened");
 }

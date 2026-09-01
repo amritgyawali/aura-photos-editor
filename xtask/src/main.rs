@@ -120,6 +120,20 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // are the second layer under a refusal that also lives in `aura-qc`. A digest is what stops
     // the second layer being quietly widened to match a first layer somebody had already changed.
     "crates/aura-catalog/migrations/0027_qc.sql",
+    // PHASE-28. The migration only; this phase ships no shader, because nothing in it opens a
+    // photograph. `autopilot.toml` is deliberately *not* frozen - it is the checklist a studio is
+    // meant to edit, and `Policy::parse` is what holds it to the bounds the code owns rather than
+    // a digest.
+    //
+    // Migration 28 is here for the reason migrations 25 and 27 are, and one of its own.
+    // `autopilot_run_no_reopen` is what stops a delivered run's record being rewritten,
+    // `autopilot_reason_no_update` is what makes a recorded reason unable to be edited afterwards,
+    // and `autopilot_event_cap` is what bounds the one table in this phase that could otherwise
+    // grow without limit - which is what makes the storage budget a property rather than a
+    // measurement that happened to be taken on a quiet machine. All three are the second layer
+    // under a refusal that also lives in `aura-jobs`, and a digest is what stops the second layer
+    // being quietly widened to match a first layer somebody had already changed.
+    "crates/aura-catalog/migrations/0028_autopilot.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];
