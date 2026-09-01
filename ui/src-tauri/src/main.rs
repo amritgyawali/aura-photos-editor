@@ -51,6 +51,14 @@ use aura_app::contract::ipc::{
     CameraReportDto, CameraStatusDto, CameraTransformDto, DisableCameraInput, MatchedPairDto,
     SetCameraReferenceInput, ShooterBiasDto,
 };
+// PHASE-27. The quality-control surface: nine commands whose subject is a *problem* rather than a
+// photograph. `QcStatusDto.completeness` travels with every other number on it, because an empty
+// QC result means either "AURA looked at everything and it is fine" or "AURA could not look", and
+// in this build the second is the common case.
+use aura_app::contract::ipc::{
+    QcDecideBulkInput, QcDecideInput, QcGroupDto, QcPassInput, QcReportDto, QcRoundDto,
+    QcStatusDto, QcTicketDto,
+};
 // PHASE-19.
 use aura_app::contract::ipc::{
     AcceptLocalInput, LocalPassDto, LocalPlanDto, LocalReviewInput, LocalStatusDto,
@@ -2216,6 +2224,121 @@ async fn camera_reason_codes() -> IpcResult<Vec<CameraReasonDto>> {
     Ok(aura_app::camera_reason_codes())
 }
 
+// PHASE-27. Nine commands, all of them off the UI thread. `qc_run` is the one that takes real
+// time - it inspects every delivered frame against ten checks and, when it is asked to, runs a
+// bounded re-edit loop over what it found - and it runs to completion rather than returning a job
+// id, because a gallery half inspected under one thresholds table and half under another has been
+// checked against nothing. ADR-0056 section 4.
+//
+// `qc_run` is also the only command on this surface that can change a photograph, and only when
+// `remediate` is true. The other eight read, or record what a photographer decided.
+#[tauri::command]
+async fn qc_status(state: State<'_, AppState>, project_id: String) -> IpcResult<QcStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_report(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<QcReportDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_report(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_report_markdown(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<String>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_report_markdown(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_queue(
+    state: State<'_, AppState>,
+    project_id: String,
+    category: Option<String>,
+    limit: usize,
+) -> IpcResult<Vec<QcTicketDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::qc_queue(&app, &project_id, category, limit)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_queue_grouped(
+    state: State<'_, AppState>,
+    project_id: String,
+    limit: usize,
+) -> IpcResult<Vec<QcGroupDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_queue_grouped(&app, &project_id, limit))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_tickets(state: State<'_, AppState>, image_id: String) -> IpcResult<Vec<QcTicketDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_tickets(&app, &image_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_rounds(
+    state: State<'_, AppState>,
+    project_id: String,
+    ticket_id: String,
+) -> IpcResult<Vec<QcRoundDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::qc_rounds(&app, &project_id, &ticket_id)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_run(state: State<'_, AppState>, input: QcPassInput) -> IpcResult<QcReportDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_run(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_decide(
+    state: State<'_, AppState>,
+    project_id: String,
+    input: QcDecideInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_decide(&app, &project_id, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn qc_decide_bulk(state: State<'_, AppState>, input: QcDecideBulkInput) -> IpcResult<u32> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_decide_bulk(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 // PHASE-25. Nine commands, all of them off the UI thread. The pass is the one that takes real time
 // - it walks every photograph in a project through three services and solves a tree - and it runs
 // to completion rather than returning a job id, because a half-solved tree has no state a reader
@@ -2483,6 +2606,16 @@ fn main() {
             disable_camera,
             set_camera_override,
             camera_reason_codes,
+            qc_status,
+            qc_report,
+            qc_report_markdown,
+            qc_queue,
+            qc_queue_grouped,
+            qc_tickets,
+            qc_rounds,
+            qc_run,
+            qc_decide,
+            qc_decide_bulk,
             set_framing,
             plan_geometry,
             analyse_integrity,

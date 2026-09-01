@@ -225,6 +225,26 @@ typed_id!(NodeId, "nod");
 // See docs/adr/ADR-0053-camera-matching-and-appearance-transforms.md section 2.
 typed_id!(PairId, "pai");
 
+// PHASE-27. Section 5 writes `TicketId` into the frozen `QcTicket` shape, so a quality-control
+// finding is an id of the same kind as the fifteen above.
+//
+// It is the first id in this file that names a *problem* rather than a thing, a part of a thing or
+// a relationship between two things - and the first whose subject may cease to exist while the id
+// must not. A ticket outlives what it is about: a frame replaced by its runner-up leaves a ticket
+// that has to keep pointing at the replacement it caused, and a remedy that was reverted leaves a
+// ticket whose whole value is the record that the product tried something and put it back.
+//
+// It is not `(image_id, category)`, and the alternative was real: ten categories over one
+// photograph would name every finding with no new id at all. It is not here for two reasons. One
+// image can carry two findings in the same category on two different faces, and section 6.3's
+// bounded loop attaches rounds to a ticket rather than to a category - so a second round on the
+// same `(image, category)` would either overwrite the first round's record or be indistinguishable
+// from it, and "we tried twice" and "we tried once" are the two things the loop bound exists to
+// tell apart.
+//
+// See docs/adr/ADR-0055-quality-control-tickets-and-the-re-edit-loop.md section 2.
+typed_id!(TicketId, "tkt");
+
 /// Content address: BLAKE3 of the file bytes. Two files with the same digest
 /// are the same file, no matter what they are called or where they live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

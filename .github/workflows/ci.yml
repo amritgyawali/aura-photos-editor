@@ -128,6 +128,18 @@ jobs:
       - name: camera matching self-test
         run: python ml/eval/camera_match_eval.py --self-test
 
+      # PHASE-27. The QC agent judges what every phase before it decided, so this lane is the
+      # one that fails when a *guarantee* stops holding rather than when an algorithm drifts:
+      # a widened threshold, an overwritten verdict, a swap that took a coverage rule out of a
+      # gallery. It also carries the three-way IPC count - handlers, definitions and typed
+      # client wrappers - which no gate checked until this phase and which had been wrong by
+      # ninety commands when phase 21 shipped.
+      - name: phase 27 verify - checks, triage, remedies, verdicts, ipc parity
+        run: cargo run --release --package aura-cli -- verify --phase 27 --work target/phase27-verify
+
+      - name: qc agreement self-test
+        run: python ml/eval/qc_agreement.py --self-test
+
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
     name: ui type-check, tests and build

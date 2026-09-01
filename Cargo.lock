@@ -75,6 +75,7 @@ dependencies = [
  "aura-models",
  "aura-people",
  "aura-preview",
+ "aura-qc",
  "aura-raw",
  "aura-recipe",
  "aura-render",
@@ -209,6 +210,7 @@ dependencies = [
  "aura-people",
  "aura-perf",
  "aura-preview",
+ "aura-qc",
  "aura-raw",
  "aura-recipe",
  "aura-render",
@@ -462,6 +464,7 @@ dependencies = [
  "aura-index",
  "aura-infer",
  "aura-people",
+ "aura-qc",
  "aura-raw",
  "aura-recipe",
  "aura-render",
@@ -490,6 +493,22 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "aura-qc"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-cloud",
+ "aura-core",
+ "aura-vision",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
  "tracing",
 ]
 

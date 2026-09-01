@@ -7185,3 +7185,315 @@ pub struct CameraOverrideInput {
     /// Recipe units, within 12.
     pub d_saturation: Option<f32>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-27 - quality control
+// ---------------------------------------------------------------------------
+//
+// Nine commands. Five read, one runs the pass, three record what a photographer decided.
+// ADR-0056 records the shape and what is deliberately absent from it.
+//
+// # What this surface does that no earlier one does
+//
+// **Its primary object is a problem.** Every earlier panel shows what AURA decided about a
+// photograph; this one shows what AURA thinks is wrong with what it decided. The reader arrives
+// sceptical, so every number that would let them check a finding travels beside the sentence:
+// `deviation`, `threshold`, `unit` and `severity`, never the sentence alone.
+//
+// **The user's answer is a judgement rather than a value.** `accepted` and `dismissed` are the whole
+// of what a photographer can write here, and the second is the false-ticket signal section 10.1
+// gates and phase 30 learns from.
+//
+// # The one field to read first
+//
+// `QcStatusDto.completeness`. A QC panel is the only place in this product where an empty result is
+// genuinely ambiguous - zero findings means either "AURA looked at everything and it is fine" or
+// "AURA could not look" - and in this build the second is the common case, because phase 06's
+// detector finds no faces and phase 18's segmenter is untrained. `inspectionsSkipped` and
+// `imagesUnreached` are on the wire beside it, and `detectorTrained` is false.
+//
+// # What is not here, and cannot be added without an ADR
+//
+// No pixels, no thresholds, no way to build a remedy, no way to raise a bound, and no bulk action
+// that authorises one. See section 8 of ADR-0056.
+
+/// What the QC panel's project header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcStatusDto {
+    /// Photographs in the **delivered gallery**. Phase 18's denominator, not the project's.
+    pub selected: u32,
+    /// Photographs the pass reached.
+    pub checked: u32,
+    /// Fraction of the gallery inspected, `0..1`.
+    pub coverage: f32,
+    /// Inspections that ran.
+    pub inspections: u32,
+    /// Inspections that could not run because something they needed was absent.
+    ///
+    /// **The number that makes the rest honest.** A category with zero findings and four hundred
+    /// skips is not a clean category.
+    pub inspections_skipped: u32,
+    /// Fraction of attempted inspections that actually ran, `0..1`.
+    pub completeness: f32,
+    /// Findings still wanting somebody's attention.
+    pub open: u32,
+    /// Findings a photographer agreed with.
+    pub accepted: u32,
+    /// Findings a photographer rejected. The false-ticket numerator.
+    pub dismissed: u32,
+    /// Fraction of reviewed findings a photographer disagreed with, `0..1`.
+    ///
+    /// The denominator is findings somebody *looked at*, not findings that exist: a queue nobody has
+    /// opened has no disagreement rate, and reporting one as zero would read as unanimous agreement.
+    pub false_ticket_rate: f32,
+    /// Frames replaced by a better alternative.
+    pub replaced: u32,
+    /// Remediation rounds run.
+    pub rounds: u32,
+    /// Planner calls made, out of forty.
+    pub planner_calls: u32,
+    /// Findings in each category, in `QcCategory::ALL` order.
+    pub by_category: Vec<u32>,
+    /// Findings in each status, in `TicketStatus::ALL` order.
+    pub by_status: Vec<u32>,
+    /// Bytes this phase occupies for the project.
+    pub bytes: u64,
+    /// Which thresholds table.
+    pub thresholds_ver: u16,
+    /// Which arithmetic.
+    pub analysis_ver: u16,
+    /// **False in this build.** No defect-detection model ships and every check is a measurement
+    /// against another phase's stored number.
+    pub detector_trained: bool,
+}
+
+/// One finding, as a photographer reads it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcTicketDto {
+    /// The finding.
+    pub ticket_id: String,
+    /// The photograph.
+    pub image_id: String,
+    /// Which inspection, as `QcCategory::as_str`.
+    pub category: String,
+    /// What exactly, as `QcCode::as_str`.
+    pub code: String,
+    /// The senior retoucher's note, rendered from the numbers rather than stored.
+    pub diagnosis: String,
+    /// How far from acceptable.
+    pub deviation: f32,
+    /// What acceptable was.
+    pub threshold: f32,
+    /// What both are measured in.
+    pub unit: String,
+    /// How far past the threshold, as a multiple of it. What the queue sorts on.
+    pub severity: f32,
+    /// What should be done, as one of the five remedy slugs.
+    pub remedy_kind: String,
+    /// What it acts on.
+    pub remedy_target: String,
+    /// How much the deviation should fall if it is applied.
+    pub expected_gain: f32,
+    /// How sure, `0..1`.
+    pub confidence: f32,
+    /// What the product is allowed to do about it.
+    pub autonomy: String,
+    /// True when the confidence and the band both permit acting without a person.
+    pub may_act_unattended: bool,
+    /// Which round it is on, out of two.
+    pub round: u8,
+    /// Where it stands.
+    pub status: String,
+    /// What happened to it, when something has.
+    pub outcome_code: Option<String>,
+    /// The scene, for the panel's own grouping.
+    pub scene: String,
+    /// What to look at: `none | crop | frames | anchors | params`.
+    pub evidence_kind: String,
+    /// The frames the finding was measured against, when it names any.
+    pub evidence_frames: Vec<String>,
+    /// The region of this frame, as `[x, y, w, h]` normalised, when it names one.
+    pub evidence_crop: Option<Vec<f32>>,
+    /// The reasons, strongest first, as sentences.
+    pub reasons: Vec<String>,
+}
+
+/// One category's findings, worst first.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcGroupDto {
+    /// Which inspection.
+    pub category: String,
+    /// The worst severity in the group, which is what orders the groups themselves.
+    pub worst: f32,
+    /// The findings.
+    pub tickets: Vec<QcTicketDto>,
+}
+
+/// One remediation attempt, and whether it worked.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcRoundDto {
+    /// Which round, one or two.
+    pub round: u8,
+    /// What was tried.
+    pub remedy_kind: String,
+    /// What it acted on.
+    pub remedy_target: String,
+    /// The deviation before.
+    pub deviation_before: f32,
+    /// And after.
+    pub deviation_after: f32,
+    /// What was predicted.
+    pub expected_gain: f32,
+    /// The share of that prediction actually realised. The number the loop decided on.
+    pub realised_share: f32,
+    /// The worst movement in another check, as a share of that check's own threshold.
+    pub collateral: f32,
+    /// Which check took it.
+    pub collateral_category: Option<String>,
+    /// Whether the change survived.
+    pub kept: bool,
+    /// What happened, as a code.
+    pub outcome: String,
+    /// How long, in milliseconds.
+    pub ms: u32,
+}
+
+/// One frame swapped for another.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcReplacementDto {
+    /// The finding that caused it.
+    pub ticket_id: String,
+    /// The frame that was in the gallery.
+    pub replaced: String,
+    /// The frame that is in it now.
+    pub replacement: String,
+    /// Which metric decided it.
+    pub category: String,
+    /// What the replaced frame measured.
+    pub metric_before: f32,
+    /// What the replacement measures.
+    ///
+    /// Both, never the difference: a photographer looking at a swap wants to know what each frame
+    /// measured, and a stored subtraction cannot be read back as two numbers.
+    pub metric_after: f32,
+    /// How sure. Never below 0.85 on an automatic swap.
+    pub confidence: f32,
+    /// True on every stored swap: coverage was re-validated and held.
+    pub coverage_held: bool,
+    /// One sentence about why.
+    pub note: String,
+}
+
+/// One category's tally in the report.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcTallyDto {
+    /// Which inspection.
+    pub category: String,
+    /// Findings opened.
+    pub found: u32,
+    /// Findings a remedy fixed and re-inspection confirmed.
+    pub fixed: u32,
+    /// Findings handed to a person.
+    pub escalated: u32,
+    /// Frames this check could not run on.
+    pub skipped: u32,
+}
+
+/// What one QC pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcReportDto {
+    /// Photographs inspected.
+    pub images: u32,
+    /// Photographs the pass did not reach before its time ran out.
+    pub images_unreached: u32,
+    /// True when it reached every frame it was asked to.
+    pub complete: bool,
+    /// Inspections that ran.
+    pub checks_run: u32,
+    /// Inspections that could not.
+    pub skipped: u32,
+    /// One row per category.
+    pub by_category: Vec<QcTallyDto>,
+    /// Findings opened, across every category.
+    pub found: u32,
+    /// Remedies applied and kept.
+    pub fixed: u32,
+    /// Remedies applied and put back.
+    pub reverted: u32,
+    /// Findings handed to a person.
+    pub escalated: u32,
+    /// Every swap, with its before and after.
+    pub replacements: Vec<QcReplacementDto>,
+    /// Planner calls made.
+    pub planner_calls: u32,
+    /// True when the planner was reached at all.
+    pub cloud_used: bool,
+    /// How long, in milliseconds.
+    pub duration_ms: u64,
+    /// Which thresholds table.
+    pub thresholds_ver: u16,
+    /// Which arithmetic.
+    pub analysis_ver: u16,
+}
+
+/// Ask for a QC pass.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcPassInput {
+    /// The project.
+    pub project_id: String,
+    /// True to apply remedies the autonomy bands permit; false to inspect and report only.
+    ///
+    /// The safe default is false, and phase 28 is the caller that sets it true. A pass that only
+    /// inspects changes nothing, which is what makes it the thing to run before a delivery.
+    pub remediate: bool,
+}
+
+/// What a photographer decided about one finding.
+///
+/// `status` may only be `accepted` or `dismissed`. Automation owns `open`, `fixed`, `reverted` and
+/// `escalated`, which are a record of what happened rather than an opinion about it - a surface that
+/// let a person set `fixed` would let somebody record a measurement they had not made.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcDecideInput {
+    /// The finding.
+    pub ticket_id: String,
+    /// `accepted` or `dismissed`.
+    pub status: String,
+    /// Apply the proposed remedy now, whatever the autonomy band said.
+    ///
+    /// A photographer overruling a review requirement upward is the one direction that is safe:
+    /// they have looked. There is no field that overrules it downward, and `qc_decide_bulk` writes
+    /// `false` here on every finding it touches - see ADR-0056 section 5.
+    pub apply_remedy: bool,
+    /// One sentence, kept for the studio's record. At most 280 characters.
+    pub note: Option<String>,
+}
+
+/// What a photographer decided about many findings at once.
+///
+/// **There is no `applyRemedy` here, and that is the decision rather than an omission.** Agreeing
+/// that forty findings are real is a statement about the findings; instructing AURA to act on forty
+/// frames unattended is a statement about the remedies, and the two are different judgements made
+/// with different amounts of attention. Per-ticket authorisation lives in the frame view, where the
+/// before and after are side by side. ADR-0056 section 5.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QcDecideBulkInput {
+    /// The project, for the audit trail.
+    pub project_id: String,
+    /// The findings.
+    pub ticket_ids: Vec<String>,
+    /// `accepted` or `dismissed`.
+    pub status: String,
+    /// One sentence, applied to all of them.
+    pub note: Option<String>,
+}

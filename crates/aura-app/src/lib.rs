@@ -77,6 +77,7 @@ pub mod micro_commands;
 pub mod moment_commands;
 pub mod people_commands;
 pub mod preview_commands;
+pub mod qc_commands;
 pub mod restore_commands;
 pub mod retouch_commands;
 pub mod state;
@@ -168,6 +169,10 @@ pub use preview_commands::base64;
 pub use preview_commands::{
     cancel_previews, get_preview, prefetch_previews, preview_problems, preview_stats, purge_cache,
     set_cache_budget,
+};
+pub use qc_commands::{
+    qc_decide, qc_decide_bulk, qc_queue, qc_queue_grouped, qc_report, qc_report_markdown,
+    qc_rounds, qc_run, qc_status, qc_tickets,
 };
 pub use restore_commands::{
     accept_restore, image_restore, restore_identity_refusals, restore_pass, restore_reason_codes,

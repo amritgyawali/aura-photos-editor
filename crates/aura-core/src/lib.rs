@@ -44,6 +44,7 @@ pub mod contract {
     pub mod moment;
     pub mod people;
     pub mod priority;
+    pub mod qc;
     pub mod restore;
     pub mod retouch;
     pub mod scene;
@@ -126,6 +127,10 @@ pub use contract::moment::{
 };
 pub use contract::people::{FaceRef, ImageSubjects, PeopleService, Role, SubjectHierarchy};
 pub use contract::priority::Priority;
+pub use contract::qc::{
+    CategoryTally, QcCategory, QcCode, QcOutline, QcOverride, QcReason, QcReport, QcRound,
+    QcService, QcTicket, Remedy, Replacement, SolveTarget, TicketStatus,
+};
 pub use contract::restore::{
     ArtefactReport, DenoiseSpec, DenoiseTier, NoiseModel, RecoveredFace, RestoreCode, RestoreField,
     RestoreOutline, RestoreOverride, RestorePlan, RestoreReason, RestoreRegion, RestoreService,

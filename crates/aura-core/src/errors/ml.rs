@@ -374,3 +374,31 @@ pub fn camera_decision_refused(detail: impl Into<String>) -> AuraError {
          has changed; reopen the panel and try again.",
     )
 }
+
+/// A photographer's quality-control verdict could not be recorded.
+pub const ML_QC_DECISION_REFUSED: ErrorCode = ErrorCode("AURA-ML-5137");
+
+/// A photographer's quality-control verdict could not be recorded.
+///
+/// The frozen `QcService` documents this on `decide`, so it lives here rather than in `aura-qc`:
+/// a contract cannot depend on the crate that implements it. The same split phases 16, 22, 23, 24,
+/// 25 and 26 made.
+///
+/// Three ways to reach it, and none of them is anything a photographer did wrong: the ticket is not
+/// in the catalog, the override named a status automation owns rather than one a person owns, or
+/// the note was longer than `QcOverride::MAX_NOTE`.
+///
+/// The second is the interesting one. `accepted` and `dismissed` are the two statuses a person
+/// owns; `fixed`, `reverted`, `escalated` and `open` are written by the loop and are a record of
+/// what happened rather than an opinion about it. A surface that let a person set `fixed` would let
+/// somebody record a measurement they had not made.
+#[must_use]
+pub fn qc_decision_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_QC_DECISION_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        detail,
+        "AURA could not record what you decided about that finding. Nothing about the photograph          has changed; reopen the review queue and try again.",
+    )
+}

@@ -10,6 +10,7 @@ import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
 import { CompositionCard } from './components/explain/CompositionCard';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
+import { QcPanel } from './components/qc/QcPanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
 import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
@@ -234,6 +235,10 @@ export function App(): JSX.Element {
             than the selected photograph, which is why it renders nothing until a project is
             open rather than showing an empty frame. */}
         <GalleryPanel projectId={activeProjectId} onError={setError} />
+        {/* PHASE-27. The second whole-wedding panel, and it sits under the first deliberately:
+            phase 25 makes a gallery coherent and this checks whether it is. It is the last thing
+            a photographer looks at before they deliver, so it is the last thing in the sidebar. */}
+        <QcPanel projectId={activeProjectId} onError={setError} />
       </aside>
 
       <main className="main">

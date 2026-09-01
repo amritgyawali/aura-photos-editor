@@ -1,0 +1,686 @@
+# Quality-control thresholds. PHASE-27 section 6.1.
+#
+# ---------------------------------------------------------------------------
+# WHAT THIS FILE IS, AND THE ONE RULE THAT MAKES IT SAFE
+# ---------------------------------------------------------------------------
+#
+# Section 6.1: "thresholds live in `qc_thresholds.toml` per scene class, because a dance floor
+# tolerates more than a family formal." How fussy AURA is about somebody's wedding is a product
+# decision, so this file is a product manager's to argue with.
+#
+# **Every number here may be lowered and none of it may be raised.** `crates/aura-qc/src/policy.rs`
+# owns a ceiling for each one, the loader refuses a row that exceeds it, and the pass halts with
+# `AURA-ML-5140` rather than falling back on defaults. Lowering a threshold makes AURA notice more;
+# there is no edit to this file that makes it notice less than the build permits.
+#
+# The direction is the whole point. A QC agent whose thresholds a studio can widen is a QC agent a
+# studio can switch off by editing a number, and `docs/how-qc-works.md` would then be a description
+# of the defaults rather than a promise about the product. Phases 21, 22 and 24 all made their
+# policy files work this way; this is the fourth.
+#
+# One consequence is worth stating because it caught this phase during construction: **a larger
+# number is always more permissive.** Two thresholds were originally written as required minimums -
+# the shadow headroom a frame must keep, and the sharpness a subject must reach - and both had to be
+# reformulated as tolerances, because a table where some rows tighten upward and others downward is
+# a table where a studio cannot tell which they did. `sharpness_slack` is how far below the
+# code-owned reference floor a subject may sit; `shadow_deficit` is how much headroom may be given
+# up.
+#
+# ---------------------------------------------------------------------------
+# EVERY ROW NEEDS A REASON
+# ---------------------------------------------------------------------------
+#
+# The loader refuses a scene row whose `reason` is empty. Fourth config file in the product to
+# demand it, after phases 10, 12 and 25, and the argument is the same: a threshold nobody can
+# explain is a threshold nobody can argue with, and this table is where the product decides whether
+# a photographer's ceremony gets checked more carefully than their dance floor.
+#
+# ---------------------------------------------------------------------------
+# THE COLUMNS
+# ---------------------------------------------------------------------------
+#
+#   consistency_sigma      how many of its lighting group's own tolerances a frame may sit out
+#   signature_distance     how far its grade character may sit from its anchors'
+#   skin_de00              how far a person's skin may sit from their own gallery target
+#   skin_hue_deg           how far the grade may have moved skin's hue
+#   skin_chroma            how far it may have moved skin's chroma
+#   exposure_ev            how far the finished frame may sit from its scene band
+#   clipping_added         how much of the frame the edit may newly clip
+#   shadow_deficit         how much shadow headroom may be given up
+#   sharpness_slack        how far below the reference floor the subject may sit
+#   ringing                how much halo sharpening may have left
+#   texture_loss           how much texture denoising may have taken
+#   identity_drift         how far a recovered face may have moved from the person
+#   texture_floor_miss     how far below its floor the retouched texture band may sit
+#   naturalness_excursion  how far a micro-retouch may have moved a catchlight, hairline or teeth
+#   allowance_overspend    how much of the per-image local allowance may be overspent
+#   mask_overreach         how far an operation may exceed what its region supports
+#   cleanup_artefact       how visible a generative removal may be
+#   duplicate_hamming      how close two delivered frames may be, in difference-hash distance
+#   crop_shortfall         how far a crop may fall below its purpose's resolution floor
+#
+# ---------------------------------------------------------------------------
+# THE LOOP
+# ---------------------------------------------------------------------------
+#
+# Not per scene, and deliberately: a remedy either realised its predicted gain or it did not, which
+# is arithmetic rather than an aesthetic judgement. A dance floor does not want a different
+# definition of "this correction worked".
+#
+# These five run in mixed directions, so the loader checks each one by hand rather than by table:
+# raising `min_gain_share` and `replace_confidence` is stricter, lowering `max_collateral` and
+# `max_rounds` is stricter, and raising `replace_margin` is stricter.
+
+version = 1
+
+[loop]
+# Half of a predicted gain. Below the contract's floor and remedies that did nothing get kept.
+min_gain_share = 0.50
+# A remedy may worsen another check by a tenth of that check's own threshold and no more.
+max_collateral = 0.10
+# The one bound in this phase whose mistake a photographer cannot see: a swapped frame is a
+# photograph they never chose, and a gallery gives them no way to notice the one that is missing.
+replace_confidence = 0.85
+# A runner-up must be better by a third of the threshold. A frame that is two per cent sharper is
+# the same photograph twice, and swapping on that margin makes the gallery a function of noise.
+replace_margin = 0.35
+max_rounds = 2
+max_tickets_per_image = 8
+
+
+[[scene]]
+id = "ceremony"
+reason = """\
+  The one part of the day nobody can reshoot. Colour and skin are held tightest here because a \
+  ceremony is a long sequence a client scrolls in order, so a drift that would be invisible on \
+  one frame is a visible warm-then-cool across forty. Detail is held less tightly than colour: \
+  ceremonies are often the darkest lit part of the day and a sharpness threshold that ignored \
+  that would file a ticket on every frame."""
+consistency_sigma = 1.1
+signature_distance = 0.165
+skin_de00 = 1.65
+skin_hue_deg = 3.3
+skin_chroma = 0.055
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.3375
+ringing = 0.09
+texture_loss = 0.225
+identity_drift = 0.06
+texture_floor_miss = 0.09
+naturalness_excursion = 0.15
+allowance_overspend = 0.12
+mask_overreach = 0.15
+cleanup_artefact = 0.1
+duplicate_hamming = 4
+crop_shortfall = 0.15
+
+[[scene]]
+id = "vows"
+reason = """\
+  As the ceremony, and skin tighter still. A vows frame is nearly always a tight portrait of \
+  one face, so a skin drift has nowhere to hide and there is no background to distract from \
+  it."""
+consistency_sigma = 1.1
+signature_distance = 0.165
+skin_de00 = 1.35
+skin_hue_deg = 2.7
+skin_chroma = 0.045
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.3375
+ringing = 0.09
+texture_loss = 0.225
+identity_drift = 0.06
+texture_floor_miss = 0.09
+naturalness_excursion = 0.15
+allowance_overspend = 0.12
+mask_overreach = 0.15
+cleanup_artefact = 0.1
+duplicate_hamming = 4
+crop_shortfall = 0.15
+
+[[scene]]
+id = "rings"
+reason = """\
+  As the ceremony. Rings are a must-have in every coverage rule table, so a frame here is far \
+  more likely to be the only one of its moment - which makes a replacement unavailable and a \
+  correction the only remedy."""
+consistency_sigma = 1.1
+signature_distance = 0.165
+skin_de00 = 1.65
+skin_hue_deg = 3.3
+skin_chroma = 0.055
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.3375
+ringing = 0.09
+texture_loss = 0.225
+identity_drift = 0.06
+texture_floor_miss = 0.09
+naturalness_excursion = 0.15
+allowance_overspend = 0.12
+mask_overreach = 0.15
+cleanup_artefact = 0.1
+duplicate_hamming = 4
+crop_shortfall = 0.15
+
+[[scene]]
+id = "kiss"
+reason = """\
+  As the ceremony. The most reproduced frame of any wedding, so its colour is the colour every \
+  other frame is compared against by eye."""
+consistency_sigma = 1.1
+signature_distance = 0.165
+skin_de00 = 1.65
+skin_hue_deg = 3.3
+skin_chroma = 0.055
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.3375
+ringing = 0.09
+texture_loss = 0.225
+identity_drift = 0.06
+texture_floor_miss = 0.09
+naturalness_excursion = 0.15
+allowance_overspend = 0.12
+mask_overreach = 0.15
+cleanup_artefact = 0.1
+duplicate_hamming = 4
+crop_shortfall = 0.15
+
+[[scene]]
+id = "ritual"
+reason = """\
+  As the ceremony, with the cleanup threshold tightest in the table. A ritual frame is dense \
+  with objects that carry meaning, and phase 24 cannot tell a bin from an offering - so a \
+  removal that left any mark here is worth a person's eyes."""
+consistency_sigma = 1.1
+signature_distance = 0.165
+skin_de00 = 1.65
+skin_hue_deg = 3.3
+skin_chroma = 0.055
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.3375
+ringing = 0.09
+texture_loss = 0.225
+identity_drift = 0.06
+texture_floor_miss = 0.09
+naturalness_excursion = 0.15
+allowance_overspend = 0.12
+mask_overreach = 0.15
+cleanup_artefact = 0.06
+duplicate_hamming = 4
+crop_shortfall = 0.15
+
+[[scene]]
+id = "family_portrait"
+reason = """\
+  The strictest skin row in the table, and the strictest detail row. A family formal is looked \
+  at by more people than any other frame in the gallery, everybody in it knows what they look \
+  like, and it is the frame most often printed. Phase 19's group-fairness work runs here too: \
+  one person two stops down under a doorway is a real situation, so exposure is held tighter \
+  than colour."""
+consistency_sigma = 1.3
+signature_distance = 0.195
+skin_de00 = 1.35
+skin_hue_deg = 2.7
+skin_chroma = 0.045
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.225
+ringing = 0.06
+texture_loss = 0.15
+identity_drift = 0.04
+texture_floor_miss = 0.0825
+naturalness_excursion = 0.1375
+allowance_overspend = 0.11
+mask_overreach = 0.1375
+cleanup_artefact = 0.1
+duplicate_hamming = 3
+crop_shortfall = 0.15
+
+[[scene]]
+id = "group_portrait"
+reason = """\
+  As the family portrait. Group frames carry the identity-coverage guarantee, so an \
+  under-covered person surfaces here before anywhere else."""
+consistency_sigma = 1.3
+signature_distance = 0.195
+skin_de00 = 1.35
+skin_hue_deg = 2.7
+skin_chroma = 0.045
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.225
+ringing = 0.06
+texture_loss = 0.15
+identity_drift = 0.04
+texture_floor_miss = 0.0825
+naturalness_excursion = 0.1375
+allowance_overspend = 0.11
+mask_overreach = 0.1375
+cleanup_artefact = 0.1
+duplicate_hamming = 3
+crop_shortfall = 0.15
+
+[[scene]]
+id = "couple_portrait"
+reason = """\
+  As the family portrait for skin and detail. Colour is a shade looser because couple \
+  portraits are often shot deliberately warmer than the rest of a chapter, and a threshold \
+  that ignored that would report a photographer's own intent as a drift."""
+consistency_sigma = 1.6
+signature_distance = 0.24
+skin_de00 = 1.35
+skin_hue_deg = 2.7
+skin_chroma = 0.045
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.225
+ringing = 0.06
+texture_loss = 0.15
+identity_drift = 0.04
+texture_floor_miss = 0.0825
+naturalness_excursion = 0.1375
+allowance_overspend = 0.11
+mask_overreach = 0.1375
+cleanup_artefact = 0.1
+duplicate_hamming = 3
+crop_shortfall = 0.15
+
+[[scene]]
+id = "first_look"
+reason = """\
+  As the couple portrait. A first look is one moment photographed once, so a replacement is \
+  rarely available and a correction has to work."""
+consistency_sigma = 1.6
+signature_distance = 0.24
+skin_de00 = 1.35
+skin_hue_deg = 2.7
+skin_chroma = 0.045
+exposure_ev = 0.6
+clipping_added = 0.03
+shadow_deficit = 0.21
+sharpness_slack = 0.225
+ringing = 0.06
+texture_loss = 0.15
+identity_drift = 0.04
+texture_floor_miss = 0.0825
+naturalness_excursion = 0.1375
+allowance_overspend = 0.11
+mask_overreach = 0.1375
+cleanup_artefact = 0.1
+duplicate_hamming = 3
+crop_shortfall = 0.15
+
+[[scene]]
+id = "getting_ready_bride"
+reason = """\
+  Mixed light is the norm here - a window, a lamp and a mirror in one frame - so the colour \
+  threshold is loosened against the portrait rows rather than tightened. Skin stays fairly \
+  tight because the frames are close and the light is soft."""
+consistency_sigma = 1.4
+signature_distance = 0.21
+skin_de00 = 2.1
+skin_hue_deg = 4.2
+skin_chroma = 0.07
+exposure_ev = 0.7
+clipping_added = 0.035
+shadow_deficit = 0.245
+sharpness_slack = 0.27
+ringing = 0.072
+texture_loss = 0.18
+identity_drift = 0.048
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "getting_ready_groom"
+reason = """\
+  As the bride's preparation, for the same reasons."""
+consistency_sigma = 1.4
+signature_distance = 0.21
+skin_de00 = 2.1
+skin_hue_deg = 4.2
+skin_chroma = 0.07
+exposure_ev = 0.7
+clipping_added = 0.035
+shadow_deficit = 0.245
+sharpness_slack = 0.27
+ringing = 0.072
+texture_loss = 0.18
+identity_drift = 0.048
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "first_dance"
+reason = """\
+  A first dance is lit by whatever the venue owns, often coloured and often moving, so \
+  consistency is loosened: phase 15's own coloured-light flag exists because a magenta \
+  uplighter is a choice rather than a cast. Detail is loosened for the same reason a dance \
+  floor's is."""
+consistency_sigma = 1.7
+signature_distance = 0.255
+skin_de00 = 2.1
+skin_hue_deg = 4.2
+skin_chroma = 0.07
+exposure_ev = 0.7
+clipping_added = 0.035
+shadow_deficit = 0.245
+sharpness_slack = 0.3825
+ringing = 0.102
+texture_loss = 0.255
+identity_drift = 0.068
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "speeches"
+reason = """\
+  Speeches are long, static and unrepeatable, and a speaker's face is the whole frame - so \
+  skin is held nearly as tightly as a portrait's while colour is loosened for the room's own \
+  lighting."""
+consistency_sigma = 1.4
+signature_distance = 0.21
+skin_de00 = 1.65
+skin_hue_deg = 3.3
+skin_chroma = 0.055
+exposure_ev = 0.7
+clipping_added = 0.035
+shadow_deficit = 0.245
+sharpness_slack = 0.27
+ringing = 0.072
+texture_loss = 0.18
+identity_drift = 0.048
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "cake"
+reason = """\
+  The cake is a coverage must-have and a detail shot at once. Detail is tight because the \
+  frame is about texture; colour is middling because the light is usually the room's."""
+consistency_sigma = 1.4
+signature_distance = 0.21
+skin_de00 = 2.1
+skin_hue_deg = 4.2
+skin_chroma = 0.07
+exposure_ev = 0.7
+clipping_added = 0.035
+shadow_deficit = 0.245
+sharpness_slack = 0.225
+ringing = 0.06
+texture_loss = 0.15
+identity_drift = 0.04
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "golden_hour"
+reason = """\
+  Golden hour is the one chapter where a strong colour cast is the point, so consistency is \
+  the loosest of any people-bearing scene. Skin is held at the portrait level anyway: warm \
+  light is a choice and orange skin is not."""
+consistency_sigma = 2.0
+signature_distance = 0.3
+skin_de00 = 1.5
+skin_hue_deg = 3.0
+skin_chroma = 0.05
+exposure_ev = 0.7
+clipping_added = 0.035
+shadow_deficit = 0.245
+sharpness_slack = 0.27
+ringing = 0.072
+texture_loss = 0.18
+identity_drift = 0.048
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "ceremony_entrance"
+reason = """\
+  An entrance is a fast sequence in changing light, often through a doorway. Colour and \
+  exposure are loosened against the ceremony's; sharpness is loosened because the subject is \
+  moving."""
+consistency_sigma = 1.4
+signature_distance = 0.21
+skin_de00 = 2.1
+skin_hue_deg = 4.2
+skin_chroma = 0.07
+exposure_ev = 0.7
+clipping_added = 0.035
+shadow_deficit = 0.245
+sharpness_slack = 0.27
+ringing = 0.072
+texture_loss = 0.18
+identity_drift = 0.048
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "reception_entrance"
+reason = """\
+  As the ceremony entrance, with the room's own lighting rather than the venue's daylight."""
+consistency_sigma = 1.4
+signature_distance = 0.21
+skin_de00 = 2.1
+skin_hue_deg = 4.2
+skin_chroma = 0.07
+exposure_ev = 0.7
+clipping_added = 0.035
+shadow_deficit = 0.245
+sharpness_slack = 0.27
+ringing = 0.072
+texture_loss = 0.18
+identity_drift = 0.048
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "exit"
+reason = """\
+  A sparkler or confetti exit is dark, fast and lit by whatever is burning. The loosest detail \
+  row that still bears people, and the loosest exposure row in the table - a frame here that \
+  is a stop out is a frame that was shot in the dark."""
+consistency_sigma = 1.4
+signature_distance = 0.21
+skin_de00 = 2.1
+skin_hue_deg = 4.2
+skin_chroma = 0.07
+exposure_ev = 0.95
+clipping_added = 0.0475
+shadow_deficit = 0.3325
+sharpness_slack = 0.4275
+ringing = 0.114
+texture_loss = 0.285
+identity_drift = 0.076
+texture_floor_miss = 0.105
+naturalness_excursion = 0.175
+allowance_overspend = 0.14
+mask_overreach = 0.175
+cleanup_artefact = 0.12
+duplicate_hamming = 6
+crop_shortfall = 0.18
+
+[[scene]]
+id = "details"
+reason = """\
+  Objects rather than people, so every skin and retouch threshold sits at the ceiling and \
+  never fires. Detail is the tightest in the table: a detail shot that is soft is a detail \
+  shot that failed, and there is nothing else in the frame to carry it."""
+consistency_sigma = 1.7
+signature_distance = 0.255
+skin_de00 = 3.0
+skin_hue_deg = 6.0
+skin_chroma = 0.1
+exposure_ev = 0.85
+clipping_added = 0.0425
+shadow_deficit = 0.2975
+sharpness_slack = 0.2475
+ringing = 0.066
+texture_loss = 0.165
+identity_drift = 0.044
+texture_floor_miss = 0.15
+naturalness_excursion = 0.25
+allowance_overspend = 0.2
+mask_overreach = 0.25
+cleanup_artefact = 0.15
+duplicate_hamming = 5
+crop_shortfall = 0.21
+
+[[scene]]
+id = "venue"
+reason = """\
+  As the details row. Venue frames are architecture, so the sharpness and crop thresholds do \
+  the work and the skin ones are inert."""
+consistency_sigma = 1.7
+signature_distance = 0.255
+skin_de00 = 3.0
+skin_hue_deg = 6.0
+skin_chroma = 0.1
+exposure_ev = 0.85
+clipping_added = 0.0425
+shadow_deficit = 0.2975
+sharpness_slack = 0.315
+ringing = 0.084
+texture_loss = 0.21
+identity_drift = 0.056
+texture_floor_miss = 0.15
+naturalness_excursion = 0.25
+allowance_overspend = 0.2
+mask_overreach = 0.25
+cleanup_artefact = 0.15
+duplicate_hamming = 5
+crop_shortfall = 0.21
+
+[[scene]]
+id = "dance_floor"
+reason = """\
+  The loosest row in the table, and section 6.1 names it: a dance floor tolerates more than a \
+  family formal. It is shot at the highest ISO of the day under lights that change colour \
+  every second, and a threshold set for a ceremony would bury the queue in tickets nobody \
+  would act on. Duplicates sit at the ceiling because a dance floor is where two frames a \
+  second apart genuinely differ."""
+consistency_sigma = 1.8
+signature_distance = 0.27
+skin_de00 = 2.4
+skin_hue_deg = 4.8
+skin_chroma = 0.08
+exposure_ev = 0.9
+clipping_added = 0.045
+shadow_deficit = 0.315
+sharpness_slack = 0.4275
+ringing = 0.114
+texture_loss = 0.285
+identity_drift = 0.076
+texture_floor_miss = 0.12
+naturalness_excursion = 0.2
+allowance_overspend = 0.16
+mask_overreach = 0.2
+cleanup_artefact = 0.15
+duplicate_hamming = 6
+crop_shortfall = 0.255
+
+[[scene]]
+id = "candid"
+reason = """\
+  Candids are shot anywhere in any light, so nothing here can be assumed. Held midway between \
+  the dance floor and the portraits, with skin the tightest of its columns because a candid is \
+  still a photograph of somebody."""
+consistency_sigma = 1.8
+signature_distance = 0.27
+skin_de00 = 1.95
+skin_hue_deg = 3.9
+skin_chroma = 0.065
+exposure_ev = 0.9
+clipping_added = 0.045
+shadow_deficit = 0.315
+sharpness_slack = 0.315
+ringing = 0.084
+texture_loss = 0.21
+identity_drift = 0.056
+texture_floor_miss = 0.12
+naturalness_excursion = 0.2
+allowance_overspend = 0.16
+mask_overreach = 0.2
+cleanup_artefact = 0.15
+duplicate_hamming = 6
+crop_shortfall = 0.255
+
+[[scene]]
+id = "unknown"
+reason = """\
+  The abstention, and deliberately the most permissive row in the table. A frame phase 07 \
+  could not classify is a frame this phase has no scene-conditioned opinion about, and a \
+  ticket the product cannot justify is worse than a finding it did not make. Invariant 7 is \
+  satisfied by every other row having an argument; this one's argument is that there is none."""
+consistency_sigma = 2.0
+signature_distance = 0.3
+skin_de00 = 3.0
+skin_hue_deg = 6.0
+skin_chroma = 0.1
+exposure_ev = 1.0
+clipping_added = 0.05
+shadow_deficit = 0.35
+sharpness_slack = 0.45
+ringing = 0.12
+texture_loss = 0.3
+identity_drift = 0.08
+texture_floor_miss = 0.15
+naturalness_excursion = 0.25
+allowance_overspend = 0.2
+mask_overreach = 0.25
+cleanup_artefact = 0.2
+duplicate_hamming = 6
+crop_shortfall = 0.3

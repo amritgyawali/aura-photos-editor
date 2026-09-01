@@ -403,6 +403,28 @@ phase-26-verify:
 camera-eval CATALOG:
     python ml/eval/camera_match_eval.py {{CATALOG}}
 
+# The phase 27 gate. Migration 27 with its four triggers, the thresholds table a studio may
+# only tighten, twenty-one injected defects caught and two hundred clean frames left alone,
+# the ticket cap, the root-cause-first triage, a swap refused before it is scored because it
+# would break a coverage guarantee, a report that leads with what it checked, a photographer's
+# verdict that automation cannot overwrite, and the three-way IPC count. It prints what it
+# does not prove at the end of every run - see docs/progress/PHASE-27-EXIT.md conditions C1
+# to C4.
+phase-27-verify:
+    cargo run --release --package aura-cli -- verify --phase 27 --work target/phase27-verify
+
+# The phase 27 gate from the catalog side. Reads a real project read-only and reports the
+# inspection completeness, the false-ticket rate against findings somebody actually reviewed,
+# what the re-edit loop kept, and any stored row that broke a bound the contract owns. It is
+# the only thing in this repository that can measure agreement with a person, because a
+# fixture cannot disagree.
+qc-eval CATALOG:
+    python ml/eval/qc_agreement.py {{CATALOG}}
+
+# The same, against a chosen answer.
+qc-selftest:
+    python ml/eval/qc_agreement.py --self-test
+
 # The same, against a chosen answer. There are no multi-camera weddings in this
 # repository, so this is what CI runs.
 camera-selftest:

@@ -37,6 +37,11 @@ aura-generative    = { path = "../aura-generative" }
 aura-recipe        = { path = "../aura-recipe" }
 aura-render        = { path = "../aura-render" }
 aura-style         = { path = "../aura-style" }
+# PHASE-27. The quality-control agent. `aura-qc` depends on none of the thirteen deciding
+# crates; `AppState::qc_frame` is the adapter that reads them on its behalf, and `qc_commands`
+# is where its `Field` port is implemented. That indirection is what stops `aura-brain-photo`
+# depending on the crate that judges it.
+aura-qc            = { path = "../aura-qc" }
 blake3.workspace      = true
 rusqlite.workspace    = true
 serde.workspace       = true

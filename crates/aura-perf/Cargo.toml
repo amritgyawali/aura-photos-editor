@@ -22,6 +22,8 @@ aura-cloud.path    = "../aura-cloud"
 aura-index.path    = "../aura-index"
 aura-infer.path    = "../aura-infer"
 aura-brain-gallery = { path = "../aura-brain-gallery" }
+# PHASE-27. Section 11's four rows plus the storage figure the phase document does not name.
+aura-qc      = { path = "../aura-qc" }
 aura-brain-wedding = { path = "../aura-brain-wedding" }
 aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-retouch       = { path = "../aura-retouch" }

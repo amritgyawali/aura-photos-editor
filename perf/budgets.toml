@@ -1265,3 +1265,68 @@ max_ms_per_unit = 25000
 # rule covers the sentence as well as the number.
 [size.camera_store_per_1000_images]
 max_bytes = 150000
+
+# ---------------------------------------------------------------------------
+# PHASE-27 - the quality-control agent
+# ---------------------------------------------------------------------------
+#
+# Section 11 names four rows. Three are timings and the fourth is a bound rather than a measurement:
+# forty planner calls per wedding, which is a constant in `aura_core::contract::qc` and a CHECK in
+# migration 27 rather than anything a studio can configure.
+#
+# The pass row is comfortably met and that is worth explaining rather than celebrating. **No check
+# in this phase opens a photograph**: every inspection is a comparison between numbers phases 08 to
+# 26 already measured and stored, so a pass is arithmetic over rows plus one catalog write. Measured
+# at 10 ms for 200 frames, which is 50 ms per thousand against a 90,000 ms budget.
+#
+# That headroom is a property of the design rather than a margin to spend. A future change that
+# reached for the renderer to measure something directly would blow this row by two orders of
+# magnitude, and `crates/aura-qc/tests/no_pixel_ops.rs` is the grep that stops it landing quietly.
+[stage.qc_pass_per_1000_images]
+max_elapsed_ms  = 90000
+max_ms_per_unit = 90000
+
+# The loop's own arithmetic - re-inspection plus the collateral re-check - with the remedy itself
+# instantaneous. The real cost of a round is the deciding phase's re-solve, which is that phase's
+# budget rather than this one's.
+[stage.qc_round]
+max_elapsed_ms  = 1200
+max_ms_per_unit = 1200
+
+[stage.qc_report]
+max_elapsed_ms  = 3000
+max_ms_per_unit = 3000
+
+# Section 11 names no storage row. One is measured anyway, and this phase's shape is **phase 21's
+# rather than phase 09's**: every migration from 09 to 26 stores one fixed-width verdict per
+# photograph, and this stores a list whose length is the number of things that were wrong with the
+# frame.
+#
+# Phase 21 learned that a per-image figure written before it is measured is wrong by a factor of
+# two, so this one is measured on a deliberately terrible gallery - every frame carrying a finding -
+# rather than on the happy path. Measured:
+#
+#   qc_ticket                      421 B/image   one finding on every frame
+#   qc_round                         0 B/image   inspection only, no remediation ran
+#   qc_replacement                   0 B/image
+#   qc_run                          <1 B/image   one row per project
+#                                 --------
+#   measured total                 421 B/image over 400 photographs
+#
+# A clean gallery measures **1 B/image**: one `qc_run` row and nothing else.
+#
+# The budget is 1,500 and the headroom is named rather than generous. A ticket that went through the
+# loop owns up to two round rows and possibly a replacement row, so one ticket per image with both
+# rounds and a swap measures about 1,100 B/image - the worst case a real gallery could reach.
+#
+# The structural ceiling is higher and is **bounded rather than open**: `MAX_TICKETS_PER_IMAGE` is
+# eight and `MAX_ROUNDS` is two, so one photograph owns at most eight tickets, sixteen rounds and
+# eight replacements - about 7.8 kB. Nothing reaches it, because a frame with eight findings
+# escalates whole as `MultiSymptom`. The test asserts the *bound* as well as the number, which is
+# the assertion phase 26 had to add after realising a size check alone would pass on a build that
+# had removed its cap.
+#
+# The denominator is **selected frames** rather than photographs. Phase 18 established that: a QC
+# check over a frame nobody is delivering is not an inspection anybody asked for.
+[size.qc_store_per_1000_images]
+max_bytes = 1500000
