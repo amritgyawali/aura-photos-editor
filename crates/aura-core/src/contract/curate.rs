@@ -1517,6 +1517,36 @@ impl CurateCode {
         }
     }
 
+    /// True when this code says the product **could not check something**.
+    ///
+    /// Six of the thirty-nine, and they are a different kind of statement from the other
+    /// thirty-three. `SpreadTonalGap` says a measurement came out badly; `SpreadFacingUnknown` says
+    /// there was no measurement. `FacingNearDuplicateRefused` says a rule fired, which is the
+    /// product working; `UniquenessUnavailable` says a rule could not be evaluated, which is the
+    /// product admitting a gap.
+    ///
+    /// It exists because of what happens to a reason list at [`MAX_REASONS`]. A pick with four
+    /// strong arguments in its favour and one caveat truncates the caveat away, so the *only* frames
+    /// that would show "AURA could not tell how similar this is to the rest" are the frames with
+    /// nothing else to say - which is exactly backwards. `aura_curate::explain::rank_reasons`
+    /// reserves a slot for the strongest caveat, and this is the predicate it reads.
+    ///
+    /// Phase 24 wrote the rule this serves - an absent input is ignorance, not permission - and
+    /// phase 27 wrote its second half, that clean and skipped are different values. This is the
+    /// third: a skip that a stronger reason can hide is a skip nobody sees.
+    #[must_use]
+    pub const fn is_caveat(self) -> bool {
+        matches!(
+            self,
+            Self::SkinLocusUnavailable
+                | Self::UniquenessUnavailable
+                | Self::RhythmUnmeasurable
+                | Self::SpreadFacingUnknown
+                | Self::AspectVariantAbsent
+                | Self::SlotUnfilled
+        )
+    }
+
     /// Which of the five groups this code belongs to.
     ///
     /// The panel groups by this, and the phase gate asserts that every group has at least one code
@@ -2301,6 +2331,22 @@ mod tests {
             assert_eq!(CurateCode::parse(code.as_str()).unwrap(), code);
         }
         assert_eq!(CurateCode::ALL.len(), CurateCode::COUNT);
+    }
+
+    #[test]
+    fn a_caveat_says_nothing_was_checked_and_a_refusal_says_a_rule_fired() {
+        // The distinction the reason list's reserved slot depends on.
+        assert!(CurateCode::SpreadFacingUnknown.is_caveat());
+        assert!(CurateCode::UniquenessUnavailable.is_caveat());
+        assert!(CurateCode::SkinLocusUnavailable.is_caveat());
+        // A rule that fired is the product working, not a gap in it.
+        assert!(!CurateCode::FacingNearDuplicateRefused.is_caveat());
+        assert!(!CurateCode::SpreadTonalGap.is_caveat());
+        assert!(!CurateCode::CaptionRefused.is_caveat());
+        assert!(!CurateCode::TechnicalVeto.is_caveat());
+
+        let caveats = CurateCode::ALL.iter().filter(|c| c.is_caveat()).count();
+        assert_eq!(caveats, 6);
     }
 
     #[test]

@@ -283,6 +283,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-curate"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-cloud",
+ "aura-core",
+ "aura-index",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "tracing",
+]
+
+[[package]]
 name = "aura-explain"
 version = "0.1.0"
 dependencies = [

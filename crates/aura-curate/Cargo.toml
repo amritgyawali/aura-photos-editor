@@ -1,0 +1,61 @@
+[package]
+name         = "aura-curate"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Curation: monochrome suitability with a per-person measured skin band, portfolio heroes under three diversity constraints, an album sequenced inside inviolable chapter order, social and teaser sets, and captions from a closed vocabulary (phase 29)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# PHASE-29. Phase 05's frozen `SimilarityIndex`, `ImageEmbedding` and `LumaStats`. Uniqueness is
+# section 6.2's fourth hero term and the near-duplicate refusal is section 10.1's own property test,
+# and both are questions about what a photograph looks like as a vector - which phase 05's rule says
+# there is exactly one way to ask. The descriptors this crate reads were computed once, by phase 05,
+# which is the other half of that rule.
+aura-index   = { path = "../aura-index" }
+# PHASE-29. The album sequencing and caption task of section 7. `CloudTask` is the only route to a
+# model provider in this product - phase 04's rule, enforced by `scripts/check-banned.sh` - and the
+# task in `sequence.rs` implements it. Its answers are *proposals*: a move is applied only when the
+# local objective agrees it is an improvement, and a caption only when it passes the same closed
+# vocabulary the local template passes by construction.
+aura-cloud   = { path = "../aura-cloud" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+
+# Deliberately absent: `aura-recipe`, `aura-render`, `aura-preview`, `aura-raw`, and every one of the
+# deciding crates from `aura-brain-photo` to `aura-qc`.
+#
+# `aura-recipe` and `aura-render` are absent for a reason sharper here than in `aura-geometry`,
+# `aura-generative`, `aura-brain-gallery` or `aura-qc`. This phase proposes a **monochrome
+# conversion**, which is the one thing in the product that would be trivial to just apply: the `bw`
+# block phase 14 froze is two fields, `schema::merge` is one call away, and a photographer would see
+# a beautiful result. That is exactly the product deciding a wedding is monochrome, and section 6.1
+# says not to. `tests/no_outputs.rs` fails the build if this crate ever calls `merge`, opens a file,
+# or grows a renderer.
+#
+# `aura-preview` and `aura-raw` are absent because **nothing in this phase opens a photograph**.
+# Every reading is a number some earlier phase measured and stored - which is what makes a whole
+# gallery affordable inside section 11's 20 s budget, and what makes each selector a pure function a
+# test can drive with a literal.
+#
+# The deciding crates are absent because everything this phase needs from them it takes through the
+# frozen traits in `aura-core`, assembled by `aura-app` into the `Field` port. A dependency in this
+# direction would also be a cycle waiting to happen: `aura-cull` decides what is delivered and this
+# crate curates what `aura-cull` chose, so the two must never be able to see each other.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
+# `tests/eval/` beside the phase 05 to 27 harnesses rather than in this crate's own `tests/`,
+# because a gate is a claim about the product and not about a crate.
+[[test]]
+name = "curate_eval"
+path = "../../tests/eval/curate_eval.rs"

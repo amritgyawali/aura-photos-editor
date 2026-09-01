@@ -1,0 +1,200 @@
+# Curation policy. PHASE-29 section 4, owned by the Product Manager Agent.
+#
+# Every number here is a **product decision** and carries a written reason, which is the rule phase
+# 10 established for `emotion_weights.toml` and every PM-owned table since has followed.
+#
+# This file may **tighten** a bound the contract owns and may never widen one. `aura_curate::policy`
+# refuses the file otherwise and the pass halts rather than falling back on defaults: curation is a
+# taste decision, this file is where a studio's taste lives, and an album composed from numbers
+# nobody chose is a proposal a photographer would trust for the wrong reason. `AURA-ML-5145`.
+#
+# There is no skin target anywhere in this file and no key one could go in. The band a monochrome
+# mix protects is looked up per identity from phase 15's measured skin loci; the loader scans this
+# file for a key naming one and refuses it. `docs/skin-fairness.md`.
+#
+# There is no strength anywhere in this file either. Section 6.1 asks for a tailored mix per frame
+# rather than a preset, and a preset scaled by a number is a preset.
+
+policy_ver = 1
+
+# ---------------------------------------------------------------------------
+# Album shape
+# ---------------------------------------------------------------------------
+
+[album]
+# The default album a photographer gets without asking. Eighty of the contract's 60-120, at the
+# middle: a forty-spread book is what most studios price as their standard, and a default at either
+# end of the range would make the common case a number somebody had to change.
+default_size = 80
+# A studio may narrow this range and may not widen it past ALBUM_MIN/ALBUM_MAX.
+min_size = 60
+max_size = 120
+
+# How many passes the rhythm-and-pairing optimiser makes. Four, and bounded rather than converged
+# because invariant 4 requires the same gallery to produce the same album on every machine.
+#
+# Four rather than two because the first pass fixes pairings and the second is where rhythm starts
+# improving; and rather than eight because measurement on the fixtures shows the third and fourth
+# passes changing under two per cent of spreads and the fifth changing none.
+swap_passes = 4
+
+# What a spread's pairing score is made of. Four terms, summing to 1.0.
+#
+# Tonal weight is the heaviest because it is the one a photographer notices from across a room: a
+# dark frame facing a bright one reads as a mistake before anybody has looked at either. Direction
+# is third rather than first because it is the term this build can least often measure - phase 06's
+# detector finds no faces - and a heavy weight on a term that is usually absent would make the
+# pairing score mostly a renormalisation artefact.
+[album.pairing]
+tonal     = 0.40   # "one of these is much darker than the other" is the complaint people make
+warmth    = 0.25   # after phase 25's normalisation this is the residual disagreement about the room
+direction = 0.20   # subjects looking inward, which is what album designers spend their time on
+variety   = 0.15   # two frames that are alike but not duplicates still make a dull spread
+
+# ---------------------------------------------------------------------------
+# Chapter importance
+# ---------------------------------------------------------------------------
+#
+# How many of the album's spreads each part of the day is worth, before duration is taken into
+# account. The allocator multiplies importance by the chapter's share of the gallery, so a long
+# reception still gets more pages than a short one - this decides how much a *minute* of each
+# chapter is worth.
+#
+# The ceremony is the highest because it is the part of the day the album is about, and because it
+# is the part a couple looks at in ten years. Details is the lowest of the eight real chapters, not
+# because detail photography is unimportant but because a page of it goes a long way and four do
+# not.
+
+[chapters]
+getting_ready = 0.9   # anticipation, and the only part of the day with two separate stories in it
+details       = 0.6   # a page of rings and shoes reads beautifully; four pages read as filler
+ceremony      = 1.6   # what the album is about
+rituals       = 1.5   # a named rite is the single most requested album page in every tradition
+portraits     = 1.3   # the photographs the couple will hang on a wall
+reception     = 1.0   # long, and mostly people eating; duration already gives it pages
+dance         = 1.1   # short and high-energy, so it needs more per minute than the reception
+exit          = 0.8   # one spread, almost always, and it ends the book
+other         = 0.5   # real, and unnamed; it gets pages when there is nothing better
+
+# ---------------------------------------------------------------------------
+# Rhythm
+# ---------------------------------------------------------------------------
+#
+# The target pattern of shot scales per chapter, repeated cyclically along the chapter's spreads.
+# Section 6.3: "alternate wide establishing, medium action and tight emotional frames using a target
+# pattern per chapter".
+#
+# Frames whose scale could not be measured are excluded from the score's denominator rather than
+# counted as misses, so a chapter of unmeasurable frames scores nothing rather than zero.
+#
+# The patterns differ because the chapters do. Getting ready opens wide and closes tight because
+# that is how the morning actually goes. The ceremony alternates because a reader needs to be
+# reminded where they are. The dance floor is nearly all wide, because a dance floor photographed
+# tight is a photograph of an elbow.
+
+[rhythm]
+getting_ready = ["wide", "medium", "tight", "tight"]
+details       = ["tight", "tight", "medium"]
+ceremony      = ["wide", "medium", "tight", "medium"]
+rituals       = ["medium", "tight", "wide", "tight"]
+portraits     = ["medium", "tight", "wide"]
+reception     = ["wide", "medium", "medium", "tight"]
+dance         = ["wide", "wide", "medium", "tight"]
+exit          = ["wide", "medium"]
+other         = ["medium", "wide", "tight"]
+
+# ---------------------------------------------------------------------------
+# Heroes
+# ---------------------------------------------------------------------------
+
+[hero]
+# How many the portfolio holds. Twenty, which is section 10.1's own number: the headline gate is
+# "top-20 overlap with photographer picks", and any other value would make the phase's own KPI
+# unmeasurable against its own output.
+target = 20
+# The most one chapter may contribute. Four of twenty is a fifth of a portfolio from one part of the
+# day, which is the largest share that still leaves room for the other eight chapters.
+per_chapter = 4
+# The most heroes that may share one measured shot scale, as a share. Sixty per cent: a portfolio
+# that is two thirds close-ups is a portfolio of faces, and a photographer being judged on it is
+# being judged on one skill.
+#
+# Frames whose scale could not be measured do not count toward this, because an unmeasurable frame
+# is not a scale.
+scale_share = 0.6
+# A studio may demand sharper portfolio work and may never demand softer. Below HERO_TECHNICAL_FLOOR
+# the file is refused.
+technical_floor = 0.55
+
+# The five terms of section 6.2, summing to 1.0. A **weighted arithmetic blend** under a veto rather
+# than phase 12's geometric mean, and ADR-0059 section 6 has the argument: every candidate here is
+# already a keeper, so a second multiplicative penalty would re-rank a technically sound set by
+# technical quality again and produce a portfolio of the sharpest photographs rather than the best.
+#
+# Emotion is the heaviest because a portfolio is how a photographer is hired, and people are hired
+# for the photographs that made somebody cry. Technical is the lightest of the five *because it is
+# already a veto*: it has decided who is in the room, and weighting it heavily again would decide
+# the order too.
+[hero.weights]
+technical   = 0.12   # already a veto; this is the tiebreak between two frames that both passed
+emotion     = 0.34   # what a portfolio is for
+composition = 0.24   # the second thing anybody looks at, and the first thing another photographer does
+uniqueness  = 0.18   # eight versions of the kiss is not a portfolio
+story       = 0.12   # a frame from a moment that mattered beats an identical one from a moment that did not
+
+# ---------------------------------------------------------------------------
+# Monochrome
+# ---------------------------------------------------------------------------
+
+[bw]
+# The lowest suitability at which a frame is offered. A studio may raise this and may not lower it
+# below BW_CANDIDATE_FLOOR.
+#
+# High on purpose. Section 10.1's gate is that B&W picks are accepted at 70 %, which is a statement
+# about the offered set: a threshold this high produces a short list a photographer looks through,
+# and a low one produces four hundred candidates and an acceptance rate measured on a list nobody
+# read to the end.
+candidate_floor = 0.62
+
+# Below this tonal separation the frame is not offered at all, whatever else is true of it.
+# Desaturating a frame whose separation is all in the colour flattens it, and a flat frame offered
+# as a monochrome candidate is the suggestion that makes a photographer stop reading the list.
+flat_floor = 0.30
+
+# The five terms of section 6.1, summing to 1.0.
+#
+# Tonal separation is the heaviest because it is the one that decides whether the conversion *works*
+# at all; the other four decide whether it is worth doing. Grain is the lightest because it is a
+# reason to be comfortable with monochrome rather than a reason to choose it.
+[bw.weights]
+tonal_separation   = 0.38   # whether the conversion works
+colour_distraction = 0.24   # the most common reason a photographer reaches for monochrome
+gesture            = 0.16   # a frame carried by what people are doing loses least by losing colour
+emotion            = 0.14   # a strong moment survives the conversion
+grain              = 0.08   # a reason not to worry, rather than a reason to convert
+
+# ---------------------------------------------------------------------------
+# Social and teaser
+# ---------------------------------------------------------------------------
+
+[social]
+# How many frames the story set holds. Eight rather than ten: a story set is watched through once at
+# about five seconds a frame, and past forty seconds the last frames are seen by nobody.
+story_size = 8
+
+# What thumbnail legibility is made of, summing to 1.0. Section 6.4: "strong subject, clear
+# silhouette at small size".
+#
+# Subject size is the heaviest because at 150 px it is the only thing that survives. Clutter is
+# second and negative for a reason a photographer will recognise: a busy background at full size is
+# context and at thumbnail size it is noise.
+[social.legibility]
+subject_size    = 0.40
+subject_sharp   = 0.25
+uncluttered     = 0.20
+negative_space  = 0.15
+
+[teaser]
+# How many the wedding-night set holds. Eighteen of the contract's 15-30: section 6.4 names six
+# slots, and three frames a slot is a set somebody can send from a phone in a car park.
+size = 18
