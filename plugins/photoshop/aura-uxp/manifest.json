@@ -1,0 +1,33 @@
+{
+  "manifestVersion": 5,
+  "id": "com.aura.wedding.photoshop",
+  "name": "AURA Wedding AI",
+  "version": "1.0.0",
+  "main": "index.html",
+  "host": [
+    {
+      "app": "PS",
+      "minVersion": "24.0.0",
+      "data": {
+        "apiVersion": 2
+      }
+    }
+  ],
+  "entrypoints": [
+    {
+      "type": "command",
+      "id": "auraOpenDelivery",
+      "label": {
+        "default": "Open an AURA delivery"
+      }
+    }
+  ],
+  "requiredPermissions": {
+    "localFileSystem": "request",
+    "launchProcess": {
+      "schemes": [],
+      "extensions": []
+    }
+  },
+  "icons": []
+}

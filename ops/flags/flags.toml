@@ -1,0 +1,100 @@
+# Feature flags and kill switches. DEVOPS-owned, read at start-up, refused rather than defaulted.
+#
+# ## Why the application halts when this file cannot be read
+#
+# A feature-flag file is the kill switch for every AI stage in the product. A build that could not
+# read it and started anyway would be a build running stages somebody had switched off - which is
+# the exact situation the switch exists for, and the exact situation in which nobody is watching.
+# `AURA-REL-12003`, severity `run_blocking`.
+#
+# ## A studio may only switch a stage OFF
+#
+# The loader refuses a file that enables a stage this build does not have. That is the shape phases
+# 21 to 29 established for every policy table in the product - a studio may tighten and never widen
+# - and here it means a flags file cannot turn on a half-built feature by naming it.
+#
+# ## Every stage has a switch, and the switch is the rollback
+#
+# Section 6.4 asks for "feature flags with kill switches for every AI stage" and section 14's
+# rollback path is "feature flag off, previous model version pinnable, catalog migration
+# reversible". This file is the first of those three. A stage switched off leaves its rows exactly
+# as they are and produces `SkipCause::FeatureFlagOff` on the next autopilot run.
+
+version = 1
+
+# The channel this build is on. `stable`, `beta` or `nightly`. A staged rollout moves a percentage
+# of installs from one to the next; nothing here decides that, and `ops/update/` does.
+channel = "stable"
+
+# ---------------------------------------------------------------------------
+# The AI stages, in pipeline order. Every one of them can be switched off.
+# ---------------------------------------------------------------------------
+
+[stages]
+# Phases 05 to 08: what a photograph looks like, who is in it, what it is of, what was shot once.
+embed          = true
+people         = true
+scenes         = true
+moments        = true
+
+# Phases 09 to 12: whether the frame worked, what it is worth, how it is framed, what is delivered.
+integrity      = true
+emotion        = true
+composition    = true
+cull           = true
+
+# Phases 14 to 17: how it is developed.
+develop        = true
+tone           = true
+colour         = true
+style          = true
+
+# Phases 18 to 24: what is done to the pixels.
+masks          = true
+local_light    = true
+retouch        = true
+micro_retouch  = true
+restoration    = true
+geometry       = true
+# **Off by default**, and this is the only stage in the table that is. Generative cleanup replaces
+# pixels that were in the photograph with pixels that were not, and section 2.2 of phase 24 is a
+# list of what it must never do. A studio switches it on deliberately or not at all.
+cleanup        = false
+
+# Phases 25 to 29: the gallery as a body of work.
+consistency    = true
+camera_match   = true
+qc             = true
+autopilot      = true
+curation       = true
+
+# Phase 30.
+export         = true
+delivery       = true
+# **Off by default.** The learning loop changes what the product will do to the *next* wedding, and
+# a photographer who has not been asked should not be teaching it. Consent is per project on top of
+# this; both have to be on.
+learning       = false
+
+# ---------------------------------------------------------------------------
+# Cloud AI. Section 7 of phase 30: this phase makes no cloud call, and the switch is here so a
+# studio with a policy against it can be sure.
+# ---------------------------------------------------------------------------
+
+[cloud]
+enabled        = false
+# Even when enabled, these three tasks are the only ones this build can run.
+segment_naming = true
+couple_hint    = true
+explain_summary = true
+
+# ---------------------------------------------------------------------------
+# Telemetry and crash reporting. Off, and the privacy page says so.
+# ---------------------------------------------------------------------------
+
+[reporting]
+# Opt-in, per install, and never containing image content. `docs/privacy.md`.
+crash_reports  = false
+telemetry      = false
+# The endpoint a report would go to, when one is enabled. Empty in this build: no transport ships.
+endpoint       = ""

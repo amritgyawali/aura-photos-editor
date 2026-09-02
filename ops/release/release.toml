@@ -1,0 +1,118 @@
+# The release checklist. EM-owned, signed by CTO, and the gate a release passes through.
+#
+# PHASE-30 section 6.4 and section 14. Every row is a thing that has to be true before a build
+# reaches a photographer, and every row names who says so.
+#
+# ## Why this is a file rather than a page in a wiki
+#
+# Because `ops/release/check.sh` reads it. A checklist nothing executes is a checklist that drifts
+# from what actually happens, and the first release under pressure is when the drift is discovered.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# What must be green
+# ---------------------------------------------------------------------------
+
+[[gate]]
+id      = "fmt"
+command = "cargo fmt --all -- --check"
+owner   = "DEVOPS"
+blocking = true
+why     = "A formatting difference in a diff is noise that hides the change underneath it."
+
+[[gate]]
+id      = "banned"
+command = "bash scripts/check-banned.sh"
+owner   = "TLC"
+blocking = true
+why     = "unwrap, panic, a socket outside aura-cloud, a key written anywhere it can be read back. Every one of these is a shortcut a hurried change makes."
+
+[[gate]]
+id      = "clippy"
+command = "cargo clippy --workspace --all-targets -- -D warnings"
+owner   = "DEVOPS"
+blocking = true
+why     = "Warnings that are allowed to accumulate stop being read."
+
+[[gate]]
+id      = "contracts"
+command = "cargo run --package xtask -- contracts --check"
+owner   = "CTO"
+blocking = true
+why     = "A frozen contract that moved without an ADR is a compatibility break nobody recorded."
+
+[[gate]]
+id      = "models"
+command = "cargo run --package xtask -- models"
+owner   = "MLOPS"
+blocking = true
+why     = "Signature, digests, cards, opset. No model card, no model - phase 03's rule."
+
+[[gate]]
+id      = "tests"
+command = "cargo test --workspace --all-targets"
+owner   = "QAL"
+blocking = true
+why     = "Including every phase gate, which run as ordinary tests so a red gate is a red build."
+
+[[gate]]
+id      = "budgets"
+command = "cargo test --release --package aura-perf --all-targets -- --test-threads=1"
+owner   = "PERF"
+blocking = true
+why     = "A budget is a claim about the binary a photographer runs, so it is measured in release and on one thread."
+
+[[gate]]
+id      = "ui"
+command = "cd ui && npm test"
+owner   = "SFE"
+blocking = true
+why     = "The panels are where every decision in this product is read."
+
+[[gate]]
+id      = "ipc"
+command = "bash scripts/check-ipc-surface.sh"
+owner   = "SFE"
+blocking = true
+why     = "Phase 21 found ninety client calls reaching a window that did not answer to them. Nothing had checked."
+
+# ---------------------------------------------------------------------------
+# What must be signed off, by a person, in writing
+# ---------------------------------------------------------------------------
+
+[[signoff]]
+id    = "quality"
+owner = "QAIQ"
+why   = "The perceptual suite is a human judgement and cannot be a command."
+
+[[signoff]]
+id    = "privacy"
+owner = "SEC"
+why   = "docs/privacy.md describes what leaves a machine. A release that changed that without SEC reading it is a release that changed it by accident."
+
+[[signoff]]
+id    = "rollback"
+owner = "CTO"
+why   = "Section 14: flag off, model pinnable, migration reversible. All three, demonstrated, before the build ships."
+
+[[signoff]]
+id    = "release"
+owner = "CTO"
+why   = "The V1 gate. Section 13's last acceptance criterion."
+
+# ---------------------------------------------------------------------------
+# The rollout
+# ---------------------------------------------------------------------------
+
+[rollout]
+# Section 6.4: "staged rollout by percentage". Each stage waits for the crash-free rate before the
+# next opens.
+stages          = [1, 5, 25, 100]
+# Section 10.1's last row, and the gate between stages.
+min_crash_free  = 0.995
+# How long a stage runs before the next one may open, in hours.
+soak_hours      = 24
+# A stage that falls below the crash-free rate rolls back rather than pausing. A paused rollout
+# leaves the installs that already took the build on it.
+on_regression   = "rollback"
