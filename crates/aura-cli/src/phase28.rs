@@ -749,12 +749,15 @@ pub fn verify(args: &[String]) -> ExitCode {
     );
     println!("      ten real weddings and a person.");
     println!(
-        "  C7  This build writes no files. Curation and export are `PhaseNotBuilt`, so a completed"
+        "  C7  This build writes no files. Curation runs since phase 29 landed; export is still"
     );
     println!(
-        "      run leaves a chosen and edited gallery in the catalog and nothing on disk - which"
+        "      `PhaseNotBuilt`, so a completed run leaves a curated wedding in the catalog and"
     );
-    println!("      makes half of section 10.1's cancellation gate vacuous rather than passed.");
+    println!(
+        "      nothing on disk - which makes half of section 10.1's cancellation gate vacuous"
+    );
+    println!("      rather than passed.");
 
     if failures == 0 {
         println!();

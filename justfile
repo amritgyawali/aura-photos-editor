@@ -423,6 +423,33 @@ phase-27-verify:
 phase-28-verify:
     cargo run --release --package aura-cli -- verify --phase 28 --work target/phase28-verify
 
+# The phase 29 gate. Migration 29 and its objects, the policy bounds a studio may not widen, a whole
+# synthetic wedding through the real curation pass on both fixture shapes, the chapter order, the
+# pairing refusals, coverage as a filter, the skin bands nothing moved, determinism, the caption
+# vocabulary's refusals, the twelve export specifications parsed back, a photographer's reorder
+# remembered across a re-run, the cloud validator, and the three IPC files agreeing.
+#
+# Every reading in it is authored. The gate prints the five conditions it did not prove at the end
+# of every run, and three of those are the headline gates of section 10.1 - they need photographers.
+phase-29-verify:
+    cargo run --release --package aura-cli -- verify --phase 29 --work target/phase29-verify
+
+# The phase 29 gates from the catalog side. Reads a real project read-only and reports the three
+# numbers no fixture can supply: how much of AURA's portfolio a photographer kept, how much of the
+# album they moved, and how many of the offered monochrome conversions they took. A project nobody
+# has reviewed reports *nothing* rather than unanimity, which is the whole design of its
+# denominators.
+curate-eval CATALOG:
+    python ml/models/curate/eval_curate.py {{CATALOG}}
+
+# The same, against a chosen answer. There are no consented portfolios in this repository, so this
+# is what CI runs - together with the two training procedures, which have no data either and prove
+# instead that they can fail.
+curate-selftest:
+    python ml/models/curate/eval_curate.py --self-test
+    python ml/models/curate/train_hero.py --self-test
+    python ml/models/curate/train_bw.py --self-test
+
 # The phase 27 gate from the catalog side. Reads a real project read-only and reports the
 # inspection completeness, the false-ticket rate against findings somebody actually reviewed,
 # what the re-edit loop kept, and any stored row that broke a bound the contract owns. It is

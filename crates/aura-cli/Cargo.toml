@@ -35,6 +35,7 @@ aura-brain-wedding = { path = "../aura-brain-wedding" }
 aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-restore = { path = "../aura-restore" }
 aura-retouch       = { path = "../aura-retouch" }
+aura-curate   = { path = "../aura-curate" }
 aura-cull          = { path = "../aura-cull" }
 aura-explain       = { path = "../aura-explain" }
 aura-recipe        = { path = "../aura-recipe" }

@@ -26,6 +26,9 @@ aura-brain-gallery = { path = "../aura-brain-gallery" }
 aura-qc      = { path = "../aura-qc" }
 # PHASE-28. The orchestrator, for the two overhead rows section 11's four waived rows leave behind.
 aura-jobs    = { path = "../aura-jobs" }
+# PHASE-29. Section 11's three rows - the whole curation, one re-composition, one monochrome mix -
+# plus the storage figure the phase document does not name.
+aura-curate  = { path = "../aura-curate" }
 aura-brain-wedding = { path = "../aura-brain-wedding" }
 aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-retouch       = { path = "../aura-retouch" }

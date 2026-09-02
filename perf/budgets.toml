@@ -1395,3 +1395,78 @@ max_ms_per_unit = 20000
 # wedding's overlap turned out to describe a table that was capped.
 [size.autopilot_store_per_1000_images]
 max_bytes = 10000
+
+# ---------------------------------------------------------------------------
+# PHASE-29 - curation
+# ---------------------------------------------------------------------------
+#
+# Section 11's three rows are all met, and none of them is waived - the first phase since 20 where
+# that is true. The reason is structural rather than an achievement: **nothing in this phase opens
+# a photograph.** Every reading is a number phases 05 to 28 already measured and stored, so a whole
+# wedding's curation is arithmetic over rows plus one catalog write.
+#
+# That is worth stating plainly rather than celebrating. The 20 s budget was written for a phase
+# that might have needed pixels, and this implementation does not.
+# `crates/aura-curate/tests/no_outputs.rs` is what keeps it true - a future change that reached for
+# the renderer to measure a mix directly would blow this by two orders of magnitude, and the grep
+# is what stops it landing quietly.
+
+# Section 11's first row. Measured at 446 ms for 600 frames in a debug build, against a 12,000 ms
+# budget at that size - 3.7 % of it.
+#
+# The one term that could have broken this is uniqueness, which asks phase 05's index how unlike
+# the already-chosen heroes a frame is. It is `candidates x target^2 / 2` readings: linear in the
+# gallery with a constant near two hundred, not quadratic in it. The **shape** is asserted rather
+# than the constant, by `tests/eval/curate_eval.rs` running the same selection over a doubled
+# wedding - a 600-frame gallery is 180,000 pairs and a build that had gone quadratic would still
+# fit inside a loose absolute bound while being unusable at 6,000.
+[stage.curate_pass]
+max_elapsed_ms  = 20000
+max_ms_per_unit = 20000
+
+# Section 11's second row, and the one a photographer actually feels. The pass happens once, in the
+# background, after a cull; a re-composition happens every time somebody drags a spread, in front of
+# them, and 1.5 s is already at the edge of what reads as instant.
+#
+# Measured at 375 ms for an 80-image album, which is what the IPC command does end to end: record
+# the order, then rebuild the album in it. ADR-0060 section 4 - one command, one wait, because
+# splitting the two would be measuring a wait nobody has.
+[stage.curate_recompose]
+max_elapsed_ms  = 1500
+max_ms_per_unit = 1500
+
+# Section 11's third row. Measured at 10 us a frame against a 25 ms budget - 0.04 % of it - because
+# a mix is solved from an 8x8x8 histogram phase 05 already computed rather than from pixels.
+#
+# Measured per image and not as a batch mean on purpose: `bw::solve` partitions the bands into the
+# ones colliding with the anchor tone and the ones that are not, so its cost depends on how many
+# bands a frame has, and a mean over a gallery would hide a frame that took a hundred times the
+# average.
+[stage.curate_mix]
+max_elapsed_ms  = 25
+max_ms_per_unit = 25
+
+# Section 11 names no storage row. One is measured anyway, and this phase's shape is unlike every
+# migration from 09 to 20: **the per-image figure falls as a wedding grows.**
+#
+# Those phases store one fixed-width verdict per photograph. This one stores a *selection* - an
+# album of 60 to 120 images, a portfolio of 20, a bounded caption list - so the numerator is capped
+# by the contract and the denominator is not. Measured by
+# `crates/aura-perf/tests/curate_budgets.rs`:
+#
+#     10 frames   ->  24,395 B  =  2,439 B/image   (the album is the whole gallery)
+#     600 frames  -> 126,840 B  =    211 B/image
+#     1,200 frames-> 205,093 B  =    171 B/image
+#
+# The budget is therefore set at the **small** end, where the figure is worst, rather than at the
+# comfortable one. **The denominator is selected frames** - phase 18's rule, which this phase
+# inherits because a monochrome suggestion about a frame nobody is delivering is not a gap.
+#
+# **The bound is asserted as well as the number.** Doubling the gallery multiplies the store by
+# 1.62x rather than 2x, and the difference is the one term that is genuinely unbounded by the
+# contract: `curate_bw`, one row per offered conversion, 90 offers at 600 frames and 191 at 1,200.
+# `BW_CANDIDATE_FLOOR` is what keeps that a short list a photographer reads rather than four hundred
+# rows nobody opens. A size assertion alone would pass on a build that had removed the floor and
+# happened to be measured on a small fixture - phase 26 learned that from the other side.
+[size.curate_store_per_image]
+max_bytes = 4000
