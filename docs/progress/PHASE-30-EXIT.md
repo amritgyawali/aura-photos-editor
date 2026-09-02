@@ -133,8 +133,12 @@ is a floor with no measurement behind it, because there has been no closed beta.
 this container on **phase 14's** rows and not on this phase's: the processor-path proxy render takes
 801 ms against a 450 ms budget, because that budget was measured on a machine roughly four times
 faster and assumes a GPU backend this build does not link. `AURA_PERF_HOST_SCALE=4` is what a slower
-host sets, and every budget in the workspace passes at it, this phase's two included. The budget was
-not moved: lowering a guardrail to make a slow container green is how a guardrail stops being one.
+host sets, and at `AURA_PERF_HOST_SCALE=4` **all nine blocking gates pass**, this phase's two budget
+rows included. The budget was not moved: lowering a guardrail to make a slow container green is how a
+guardrail stops being one.
+
+The four sign-offs are outstanding, which is the checklist working rather than a gap — a release with
+green gates and no sign-offs is a release nobody has looked at.
 
 **The procedure is evidence of intent and not of a release.**
 
