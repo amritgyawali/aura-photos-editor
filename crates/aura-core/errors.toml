@@ -2097,3 +2097,220 @@ summary      = "The curation policy table was refused"
 user_message = "AURA could not load the settings that decide album sizes, rhythm and social formats, so it has not curated anything. Restore the file or reinstall."
 runbook      = "docs/runbooks/AURA-ML-5145.md"
 introduced   = "PHASE-29"
+
+# ---------------------------------------------------------------------------
+# PHASE-30 - delivery: export, backup, providers, the learning loop, releases
+# ---------------------------------------------------------------------------
+#
+# Twenty-one codes across four domains, and the domain split is the argument rather than a
+# formality. Six of them are RENDER, because phase 14 renamed the reserved-but-empty EXPORT block
+# to RENDER with a note saying "phase 30 will want codes in the same domain for the same subject" -
+# an export *is* a render written to a file, and its failures are the render's failures plus one.
+#
+# The other three domains are new, and there are three of them because this phase adds three
+# genuinely separate areas to the product. DLV is about getting a finished file somewhere else,
+# whose failures are a network's and a filesystem's. LRN is about the product changing its own
+# future behaviour, whose failures are statistical. REL is about shipping the application, whose
+# failures happen on a machine nobody is watching. A support case that begins "my gallery did not
+# arrive" and one that begins "the update made it worse" are read by different people with
+# different runbooks, and one domain for all three would put them in one list.
+#
+# AURA-RENDER-8022 is the most important code in this phase and one of the few in the product whose
+# severity is run_blocking for a reason that is not a resource. A file that did not read back the
+# same is a silent corruption, section 12's first row, and the correct response is to stop the
+# delivery rather than to skip the frame - because a gallery missing one photograph is a phone call
+# and a gallery containing one broken photograph is a photograph nobody notices until the couple
+# opens it.
+#
+# AURA-LRN-11004 is the second most important, and it declines rather than degrades quietly. A
+# correction with no ledger decision behind it is a residual measured from no baseline, which is
+# phase 17's condition C4 - and this is the phase that would propagate it into every future wedding.
+
+[[error]]
+code         = "AURA-RENDER-8020"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A stored delivery note came from a build with a different reason vocabulary"
+user_message = "AURA found a delivery note it does not recognise, which usually means this wedding was delivered by a newer version."
+runbook      = "docs/runbooks/AURA-RENDER-8020.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-RENDER-8021"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "The export job was refused before anything was written"
+user_message = "AURA cannot run this export as it is set up. Nothing has been written. Check the sets, sizes and file names, then try again."
+runbook      = "docs/runbooks/AURA-RENDER-8021.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-RENDER-8022"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "A written file did not read back the same and the delivery was stopped"
+user_message = "One file AURA wrote came back different from what it sent, so the whole delivery has been stopped. Check the drive before sending any of this to a client."
+runbook      = "docs/runbooks/AURA-RENDER-8022.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-RENDER-8023"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "The export destination is full or cannot be written to"
+user_message = "AURA cannot write where this export was going. Free up space or choose somewhere else; what has already been written is listed and unharmed."
+runbook      = "docs/runbooks/AURA-RENDER-8023.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-RENDER-8024"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "One photograph could not be rendered for export"
+user_message = "One photograph could not be prepared, so it is not in this export. Everything else was written and checked, and the summary names it."
+runbook      = "docs/runbooks/AURA-RENDER-8024.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-RENDER-8025"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A file name could not be made unique"
+user_message = "AURA ran out of ways to give this photograph a name of its own. Change the file-naming template so it includes a number or the original name."
+runbook      = "docs/runbooks/AURA-RENDER-8025.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-DLV-10001"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "The gallery provider named is not one this build has"
+user_message = "AURA does not know that client gallery. Choose one from the list in the delivery settings."
+runbook      = "docs/runbooks/AURA-DLV-10001.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-DLV-10002"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "The backup destination or the gallery provider could not be reached"
+user_message = "AURA could not reach that place. Everything already sent is remembered, so when it comes back the upload carries on from where it stopped."
+runbook      = "docs/runbooks/AURA-DLV-10002.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-DLV-10003"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "A backup copy did not match the file it was made from"
+user_message = "A backup copy came back different from the original, so the backup was stopped. Check that drive before trusting anything on it."
+runbook      = "docs/runbooks/AURA-DLV-10003.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-DLV-10004"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "No credential is saved for this gallery provider"
+user_message = "There is no sign-in saved for that gallery. Add one in the delivery settings and the upload will start."
+runbook      = "docs/runbooks/AURA-DLV-10004.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-DLV-10005"
+severity     = "item_failed"
+recovery     = "retry"
+summary      = "The gallery provider reported a different checksum from the one sent"
+user_message = "The gallery received something different from what AURA sent, so that photograph will be sent again."
+runbook      = "docs/runbooks/AURA-DLV-10005.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-DLV-10006"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A set has nowhere to go at this provider and was not uploaded"
+user_message = "One of these sets has no place to go in that gallery, so it was left out. Map it in the delivery settings and run the upload again."
+runbook      = "docs/runbooks/AURA-DLV-10006.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-LRN-11001"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A stored learning note came from a build with a different reason vocabulary"
+user_message = "AURA found a note about learning that it does not recognise, which usually means this profile was trained by a newer version."
+runbook      = "docs/runbooks/AURA-LRN-11001.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-LRN-11002"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A stored correction names a setting this build does not learn"
+user_message = "AURA found a correction about a setting it does not learn from. Nothing is lost; it simply does not count toward your profile."
+runbook      = "docs/runbooks/AURA-LRN-11002.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-LRN-11003"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "An update could not be worked out from the corrections available"
+user_message = "AURA could not work out an update from your corrections. Nothing about your photographs or your profile has changed."
+runbook      = "docs/runbooks/AURA-LRN-11003.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-LRN-11004"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "A change had no decision behind it, or the project has not consented, so nothing was learned"
+user_message = "AURA kept your change and did not learn from it, because there was nothing of its own to compare it against or learning is off for this wedding."
+runbook      = "docs/runbooks/AURA-LRN-11004.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-LRN-11005"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A profile could not be rolled back"
+user_message = "AURA could not put the earlier version of that profile back. The version you are on is unchanged and still works."
+runbook      = "docs/runbooks/AURA-LRN-11005.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-REL-12001"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "A release or model pack did not verify and was not installed"
+user_message = "An update did not pass its signature check, so AURA did not install it. You are still on the version you had this morning."
+runbook      = "docs/runbooks/AURA-REL-12001.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-REL-12002"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "An update was applied, failed its first use, and was rolled back"
+user_message = "An update did not work on this machine, so AURA put the previous version back. Nothing you have done has been lost."
+runbook      = "docs/runbooks/AURA-REL-12002.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-REL-12003"
+severity     = "run_blocking"
+recovery     = "halt"
+summary      = "The feature-flag file was refused"
+user_message = "AURA could not read the settings that say which parts of it are switched on, so it has not started. Restore the file or reinstall."
+runbook      = "docs/runbooks/AURA-REL-12003.md"
+introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-REL-12004"
+severity     = "warning"
+recovery     = "fallback"
+summary      = "The licence could not be checked and the offline grace period is running"
+user_message = "AURA could not check your licence, so it is carrying on offline. Everything works; connect within the grace period to keep it that way."
+runbook      = "docs/runbooks/AURA-REL-12004.md"
+introduced   = "PHASE-30"

@@ -66,13 +66,16 @@ dependencies = [
  "aura-core",
  "aura-cull",
  "aura-curate",
+ "aura-delivery",
  "aura-explain",
+ "aura-export",
  "aura-generative",
  "aura-geometry",
  "aura-index",
  "aura-infer",
  "aura-ingest",
  "aura-jobs",
+ "aura-learn",
  "aura-models",
  "aura-people",
  "aura-preview",
@@ -202,13 +205,16 @@ dependencies = [
  "aura-core",
  "aura-cull",
  "aura-curate",
+ "aura-delivery",
  "aura-explain",
+ "aura-export",
  "aura-generative",
  "aura-geometry",
  "aura-index",
  "aura-infer",
  "aura-ingest",
  "aura-jobs",
+ "aura-learn",
  "aura-models",
  "aura-people",
  "aura-perf",
@@ -221,6 +227,7 @@ dependencies = [
  "aura-retouch",
  "aura-style",
  "aura-vision",
+ "blake3",
  "rusqlite",
  "serde",
  "serde_json",
@@ -303,6 +310,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-delivery"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-export",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "aura-explain"
 version = "0.1.0"
 dependencies = [
@@ -316,6 +338,29 @@ dependencies = [
  "time",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "aura-export"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-delivery",
+ "aura-learn",
+ "aura-recipe",
+ "aura-render",
+ "blake3",
+ "jpeg-encoder",
+ "png",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "toml",
+ "tracing",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -432,6 +477,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-learn"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-explain",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aura-models"
 version = "0.1.0"
 dependencies = [
@@ -482,12 +544,15 @@ dependencies = [
  "aura-core",
  "aura-cull",
  "aura-curate",
+ "aura-delivery",
  "aura-explain",
+ "aura-export",
  "aura-generative",
  "aura-geometry",
  "aura-index",
  "aura-infer",
  "aura-jobs",
+ "aura-learn",
  "aura-people",
  "aura-qc",
  "aura-raw",

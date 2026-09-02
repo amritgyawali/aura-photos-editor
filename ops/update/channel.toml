@@ -1,0 +1,63 @@
+# The update channel. DEVOPS-owned.
+#
+# ## Why a percentage rollout at all
+#
+# Because a bug that reproduces on one machine in fifty is invisible in every test suite and
+# obvious across a thousand installs. A rollout that goes straight to everyone converts that into a
+# thousand photographers finding it on a Saturday.
+#
+# ## Why a regression rolls back rather than pausing
+#
+# A paused rollout leaves the installs that already took the build on it. Pausing protects the
+# people who have not updated and does nothing for the people the problem is happening to, which is
+# exactly backwards.
+
+version = 1
+
+[channels.stable]
+# What a photographer is on unless they asked otherwise.
+stages         = [1, 5, 25, 100]
+soak_hours     = 24
+min_crash_free = 0.995
+on_regression  = "rollback"
+
+[channels.beta]
+# Photographers who volunteered. Faster, and the same floor: a beta that crashes is still somebody's
+# wedding.
+stages         = [25, 100]
+soak_hours     = 6
+min_crash_free = 0.99
+on_regression  = "rollback"
+
+[channels.nightly]
+# Internal only. No soak and no floor, because nobody on it is delivering a wedding from it.
+stages         = [100]
+soak_hours     = 0
+min_crash_free = 0.0
+on_regression  = "none"
+
+# ---------------------------------------------------------------------------
+# Model packs, which update on their own schedule
+# ---------------------------------------------------------------------------
+
+[models]
+# Verified before install: ed25519 over models.lock, then sha256 per file, then the model card.
+# Phase 03's order, unchanged.
+verify          = "signature-then-digest-then-card"
+# Delta downloads when a delta is smaller than the file it patches.
+delta           = true
+# A model that fails its first real use is rolled back automatically and recorded as rejected. The
+# photographer keeps the quality they had that morning - phase 03's rule.
+rollback_on_first_failure = true
+# How many previous versions stay installed and pinnable.
+keep_versions   = 3
+
+# ---------------------------------------------------------------------------
+# What this build can actually do
+# ---------------------------------------------------------------------------
+
+[capabilities]
+# No transport ships in this build, so the staged rollout above is a specification rather than a
+# running service. Stated here rather than left to be discovered, because a rollout table that
+# looks live and is not is worse than no table. Exit condition C6.
+network_transport = false

@@ -82,6 +82,17 @@ fn every_registered_code_is_well_formed_and_has_a_runbook() {
             // same domain for the same subject. ADR-0029 section 9.
             "RENDER" => 8000..9000,
             "SEC" => 9000..10000,
+            // PHASE-30 adds three domains, and three rather than one because this phase adds
+            // three genuinely separate areas to the product. DLV is about getting a finished
+            // file somewhere else and fails the way a network and a filesystem fail; LRN is
+            // about the product changing its own future behaviour and fails statistically;
+            // REL is about shipping the application and fails on a machine nobody is watching.
+            // Its *export* codes are not here: phase 14 renamed the reserved-but-empty EXPORT
+            // block to RENDER for exactly this phase, and an export is a render written to a
+            // file. ADR-0061 section 8.
+            "DLV" => 10000..11000,
+            "LRN" => 11000..12000,
+            "REL" => 12000..13000,
             other => panic!("unknown domain {other}"),
         };
         assert!(

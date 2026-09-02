@@ -1,0 +1,40 @@
+[package]
+name         = "aura-learn"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "The learning loop: correction capture, attribution to phase 13 decisions, robust aggregation, held-out verification, explicit adoption and exact rollback (phase 30)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# PHASE-30. `ExplainService` is the only way to record what happened - phase 13's rule - and a
+# correction is a correction *of* a decision. `attribute` looks the decision up through the frozen
+# service, which is what makes `Correction::decision_id` a real reference rather than a field
+# somebody fills in.
+aura-explain = { path = "../aura-explain" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+blake3       = { workspace = true }
+# PHASE-30. The fixtures derive their identifiers from a seed rather than minting v7 UUIDs, which
+# is phase 29's lesson: a v7 id is random in its low bits, so a fixture that minted one looked
+# deterministic for a whole phase while every tie-break downstream fell back on the id.
+uuid         = { workspace = true }
+
+# Deliberately absent: `aura-style`, and every other crate whose values this loop moves.
+#
+# A profile update is applied by the crate that owns the profile, through the frozen `StyleService`
+# that `aura-app` assembles. This crate computes an *offset* and stores a *snapshot*; it has no way
+# to write a profile, which is the same shape phase 29 took for recipes. A learning loop that could
+# write directly into a style profile is a learning loop whose adoption step is decorative.
+#
+# `aura-render` and `aura-recipe` are absent because nothing here touches a photograph.
+
+[dev-dependencies]
+tempfile     = { workspace = true }

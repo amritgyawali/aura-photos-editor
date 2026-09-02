@@ -1,0 +1,36 @@
+[package]
+name         = "aura-delivery"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Delivery: verified backup destinations, the gallery-provider trait, per-set mapping and a resumable per-file upload state machine (phase 30)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# PHASE-30. The read-back is `aura_export::verify`'s, deliberately reused rather than re-written.
+# "Did the bytes survive" is one question with one answer, and a second implementation of it in the
+# crate that copies files is a second answer that can disagree with the first about the same file.
+aura-export  = { path = "../aura-export" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+tracing      = { workspace = true }
+blake3       = { workspace = true }
+
+# Deliberately absent: every networking crate there is.
+#
+# `scripts/check-banned.sh` refuses `std::net`, `reqwest`, `hyper`, `rustls`, `ureq`,
+# `tungstenite` and `native_tls` outside `aura-cloud`, and phase 04's rule is that one crate owns
+# outbound networking. A gallery provider is not a model provider, so the honest options were to
+# widen that lint here or to ship the state machine and the port and leave the socket for the phase
+# that widens it. This crate takes the second: the resumable upload logic, the per-file state, the
+# digest comparison and the per-set mapping are all real and all tested against a transport that
+# can be made to drop connections on demand. What is missing is one implementation of a two-method
+# trait. ADR-0061 decision 4, and condition C3 in the exit report.
+
+[dev-dependencies]
+tempfile     = { workspace = true }

@@ -41,6 +41,8 @@ use aura_core::contract::ledger::{Autonomy, DecisionKind};
 use aura_core::progress::CancelToken;
 use aura_core::{AuraResult, ProjectId};
 use aura_explain::policy::Risk;
+use aura_export::api::ExportPass;
+use aura_export::store::ExportStore;
 use aura_jobs::api::{Autopilot, Ports, Tally};
 use aura_jobs::contract::autopilot::{
     AutonomyGate, AutopilotOverride, AutopilotService, MachineProbe, MachineState, RunHandle,
@@ -54,6 +56,7 @@ use crate::contract::ipc::{
     AutopilotSettingsInput, AutopilotStageDto, AutopilotStartInput, AutopilotStatusDto,
     AutopilotSummaryDto, IpcError,
 };
+use crate::delivery_commands::{ExportField, ExportSource};
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -322,19 +325,21 @@ impl StageRunner for AppRunner {
         }
     }
 
-    fn availability(&self, _project: ProjectId, stage: StageId) -> Option<SkipCause> {
-        match stage {
-            // Phase 30 is not built. `aura-export` and `aura-delivery` do not exist in this
-            // workspace, so this stage reports what is true rather than finishing instantly and
-            // letting the run claim a wedding was delivered.
-            //
-            // Curation was here until phase 29 landed and is not any more. That is the whole shape
-            // of this table: a stage is unavailable because the phase that owns it does not exist,
-            // and the day it does the arm becomes one call. Phase 28's condition C7 is half closed
-            // by that line and stays open for export.
-            StageId::Export => Some(SkipCause::PhaseNotBuilt),
-            _ => None,
-        }
+    fn availability(&self, _project: ProjectId, _stage: StageId) -> Option<SkipCause> {
+        // **Empty, for the first time since phase 28 wrote it.** Curation left this table when
+        // phase 29 landed and export left it when phase 30 did, which closes phase 28's condition
+        // C7: every stage in the DAG is now built, and a completed run writes files.
+        //
+        // It is kept rather than deleted because it is the one place a stage can say "this
+        // release does not have me" before any work starts, and the next feature that ships behind
+        // its own phase will need it.
+        //
+        // Note what is *not* here. Export is available, and whether it can actually write is a
+        // question about this wedding rather than about this release - it needs a destination
+        // somebody chose - so the answer is `NoInput` from the stage itself rather than
+        // `PhaseNotBuilt` from this table. The two read very differently on the run summary, and
+        // only one of them is true.
+        None
     }
 
     /// Run one stage by calling the command the phase that owns it already ships.
@@ -641,7 +646,43 @@ impl AppRunner {
                 // stage declares.
                 status.curated
             }
-            StageId::Export => return Ok(StageOutcome::Skipped(SkipCause::PhaseNotBuilt)),
+            StageId::Export => {
+                // The one stage that writes outside the catalog, and the only arm here that can
+                // decline on the wedding rather than on the release.
+                //
+                // **The autopilot never chooses a destination.** An export needs a folder, a
+                // naming template, a size and a quality, and every one of those is a decision a
+                // photographer makes in the export panel about this client. A run that invented
+                // them would write three thousand JPEGs somewhere nobody asked for, at a size
+                // nobody chose, and the fact that they were deletable afterwards is not a defence.
+                //
+                // So a run repeats the export this wedding has already been given - the same
+                // destination, the same sets, the same policy, over whatever is selected *now* -
+                // and when there has never been one it skips with `NoInput`: "There was nothing
+                // for this step to work on", which is exactly true, and which leaves the run
+                // `CompletedDegraded` with export named rather than reported as delivered.
+                // `autopilot.toml`'s own row says a photographer whose run wrote nothing needs to
+                // read why on the summary.
+                let store = ExportStore::new(Arc::clone(self.state.catalog()));
+                let Some(spec) = lift(store.last_spec(project).map_err(IpcError::from))? else {
+                    return Ok(StageOutcome::Skipped(SkipCause::NoInput));
+                };
+                let images = lift(crate::delivery_commands::selected_images(
+                    &self.state,
+                    project,
+                ))?;
+                if images.is_empty() {
+                    return Ok(StageOutcome::Skipped(SkipCause::NoInput));
+                }
+                let field = lift(ExportField::new(&self.state, project))?;
+                let source = ExportSource::new(&self.state);
+                let pass = ExportPass::new(&store, &field, &source, crate::state::APP_VERSION);
+                let result = lift(
+                    pass.run(project, &spec.over(&images))
+                        .map_err(IpcError::from),
+                )?;
+                clamp(i64::try_from(result.files.len()).unwrap_or(i64::MAX))
+            }
         };
 
         Ok(StageOutcome::Completed { items })
@@ -811,13 +852,23 @@ pub fn autopilot_start(
         let Ok(autopilot) = build_autopilot(&worker_state) else {
             return;
         };
+        // Where the summary sends a photographer at one in the morning. The destination this
+        // wedding was last exported to when it has one, and the project's own directory when it
+        // has not - which is the case where the export stage skips with `NoInput`, so the two
+        // answers agree about what happened.
+        let output_path = ExportStore::new(Arc::clone(worker_state.catalog()))
+            .last_spec(project)
+            .ok()
+            .flatten()
+            .and_then(|spec| spec.destination.local_root().map(PathBuf::from))
+            .unwrap_or_else(|| worker_state.cache_root().to_path_buf());
         let tally = Tally {
             selected: 0,
             exported: 0,
             needs_review: 0,
             qc: None,
             spend_usd: 0.0,
-            output_path: worker_state.cache_root().to_path_buf(),
+            output_path,
         };
         drop(autopilot.execute(project, &settings, &worker_handle, &tally));
         worker_state.finish_job(&worker_handle.run_id.to_db());

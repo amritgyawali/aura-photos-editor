@@ -135,6 +135,14 @@ Never load two phase files into one session.
 | Album sizes, rhythm, hero and monochrome weights (versioned, PM-owned) | `crates/aura-curate/config/curation.toml` |
 | Curation evaluation gates | `tests/eval/curate_eval.rs` + `ml/models/curate/eval_curate.py` |
 | What AURA proposes after the cull, in the product's own words | `docs/curation.md` |
+| Delivery and learning decisions | `docs/adr/ADR-0061-delivery-learning-loop-and-release.md` |
+| Export presets (versioned, PM-owned) | `crates/aura-export/config/export_presets.toml` |
+| Delivery evaluation gates | `tests/eval/delivery_eval.rs` |
+| What a delivery promises, in the product's own words | `docs/delivery.md` |
+| What AURA will and will not learn from you | `docs/learning-loop.md` |
+| Release checklist, signing, rollout and flags | `ops/release/`, `ops/sign/`, `ops/notarise/`, `ops/update/`, `ops/flags/` |
+| How a release ships | `docs/release-process.md` |
+| What leaves the machine, and what does not | `docs/privacy.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
@@ -1788,6 +1796,101 @@ Phase 29 also **half closes phase 28's condition C7**: `AppRunner::availability`
 `SkipCause::PhaseNotBuilt` for curation, and the stage's arm is one call into `curate_project` - the
 shape phase 28's own rule asks for. Export is still unbuilt, so a completed run leaves a curated
 wedding in the catalog and nothing on disk, and phase 28's gate prints C7 saying exactly that.
+
+Phase 30 is implemented conditionally, and it is the last phase of the plan.
+`aura-core::contract::delivery` freezes the three formats, the three colour spaces, the resize, the
+output sharpening, the seven naming tokens and their template, the metadata policy, the destination,
+the set, the job, the written file, the sealed manifest, the upload state machine, thirty
+`DeliveryCode`s of which three stop a job, `ExportService` and `DeliveryService`;
+`aura-core::contract::learn` freezes `Learnable` - **closed at fifteen members with no `Other`** - the
+correction, its context, its bucket, the aggregate, the held-out split, the update, the A/B
+comparison, consent, twenty `LearnCode`s and `LearnService`. `aura-export` writes: `naming.rs` plans
+every name before a byte exists and refuses a template that could name a folder, `resample.rs`
+downscales in linear light and sharpens on encoded samples after it, `icc.rs` synthesises v4
+matrix/TRC profiles with the creation date zeroed, `metadata.rs` **builds** a block rather than
+copying one forward, `jpeg.rs`/`tiff.rs`/`png.rs` are the three writers, `verify.rs` writes, flushes,
+`sync_all`s, re-opens, re-reads and hashes, `manifest.rs` seals a record that can never be edited and
+`store.rs` owns the export half of migration 30. `aura-delivery` sends: `backup.rs` is matched,
+missing and **diverged**, `providers/` is the `Transport` port with a folder and a scripted
+implementation, `mapping.rs` is per-set, `resume.rs` takes its offset from the far end in 4 MiB
+chunks under a three-attempt bound. `aura-learn` learns: `attribute.rs` puts a correction beside the
+decision it corrected, `aggregate.rs` splits deterministically by the correction's own id and trims
+with a MAD that falls back on the mean absolute deviation, `update.rs` bounds the step at half of
+what was asked and measures the result on corrections the fit never saw, `review.rs` offers,
+`rollback.rs` restores exactly. Migration 30 stores 13 tables, 3 views and 5 triggers at 566 to 594
+bytes a delivered file; six presets live in editable config; seventeen IPC commands (ADR-0062) feed a
+delivery panel; the Lightroom and Photoshop plugins and the whole release machinery ship in
+`plugins/` and `ops/`; and `aura-cli verify --phase 30` is the executable gate. Its exit report is
+`docs/progress/PHASE-30-EXIT.md`.
+
+**This phase ships no model** - the tenth since phase 08, and for a fourth distinct reason. It is not
+"nothing to train" (17, 23, 25, 29), not "no data" (24) and not "a model would be worse than a
+measurement" (27, 28): there is nothing here a model would be *for*. An export is arithmetic and file
+I/O, a digest is a digest, and the learning loop is a trimmed median over rows the ledger already
+holds. **No socket ships either**, which is the condition to be careful about: `check-banned.sh`
+forbids one outside `aura-cloud` and a client-gallery provider is not a model provider, so everything
+above the socket was built and the socket was not. `NETWORK_TRANSPORT_AVAILABLE` is false and is on
+the wire. That is condition C3 and a Sev 2 trigger. C1 is that every pixel in every delivered file
+came from a placeholder - the guarantee this phase makes is about the *bytes* and not about the
+picture - C2 is the waived export budget, C4 is that no profile has been fitted from a real
+photographer's corrections so the 15 % style-match improvement is unmeasured, C5 is that nothing has
+been signed, notarised or rolled out, and C6 is that neither plugin has met the application it is
+for.
+
+Five rules that phase 30 adds, and they are the product's rather than the next phase's:
+
+- **`ExportService` and `DeliveryService` are the only ways to turn a decision into a file.**
+  Twenty-sixth and twenty-seventh services of their kind, and the first whose subject is a **thing on
+  somebody else's disk**. Every store from phase 05 to 29 caches a decision that can be recomputed;
+  these record a JPEG on an external drive, and re-running does not re-derive it - it writes it
+  again, which is a different operation with a different cost and a different risk.
+- **A file is verified by reading it back, never by hashing the buffer.** The failure this catches is
+  silent: a loose reader, a NAS that dropped a packet, a drive on the way out - all of them give you
+  a folder that looks right in a file browser and is wrong in the middle. A file that does not read
+  back the same **stops the job**, because a destination that corrupted one file is not one to send
+  three thousand more to. It costs 2 % of an export, measured in release.
+- **A guarantee is not learnable, and the enforcement is a closed vocabulary.** `Learnable` has
+  fifteen members and no `Other`, so the texture floor, the skin protection, the identity constraint,
+  the crop safety filter and the naturalness guard cannot be named by a correction, aggregated into a
+  bucket, or moved by an update. `crates/aura-learn/tests/no_guarantee_learning.rs` is the tenth
+  grep-as-a-test. An open vocabulary is one where the next feature adds "retouch texture floor" and
+  the guarantee erodes one correction at a time.
+- **A record of what was delivered cannot be edited.** `delivery_manifest_no_update` aborts every
+  UPDATE and a correction is a new job. Phase 28 gave a run's record this property and this is the
+  same argument about the thing a client actually received.
+- **Automation never chooses a destination.** The autopilot repeats the export a wedding was already
+  given and skips with `SkipCause::NoInput` when there is none; there is no default folder and no
+  field on the wire that could set one. A run that invented a destination would be the scheduler
+  making a decision, which is what `crates/aura-jobs/tests/no_decisions.rs` exists to prevent.
+
+Phase 30 **closes phase 28's condition C7**. `AppRunner::availability` is empty for the first time
+since phase 28 wrote it: every stage in the DAG is built and a completed run writes files.
+`crates/aura-jobs/src/stages/deliver.rs` predicted exactly that - "phases 29 and 30 change two
+`availability` answers in `aura-app` and change nothing here" - and the prediction held.
+
+Four things phase 30 got wrong first, and the first is the one to generalise:
+
+**A ratio measured as a difference of two large numbers measured nothing.** The verification overhead
+was first measured by running the same export twice, with and without the read-back, and subtracting.
+The two whole-run timings came out within a third of a per cent of each other and the *verified* run
+was faster - an overhead of zero, passing an 8 % budget, for no reason at all. It is measured
+directly now. Phase 19's halo test and phase 22's ringing measurement are the same defect, and this
+is the third time: **a difference of two large numbers is the wrong instrument for a small one.**
+
+**A budget asserted in a debug build asserts the wrong thing.** The same ratio is *flattered* by a
+debug build, because the encoder is several times slower than it ships and the denominator inflates.
+Release-only now, printing the number with a note in debug.
+
+**A performance fixture must be a shape the product would actually produce.** The learning budget's
+first fixture proposed 45 changes and `LearningUpdate::validate` refuses anything over
+`MAX_DIFF_LINES` - 24, because that is what a photographer reads before agreeing. The fixture folds
+45 buckets and moves 24 now, which is the largest legitimate fit.
+
+**Ten of fifteen learnables were unattributable, silently.** `DecisionKind` has six members and phase
+13's reason registry carried a vocabulary for one, so a correction to an `Edit` decision could never
+be recorded - `AURA-ML-5054` refuses a code that is not in the shipped registry, and every unit test
+passed because each exercised the kind that worked. The registry now covers `ToneCode`, `ColourCode`,
+`CurateCode` and `QcCode`, and `docs/reason-codes.md` is regenerated at 227 codes.
 
 Five rules that phase 13 adds and every later phase inherits:
 

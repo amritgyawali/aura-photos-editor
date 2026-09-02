@@ -13,6 +13,10 @@ use aura_app::contract::ipc::{
     CurateAlbumDto, CurateBwDto, CurateDecideInput, CurateExportDto, CurateExportInput,
     CurateHeroDto, CurateOrderInput, CuratePickDto, CurateProjectInput, CurateSocialDto,
     CurateSpreadDto, CurateStatusDto,
+    // PHASE-30.
+    ConsentDto, DeliveryInput, DeliveryManifestDto, DeliveryStatusDto, DiagnosticsDto,
+    ExportFileDto, ExportJobInput, ExportNameDto, ExportPresetDto, ExportStatusDto,
+    LearnBucketDto, LearnComparisonDto, LearnStatusDto, ProviderDto, UploadItemDto,
     AcceptToneInput, CleanupBlockedDto, CleanupDisclosureDto, CleanupPassDto, CleanupPassInput,
     CleanupProposalDto, CleanupReasonDto, CleanupStatusDto, DecideCleanupInput,
     DisableCleanupInput, EstimateToneInput, ManualRemoveDto, ManualRemoveInput, ReferenceFrameDto,
@@ -2687,6 +2691,209 @@ async fn curate_export(
 }
 
 
+
+// ---------------------------------------------------------------------------
+// PHASE-30. Delivery, learning and diagnostics.
+// ---------------------------------------------------------------------------
+//
+// Seventeen commands across four panels, and the first surface on this shell whose act writes
+// files. `export_run` is the only command in the product that changes somebody's disk, and
+// `export_preview_names` exists beside it so a photographer can see what four thousand files will
+// be called before committing a wedding to a template. ADR-0062.
+
+#[tauri::command]
+async fn export_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<ExportStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::export_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn export_presets() -> IpcResult<Vec<ExportPresetDto>> {
+    tauri::async_runtime::spawn_blocking(aura_app::export_presets)
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn export_preview_names(
+    state: State<'_, AppState>,
+    input: ExportJobInput,
+) -> IpcResult<Vec<ExportNameDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::export_preview_names(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn export_run(
+    state: State<'_, AppState>,
+    input: ExportJobInput,
+) -> IpcResult<ExportStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::export_run(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn export_files(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<ExportFileDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::export_files(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn export_manifest(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<DeliveryManifestDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::export_manifest(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn delivery_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<DeliveryStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::delivery_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn delivery_providers(state: State<'_, AppState>) -> IpcResult<Vec<ProviderDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::delivery_providers(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn delivery_backup(
+    state: State<'_, AppState>,
+    input: DeliveryInput,
+) -> IpcResult<DeliveryStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::delivery_backup(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn delivery_upload(
+    state: State<'_, AppState>,
+    input: DeliveryInput,
+) -> IpcResult<DeliveryStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::delivery_upload(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn delivery_items(
+    state: State<'_, AppState>,
+    project_id: String,
+    provider: String,
+) -> IpcResult<Vec<UploadItemDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::delivery_items(&app, &project_id, &provider)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_status(state: State<'_, AppState>) -> IpcResult<LearnStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::learn_status(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_buckets(state: State<'_, AppState>) -> IpcResult<Vec<LearnBucketDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::learn_buckets(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_compare(
+    state: State<'_, AppState>,
+    profile_id: String,
+) -> IpcResult<Option<LearnComparisonDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::learn_compare(&app, &profile_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_adopt(
+    state: State<'_, AppState>,
+    profile_id: String,
+) -> IpcResult<LearnStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::learn_adopt(&app, &profile_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_roll_back(state: State<'_, AppState>, profile_id: String) -> IpcResult<u16> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::learn_roll_back(&app, &profile_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_consent(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<ConsentDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::learn_consent(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_set_consent(
+    state: State<'_, AppState>,
+    input: ConsentDto,
+) -> IpcResult<ConsentDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::learn_set_consent(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn diagnostics_report(state: State<'_, AppState>) -> IpcResult<DiagnosticsDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::diagnostics_report(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -2975,6 +3182,26 @@ fn main() {
             curate_set_order,
             curate_decide,
             curate_export,
+            // PHASE-30.
+            export_status,
+            export_presets,
+            export_preview_names,
+            export_run,
+            export_files,
+            export_manifest,
+            delivery_status,
+            delivery_providers,
+            delivery_backup,
+            delivery_upload,
+            delivery_items,
+            learn_status,
+            learn_buckets,
+            learn_compare,
+            learn_adopt,
+            learn_roll_back,
+            learn_consent,
+            learn_set_consent,
+            diagnostics_report,
         ])
         .run(tauri::generate_context!());
 

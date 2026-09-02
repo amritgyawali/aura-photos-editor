@@ -1,0 +1,36 @@
+<!--
+  The panel. Four lines of markup and a script, because the plugin's whole surface is one button
+  and the honest list of what it will and will not carry across.
+
+  The caveat list is not boilerplate. A retoucher who opens a delivery expecting AURA's grading to
+  be editable and finds pixels has been misled by the button; one who is told before they press it
+  has been given a choice.
+-->
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 12px; }
+  h2 { font-size: 13px; margin: 0 0 8px; }
+  p, li { font-size: 11px; line-height: 1.5; }
+  ul { margin: 4px 0 12px 16px; padding: 0; }
+  .caveat { opacity: 0.75; }
+  sp-button { width: 100%; }
+</style>
+
+<h2>Open an AURA delivery</h2>
+
+<p>Choose the folder AURA exported into. Each photograph opens with:</p>
+<ul>
+  <li>the rendered pixels as the base layer;</li>
+  <li>AURA's regions as layer masks;</li>
+  <li>AURA's retouch as a separate layer you can switch off.</li>
+</ul>
+
+<p class="caveat">
+  AURA's exposure, colour temperature, tone curve and HSL settings do <strong>not</strong> come
+  across. They act in a linear working space Photoshop has no equivalent of, and a translation would
+  look close and drift the moment you moved a slider. Change them in AURA and re-export.
+</p>
+
+<sp-button id="open" variant="cta">Choose a delivery folder</sp-button>
+<p id="status" class="caveat"></p>
+
+<script src="./main.js"></script>

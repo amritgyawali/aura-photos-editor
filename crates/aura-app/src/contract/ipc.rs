@@ -8092,3 +8092,485 @@ pub struct CurateExportDto {
     /// The extension a shell should offer.
     pub extension: String,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-30. Delivery, learning and diagnostics.
+// ---------------------------------------------------------------------------
+//
+// Seventeen commands and fifteen shapes, across four panels that have no equivalent anywhere
+// earlier on this surface: an export dialog whose button **writes files**, a delivery screen that
+// talks to a network, a learning review that changes what the product will do next time, and a
+// diagnostics screen whose subject is the product itself.
+//
+// Every earlier panel answers "what did AURA decide about this photograph". These four answer
+// "what is AURA about to do to my week", and the shapes are built for that.
+//
+// `ExportStatusDto` carries **three denominators** because an album export is 80 frames out of a
+// gallery of 700 out of a project of 4,000, and a panel that measured it against the project would
+// report a job that did exactly what it was asked to as having missed 98 % of a wedding.
+//
+// `ExportStatusDto.unverified` is a separate count rather than a subtraction, because "written
+// without the read-back" and "written and the read-back failed" are opposite facts and only one of
+// them is a choice somebody made.
+//
+// `DeliveryStatusDto.networkAvailable` is on the wire because this build ships no network
+// transport. A photographer who configures a provider and sees nothing upload has to be told why
+// rather than left to conclude their credentials are wrong - phase 24's rule, in the phase where
+// the absent capability is the most expensive to mistake for a failure.
+//
+// `LearnStatusDto.attributionRate` is the number that says whether the loop is *receiving*
+// anything. A build where every override arrives with no decision behind it has a full correction
+// table and an empty loop, and nothing else on the shape can tell them apart.
+//
+// What is deliberately absent: any bulk action, any credential on the wire, any `learn_capture`,
+// any threshold write, and any command that sends telemetry. ADR-0062 sections 5 and 6.
+
+/// What the Export panel's header shows.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportStatusDto {
+    /// Photographs in the project. The widest denominator.
+    pub photos: u32,
+    /// Photographs phase 12 selected.
+    pub selected: u32,
+    /// Photographs the last job asked for, across every set. **The one a completion is against.**
+    pub requested: u32,
+    /// Files written.
+    pub written: u32,
+    /// Files read back and hashed.
+    pub verified: u32,
+    /// Files written **without** the read-back, because the job asked for none.
+    pub unverified: u32,
+    /// Files whose read-back did not match. Non-zero means a delivery was stopped.
+    pub corrupt: u32,
+    /// Photographs that could not be rendered.
+    pub render_failed: u32,
+    /// Names that collided and were suffixed.
+    pub renamed: u32,
+    /// Sidecars written.
+    pub sidecars: u32,
+    /// Bytes written.
+    pub bytes: u64,
+    /// Whether the last job sealed a manifest. A partial delivery seals none.
+    pub manifest_sealed: bool,
+    /// Wall-clock milliseconds of the last job.
+    pub ms: u64,
+}
+
+/// One file a job wrote.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportFileDto {
+    /// The photograph.
+    pub image_id: String,
+    /// Which set wrote it.
+    pub set: String,
+    /// Where it landed, relative to the destination root, forward slashes.
+    pub path: String,
+    /// Its size on disk.
+    pub bytes: u64,
+    /// BLAKE3 of the bytes **read back**. Empty when the job asked for no verification.
+    pub hash: String,
+    /// Written width.
+    pub width: u32,
+    /// Written height.
+    pub height: u32,
+    /// Whether the bytes were re-read.
+    pub verified: bool,
+    /// Whether a name collision was resolved by suffixing this file.
+    pub renamed: bool,
+    /// What the panel says about it.
+    pub reasons: Vec<DeliveryReasonDto>,
+}
+
+/// One reason, rendered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryReasonDto {
+    /// The stable slug.
+    pub code: String,
+    /// The whole sentence, code plus measured half.
+    pub text: String,
+    /// Whether this code stops the job it appears on.
+    pub fatal: bool,
+}
+
+/// A sealed delivery manifest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryManifestDto {
+    /// The wedding.
+    pub project_id: String,
+    /// When it was sealed, epoch milliseconds.
+    pub created_at: i64,
+    /// How many files.
+    pub files: u32,
+    /// How many bytes across all of them.
+    pub bytes: u64,
+    /// Each set and how many files it produced.
+    pub sets: Vec<(String, u32)>,
+    /// Phase 27's archived report, when one sits beside the delivery.
+    pub qc_report_path: Option<String>,
+    /// Phase 24's removals: which photograph, and what was taken out.
+    pub cleanup_disclosures: Vec<(String, String)>,
+    /// The versions that produced it.
+    pub engine_versions: Vec<(String, String)>,
+    /// Whether every file in it carries a real digest.
+    pub fully_hashed: bool,
+}
+
+/// One set, as the export dialog builds it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportSetInput {
+    /// What the set is called.
+    pub name: String,
+    /// The photographs, in the order they are written.
+    pub image_ids: Vec<String>,
+    /// `jpeg`, `tiff` or `png`.
+    pub format: String,
+    /// JPEG quality, `60..=100`.
+    pub quality: u8,
+    /// `srgb`, `adobe_rgb` or `display_p3`.
+    pub colour: String,
+    /// 8 or 16.
+    pub bit_depth: u8,
+    /// `full`, `long_edge:N` or `fit:WxH`.
+    pub resize: String,
+    /// `none`, `screen` or `print`.
+    pub sharpen: String,
+    /// The naming template.
+    pub naming: String,
+    /// Write an XMP sidecar beside each file.
+    pub sidecar: bool,
+}
+
+/// A whole job, sent at once.
+///
+/// Whole rather than field by field, deliberately: a surface with per-field setters is a surface
+/// where a job can be half configured, and `ExportJob::validate` would then run against something
+/// nobody assembled. ADR-0062 section 6.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportJobInput {
+    /// The wedding.
+    pub project_id: String,
+    /// The sets. At most eight.
+    pub sets: Vec<ExportSetInput>,
+    /// Where the files go.
+    pub destination: String,
+    /// `folder` or `nas`. A provider is `aura-delivery`'s, not this command's.
+    pub destination_kind: String,
+    /// The copyright line.
+    pub copyright: Option<String>,
+    /// How to reach the photographer.
+    pub contact: Option<String>,
+    /// The creator's name.
+    pub creator: Option<String>,
+    /// Keywords written into every file.
+    pub keywords: Vec<String>,
+    /// Remove every location tag. **Defaults to true in the contract.**
+    pub strip_gps: bool,
+    /// Remove the camera body's serial number.
+    pub strip_camera_serial: bool,
+    /// Re-read and hash every written file.
+    pub verify: bool,
+}
+
+/// One name a job would produce, without writing anything.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportNameDto {
+    /// The photograph.
+    pub image_id: String,
+    /// Which set.
+    pub set: String,
+    /// The name it would land under, relative to the destination root.
+    pub path: String,
+    /// Whether a collision suffix was needed.
+    pub renamed: bool,
+    /// What the panel says about this name.
+    pub reasons: Vec<DeliveryReasonDto>,
+}
+
+/// One export preset, as the dialog offers it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPresetDto {
+    /// The set's name.
+    pub name: String,
+    /// `jpeg`, `tiff` or `png`.
+    pub format: String,
+    /// JPEG quality.
+    pub quality: u8,
+    /// The output space.
+    pub colour: String,
+    /// Bits per sample.
+    pub bit_depth: u8,
+    /// The resize, as text.
+    pub resize: String,
+    /// The output sharpening.
+    pub sharpen: String,
+    /// The naming template.
+    pub naming: String,
+    /// Whether a sidecar goes beside each file.
+    pub sidecar: bool,
+    /// **The argued-over half.** Why this preset is what it is, rendered in the dialog.
+    pub reason: String,
+}
+
+/// What the Delivery panel's header shows.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryStatusDto {
+    /// Files in the last export.
+    pub files: u32,
+    /// Backup destinations configured.
+    pub backups: u32,
+    /// Files present and matching at every backup destination.
+    pub backed_up: u32,
+    /// Files whose backup copy has a different digest. Non-zero stopped a backup.
+    pub diverged: u32,
+    /// Providers configured.
+    pub providers: u32,
+    /// Files a provider has accepted and verified.
+    pub uploaded: u32,
+    /// Files still outstanding at a provider.
+    pub outstanding: u32,
+    /// Files a provider refused.
+    pub refused: u32,
+    /// How many times a file was resumed.
+    pub resumes: u32,
+    /// Sets with no mapping at a provider.
+    pub unmapped_sets: u32,
+    /// Bytes sent.
+    pub bytes_sent: u64,
+    /// **Whether this build can reach a gallery over a network at all.**
+    ///
+    /// False here. On the wire rather than in a release note, so a photographer who configures a
+    /// provider and sees nothing upload is told why rather than left to conclude their credentials
+    /// are wrong.
+    pub network_available: bool,
+}
+
+/// One provider this machine has configured.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderDto {
+    /// The provider's name.
+    pub id: String,
+    /// The human name.
+    pub label: String,
+    /// Whether a credential is saved. **Never the credential.**
+    pub has_credential: bool,
+    /// Whether this provider may publish on upload. False for every provider in this build.
+    pub may_publish: bool,
+}
+
+/// One file's place in an upload.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadItemDto {
+    /// The photograph.
+    pub image_id: String,
+    /// Which set.
+    pub set: String,
+    /// The local file, relative to the export root.
+    pub path: String,
+    /// Its size.
+    pub bytes: u64,
+    /// `pending`, `in_progress`, `verified`, `corrupt` or `failed`.
+    ///
+    /// `corrupt` and `failed` are separate on purpose: a file that did not arrive and a file that
+    /// arrived wrong need different responses, and only the second is worth re-sending at once.
+    pub state: String,
+    /// Bytes the far end has acknowledged.
+    pub sent: u64,
+    /// How many times this file has been resumed.
+    pub resumes: u32,
+    /// The transport's code when the state is `failed`.
+    pub failure_code: Option<String>,
+}
+
+/// Which set goes where at a provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetMappingInput {
+    /// The set's name.
+    pub set: String,
+    /// The provider-side collection it lands in.
+    pub remote: String,
+    /// Whether to publish it. **Cleared by every provider in this build**, and the clearing is
+    /// named in the reasons rather than silent.
+    pub publish: bool,
+}
+
+/// What a delivery command was asked to do.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryInput {
+    /// The wedding.
+    pub project_id: String,
+    /// The backup destination, or the provider's name.
+    pub target: String,
+    /// Per-set mapping. Empty for a backup, which takes the whole delivery.
+    pub mapping: Vec<SetMappingInput>,
+}
+
+/// What the Learning panel's header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnStatusDto {
+    /// Corrections captured, all time.
+    pub corrections: u32,
+    /// Weddings they came from.
+    pub projects: u32,
+    /// Buckets with at least one correction.
+    pub buckets: u32,
+    /// Buckets with enough corrections from enough weddings to act on.
+    pub actionable_buckets: u32,
+    /// Changes that could not be attributed to a decision and were not learned from.
+    pub unattributed: u32,
+    /// **Whether the loop is receiving anything at all.** `0..1`.
+    pub attribution_rate: f32,
+    /// Updates computed.
+    pub updates: u32,
+    /// Updates a person adopted.
+    pub adopted: u32,
+    /// Projects whose consent allows local learning.
+    pub consented_projects: u32,
+    /// Projects whose consent allows anonymised contribution.
+    pub contributing_projects: u32,
+    /// **Whether this build has ever fitted a profile from real corrections.** False.
+    pub fitted_on_real_corrections: bool,
+}
+
+/// One bucket of corrections, aggregated.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnBucketDto {
+    /// Which value.
+    pub learnable: String,
+    /// The sentence a photographer reads for it.
+    pub label: String,
+    /// What the photograph is of.
+    pub scene: String,
+    /// Whether it is about somebody close to the couple.
+    pub subject_close: bool,
+    /// How many corrections went in.
+    pub corrections: u32,
+    /// How many weddings they came from.
+    pub projects: u32,
+    /// How many were dropped as outliers. **Shown, so a photographer can see what was ignored.**
+    pub outliers_dropped: u32,
+    /// The trimmed median magnitude.
+    pub central: f32,
+    /// How much the bucket disagrees with itself.
+    pub dispersion: f32,
+    /// How many were held out of the fit.
+    pub held_out: u32,
+    /// Whether this bucket met both floors.
+    pub actionable: bool,
+    /// The offset it proposes, bounded twice.
+    pub proposed_offset: f32,
+}
+
+/// The two sides a photographer compares before adopting.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnComparisonDto {
+    /// The profile.
+    pub profile_id: String,
+    /// The version in use.
+    pub current_version: u16,
+    /// The version on offer.
+    pub candidate_version: u16,
+    /// Mean absolute residual of the current profile on the held-out corrections.
+    pub current_error: f32,
+    /// Mean absolute residual of the candidate on the **same** corrections.
+    pub candidate_error: f32,
+    /// How many corrections both were measured on.
+    pub held_out: u32,
+    /// The improvement, `0..1`. Never negative.
+    pub improvement: f32,
+    /// Whether it may be offered at all.
+    pub offerable: bool,
+    /// One row per changed value.
+    pub rows: Vec<LearnRowDto>,
+    /// What the panel says.
+    pub reasons: Vec<DeliveryReasonDto>,
+}
+
+/// One row of the A/B comparison.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnRowDto {
+    /// Which value.
+    pub learnable: String,
+    /// Which scene.
+    pub scene: String,
+    /// The offset in the current profile.
+    pub current: f32,
+    /// The offset the candidate proposes.
+    pub candidate: f32,
+    /// How many corrections the candidate's number came from.
+    pub corrections: u32,
+    /// The sentence a photographer reads.
+    pub summary: String,
+}
+
+/// What a project has consented to.
+///
+/// Four separate booleans rather than a set, deliberately. Each is a question a person answered
+/// separately, and the whole point of the shape is that they cannot be set together by accident.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsentDto {
+    /// The wedding.
+    pub project_id: String,
+    /// May this machine learn from this wedding's corrections?
+    pub local_learning: bool,
+    /// May anonymised corrections contribute to the shared dataset?
+    pub dataset_contribution: bool,
+    /// May crash reports be sent?
+    pub crash_reports: bool,
+    /// May aggregate telemetry be sent?
+    pub telemetry: bool,
+    /// When the answers were last set, epoch milliseconds.
+    pub decided_at: i64,
+    /// **Which build's wording was agreed to.**
+    pub app_version: String,
+    /// Whether anything at all may leave this machine because of this project.
+    pub anything_leaves: bool,
+}
+
+/// What the diagnostics screen shows.
+///
+/// It leads with what is **not** working, for the reason phase 27's QC report leads with what was
+/// checked: a support call starts with somebody reading this down a telephone, and the useful half
+/// is the half that says what this machine cannot do.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticsDto {
+    /// The build.
+    pub app_version: String,
+    /// The catalog's schema version.
+    pub schema_version: i64,
+    /// The render backend's name.
+    pub render_backend: String,
+    /// The degradation the backend is running under, if any.
+    pub render_degradation: Option<String>,
+    /// The pinned model set's digest.
+    pub model_set: String,
+    /// Which AI stages are switched off.
+    pub stages_off: Vec<String>,
+    /// Whether this build can reach a gallery over a network.
+    pub network_transport: bool,
+    /// Whether this build has a trained detector for anything.
+    pub trained_models: bool,
+    /// Providers configured, and whether each has a credential.
+    pub providers: Vec<ProviderDto>,
+    /// The last few error codes, newest first, with their runbooks.
+    pub recent_errors: Vec<IpcError>,
+}

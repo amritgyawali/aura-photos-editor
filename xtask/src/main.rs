@@ -149,6 +149,9 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // near-duplicate ceiling on `album_spread.similarity` and the caption length bound. Phase 21's
     // rule - a promise enforced in one layer lasts until somebody writes a second caller.
     "crates/aura-catalog/migrations/0029_curation.sql",
+    // PHASE-30. The last migration. Every migration has been a frozen contract since phase 01;
+    // phase 16 found 15 missing and phase 28 found 28 missing, both the same way.
+    "crates/aura-catalog/migrations/0030_delivery.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

@@ -1,0 +1,66 @@
+[package]
+name         = "aura-export"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Export: naming templates, metadata policy, per-set outputs, JPEG/TIFF/PNG writers, mandatory read-back verification and the delivery manifest (phase 30)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# PHASE-30. `RenderService` is the only way in this product to turn a recipe into pixels - phase
+# 14's rule, and the first phase that had a real reason to want its own copy. An exporter with its
+# own resampler or its own output transform is a delivered JPEG that does not match the proof the
+# couple approved, and nothing would record which of the two a gallery came from.
+aura-render  = { path = "../aura-render" }
+# PHASE-30. Section 6.2's "XMP sidecars are the universal path". `aura_recipe::xmp::write` already
+# produces the document Lightroom reads; this crate places it beside the delivered file rather than
+# beside the RAW, which is the only difference.
+aura-recipe  = { path = "../aura-recipe" }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+toml         = { workspace = true }
+tracing      = { workspace = true }
+blake3       = { workspace = true }
+time         = { workspace = true }
+# The two codecs a delivery uses. TIFF is written by hand in `tiff.rs` - there is no pure-Rust
+# baseline TIFF *writer* in the licence allow list, the format's writer half is a header and an IFD,
+# and a delivery needs the ICC tag which most of them do not write.
+jpeg-encoder = { workspace = true }
+png          = { workspace = true }
+
+# Deliberately absent: every deciding crate from `aura-brain-photo` to `aura-curate`. What to export
+# arrives as an `ExportJob` - a list of images somebody chose - and the per-frame facts a naming
+# template needs arrive through the `read::Field` port that `aura-app` implements. An exporter that
+# could ask the cull engine what is in the gallery is an exporter with an opinion about what is
+# delivered, and section 2.1 gives it none.
+#
+# `aura-preview` and `aura-raw` are absent because nothing here opens an original: pixels come from
+# `RenderService` and from nowhere else.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+# PHASE-30. Section 10.1's first row: "rendered JPEG/TIFF match the reference render within a
+# perceptual tolerance". A test that encoded a JPEG and checked its length would prove nothing, so
+# the fidelity test decodes what was written back and compares it to the buffer that went in.
+zune-jpeg    = { workspace = true }
+# PHASE-30. The same reason `zune-jpeg` is here: an integration test cannot reach a crate's own
+# dependencies, and gate 1 decodes what the PNG writer wrote rather than checking its length.
+png          = { workspace = true }
+blake3       = { workspace = true }
+# PHASE-30. The gates measure the phase rather than the crate: an upload that resumes and a
+# candidate that improves on held-out corrections are section 10.1 rows, and they live beside the
+# export rows because a photographer's delivery is one thing. Dev-dependencies, so nothing in this
+# crate's library can reach them - `aura-export` writes files and knows nothing about sending them.
+aura-delivery = { path = "../aura-delivery" }
+aura-learn    = { path = "../aura-learn" }
+serde_json   = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build.
+[[test]]
+name = "delivery_eval"
+path = "../../tests/eval/delivery_eval.rs"

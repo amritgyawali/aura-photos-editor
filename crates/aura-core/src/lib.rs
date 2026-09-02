@@ -33,12 +33,14 @@ pub mod contract {
     pub mod consent;
     pub mod cull;
     pub mod curate;
+    pub mod delivery;
     pub mod emotion;
     pub mod error;
     pub mod gallery;
     pub mod geometry;
     pub mod ids;
     pub mod integrity;
+    pub mod learn;
     pub mod ledger;
     pub mod local;
     pub mod micro;
@@ -87,6 +89,12 @@ pub use contract::cull::{
     Coverage, CoverageReport, CullCode, CullMode, CullOutline, CullReason, CullService, Decision,
     KeepScore, MustHave, Rejected, Selected, SelectionResult,
 };
+pub use contract::delivery::{
+    DeliveryCode, DeliveryColour, DeliveryManifest, DeliveryOutline, DeliveryReason,
+    DeliveryService, Destination, ExportJob, ExportOutline, ExportService, ExportSet, ExportedFile,
+    FileFormat, MetadataPolicy, NameToken, NamingTemplate, OutputSharpen, ProviderId, Resize,
+    SetMapping, UploadItem, UploadProgress, UploadState,
+};
 pub use contract::emotion::{
     EmotionCode, EmotionOutline, EmotionReason, EmotionService, FaceExpression, GazeTarget,
     ImageEmotion, Interaction, MomentPeak, PeakKind, Preference, ReactionLink,
@@ -108,6 +116,10 @@ pub use contract::ids::{
 pub use contract::integrity::{
     CropRect, ExposureVerdict, EyeOpenness, EyeState, IntegrityFlags, IntegrityOutline,
     IntegrityResult, IntegrityService, MotionKind, Reason, ReasonCode,
+};
+pub use contract::learn::{
+    AbComparison, AbRow, Aggregate, Consent, Correction, CorrectionBucket, CorrectionContext,
+    HeldOut, LearnCode, LearnOutline, LearnReason, LearnService, Learnable, LearningUpdate,
 };
 pub use contract::ledger::{
     Autonomy, DecisionKind, DecisionSource, DecisionSubject, Evidence, ExplainService, Explainable,

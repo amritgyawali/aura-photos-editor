@@ -1,0 +1,74 @@
+# The telemetry schema. SEC-owned, and the list is closed.
+#
+# Every event section 11 names, with every field it may carry. A field not in this file cannot be
+# emitted: `aura-app`'s emitter checks against it, so adding a field is a change to this file and a
+# review by SEC rather than a line in a function nobody reads.
+#
+# ## Why a closed schema rather than a redaction pass
+#
+# Because a redactor is a list of things to remove and this is a list of things to keep, and only
+# one of those is safe when somebody adds a field. Phase 04 made the same call about what may reach
+# a model provider, and phase 13 about what may reach a support bundle.
+
+version = 1
+
+# Every field below is a count, a duration, a boolean or a word from a closed set. There is no type
+# in this file that could hold a name, a path, a photograph or an identifier.
+[types]
+allowed = ["count", "ms", "bytes", "bool", "enum", "ratio", "version"]
+
+[[event]]
+name = "export.job"
+[event.fields]
+sets             = "count"
+images           = "count"
+format           = "enum"
+ms               = "ms"
+verified         = "bool"
+destination_kind = "enum"
+
+[[event]]
+name = "delivery.upload"
+[event.fields]
+provider = "enum"
+images   = "count"
+bytes    = "bytes"
+ms       = "ms"
+resumes  = "count"
+
+[[event]]
+name = "learn.corrections"
+[event.fields]
+kind           = "enum"
+count          = "count"
+mean_magnitude = "ratio"
+
+[[event]]
+name = "learn.update"
+[event.fields]
+# The profile's *version*, never its name. A profile name is something a photographer typed and is
+# often a client's name.
+profile              = "version"
+expected_improvement = "ratio"
+adopted              = "bool"
+
+[[event]]
+name = "release.update"
+[event.fields]
+from_version = "version"
+to_version   = "version"
+channel      = "enum"
+rolled_back  = "bool"
+
+# ---------------------------------------------------------------------------
+# What may never appear, whatever a future event is called
+# ---------------------------------------------------------------------------
+
+[forbidden]
+# Not a redaction list - the schema above is closed, so this is a second lock rather than the only
+# one. It exists because the failure it guards is somebody adding a field in a hurry.
+substrings = [
+  "path", "file", "name", "couple", "bride", "groom", "venue", "email",
+  "thumbnail", "preview", "crop", "histogram", "embedding", "template", "face",
+  "identity", "gps", "latitude", "longitude", "serial",
+]

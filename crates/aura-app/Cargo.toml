@@ -32,6 +32,12 @@ aura-cull          = { path = "../aura-cull" }
 # owns no output of its own: the album, the portfolio and the sets are proposals a photographer
 # accepts. ADR-0059 section 3.
 aura-curate        = { path = "../aura-curate" }
+# PHASE-30. The three crates this phase adds. `aura-export` writes files, `aura-delivery` sends
+# them somewhere else, `aura-learn` learns from what a photographer changed - and this crate is
+# where the ports each of them declares get their implementations, out of the frozen services.
+aura-export        = { path = "../aura-export" }
+aura-delivery      = { path = "../aura-delivery" }
+aura-learn         = { path = "../aura-learn" }
 aura-explain       = { path = "../aura-explain" }
 aura-geometry      = { path = "../aura-geometry" }
 # PHASE-24. The cleanup engine. `aura-app` is where the editorial-judgement port meets

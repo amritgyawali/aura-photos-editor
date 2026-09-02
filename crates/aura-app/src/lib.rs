@@ -58,8 +58,10 @@ pub mod commands;
 pub mod composition_commands;
 pub mod cull_commands;
 pub mod curate_commands;
+pub mod delivery_commands;
 pub mod develop_commands;
 pub mod gallery_commands;
+pub mod learn_commands;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.
@@ -124,6 +126,10 @@ pub use curate_commands::{
     curate_album, curate_bw, curate_decide, curate_export, curate_heroes, curate_project,
     curate_set_order, curate_social, curate_spread, curate_status, curate_teaser,
 };
+pub use delivery_commands::{
+    delivery_backup, delivery_items, delivery_providers, delivery_status, delivery_upload,
+    export_files, export_manifest, export_presets, export_preview_names, export_run, export_status,
+};
 pub use develop_commands::{
     develop_status, history_step, image_history, image_recipe, render_caps, render_image,
     set_param, snapshot,
@@ -154,6 +160,10 @@ pub use infer_commands::{
 pub use integrity_commands::{
     analyse_integrity, dismiss_flag, flagged_images, image_integrity, integrity_status,
     within_moment,
+};
+pub use learn_commands::{
+    diagnostics_report, learn_adopt, learn_buckets, learn_compare, learn_consent, learn_roll_back,
+    learn_set_consent, learn_status,
 };
 pub use local_commands::{
     accept_local, image_local, local_review_queue, local_status, sculpt_local, set_local_strength,
