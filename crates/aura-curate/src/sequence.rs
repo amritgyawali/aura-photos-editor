@@ -359,6 +359,15 @@ pub fn apply(
     if answer.moves.is_empty() {
         return result;
     }
+    // A photographer's order is not a starting point for a model's suggestions. The operating
+    // manual's fifth code rule outranks section 7's refinement, and a cloud move applied to a
+    // hand-set album would be the one place in this phase where automation overwrote a person.
+    if plan.user_ordered {
+        result.refused = answer.moves.len().min(MAX_MOVES) as u32;
+        plan.reasons
+            .push(CurateReason::plain(CurateCode::UserOrdered, 1.0));
+        return result;
+    }
     let by_id: BTreeMap<ImageId, &Frame> = frames.iter().map(|f| (f.image_id, f)).collect();
 
     for entry in answer.moves.iter().take(MAX_MOVES) {
@@ -397,7 +406,9 @@ pub fn apply(
         order.insert(to, image);
 
         // Checks 2 and 3: the local optimiser is the judge.
-        let mut candidate = crate::album::lay_out(&order, &by_id, field, policy);
+        // Laid out the same way the album it is being compared against was, so the objective
+        // comparison is between two sequences and not between two layout policies.
+        let mut candidate = crate::album::lay_out(&order, &by_id, field, policy, true);
         crate::album::renumber(&mut candidate);
         if !objective_improved(plan, &candidate, &by_id, policy) {
             result.refused += 1;

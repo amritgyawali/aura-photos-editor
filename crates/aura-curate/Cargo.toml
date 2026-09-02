@@ -29,8 +29,9 @@ serde_json   = { workspace = true }
 toml         = { workspace = true }
 tracing      = { workspace = true }
 
-# Deliberately absent: `aura-recipe`, `aura-render`, `aura-preview`, `aura-raw`, and every one of the
-# deciding crates from `aura-brain-photo` to `aura-qc`.
+# Deliberately absent from the *library*: `aura-recipe`, `aura-render`, `aura-preview`, `aura-raw`,
+# and every one of the deciding crates from `aura-brain-photo` to `aura-qc`. `aura-render` returns
+# below as a dev-dependency and the distinction is the whole point - see the note on it there.
 #
 # `aura-recipe` and `aura-render` are absent for a reason sharper here than in `aura-geometry`,
 # `aura-generative`, `aura-brain-gallery` or `aura-qc`. This phase proposes a **monochrome
@@ -57,6 +58,21 @@ tempfile     = { workspace = true }
 # nobody has checked. The export itself is written by hand - ADR-0059 section 4 - so this is the
 # consumer rather than the producer.
 serde_json   = { workspace = true }
+# PHASE-29, and a dependency that is deliberately *only* here. Section 10.1 asks whether a generated
+# monochrome mix is better than a fixed preset, and that is a question about greys rather than about
+# band weights: two mixes with different numbers can render the same photograph identically, and a
+# mix that separated a red from a green on paper can collapse them on the pixel. So the gate measures
+# through `aura_render::tonemap::monochrome`, which is the arithmetic that will actually run when a
+# photographer accepts a proposal.
+#
+# Phase 16's rule - a guarantee about a pixel is enforced on the pixel - with phase 29's constraint
+# on top of it: the library must not be able to render, because rendering is one call from applying,
+# and applying is the product deciding a wedding is monochrome. A dev-dependency cannot be reached
+# from the library at all, and `tests/no_outputs.rs` fails the build if `src/` ever names it.
+aura-render  = { path = "../aura-render" }
+# The `Bw` block `aura_render::tonemap::monochrome` takes. Here for the same reason and under the
+# same guard: the library must not be able to write one.
+aura-recipe  = { path = "../aura-recipe" }
 
 # The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
 # `tests/eval/` beside the phase 05 to 27 harnesses rather than in this crate's own `tests/`,

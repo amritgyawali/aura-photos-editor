@@ -239,7 +239,7 @@ pub fn select(frames: &[Frame], field: &dyn Field, policy: &Policy) -> Vec<HeroP
         }
         match binding {
             HeroBinding::ChapterQuota => {
-                reasons.push(CurateReason::plain(CurateCode::ChapterQuotaBinding, -0.20))
+                reasons.push(CurateReason::plain(CurateCode::ChapterQuotaBinding, -0.20));
             }
             HeroBinding::MomentExhausted => reasons.push(CurateReason::plain(
                 CurateCode::MomentAlreadyRepresented,

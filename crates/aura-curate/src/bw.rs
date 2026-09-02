@@ -515,7 +515,11 @@ pub fn suitability(frame: &Frame, skin_bands: &BTreeSet<usize>, policy: &Policy)
 ///
 /// A tenth of the tonal range. Two regions whose greys land inside that are the same tone in a
 /// monochrome print, whatever their hues were.
-const COLLAPSE: f32 = 0.10;
+///
+/// Public because `tests/eval/curate_eval.rs` measures the solver against exactly this set - the
+/// bands that had collapsed onto the anchor - and a gate that carried its own copy of a threshold
+/// would go on passing after somebody moved this one.
+pub const COLLAPSE: f32 = 0.10;
 
 /// Solve the eight-band mix for one frame.
 ///

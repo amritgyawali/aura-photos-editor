@@ -306,7 +306,7 @@ fn every_export_format_produces_something_a_consumer_can_read() {
                 let parsed: serde_json::Value = serde_json::from_str(&text)
                     .unwrap_or_else(|e| panic!("{subject:?}: {e}\n{text}"));
                 assert!(parsed.is_object());
-                assert_eq!(parsed["version"], serde_json::json!(1));
+                assert_eq!(parsed["version"].as_u64(), Some(1));
             }
         }
     }

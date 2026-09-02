@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use aura_core::contract::cull::{Coverage, CoverageReport, MustHave};
-use aura_core::contract::curate::{AspectVariant, ImageId};
+use aura_core::contract::curate::{AspectVariant, ImageId, MAX_HEROES_PER_CHAPTER};
 use aura_core::contract::ids::{IdentityId, MomentId};
 use aura_core::contract::scene::{ChapterId, SceneId};
 use aura_core::{AuraResult, ProjectId};
@@ -144,23 +144,23 @@ const PLAN: [(ChapterId, SceneId, Option<MustHave>, f32); 10] = [
 /// to be across versions of its crate.
 #[must_use]
 pub fn wedding(shape: Shape, seed: u64) -> Wedding {
-    let project = ProjectId::new();
-    let identities: Vec<IdentityId> = (0..4).map(|_| IdentityId::new()).collect();
+    let project = project_id(seed);
+    let identities: Vec<IdentityId> = (0..4).map(|ix| identity_id(seed, ix)).collect();
     let mut frames = Vec::with_capacity(shape.frames as usize);
     let mut satisfied: Vec<MustHave> = Vec::new();
 
     let mut order = 0u32;
     for (chapter, scene, rule, share) in PLAN {
         let count = ((shape.frames as f32) * share).round().max(1.0) as u32;
-        let moment = MomentId::new();
+        let moment = moment_id(seed, u64::from(order) | 0x1000_0000);
         for ix in 0..count {
             let noise = mix(seed, u64::from(order));
-            let mut frame = Frame::bare(ImageId::new(), order);
+            let mut frame = Frame::bare(image_id(seed, u64::from(order)), order);
             frame.scene = Some(scene);
             frame.chapter = Some(chapter);
             // Every eighth frame starts a new moment, so a chapter has several.
             frame.moment = Some(if ix.is_multiple_of(8) {
-                MomentId::new()
+                moment_id(seed, u64::from(order))
             } else {
                 moment
             });
@@ -202,7 +202,7 @@ pub fn wedding(shape: Shape, seed: u64) -> Wedding {
                 }];
             }
             if shape.descriptors {
-                frame.descriptor = Some(descriptor(noise));
+                frame.descriptor = Some(descriptor(noise, chapter_base_luma(chapter)));
             }
             // Every third frame has a square crop; every fifth has a 4:5.
             frame.aspects = vec![AspectVariant::Original];
@@ -264,11 +264,74 @@ pub fn wedding(shape: Shape, seed: u64) -> Wedding {
 pub fn planted(shape: Shape, seed: u64, count: usize) -> (Wedding, Vec<ImageId>) {
     let mut wedding = wedding(shape, seed);
     let mut planted = Vec::new();
-    // Spread the plants across chapters, so a correct selector has to satisfy the diversity
-    // constraints to find them all.
-    let stride = (wedding.frames.len() / count.max(1)).max(1);
-    for ix in 0..count {
-        let position = ix * stride;
+
+    // Plants are allocated across the chapters in proportion to how much of the day each one is,
+    // capped below the hero quota, and placed at an even stride *inside* each chapter.
+    //
+    // Two corrections, both forced by the hero agreement gate, and both the same lesson in different
+    // clothes - phase 25's, for the sixth and seventh time in this repository.
+    //
+    // The first version planted at a fixed stride through the whole gallery, which follows chapter
+    // size and therefore put exactly `MAX_HEROES_PER_CHAPTER` plants into each of the three longest
+    // chapters. A plant set that fills a quota is one where a single ordinary frame winning a single
+    // round costs a plant permanently, and the gate measures the tie rather than the selector.
+    //
+    // The second was an even round robin, which fixed the quota and broke the spacing: three plants
+    // in the shortest chapter sit close enough together to be near-duplicates of each other, and
+    // uniqueness is eighteen per cent of the portfolio blend. A photographer's own top twenty is not
+    // three frames from one corner of a short chapter; it is spread in proportion to where the day
+    // actually was.
+    let mut by_chapter: BTreeMap<ChapterId, Vec<usize>> = BTreeMap::new();
+    for (ix, frame) in wedding.frames.iter().enumerate() {
+        by_chapter
+            .entry(frame.chapter_or_other())
+            .or_default()
+            .push(ix);
+    }
+    let cap = (MAX_HEROES_PER_CHAPTER.saturating_sub(1)).max(1) as usize;
+    let total: usize = by_chapter.values().map(Vec::len).sum();
+    let mut quota: BTreeMap<ChapterId, usize> = BTreeMap::new();
+    for (chapter, frames_in) in &by_chapter {
+        let proportional = frames_in.len() * count / total.max(1);
+        quota.insert(*chapter, proportional.min(cap).min(frames_in.len()));
+    }
+    // Hand the remainder to whichever chapter is furthest below its cap, longest first, so an
+    // allocation that rounded down does not silently plant fewer than asked for.
+    while quota.values().sum::<usize>() < count {
+        let mut best: Option<ChapterId> = None;
+        let mut best_room = 0usize;
+        for (chapter, frames_in) in &by_chapter {
+            let taken = quota.get(chapter).copied().unwrap_or_default();
+            let room = cap.min(frames_in.len()).saturating_sub(taken);
+            if room > best_room {
+                best_room = room;
+                best = Some(*chapter);
+            }
+        }
+        let Some(chapter) = best else { break };
+        *quota.entry(chapter).or_default() += 1;
+    }
+
+    let mut positions: Vec<usize> = Vec::new();
+    for (chapter, frames_in) in &by_chapter {
+        let take = quota.get(chapter).copied().unwrap_or_default();
+        if take == 0 {
+            continue;
+        }
+        // Centred strides: `len/2n`, `3len/2n`, ... so the plants are as far from each other and
+        // from the chapter's edges as the chapter allows.
+        let span = frames_in.len();
+        for slot in 0..take {
+            let offset = (2 * slot + 1) * span / (2 * take);
+            if let Some(position) = frames_in.get(offset.min(span.saturating_sub(1))) {
+                positions.push(*position);
+            }
+        }
+    }
+    positions.sort_unstable();
+    positions.truncate(count);
+
+    for position in positions {
         let Some(frame) = wedding.frames.get_mut(position) else {
             break;
         };
@@ -278,26 +341,79 @@ pub fn planted(shape: Shape, seed: u64, count: usize) -> (Wedding, Vec<ImageId>)
         frame.narrative = Some(0.95);
         frame.keep_score = 0.98;
         // Its own moment, so the moment constraint does not exclude it.
-        frame.moment = Some(MomentId::new());
+        frame.moment = Some(moment_id(seed, 0x8000_0000 | position as u64));
         planted.push(frame.image_id);
     }
     (wedding, planted)
 }
 
+/// The mean luminance a chapter sits around, after phase 25 has normalised the gallery.
+///
+/// Per chapter rather than per frame, and this is a correction the phase gate forced. The first
+/// fixture drew each frame's mean luminance uniformly across the whole range, which models a gallery
+/// **nobody normalised** - and no curation pass ever sees one of those, because phase 25 runs first.
+/// The consequence was that half of every candidate pairing exceeded the tonal ceiling and the gate
+/// reported an album of single pages.
+///
+/// Phase 25's lesson, restated: when a gate cannot be met, work out whether the fixture, the
+/// threshold or the code is the thing that does not match reality. Here it was the fixture. A real
+/// wedding varies enormously in brightness **between** a dark church and a sunset portrait and
+/// modestly **within** either - and spreads only ever pair inside one chapter.
+const fn chapter_base_luma(chapter: ChapterId) -> f32 {
+    match chapter {
+        ChapterId::GettingReady => 0.62,
+        ChapterId::Details => 0.54,
+        ChapterId::Ceremony => 0.34,
+        ChapterId::Rituals => 0.36,
+        ChapterId::Portraits => 0.66,
+        ChapterId::Reception => 0.42,
+        ChapterId::Dance => 0.22,
+        ChapterId::Exit => 0.28,
+        ChapterId::Other => 0.45,
+    }
+}
+
 /// A descriptor whose colour and tone vary with the frame.
-fn descriptor(noise: u64) -> Descriptor {
+///
+/// `base` is the chapter's own tone; a frame varies around it by at most a tenth of the range, which
+/// is roughly what phase 25 leaves behind inside one lighting node.
+fn descriptor(noise: u64, base: f32) -> Descriptor {
     let mut hist = vec![0u8; 512];
-    let hue = (noise % 8) as usize;
+    // Four hues rather than one. The first fixture put a frame's whole population in a single hue
+    // bin, and the monochrome gate is what found it: a one-hue frame has **nothing to separate**,
+    // so every mix and every preset scored zero on it and three quarters of the gallery measured
+    // nothing at all. A wedding photograph is skin, fabric, foliage and sky in one frame - which is
+    // the entire reason a per-band mix exists - and a fixture with one hue in it is a fixture that
+    // cannot tell a working solver from a solver that returns neutral.
+    //
+    // The four are spread around the wheel rather than adjacent, because two neighbouring hue bins
+    // land in overlapping bands and would leave the same gap.
+    let first = (noise % 8) as usize;
+    let hues = [first, (first + 2) % 8, (first + 4) % 8, (first + 5) % 8];
+    // Descending weights, so a frame has a dominant colour and three lesser ones rather than four
+    // equal quarters - which is what `hue_carried` and `dominant` are written against.
+    let weights = [255u8, 170, 110, 60];
     let sat = 4 + ((noise >> 3) % 4) as usize;
     let dark = ((noise >> 6) % 3) as usize;
     let light = 5 + ((noise >> 8) % 3) as usize;
-    for (bin, weight) in [(dark, 255u8), (light, 200u8)] {
-        let ix = hue * 64 + sat * 8 + bin;
-        if let Some(slot) = hist.get_mut(ix) {
-            *slot = weight;
+    for (slot_ix, hue) in hues.into_iter().enumerate() {
+        let Some(top) = weights.get(slot_ix) else {
+            continue;
+        };
+        // Each hue sits at its own brightness, so the bands are separable in principle and a mix
+        // has something to do. The two bins per hue are its shadow and its highlight.
+        let step = ((noise >> (16 + slot_ix * 3)) % 3) as usize;
+        for (bin, share) in [
+            (dark.saturating_add(step).min(7), *top),
+            (light.saturating_sub(step).max(dark), top / 2 + 20),
+        ] {
+            let ix = hue * 64 + sat * 8 + bin;
+            if let Some(slot) = hist.get_mut(ix) {
+                *slot = slot.saturating_add(share);
+            }
         }
     }
-    let mean = 0.25 + 0.5 * unit(noise, 13);
+    let mean = (base + 0.20f32.mul_add(unit(noise, 13), -0.10)).clamp(0.05, 0.95);
     Descriptor {
         hsv_hist: hist,
         luma: LumaStats {
@@ -425,14 +541,42 @@ impl Field for FixtureField {
                 if from_moment.is_some() && from_moment == moment_of(*other) {
                     return Some(0.95);
                 }
+                // Otherwise it falls off with how far apart in the day the two frames were shot,
+                // plus a small stable jitter.
+                //
+                // The first version was a hash of the two ids and nothing else, which makes
+                // similarity **independent of everything else about a frame** - and the hero gate is
+                // what found it. Uniqueness is eighteen per cent of the portfolio blend, so a
+                // planted frame that drew an unlucky hash lost its place to an ordinary frame that
+                // drew a lucky one, and the agreement gate read 0.60 while measuring a coin toss.
+                //
+                // A wedding does not work like that. Two frames from the same minute look alike
+                // whether or not the grouper put them in one moment, and a frame from the vows and a
+                // frame from the first dance do not - which is exactly why a photographer's own top
+                // twenty is spread across the day. Modelling that makes the uniqueness term mean
+                // what the product says it means, and it gives the album's near-duplicate refusal
+                // consecutive frames to refuse rather than an arbitrary scattering.
+                //
                 // Combined commutatively, because a similarity that disagrees with itself when the
                 // arguments are swapped is not a distance - and the near-duplicate constraint asks
                 // it both ways, once when the pair is laid out and once when a swap is considered.
                 // The first version passed the two folds straight into `mix`, which is not
                 // symmetric in its arguments, and `similarity_is_symmetric` is what found it.
+                let order_of = |id: ImageId| -> Option<u32> {
+                    self.wedding
+                        .frames
+                        .iter()
+                        .find(|f| f.image_id == id)
+                        .map(|f| f.order)
+                };
+                let (Some(x), Some(y)) = (order_of(from), order_of(*other)) else {
+                    return None;
+                };
+                let gap = (f64::from(x) - f64::from(y)).abs() as f32;
                 let (a, b) = (fold(&from.to_db()), fold(&other.to_db()));
                 let noise = mix(a.wrapping_add(b), a ^ b);
-                Some(0.1 + 0.7 * unit(noise, 0))
+                let falloff = 0.82 * (-gap / 45.0).exp();
+                Some((0.04 + falloff + 0.10 * unit(noise, 0)).clamp(0.0, 0.99))
             })
             .collect()
     }
@@ -444,6 +588,59 @@ impl Field for FixtureField {
     fn close_family(&self, _project: ProjectId) -> AuraResult<(Vec<IdentityId>, u32)> {
         Ok((self.wedding.identities.clone(), 2))
     }
+}
+
+/// A deterministic id of the same kind as `sample`, keyed on the fixture's seed.
+///
+/// **The fixture minted random ids until the hero gate caught it.** `ImageId::new()` is a v7 UUID,
+/// which is time-ordered in its high bits and *random* in its low ones - so two runs of the same
+/// seed produced galleries that agreed about every score and disagreed about every identifier. That
+/// is invisible until something reads an id: the similarity jitter does, and so does every
+/// tie-break in this crate that falls back on `image_id`. The agreement gate moved by fifteen
+/// points between two runs of an unchanged build, which is the worst kind of red line - one nobody
+/// can reproduce.
+///
+/// `the_same_seed_produces_the_same_wedding` had been passing throughout, because it compared
+/// scores and chapters rather than identifiers. It compares ids now.
+///
+/// The index goes in the high bytes so the ids still sort in gallery order, which is the one
+/// property of a v7 UUID this crate relies on.
+fn id_text(sample: &str, seed: u64, tag: u64, index: u64) -> String {
+    let prefix = sample.split('_').next().unwrap_or("id");
+    let hi = mix(seed ^ tag, index);
+    let lo = mix(hi, index.wrapping_add(tag));
+    format!(
+        "{prefix}_{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
+        index as u32,
+        ((hi >> 48) & 0xFFFF) as u16,
+        ((hi >> 32) & 0xFFFF) as u16,
+        ((hi >> 16) & 0xFFFF) as u16,
+        lo & 0xFFFF_FFFF_FFFF
+    )
+}
+
+/// The `index`-th image of the wedding `seed` describes.
+fn image_id(seed: u64, index: u64) -> ImageId {
+    ImageId::from_db(&id_text(&ImageId::new().to_db(), seed, 0x1_1111, index))
+        .unwrap_or_else(|_| ImageId::new())
+}
+
+/// The `index`-th moment of the wedding `seed` describes.
+fn moment_id(seed: u64, index: u64) -> MomentId {
+    MomentId::from_db(&id_text(&MomentId::new().to_db(), seed, 0x2_2222, index))
+        .unwrap_or_else(|_| MomentId::new())
+}
+
+/// The `index`-th person in the wedding `seed` describes.
+fn identity_id(seed: u64, index: u64) -> IdentityId {
+    IdentityId::from_db(&id_text(&IdentityId::new().to_db(), seed, 0x3_3333, index))
+        .unwrap_or_else(|_| IdentityId::new())
+}
+
+/// The project the wedding `seed` describes.
+fn project_id(seed: u64) -> ProjectId {
+    ProjectId::from_db(&id_text(&ProjectId::new().to_db(), seed, 0x4_4444, 0))
+        .unwrap_or_else(|_| ProjectId::new())
 }
 
 /// Fold a string into a hash seed, symmetrically enough that `similarity(a, b)` and
@@ -458,15 +655,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_chapter_is_tonally_consistent_and_two_chapters_are_not() {
+        // The correction the phase gate forced: a curation pass only ever sees a gallery phase 25
+        // has normalised, and pairs only ever form inside one chapter.
+        let w = wedding(Shape::as_shipped(400), 4);
+        let mut by_chapter: BTreeMap<ChapterId, Vec<f32>> = BTreeMap::new();
+        for frame in &w.frames {
+            if let Some(luma) = frame.tonal_weight() {
+                by_chapter
+                    .entry(frame.chapter_or_other())
+                    .or_default()
+                    .push(luma);
+            }
+        }
+        let mut means = Vec::new();
+        for (chapter, lumas) in &by_chapter {
+            let lo = lumas.iter().copied().fold(f32::MAX, f32::min);
+            let hi = lumas.iter().copied().fold(f32::MIN, f32::max);
+            assert!(
+                hi - lo <= aura_core::contract::curate::MAX_PAIR_TONAL_GAP,
+                "{chapter:?} spans {:.2}, which is wider than a normalised chapter",
+                hi - lo
+            );
+            let sum: f32 = lumas.iter().copied().sum();
+            means.push(sum / lumas.len() as f32);
+        }
+        let lo = means.iter().copied().fold(f32::MAX, f32::min);
+        let hi = means.iter().copied().fold(f32::MIN, f32::max);
+        assert!(
+            hi - lo > aura_core::contract::curate::MAX_PAIR_TONAL_GAP,
+            "the chapters are all the same brightness ({lo:.2} to {hi:.2}), which no wedding is"
+        );
+    }
+
+    #[test]
     fn the_same_seed_produces_the_same_wedding() {
         let a = wedding(Shape::as_shipped(200), 7);
         let b = wedding(Shape::as_shipped(200), 7);
         assert_eq!(a.frames.len(), b.frames.len());
         for (x, y) in a.frames.iter().zip(&b.frames) {
+            // The identifiers as well as the scores. Comparing only the scores is what let a
+            // fixture that minted random ids look deterministic for four phases of this crate's
+            // development - see `id_text`.
+            assert_eq!(x.image_id, y.image_id);
+            assert_eq!(x.moment, y.moment);
             assert_eq!(x.keep_score, y.keep_score);
             assert_eq!(x.technical, y.technical);
             assert_eq!(x.chapter, y.chapter);
         }
+        assert_eq!(a.project, b.project, "the project id is not reproducible");
+        assert_eq!(
+            a.identities, b.identities,
+            "the people are not reproducible"
+        );
     }
 
     #[test]

@@ -97,7 +97,7 @@ pub fn compose(
     };
     let user_ordered = context.user_order.is_some();
 
-    let mut spreads = lay_out(&chosen, &by_id, field, policy);
+    let mut spreads = lay_out(&chosen, &by_id, field, policy, !user_ordered);
     if !user_ordered {
         optimise(&mut spreads, &by_id, field, policy);
     }
@@ -371,48 +371,101 @@ pub fn apportion(
     out
 }
 
+/// How far ahead the layout looks for a frame that can face the one on the left.
+///
+/// Four. The whole point is that a refused pair should cost a small reordering rather than a page,
+/// and a window this size covers the common cause - a run of frames from one moment - without
+/// moving a frame far enough that a reader notices the sequence is not chronological.
+pub const PAIR_LOOKAHEAD: usize = 4;
+
 /// Turn an ordered list of images into spreads, chapter by chapter.
 ///
 /// A chapter never shares a spread with another chapter: the fold is where a reader turns the page,
 /// and a spread whose left page is the ceremony and whose right is the reception reads as an
 /// editing mistake. So a chapter with an odd number of images ends on a **single**, which is a
 /// design a photographer recognises.
+///
+/// # Why it looks ahead
+///
+/// The first version of this function paired `order[ix]` with `order[ix + 1]` and made a single
+/// whenever that pair was refused. Every unit test passed - the constraints were enforced, the
+/// chapters held, no near-duplicate faced another - and the phase gate reported **75 spreads for 80
+/// images**, which is an album of seventy single pages.
+///
+/// The cause is that the constraints refuse exactly the pairs a timeline order produces most often:
+/// two frames of one moment are adjacent in time, so they are adjacent in the album, so the
+/// near-duplicate rule fires on nearly every pair. Refusing was right; giving up was not.
+///
+/// So a refused pair now costs a small reordering rather than a page: the next frame *inside the
+/// same chapter* that can face this one is brought forward, up to [`PAIR_LOOKAHEAD`] positions.
+/// Reordering inside a chapter is what the optimiser does anyway, and the optimiser could never have
+/// fixed this - it trades right pages between existing pairs, and there were no pairs to trade.
+///
+/// # Why `may_reorder` exists
+///
+/// Because the look-ahead broke a guarantee the moment it was added, and the phase gate caught it on
+/// the next run. A photographer who drags a frame has chosen an **adjacency**, not just an order;
+/// bringing a different frame forward to make a pair work is AURA moving their album. So on a
+/// user-ordered album the look-ahead is switched off entirely: the pages are exactly what they
+/// dragged, and a pair that cannot be permitted becomes a single. The operating manual's fifth code
+/// rule - a parameter a person set is never overwritten - applied to a sequence.
 #[must_use]
 pub fn lay_out(
     order: &[ImageId],
     by_id: &BTreeMap<ImageId, &Frame>,
     field: &dyn Field,
     policy: &Policy,
+    may_reorder: bool,
 ) -> Vec<Spread> {
+    // A working copy, because a refused pair is fixed by moving a frame forward rather than by
+    // leaving a page blank. The caller's order is unchanged.
+    let mut remaining: Vec<ImageId> = order.to_vec();
     let mut spreads = Vec::new();
     let mut ix = 0usize;
-    while ix < order.len() {
-        let Some(left_id) = order.get(ix) else { break };
-        let Some(left) = by_id.get(left_id) else {
+
+    while ix < remaining.len() {
+        let Some(left_id) = remaining.get(ix).copied() else {
+            break;
+        };
+        let Some(left) = by_id.get(&left_id) else {
             ix += 1;
             continue;
         };
         let chapter = left.chapter_or_other();
 
-        // The candidate for the facing page: the next image, if it is in the same chapter and the
-        // pair is permitted.
-        let right = order
-            .get(ix + 1)
-            .and_then(|id| by_id.get(id).map(|f| (*id, *f)))
-            .filter(|(_, frame)| frame.chapter_or_other() == chapter);
+        // Look for the nearest frame inside this chapter that may face the left page. The first
+        // candidate is the next frame, which is the common case and costs no reordering at all.
+        let mut chosen: Option<(usize, ImageId, SpreadPair)> = None;
+        let window = if may_reorder { PAIR_LOOKAHEAD } else { 1 };
+        for offset in 1..=window {
+            let Some(candidate_id) = remaining.get(ix + offset).copied() else {
+                break;
+            };
+            let Some(candidate) = by_id.get(&candidate_id) else {
+                continue;
+            };
+            // Never past the chapter's own end: the fold is where a reader turns the page.
+            if candidate.chapter_or_other() != chapter {
+                break;
+            }
+            let similarity = one_similarity(field, left, candidate_id);
+            if spread::permitted(left, candidate, similarity, policy) {
+                chosen = Some((
+                    ix + offset,
+                    candidate_id,
+                    spread::measure(left, candidate, similarity, policy),
+                ));
+                break;
+            }
+        }
 
-        let (right_id, pair, single) = match right {
-            Some((right_id, right_frame)) => {
-                let similarity = one_similarity(field, left, right_id);
-                if spread::permitted(left, right_frame, similarity, policy) {
-                    (
-                        Some(right_id),
-                        spread::measure(left, right_frame, similarity, policy),
-                        false,
-                    )
-                } else {
-                    (None, SpreadPair::none(), true)
-                }
+        let (right_id, pair, single) = match chosen {
+            Some((position, id, pair)) => {
+                // Bring it forward. `remove` then `insert` rather than a swap, because a swap would
+                // send the displaced frame backwards past pages already laid out.
+                remaining.remove(position);
+                remaining.insert(ix + 1, id);
+                (Some(id), pair, false)
             }
             None => (None, SpreadPair::none(), true),
         };
@@ -421,7 +474,7 @@ pub fn lay_out(
         spreads.push(Spread {
             id: SpreadId::new(),
             index: spreads.len() as u32,
-            left: Some(*left_id),
+            left: Some(left_id),
             right: right_id,
             single,
             chapter,

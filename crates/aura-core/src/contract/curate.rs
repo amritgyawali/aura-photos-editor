@@ -2308,6 +2308,8 @@ pub const fn scale_of_scene(scene: SceneId) -> ShotScale {
     clippy::float_cmp,
     clippy::assertions_on_constants,
     clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::disallowed_methods,
     clippy::panic
 )]
 mod tests {
@@ -2582,7 +2584,7 @@ mod tests {
 
     #[test]
     fn reasons_rank_vetoes_first_and_then_by_magnitude() {
-        let mut reasons = vec![
+        let mut reasons = [
             CurateReason::plain(CurateCode::StrongComposition, 0.3),
             CurateReason::plain(CurateCode::TechnicalVeto, -1.0),
             CurateReason::plain(CurateCode::EmotionalPeak, 0.9),

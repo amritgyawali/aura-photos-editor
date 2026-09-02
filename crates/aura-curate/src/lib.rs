@@ -166,6 +166,16 @@ pub const HERO_HEAD_TRAINED: bool = false;
 /// descriptors, whose failure mode is offering fewer candidates rather than confidently wrong ones.
 pub const BW_HEAD_TRAINED: bool = false;
 
+/// How many album frames each close-family identity needs.
+///
+/// Two. Phase 12's `coverage_rules.toml` decides how many *gallery* frames a close-family member
+/// needs, and that number is much larger - an album is 60 to 120 images out of a gallery of
+/// hundreds, so demanding the gallery's minimum here would spend a third of the album on coverage.
+///
+/// Two rather than one because one photograph of somebody is a photograph they might not be looking
+/// at, and because an album is a book a family looks through together.
+pub const CLOSE_FAMILY_ALBUM_MINIMUM: u32 = 2;
+
 /// True when either head is trained. Stored on the run, because a catalog outlives a build.
 #[must_use]
 pub const fn heads_trained() -> bool {
