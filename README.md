@@ -6,21 +6,40 @@ The autonomous AI post-production system for wedding photographers. Import 1,000
 to 4,000 RAW files, press one button, and receive a culled, edited, retouched,
 quality-checked, consistently graded, export-ready wedding gallery.
 
-**Phase 01 of 30 is implemented here:** create a wedding project, point it at one
-to six folders of RAWs from several cameras, and get a fully indexed,
-deduplicated, timeline-ordered catalog with a scrollable grid.
+**All thirty phases are implemented here**, conditionally: import to delivery, one
+button end to end, with every phase's exit report naming what it could not prove.
+
+Read those before believing a number. The short version is that the shape of the
+product is complete and the evidence underneath it is not: there are no camera
+files, no GPU backend, no consented wedding data and no photographers in this
+repository, so every model ships as a placeholder or as a refusal, every quality
+gate is measured against a fixture whose answer this repository chose, and the
+build says so on the wire rather than in a footnote.
+`docs/progress/PHASE-30-EXIT.md` section 7 is the whole open list.
 
 ## Layout
 
 ```
 Cargo.toml                 workspace
-crates/
-  aura-core/               error taxonomy, typed ids, clock, paths, consent, progress
-  aura-catalog/            SQLite schema v1, migrations, single writer, verified backups
+crates/                    thirty-three crates. The ones to start from:
+  aura-core/               error taxonomy, typed ids, clock, and every frozen contract
+  aura-catalog/            SQLite schema, thirty migrations, single writer, verified backups
   aura-ingest/             scan, hash, pair, EXIF, journal, clock alignment, fixtures
-  aura-jobs/               task graph, dependencies, leases, heartbeats
+  aura-raw/                containers, three decode tiers, the colour pipeline
+  aura-preview/            the preview service and its strict-priority scheduler
+  aura-infer/              the one way to run a model; hardware probe and session pool
+  aura-cloud/              the one way to reach a provider; seven-step gateway
+  aura-index/  aura-vision/  aura-people/     similarity, pixels, faces, identities
+  aura-brain-wedding/      scenes, story, moments, emotion, gallery consistency
+  aura-brain-photo/        integrity, tone, colour, composition, local light
+  aura-cull/  aura-curate/                    what is delivered, and what is shown
+  aura-recipe/ aura-render/                   the edit recipe and the only renderer
+  aura-retouch/ aura-restore/ aura-geometry/ aura-generative/
+  aura-style/  aura-explain/ aura-qc/         learned look, the ledger, the QC agent
+  aura-export/ aura-delivery/ aura-learn/     files, where they went, what it learned
+  aura-jobs/               the autopilot: task graph, DAG, checkpoints, governor
   aura-perf/               budget instrumentation and assertions
-  aura-app/                typed IPC command surface
+  aura-app/                typed IPC command surface - 259 commands
   aura-cli/                headless driver: fixtures, import, verify, info
 xtask/                     contract digests, fixture and bench entry points
 ui/                        React 18 + TypeScript + Vite
@@ -41,7 +60,7 @@ rustup show                       # installs the pinned toolchain from rust-tool
 just setup                        # git hooks + npm install
 just gates                        # fmt, banned patterns, clippy, frozen contracts
 just test                         # Rust + UI tests
-just phase-01-verify              # the phase gate on the reference weddings
+just phase-01-verify              # any phase's gate: phase-01-verify .. phase-30-verify
 just dev                          # run the desktop app
 ```
 
