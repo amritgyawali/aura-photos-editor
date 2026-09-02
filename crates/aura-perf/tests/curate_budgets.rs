@@ -58,11 +58,11 @@ use aura_core::clock::{Clock, FixedClock};
 use aura_core::contract::curate::{ImageId, ALBUM_DEFAULT};
 use aura_core::ProjectId;
 use aura_curate::api::CuratePass;
+use aura_curate::bw;
 use aura_curate::fixtures::{self, FixtureField, Shape};
 use aura_curate::policy::{Policy, DEFAULT_TOML};
 use aura_curate::read::Field;
 use aura_curate::store::CurateStore;
-use aura_curate::bw;
 use rusqlite::params;
 
 /// Section 11's whole-pass row, for a thousand images.

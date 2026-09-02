@@ -190,7 +190,7 @@ impl FileFormat {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when the text names no format this build has.
+    /// `AURA-RENDER-8021` when the text names no format this build has.
     pub fn parse(text: &str) -> AuraResult<Self> {
         Self::ALL
             .iter()
@@ -250,7 +250,7 @@ impl DeliveryColour {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when the text names no space this build has.
+    /// `AURA-RENDER-8021` when the text names no space this build has.
     pub fn parse(text: &str) -> AuraResult<Self> {
         Self::ALL
             .iter()
@@ -340,7 +340,7 @@ impl Resize {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when a dimension is outside [`MIN_LONG_EDGE`]..=[`MAX_LONG_EDGE`].
+    /// `AURA-RENDER-8021` when a dimension is outside [`MIN_LONG_EDGE`]..=[`MAX_LONG_EDGE`].
     pub fn validate(self) -> AuraResult<()> {
         let check = |v: u32, what: &str| -> AuraResult<()> {
             if !(MIN_LONG_EDGE..=MAX_LONG_EDGE).contains(&v) {
@@ -404,7 +404,7 @@ impl OutputSharpen {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when the text names no setting this build has.
+    /// `AURA-RENDER-8021` when the text names no setting this build has.
     pub fn parse(text: &str) -> AuraResult<Self> {
         Self::ALL
             .iter()
@@ -535,7 +535,7 @@ impl NamingTemplate {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when the template is empty, is longer than [`MAX_TEMPLATE_LEN`], contains a
+    /// `AURA-RENDER-8021` when the template is empty, is longer than [`MAX_TEMPLATE_LEN`], contains a
     /// path separator, names a token this build does not have, or has an unclosed brace.
     pub fn parse(raw: &str) -> AuraResult<Self> {
         if raw.is_empty() {
@@ -689,7 +689,7 @@ impl MetadataPolicy {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when there are more than [`MAX_KEYWORDS`] keywords or one of them is empty.
+    /// `AURA-RENDER-8021` when there are more than [`MAX_KEYWORDS`] keywords or one of them is empty.
     pub fn validate(&self) -> AuraResult<()> {
         if self.keywords.len() > MAX_KEYWORDS {
             return Err(bad_job(
@@ -725,7 +725,7 @@ impl ProviderId {
     ///
     /// # Errors
     ///
-    /// `AURA-DLV-9020` when the name is empty, longer than 64 characters, or contains anything but
+    /// `AURA-DLV-10001` when the name is empty, longer than 64 characters, or contains anything but
     /// lower-case letters, digits, `-` and `_`. A provider name reaches a file path and a catalog
     /// key, and the two have different ideas about what is legal in one.
     pub fn parse(name: &str) -> AuraResult<Self> {
@@ -736,7 +736,7 @@ impl ProviderId {
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
         if !ok {
             return Err(AuraError::new(
-                ErrorCode("AURA-DLV-9020"),
+                ErrorCode("AURA-DLV-10001"),
                 Severity::ItemFailed,
                 Recovery::AskUser,
                 format!("invalid provider name `{name}`"),
@@ -866,7 +866,7 @@ impl ExportSet {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when the name is empty or too long, the set has no images, the quality is
+    /// `AURA-RENDER-8021` when the name is empty or too long, the set has no images, the quality is
     /// outside [`MIN_JPEG_QUALITY`]..=[`MAX_JPEG_QUALITY`] on a lossy format, a bit depth is asked
     /// for that the format cannot carry, or the resize is out of range.
     pub fn validate(&self) -> AuraResult<()> {
@@ -950,7 +950,7 @@ impl ExportJob {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when the job has no sets, more than [`MAX_SETS`], two sets with the same
+    /// `AURA-RENDER-8021` when the job has no sets, more than [`MAX_SETS`], two sets with the same
     /// name, or a set that fails its own validation. Two sets with one name write into one another;
     /// the collision suffix would hide it and the manifest would report both.
     pub fn validate(&self) -> AuraResult<()> {
@@ -1428,7 +1428,7 @@ impl DeliveryCode {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9001` when the slug is not one this build knows, which is what a catalog written
+    /// `AURA-RENDER-8020` when the slug is not one this build knows, which is what a catalog written
     /// by a newer release looks like.
     pub fn parse(slug: &str) -> AuraResult<Self> {
         Self::ALL
@@ -1437,7 +1437,7 @@ impl DeliveryCode {
             .find(|code| code.as_str() == slug)
             .ok_or_else(|| {
                 AuraError::new(
-                    ErrorCode("AURA-EXP-9001"),
+                    ErrorCode("AURA-RENDER-8020"),
                     Severity::Degraded,
                     Recovery::Fallback,
                     format!("unknown delivery reason code `{slug}`"),
@@ -1606,8 +1606,8 @@ pub trait ExportService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when the job does not validate, `AURA-EXP-9003` when a written file did not
-    /// read back the same, `AURA-EXP-9004` when the destination is full or unwritable, and
+    /// `AURA-RENDER-8021` when the job does not validate, `AURA-RENDER-8022` when a written file did not
+    /// read back the same, `AURA-RENDER-8023` when the destination is full or unwritable, and
     /// `AURA-RENDER-*` when a frame could not be rendered.
     fn run(&self, project: ProjectId, job: &ExportJob) -> AuraResult<DeliveryManifest>;
 
@@ -1635,7 +1635,7 @@ pub trait ExportService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-EXP-9002` when the job does not validate.
+    /// `AURA-RENDER-8021` when the job does not validate.
     fn preview_names(
         &self,
         project: ProjectId,
@@ -1660,7 +1660,7 @@ pub trait DeliveryService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-DLV-9021` when the destination cannot be reached, `AURA-DLV-9022` when a copy did not
+    /// `AURA-DLV-10002` when the destination cannot be reached, `AURA-DLV-10003` when a copy did not
     /// verify.
     fn backup(&self, project: ProjectId, to: &Destination) -> AuraResult<DeliveryOutline>;
 
@@ -1672,8 +1672,8 @@ pub trait DeliveryService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-DLV-9020` when the provider is unknown, `AURA-DLV-9023` when no credential is
-    /// configured, `AURA-DLV-9021` when it cannot be reached.
+    /// `AURA-DLV-10001` when the provider is unknown, `AURA-DLV-10004` when no credential is
+    /// configured, `AURA-DLV-10002` when it cannot be reached.
     fn upload(
         &self,
         project: ProjectId,
@@ -1710,7 +1710,7 @@ pub trait DeliveryService: Send + Sync + fmt::Debug {
 /// The error a job that does not validate produces.
 fn bad_job(detail: String, user: &str) -> AuraError {
     AuraError::new(
-        ErrorCode("AURA-EXP-9002"),
+        ErrorCode("AURA-RENDER-8021"),
         Severity::ItemFailed,
         Recovery::AskUser,
         detail,

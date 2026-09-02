@@ -272,7 +272,7 @@ impl Learnable {
     ///
     /// # Errors
     ///
-    /// `AURA-LRN-9041` when the slug names nothing this build can learn.
+    /// `AURA-LRN-11002` when the slug names nothing this build can learn.
     pub fn parse(slug: &str) -> AuraResult<Self> {
         Self::ALL
             .iter()
@@ -280,7 +280,7 @@ impl Learnable {
             .find(|l| l.as_str() == slug)
             .ok_or_else(|| {
                 AuraError::new(
-                    ErrorCode("AURA-LRN-9041"),
+                    ErrorCode("AURA-LRN-11002"),
                     Severity::Degraded,
                     Recovery::Fallback,
                     format!("`{slug}` is not something this build learns"),
@@ -506,7 +506,7 @@ impl LearningUpdate {
     ///
     /// # Errors
     ///
-    /// `AURA-LRN-9042` when the version does not advance, the summary is too long, or a line is.
+    /// `AURA-LRN-11003` when the version does not advance, the summary is too long, or a line is.
     pub fn validate(&self) -> AuraResult<()> {
         if self.to_version <= self.from_version {
             return Err(bad_update(format!(
@@ -810,7 +810,7 @@ impl LearnCode {
     ///
     /// # Errors
     ///
-    /// `AURA-LRN-9040` when the slug is not one this build knows.
+    /// `AURA-LRN-11001` when the slug is not one this build knows.
     pub fn parse(slug: &str) -> AuraResult<Self> {
         Self::ALL
             .iter()
@@ -818,7 +818,7 @@ impl LearnCode {
             .find(|c| c.as_str() == slug)
             .ok_or_else(|| {
                 AuraError::new(
-                    ErrorCode("AURA-LRN-9040"),
+                    ErrorCode("AURA-LRN-11001"),
                     Severity::Degraded,
                     Recovery::Fallback,
                     format!("unknown learning reason code `{slug}`"),
@@ -945,7 +945,7 @@ pub trait LearnService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-LRN-9043` when there is no ledger decision behind it, when the value is not
+    /// `AURA-LRN-11004` when there is no ledger decision behind it, when the value is not
     /// [`Learnable`], or when the project has not consented to local learning.
     fn capture(
         &self,
@@ -964,28 +964,28 @@ pub trait LearnService: Send + Sync + fmt::Debug {
     ///
     /// # Errors
     ///
-    /// `AURA-LRN-9042` when the profile is unknown or the fit cannot be measured.
+    /// `AURA-LRN-11003` when the profile is unknown or the fit cannot be measured.
     fn compute(&self, profile: ProfileId) -> AuraResult<Option<LearningUpdate>>;
 
     /// The two sides a photographer compares, both measured on the same held-out corrections.
     ///
     /// # Errors
     ///
-    /// `AURA-LRN-9042` when there is no candidate to compare against.
+    /// `AURA-LRN-11003` when there is no candidate to compare against.
     fn compare(&self, profile: ProfileId) -> AuraResult<Option<AbComparison>>;
 
     /// Adopt a candidate. **The only way `adopted` becomes true.**
     ///
     /// # Errors
     ///
-    /// `AURA-LRN-9042` when there is no candidate, or when the candidate is not offerable.
+    /// `AURA-LRN-11003` when there is no candidate, or when the candidate is not offerable.
     fn adopt(&self, profile: ProfileId) -> AuraResult<LearningUpdate>;
 
     /// Roll a profile back to its previous version, exactly.
     ///
     /// # Errors
     ///
-    /// `AURA-LRN-9044` when there is no earlier version, or when the stored bytes do not restore.
+    /// `AURA-LRN-11005` when there is no earlier version, or when the stored bytes do not restore.
     fn roll_back(&self, profile: ProfileId) -> AuraResult<(u16, Vec<LearnReason>)>;
 
     /// What a project has consented to.
@@ -1009,7 +1009,7 @@ pub trait LearnService: Send + Sync + fmt::Debug {
 
 fn bad_update(detail: String) -> AuraError {
     AuraError::new(
-        ErrorCode("AURA-LRN-9042"),
+        ErrorCode("AURA-LRN-11003"),
         Severity::ItemFailed,
         Recovery::AskUser,
         detail,
