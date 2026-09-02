@@ -2,6 +2,67 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 29 - Curation: the four questions that come after the cull
+
+Culling answers "what am I delivering". This phase answers the four that follow, and they are
+different questions with different right answers: the best photograph of a wedding is not the best
+opening spread, and neither of them is the frame that works on a phone screen. It ships a portfolio
+of twenty, an album of sixty to a hundred and twenty in paired spreads, a monochrome shortlist with a
+mix solved per frame, three social sets and an overnight teaser.
+
+**Nothing in it moves a pixel, and the monochrome suggestion is why that needed a grep behind it.**
+The `bw` block phase 14 froze is two fields, `schema::merge` is one call away, and a photographer
+would see a beautiful result - which is the product deciding a wedding is monochrome, and section
+6.1 says not to. `crates/aura-curate/tests/no_outputs.rs` is the ninth grep-as-a-test in the
+repository and fails the build if this crate writes a recipe, opens a file, reaches a socket, opens a
+photograph, grows a second similarity index, or acquires a constant it could compare a person's skin
+against. `aura-render` and `aura-recipe` are dev-dependencies only, so the eval can measure a mix on
+the greys it actually produces while the library cannot reach a renderer at all.
+
+**A monochrome mix never moves the band somebody's measured skin sits in.** Not a little, not in a
+safe direction, not at all - a bound in the contract, in the solver and in the schema. It is also
+the one concrete sense in which a solved mix beats a fixed preset, and it is a fact rather than a
+matter of taste: a preset is a set of numbers chosen before the photograph existed, so it moves
+whatever band a person's skin happens to fall in. There is no ideal skin tone anywhere in this
+product to compare somebody against - phase 15's rule - and the phase gate scans the policy table and
+the schema for one on every run. **On this build the rule has nothing to apply to**, because phase
+06's detector finds no faces, and `docs/curation.md` and condition C2 both say so.
+
+**Coverage is a filter, applied before anything is scored.** Every guarantee the gallery covers is in
+the album, and every close-family member appears at least twice, whatever an eighty-image album would
+otherwise have chosen. Phase 12 wrote the rule and phase 23 and 24 applied it to crops and removals;
+this is its fifth application, and here it is what stops a beautiful frame displacing the only
+photograph of somebody's grandmother.
+
+**Chapter order is inviolable, including when a photographer reorders the album themselves.** A drag
+that would move a photograph into a different chapter is refused rather than accepted quietly, and an
+order somebody set is never overwritten by a later run - `album_order` is kept apart from the spreads
+precisely so a re-curation over a gallery that grew by two hundred frames rebuilds the spreads around
+the order rather than through it.
+
+**Captions come from a closed vocabulary built out of this wedding's own labels**, and the same
+grounding check applies to a template and to a model. No names, no venue, no relationships, no claims
+about how anybody felt - and no gendered role word, because which of two people is the bride is not a
+photographic fact. The cloud sequencing task can only be **agreed with**: an unreachable provider, a
+refused answer, a spent budget and a cautious model all produce the same album.
+
+**All three of section 11's budgets are met and none is waived** - the first phase since 20. A whole
+wedding curates in 446 ms against 12 s, a re-composition after a drag in 375 ms against 1.5 s, and a
+monochrome mix in 10 microseconds against 25 ms. That is structural rather than an achievement:
+nothing here opens a photograph, so curation is arithmetic over rows phases 05 to 28 already wrote.
+
+**Ninth phase since 08 to ship no model**, and the reason is phase 17's: there is nothing to train
+until there is data. Section 9 asks for sixty consented album sequences, hero sets and monochrome
+selections and there are none, so `HERO_HEAD_TRAINED` and `BW_HEAD_TRAINED` are false, both are on
+the wire, and section 10.1's three headline gates - hero agreement, album reordering, monochrome
+acceptance - are **unmeasured**. Three attempts were made to find an arithmetic proxy for them and
+all three were wrong; `docs/progress/PHASE-29-EXIT.md` section 8 records why, along with a fixture
+that minted random identifiers and looked deterministic for the whole of this phase's development.
+
+Migration 29 adds eleven tables, two views and five triggers at 211 B per selected image, and is
+locked as contract 78. `crates/aura-app`'s autopilot no longer reports curation as `PhaseNotBuilt`:
+the stage is one call into `curate_project`, which half closes phase 28's condition C7.
+
 ## Phase 28 - The zero-touch autopilot: twenty-seven phases as one button
 
 Twenty-seven phases decided things about a photograph, a person, a camera body or a gallery. None of

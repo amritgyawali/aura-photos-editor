@@ -336,6 +336,15 @@ above the acceptance threshold and which a photographer has accepted, which is a
   the deciding crates. Everything it reads about a photograph arrives through the `Field` port that
   `aura-app` implements out of the frozen services - the same indirection phase 27 built, for the
   same reason: `aura-brain-photo` must not depend on the crate that curates it.
+- `aura-render` and `aura-recipe` are **dev-dependencies only**, and the distinction is the whole
+  point. Section 10.1 asks whether a generated monochrome mix is better than a fixed preset, which is
+  a question about greys rather than about band weights: two mixes with different numbers can render
+  a photograph identically. So `tests/eval/curate_eval.rs` measures through
+  `aura_render::tonemap::monochrome`, which is phase 16's rule - a guarantee about a pixel is
+  enforced on the pixel - with this phase's constraint on top. The **library** must not be able to
+  render, because rendering is one call from applying and applying is the product deciding a wedding
+  is monochrome. A dev-dependency is unreachable from the library, and
+  `crates/aura-curate/tests/no_outputs.rs` fails the build if `src/` ever names either crate.
 - Every number in this phase is measured against synthetic galleries this repository authored. There
   is no photographer agreement study, so the three headline gates of section 10.1 - hero agreement
   0.75, album reordering 15 %, B&W acceptance 70 % - are **unmeasured**, and the phase gate prints
