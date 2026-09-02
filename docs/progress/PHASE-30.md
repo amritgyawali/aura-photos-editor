@@ -78,3 +78,10 @@ Apple account and the install base are not.
 behind it.
 
 All four are conditions in the exit report and all four are printed by the phase gate on every run.
+
+One further note about the release checklist, because it is the sort of thing that reads as a
+regression and is not. `ops/release/check.sh` runs nine gates and eight are green; `budgets` fails on
+this container on **phase 14's** rows, not on this phase's — the processor-path proxy render takes
+801 ms against a 450 ms budget measured on a machine about four times faster, on a build with no GPU
+backend. Every budget in the workspace passes at `AURA_PERF_HOST_SCALE=4`, which is what that
+variable is for. The budget was not moved.

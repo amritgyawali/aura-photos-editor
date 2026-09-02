@@ -31,6 +31,15 @@ The checklist is a file that something executes rather than a page in a wiki, fo
 checklist nothing runs drifts from what actually happens, and the release under time pressure is
 when the drift is discovered.
 
+**A timing budget is a statement about hardware as well as about code.** The figures in
+`perf/budgets.toml` were measured on a development machine, and a slower host fails them without
+anything having regressed — on the container this was last run on, phase 14's processor-path proxy
+render takes 801 ms against a 450 ms budget, because that budget assumes a GPU backend this build
+does not link and a machine four times faster than the one measuring it. `AURA_PERF_HOST_SCALE` is
+what a slower host sets: the budget file keeps the developer-machine numbers, the assertion stays
+real on both, and a genuine regression still fails. It applies to timings only. A byte is a byte on
+any machine, and a slow runner is not a reason to store more.
+
 ## Signing
 
 Windows builds are Authenticode-signed with a hardware-token certificate. macOS builds are signed

@@ -127,9 +127,16 @@ Nine executable gates, four sign-offs, a signing script, a notarisation script, 
 with a crash-free floor, feature flags with kill switches and an opt-in crash reporter. Nothing has
 been signed, because there is no certificate here; nothing has been notarised, because there is no
 Apple account; no rollout has run, because there is no install base; and the 99.5 % crash-free rate
-is a floor with no measurement behind it, because there has been no closed beta. `ops/release/check.sh`
-runs the nine gates today and they are green. **The procedure is evidence of intent and not of a
-release.**
+is a floor with no measurement behind it, because there has been no closed beta.
+
+`ops/release/check.sh` runs the nine gates today. Eight are green. The ninth — `budgets` — fails on
+this container on **phase 14's** rows and not on this phase's: the processor-path proxy render takes
+801 ms against a 450 ms budget, because that budget was measured on a machine roughly four times
+faster and assumes a GPU backend this build does not link. `AURA_PERF_HOST_SCALE=4` is what a slower
+host sets, and every budget in the workspace passes at it, this phase's two included. The budget was
+not moved: lowering a guardrail to make a slow container green is how a guardrail stops being one.
+
+**The procedure is evidence of intent and not of a release.**
 
 **C6 — neither plugin has met the application it is for.**
 The Lightroom plugin and the Photoshop hand-off are written against the published shapes of both
