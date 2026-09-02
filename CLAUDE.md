@@ -131,6 +131,10 @@ Never load two phase files into one session.
 | The checklist and the resource budgets (versioned, PM-owned) | `crates/aura-jobs/config/autopilot.toml` |
 | Autopilot gates | `tests/e2e/autopilot_chaos.rs`, `tests/e2e/autopilot_run.rs` |
 | One button, in the product's own words | `docs/autopilot.md` |
+| Curation decisions | `docs/adr/ADR-0059-curation-selection-and-album-composition.md` |
+| Album sizes, rhythm, hero and monochrome weights (versioned, PM-owned) | `crates/aura-curate/config/curation.toml` |
+| Curation evaluation gates | `tests/eval/curate_eval.rs` + `ml/models/curate/eval_curate.py` |
+| What AURA proposes after the cull, in the product's own words | `docs/curation.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
@@ -1680,6 +1684,110 @@ entries. And it **mounted its own panel**, which the develop panels from phase 1
 not have: `ui/src/App.tsx` renders `AutopilotPanel` beside the gallery and QC panels, and the
 container-plus-pure-views split phase 25 established is what made the five views testable without a
 window.
+
+Phase 29 is implemented conditionally: `aura-core::contract::curate` freezes the eight-band monochrome
+mix, the four suitability terms, the hero pick with its five terms and its binding constraint, the
+spread and its four pairing measurements, the album plan with its chapter map and its own coverage
+report, the three social sets, the teaser, the caption and its source, 39 reason codes in five groups,
+the outline, the override, twelve export formats and `CurateService`, and `ids.rs` gains `SpreadId`;
+`aura-curate` proposes. `policy.rs` loads a table whose five bounds the *code* owns and whose keys are
+scanned for anything naming a skin target, `read.rs` is the one port through which this crate learns
+anything and every reading on it is an `Option`, `bw.rs` reads eight bands out of phase 05's histogram
+and solves a mix that spreads the **collapsed** set against itself rather than away from the mean,
+`hero.rs` blends five terms under a technical veto and records which of three diversity constraints was
+binding, `album.rs` filters for coverage *before* it scores, apportions chapters by largest remainder
+and lays out spreads with a bounded look-ahead, `spread.rs` refuses a pair rather than penalising it,
+`caption.rs` builds a closed vocabulary out of this wedding's own labels, `sequence.rs` is a cloud task
+whose every move the local objective may refuse, `export.rs` writes twelve specifications by hand,
+`store.rs` owns migration 29 and `api.rs` is the frozen service and the resumable pass. Migration 29
+stores eleven tables, two views and five triggers at 211 bytes a selected image; eleven IPC commands
+(ADR-0060) feed a hero grid, a monochrome panel, a spread view, social sets and an album builder; and
+`aura-cli verify --phase 29` is the executable gate. Its exit report is
+`docs/progress/PHASE-29-EXIT.md`.
+
+**This phase ships no model** - the ninth since phase 08 - and the reason is phase 17's, 23's and 25's
+rather than phase 24's: there is nothing to train until there is data. Section 9's DATA row asks for
+sixty consented album sequences, hero sets and monochrome selections and there are none, so
+`HERO_HEAD_TRAINED` and `BW_HEAD_TRAINED` are false and both are on the wire. That is condition C1 and
+a Sev 2 trigger. Condition C2 is the second and it is the one to be careful about: **the skin rule is
+unreachable on this build** - phase 06's detector finds no faces, so phase 15 measures no locus, so
+every mix is solved as a faceless frame, and no claim may be made that this build protects anybody's
+skin in a monochrome conversion. C3 is the same absence reaching the facing term. C4 is the headline:
+**the three studies of section 10.1 are unmeasured** - hero agreement, album reordering, monochrome
+acceptance - and all three need photographers.
+
+Five rules that phase 29 adds and every later phase inherits:
+
+- **`CurateService` is the only way to ask what a photographer should show.** Twenty-fifth service of
+  its kind and the first whose subject is an **audience**. Phase 30 exports these albums, posts these
+  social sets and reads these overrides as its learning signal. Two answers to "which twenty
+  photographs are the portfolio" is a website that does not match the album that does not match the
+  post.
+- **A proposal is never an application, and here that needed a grep.** Nothing in this phase writes a
+  recipe. The monochrome suggestion is why the rule needed enforcing rather than stating: the `bw`
+  block is two fields, `schema::merge` is one call away, and the result would be beautiful - and would
+  be the product deciding a wedding is monochrome. `aura-render` and `aura-recipe` are
+  dev-dependencies only, so the eval can measure a mix on the greys it actually produces while the
+  library cannot reach a renderer at all.
+- **Chapter order is inviolable, and a photographer's own order outranks the composer's.** A drag that
+  crosses a chapter is refused rather than accepted quietly; an order somebody set is never
+  overwritten. `album_order` is a separate table from `album_spread` for exactly that reason - a pass
+  that stored the order in the spreads would lose it the moment it rebuilt them, which is what a
+  photographer does after adding two hundred frames.
+- **The cloud can only be agreed with.** `AlbumSequencing` returns moves and captions; the local
+  objective accepts or refuses each move, and a chapter-crossing one is refused rather than nudged
+  back inside. An unreachable provider, a spent budget, a malformed response and a cautious model all
+  produce the same album. Phase 24's shape, second application.
+- **A caption is assembled from words this wedding supplied, and the check is the same for a template
+  and for a model.** The local template passes by construction, which is what makes the grounding
+  check meaningful rather than decorative. No name, no venue, no relationship, no claim about how
+  anybody felt - and no gendered role word, because which of two people is the bride is not a
+  photographic fact.
+
+Five things phase 29 got wrong first, and the first of them is the one to generalise:
+
+**A fixture that minted random identifiers looked deterministic for the whole of this phase's
+development.** `ImageId::new()` is a v7 UUID - time-ordered in its high bits and random in its low
+ones - so two runs of one seed agreed about every score and disagreed about every identifier, and
+every tie-break in the crate falls back on `image_id`. A gate moved fifteen points between two runs of
+an unchanged build. `the_same_seed_produces_the_same_wedding` had been passing throughout, because it
+compared scores and chapters rather than ids. **A determinism test that does not compare the
+identifiers is not a determinism test.**
+
+**Three attempts at an arithmetic proxy for a human judgement, all wrong and all plausible.** "Is this
+mix better than a fixed preset" cannot be answered by a statistic: one that rewards how far a mix
+moves the tones is won by the preset, one that rewards restraint is won by the solver, and one that
+takes the worst pair of seven bands is a lottery. The album's reordering row went the same way through
+three successive distance bounds, each either loose enough to prove nothing or tight enough to fail a
+correct build. What both rows carry now is the *fact* underneath the judgement, with the judgement
+named as unmeasured. **When a gate cannot be met honestly, the answer is sometimes that the gate is a
+study** - which is the fifth member of the family phases 19, 21, 22 and 25 started, and the first where
+the right fix was to stop asserting.
+
+**Three fixture defects in one file, all found by the gates.** Every frame was one hue, which gives a
+monochrome solver nothing to separate; every frame's luminance was drawn across the whole range, which
+models a gallery nobody normalised and which no curation pass ever sees because phase 25 runs first;
+and similarity was a hash of two ids, which makes distinctness independent of everything else about a
+photograph and turns eighteen per cent of the portfolio blend into a coin toss. Phase 25's lesson three
+more times.
+
+**A ground truth an algorithm cannot reach is a ground truth, not a finding.** `fixtures::planted`
+spread its twenty picks at a fixed stride, which follows chapter length, which filled three chapters'
+hero quotas exactly - so one ordinary frame winning one round cost a plant permanently and the gate
+measured ties.
+
+**A budget written before it was measured, wrong by a factor of ten and in the wrong direction.** The
+store note said 2,143 B an image; it measures 211 B at 600 frames and 2,439 B at the smallest gallery,
+because the album, the portfolio and the captions are capped by the contract and the gallery is not -
+so the figure *falls* as a wedding grows, which is the opposite of every migration from 09 to 20. The
+budget is set at the small end now and the bound is asserted as well as the number. Phase 21 wrote this
+rule and phase 26 wrote its second half; this is the first time the shape was inverted rather than
+mis-sized.
+
+Phase 29 also **half closes phase 28's condition C7**: `AppRunner::availability` no longer reports
+`SkipCause::PhaseNotBuilt` for curation, and the stage's arm is one call into `curate_project` - the
+shape phase 28's own rule asks for. Export is still unbuilt, so a completed run leaves a curated
+wedding in the catalog and nothing on disk, and phase 28's gate prints C7 saying exactly that.
 
 Five rules that phase 13 adds and every later phase inherits:
 

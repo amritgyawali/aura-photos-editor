@@ -134,6 +134,21 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // under a refusal that also lives in `aura-jobs`, and a digest is what stops the second layer
     // being quietly widened to match a first layer somebody had already changed.
     "crates/aura-catalog/migrations/0028_autopilot.sql",
+    //
+    // Migration 29 is here for the reason 25, 27 and 28 are, and for one that is sharper than any
+    // of them. Five of its triggers are the second layer under a refusal that also lives in
+    // `aura-curate`, and two of those are refusals about *authorship*:
+    // `curate_album_order_is_the_photographers` aborts any statement that would write an album
+    // order claiming to be somebody else's, and `curate_album_no_reorder` stops a pass rewriting an
+    // order a person set. "Reordering is remembered" is the whole of section 13's fourth acceptance
+    // criterion, and it is a promise about what happens on the *next* run rather than on this one -
+    // so the layer that has to hold it is the one that outlives the build. A digest is what stops
+    // that layer being quietly widened to match a first layer somebody had already changed.
+    //
+    // The schema also carries two bounds the panel depends on and the code cannot see: the
+    // near-duplicate ceiling on `album_spread.similarity` and the caption length bound. Phase 21's
+    // rule - a promise enforced in one layer lasts until somebody writes a second caller.
+    "crates/aura-catalog/migrations/0029_curation.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

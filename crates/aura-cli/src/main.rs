@@ -42,6 +42,7 @@ mod phase25;
 mod phase26;
 mod phase27;
 mod phase28;
+mod phase29;
 mod replay;
 
 pub(crate) const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -88,6 +89,7 @@ fn main() -> ExitCode {
             Some("26") => phase26::verify(&args),
             Some("27") => phase27::verify(&args),
             Some("28") => phase28::verify(&args),
+            Some("29") => phase29::verify(&args),
             _ => cmd_verify(&args),
         },
         Some("replay") => replay::run(&args),
@@ -100,7 +102,7 @@ fn main() -> ExitCode {
                  aura-cli raw-fixtures --out DIR\n  \
                  aura-cli import --catalog FILE --project NAME --root DIR [--root DIR]\n  \
                  aura-cli previews --catalog FILE --project NAME [--level thumb|proxy]\n  \
-                 aura-cli verify [--phase 01..25] --work DIR\n  \
+                 aura-cli verify [--phase 01..29] --work DIR\n  \
                  aura-cli infer --model FILE [--precision fp32|fp16|int8] [--batch N]\n  \
                  aura-cli info --catalog FILE"
             );

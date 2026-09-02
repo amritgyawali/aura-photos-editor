@@ -402,3 +402,85 @@ pub fn qc_decision_refused(detail: impl Into<String>) -> AuraError {
         "AURA could not record what you decided about that finding. Nothing about the photograph          has changed; reopen the review queue and try again.",
     )
 }
+
+/// A curation choice could not be recorded.
+pub const ML_CURATE_DECISION_REFUSED: ErrorCode = ErrorCode("AURA-ML-5143");
+
+/// A curation choice could not be recorded.
+///
+/// The frozen `CurateService` documents this on `set_order` and `decide`, so it lives here rather
+/// than in `aura-curate`: a contract cannot depend on the crate that implements it. The same split
+/// phases 16, 22, 23, 24, 25, 26 and 27 made.
+///
+/// Three ways to reach it and none of them is anything a photographer did wrong: an album order
+/// that puts one chapter before another, an order or a pick naming an image outside this project's
+/// gallery, or a note above `MAX_NOTE`.
+///
+/// The first is the one worth understanding. Reordering *within* a chapter is the whole point of
+/// the album builder and is always allowed; reordering the chapters themselves is refused by the
+/// optimiser, by the drag handler and by the cloud validator alike, because a wedding album whose
+/// ceremony follows its reception is not an album with an unusual sequence. ADR-0059 section 8.
+///
+/// `ExportFormat::parse` and `ExportSubject::parse` raise the same code, which in practice means a
+/// shell and a core from different builds.
+#[must_use]
+pub fn curate_decision_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_CURATE_DECISION_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        detail,
+        "AURA could not record that choice. Nothing about your photographs has changed; reopen the \
+         panel and try again.",
+    )
+}
+
+/// One project's curation pass could not run.
+pub const ML_CURATE_PASS_FAILED: ErrorCode = ErrorCode("AURA-ML-5144");
+
+/// One project's curation pass could not run.
+///
+/// A whole-project failure rather than a per-image one, because curation's subject is a *set*: an
+/// album, a portfolio and three social sets are decided over the whole gallery at once, and there is
+/// no partial album that would be worth storing.
+///
+/// The pass writes its result in one transaction, so a failure leaves the previous curation exactly
+/// as it was rather than half-replaced - and leaves every photograph untouched, because nothing in
+/// phase 29 writes a recipe, opens a file or moves a pixel.
+#[must_use]
+pub fn curate_pass_failed(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_CURATE_PASS_FAILED,
+        Severity::ItemFailed,
+        Recovery::Retry,
+        detail,
+        "AURA could not work out an album, a portfolio or a set of posts for this wedding. Your \
+         gallery and every edit in it are exactly as they were.",
+    )
+}
+
+/// The curation policy table was refused.
+pub const ML_CURATE_POLICY_REFUSED: ErrorCode = ErrorCode("AURA-ML-5145");
+
+/// The curation policy table was refused.
+///
+/// `curation.toml` may tighten a bound the contract owns and may never widen one, which is phase
+/// 21's rule in its sixth application. The pass halts rather than falling back on defaults, for the
+/// reason phases 24 to 28 each halted: curation is a taste decision, this file is where a studio's
+/// taste lives, and an album composed from numbers nobody chose is a proposal a photographer would
+/// trust for the wrong reason.
+///
+/// The loader also refuses any key naming a skin target, as phases 15, 25 and 27 scan their own
+/// schemas for one. The band a monochrome mix protects is measured per person from
+/// `ToneService::skin_loci`; a configurable one would be the constant this product does not have.
+#[must_use]
+pub fn curate_policy_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_CURATE_POLICY_REFUSED,
+        Severity::RunBlocking,
+        Recovery::Halt,
+        detail,
+        "AURA could not load the settings that decide album sizes, rhythm and social formats, so it \
+         has not curated anything. Restore the file or reinstall.",
+    )
+}

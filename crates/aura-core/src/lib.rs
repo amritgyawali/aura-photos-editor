@@ -32,6 +32,7 @@ pub mod contract {
     pub mod composition;
     pub mod consent;
     pub mod cull;
+    pub mod curate;
     pub mod emotion;
     pub mod error;
     pub mod gallery;

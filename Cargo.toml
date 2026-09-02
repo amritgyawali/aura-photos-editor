@@ -26,6 +26,7 @@ members = [
   "crates/aura-geometry",
   "crates/aura-generative",
   "crates/aura-qc",
+  "crates/aura-curate",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",

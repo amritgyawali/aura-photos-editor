@@ -28,6 +28,10 @@ aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-restore       = { path = "../aura-restore" }
 aura-retouch       = { path = "../aura-retouch" }
 aura-cull          = { path = "../aura-cull" }
+# PHASE-29. Curation reads a finished gallery through the `Field` port this crate implements, and
+# owns no output of its own: the album, the portfolio and the sets are proposals a photographer
+# accepts. ADR-0059 section 3.
+aura-curate        = { path = "../aura-curate" }
 aura-explain       = { path = "../aura-explain" }
 aura-geometry      = { path = "../aura-geometry" }
 # PHASE-24. The cleanup engine. `aura-app` is where the editorial-judgement port meets

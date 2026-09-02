@@ -324,10 +324,15 @@ impl StageRunner for AppRunner {
 
     fn availability(&self, _project: ProjectId, stage: StageId) -> Option<SkipCause> {
         match stage {
-            // Phases 29 and 30 are not built. `aura-curate`, `aura-export` and `aura-delivery` do
-            // not exist in this workspace, so these two stages report what is true rather than
-            // finishing instantly and letting the run claim a wedding was delivered.
-            StageId::Curation | StageId::Export => Some(SkipCause::PhaseNotBuilt),
+            // Phase 30 is not built. `aura-export` and `aura-delivery` do not exist in this
+            // workspace, so this stage reports what is true rather than finishing instantly and
+            // letting the run claim a wedding was delivered.
+            //
+            // Curation was here until phase 29 landed and is not any more. That is the whole shape
+            // of this table: a stage is unavailable because the phase that owns it does not exist,
+            // and the day it does the arm becomes one call. Phase 28's condition C7 is half closed
+            // by that line and stays open for export.
+            StageId::Export => Some(SkipCause::PhaseNotBuilt),
             _ => None,
         }
     }
@@ -384,10 +389,10 @@ impl AppRunner {
     fn dispatch(&self, request: &StageRequest, cancel_id: &str) -> AuraResult<StageOutcome> {
         use crate::contract::ipc::{
             AnalyseCompositionInput, AnalyseIntegrityInput, CameraPassInput, ClassifyScenesInput,
-            CleanupPassInput, CullProjectInput, EmbedProjectInput, EstimateColourInput,
-            EstimateToneInput, GalleryPassInput, GroupMomentsInput, MicroPassInput,
-            PlanGeometryInput, QcPassInput, RestorePassInput, RetouchPassInput, ScanFacesInput,
-            ScoreEmotionInput, SculptLocalInput,
+            CleanupPassInput, CullProjectInput, CurateProjectInput, EmbedProjectInput,
+            EstimateColourInput, EstimateToneInput, GalleryPassInput, GroupMomentsInput,
+            MicroPassInput, PlanGeometryInput, QcPassInput, RestorePassInput, RetouchPassInput,
+            ScanFacesInput, ScoreEmotionInput, SculptLocalInput,
         };
 
         let state = self.state.as_ref();
@@ -617,9 +622,26 @@ impl AppRunner {
                 ))?;
                 report.images
             }
-            StageId::Curation | StageId::Export => {
-                return Ok(StageOutcome::Skipped(SkipCause::PhaseNotBuilt))
+            StageId::Curation => {
+                // The album size is the configured default. A run cannot be given one, and that is
+                // deliberate: `autopilot.toml` is a checklist of what runs rather than a place to
+                // set a phase's parameters, and an album size on the run would be a second answer to
+                // a question `curation.toml` already answers. A photographer who wants a different
+                // album asks for one in the curation panel, which re-composes in under a second.
+                let status = lift(crate::curate_commands::curate_project(
+                    state,
+                    CurateProjectInput {
+                        project_id: project.to_db(),
+                        album_size: None,
+                    },
+                ))?;
+                // The units are the frames curation could actually read, not the album's size. A
+                // stage that reported 80 on a 600-frame gallery would make the progress bar jump and
+                // the throughput figure meaningless, and `StageScope::SelectedImages` is what this
+                // stage declares.
+                status.curated
             }
+            StageId::Export => return Ok(StageOutcome::Skipped(SkipCause::PhaseNotBuilt)),
         };
 
         Ok(StageOutcome::Completed { items })

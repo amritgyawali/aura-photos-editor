@@ -65,6 +65,7 @@ dependencies = [
  "aura-cloud",
  "aura-core",
  "aura-cull",
+ "aura-curate",
  "aura-explain",
  "aura-generative",
  "aura-geometry",
@@ -200,6 +201,7 @@ dependencies = [
  "aura-cloud",
  "aura-core",
  "aura-cull",
+ "aura-curate",
  "aura-explain",
  "aura-generative",
  "aura-geometry",
@@ -280,6 +282,24 @@ dependencies = [
  "toml",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aura-curate"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-cloud",
+ "aura-core",
+ "aura-index",
+ "aura-recipe",
+ "aura-render",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "tracing",
 ]
 
 [[package]]
@@ -461,6 +481,7 @@ dependencies = [
  "aura-cloud",
  "aura-core",
  "aura-cull",
+ "aura-curate",
  "aura-explain",
  "aura-generative",
  "aura-geometry",

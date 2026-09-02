@@ -57,6 +57,7 @@ pub mod colour_commands;
 pub mod commands;
 pub mod composition_commands;
 pub mod cull_commands;
+pub mod curate_commands;
 pub mod develop_commands;
 pub mod gallery_commands;
 
@@ -118,6 +119,10 @@ pub use composition_commands::{
 pub use cull_commands::{
     cull_project, cull_status, gallery, image_decision, override_decision, resize_gallery,
     set_cull_mode,
+};
+pub use curate_commands::{
+    curate_album, curate_bw, curate_decide, curate_export, curate_heroes, curate_project,
+    curate_set_order, curate_social, curate_spread, curate_status, curate_teaser,
 };
 pub use develop_commands::{
     develop_status, history_step, image_history, image_recipe, render_caps, render_image,

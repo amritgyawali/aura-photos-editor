@@ -9,6 +9,7 @@ import { ImportWizard } from './components/ImportWizard';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
 import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
+import { CuratePanel } from './components/curate/CuratePanel';
 import { CompositionCard } from './components/explain/CompositionCard';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
@@ -241,6 +242,7 @@ export function App(): JSX.Element {
             a photographer looks at before they deliver, so it is the last thing in the sidebar. */}
         <AutopilotPanel projectId={activeProjectId} onError={setError} />
         <QcPanel projectId={activeProjectId} onError={setError} />
+        <CuratePanel projectId={activeProjectId} onError={setError} />
       </aside>
 
       <main className="main">
