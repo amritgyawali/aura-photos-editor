@@ -2,6 +2,76 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 30 - Delivery: getting it out, learning from it, and shipping the thing
+
+The last phase of the plan. Export, backup, client galleries, the Lightroom and Photoshop hand-off,
+the loop that learns from every correction, and the machinery that puts a build on somebody's
+machine without breaking their Saturday.
+
+**Every written file is read back before AURA says it wrote it.** Write, flush, `sync_all`, re-open,
+read every byte, hash what was read. The digest stored is the digest of *the file on the disk*, not
+of the buffer it came from, and that distinction is the whole feature: the failure it catches - a
+loose reader, a NAS that dropped a packet, a drive on the way out - is silent, and gives you a folder
+that looks right in a file browser and is wrong in the middle. A file that does not read back the
+same **stops the job**, because a destination that corrupted one file is not a destination to send
+three thousand more to. It costs 2 % of an export.
+
+**Every name is planned before a byte is written.** Seven tokens, collisions suffixed
+deterministically, and the whole list previewable before anything exists - which matters the moment
+two cards both start at `DSC_0001`. A template cannot name a folder: `{date}/{seq}` is refused in the
+parser, because a naming template that can hold a path separator is one that can write outside the
+folder somebody chose.
+
+**Location is removed from a delivered file by default**, and the metadata block is *built* rather
+than copied forward, so a tag AURA has never heard of cannot survive into a delivery by accident. A
+wedding gallery on a public link is a map of a church, a venue and somebody's home.
+
+**The manifest is sealed once and can never be edited** - a trigger aborts every UPDATE. It lists
+every file, its digest, what was removed from it generatively and which versions made it, and a copy
+travels beside the files. A record of what you delivered is worth something only if it cannot be
+quietly changed afterwards.
+
+**A backup that finds a file that is different on both sides halts.** Matched, missing and
+**diverged** are three answers rather than two, and only the first two are safe to act on: the copy
+on the backup might be the good one.
+
+**The learning loop asks, and it never learns a guarantee.** Twelve corrections from two weddings
+before anything is proposed - the second floor is the one that matters, because twelve corrections
+from one wedding is one venue and one photographer's evening. Outliers trimmed, the step bounded at
+half of what the corrections asked for, a quarter of them held back and never fitted on, and the
+improvement measured against *those*. Below 2 % you are not asked at all. At most twenty-four lines
+in the offer, because that is about what somebody reads before agreeing, and ten versions kept for an
+exact rollback.
+
+`Learnable` is closed at fifteen members and **has no `Other`**. The texture floor, the skin
+protection, the identity constraint, the crop safety filter and the naturalness guard are not in the
+vocabulary and cannot be added to it without an ADR - `crates/aura-learn/tests/no_guarantee_learning.rs`
+is the tenth grep-as-a-test in the repository and fails the build over it. A guarantee that erodes
+because somebody kept overriding it is not a guarantee.
+
+**Phase 28's condition C7 closes.** `AppRunner::availability` is empty for the first time since phase
+28 wrote it: every stage in the autopilot's DAG is built and a completed run writes files. Export is
+the first stage in the product that declines on the *wedding* rather than on the release - it repeats
+the export this wedding was already given and skips with `NoInput` when there is none, because a run
+that invented a destination would be the scheduler making a decision.
+
+**Tenth phase since 08 to ship no model**, for a fourth distinct reason: there is nothing here a model
+would be *for*. An export is arithmetic and file I/O; a digest is a digest.
+
+**No socket ships.** `scripts/check-banned.sh` forbids one outside `aura-cloud`, and a client-gallery
+provider is not a model provider - so everything above the socket was built and the socket was not.
+The provider trait, per-set mapping, chunked resume with the offset taken from the far end, the
+three-attempt bound and the digest comparison are all real and all exercised against a transport that
+drops on demand. `NETWORK_TRANSPORT_AVAILABLE` is false and is on the wire. Nothing in this build has
+uploaded a wedding anywhere, no profile has been fitted from a real photographer's corrections,
+nothing has been signed or notarised, and there has been no beta - four of the six conditions in
+`docs/progress/PHASE-30-EXIT.md`, printed by the phase gate on every run.
+
+Section 8 of that report is worth reading before the next measurement anybody adds: the verification
+overhead was first measured by subtracting two whole-run timings, the noise between them was larger
+than the thing being measured, and the *verified* run came out faster - an overhead of zero, passing
+an 8 % budget, for no reason at all.
+
 ## Phase 29 - Curation: the four questions that come after the cull
 
 Culling answers "what am I delivering". This phase answers the four that follow, and they are
