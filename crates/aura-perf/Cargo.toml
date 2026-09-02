@@ -29,6 +29,11 @@ aura-jobs    = { path = "../aura-jobs" }
 # PHASE-29. Section 11's three rows - the whole curation, one re-composition, one monochrome mix -
 # plus the storage figure the phase document does not name.
 aura-curate  = { path = "../aura-curate" }
+# PHASE-30. Section 11's five rows - three waived with their reasons printed on every run - plus
+# the storage figure the phase document does not name.
+aura-export   = { path = "../aura-export" }
+aura-delivery = { path = "../aura-delivery" }
+aura-learn    = { path = "../aura-learn" }
 aura-brain-wedding = { path = "../aura-brain-wedding" }
 aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-retouch       = { path = "../aura-retouch" }

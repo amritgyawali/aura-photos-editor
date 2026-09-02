@@ -36,6 +36,11 @@ aura-brain-photo   = { path = "../aura-brain-photo" }
 aura-restore = { path = "../aura-restore" }
 aura-retouch       = { path = "../aura-retouch" }
 aura-curate   = { path = "../aura-curate" }
+# PHASE-30. The gate drives the real writers, the real resume state machine and the real
+# aggregation over a real catalog, which is the whole point of a mechanical gate.
+aura-export   = { path = "../aura-export" }
+aura-delivery = { path = "../aura-delivery" }
+aura-learn    = { path = "../aura-learn" }
 aura-cull          = { path = "../aura-cull" }
 aura-explain       = { path = "../aura-explain" }
 aura-recipe        = { path = "../aura-recipe" }
@@ -45,6 +50,7 @@ aura-vision  = { path = "../aura-vision" }
 rusqlite.workspace   = true
 serde.workspace      = true
 serde_json.workspace = true
+blake3.workspace     = true
 time.workspace       = true
 tracing.workspace    = true
 tracing-subscriber.workspace = true

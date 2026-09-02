@@ -221,19 +221,22 @@ have to re-inspect the other 3,999 frames - and that is the only reason.
 id         = "curation"
 default_on = true
 reason = """
-On, and it does not exist in this release. Phase 29 builds it; until then the stage reports
-`phase_not_built` and the run finishes degraded rather than pretending an album was made. Leaving
-it on means the row is visible in the checklist with an honest explanation beside it, which is
-better than a checklist that quietly omits what the product cannot yet do.
+On. Phase 29 built it, so the stage now runs `curate_project` and proposes heroes, an album and
+the social sets. A proposal is not an application: nothing curation decides changes a photograph,
+which is why this is on by default where a stage that edited would not be.
 """
 
 [[stage]]
 id         = "export"
 default_on = true
 reason = """
-On, and it does not exist in this release either. Phase 30 builds it. The same argument as
-curation, and it matters more here: a photographer whose run finished with nothing written needs
-to read why on the run summary, not discover it in an empty folder.
+On. Phase 30 built it, and it is the only stage that writes outside the catalog - so what "on"
+means here is narrower than it looks: the run repeats the export **this wedding has already been
+given**, at the same destination, with the same sets and the same policy, over whatever is
+selected now. It never invents a folder. A wedding nobody has set an export up for skips with
+`no_input` and the run finishes degraded with this stage named, because a photographer whose run
+finished with nothing written needs to read why on the run summary rather than discover it in an
+empty folder.
 """
 
 # -----------------------------------------------------------------------------

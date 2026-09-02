@@ -1470,3 +1470,87 @@ max_ms_per_unit = 25
 # happened to be measured on a small fixture - phase 26 learned that from the other side.
 [size.curate_store_per_image]
 max_bytes = 4000
+
+# ---------------------------------------------------------------------------
+# Phase 30 performance budgets, from PHASE-30 section 11.
+#
+# Three of the five rows are waived, and `crates/aura-perf/tests/delivery_budgets.rs`
+# prints all three with their reasons on every run rather than leaving them in a
+# document nobody opens - phase 28's rule, written after its own first gate read a
+# wall clock over a scripted runner.
+#
+#   export 1,000 45 MP JPEGs in <= 12 min  - waived. That row is dominated by the
+#     render graph, not by the writer: this build links no `wgpu` backend and the
+#     processor reference path takes about 210 ms for a 2,048 px proxy. Phase 14
+#     condition C1. Measuring the writer alone and calling it an export budget
+#     would produce a comfortable number about the wrong thing.
+#   export throughput >= 1.4 images/s      - waived, same measurement, same reason.
+#   upload 1,000 images in <= 35 min       - waived. `NETWORK_TRANSPORT_AVAILABLE`
+#     is false, so there is no socket to measure; a resume run against an in-memory
+#     transport is a measurement of memcpy. Exit condition C3.
+#
+# What is measured is the two rows that are entirely this phase's own work, plus a
+# storage figure section 11 does not name.
+
+# Section 11's third row: what the guarantee costs. Every written file is flushed,
+# `sync_all`ed, re-opened, read back and hashed, and the budget is that the whole
+# of that stays under a twelfth of the export.
+#
+# A percentage rather than a ratio, in a `count`, for the reason `cost` is in
+# hundredths of a cent: this file is read by people as well as by tests and a float
+# in a budget invites an argument about rounding. The same shape as
+# `count.cloud_outage_overhead_percent`, which phase 04 wrote for the same reason.
+#
+# It is the one row that decides whether anybody switches the guarantee off. At 8 %
+# a photographer leaves it on; at 40 % somebody adds a setting, and a delivery
+# nobody verified is the failure this whole phase exists to prevent.
+#
+# Measured at **2 %** in release: 60 frames written in 195,743 us, of which the
+# re-open, re-read and hash of all 60 files is 2,061 us.
+#
+# **Measured directly rather than by differencing two exports.** The first version
+# ran the job twice, with and without verification, and subtracted - and the two
+# whole-run timings came out within a third of a per cent of each other, with the
+# *verified* run faster. That reads as an overhead of zero and passes this budget
+# for no reason at all. A difference of two large numbers is the wrong instrument
+# for a small one; phase 19's halo test and phase 22's ringing measurement are the
+# same defect in two other phases. Asserted in release only, because a debug build's
+# encoder inflates the denominator and flatters the ratio.
+[count.export_verify_overhead_percent]
+max_count = 8
+
+# Section 11's fifth row: a learning update in at most 90 s per wedding. The
+# measurement is in milliseconds, and the four orders of magnitude are not a boast -
+# they are what `crates/aura-learn/tests/no_guarantee_learning.rs` protects. The
+# loop is a trimmed median per bucket over rows the ledger already holds; it opens
+# no photograph and reaches no renderer, and a future change that measured an
+# improvement by rendering it would blow this budget by four orders of magnitude
+# rather than by a few per cent, which is why the margin is worth asserting.
+#
+# Measured at under a millisecond for 1,800 corrections across 45 buckets - more
+# than any real wedding produces - of which 24 move, because `MAX_DIFF_LINES` is
+# what a photographer reads before agreeing to an update and so is the largest fit
+# this loop can ever be asked for.
+[stage.learn_update]
+max_elapsed_ms  = 90000
+max_ms_per_unit = 90000
+
+# Section 11 names no storage row. One is measured anyway, and unlike phase 29's
+# this phase's shape is flat: migration 30 stores one row per **delivered file**
+# plus a bounded per-job header, so the per-file figure neither falls with the
+# gallery (phase 29) nor grows with it (phase 26).
+#
+# **The bound is asserted as well as the number**, by running the same export over
+# ten times the files: ten times the files must cost between seven and thirteen
+# times the store. A size assertion alone passes on a build that removed a cap and
+# happened to be measured on a small fixture - phase 26's lesson, and phase 21's
+# before it. Measured by `crates/aura-perf/tests/delivery_budgets.rs`:
+#
+#     20 files   ->  11,896 B  =  594 B/file
+#     200 files  -> 113,221 B  =  566 B/file   (9.5x the bytes for 10x the files)
+#
+# The budget is set at the **small** end, where the per-file figure is worst, and
+# the headroom above 594 B is for the two variable-length terms a real delivery has
+# and this fixture does not: a long original stem and a set name a studio chose.
+[size.delivery_store_per_file]
+max_bytes = 1200

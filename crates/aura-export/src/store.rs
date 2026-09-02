@@ -20,8 +20,9 @@ use std::sync::Arc;
 use aura_catalog::Catalog;
 use aura_core::clock::Clock;
 use aura_core::contract::delivery::{
-    DeliveryCode, DeliveryManifest, DeliveryReason, Destination, ExportJob, ExportOutline,
-    ExportedFile, ImageId, MAX_REASONS,
+    DeliveryCode, DeliveryColour, DeliveryManifest, DeliveryReason, Destination, ExportJob,
+    ExportOutline, ExportSet, ExportedFile, FileFormat, ImageId, MetadataPolicy, NamingTemplate,
+    OutputSharpen, Resize, MAX_REASONS,
 };
 use aura_core::errors::db::statement_failed;
 use aura_core::{AuraResult, ProjectId};
@@ -42,6 +43,112 @@ struct SetRow {
     naming: String,
     sidecar: bool,
     requested: u32,
+}
+
+/// One set's stored shape, as it comes back off the row.
+struct SetSpecRow {
+    name: String,
+    format: String,
+    quality: u8,
+    colour: String,
+    bit_depth: u8,
+    resize: String,
+    sharpen: String,
+    naming: String,
+    sidecar: bool,
+}
+
+/// One set of a job, without its photographs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SetSpec {
+    /// What the set is called.
+    pub name: String,
+    /// What kind of file.
+    pub format: FileFormat,
+    /// JPEG quality.
+    pub quality: u8,
+    /// How large.
+    pub resize: Resize,
+    /// Output sharpening.
+    pub sharpen: OutputSharpen,
+    /// How the files are named.
+    pub naming: NamingTemplate,
+    /// The output colour space.
+    pub colour: DeliveryColour,
+    /// Bits per sample.
+    pub bit_depth: u8,
+    /// Whether an XMP sidecar goes beside each file.
+    pub sidecar: bool,
+}
+
+impl SetSpec {
+    /// Turn the specification into a set over these photographs.
+    #[must_use]
+    pub fn over(&self, images: Vec<ImageId>) -> ExportSet {
+        ExportSet {
+            name: self.name.clone(),
+            images,
+            format: self.format,
+            quality: self.quality,
+            resize: self.resize,
+            sharpen: self.sharpen,
+            naming: self.naming.clone(),
+            colour: self.colour,
+            bit_depth: self.bit_depth,
+            sidecar: self.sidecar,
+        }
+    }
+}
+
+/// A job's shape without its photographs: everything a repeat needs except *what* to write.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobSpec {
+    /// Where the files went last time.
+    pub destination: Destination,
+    /// What metadata travelled with them.
+    pub metadata: MetadataPolicy,
+    /// Whether the job read every file back.
+    pub verify: bool,
+    /// The sets, in name order.
+    pub sets: Vec<SetSpec>,
+}
+
+impl JobSpec {
+    /// Turn the specification into a job over these photographs.
+    ///
+    /// Every set gets the same list, which is what a repeat of a single-set gallery job means.
+    /// A multi-set job repeated this way writes the same gallery into each of its sets at that
+    /// set's own size and quality, which is what those sets are for.
+    #[must_use]
+    pub fn over(&self, images: &[ImageId]) -> ExportJob {
+        ExportJob {
+            sets: self.sets.iter().map(|s| s.over(images.to_vec())).collect(),
+            destination: self.destination.clone(),
+            metadata: self.metadata.clone(),
+            verify: self.verify,
+        }
+    }
+}
+
+/// Read back the text [`resize_text`] wrote.
+fn parse_resize(text: &str) -> Option<Resize> {
+    if text == "full" {
+        return Some(Resize::Full);
+    }
+    if let Some(rest) = text.strip_prefix("long_edge:") {
+        return rest
+            .parse::<u32>()
+            .ok()
+            .map(|pixels| Resize::LongEdge { pixels });
+    }
+    if let Some(rest) = text.strip_prefix("fit:") {
+        let (w, h) = rest.split_once('x')?;
+        return Some(Resize::Fit {
+            width: w.parse().ok()?,
+            height: h.parse().ok()?,
+        });
+    }
+    None
 }
 
 /// One catalog, wrapped.
@@ -316,6 +423,124 @@ impl ExportStore {
             .optional()
             .map_err(|e| statement_failed("export_job", &e))
         })
+    }
+
+    /// The shape of the project's most recent job, without its images.
+    ///
+    /// Every field of an [`ExportJob`] except the photographs, read back out of the rows the job
+    /// itself wrote: the destination, the metadata policy, whether it verified, and each set's
+    /// format, quality, colour, depth, resize, sharpening, template and sidecar flag.
+    ///
+    /// **The images are deliberately absent**, and that is what makes this a *specification*
+    /// rather than a stored job. `export_set` does not keep the requested image list - the note in
+    /// migration 30 says why - so a repeat runs over whatever is selected *now*, which after a
+    /// re-cull or a re-edit is a different gallery. A reader that reconstructed the old list would
+    /// be re-delivering last week's selection under this week's name.
+    ///
+    /// `None` when the project has never been exported. Used by the autopilot, which is not
+    /// allowed to invent a destination: a run over a wedding nobody has set an export up for skips
+    /// the stage and says so, rather than writing three thousand files somewhere nobody chose.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the rows cannot be read.
+    pub fn last_spec(&self, project: ProjectId) -> AuraResult<Option<JobSpec>> {
+        let Some(job_id) = self.latest_job(project)? else {
+            return Ok(None);
+        };
+        let id = job_id.clone();
+        let (destination, policy, verify) = self.catalog.read(move |conn| {
+            conn.query_row(
+                "SELECT destination, metadata_policy, verify FROM export_job WHERE job_id = ?1",
+                params![id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(2)? == 1,
+                    ))
+                },
+            )
+            .map_err(|e| statement_failed("export_job", &e))
+        })?;
+
+        let Ok(destination) = serde_json::from_str::<Destination>(&destination) else {
+            return Ok(None);
+        };
+        let metadata = serde_json::from_str::<MetadataPolicy>(&policy).unwrap_or_default();
+
+        let id = job_id.clone();
+        let rows: Vec<SetSpecRow> = self.catalog.read(move |conn| {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT name, format, quality, colour_space, bit_depth, resize, sharpen,
+                         naming, sidecar
+                     FROM export_set WHERE job_id = ?1 ORDER BY name",
+                )
+                .map_err(|e| statement_failed("export_set", &e))?;
+            let mapped = stmt
+                .query_map(params![id], |row| {
+                    Ok(SetSpecRow {
+                        name: row.get(0)?,
+                        format: row.get(1)?,
+                        quality: row.get(2)?,
+                        colour: row.get(3)?,
+                        bit_depth: row.get(4)?,
+                        resize: row.get(5)?,
+                        sharpen: row.get(6)?,
+                        naming: row.get(7)?,
+                        sidecar: row.get::<_, i64>(8)? == 1,
+                    })
+                })
+                .map_err(|e| statement_failed("export_set", &e))?;
+            let mut out = Vec::new();
+            for row in mapped {
+                out.push(row.map_err(|e| statement_failed("export_set", &e))?);
+            }
+            Ok(out)
+        })?;
+
+        // A set whose stored shape no longer parses drops out rather than being repeated wrong:
+        // the vocabulary is checked by the schema, so this is only reachable across a downgrade,
+        // and a set repeated at the wrong quality is worse than a set nobody repeated.
+        let mut sets = Vec::with_capacity(rows.len());
+        for row in rows {
+            let Ok(format) = FileFormat::parse(&row.format) else {
+                continue;
+            };
+            let Ok(colour) = DeliveryColour::parse(&row.colour) else {
+                continue;
+            };
+            let Ok(naming) = NamingTemplate::parse(&row.naming) else {
+                continue;
+            };
+            let Ok(sharpen) = OutputSharpen::parse(&row.sharpen) else {
+                continue;
+            };
+            let Some(resize) = parse_resize(&row.resize) else {
+                continue;
+            };
+            sets.push(SetSpec {
+                name: row.name,
+                format,
+                quality: row.quality,
+                resize,
+                sharpen,
+                naming,
+                colour,
+                bit_depth: row.bit_depth,
+                sidecar: row.sidecar,
+            });
+        }
+        if sets.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(JobSpec {
+            destination,
+            metadata,
+            verify,
+            sets,
+        }))
     }
 
     /// What a project's exports covered and found.

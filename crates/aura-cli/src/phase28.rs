@@ -749,15 +749,16 @@ pub fn verify(args: &[String]) -> ExitCode {
     );
     println!("      ten real weddings and a person.");
     println!(
-        "  C7  This build writes no files. Curation runs since phase 29 landed; export is still"
+        "  C7  CLOSED by phase 30. Every stage in the DAG is built - curation since phase 29,"
     );
     println!(
-        "      `PhaseNotBuilt`, so a completed run leaves a curated wedding in the catalog and"
+        "      export since phase 30 - and `AppRunner::availability` is empty, so a completed run"
     );
+    println!("      writes files. Export declines on the *wedding* rather than on the release: it");
     println!(
-        "      nothing on disk - which makes half of section 10.1's cancellation gate vacuous"
+        "      repeats the export a photographer has already set up and skips with `NoInput` when"
     );
-    println!("      rather than passed.");
+    println!("      there is none, so section 10.1's cancellation gate is reachable now.");
 
     if failures == 0 {
         println!();

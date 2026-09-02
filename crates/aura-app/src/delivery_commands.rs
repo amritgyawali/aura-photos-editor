@@ -63,6 +63,49 @@ use crate::state::AppState;
 // The field
 // ---------------------------------------------------------------------------
 
+/// The project's gallery, in the order a delivery writes it.
+///
+/// Phase 12's keepers, ordered by the timeline and then by id. **The order is the sequence
+/// token's input**, so it has to be a property of the wedding rather than of whatever order
+/// `SQLite` felt like returning rows in - a re-export that renumbered a gallery would hand a client
+/// a second set of files that collide with the first under different names.
+///
+/// Empty is a real answer: a project whose cull has not run has no gallery, and an export over
+/// nothing is a skip rather than an empty folder.
+///
+/// # Errors
+///
+/// `AURA-DB-3006` when the rows cannot be read.
+pub fn selected_images(state: &AppState, project: ProjectId) -> Result<Vec<ImageId>, IpcError> {
+    let key = project.to_db();
+    let rows: Vec<String> = Arc::clone(state.catalog())
+        .read(move |conn| {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT p.photo_id FROM selection_keep k
+                     JOIN photo p ON p.photo_id = k.photo_id
+                     WHERE p.project_id = ?1
+                     ORDER BY p.timeline_time, p.photo_id",
+                )
+                .map_err(|e| aura_core::errors::db::statement_failed("selection_keep", &e))?;
+            let mapped = stmt
+                .query_map(rusqlite::params![key], |row| row.get::<_, String>(0))
+                .map_err(|e| aura_core::errors::db::statement_failed("selection_keep", &e))?;
+            let mut out = Vec::new();
+            for row in mapped {
+                out.push(
+                    row.map_err(|e| aura_core::errors::db::statement_failed("selection_keep", &e))?,
+                );
+            }
+            Ok(out)
+        })
+        .map_err(IpcError::from)?;
+    Ok(rows
+        .iter()
+        .filter_map(|id| ImageId::from_db(id).ok())
+        .collect())
+}
+
 /// One project's facts, gathered once.
 ///
 /// Gathered rather than fetched per call, for the reason phases 27 and 29's fields are: a naming

@@ -48,6 +48,16 @@ tempfile     = { workspace = true }
 # perceptual tolerance". A test that encoded a JPEG and checked its length would prove nothing, so
 # the fidelity test decodes what was written back and compares it to the buffer that went in.
 zune-jpeg    = { workspace = true }
+# PHASE-30. The same reason `zune-jpeg` is here: an integration test cannot reach a crate's own
+# dependencies, and gate 1 decodes what the PNG writer wrote rather than checking its length.
+png          = { workspace = true }
+blake3       = { workspace = true }
+# PHASE-30. The gates measure the phase rather than the crate: an upload that resumes and a
+# candidate that improves on held-out corrections are section 10.1 rows, and they live beside the
+# export rows because a photographer's delivery is one thing. Dev-dependencies, so nothing in this
+# crate's library can reach them - `aura-export` writes files and knows nothing about sending them.
+aura-delivery = { path = "../aura-delivery" }
+aura-learn    = { path = "../aura-learn" }
 serde_json   = { workspace = true }
 
 # The section 10.1 gates, run as an ordinary test so a red gate is a red build.

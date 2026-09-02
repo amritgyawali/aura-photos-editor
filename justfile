@@ -434,6 +434,17 @@ phase-28-verify:
 phase-29-verify:
     cargo run --release --package aura-cli -- verify --phase 29 --work target/phase29-verify
 
+# The phase 30 gate. Migration 30 and its objects, the naming plan's refusals and its collision
+# suffixes, a real export written to a real directory and read back byte for byte, the metadata
+# policy that strips rather than copies, the manifest that cannot be rewritten, the upload state
+# machine's resume, the backup comparison's three outcomes, the learning loop's two bounds and its
+# held-out measurement, the guarantees no correction may move, and the three IPC files agreeing.
+#
+# Nothing in it reaches a network and nothing in it is fitted on a photographer's corrections. The
+# gate prints the six conditions it did not prove at the end of every run.
+phase-30-verify:
+    cargo run --release --package aura-cli -- verify --phase 30 --work target/phase30-verify
+
 # The phase 29 gates from the catalog side. Reads a real project read-only and reports the three
 # numbers no fixture can supply: how much of AURA's portfolio a photographer kept, how much of the
 # album they moved, and how many of the offered monochrome conversions they took. A project nobody

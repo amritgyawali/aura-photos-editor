@@ -1,13 +1,16 @@
 //! The last three stages: QC, curation and export.
 //!
-//! Two of the three are not built in this release, and they are declared anyway. That is
-//! deliberate and it is phase 27's rule applied to a whole stage: a DAG that omitted the stages
-//! this build cannot run would be a DAG whose run summary said a wedding was finished, when what
+//! All three are built. Two of them were not when this file was written, and they were declared
+//! anyway - which is phase 27's rule applied to a whole stage: a DAG that omitted the stages this
+//! build could not run would be a DAG whose run summary said a wedding was finished, when what
 //! actually happened is that nobody wrote a file.
 //!
-//! `SkipCause::PhaseNotBuilt` is what they report, `RunStatus::CompletedDegraded` is what a run
-//! carrying them ends as, and `RunSummary::degraded_stages` names them. Phases 29 and 30 change
-//! two `availability` answers in `aura-app` and change nothing here.
+//! That prediction held exactly. Phase 29 and phase 30 each changed one `availability` answer in
+//! `aura-app` and changed nothing here, and `AppRunner::availability` is now empty. What survives
+//! is the machinery it was built for: `SkipCause` is still what a stage that cannot run reports,
+//! `RunStatus::CompletedDegraded` is still what a run carrying one ends as, and
+//! `RunSummary::degraded_stages` still names it - and export uses all three, on a wedding nobody
+//! has set an export up for.
 
 use crate::contract::autopilot::{CheckpointKind, ResourceNeeds, StageDecl, StageId, StageScope};
 
@@ -38,9 +41,9 @@ pub const QC: StageDecl = StageDecl {
 
 /// Phase 29. Albums, heroes, black and white, social crops.
 ///
-/// Not built in this release. Section 2.2 of the phase document puts curation outputs in phase 29
-/// and says this phase runs it "as an optional stage" - so the stage exists, its dependencies are
-/// declared, and `StageRunner::availability` answers `PhaseNotBuilt` until `aura-curate` does.
+/// Built since phase 29. Section 2.2 of the phase document puts curation outputs in phase 29 and
+/// says this phase runs it "as an optional stage", and the arm in `AppRunner::run_stage` is one
+/// call into `curate_project` - the shape section 4 asks for.
 pub const CURATION: StageDecl = StageDecl {
     id: StageId::Curation,
     name: "curation",
@@ -54,11 +57,17 @@ pub const CURATION: StageDecl = StageDecl {
 
 /// Phase 30. JPEG, TIFF, XMP, and where they went.
 ///
-/// Not built in this release. The terminal stage of section 3's DAG, and the only one whose
-/// failure a photographer would describe as the product not working - which is exactly why it is
-/// declared here with `PerStage` checkpointing and why `RunSummary::exported` is zero and
-/// `RunSummary::output_path` is the project's own directory on this build, rather than either
-/// being quietly omitted.
+/// Built since phase 30, which closes phase 28's condition C7: every stage in this DAG now exists,
+/// and a completed run writes files. The terminal stage of section 3's DAG, and the only one whose
+/// failure a photographer would describe as the product not working.
+///
+/// **It is the one stage that can decline on the wedding rather than on the release.** An export
+/// needs a destination, a naming template, a size and a quality, and all four are decisions a
+/// photographer makes about this client in the export panel. A run repeats the export this wedding
+/// has already been given, over whatever is selected now; a wedding that has never been exported
+/// skips with `SkipCause::NoInput` and the run finishes degraded with this stage named. The
+/// autopilot inventing a folder would be the scheduler making a decision, which is the one thing
+/// `crates/aura-jobs/tests/no_decisions.rs` exists to prevent.
 ///
 /// `PerStage` and not `PerImage`, even though it writes one file per photograph. Section 10.1
 /// requires that cancellation leaves no partial exports, and the way that is guaranteed is that
