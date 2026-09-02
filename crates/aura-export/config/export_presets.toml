@@ -1,0 +1,109 @@
+# Export presets. PM-owned, versioned, editable by a studio.
+#
+# Six rows: the five sets section 2.1 names - gallery, album, social, teaser and black-and-white -
+# plus a hand-off for another editor. Each row is what a photographer gets when they press the
+# button without changing anything, and every one of them is a *product* decision rather than a
+# technical one.
+#
+# ## What the loader will and will not accept
+#
+# The contract owns every bound and this file may only choose inside them. A row that asks for a
+# quality below MIN_JPEG_QUALITY, a long edge outside MIN_LONG_EDGE..=MAX_LONG_EDGE, sixteen bits
+# on a JPEG, or a naming template with a path separator in it is refused - and the whole file is
+# refused, not just the row, because a preset table that silently dropped its album row would give
+# a studio the gallery preset for their album.
+#
+# The shape phases 21 to 29 established: a studio may tighten, never widen, and the loader is what
+# holds the file to the contract rather than a digest.
+#
+# ## Why the gallery is 92 and not 85
+#
+# Because a client gallery is what a couple zooms into on a phone, and JPEG artefacts on skin at
+# 100 % are the single most common complaint a photographer gets about a delivered file. The
+# difference between 85 and 92 on a 24 MP frame is about 40 % more bytes and it is the difference
+# between visible and not.
+#
+# ## Why the album is TIFF at sixteen bits and not JPEG at 100
+#
+# Because an album goes to a print lab that will apply its own profile, its own sharpening and its
+# own paper curve on top of what AURA did. Every one of those is a second quantisation, and the
+# eight-bit file is where the banding in a gradient sky comes from.
+#
+# ## Why nothing here is larger than the frame
+#
+# There is no upscaling anywhere in this product. A row asking for a long edge above a camera's own
+# is written at the camera's own and says so, which is `resize_ignored_upscale`.
+
+version = 1
+
+[[preset]]
+name    = "gallery"
+format  = "jpeg"
+quality = 92
+colour  = "srgb"
+bit_depth = 8
+resize  = "full"
+sharpen = "screen"
+naming  = "{date}_{couple}_{seq}"
+sidecar = false
+reason  = "The delivered gallery. Full size, sRGB, sharpened for a screen because that is where a couple looks at it first."
+
+[[preset]]
+name    = "album"
+format  = "tiff"
+quality = 100
+colour  = "adobe_rgb"
+bit_depth = 16
+resize  = "full"
+sharpen = "print"
+naming  = "{date}_{couple}_album_{seq}"
+sidecar = false
+reason  = "The album layout, for a lab. Sixteen bits in Adobe RGB so the lab's own profile is not the second quantisation."
+
+[[preset]]
+name    = "social"
+format  = "jpeg"
+quality = 90
+colour  = "srgb"
+bit_depth = 8
+resize  = "long_edge:2048"
+sharpen = "screen"
+naming  = "{date}_{couple}_social_{seq}"
+sidecar = false
+reason  = "For a feed. 2,048 px because every platform re-compresses, and giving it a file it does not have to scale twice is the whole trick."
+
+[[preset]]
+name    = "teaser"
+format  = "jpeg"
+quality = 90
+colour  = "srgb"
+bit_depth = 8
+resize  = "long_edge:1600"
+sharpen = "screen"
+naming  = "{date}_{couple}_teaser_{seq}"
+sidecar = false
+reason  = "The wedding-night teaser. Small, so it uploads from a venue's wifi."
+
+[[preset]]
+name    = "bw"
+format  = "jpeg"
+quality = 92
+colour  = "srgb"
+bit_depth = 8
+resize  = "full"
+sharpen = "screen"
+naming  = "{date}_{couple}_bw_{seq}"
+sidecar = false
+reason  = "The monochrome frames, delivered exactly like the gallery because they are part of it."
+
+[[preset]]
+name    = "handoff"
+format  = "tiff"
+quality = 100
+colour  = "adobe_rgb"
+bit_depth = 16
+resize  = "full"
+sharpen = "none"
+naming  = "{original}"
+sidecar = true
+reason  = "For another editor. No output sharpening, sixteen bits, and an XMP sidecar beside every file - section 6.2's universal path."

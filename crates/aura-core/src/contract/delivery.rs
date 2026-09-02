@@ -301,6 +301,11 @@ impl Resize {
     /// Returns `(0, 0)` for a degenerate source rather than dividing by zero; the writer refuses
     /// such a frame with [`DeliveryCode::RenderUnavailable`].
     #[must_use]
+    #[allow(
+        clippy::cast_lossless,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
     pub fn target(self, src_w: u32, src_h: u32) -> (u32, u32) {
         if src_w == 0 || src_h == 0 {
             return (0, 0);
@@ -1719,6 +1724,7 @@ fn bad_job(detail: String, user: &str) -> AuraError {
 }
 
 /// A ratio that is exact in `f64` for every count this product can produce.
+#[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
 fn f64_ratio(num: u64, den: u64) -> f32 {
     if den == 0 {
         return 0.0;
@@ -1727,6 +1733,17 @@ fn f64_ratio(num: u64, den: u64) -> f32 {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::float_cmp,
+    clippy::assertions_on_constants,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::disallowed_methods,
+    clippy::panic
+)]
 mod tests {
     use super::*;
 

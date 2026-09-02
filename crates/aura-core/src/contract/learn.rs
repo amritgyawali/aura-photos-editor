@@ -250,6 +250,11 @@ impl Learnable {
     /// raise one, which is the shape phases 21 and 22 established for ceilings. A learning loop with
     /// an unbounded step is a learning loop that walks off after four weddings.
     #[must_use]
+    // The arms are written one family at a time and two of them happen to share a number today.
+    // Collapsing them would put `GallerySize` beside `EmotionWeight` in a match whose grouping is
+    // the argument - a ranker weight and a gallery-size share are bounded at 0.20 for completely
+    // different reasons, and the day one of them moves the merge has to be undone first.
+    #[allow(clippy::match_same_arms)]
     pub fn ceiling(self) -> f32 {
         match self {
             Self::Exposure => 0.60,
@@ -601,6 +606,12 @@ pub struct AbRow {
 /// different questions: one asks whether this machine may learn from this wedding, the other whether
 /// anonymised evidence may leave it. Collapsing them into one switch would make the second one
 /// happen by accident.
+///
+/// Four bools rather than a bitmask or a set, deliberately. Each is a separate question a person
+/// answered separately, and the whole point of the shape is that they cannot be set together by
+/// accident. Folding them into an integer would make "what did they agree to" an argument about how
+/// to decode it, in the one struct where that question has to be answerable a year later.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Consent {
     /// The wedding.
@@ -911,6 +922,7 @@ impl LearnOutline {
     /// arrives without a decision behind it has a full correction table and an empty loop, and the
     /// two look identical from the outline's other fields.
     #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
     pub fn attribution_rate(&self) -> f32 {
         let total = self.corrections + self.unattributed;
         if total == 0 {
@@ -1019,6 +1031,17 @@ fn bad_update(detail: String) -> AuraError {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::float_cmp,
+    clippy::assertions_on_constants,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::disallowed_methods,
+    clippy::panic
+)]
 mod tests {
     use super::*;
 

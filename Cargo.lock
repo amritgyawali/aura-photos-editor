@@ -319,6 +319,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-export"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-recipe",
+ "aura-render",
+ "blake3",
+ "jpeg-encoder",
+ "png",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "time",
+ "toml",
+ "tracing",
+ "zune-jpeg",
+]
+
+[[package]]
 name = "aura-generative"
 version = "0.1.0"
 dependencies = [
