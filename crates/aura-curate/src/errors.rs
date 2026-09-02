@@ -21,7 +21,7 @@ pub fn pass_failed(stage: &str, detail: impl AsRef<str>) -> AuraError {
 /// `curation.toml` asked for something the contract does not permit.
 ///
 /// The message names the key and both numbers, because "the file is wrong" is not something a
-/// studio can act on and "album_max is 200 and the ceiling is 120" is.
+/// studio can act on and "`album_max` is 200 and the ceiling is 120" is.
 #[must_use]
 pub fn policy_refused(key: &str, detail: impl AsRef<str>) -> AuraError {
     curate_policy_refused(format!("curation.toml `{key}`: {}", detail.as_ref()))

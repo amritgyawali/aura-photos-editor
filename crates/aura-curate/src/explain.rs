@@ -45,7 +45,7 @@ pub fn rank_reasons(reasons: &mut Vec<CurateReason>, limit: usize) {
         .iter()
         .position(|r| r.code.is_caveat())
         .filter(|ix| *ix >= limit)
-        .map(|ix| reasons[ix].clone());
+        .and_then(|ix| reasons.get(ix).cloned());
     reasons.truncate(limit);
     if let Some(caveat) = caveat {
         // The last slot, so the arguments a photographer reads first are still the strongest.
@@ -192,7 +192,10 @@ mod tests {
     fn a_blend_over_nothing_measured_is_none_rather_than_zero() {
         assert_eq!(blend(&[(0.5, 0.9, false), (0.5, 0.8, false)]), None);
         let partial = blend(&[(0.5, 0.9, true), (0.5, 0.1, false)]).expect("one term measured");
-        assert!((partial - 0.9).abs() < 1e-6, "renormalised over what was seen");
+        assert!(
+            (partial - 0.9).abs() < 1e-6,
+            "renormalised over what was seen"
+        );
     }
 
     #[test]

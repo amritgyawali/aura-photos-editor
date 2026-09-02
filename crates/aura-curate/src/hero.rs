@@ -139,12 +139,8 @@ pub fn select(frames: &[Frame], field: &dyn Field, policy: &Policy) -> Vec<HeroP
 
         // Descending, with a total tiebreak so the result does not depend on the sort.
         scored.sort_by(|a, b| {
-            b.0.total_cmp(&a.0).then_with(|| {
-                a.3.frame
-                    .image_id
-                    .to_db()
-                    .cmp(&b.3.frame.image_id.to_db())
-            })
+            b.0.total_cmp(&a.0)
+                .then_with(|| a.3.frame.image_id.to_db().cmp(&b.3.frame.image_id.to_db()))
         });
 
         // Walk down until something passes the three constraints, remembering what stopped the
@@ -209,7 +205,10 @@ pub fn select(frames: &[Frame], field: &dyn Field, policy: &Policy) -> Vec<HeroP
 
         let mut reasons = Vec::new();
         if terms.emotion >= 0.7 {
-            reasons.push(CurateReason::plain(CurateCode::EmotionalPeak, terms.emotion));
+            reasons.push(CurateReason::plain(
+                CurateCode::EmotionalPeak,
+                terms.emotion,
+            ));
         }
         if terms.composition >= 0.7 {
             reasons.push(CurateReason::plain(
@@ -224,7 +223,10 @@ pub fn select(frames: &[Frame], field: &dyn Field, policy: &Policy) -> Vec<HeroP
             ));
         }
         if unique_known && terms.uniqueness >= 0.6 {
-            reasons.push(CurateReason::plain(CurateCode::UniqueFrame, terms.uniqueness));
+            reasons.push(CurateReason::plain(
+                CurateCode::UniqueFrame,
+                terms.uniqueness,
+            ));
         }
         if !unique_known {
             reasons.push(CurateReason::plain(
@@ -236,10 +238,9 @@ pub fn select(frames: &[Frame], field: &dyn Field, policy: &Policy) -> Vec<HeroP
             reasons.push(CurateReason::plain(CurateCode::StoryImportant, terms.story));
         }
         match binding {
-            HeroBinding::ChapterQuota => reasons.push(CurateReason::plain(
-                CurateCode::ChapterQuotaBinding,
-                -0.20,
-            )),
+            HeroBinding::ChapterQuota => {
+                reasons.push(CurateReason::plain(CurateCode::ChapterQuotaBinding, -0.20))
+            }
             HeroBinding::MomentExhausted => reasons.push(CurateReason::plain(
                 CurateCode::MomentAlreadyRepresented,
                 -0.20,
@@ -346,10 +347,7 @@ mod tests {
         fn gallery_coverage(&self, _project: ProjectId) -> AuraResult<CoverageReport> {
             Ok(CoverageReport::default())
         }
-        fn skin_bands(
-            &self,
-            _project: ProjectId,
-        ) -> AuraResult<BTreeMap<IdentityId, u8>> {
+        fn skin_bands(&self, _project: ProjectId) -> AuraResult<BTreeMap<IdentityId, u8>> {
             Ok(BTreeMap::new())
         }
         fn similarity(&self, from: ImageId, others: &[ImageId]) -> Vec<Option<f32>> {
@@ -421,9 +419,7 @@ mod tests {
             .collect();
         let heroes = select(&frames, &field, &policy);
         assert_eq!(heroes.len() as u32, policy.heroes_per_chapter);
-        assert!(heroes
-            .iter()
-            .all(|h| h.chapter == ChapterId::Ceremony));
+        assert!(heroes.iter().all(|h| h.chapter == ChapterId::Ceremony));
     }
 
     #[test]

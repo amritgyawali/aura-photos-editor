@@ -52,6 +52,11 @@ tracing      = { workspace = true }
 
 [dev-dependencies]
 tempfile     = { workspace = true }
+# PHASE-29. `tests/store_round_trip.rs` parses every JSON export back, because "exports cleanly to
+# external tools" is section 13's fifth acceptance criterion and a format nobody parsed is a format
+# nobody has checked. The export itself is written by hand - ADR-0059 section 4 - so this is the
+# consumer rather than the producer.
+serde_json   = { workspace = true }
 
 # The section 10.1 gates, run as an ordinary test so a red gate is a red build. Lives in
 # `tests/eval/` beside the phase 05 to 27 harnesses rather than in this crate's own `tests/`,

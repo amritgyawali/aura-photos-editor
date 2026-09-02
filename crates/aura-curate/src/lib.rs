@@ -29,7 +29,13 @@
     // Every weight in `curation.toml` is named for the term it weights and reads that way in the
     // file, in the contract and in the panel. Renaming them to satisfy a lint would put three
     // spellings of the same number in the product.
-    clippy::struct_field_names
+    clippy::struct_field_names,
+    // The selectors in this crate are single passes with a lot of *explanation* in them: `hero::
+    // select` is one greedy loop whose length is the three diversity constraints and the six reason
+    // arms, and splitting it would put the constraint and the sentence that reports it in different
+    // files. The store's readers are long for the same reason as every store in this repository -
+    // a column list is a column list. The same exemption phases 14, 24, 25, 26 and 27 took.
+    clippy::too_many_lines
 )]
 // The panic family and slice indexing are banned in library code and are how a test asserts. An
 // inline `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
@@ -45,8 +51,7 @@
         clippy::float_cmp,
         clippy::disallowed_methods,
         clippy::assertions_on_constants,
-        clippy::uninlined_format_args,
-        clippy::too_many_lines
+        clippy::uninlined_format_args
     )
 )]
 
@@ -134,7 +139,7 @@ pub mod spread;
 pub mod store;
 pub mod teaser;
 
-// pub use api::{Curate, CuratePass};  // restored below
+pub use api::{Curate, CuratePass};
 pub use policy::Policy;
 pub use read::{Facing, Field, Frame};
 
@@ -162,6 +167,7 @@ pub const HERO_HEAD_TRAINED: bool = false;
 pub const BW_HEAD_TRAINED: bool = false;
 
 /// True when either head is trained. Stored on the run, because a catalog outlives a build.
+#[must_use]
 pub const fn heads_trained() -> bool {
     HERO_HEAD_TRAINED || BW_HEAD_TRAINED
 }

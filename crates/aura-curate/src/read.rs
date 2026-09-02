@@ -298,8 +298,10 @@ impl Frame {
             }
             return ShotScale::Wide;
         }
-        self.scene
-            .map_or(ShotScale::Unknown, aura_core::contract::curate::scale_of_scene)
+        self.scene.map_or(
+            ShotScale::Unknown,
+            aura_core::contract::curate::scale_of_scene,
+        )
     }
 
     /// Mean luminance, `0..1`, when phase 05 measured it. The frame's tonal weight.
@@ -399,7 +401,7 @@ mod tests {
             centre_x: centre,
             width,
             eye_mid_x: eye,
-            }
+        }
     }
 
     #[test]

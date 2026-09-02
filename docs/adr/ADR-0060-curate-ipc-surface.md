@@ -77,6 +77,14 @@ the two disagreeing about an album silently. The whole order is idempotent and s
 `curate_set_order` refuses one that reorders chapters, that contains an image outside the gallery, or
 that repeats one - which is the validation an out-of-order move could not have.
 
+`curate_set_order` **records the order and then re-composes the album**, in that order and in one
+command. The split matters: which two images share a spread is still AURA's decision, because a
+photographer chose a *sequence* and the near-duplicate refusal and the tonal ceiling still apply to
+whatever ends up adjacent. `CurateService::set_order` therefore stores the order and stops - it has
+no readings and no business inventing a pairing - and the command follows it with a pass, which does.
+A build that recorded the order without re-composing would leave the panel showing yesterday's
+spreads, and section 13's fourth criterion says reordering is *instant* as well as remembered.
+
 A decision on a pick is a click on one card and it stays one row. There is no bulk decide on this
 surface at all: phase 27 established that agreeing with forty findings and authorising forty actions
 are different judgements, and here the equivalent is that accepting twenty heroes one at a time is

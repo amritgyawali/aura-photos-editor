@@ -329,7 +329,10 @@ pub fn grain(noise_sigma_rel: f32) -> f32 {
 /// Empty when nobody in the frame has a usable locus. Distinct from "no people in the frame", which
 /// is `frame.faces.is_empty()` - and the two lead to opposite decisions in [`suitability`].
 #[must_use]
-pub fn skin_bands_of(frame: &Frame, loci: &std::collections::BTreeMap<aura_core::contract::ids::IdentityId, u8>) -> BTreeSet<usize> {
+pub fn skin_bands_of(
+    frame: &Frame,
+    loci: &std::collections::BTreeMap<aura_core::contract::ids::IdentityId, u8>,
+) -> BTreeSet<usize> {
     frame
         .identities
         .iter()
@@ -349,11 +352,7 @@ pub fn skin_bands_of(frame: &Frame, loci: &std::collections::BTreeMap<aura_core:
 /// * **Below the flat floor, or below the candidate floor.** The conversion would flatten the frame,
 ///   or it is simply not worth offering.
 #[must_use]
-pub fn suitability(
-    frame: &Frame,
-    skin_bands: &BTreeSet<usize>,
-    policy: &Policy,
-) -> Option<BwPick> {
+pub fn suitability(frame: &Frame, skin_bands: &BTreeSet<usize>, policy: &Policy) -> Option<BwPick> {
     let descriptor = frame.descriptor.as_ref()?;
     let has_faces = !frame.faces.is_empty();
     if has_faces && skin_bands.is_empty() {
@@ -446,8 +445,9 @@ pub fn suitability(
         .sum::<f32>()
         .max(f32::EPSILON);
     let measured_share = (weight_sum / total_weight).clamp(0.0, 1.0);
-    let margin = ((score - policy.bw_candidate_floor) / (1.0 - policy.bw_candidate_floor).max(0.05))
-        .clamp(0.0, 1.0);
+    let margin = ((score - policy.bw_candidate_floor)
+        / (1.0 - policy.bw_candidate_floor).max(0.05))
+    .clamp(0.0, 1.0);
     let confidence = (0.35 + 0.45 * measured_share + 0.20 * margin).clamp(0.0, 1.0);
 
     let mut reasons = Vec::new();
@@ -480,10 +480,7 @@ pub fn suitability(
         reasons.push(CurateReason::plain(CurateCode::ColourIsTheSubject, -0.35));
     }
     if skin_bands.is_empty() {
-        reasons.push(CurateReason::plain(
-            CurateCode::SkinLocusUnavailable,
-            -0.05,
-        ));
+        reasons.push(CurateReason::plain(CurateCode::SkinLocusUnavailable, -0.05));
     } else {
         reasons.push(CurateReason::detailed(
             CurateCode::SkinSeparationHeld,

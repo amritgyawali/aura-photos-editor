@@ -248,7 +248,9 @@ pub const MAX_NOTE: usize = 500;
 /// ordinary scene cannot be scaled from stored numbers, and it is **excluded from the rhythm score's
 /// denominator** rather than counted as a miss. Phase 27's rule: clean and skipped are different
 /// values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ShotScale {
     /// The room, the landscape, the crowd. Establishing.
@@ -486,9 +488,13 @@ impl BwPick {
             && self.mix.within_bounds()
             && !self.reasons.is_empty()
             && self.reasons.len() <= MAX_REASONS
-            && self
-                .mix
-                .within_skin_bound(&self.skin_bands.iter().map(|b| *b as usize).collect::<Vec<_>>())
+            && self.mix.within_skin_bound(
+                &self
+                    .skin_bands
+                    .iter()
+                    .map(|b| *b as usize)
+                    .collect::<Vec<_>>(),
+            )
     }
 }
 
@@ -505,7 +511,9 @@ impl BwPick {
 /// It is on the wire because "why is this one a hero and that one not" is answered by the constraint
 /// far more often than by the score. Two frames from the same kiss can differ by 0.004; what decided
 /// between them was that one of them was in a moment already represented.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum HeroBinding {
     /// Nothing was in the way: this was simply the next best frame.
@@ -968,7 +976,9 @@ impl AlbumPlan {
 /// Section 6.4's quota verbatim: "one hero, two portraits, two details, two candids, two
 /// family/group and one exit-style frame". The variants are the quota, and [`SocialSlot::GRID_QUOTA`]
 /// sums to [`GRID_SIZE`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SocialSlot {
     /// The single strongest frame.
@@ -1067,7 +1077,9 @@ pub struct SocialPick {
 }
 
 /// Where a caption came from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum CaptionSource {
     /// Assembled locally from this wedding's own labels. Passes the grounding check by construction.
@@ -1240,7 +1252,9 @@ impl CurationResult {
 /// Thirty-nine codes in five groups. A closed vocabulary rather than a sentence, for the reason
 /// phase 09 established and phase 27 finished: a stored sentence is copy a release has to maintain,
 /// a catalog full of English cannot be translated, and a code is something a gate can count.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum CurateCode {
     // -- monochrome ---------------------------------------------------------------------
@@ -1604,7 +1618,9 @@ impl fmt::Display for CurateCode {
 }
 
 /// The five families a curation reason belongs to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum CurateGroup {
     /// Monochrome suitability and the mix.
@@ -1839,7 +1855,9 @@ impl CurationOutline {
 // ---------------------------------------------------------------------------
 
 /// What kind of pick a photographer is deciding about.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum PickKind {
     /// A portfolio hero.
@@ -1938,7 +1956,9 @@ impl CurateOverride {
 /// Section 2.1 asks for "export to album software formats (JSON/CSV/PSD-ready layer lists)". Three
 /// formats and no fourth: this produces a **specification**, never a file of pixels. Section 2.2
 /// puts album page rendering out of scope and phase 30 owns delivery.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportFormat {
     /// The whole plan, machine-readable. What another tool imports.
@@ -1997,7 +2017,9 @@ impl ExportFormat {
 }
 
 /// Which set is being exported.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ExportSubject {
     /// The album plan.
@@ -2140,6 +2162,12 @@ pub trait CurateService: Send + Sync + fmt::Debug {
     /// A stored order is never overwritten by a re-run: the next pass reports what it would have
     /// done and leaves the album alone. The operating manual's fifth code rule, and the row phase
     /// 30's learning loop reads.
+    ///
+    /// **This records the order; it does not re-lay-out the spreads.** Which two images share a
+    /// spread is still AURA's decision - a photographer chose a *sequence*, and the near-duplicate
+    /// refusal and the tonal ceiling still apply to whatever ends up adjacent - so the spreads are
+    /// re-formed by the next curation pass, which has the readings that decision needs. The IPC
+    /// command runs both in one go, which is what makes a drag look instant. ADR-0060 section 4.
     ///
     /// # Errors
     ///
@@ -2637,8 +2665,8 @@ mod tests {
         };
         assert!(caption.within_bounds());
 
-        caption.text = "one two three four five six seven eight nine ten eleven twelve thirteen"
-            .to_string();
+        caption.text =
+            "one two three four five six seven eight nine ten eleven twelve thirteen".to_string();
         assert!(!caption.within_bounds(), "thirteen words is over the bound");
 
         caption.text = "x".repeat(CAPTION_MAX_CHARS + 1);
