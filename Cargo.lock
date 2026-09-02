@@ -468,6 +468,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-learn"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-explain",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aura-models"
 version = "0.1.0"
 dependencies = [

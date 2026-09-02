@@ -37,11 +37,15 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+use aura_core::contract::colour::ColourCode;
 use aura_core::contract::composition::CompositionCode;
 use aura_core::contract::cull::CullCode;
+use aura_core::contract::curate::CurateCode;
 use aura_core::contract::emotion::EmotionCode;
 use aura_core::contract::integrity::ReasonCode;
 use aura_core::contract::ledger::DecisionKind;
+use aura_core::contract::qc::QcCode;
+use aura_core::contract::tone::ToneCode;
 
 /// How a reason should be read.
 ///
@@ -127,6 +131,10 @@ impl Catalog {
     /// Assembled from the four frozen vocabularies plus the codes phase 13 owns itself. See
     /// this module's header for why it is assembled rather than written.
     #[must_use]
+    // Eight vocabularies, each assembled the same way from its phase's own frozen enum. Splitting
+    // this would put the loop and the domain it fills in different functions, which is the one
+    // thing a registry that must not go stale should not do.
+    #[allow(clippy::too_many_lines)]
     pub fn shipped() -> Self {
         let mut by_code = BTreeMap::new();
 
@@ -182,6 +190,71 @@ impl Catalog {
                 },
             );
         }
+        // PHASE-30. `DecisionKind` has had six members since phase 13 and this registry had
+        // vocabulary for exactly one of them, so a develop, curation or QC decision recorded
+        // through `ExplainService` was refused with `AURA-ML-5054` - which nothing noticed,
+        // because nothing had recorded one yet.
+        //
+        // The learning loop is what noticed: `Learnable::Exposure` maps to `DecisionKind::Edit`,
+        // and a correction can only be attributed to a decision that exists. Ten of the fifteen
+        // learnable values were unattributable in this build, silently, and the loop would have
+        // reported an empty correction table on a wedding somebody had spent an evening
+        // correcting.
+        //
+        // The four vocabularies are assembled the same way the first four are - from the phases'
+        // own frozen enums - so they cannot go stale either.
+        for code in ToneCode::ALL {
+            by_code.insert(
+                code.as_str(),
+                RegisteredReason {
+                    code: code.as_str(),
+                    domain: DEVELOP,
+                    kind: DecisionKind::Edit,
+                    severity: ReasonSeverity::Note,
+                    template: code.user_text(),
+                },
+            );
+        }
+        for code in ColourCode::ALL {
+            by_code.insert(
+                code.as_str(),
+                RegisteredReason {
+                    code: code.as_str(),
+                    domain: DEVELOP,
+                    kind: DecisionKind::Edit,
+                    severity: ReasonSeverity::Note,
+                    template: code.user_text(),
+                },
+            );
+        }
+        for code in CurateCode::ALL {
+            by_code.insert(
+                code.as_str(),
+                RegisteredReason {
+                    code: code.as_str(),
+                    domain: CURATION,
+                    kind: DecisionKind::Curate,
+                    severity: ReasonSeverity::Note,
+                    template: code.user_text(),
+                },
+            );
+        }
+        for code in QcCode::ALL {
+            by_code.insert(
+                code.as_str(),
+                RegisteredReason {
+                    code: code.as_str(),
+                    domain: QUALITY,
+                    kind: DecisionKind::Qc,
+                    // A QC finding is a fault by construction - that is what a ticket is - so
+                    // every one of these is a caveat rather than a credit. Phase 27's own
+                    // vocabulary carries no positive code.
+                    severity: ReasonSeverity::Caveat,
+                    template: code.user_text(),
+                },
+            );
+        }
+
         for entry in LEDGER_CODES {
             by_code.insert(entry.code, entry.clone());
         }
@@ -269,6 +342,12 @@ pub const COMPOSITION: &str = "composition";
 pub const SELECTION: &str = "selection";
 /// Phase 13's own: things about the record rather than about the photograph.
 pub const LEDGER: &str = "ledger";
+/// Phases 15 and 16's: how a photograph was developed. PHASE-30.
+pub const DEVELOP: &str = "develop";
+/// Phase 29's: what a photographer should show. PHASE-30.
+pub const CURATION: &str = "curation";
+/// Phase 27's: what the product found wrong with its own work. PHASE-30.
+pub const QUALITY: &str = "quality";
 
 /// The codes phase 13 owns.
 ///

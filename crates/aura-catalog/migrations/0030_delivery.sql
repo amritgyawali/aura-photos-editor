@@ -364,7 +364,7 @@ CREATE TABLE learn_correction (
     kind               TEXT    NOT NULL CHECK (kind IN ('cull','edit','retouch','qc','curate','export')),
     learnable          TEXT    NOT NULL,
     scene              TEXT    NOT NULL,
-    identity_id        TEXT REFERENCES identities(identity_id) ON DELETE SET NULL,
+    identity_id        TEXT REFERENCES identities(id) ON DELETE SET NULL,
 
     -- Whether the subject was somebody close to the couple. The bucket's fourth coordinate, and a
     -- *role* rather than a person: a profile that learned "brighten this specific bride" is a

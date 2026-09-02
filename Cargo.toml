@@ -29,6 +29,7 @@ members = [
   "crates/aura-curate",
   "crates/aura-export",
   "crates/aura-delivery",
+  "crates/aura-learn",
   "crates/aura-jobs",
   "crates/aura-perf",
   "crates/aura-app",

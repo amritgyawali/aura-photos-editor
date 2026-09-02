@@ -12,7 +12,8 @@
 //! ```
 
 use aura_explain::reason::{
-    Catalog, ReasonSeverity, COMPOSITION, EMOTION, LEDGER, SELECTION, TECHNICAL,
+    Catalog, ReasonSeverity, COMPOSITION, CURATION, DEVELOP, EMOTION, LEDGER, QUALITY, SELECTION,
+    TECHNICAL,
 };
 
 fn main() {
@@ -71,6 +72,26 @@ fn main() {
             "Selection - whether the frame is delivered",
             "Phase 12's vocabulary. What put a photograph in the gallery, and what kept it \
              out.",
+        ),
+        (
+            DEVELOP,
+            "Develop - how the photograph was treated",
+            "Phases 15 and 16's vocabularies. What the light was, what was done about it, and \
+             what the grade did to skin. Added to this reference in phase 30, when the learning \
+             loop needed a develop decision to attribute a correction to.",
+        ),
+        (
+            CURATION,
+            "Curation - what to show",
+            "Phase 29's vocabulary. Monochrome, portfolio, album sequence, social sets and \
+             captions.",
+        ),
+        (
+            QUALITY,
+            "Quality control - what AURA found wrong with its own work",
+            "Phase 27's vocabulary. Every one of these is a caveat by construction: a QC finding \
+             is a fault the product found in itself, and phase 27's vocabulary carries no \
+             positive code.",
         ),
         (
             LEDGER,
