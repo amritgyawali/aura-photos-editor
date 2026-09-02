@@ -11,6 +11,22 @@ import type {
   AutopilotStartInput,
   AutopilotStatusDto,
   AutopilotSummaryDto,
+  // PHASE-30.
+  ConsentDto,
+  DeliveryInput,
+  DeliveryManifestDto,
+  DeliveryStatusDto,
+  DiagnosticsDto,
+  ExportFileDto,
+  ExportJobInput,
+  ExportNameDto,
+  ExportPresetDto,
+  ExportStatusDto,
+  LearnBucketDto,
+  LearnComparisonDto,
+  LearnStatusDto,
+  ProviderDto,
+  UploadItemDto,
   // PHASE-29.
   CurateAlbumDto,
   CurateBwDto,
@@ -1796,4 +1812,111 @@ export const curate = {
   /** One set as a specification another tool can read. Text, never a file. */
   curateExport: (input: CurateExportInput): Promise<CurateExportDto> =>
     invoke<CurateExportDto>('curate_export', { input }),
+};
+
+/**
+ * PHASE-30. Export and delivery.
+ *
+ * Ten calls. `exportRun` is the only call anywhere on this surface that writes files, and
+ * `exportPreviewNames` exists so a photographer can see what four thousand of them will be called
+ * before committing a wedding to a naming template.
+ *
+ * Three things are deliberately absent. There is no per-field setter, because the dialog builds a
+ * whole job and sends it in one go. No credential ever travels; a provider is a name and a
+ * boolean. And there is no bulk action, because every call here is already an action on a whole
+ * wedding.
+ */
+export const delivery = {
+  /** Three denominators, the verified share, and whether a manifest was sealed. */
+  exportStatus: (projectId: string): Promise<ExportStatusDto> =>
+    invoke<ExportStatusDto>('export_status', { projectId }),
+
+  /** The six presets, each with the argument for it. */
+  exportPresets: (): Promise<ExportPresetDto[]> =>
+    invoke<ExportPresetDto[]>('export_presets'),
+
+  /** Every name a job would produce. **Writes nothing.** */
+  exportPreviewNames: (input: ExportJobInput): Promise<ExportNameDto[]> =>
+    invoke<ExportNameDto[]>('export_preview_names', { input }),
+
+  /** Render, write, read back, hash, seal. The one call that changes somebody's disk. */
+  exportRun: (input: ExportJobInput): Promise<ExportStatusDto> =>
+    invoke<ExportStatusDto>('export_run', { input }),
+
+  /** Every file the last job wrote, with its reasons. */
+  exportFiles: (projectId: string): Promise<ExportFileDto[]> =>
+    invoke<ExportFileDto[]>('export_files', { projectId }),
+
+  /**
+   * The last sealed manifest, or null.
+   *
+   * Null is not an empty manifest: a wedding nobody exported and one whose export wrote nothing
+   * are different answers.
+   */
+  exportManifest: (projectId: string): Promise<DeliveryManifestDto | null> =>
+    invoke<DeliveryManifestDto | null>('export_manifest', { projectId }),
+
+  /** Backups and uploads, plus whether this build can reach a network at all. */
+  deliveryStatus: (projectId: string): Promise<DeliveryStatusDto> =>
+    invoke<DeliveryStatusDto>('delivery_status', { projectId }),
+
+  /** Which providers exist and which have a credential. **Never the credential.** */
+  deliveryProviders: (): Promise<ProviderDto[]> =>
+    invoke<ProviderDto[]>('delivery_providers'),
+
+  /** Copy a sealed delivery somewhere else, verifying every file. */
+  deliveryBackup: (input: DeliveryInput): Promise<DeliveryStatusDto> =>
+    invoke<DeliveryStatusDto>('delivery_backup', { input }),
+
+  /**
+   * Start or resume an upload.
+   *
+   * Resuming is not a separate call: a photographer pressing this after their wifi came back is
+   * doing the same thing they did the first time.
+   */
+  deliveryUpload: (input: DeliveryInput): Promise<DeliveryStatusDto> =>
+    invoke<DeliveryStatusDto>('delivery_upload', { input }),
+
+  /** Every file's state at a provider. */
+  deliveryItems: (projectId: string, provider: string): Promise<UploadItemDto[]> =>
+    invoke<UploadItemDto[]>('delivery_items', { projectId, provider }),
+};
+
+/**
+ * PHASE-30. The learning loop, and the diagnostics screen.
+ *
+ * Seven calls, and only two of them change anything. `learnAdopt` is the only way a profile moves
+ * forward and `learnRollBack` is the only way it moves back; there is no third, no confidence above
+ * which an update adopts itself, and no `learnCapture` - corrections are captured by the panels
+ * that already own the override.
+ */
+export const learning = {
+  /** What the loop has seen, and whether it is receiving anything. */
+  learnStatus: (): Promise<LearnStatusDto> => invoke<LearnStatusDto>('learn_status'),
+
+  /** Every bucket, with what was dropped as an outlier. */
+  learnBuckets: (): Promise<LearnBucketDto[]> => invoke<LearnBucketDto[]>('learn_buckets'),
+
+  /** The A/B, both sides on the same held-out corrections. Null when there is no candidate. */
+  learnCompare: (profileId: string): Promise<LearnComparisonDto | null> =>
+    invoke<LearnComparisonDto | null>('learn_compare', { profileId }),
+
+  /** **The only way a profile moves forward.** */
+  learnAdopt: (profileId: string): Promise<LearnStatusDto> =>
+    invoke<LearnStatusDto>('learn_adopt', { profileId }),
+
+  /** The previous version, byte for byte. */
+  learnRollBack: (profileId: string): Promise<number> =>
+    invoke<number>('learn_roll_back', { profileId }),
+
+  /** What a project has consented to. Everything off unless somebody said otherwise. */
+  learnConsent: (projectId: string): Promise<ConsentDto> =>
+    invoke<ConsentDto>('learn_consent', { projectId }),
+
+  /** Record consent. The app version stored is the build that asked, not one the caller sets. */
+  learnSetConsent: (input: ConsentDto): Promise<ConsentDto> =>
+    invoke<ConsentDto>('learn_set_consent', { input }),
+
+  /** What this machine can and cannot do. Leads with the second. */
+  diagnosticsReport: (): Promise<DiagnosticsDto> => invoke<DiagnosticsDto>('diagnostics_report'),
 };

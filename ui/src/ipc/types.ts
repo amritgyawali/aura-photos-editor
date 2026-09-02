@@ -4690,3 +4690,306 @@ export type CurateExportDto = {
   /** The extension a shell should offer. */
   extension: string;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-30. Delivery, learning and diagnostics.
+// ---------------------------------------------------------------------------
+//
+// Fifteen shapes across four panels that have no equivalent anywhere earlier: an export dialog
+// whose button writes files, a delivery screen that talks to a network, a learning review that
+// changes what the product will do next time, and a diagnostics screen whose subject is the
+// product itself.
+//
+// Three of these fields exist because a number that could not be measured and a number that came
+// out badly must never render the same: `ExportStatusDto.unverified` beside `corrupt`,
+// `DeliveryStatusDto.networkAvailable`, and `LearnStatusDto.fittedOnRealCorrections`.
+
+/** What the Export panel's header shows. */
+export type ExportStatusDto = {
+  /** Photographs in the project. The widest denominator. */
+  photos: number;
+  /** Photographs phase 12 selected. */
+  selected: number;
+  /** Photographs the last job asked for. **The one a completion is measured against.** */
+  requested: number;
+  /** Files written. */
+  written: number;
+  /** Files read back and hashed. */
+  verified: number;
+  /** Files written *without* the read-back, because the job asked for none. */
+  unverified: number;
+  /** Files whose read-back did not match. Non-zero means a delivery was stopped. */
+  corrupt: number;
+  /** Photographs that could not be rendered. */
+  renderFailed: number;
+  /** Names that collided and were suffixed. */
+  renamed: number;
+  /** Sidecars written. */
+  sidecars: number;
+  /** Bytes written. */
+  bytes: number;
+  /** Whether the last job sealed a manifest. A partial delivery seals none. */
+  manifestSealed: boolean;
+  /** Wall-clock milliseconds of the last job. */
+  ms: number;
+};
+
+/** One reason, rendered. */
+export type DeliveryReasonDto = {
+  /** The stable slug. */
+  code: string;
+  /** The whole sentence. */
+  text: string;
+  /** Whether this code stops the job it appears on. */
+  fatal: boolean;
+};
+
+/** One file a job wrote. */
+export type ExportFileDto = {
+  imageId: string;
+  set: string;
+  /** Relative to the destination root, forward slashes. */
+  path: string;
+  bytes: number;
+  /** BLAKE3 of the bytes **read back**. Empty when the job asked for no verification. */
+  hash: string;
+  width: number;
+  height: number;
+  verified: boolean;
+  renamed: boolean;
+  reasons: DeliveryReasonDto[];
+};
+
+/** A sealed delivery manifest. */
+export type DeliveryManifestDto = {
+  projectId: string;
+  createdAt: number;
+  files: number;
+  bytes: number;
+  sets: Array<[string, number]>;
+  qcReportPath: string | null;
+  cleanupDisclosures: Array<[string, string]>;
+  engineVersions: Array<[string, string]>;
+  /** Whether every file in it carries a real digest. */
+  fullyHashed: boolean;
+};
+
+/** One set, as the export dialog builds it. */
+export type ExportSetInput = {
+  name: string;
+  imageIds: string[];
+  /** `jpeg`, `tiff` or `png`. */
+  format: string;
+  /** JPEG quality, 60 to 100. */
+  quality: number;
+  /** `srgb`, `adobe_rgb` or `display_p3`. */
+  colour: string;
+  /** 8 or 16. */
+  bitDepth: number;
+  /** `full`, `long_edge:N` or `fit:WxH`. */
+  resize: string;
+  /** `none`, `screen` or `print`. */
+  sharpen: string;
+  naming: string;
+  sidecar: boolean;
+};
+
+/**
+ * A whole job, sent at once.
+ *
+ * Whole rather than field by field: a surface with per-field setters is a surface where a job can
+ * be half configured, and the validator would then run against something nobody assembled.
+ */
+export type ExportJobInput = {
+  projectId: string;
+  sets: ExportSetInput[];
+  destination: string;
+  /** `folder` or `nas`. A provider is the delivery panel's, not this dialog's. */
+  destinationKind: string;
+  copyright: string | null;
+  contact: string | null;
+  creator: string | null;
+  keywords: string[];
+  /** Remove every location tag. **True by default.** */
+  stripGps: boolean;
+  stripCameraSerial: boolean;
+  verify: boolean;
+};
+
+/** One name a job would produce, without writing anything. */
+export type ExportNameDto = {
+  imageId: string;
+  set: string;
+  path: string;
+  renamed: boolean;
+  reasons: DeliveryReasonDto[];
+};
+
+/** One export preset, with the argument for it. */
+export type ExportPresetDto = {
+  name: string;
+  format: string;
+  quality: number;
+  colour: string;
+  bitDepth: number;
+  resize: string;
+  sharpen: string;
+  naming: string;
+  sidecar: boolean;
+  /** **The argued-over half.** Why this preset is what it is. */
+  reason: string;
+};
+
+/** What the Delivery panel's header shows. */
+export type DeliveryStatusDto = {
+  files: number;
+  backups: number;
+  backedUp: number;
+  /** Files whose backup copy has a different digest. Non-zero stopped a backup. */
+  diverged: number;
+  providers: number;
+  uploaded: number;
+  outstanding: number;
+  refused: number;
+  resumes: number;
+  unmappedSets: number;
+  bytesSent: number;
+  /**
+   * Whether this build can reach a gallery over a network at all.
+   *
+   * False here. A photographer who configures a provider and sees nothing upload has to be told
+   * why rather than left to conclude their credentials are wrong.
+   */
+  networkAvailable: boolean;
+};
+
+/** One provider this machine has configured. */
+export type ProviderDto = {
+  id: string;
+  label: string;
+  /** Whether a credential is saved. **Never the credential.** */
+  hasCredential: boolean;
+  mayPublish: boolean;
+};
+
+/** One file's place in an upload. */
+export type UploadItemDto = {
+  imageId: string;
+  set: string;
+  path: string;
+  bytes: number;
+  /** `pending`, `in_progress`, `verified`, `corrupt` or `failed`. */
+  state: string;
+  sent: number;
+  resumes: number;
+  failureCode: string | null;
+};
+
+/** Which set goes where at a provider. */
+export type SetMappingInput = {
+  set: string;
+  remote: string;
+  /** **Cleared by every provider in this build**, and the clearing is named rather than silent. */
+  publish: boolean;
+};
+
+/** What a delivery command was asked to do. */
+export type DeliveryInput = {
+  projectId: string;
+  /** The backup destination, or the provider's name. */
+  target: string;
+  mapping: SetMappingInput[];
+};
+
+/** What the Learning panel's header shows. */
+export type LearnStatusDto = {
+  corrections: number;
+  projects: number;
+  buckets: number;
+  actionableBuckets: number;
+  unattributed: number;
+  /** **Whether the loop is receiving anything at all**, 0 to 1. */
+  attributionRate: number;
+  updates: number;
+  adopted: number;
+  consentedProjects: number;
+  contributingProjects: number;
+  /** Whether this build has ever fitted a profile from real corrections. False. */
+  fittedOnRealCorrections: boolean;
+};
+
+/** One bucket of corrections, aggregated. */
+export type LearnBucketDto = {
+  learnable: string;
+  /** The sentence a photographer reads for it. */
+  label: string;
+  scene: string;
+  subjectClose: boolean;
+  corrections: number;
+  projects: number;
+  /** **Shown**, so a photographer can see what the loop ignored. */
+  outliersDropped: number;
+  central: number;
+  dispersion: number;
+  heldOut: number;
+  actionable: boolean;
+  proposedOffset: number;
+};
+
+/** One row of the A/B comparison. */
+export type LearnRowDto = {
+  learnable: string;
+  scene: string;
+  current: number;
+  candidate: number;
+  corrections: number;
+  summary: string;
+};
+
+/** The two sides a photographer compares before adopting. */
+export type LearnComparisonDto = {
+  profileId: string;
+  currentVersion: number;
+  candidateVersion: number;
+  currentError: number;
+  /** Measured on the **same** held-out corrections as `currentError`. */
+  candidateError: number;
+  heldOut: number;
+  /** 0 to 1. Never negative. */
+  improvement: number;
+  offerable: boolean;
+  rows: LearnRowDto[];
+  reasons: DeliveryReasonDto[];
+};
+
+/** What a project has consented to. */
+export type ConsentDto = {
+  projectId: string;
+  localLearning: boolean;
+  datasetContribution: boolean;
+  crashReports: boolean;
+  telemetry: boolean;
+  decidedAt: number;
+  /** **Which build's wording was agreed to.** */
+  appVersion: string;
+  anythingLeaves: boolean;
+};
+
+/**
+ * What the diagnostics screen shows.
+ *
+ * It leads with what is not working, because a support call starts with somebody reading this down
+ * a telephone and the useful half is the half that says what this machine cannot do.
+ */
+export type DiagnosticsDto = {
+  appVersion: string;
+  schemaVersion: number;
+  renderBackend: string;
+  renderDegradation: string | null;
+  modelSet: string;
+  stagesOff: string[];
+  networkTransport: boolean;
+  trainedModels: boolean;
+  providers: ProviderDto[];
+  recentErrors: IpcError[];
+};

@@ -10,6 +10,7 @@ import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
 import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
 import { CuratePanel } from './components/curate/CuratePanel';
+import { DeliveryPanel } from './components/delivery/DeliveryPanel';
 import { CompositionCard } from './components/explain/CompositionCard';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
@@ -243,6 +244,10 @@ export function App(): JSX.Element {
         <AutopilotPanel projectId={activeProjectId} onError={setError} />
         <QcPanel projectId={activeProjectId} onError={setError} />
         <CuratePanel projectId={activeProjectId} onError={setError} />
+        {/* PHASE-30. The last panel, and the first whose button writes files. `profileId` is null
+            until a photographer has trained a style profile, which is what makes the learning
+            review show its buckets and no comparison - the ordinary state of the feature. */}
+        <DeliveryPanel projectId={activeProjectId} profileId={null} onError={setError} />
       </aside>
 
       <main className="main">

@@ -433,7 +433,16 @@ fn control_label(path: &str) -> String {
     chars
 }
 
-pub(crate) fn load_or_neutral(state: &AppState, photo: PhotoId) -> Result<Recipe, AuraError> {
+/// The recipe stored for a photograph, or the neutral one when it has never been edited.
+///
+/// Public since PHASE-30, because the export source needs the same recipe the develop panel shows.
+/// Two loaders would be two answers to what the edit is, which is the failure phase 14's rule about
+/// `RenderService` exists to prevent one level down.
+///
+/// # Errors
+///
+/// `AURA-DB-3006` when the recipe cannot be read, `AURA-RENDER-8002` when it does not parse.
+pub fn load_or_neutral(state: &AppState, photo: PhotoId) -> Result<Recipe, AuraError> {
     match state.recipe_store().load(&photo)? {
         Some(recipe) => Ok(recipe),
         None => Ok(recipe_fixtures::neutral(
