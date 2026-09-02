@@ -303,6 +303,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-delivery"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-export",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "aura-explain"
 version = "0.1.0"
 dependencies = [
