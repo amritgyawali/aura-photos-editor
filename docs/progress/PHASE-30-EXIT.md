@@ -138,6 +138,12 @@ not moved: lowering a guardrail to make a slow container green is how a guardrai
 
 **The procedure is evidence of intent and not of a release.**
 
+**A gap this phase's own checklist had, found by running it.** The `ui` gate was `npm test`, which
+runs vitest and nothing else — and vitest transpiles rather than type-checks, so a type error in a
+panel test passed the release gate and would have failed CI. The gate runs `npm run lint` as well
+now. It is the second time in this phase that a checker under-reported and looked like a clean
+codebase; `scripts/check-ipc-surface.sh` was the first.
+
 **C6 — neither plugin has met the application it is for.**
 The Lightroom plugin and the Photoshop hand-off are written against the published shapes of both
 APIs and neither has been loaded into either application, because neither is installed here. The

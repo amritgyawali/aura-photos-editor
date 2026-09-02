@@ -65,10 +65,10 @@ why     = "A budget is a claim about the binary a photographer runs, so it is me
 
 [[gate]]
 id      = "ui"
-command = "cd ui && npm test"
+command = "cd ui && npm test && npm run lint"
 owner   = "SFE"
 blocking = true
-why     = "The panels are where every decision in this product is read."
+why     = "The panels are where every decision in this product is read. Both halves: `npm test` was the whole gate until a type error passed it - vitest transpiles rather than type-checks, so a file whose tests are green can still fail `tsc --noEmit`, which is what CI runs."
 
 [[gate]]
 id      = "ipc"
