@@ -29,7 +29,7 @@ One line per task, in the order section 9 asks for them.
 | DEVOPS - ops | `ops/release/`, `ops/sign/`, `ops/notarise/`, `ops/update/`, `ops/crash/`, `ops/flags/` | - | Nine executable release gates and four sign-offs; staged rollout with a crash-free floor; cleanup and learning off by default |
 | SFE - IPC | `crates/aura-app/src/delivery_commands.rs`, `learn_commands.rs`, `contract/ipc.rs` | - | Seventeen commands, fifteen DTOs, the `Field` and `Source` ports over `AppState` |
 | SFE - shell | `ui/src-tauri/src/main.rs`, `ui/src/ipc/{client,types}.ts` | - | 259 handlers, 259 registered, 259 client wrappers - asserted by the gate and by `scripts/check-ipc-surface.sh` |
-| MFE - panels | `ui/src/components/delivery/` | 15 vitest | Five pure views and a container; mounted in `App.tsx` |
+| MFE - panels | `ui/src/components/delivery/` | 17 vitest | Five pure views and a container; mounted in `App.tsx` |
 | SFE - autopilot | `crates/aura-app/src/autopilot_commands.rs`, `crates/aura-jobs/src/stages/deliver.rs`, `config/autopilot.toml` | gate check 12 | The export stage runs the job this wedding was already given and skips with `NoInput` when there is none; `AppRunner::availability` is empty for the first time |
 | QAL - gates | `tests/eval/delivery_eval.rs` | 21 | Section 10.1's rows: verification catches a corruption, 4,000 names are unique, metadata is built not copied, the two bounds hold, an update improves on held-out corrections |
 | PERF - budgets | `crates/aura-perf/tests/delivery_budgets.rs`, `perf/budgets.toml` | 5 | Two rows measured, three waived with their reasons printed on every run, plus the storage figure with its bound asserted |

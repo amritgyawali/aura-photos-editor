@@ -332,9 +332,10 @@ describe('the delivery view', () => {
         onUpload={onUpload}
       />,
     );
-    const buttons = screen.getAllByText('Upload');
-    expect(buttons).toHaveLength(1);
-    fireEvent.click(buttons[0]);
+    // One button, and it belongs to the provider that has a credential. `getByText` rather than
+    // indexing `getAllByText`: it asserts the count and hands back the element in one call.
+    expect(screen.getAllByText('Upload')).toHaveLength(1);
+    fireEvent.click(screen.getByText('Upload'));
     expect(onUpload).toHaveBeenCalledWith('b');
   });
 

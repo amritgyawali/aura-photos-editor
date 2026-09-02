@@ -25,7 +25,7 @@ photographer's corrections, signed, notarised, or measured for crash-free rate.*
 | Plugins | `plugins/lightroom/aura.lrdevplugin/`, `plugins/photoshop/aura-uxp/` |
 | Release machinery | `ops/release/`, `ops/sign/`, `ops/notarise/`, `ops/update/`, `ops/crash/`, `ops/flags/` |
 | IPC | `crates/aura-app/src/delivery_commands.rs`, `learn_commands.rs` — seventeen commands |
-| Panels | `ui/src/components/delivery/` — five pure views and a container, 15 tests, mounted in `App.tsx` |
+| Panels | `ui/src/components/delivery/` — five pure views and a container, 17 tests, mounted in `App.tsx` |
 | Gates | `tests/eval/delivery_eval.rs` (21), `crates/aura-learn/tests/no_guarantee_learning.rs` (5), 64 + 26 + 17 unit tests, 9 + 8 + 11 integration tests, 20 contract tests |
 | Budgets | `crates/aura-perf/tests/delivery_budgets.rs` (5), `perf/budgets.toml` |
 | Executable gate | `cargo run --release -p aura-cli -- verify --phase 30` — twelve checks |
