@@ -11,6 +11,19 @@ import type {
   AutopilotStartInput,
   AutopilotStatusDto,
   AutopilotSummaryDto,
+  // PHASE-29.
+  CurateAlbumDto,
+  CurateBwDto,
+  CurateDecideInput,
+  CurateExportDto,
+  CurateExportInput,
+  CurateHeroDto,
+  CurateOrderInput,
+  CuratePickDto,
+  CurateProjectInput,
+  CurateSocialDto,
+  CurateSpreadDto,
+  CurateStatusDto,
   // PHASE-17.,
   // PHASE-19.,
   // PHASE-20.,
@@ -1713,4 +1726,74 @@ export const autopilot = {
   /** Record what the photographer chose in the checklist. */
   autopilotSetSettings: (input: AutopilotSettingsInput): Promise<void> =>
     invoke<void>('autopilot_set_settings', { input }),
+};
+
+/**
+ * PHASE-29. Curation: what a finished gallery becomes.
+ *
+ * Eleven commands, none of which changes a photograph. `curateExport` returns text and the shell
+ * saves it; there is no apply, no threshold, no B&W strength and no bulk decide on this surface.
+ * ADR-0060 sections 5 and 6.
+ */
+export const curate = {
+
+  /** The Curate panel's header: what has been curated, from how many keepers, at what versions. */
+  curateStatus: (projectId: string): Promise<CurateStatusDto> =>
+    invoke<CurateStatusDto>('curate_status', { projectId }),
+
+  /**
+   * Run the whole curation pass for a wedding.
+   *
+   * Returns the header rather than the whole result: a 120-spread album with its coverage report,
+   * twenty heroes, two hundred monochrome candidates and three social sets is a large payload to
+   * send when the panel that asked is about to render a header.
+   */
+  curateProject: (input: CurateProjectInput): Promise<CurateStatusDto> =>
+    invoke<CurateStatusDto>('curate_project', { input }),
+
+  /** The monochrome candidates, best first, each with its own eight-band mix. */
+  curateBw: (projectId: string): Promise<CurateBwDto[]> =>
+    invoke<CurateBwDto[]>('curate_bw', { projectId }),
+
+  /** The portfolio, in rank order. */
+  curateHeroes: (projectId: string): Promise<CurateHeroDto[]> =>
+    invoke<CurateHeroDto[]>('curate_heroes', { projectId }),
+
+  /** The album draft, or null when this wedding has not been curated. */
+  curateAlbum: (projectId: string): Promise<CurateAlbumDto | null> =>
+    invoke<CurateAlbumDto | null>('curate_album', { projectId }),
+
+  /**
+   * One spread in detail.
+   *
+   * A spread rather than the album, because the spread view is the screen a photographer spends the
+   * most time on and fetching 120 spreads to draw two frames is the shape ADR-0060 rejects.
+   */
+  curateSpread: (spreadId: string): Promise<CurateSpreadDto | null> =>
+    invoke<CurateSpreadDto | null>('curate_spread', { spreadId }),
+
+  /** The grid set, the story set, the hero and their captions. */
+  curateSocial: (projectId: string): Promise<CurateSocialDto> =>
+    invoke<CurateSocialDto>('curate_social', { projectId }),
+
+  /** The wedding-night teaser. */
+  curateTeaser: (projectId: string): Promise<CuratePickDto[]> =>
+    invoke<CuratePickDto[]>('curate_teaser', { projectId }),
+
+  /**
+   * Record a photographer's album order, and re-compose the album around it.
+   *
+   * The whole order rather than a move: the panel already holds the sequence, and a dropped message
+   * would leave the two disagreeing about an album silently. Refused when it reorders chapters.
+   */
+  curateSetOrder: (input: CurateOrderInput): Promise<CurateAlbumDto> =>
+    invoke<CurateAlbumDto>('curate_set_order', { input }),
+
+  /** Record accept or reject on one pick. One pick per call; there is no bulk decide. */
+  curateDecide: (input: CurateDecideInput): Promise<void> =>
+    invoke<void>('curate_decide', { input }),
+
+  /** One set as a specification another tool can read. Text, never a file. */
+  curateExport: (input: CurateExportInput): Promise<CurateExportDto> =>
+    invoke<CurateExportDto>('curate_export', { input }),
 };

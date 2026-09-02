@@ -4402,3 +4402,291 @@ export type AutopilotSettingsInput = {
   /** Whether the run yields to foreground work. */
   quietMode: boolean;
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-29. Curation.
+// ---------------------------------------------------------------------------
+//
+// Eleven commands and nine shapes. The primary object is a **deliverable**, and the reader is
+// making a decision about their own portfolio rather than checking a measurement - so what travels
+// beside every pick is enough to disagree quickly.
+//
+// Two pairs of fields carry the phase's hardest idea. `facingKnown` beside `facingScore`, and
+// `rhythmMeasurable` beside `rhythmScore`: a number nobody could measure and a number that came out
+// badly must not look the same, and on this build the first is the common case. ADR-0060 section 3.
+
+/** What the Curate panel's header shows. */
+export type CurateStatusDto = {
+  /** Photographs in the project. */
+  photos: number;
+  /** Photographs phase 12 selected. **The denominator for everything else here.** */
+  selected: number;
+  /** Selected photographs curation could read at all. */
+  curated: number;
+  /** `curated / selected`, 0..1. */
+  coverage: number;
+  /** Monochrome candidates offered. */
+  bwOffered: number;
+  /** Monochrome candidates the photographer took. */
+  bwAccepted: number;
+  /** Monochrome candidates the photographer rejected. */
+  bwRejected: number;
+  /** Heroes chosen. */
+  heroes: number;
+  /** Chapters that contributed at least one hero. */
+  chaptersCovered: number;
+  /** Spreads in the album. */
+  spreads: number;
+  /** Images in the album. */
+  albumSize: number;
+  /** The album's rhythm score, 0..1. */
+  rhythmScore: number;
+  /** The share of the album whose shot scale could be measured. **Read the score with this.** */
+  rhythmMeasurable: number;
+  /** The album's mean pairing score, 0..1. */
+  pairingScore: number;
+  /** Must-have rules the album satisfies. */
+  albumCovered: number;
+  /** Must-have rules the album misses. */
+  albumMissing: number;
+  /** How many times the photographer has reordered the album. */
+  reorders: number;
+  /** Grid slots this wedding could not fill. */
+  slotsUnfilled: number;
+  /** Whether the cloud sequencing task was reached at all. */
+  cloudUsed: boolean;
+  /** Cloud moves the local objective agreed with. */
+  cloudMovesApplied: number;
+  /** Cloud moves it refused. */
+  cloudMovesRefused: number;
+  /** Bytes migration 29 holds for this wedding. */
+  bytes: number;
+  /** Which `curation.toml`. */
+  policyVer: number;
+  /** Which build's arithmetic. */
+  analysisVer: number;
+  /** Which phase 05 embedding the uniqueness and pairing terms were measured against. */
+  embedVer: number;
+  /** Whether either of this phase's heads is trained. False on every build shipped so far. */
+  headsTrained: boolean;
+};
+
+/** One explanation, on any curation pick. */
+export type CurateReasonDto = {
+  /** The stable slug. */
+  code: string;
+  /** The sentence a photographer reads. */
+  text: string;
+  /** How much it moved the decision. Negative argues against; -1 is a veto. */
+  weight: number;
+  /** Whether this says AURA could not check something, as opposed to found something. */
+  caveat: boolean;
+};
+
+/** One monochrome candidate. */
+export type CurateBwDto = {
+  /** The photograph. */
+  imageId: string;
+  /** Suitability, 0..1. */
+  score: number;
+  /** How sure the suggestion is, 0..1. */
+  confidence: number;
+  /** Eight band weights: red, orange, yellow, green, aqua, blue, purple, magenta. */
+  mix: number[];
+  /** The five measured terms. */
+  terms: [string, number][];
+  /** Which bands somebody's measured skin locus put them in. Empty is not "no people". */
+  skinBands: number[];
+  /** Why. */
+  reasons: CurateReasonDto[];
+  /** What the photographer said. */
+  accepted: boolean | null;
+};
+
+/** One portfolio pick. */
+export type CurateHeroDto = {
+  /** The photograph. */
+  imageId: string;
+  /** Where it came, 0 first. */
+  rank: number;
+  /** The blended score, 0..1. */
+  score: number;
+  /** How sure the suggestion is, 0..1. */
+  confidence: number;
+  /** The five terms. */
+  terms: [string, number][];
+  /** Which part of the day it came from. */
+  chapter: string;
+  /** How close the photographer was, or `unknown`. */
+  scale: string;
+  /** Which diversity constraint was binding when this pick was made. */
+  binding: string;
+  /** The sentence for that constraint. */
+  bindingText: string;
+  /** Why. */
+  reasons: CurateReasonDto[];
+  /** What the photographer said. */
+  accepted: boolean | null;
+};
+
+/** Two facing pages. */
+export type CurateSpreadDto = {
+  /** Stable across a reorder. */
+  spreadId: string;
+  /** Where it sits in the album, 0 first. */
+  index: number;
+  /** The left-hand page. */
+  left: string | null;
+  /** The right-hand page. */
+  right: string | null;
+  /** True when this spread carries one image. */
+  single: boolean;
+  /** Which chapter it belongs to. */
+  chapter: string;
+  /** The combined pairing score, 0..1. */
+  pairScore: number;
+  /** Difference in tonal weight, 0..1. */
+  tonalGap: number;
+  /** Difference in colour temperature, in kelvin. */
+  warmthGapK: number;
+  /** How well the subjects face inward, 0..1. */
+  facingScore: number;
+  /** Whether anything could be measured about which way they face. */
+  facingKnown: boolean;
+  /** How alike the two frames are, 0..1. */
+  similarity: number;
+  /** Why these two, or why this one alone. */
+  reasons: CurateReasonDto[];
+};
+
+/** Which spreads belong to one chapter. */
+export type CurateChapterDto = {
+  /** The chapter slug. */
+  chapter: string;
+  /** Index of its first spread. */
+  first: number;
+  /** How many spreads it got. */
+  len: number;
+  /** How many the allocator wanted to give it. */
+  target: number;
+};
+
+/** The album draft. */
+export type CurateAlbumDto = {
+  /** The spreads, in album order. */
+  spreads: CurateSpreadDto[];
+  /** Which spreads belong to which chapter, in wedding order. */
+  chapters: CurateChapterDto[];
+  /** How many images the album carries. */
+  size: number;
+  /** How many were asked for. */
+  targetSize: number;
+  /** How well the sequence alternates wide, medium and tight, 0..1. */
+  rhythmScore: number;
+  /** The share of the album whose shot scale could be measured. **Read the score with this.** */
+  rhythmMeasurable: number;
+  /** The mean pairing score over the spreads that carry two images. */
+  pairingScore: number;
+  /** True when the photographer has reordered this album by hand. */
+  userOrdered: boolean;
+  /** Every must-have and how the album came out. */
+  coverage: [string, string][];
+  /** Everything a photographer should read before printing. */
+  warnings: string[];
+  /** Album-level notes. */
+  reasons: CurateReasonDto[];
+  /** The rendered summary. */
+  summary: string;
+};
+
+/** One frame in a social or teaser set. */
+export type CuratePickDto = {
+  /** The photograph. */
+  imageId: string;
+  /** Which crop it is delivered at. */
+  aspect: string;
+  /** What this frame is doing in the set. */
+  slot: string;
+  /** Where it came, 0 first. */
+  rank: number;
+  /** How well it reads at thumbnail size, 0..1. */
+  legibility: number;
+  /** Why. */
+  reasons: CurateReasonDto[];
+  /** What the photographer said. */
+  accepted: boolean | null;
+};
+
+/** A caption a photographer may post, edit or delete. */
+export type CurateCaptionDto = {
+  /** The photograph, or null for a chapter caption. */
+  imageId: string | null;
+  /** Which part of the day it describes. */
+  chapter: string;
+  /** The sentence. */
+  text: string;
+  /** `template` or `cloud`. */
+  source: string;
+};
+
+/** The three sets a photographer posts from. */
+export type CurateSocialDto = {
+  /** The grid set. */
+  grid: CuratePickDto[];
+  /** The story set. */
+  story: CuratePickDto[];
+  /** The single hero, when there is one. */
+  hero: CuratePickDto | null;
+  /** Captions, grounded in this wedding's own labels. */
+  captions: CurateCaptionDto[];
+  /** Grid slots this wedding could not fill, as (slot, how many short). */
+  unfilled: [string, number][];
+};
+
+/** Run the curation pass. */
+export type CurateProjectInput = {
+  /** The wedding. */
+  projectId: string;
+  /** How many images the album should hold, or null for the configured default. */
+  albumSize: number | null;
+};
+
+/** Record a photographer's album order. */
+export type CurateOrderInput = {
+  /** The wedding. */
+  projectId: string;
+  /** Every image the album carries, in the order the photographer wants them. */
+  order: string[];
+};
+
+/** Record what a photographer decided about one pick. */
+export type CurateDecideInput = {
+  /** The wedding. */
+  projectId: string;
+  /** The photograph. */
+  imageId: string;
+  /** `hero`, `bw`, `social_grid`, `social_story`, `social_hero` or `teaser`. */
+  kind: string;
+  /** Yes or no. */
+  accepted: boolean;
+  /** Why, in the photographer's own words. */
+  note: string | null;
+};
+
+/** Ask for a specification. */
+export type CurateExportInput = {
+  /** The wedding. */
+  projectId: string;
+  /** `album`, `social`, `heroes` or `teaser`. */
+  subject: string;
+  /** `json`, `csv` or `layer_list`. */
+  format: string;
+};
+
+/** A specification, as text. */
+export type CurateExportDto = {
+  /** The specification. */
+  text: string;
+  /** The extension a shell should offer. */
+  extension: string;
+};

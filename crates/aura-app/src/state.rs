@@ -3593,6 +3593,237 @@ impl AppState {
 
         frame
     }
+
+    // -----------------------------------------------------------------------------------
+    // PHASE-29. Curation.
+    // -----------------------------------------------------------------------------------
+
+    /// The curation policy table.
+    ///
+    /// Loaded from the compiled-in file. A studio's own copy on disk is read by the shell's
+    /// installer rather than here, which is the same arrangement phases 24 to 28 have.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-ML-5145` when the table is refused.
+    pub fn curate_policy(&self) -> AuraResult<aura_curate::policy::Policy> {
+        aura_curate::policy::Policy::load_str(aura_curate::policy::DEFAULT_TOML)
+    }
+
+    /// One gallery frame's readings, assembled from the frozen services.
+    #[must_use]
+    pub fn curate_frame(
+        &self,
+        project: ProjectId,
+        image: PhotoId,
+        order: u32,
+    ) -> aura_curate::read::Frame {
+        crate::curate_commands::frame_from_services(self, project, image, order)
+    }
+
+    /// Phase 05's stored descriptors for one photograph.
+    ///
+    /// `None` when the frame has no embedding row, which is a **skipped** monochrome candidate
+    /// rather than a bad one.
+    #[must_use]
+    pub fn curate_descriptor(
+        &self,
+        project: ProjectId,
+        image: PhotoId,
+    ) -> Option<aura_curate::read::Descriptor> {
+        let store = self.embedding_store();
+        store
+            .load_one(&project.to_db(), image)
+            .ok()
+            .flatten()
+            .as_ref()
+            .map(crate::curate_commands::descriptor_from)
+    }
+
+    /// The phase 05 vectors for a gallery, loaded once.
+    ///
+    /// One read of the whole project rather than one per frame: the hero selector asks every
+    /// candidate about every chosen hero, and a per-question catalog round trip would be twenty
+    /// thousand reads inside a twenty-second budget.
+    #[must_use]
+    pub fn curate_vectors(
+        &self,
+        project: ProjectId,
+        selected: &[PhotoId],
+    ) -> std::collections::BTreeMap<PhotoId, Vec<f32>> {
+        let wanted: std::collections::BTreeSet<PhotoId> = selected.iter().copied().collect();
+        let Ok((entries, _)) = self.embedding_store().load_entries(&project.to_db()) else {
+            return std::collections::BTreeMap::new();
+        };
+        entries
+            .into_iter()
+            .filter(|entry| wanted.contains(&entry.embedding.image_id))
+            .map(|entry| (entry.embedding.image_id, entry.embedding.to_f32()))
+            .collect()
+    }
+
+    /// Which of the eight hue bands each identity's **measured** skin locus falls in.
+    ///
+    /// Converted from phase 15's `u'v'` chromaticity to a hue and then to a band. An identity with
+    /// no usable locus is absent from the map, which is not the same as an identity in the red
+    /// band. ADR-0059 section 5, and the difference is what stops a monochrome mix being offered on
+    /// a photograph of somebody the product has never measured.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the loci cannot be read.
+    pub fn curate_skin_bands(
+        &self,
+        project: ProjectId,
+    ) -> AuraResult<std::collections::BTreeMap<aura_core::contract::ids::IdentityId, u8>> {
+        use aura_core::contract::tone::ToneService as _;
+        let loci = self.tone().skin_loci(project)?;
+        Ok(loci
+            .into_iter()
+            .map(|(identity, locus)| (identity, band_of_uv(locus.uv)))
+            .collect())
+    }
+
+    /// The rituals phase 07 named for this wedding, as the words a caption may use.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the segments cannot be read.
+    pub fn curate_rituals(&self, project: ProjectId) -> AuraResult<Vec<String>> {
+        use aura_core::contract::cull::CullService as _;
+        let Ok(cull) = self.cull() else {
+            return Ok(Vec::new());
+        };
+        // Read from the **gallery** rather than from the project, because a caption belongs to a
+        // set the photographer is delivering: a rite that appears only in frames nobody selected is
+        // not a word this wedding's captions are entitled to use.
+        let Some(selection) = cull.selection(project)? else {
+            return Ok(Vec::new());
+        };
+        let mut out: Vec<String> = Vec::new();
+        for keeper in &selection.selected {
+            if let Ok(Some(slug)) = self.story_ritual_slug(keeper.image_id) {
+                if !out.contains(&slug) {
+                    out.push(slug);
+                }
+            }
+        }
+        out.sort();
+        Ok(out)
+    }
+
+    /// The identities phase 12 treats as close family, and how many album frames each needs.
+    ///
+    /// The number comes from `coverage_rules.toml`, which is phase 12's file and stays phase 12's
+    /// file. There is no second close-family rule in this product.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the identities cannot be read.
+    pub fn curate_close_family(
+        &self,
+        project: ProjectId,
+    ) -> AuraResult<(Vec<aura_core::contract::ids::IdentityId>, u32)> {
+        use aura_core::contract::people::PeopleService as _;
+        let hierarchy = self.people().hierarchy(project)?;
+        // `primary` is the couple and `secondary` is close family and anybody the photographer
+        // marked important - which is phase 06's own answer to "who must appear", read here rather
+        // than re-derived from roles. Phase 06's rule: `PeopleService` is the only way to ask who is
+        // in a photograph, and that includes who matters.
+        let mut family: Vec<aura_core::contract::ids::IdentityId> = hierarchy.primary.clone();
+        family.extend(hierarchy.secondary.iter().copied());
+        family.sort_by_key(aura_core::contract::ids::IdentityId::to_db);
+        family.dedup();
+        Ok((family, aura_curate::CLOSE_FAMILY_ALBUM_MINIMUM))
+    }
+
+    /// Which phase 05 embedding this project's vectors came from.
+    ///
+    /// Zero when nothing has been embedded, which is honest: a curation whose uniqueness term read
+    /// no vectors is not comparable with one that did, and `AURA-ML-5142` exists so the comparison
+    /// never happens silently.
+    #[must_use]
+    pub fn curate_embed_ver(&self, project: ProjectId) -> u16 {
+        self.embedding_store()
+            .model_versions(&project.to_db())
+            .ok()
+            .and_then(|versions| versions.into_iter().max())
+            .unwrap_or(0)
+    }
+}
+
+/// Which of phase 16's eight hue bands a `u'v'` chromaticity falls in.
+///
+/// The one conversion between phase 15's measurement space and phase 16's vocabulary, and it lives
+/// here rather than in `aura-curate` because it is a fact about two frozen contracts rather than
+/// about curation.
+///
+/// `u'v'` is converted to an approximate hue through xy and then RGB, and the hue is bucketed by
+/// the band boundaries phase 16's centres imply. Approximate on purpose: the question is which of
+/// eight 30-to-60-degree bands somebody's skin sits in, and a full colorimetric round trip would be
+/// more precision than the answer can carry.
+#[allow(clippy::many_single_char_names)]
+fn band_of_uv(uv: [f32; 2]) -> u8 {
+    let (u, v) = (uv[0], uv[1]);
+    let denominator = 6.0f32.mul_add(u, -(16.0 * v)) + 12.0;
+    if denominator.abs() < f32::EPSILON {
+        return 1;
+    }
+    let x = 9.0 * u / denominator;
+    let y = 4.0 * v / denominator;
+    let z = 1.0 - x - y;
+    // XYZ to linear sRGB, at Y = 1.
+    let (big_x, big_y, big_z) = if y.abs() < f32::EPSILON {
+        (0.0, 1.0, 0.0)
+    } else {
+        (x / y, 1.0, z / y)
+    };
+    let r = 3.2406f32.mul_add(big_x, (-1.5372f32).mul_add(big_y, -0.4986 * big_z));
+    let g = (-0.9689f32).mul_add(big_x, 1.8758f32.mul_add(big_y, 0.0415 * big_z));
+    let b = 0.0557f32.mul_add(big_x, (-0.2040f32).mul_add(big_y, 1.0570 * big_z));
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let span = max - min;
+    if span.abs() < f32::EPSILON {
+        // Achromatic: no hue to speak of. The orange band is where most skin sits at most skin
+        // tones, and this is the one place that fact is used - on a locus with no measurable hue,
+        // which is a degenerate reading rather than a person.
+        return 1;
+    }
+    let hue = if (max - r).abs() < f32::EPSILON {
+        ((g - b) / span).rem_euclid(6.0) * 60.0
+    } else if (max - g).abs() < f32::EPSILON {
+        ((b - r) / span + 2.0) * 60.0
+    } else {
+        ((r - g) / span + 4.0) * 60.0
+    };
+    band_of_hue(hue)
+}
+
+/// Which band a hue in degrees falls in, by the boundaries phase 16's band centres imply.
+///
+/// Centres: red 0, orange 30, yellow 60, green 120, aqua 180, blue 240, purple 280, magenta 320.
+/// Boundaries are their midpoints, which is the same table `aura_curate::bw::BAND_SPLIT` is derived
+/// from.
+const fn band_of_hue(hue: f32) -> u8 {
+    let h = hue % 360.0;
+    if h < 15.0 || h >= 340.0 {
+        0 // red
+    } else if h < 45.0 {
+        1 // orange
+    } else if h < 90.0 {
+        2 // yellow
+    } else if h < 150.0 {
+        3 // green
+    } else if h < 210.0 {
+        4 // aqua
+    } else if h < 260.0 {
+        5 // blue
+    } else if h < 300.0 {
+        6 // purple
+    } else {
+        7 // magenta
+    }
 }
 
 /// How much strength phase 19 applied through a region of this kind.

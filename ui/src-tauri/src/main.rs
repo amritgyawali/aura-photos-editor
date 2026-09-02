@@ -9,6 +9,10 @@ use aura_app::contract::ipc::{
     // PHASE-28.
     AutopilotEventDto, AutopilotPreflightDto, AutopilotProgressDto, AutopilotSettingsInput,
     AutopilotStageDto, AutopilotStartInput, AutopilotStatusDto, AutopilotSummaryDto,
+    // PHASE-29.
+    CurateAlbumDto, CurateBwDto, CurateDecideInput, CurateExportDto, CurateExportInput,
+    CurateHeroDto, CurateOrderInput, CuratePickDto, CurateProjectInput, CurateSocialDto,
+    CurateSpreadDto, CurateStatusDto,
     AcceptToneInput, CleanupBlockedDto, CleanupDisclosureDto, CleanupPassDto, CleanupPassInput,
     CleanupProposalDto, CleanupReasonDto, CleanupStatusDto, DecideCleanupInput,
     DisableCleanupInput, EstimateToneInput, ManualRemoveDto, ManualRemoveInput, ReferenceFrameDto,
@@ -2557,6 +2561,131 @@ async fn autopilot_set_settings(
         .map_err(|_| background_request_failed())?
 }
 
+// ---------------------------------------------------------------------------
+// PHASE-29. Curation.
+// ---------------------------------------------------------------------------
+//
+// Eleven commands, none of which changes a photograph. `curate_export` returns text and the shell
+// saves it; there is no apply on this surface. ADR-0060 section 5.
+
+#[tauri::command]
+async fn curate_status(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<CurateStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_project(
+    state: State<'_, AppState>,
+    input: CurateProjectInput,
+) -> IpcResult<CurateStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_project(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_bw(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<CurateBwDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_bw(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_heroes(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<CurateHeroDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_heroes(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_album(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<CurateAlbumDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_album(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_spread(
+    state: State<'_, AppState>,
+    spread_id: String,
+) -> IpcResult<Option<CurateSpreadDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_spread(&app, &spread_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_social(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<CurateSocialDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_social(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_teaser(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Vec<CuratePickDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_teaser(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_set_order(
+    state: State<'_, AppState>,
+    input: CurateOrderInput,
+) -> IpcResult<CurateAlbumDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_set_order(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_decide(state: State<'_, AppState>, input: CurateDecideInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_decide(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn curate_export(
+    state: State<'_, AppState>,
+    input: CurateExportInput,
+) -> IpcResult<CurateExportDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::curate_export(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 
 fn main() {
     tracing_subscriber::fmt()
@@ -2834,6 +2963,18 @@ fn main() {
             autopilot_summary,
             autopilot_events,
             autopilot_set_settings,
+            // PHASE-29.
+            curate_status,
+            curate_project,
+            curate_bw,
+            curate_heroes,
+            curate_album,
+            curate_spread,
+            curate_social,
+            curate_teaser,
+            curate_set_order,
+            curate_decide,
+            curate_export,
         ])
         .run(tauri::generate_context!());
 

@@ -7738,3 +7738,357 @@ pub struct AutopilotSettingsInput {
     /// Whether the run yields to foreground work.
     pub quiet_mode: bool,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-29. Curation.
+// ---------------------------------------------------------------------------
+//
+// Eleven commands and nine shapes. The primary object is a **deliverable** - an album draft, a
+// portfolio, a set of posts - which is the first subject on this surface that a photographer takes
+// away and sells.
+//
+// That changes what the shapes carry. Every earlier panel answers "what did AURA decide about this
+// photograph", and the reader is checking a measurement. Here the reader is making a decision about
+// their own portfolio, and what they need is enough to **disagree quickly**: `CurateHeroDto.binding`
+// because the constraint decides more often than the score does, `CurateBwDto.mix` as eight named
+// bands because section 13 says the mix is per frame rather than a preset, and
+// `CurateSpreadDto.facingKnown` and `CurateAlbumDto.rhythmMeasurable` because a number nobody could
+// measure and a number that came out badly must not look the same.
+//
+// What is deliberately absent: any `apply`, any threshold, any B&W strength, any bulk decide, and
+// any command that changes a photograph or the delivered gallery. ADR-0060 sections 5 and 6.
+
+/// What the Curate panel's header shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateStatusDto {
+    /// Photographs in the project.
+    pub photos: u32,
+    /// Photographs phase 12 selected. **The denominator for everything else here.**
+    pub selected: u32,
+    /// Selected photographs curation could read at all.
+    pub curated: u32,
+    /// `curated / selected`, `0..1`.
+    pub coverage: f32,
+    /// Monochrome candidates offered.
+    pub bw_offered: u32,
+    /// Monochrome candidates the photographer took.
+    pub bw_accepted: u32,
+    /// Monochrome candidates the photographer rejected.
+    pub bw_rejected: u32,
+    /// Heroes chosen.
+    pub heroes: u32,
+    /// Chapters that contributed at least one hero.
+    pub chapters_covered: u32,
+    /// Spreads in the album.
+    pub spreads: u32,
+    /// Images in the album.
+    pub album_size: u32,
+    /// The album's rhythm score, `0..1`.
+    pub rhythm_score: f32,
+    /// The share of the album whose shot scale could be measured. **Read the score with this.**
+    pub rhythm_measurable: f32,
+    /// The album's mean pairing score, `0..1`.
+    pub pairing_score: f32,
+    /// Must-have rules the album satisfies.
+    pub album_covered: u32,
+    /// Must-have rules the album misses.
+    pub album_missing: u32,
+    /// How many times the photographer has reordered the album.
+    pub reorders: u32,
+    /// Grid slots this wedding could not fill.
+    pub slots_unfilled: u32,
+    /// Whether the cloud sequencing task was reached at all.
+    pub cloud_used: bool,
+    /// Cloud moves the local objective agreed with.
+    pub cloud_moves_applied: u32,
+    /// Cloud moves it refused.
+    pub cloud_moves_refused: u32,
+    /// Bytes migration 29 holds for this wedding.
+    pub bytes: u64,
+    /// Which `curation.toml`.
+    pub policy_ver: u16,
+    /// Which build's arithmetic.
+    pub analysis_ver: u16,
+    /// Which phase 05 embedding the uniqueness and pairing terms were measured against.
+    pub embed_ver: u16,
+    /// Whether either of this phase's heads is trained.
+    ///
+    /// False on every build shipped so far. A panel that did not show it would present a
+    /// deterministic solver's answer as a learned one.
+    pub heads_trained: bool,
+}
+
+/// One explanation, on any curation pick.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateReasonDto {
+    /// The stable slug, from `CurateCode::as_str`.
+    pub code: String,
+    /// The sentence a photographer reads.
+    pub text: String,
+    /// How much it moved the decision. Negative argues against; `-1.0` is a veto.
+    pub weight: f32,
+    /// Whether this says the product **could not check something**, as opposed to found something.
+    ///
+    /// The panel renders a caveat in grey rather than in red. Phase 24's rule and phase 27's, on
+    /// the wire: a spread nobody could measure and a spread that measured badly must not look the
+    /// same.
+    pub caveat: bool,
+}
+
+/// One monochrome candidate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateBwDto {
+    /// The photograph.
+    pub image_id: String,
+    /// Suitability, `0..1`.
+    pub score: f32,
+    /// How sure the suggestion is, `0..1`.
+    pub confidence: f32,
+    /// The eight band weights, in the recipe's own order: red, orange, yellow, green, aqua, blue,
+    /// purple, magenta.
+    ///
+    /// The values themselves rather than a preset name, because section 13's second criterion is
+    /// that mixes are per frame - and a surface that sent a name would make that unfalsifiable.
+    pub mix: Vec<i16>,
+    /// The five measured terms, in `BwTerms::labelled` order.
+    pub terms: Vec<(String, f32)>,
+    /// Which bands somebody's **measured** skin locus put them in. Empty is not "no people".
+    pub skin_bands: Vec<u8>,
+    /// Why.
+    pub reasons: Vec<CurateReasonDto>,
+    /// What the photographer said, when they have said anything.
+    pub accepted: Option<bool>,
+}
+
+/// One portfolio pick.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateHeroDto {
+    /// The photograph.
+    pub image_id: String,
+    /// Where it came, `0` first.
+    pub rank: u32,
+    /// The blended score, `0..1`.
+    pub score: f32,
+    /// How sure the suggestion is, `0..1`.
+    pub confidence: f32,
+    /// The five terms, in `HeroTerms::labelled` order.
+    pub terms: Vec<(String, f32)>,
+    /// Which part of the day it came from.
+    pub chapter: String,
+    /// How close the photographer was, or `unknown`.
+    pub scale: String,
+    /// Which diversity constraint was binding when this pick was made.
+    ///
+    /// The field a photographer actually reads: two frames from the same kiss can differ by 0.004,
+    /// and what decided between them was a constraint rather than a score.
+    pub binding: String,
+    /// The sentence for that constraint.
+    pub binding_text: String,
+    /// Why.
+    pub reasons: Vec<CurateReasonDto>,
+    /// What the photographer said.
+    pub accepted: Option<bool>,
+}
+
+/// Two facing pages.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateSpreadDto {
+    /// Stable across a reorder.
+    pub spread_id: String,
+    /// Where it sits in the album, `0` first.
+    pub index: u32,
+    /// The left-hand page.
+    pub left: Option<String>,
+    /// The right-hand page.
+    pub right: Option<String>,
+    /// True when this spread carries one image.
+    pub single: bool,
+    /// Which chapter it belongs to.
+    pub chapter: String,
+    /// The combined pairing score, `0..1`.
+    pub pair_score: f32,
+    /// Difference in tonal weight, `0..1`.
+    pub tonal_gap: f32,
+    /// Difference in colour temperature, in kelvin.
+    pub warmth_gap_k: f32,
+    /// How well the subjects face inward, `0..1`.
+    pub facing_score: f32,
+    /// Whether anything could be measured about which way they face.
+    ///
+    /// False almost everywhere on this build. A panel that rendered a zero facing score as a failed
+    /// pairing would report a defect in every spread of every album.
+    pub facing_known: bool,
+    /// How alike the two frames are, `0..1`.
+    pub similarity: f32,
+    /// Why these two, or why this one alone.
+    pub reasons: Vec<CurateReasonDto>,
+}
+
+/// Which spreads belong to one chapter.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateChapterDto {
+    /// The chapter slug.
+    pub chapter: String,
+    /// Index of its first spread.
+    pub first: u32,
+    /// How many spreads it got.
+    pub len: u32,
+    /// How many the allocator wanted to give it.
+    pub target: u32,
+}
+
+/// The album draft.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateAlbumDto {
+    /// The spreads, in album order.
+    pub spreads: Vec<CurateSpreadDto>,
+    /// Which spreads belong to which chapter, in wedding order.
+    pub chapters: Vec<CurateChapterDto>,
+    /// How many images the album carries.
+    pub size: u32,
+    /// How many were asked for.
+    pub target_size: u32,
+    /// How well the sequence alternates wide, medium and tight, `0..1`.
+    pub rhythm_score: f32,
+    /// The share of the album whose shot scale could be measured. **Read the score with this.**
+    pub rhythm_measurable: f32,
+    /// The mean pairing score over the spreads that carry two images.
+    pub pairing_score: f32,
+    /// True when the photographer has reordered this album by hand.
+    pub user_ordered: bool,
+    /// Every must-have and how the **album** came out, as `(rule, state)`.
+    pub coverage: Vec<(String, String)>,
+    /// Everything a photographer should read before printing.
+    pub warnings: Vec<String>,
+    /// Album-level notes.
+    pub reasons: Vec<CurateReasonDto>,
+    /// The rendered summary, for the panel's header.
+    pub summary: String,
+}
+
+/// One frame in a social or teaser set.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CuratePickDto {
+    /// The photograph.
+    pub image_id: String,
+    /// Which crop it is delivered at. Only ever one phase 23 called safe.
+    pub aspect: String,
+    /// What this frame is doing in the set.
+    pub slot: String,
+    /// Where it came, `0` first.
+    pub rank: u32,
+    /// How well it reads at thumbnail size, `0..1`.
+    pub legibility: f32,
+    /// Why.
+    pub reasons: Vec<CurateReasonDto>,
+    /// What the photographer said.
+    pub accepted: Option<bool>,
+}
+
+/// A caption a photographer may post, edit or delete.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateCaptionDto {
+    /// The photograph, or absent for a chapter caption.
+    pub image_id: Option<String>,
+    /// Which part of the day it describes.
+    pub chapter: String,
+    /// The sentence.
+    pub text: String,
+    /// `template` or `cloud`.
+    pub source: String,
+}
+
+/// The three sets a photographer posts from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateSocialDto {
+    /// The grid set.
+    pub grid: Vec<CuratePickDto>,
+    /// The story set.
+    pub story: Vec<CuratePickDto>,
+    /// The single hero, when there is one.
+    pub hero: Option<CuratePickDto>,
+    /// Captions, grounded in this wedding's own labels.
+    pub captions: Vec<CurateCaptionDto>,
+    /// Grid slots this wedding could not fill, as `(slot, how many short)`.
+    ///
+    /// Reported rather than substituted: a wedding with no exit photographs gets a nine-image grid
+    /// and a sentence, not a tenth frame promoted out of another slot.
+    pub unfilled: Vec<(String, u32)>,
+}
+
+/// Run the curation pass.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateProjectInput {
+    /// The wedding.
+    pub project_id: String,
+    /// How many images the album should hold, or absent for the configured default.
+    ///
+    /// Bounded by `ALBUM_MIN` and `ALBUM_MAX`; anything outside is clamped rather than refused,
+    /// because a slider that snaps is kinder than one that errors.
+    pub album_size: Option<u32>,
+}
+
+/// Record a photographer's album order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateOrderInput {
+    /// The wedding.
+    pub project_id: String,
+    /// Every image the album carries, in the order the photographer wants them.
+    ///
+    /// The whole order rather than a move: the panel already holds the sequence, and a dropped
+    /// message would leave the two disagreeing about an album silently. ADR-0060 section 4.
+    pub order: Vec<String>,
+}
+
+/// Record what a photographer decided about one pick.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateDecideInput {
+    /// The wedding.
+    pub project_id: String,
+    /// The photograph.
+    pub image_id: String,
+    /// Which kind of pick, from `PickKind::as_str`.
+    pub kind: String,
+    /// Yes or no. There is no third state; clearing a decision is not on this surface.
+    pub accepted: bool,
+    /// Why, in the photographer's own words.
+    pub note: Option<String>,
+}
+
+/// Ask for a specification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateExportInput {
+    /// The wedding.
+    pub project_id: String,
+    /// `album`, `social`, `heroes` or `teaser`.
+    pub subject: String,
+    /// `json`, `csv` or `layer_list`.
+    pub format: String,
+}
+
+/// A specification, as text.
+///
+/// Text rather than a file, because nothing in phase 29 opens one. The shell saves it, and section
+/// 2.2 puts album page rendering out of scope.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurateExportDto {
+    /// The specification.
+    pub text: String,
+    /// The extension a shell should offer.
+    pub extension: String,
+}
