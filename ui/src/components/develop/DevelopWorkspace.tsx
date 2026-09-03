@@ -102,6 +102,36 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]['id'];
 
+/**
+ * Where this edit came from, and how much of it a person owns, as one sentence.
+ *
+ * The five `RecipeDto.source` values are slugs - `ai`, `user`, `qc`, `preset`, `default` - and
+ * the first version of this rendered them straight into the prose, so a photograph nobody had
+ * edited read "This edit came from default". A slug in a sentence is a slug a photographer has
+ * to decode, and `default` in particular says the opposite of what it means: it is the camera's
+ * own starting point rather than a decision anything made.
+ */
+export function provenance(recipe: RecipeDto): string {
+  const owned = recipe.userEditedFields.length;
+  const mine =
+    owned === 0
+      ? 'Nothing on it has been set by hand.'
+      : `${owned} of its settings ${owned === 1 ? 'is yours' : 'are yours'} and will not be overwritten.`;
+  switch (recipe.source) {
+    case 'ai':
+      return `AURA suggested this edit. ${mine}`;
+    case 'user':
+      return `This edit is yours. ${mine}`;
+    case 'qc':
+      return `This edit was changed by a quality-control fix. ${mine}`;
+    case 'preset':
+      return `This edit came from a preset. ${mine}`;
+    // `default` is the camera's own starting point, which is not an edit anybody made.
+    default:
+      return `Nothing has edited this photograph yet - this is the camera's own starting point. ${mine}`;
+  }
+}
+
 function toBanner(error: unknown): { code: string; message: string } {
   const ipc = asIpcError(error);
   return {
@@ -304,12 +334,7 @@ export function DevelopWorkspace({
     <section className="develop-workspace" aria-label="Develop">
       <header className="develop-workspace__header">
         <h2>Develop</h2>
-        <p className="develop-workspace__source">
-          This edit came from {recipe.source === 'ai' ? 'AURA' : recipe.source}, and{' '}
-          {recipe.userEditedFields.length === 0
-            ? 'nothing on it has been set by hand.'
-            : `${recipe.userEditedFields.length} of its settings are yours and will not be overwritten.`}
-        </p>
+        <p className="develop-workspace__source">{provenance(recipe)}</p>
         {caveats.length > 0 ? (
           <ul className="develop-workspace__caveats">
             {caveats.map((note) => (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { asIpcError, delivery as api, learning as learnApi } from '../../ipc/client';
+import { asIpcError, inTauri, delivery as api, learning as learnApi } from '../../ipc/client';
 import type {
   ConsentDto,
   DeliveryManifestDto,
@@ -183,7 +183,19 @@ export function DeliveryPanel({ projectId, profileId, onError }: DeliveryPanelPr
     }
   }, [projectId, profileId, onError, fail]);
 
+  // The two project-independent reads: the preset list and the learning diagnostics.
+  //
+  // `inTauri` because this is the one effect in the panel with no `projectId` to bail on, so
+  // without it the panel calls a command with no window behind it - which `asIpcError` cannot
+  // recognise as an IPC failure and reports as `AURA-DB-3006`, a *catalog* error. A banner
+  // saying the catalog failed when the truth is that there is no backend is worse than no
+  // banner: it sends somebody to the wrong runbook. `HardwarePanel`, `AiKeysPanel` and
+  // `CacheSettings` all take the same guard; this panel was the one that did not, and it is
+  // what the browser sees against the vite dev server.
   useEffect(() => {
+    if (!inTauri()) {
+      return;
+    }
     void (async () => {
       try {
         setPresets(await api.exportPresets());

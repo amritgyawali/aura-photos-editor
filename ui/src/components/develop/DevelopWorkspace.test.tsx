@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DevelopWorkspace } from './DevelopWorkspace';
+import { DevelopWorkspace, provenance } from './DevelopWorkspace';
 
 // `vi.mock` is hoisted above every `const` in the module, so the spies and the fixtures it
 // closes over have to be hoisted with it. `vi.hoisted` is the supported way to say that.
@@ -181,7 +181,8 @@ describe('DevelopWorkspace', () => {
 
   it('says whose the edit is, and how much of it a person owns', async () => {
     await mount('prj_1', 'pho_1');
-    expect(screen.getByText(/nothing on it has been set by hand/)).toBeDefined();
+    expect(screen.getByText(/AURA suggested this edit/)).toBeDefined();
+    expect(screen.getByText(/Nothing on it has been set by hand/)).toBeDefined();
   });
 
   it('does not ask the machine what its renderer can do until that tab is opened', async () => {
@@ -194,5 +195,48 @@ describe('DevelopWorkspace', () => {
       await Promise.resolve();
     });
     expect(fixtures.renderCaps).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('provenance', () => {
+  function recipe(source: string, owned: string[] = []) {
+    return { ...fixtures.RECIPE, source, userEditedFields: owned };
+  }
+
+  it('never renders a slug into the sentence', () => {
+    // The five `RecipeDto.source` values are slugs. The first version of the header rendered
+    // them straight through, so a photograph nobody had edited read "This edit came from
+    // default" - which is both a slug and the opposite of what it means.
+    //
+    // The assertion is against slug *shapes* rather than against the strings themselves,
+    // because `preset` is an ordinary English word and the sentence for that source contains
+    // it legitimately. A test that forbade the word outright could not be met by a correct
+    // implementation, which is the same trap the exit reports record for phases 19, 21, 22, 25
+    // and 29 - a threshold nothing can meet is a bug in the threshold.
+    for (const source of ['ai', 'user', 'qc', 'preset', 'default', 'something_new']) {
+      const sentence = provenance(recipe(source));
+      expect(sentence).not.toMatch(/\b(ai|qc|default|something_new)\b/);
+      expect(sentence).not.toMatch(/_/);
+      expect(sentence.endsWith('.')).toBe(true);
+      // Prose, not a fragment: a capital at the front and more than a label's worth of it.
+      expect(sentence[0]).toBe(sentence[0]?.toUpperCase());
+      expect(sentence.length).toBeGreaterThan(30);
+    }
+  });
+
+  it('says the camera made it rather than naming a source, when nothing has edited it', () => {
+    expect(provenance(recipe('default'))).toContain("camera's own starting point");
+  });
+
+  it('counts what a person owns, and agrees with itself about number', () => {
+    expect(provenance(recipe('ai'))).toContain('Nothing on it has been set by hand.');
+    expect(provenance(recipe('ai', ['exposure']))).toContain('1 of its settings is yours');
+    expect(provenance(recipe('ai', ['exposure', 'tint']))).toContain('2 of its settings are yours');
+  });
+
+  it('promises the protection every source shares', () => {
+    for (const source of ['ai', 'user', 'qc', 'preset', 'default']) {
+      expect(provenance(recipe(source, ['exposure']))).toContain('will not be overwritten');
+    }
   });
 });
