@@ -251,3 +251,188 @@ pub fn upper_quartile(mut values: Vec<f32>) -> f32 {
         .copied()
         .unwrap_or(0.0)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use aura_core::{KeepScore, SceneId};
+    use uuid::Uuid;
+
+    use super::{predict, reconcile, upper_quartile, SizeFeatures, BASE_RATE, MAX_RATE, MIN_RATE};
+
+    fn image(n: u128) -> aura_core::contract::cull::ImageId {
+        aura_core::PhotoId::from_uuid(Uuid::from_u128(n))
+    }
+
+    fn score(image_id: aura_core::contract::cull::ImageId, value: f32) -> KeepScore {
+        KeepScore {
+            image_id,
+            technical: value,
+            emotion: value,
+            composition: value,
+            prominence: value,
+            scene_weighted: value,
+            scene: SceneId::Unknown,
+            calibration_ver: KeepScore::UNCALIBRATED,
+        }
+    }
+
+    /// A wedding whose every feature sits at the model's own centre.
+    fn average() -> SizeFeatures {
+        SizeFeatures {
+            eligible: 4_000,
+            moments: 1_000,
+            chapters: 5,
+            hours: 8.0,
+            mean_score: 0.5,
+            p75_score: 0.6,
+        }
+    }
+
+    #[test]
+    fn a_wedding_with_average_features_is_delivered_at_the_base_rate() {
+        // Every coefficient in the model is a deviation from `BASE_RATE`, so a wedding sitting
+        // on the centre of all six has to come out at exactly it. If this drifts, one of the
+        // six centring constants has moved and the whole model is quietly re-based.
+        let predicted = predict(average(), 1.0);
+        let expected = (4_000.0 * BASE_RATE + 0.5) as u32;
+        assert_eq!(predicted, expected);
+    }
+
+    #[test]
+    fn the_predicted_rate_never_leaves_the_documented_band() {
+        // Section 6.4's 22-38 %. The clamp is what makes the band a guarantee rather than a
+        // description of what the coefficients happen to produce, and the two extremes below
+        // are well outside anything the coefficients could reach on their own.
+        let best = SizeFeatures {
+            mean_score: 1.0,
+            p75_score: 1.0,
+            hours: 0.0,
+            chapters: 9,
+            moments: 4_000,
+            ..average()
+        };
+        let worst = SizeFeatures {
+            mean_score: 0.0,
+            p75_score: 0.0,
+            hours: 20.0,
+            chapters: 1,
+            moments: 100,
+            ..average()
+        };
+        let high = f64::from(predict(best, 1.0)) / 4_000.0;
+        let low = f64::from(predict(worst, 1.0)) / 4_000.0;
+        assert!(high <= f64::from(MAX_RATE) + 0.001, "{high}");
+        assert!(low >= f64::from(MIN_RATE) - 0.001, "{low}");
+    }
+
+    #[test]
+    fn a_wedding_with_no_eligible_frames_is_delivered_as_nothing_rather_than_as_a_rate() {
+        assert_eq!(predict(SizeFeatures::default(), 1.0), 0);
+    }
+
+    #[test]
+    fn the_mode_scales_the_count_exactly_and_leaves_the_rate_inside_its_band() {
+        // "A `Conservative` gallery is 1.2 times a `Balanced` one, exactly, whatever the
+        // wedding" - which is only true because the scale multiplies the count rather than
+        // the rate. Scaling the rate would push it out of the documented band and then clamp,
+        // and the mode's effect would silently disappear on a strong wedding.
+        let balanced = predict(average(), 1.0);
+        let conservative = predict(average(), 1.2);
+        let ratio = f64::from(conservative) / f64::from(balanced);
+        assert!((ratio - 1.2).abs() < 0.01, "{ratio}");
+    }
+
+    #[test]
+    fn a_short_gallery_is_padded_only_with_frames_that_clear_their_own_floor() {
+        // "Padding a gallery with frames nobody would have delivered is how *we hit the
+        // number* becomes *the last hundred photographs are filler*."
+        let strong = image(1);
+        let weak = image(2);
+        let mut scores = BTreeMap::new();
+        scores.insert(strong, score(strong, 0.80));
+        scores.insert(weak, score(weak, 0.10));
+        let mut floors = BTreeMap::new();
+        floors.insert(strong, 0.35);
+        floors.insert(weak, 0.35);
+
+        let mut kept = BTreeSet::new();
+        let outcome = reconcile(
+            5,
+            &[strong, weak],
+            &scores,
+            &floors,
+            &BTreeSet::new(),
+            &mut kept,
+        );
+        assert_eq!(outcome.added, vec![strong]);
+        assert!(
+            !kept.contains(&weak),
+            "a frame under its floor was used as filler"
+        );
+        assert!(kept.len() < 5, "the target was met with filler");
+    }
+
+    #[test]
+    fn a_long_gallery_is_trimmed_weakest_first_and_never_touches_a_protected_frame() {
+        let ids: Vec<_> = (1..=4).map(image).collect();
+        let mut scores = BTreeMap::new();
+        for (index, id) in ids.iter().enumerate() {
+            scores.insert(*id, score(*id, 0.2 + 0.1 * index as f32));
+        }
+        // The weakest frame is also the one a coverage guarantee is holding.
+        let mut protected = BTreeSet::new();
+        protected.insert(ids[0]);
+
+        let mut kept: BTreeSet<_> = ids.iter().copied().collect();
+        let outcome = reconcile(2, &[], &scores, &BTreeMap::new(), &protected, &mut kept);
+        assert!(
+            kept.contains(&ids[0]),
+            "a guarantee was trimmed to hit a number"
+        );
+        assert_eq!(kept.len(), 2);
+        assert_eq!(outcome.trimmed, vec![ids[1], ids[2]]);
+    }
+
+    #[test]
+    fn reconciling_a_gallery_that_is_already_the_right_size_changes_nothing() {
+        let ids: Vec<_> = (1..=3).map(image).collect();
+        let mut kept: BTreeSet<_> = ids.iter().copied().collect();
+        let before = kept.clone();
+        let outcome = reconcile(
+            3,
+            &[],
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            &BTreeSet::new(),
+            &mut kept,
+        );
+        assert_eq!(kept, before);
+        assert_eq!(outcome, super::SizeOutcome::default());
+    }
+
+    #[test]
+    fn the_upper_quartile_is_nearest_rank_rather_than_interpolated() {
+        // The input is already a set of estimates, and interpolating between two of them adds
+        // precision that is not there.
+        assert!((upper_quartile(vec![0.1, 0.2, 0.3, 0.4]) - 0.4).abs() < 1e-6);
+        assert_eq!(upper_quartile(Vec::new()), 0.0);
+        assert!((upper_quartile(vec![0.5]) - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_bursty_wedding_is_delivered_at_a_lower_rate_than_a_deliberate_one() {
+        // Twelve frames a moment is a photographer who sprays; three is one who waits. The
+        // second earns a higher keep rate from the same number of frames.
+        let bursty = SizeFeatures {
+            moments: 333,
+            ..average()
+        };
+        let deliberate = SizeFeatures {
+            moments: 1_333,
+            ..average()
+        };
+        assert!(predict(bursty, 1.0) < predict(deliberate, 1.0));
+    }
+}

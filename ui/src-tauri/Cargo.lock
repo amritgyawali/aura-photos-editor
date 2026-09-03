@@ -104,6 +104,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "aura-app"
 version = "0.1.0"
 dependencies = [
+ "aura-brain-gallery",
  "aura-brain-photo",
  "aura-brain-wedding",
  "aura-cache",
@@ -111,21 +112,30 @@ dependencies = [
  "aura-cloud",
  "aura-core",
  "aura-cull",
+ "aura-curate",
+ "aura-delivery",
  "aura-explain",
+ "aura-export",
+ "aura-generative",
+ "aura-geometry",
  "aura-index",
  "aura-infer",
  "aura-ingest",
  "aura-jobs",
+ "aura-learn",
  "aura-models",
  "aura-people",
  "aura-preview",
+ "aura-qc",
  "aura-raw",
  "aura-recipe",
  "aura-render",
+ "aura-restore",
  "aura-retouch",
  "aura-style",
  "aura-vision",
  "blake3",
+ "fs4",
  "parking_lot",
  "rusqlite",
  "serde",
@@ -133,6 +143,23 @@ dependencies = [
  "time",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aura-brain-gallery"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-index",
+ "aura-preview",
+ "aura-raw",
+ "aura-vision",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "toml 0.8.2",
+ "tracing",
 ]
 
 [[package]]
@@ -254,6 +281,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-curate"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-cloud",
+ "aura-core",
+ "aura-index",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "toml 0.8.2",
+ "tracing",
+]
+
+[[package]]
+name = "aura-delivery"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-export",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
 name = "aura-desktop"
 version = "0.1.0"
 dependencies = [
@@ -280,6 +336,58 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
+ "toml 0.8.2",
+ "tracing",
+]
+
+[[package]]
+name = "aura-export"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-recipe",
+ "aura-render",
+ "blake3",
+ "jpeg-encoder",
+ "png 0.17.16",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "time",
+ "toml 0.8.2",
+ "tracing",
+]
+
+[[package]]
+name = "aura-generative"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "aura-vision",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "toml 0.8.2",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "aura-geometry"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "rusqlite",
+ "serde",
+ "serde_json",
  "toml 0.8.2",
  "tracing",
 ]
@@ -340,11 +448,29 @@ version = "0.1.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
+ "blake3",
  "parking_lot",
  "rusqlite",
  "serde",
  "serde_json",
  "time",
+ "toml 0.8.2",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "aura-learn"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-explain",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "toml 0.8.2",
  "tracing",
  "uuid",
 ]
@@ -399,6 +525,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-qc"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-cloud",
+ "aura-core",
+ "aura-vision",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "toml 0.8.2",
+ "tracing",
+]
+
+[[package]]
 name = "aura-raw"
 version = "0.1.0"
 dependencies = [
@@ -436,6 +577,22 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "time",
+ "toml 0.8.2",
+ "tracing",
+]
+
+[[package]]
+name = "aura-restore"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-preview",
+ "aura-raw",
+ "aura-render",
+ "rusqlite",
+ "serde",
  "time",
  "toml 0.8.2",
  "tracing",

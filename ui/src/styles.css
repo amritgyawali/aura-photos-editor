@@ -313,3 +313,145 @@ button:focus-visible,
   position: absolute;
   top: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   The workspace shell.
+
+   Added when the phases 01 to 30 review found that forty-two of the eighty-two UI source files
+   were reachable from `main.tsx` by no import path - the whole develop stack, people, story,
+   style, cull, cleanup and camera matching among them. The rail below is what mounts them.
+   `PHASE-01-30-REVIEW.md` section 6.4.
+   --------------------------------------------------------------------------- */
+
+.workspace-nav {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  flex: 0 0 auto;
+}
+
+.workspace-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+}
+
+.workspace-nav button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 12px;
+}
+
+.workspace-nav button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.workspace-nav button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.workspace-nav button.is-active {
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+/* The per-photograph rail. Six readings of one frame, one at a time. */
+.inspector {
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.inspector__tabs,
+.develop-workspace__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.inspector__tabs button,
+.develop-workspace__tabs button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.inspector__tabs button.is-open,
+.develop-workspace__tabs button.is-open {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Everything but the library is a single scrolling column. */
+.people-panel,
+.story-panel,
+.moments,
+.cull-view,
+.cleanup-panel,
+.style-panel,
+.camera-match,
+.develop-workspace,
+.tone-review {
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.develop-workspace {
+  min-width: 0;
+}
+
+.develop-workspace__caveats {
+  color: var(--warn);
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.develop-workspace__source,
+.story-panel__summary,
+.style-panel__bucket,
+.filter-note {
+  color: var(--muted);
+  margin: 4px 0;
+}
+
+.story-panel__editor {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.story-panel__editor label,
+.style-panel__pick {
+  display: block;
+  margin: 8px 0;
+}
+
+.story-panel__editor input[type='range'] {
+  display: block;
+  width: 100%;
+}
+
+.filter-note button {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+}

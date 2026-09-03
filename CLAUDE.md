@@ -185,6 +185,30 @@ installed. Run xtask in debug (`cargo xtask ...`, which is what the alias does).
 
 ## Current state
 
+**All thirty phases are implemented, and the eight process gaps the independent review found are
+closed.** `docs/progress/PHASE-01-30-REVIEW.md` is the review; its section 10 is what was done
+about it. Three things a later agent needs from that page rather than from this one:
+
+- **Every UI source file is reachable from `main.tsx`, and a test keeps it that way.** Forty-two
+  of eighty-two were not, for nineteen phases - the whole develop stack, people, story, style,
+  cull, cleanup and camera matching. `App.tsx` now mounts nine workspaces;
+  `ui/src/reachability.test.ts` fails on one orphan. **A component with passing tests is not a
+  mounted component**, and nothing in this repository checked the difference until it did.
+- **All thirty phase gates run.** `scripts/check-phase-gates.sh` runs them and refuses to run at
+  all unless it finds thirty gate modules in `aura-cli`, so a phase whose gate is not wired in is
+  a red build. It is CI lane `phase-gates` and the `phases` release gate. Sixteen of them had run
+  nowhere.
+- **`ui/src-tauri` is compiled by CI lane `shell` and by nothing on this machine.** The reference
+  Windows machine has no linker for it - no `gcc` under the GNU toolchain, no MSVC linker - so
+  `just shell-check` will not run here. That lane is the only thing that type-checks the IPC
+  boundary; `scripts/check-ipc-surface.sh` proves the names and not the types, and says so.
+
+**Nothing in section 7 of the review is closed and nothing in it can be closed by writing code.**
+Every model-capability flag is still false, no camera file has ever been decoded, nothing is
+calibrated, no lens or brand baseline is measured, there is no GPU backend, no network transport
+and nothing has been signed. The product is architecturally complete and evidentially empty, and
+every quality number anywhere in it was measured against a fixture this repository authored.
+
 Phase 01 is implemented: workspace, error taxonomy, catalog schema v1 with the
 six-step refusal chain, idempotent ingest with clock alignment, the job graph with
 leases, the typed IPC surface, the virtualised grid, the fixture generator, CI and
@@ -2151,3 +2175,22 @@ Two rules that phase 02 added and every later phase inherits:
 - **Pixels carry their provenance.** `PixelSource` says whether a buffer came
   from the camera's own JPEG or from AURA's documented render. Never mix the two
   in a score without recording which one it was.
+
+Three rules the post-review work adds, and they are the repository's rather than any phase's:
+
+- **A component with passing tests is not a mounted component.** The review counted forty-two
+  finished, tested, command-backed UI files that no import path reached from the entry point.
+  Every one of them looked done from inside its own test file. `ui/src/reachability.test.ts` is
+  the guard, and the general form of the rule is that *proving a part works is not proving the
+  product has it* - which applies to a gate nothing runs and a crate nothing compiles just as
+  much as to a panel nothing mounts.
+- **A guard written in a doc comment is not a guard.** `Calibrator::fit_isotonic` had documented
+  since phase 13 that it returns the identity map when there is nothing to fit; it checked the
+  *outcome count* and not the *fitted map*, so a degenerate fit produced one constant confidence
+  for every decision in the product. It was found by writing a test that asserted what the
+  comment said. The two lessons compound: the crate had no unit tests, which is why a doc comment
+  was the only place the rule lived.
+- **A check that only runs inside one phase's gate is a check that stops running.** Phase 30
+  lifted the IPC parity check out of phase 27's gate for this reason and the review found sixteen
+  gates that had gone the other way. Anything that has to hold across the product belongs in
+  `scripts/`, in CI and in `ops/release/release.toml` - all three.

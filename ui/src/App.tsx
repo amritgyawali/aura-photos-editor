@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api, asIpcError, inTauri } from './ipc/client';
 import { AiKeysPanel } from './components/AiKeysPanel';
@@ -8,12 +8,23 @@ import { HardwarePanel } from './components/HardwarePanel';
 import { ImportWizard } from './components/ImportWizard';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
+import { WorkspaceNav, type WorkspaceId } from './components/WorkspaceNav';
 import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
+import { CameraMatchPanel } from './components/camera/CameraMatchPanel';
+import { CleanupPanel } from './components/cleanup/CleanupPanel';
+import { CullView } from './components/cull/CullView';
 import { CuratePanel } from './components/curate/CuratePanel';
 import { DeliveryPanel } from './components/delivery/DeliveryPanel';
-import { CompositionCard } from './components/explain/CompositionCard';
+import { DevelopWorkspace } from './components/develop/DevelopWorkspace';
+import { ToneReviewQueue } from './components/develop/ToneReviewQueue';
+import { Inspector } from './components/explain/Inspector';
+import { FilterChips } from './components/explain/FilterChips';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
+import { MomentStack } from './components/grid/MomentStack';
+import { PeoplePanel } from './components/people/PeoplePanel';
 import { QcPanel } from './components/qc/QcPanel';
+import { StoryPanel } from './components/story/StoryPanel';
+import { StylePanel } from './components/style/StylePanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
 import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
@@ -27,6 +38,17 @@ export function App(): JSX.Element {
   const progress = useStore((state) => state.progress);
   const lastError = useStore((state) => state.lastError);
   const focusedIndex = useStore((state) => state.focusedIndex);
+  const focusIndex = useStore((state) => state.focusIndex);
+  const selectOnly = useStore((state) => state.selectOnly);
+
+  // Which workspace is open, and which photographs the library is filtered to.
+  //
+  // The filter is a list of ids rather than a predicate, because the thing doing the filtering
+  // is the catalog: `flagged_images`, `flagged_composition` and the review queues all answer
+  // with ids, and re-deriving the same answer in the browser would be a second implementation
+  // of a judgement the product has already made. `null` is "no filter", never "no matches".
+  const [workspace, setWorkspace] = useState<WorkspaceId>('library');
+  const [filtered, setFiltered] = useState<string[] | null>(null);
 
   const setProjects = useStore((state) => state.setProjects);
   const setActiveProject = useStore((state) => state.setActiveProject);
@@ -212,6 +234,34 @@ export function App(): JSX.Element {
   );
 
   const focusedPhoto = rows[focusedIndex] ?? null;
+  const focusedPhotoId = focusedPhoto?.id ?? null;
+
+  /**
+   * Jump the grid to one photograph, from wherever it was named.
+   *
+   * Six panels can name a frame - the similar list, the moment browser, the cull view's
+   * rejections, the outlier list, the QC queue and the review queue - and all six mean the same
+   * thing by it: show me that one. It scrolls the library rather than opening a modal, because a
+   * photograph in this product is only ever understood beside the frames around it.
+   */
+  const openPhoto = useCallback(
+    (photoId: string) => {
+      const index = rows.findIndex((row) => row.id === photoId);
+      if (index >= 0) {
+        focusIndex(index);
+        selectOnly(photoId);
+      }
+    },
+    [focusIndex, rows, selectOnly],
+  );
+
+  // A `Set` rather than the list itself: `Array.includes` inside a `filter` is quadratic, and a
+  // filter chip on a four-thousand-frame wedding is exactly the case that matters.
+  const filteredSet = useMemo(() => (filtered ? new Set(filtered) : null), [filtered]);
+  const visibleRows = useMemo(
+    () => (filteredSet ? rows.filter((row) => filteredSet.has(row.id)) : rows),
+    [filteredSet, rows],
+  );
 
   return (
     <div className="app">
@@ -237,7 +287,12 @@ export function App(): JSX.Element {
         {/* PHASE-25. The one panel in the sidebar whose subject is the whole wedding rather
             than the selected photograph, which is why it renders nothing until a project is
             open rather than showing an empty frame. */}
-        <GalleryPanel projectId={activeProjectId} onError={setError} />
+        <GalleryPanel
+          projectId={activeProjectId}
+          selectedPhotoId={focusedPhotoId}
+          onSelectPhoto={openPhoto}
+          onError={setError}
+        />
         {/* PHASE-27. The second whole-wedding panel, and it sits under the first deliberately:
             phase 25 makes a gallery coherent and this checks whether it is. It is the last thing
             a photographer looks at before they deliver, so it is the last thing in the sidebar. */}
@@ -251,6 +306,12 @@ export function App(): JSX.Element {
       </aside>
 
       <main className="main">
+        <WorkspaceNav
+          active={workspace}
+          onSelect={setWorkspace}
+          disabled={activeProjectId === null}
+        />
+
         {lastError && (
           <div className="banner" role="alert">
             <strong>{lastError.code}</strong> {lastError.message}
@@ -264,22 +325,85 @@ export function App(): JSX.Element {
           <p className="empty">Create a wedding, then point AURA at your cards.</p>
         ) : (
           <>
-            <div className="workspace">
-              <div className="photo-browser">
-                <VirtualGrid
-                  rows={rows}
-                  onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)}
+            {workspace === 'library' ? (
+              <div className="workspace">
+                <div className="photo-browser">
+                  {/* PHASE-09 and PHASE-11. The chips are the catalog's own answers: every one of
+                      them is a query rather than a verdict, and a chip that found nothing and a
+                      chip nobody could evaluate are drawn differently. */}
+                  <FilterChips
+                    projectId={activeProjectId}
+                    onSelect={(photoIds) =>
+                      setFiltered(photoIds.length === 0 ? null : photoIds)
+                    }
+                  />
+                  {filtered ? (
+                    <p className="filter-note">
+                      Showing {visibleRows.length} of {rows.length} photographs.{' '}
+                      <button type="button" onClick={() => setFiltered(null)}>
+                        Show everything
+                      </button>
+                    </p>
+                  ) : null}
+                  <VirtualGrid
+                    rows={visibleRows}
+                    onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)}
+                  />
+                  <Filmstrip rows={visibleRows} />
+                </div>
+                <Inspector
+                  projectId={activeProjectId}
+                  photoId={focusedPhotoId}
+                  onSelect={openPhoto}
+                  onError={setError}
                 />
-                <Filmstrip rows={rows} />
               </div>
-              <aside className="explain-panel" aria-label="Explain selected photograph">
-                {focusedPhoto ? (
-                  <CompositionCard photoId={focusedPhoto.id} />
-                ) : (
-                  <p className="empty">Select a photograph to inspect its composition.</p>
-                )}
-              </aside>
-            </div>
+            ) : null}
+
+            {workspace === 'people' ? (
+              <PeoplePanel projectId={activeProjectId} onError={setError} />
+            ) : null}
+
+            {workspace === 'story' ? (
+              <StoryPanel projectId={activeProjectId} onError={setError} />
+            ) : null}
+
+            {workspace === 'moments' ? <MomentStack projectId={activeProjectId} /> : null}
+
+            {workspace === 'cull' ? (
+              <CullView projectId={activeProjectId} onOpenImage={openPhoto} />
+            ) : null}
+
+            {workspace === 'develop' ? (
+              <div className="workspace">
+                <DevelopWorkspace
+                  projectId={activeProjectId}
+                  photoId={focusedPhotoId}
+                  onError={setError}
+                />
+                <ToneReviewQueue
+                  projectId={activeProjectId}
+                  onOpen={openPhoto}
+                  onError={setError}
+                />
+              </div>
+            ) : null}
+
+            {workspace === 'cleanup' ? (
+              <CleanupPanel
+                projectId={activeProjectId}
+                photoId={focusedPhotoId}
+                onError={setError}
+              />
+            ) : null}
+
+            {workspace === 'style' ? (
+              <StylePanel projectId={activeProjectId} onError={setError} />
+            ) : null}
+
+            {workspace === 'camera' ? (
+              <CameraMatchPanel projectId={activeProjectId} onError={setError} />
+            ) : null}
           </>
         )}
       </main>

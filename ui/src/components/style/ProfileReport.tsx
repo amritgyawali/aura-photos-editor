@@ -25,6 +25,15 @@ export type ProfileReportProps = {
   imported?: ImportProfileDto | null;
   onAdopt?: (profileId: string) => void;
   onCompare?: (profileId: string) => void;
+  /**
+   * Open one leaf of the matrix.
+   *
+   * Forwarded to the matrix this report already draws rather than let a container draw a second
+   * one beside it. Two coverage tables of the same eighty leaves is two answers to what AURA has
+   * learned, which is exactly the failure the phase 17 rules exist to prevent - and the reader
+   * cannot tell which of the two is the one being used.
+   */
+  onSelectBucket?: (key: string) => void;
 };
 
 /** The strength meter's label. A number and a word, never a word alone. */
@@ -43,7 +52,13 @@ export function signatureLabel(imported: ImportProfileDto): string {
     : `this file could not be checked · key ${imported.fingerprint}`;
 }
 
-export function ProfileReport({ report, imported, onAdopt, onCompare }: ProfileReportProps) {
+export function ProfileReport({
+  report,
+  imported,
+  onAdopt,
+  onCompare,
+  onSelectBucket,
+}: ProfileReportProps) {
   if (!report) {
     return (
       <section className="profile-report empty" aria-label="Style profile report">
@@ -98,7 +113,7 @@ export function ProfileReport({ report, imported, onAdopt, onCompare }: ProfileR
 
       {imported ? <p className="profile-signature">{signatureLabel(imported)}</p> : null}
 
-      <BucketMatrix buckets={report.perBucket} />
+      <BucketMatrix buckets={report.perBucket} onSelect={onSelectBucket} />
 
       <footer className="profile-actions">
         <button type="button" onClick={onCompare ? () => onCompare(profile.profileId) : undefined}>

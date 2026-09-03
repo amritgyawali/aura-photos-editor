@@ -45,10 +45,30 @@ gates:
     cargo run --package xtask -- contracts --check
     cargo run --package xtask -- models
 
-# The full test suite: Rust plus UI.
+# The full test suite: Rust plus UI. `--doc` because `--all-targets` excludes
+# doctests, which is the one thing the command everybody reaches for does not
+# cover - PHASE-01-30-REVIEW.md section 6.8.
 test:
     cargo test --workspace --all-targets
+    cargo test --workspace --doc
     cd ui && npm test
+
+# Every phase gate, 01 to 30. Sixteen of them ran nowhere on a push until the
+# phases 01 to 30 review found it, phase 30's delivery guarantee and phase 13's
+# unattended-operation check among them - PHASE-01-30-REVIEW.md section 6.1.
+phases *ARGS:
+    bash scripts/check-phase-gates.sh {{ARGS}}
+
+# Type-check the desktop shell.
+#
+# `ui/src-tauri` is not a workspace member, so nothing in `gates`, `test` or the
+# release checklist compiles it. That is how 3,211 lines of Rust and every IPC
+# handler came to be checked by nothing at all - PHASE-01-30-REVIEW.md section
+# 6.3. It needs a working linker plus Tauri's own system dependencies, which the
+# reference Windows machine has neither of; CI lane 4 is where this actually runs.
+shell-check:
+    cargo check --manifest-path ui/src-tauri/Cargo.toml --all-targets
+    cargo clippy --manifest-path ui/src-tauri/Cargo.toml --all-targets -- -D warnings
 
 # Budget benchmarks.
 bench:
@@ -199,6 +219,13 @@ parity:
 # Build previews for an existing catalog, the way the app does.
 previews CATALOG PROJECT LEVEL="thumb":
     cargo run --release --package aura-cli -- previews --catalog {{CATALOG}} --project {{PROJECT}} --level {{LEVEL}}
+
+# The phase 12 gate: migration 12 and its five tables, the twelve coverage
+# guarantees, the three autonomy modes, the geometric fusion and its three hard
+# vetoes, the per-moment winners, the chapter quotas, the diversity caps, the
+# size reconciliation, the photographer's overrides and determinism.
+phase-12-verify:
+    cargo run --release --package aura-cli -- verify --phase 12 --work target/phase12-verify
 
 # The phase 13 gate: migration 13 and its trigger, the band table, the reason
 # registry against all four vocabularies, a real cull recorded end to end, the
@@ -361,8 +388,11 @@ phase-24-verify:
 
 # The phase 24 gate from the catalog side. Reads a real project read-only and
 # reports the artefact-free rate, the borrow share and the refusal histogram.
-cleanup-eval CATALOG:
-    python ml/models/generative/eval_cleanup.py {{CATALOG}}
+# `--self-test` proves the metric rejects a degenerate catalog before it is
+# trusted with a photographer's own: this was the one eval harness in the
+# repository without one - PHASE-01-30-REVIEW.md section 6.7.
+cleanup-eval CATALOG="":
+    python ml/models/generative/eval_cleanup.py {{ if CATALOG == "" { "--self-test" } else { CATALOG } }}
 
 # The phase 25 gate. Migration 25 and its three triggers, the policy table a product
 # manager owns and the widened bound it refuses, a whole synthetic wedding through the

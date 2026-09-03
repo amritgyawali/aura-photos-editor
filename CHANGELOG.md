@@ -2,6 +2,69 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Post-review - the application becomes reachable, and every gate becomes enforced
+
+Not a phase. This is the engineering work the independent review of phases 01 to 30 asked for
+(`docs/progress/PHASE-01-30-REVIEW.md` section 7.3), all eight items of it, and nothing else. No
+contract moved, no migration was added and no decision anywhere in the product changed.
+
+**Four fifths of what had been built was reachable from the application by no path at all.**
+Forty-two of the eighty-two UI source files - the whole develop stack, people, story, style, cull,
+cleanup, camera matching and most of the explain rail - had passing tests, had answering commands
+behind them, and had nothing that mounted them. There is now a workspace shell with nine
+workspaces, four new containers wiring the pure views to the commands they belong to, a
+per-photograph inspector rail, and a review queue for the frames whose white balance is worth a
+second look. Nothing is unreachable.
+
+**The way that stays true is a test rather than a promise.** `ui/src/reachability.test.ts` walks
+the import graph from `main.tsx` and fails on a single orphaned file. A component test proves a
+component works; it cannot prove the component is mounted, and the failure mode is silent in
+exactly the way the review found - green build, green tests, finished feature, and an application
+that does not have it.
+
+**Sixteen of the thirty phase gates were run by nothing on a push.** Among them phase 30's, which
+checks the delivery guarantee, and phase 13's, which checks that nothing acts unattended while the
+product is uncalibrated. `scripts/check-phase-gates.sh` now runs all thirty, and it refuses to run
+at all unless it finds thirty gate modules in `aura-cli` - so a phase added without its gate wired
+in is a red build rather than a silent gap. It is a CI lane and a release gate.
+
+**The desktop shell had never been compiled by anything.** 3,211 lines of Rust and every IPC
+handler, excluded from the workspace by design and built by no CI job, no release gate and no
+recipe but `dev`. There is now a CI lane that installs Tauri's Linux prerequisites and runs
+`check`, `clippy -D warnings` and `fmt --check` over it. **This is the one fix in this changeset
+that could not be verified where it was written** - the reference Windows machine has no linker
+for it - so the first CI run is what proves it. The attempt did get far enough to resolve
+dependencies, and `ui/src-tauri/Cargo.lock` moved by 158 lines: it was missing **nine crates
+`aura-app` has depended on since phase 22**. A lockfile drifts only when nothing resolves
+against it.
+
+**`aura-cull` and `aura-explain` had no in-crate tests**, which is the culling engine that decides
+what a client receives and the ledger that is the only record of why. They have 37 and 41.
+
+Writing them found a defect. `Calibrator::fit_isotonic` guarded on the number of outcomes and not
+on the fitted map, so outcomes that were all correct, all wrong, or all at one confidence produced
+a calibration that returned **one constant for every input** - which puts every decision in the
+product into one autonomy band and destroys the ordering the review queue is sorted by. Its own
+doc comment had said it returned the identity in that case since phase 13. **A guard written in a
+doc comment is not a guard**, and a crate with no unit tests is where that goes unnoticed.
+
+**Running all thirty gates found a second host-sensitive one.** Phase 04's gateway-overhead row
+asserts 15 ms per cached call, measured 66.7 ms on the reference Windows machine, and had never
+honoured `AURA_PERF_HOST_SCALE` - phase 14's guardrail multiplies by it and this one did not, so
+the container the review first ran on cleared 15 ms and the question never came up. It applies the
+scale now, exactly as phase 14 does, and the developer-machine figure in the source is unchanged.
+Two of thirty gates are host-sensitive rather than one, and both are timing rows on a build with
+no GPU backend.
+
+Also: doctests are run (there are none; the next one is now compiled), `eval_cleanup.py` has the
+`--self-test` every other harness had, the `justfile` has the `phase-12-verify` recipe every other
+phase had, and 1.9 MB of a code-graph tool's AST cache with stale Windows paths is out of the
+repository.
+
+**None of this is evidence about a photograph.** Every model-capability flag is still false, no
+camera file has been decoded, nothing is calibrated and nothing has been signed. Section 7 of the
+review is the list, and it is unchanged.
+
 ## Phase 30 - Delivery: getting it out, learning from it, and shipping the thing
 
 The last phase of the plan. Export, backup, client galleries, the Lightroom and Photoshop hand-off,
