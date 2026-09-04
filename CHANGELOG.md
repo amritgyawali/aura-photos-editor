@@ -2,6 +2,62 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Bring your own AI - nineteen providers, a first-run setup screen, and TLS
+
+Not a phase. Phase 04 shipped a governed cloud gateway that could reach four vendors, and the
+photographer met it through a dropdown with four strings in it, in a settings panel they had to go
+looking for. Three things change and they are one change.
+
+**The provider list is data now, and it is nineteen rows long.** `aura_cloud::catalog` holds one
+row per provider - the wire format, the address, whether that address is the photographer's to
+set, whether a key is needed, what a key looks like, whether the models can see a photograph, and
+three models with three prices. Anthropic, OpenAI, Google, Azure OpenAI, OpenRouter, Groq,
+Mistral, DeepSeek, xAI, Together, Fireworks, DeepInfra, Cerebras, Moonshot, NVIDIA NIM,
+Perplexity, Ollama, LM Studio, and anything else that speaks OpenAI's chat format. `catalog::build`
+is the only place that turns a choice into something which can speak to a vendor, so the twentieth
+provider is a row in a table rather than an edit in three crates.
+
+**It is the first thing a photographer sees, and it can always be declined.** A full-screen setup
+step with a searchable grid of providers, what each one costs per million tokens, what its keys
+look like and where they come from, an address field for the servers whose address is theirs, a
+model name per tier for anybody who wants to name one, and a Check button that spends one round
+trip before a four-thousand-frame run does. "Not now" is a first-class button, it is a complete
+answer, and nobody is asked twice. Invariant 6 is unchanged: the product edits a whole wedding
+with none of this.
+
+**TLS ships, which is what makes the other two mean anything.** ADR-0009 waived it in phase 04 and
+`docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` discharges the waiver. Sixteen of those
+nineteen rows are HTTPS-only, and *a setup screen that collects a key it cannot use is worse than
+no setup screen*. It arrives exactly where phase 04's own module comment said it would - through
+the `Connector` port - and `HttpTransport` now holds one connector per scheme, so a hosted key and
+Ollama on the same machine are not a restart apart. The crypto provider is pure Rust
+(`rustls-rustcrypto`) because both of the providers rustls ships with compile C and the reference
+build machine has no C toolchain; the ADR says plainly that this is the weakest dependency in the
+product sitting in its most sensitive path, and what was traded for it. Certificate verification
+is on and there is no switch that turns it off.
+
+**Two things that were in memory are now written down.** The provider choice and the model names
+go to the `setting` table - which has been in migration 0001 since phase 01 and had never been
+written to, so no migration was added. Phase 04 kept them in memory: a photographer picked Google,
+pasted a key, closed the application, and reopened it pointed at Anthropic with no key, which
+reads as the key having been lost. The two integration tests that matter open the catalog **twice**,
+because a single-process test cannot tell a stored choice from a cached one. The key itself is not
+in that row and cannot be - it stays in the operating system's credential store, filed per
+provider, so three can be kept and switched between without pasting anything again, and a catalog
+copied to a second machine carries the choice and not the secret.
+
+Four commands are added (`list_ai_providers`, `ai_setup_status`, `save_ai_setup`, `skip_ai_setup`)
+and `crates/aura-app/src/contract/ipc.rs` gains four types, which is a frozen contract amended
+with an ADR and a re-lock - the sixth amendment in the product's history. `check-ipc-surface.sh`
+reports 263 = 263 = 263.
+
+**What is still not proved.** No call in this repository has ever reached a public vendor. This
+machine cannot compile the desktop shell, every test uses the cassette transport, and the prices
+in the table are the vendors' published list prices rather than anything measured here - which is
+why they are only ever used to *refuse* a call, and why the spend meter reads the tokens the
+provider said it billed. The first successful round trip to any of the nineteen reopens ADR-0063's
+criteria the way the first real camera file reopens phase 02's.
+
 ## Post-review - the application becomes reachable, and every gate becomes enforced
 
 Not a phase. This is the engineering work the independent review of phases 01 to 30 asked for

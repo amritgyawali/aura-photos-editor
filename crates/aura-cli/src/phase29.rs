@@ -792,7 +792,10 @@ pub fn verify(args: &[String]) -> ExitCode {
         "  C5  The cloud sequencing task has never reached a provider. Its contact sheets need a"
     );
     println!(
-        "      renderer this crate must not have, and TLS is waived - so what is proved is that"
+        "      renderer this crate must not have, and no call in this repository has ever reached"
+    );
+    println!(
+        "      a vendor - ADR-0063 ships TLS but proves no round trip - so what is proved is that"
     );
     println!("      the validator refuses, not that a model helps.");
 

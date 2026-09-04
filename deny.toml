@@ -26,6 +26,14 @@ confidence-threshold = 0.9
 # fails the gate.
 exceptions = [
   { crate = "jpeg-encoder", allow = ["IJG"] },
+  # `webpki-roots` is the Mozilla trusted-root certificate set, and it is *data*
+  # rather than code - which is why it carries the Community Data License
+  # Agreement rather than a software licence. CDLA-Permissive-2.0 imposes no
+  # conditions on use or redistribution and no attribution requirement; the OSI
+  # has not reviewed it because it is not a software licence. Scoped to this
+  # crate so a second CDLA dependency still fails the gate. See
+  # docs/adr/ADR-0063-tls-and-the-provider-catalogue.md section 4.
+  { crate = "webpki-roots", allow = ["CDLA-Permissive-2.0"] },
 ]
 
 # The workspace crates are `publish = false` and carry the non-SPDX marker

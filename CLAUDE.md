@@ -29,6 +29,8 @@ Never load two phase files into one session.
 | Hardware troubleshooting | `docs/runbooks/hardware.md` |
 | Adding a model | `docs/runbooks/adding-a-model.md` |
 | Cloud AI policy | `docs/adr/ADR-0009-cloud-ai-policy.md` |
+| Provider catalogue, first-run setup and TLS | `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` |
+| The nineteen AI providers, as data | `crates/aura-cloud/src/catalog.rs` |
 | Using your own AI key | `docs/using-your-own-ai-key.md` |
 | Recorded provider responses | `tests/cloud/cassettes/` |
 | Embedding and index decisions | `docs/adr/ADR-0011-embeddings-and-similarity-index.md` |
@@ -184,6 +186,37 @@ RUSTUP_TOOLCHAIN=1.97.1-x86_64-pc-windows-gnu cargo test --workspace --all-targe
 installed. Run xtask in debug (`cargo xtask ...`, which is what the alias does).
 
 ## Current state
+
+**Bring your own AI (post-30).** The cloud gateway reaches nineteen providers rather than four,
+and it reaches them over TLS. `crates/aura-cloud/src/catalog.rs` is the whole vendor list as data -
+wire format, address, whether the address is the photographer's to set, whether a key is required,
+what a key looks like, whether the models can see a photograph, three models and three prices -
+and `catalog::build` is the only place that turns a choice into a provider, so `aura-app` does no
+matching of its own. `crates/aura-cloud/src/tls.rs` discharges phase 04's TLS waiver through the
+`Connector` port ADR-0009 said it would arrive in; the crypto is `rustls-rustcrypto` because this
+machine has no C toolchain and both of rustls's own providers compile C, and
+`docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` says plainly what that trades. Three things a
+later agent needs from it:
+
+- **The provider choice is persisted and the key still is not.** `crates/aura-app/src/ai_settings.rs`
+  writes the provider, address and model names to the `setting` table from migration 0001, which
+  nothing had ever written to - so no migration was added. The key stays in the credential store,
+  filed per provider. A catalog copied to a second machine carries the choice and not the secret.
+- **A first-run screen that can always be declined.** `ui/src/components/AiSetup.tsx`, mounted from
+  `App.tsx` when `ai_setup_status` says the question is outstanding. `skip_ai_setup` is a separate
+  command from `save_ai_setup` and records **no provider**, because declining is an answer and a
+  panel that later showed a configured-looking Anthropic with no key behind it would be reporting a
+  decision nobody made.
+- **`Transport::schemes` is on the wire.** A build without the `tls` feature reports `["http"]` and
+  the setup screen warns on every HTTPS provider that a key saved there would not be used. Phase
+  24's rule - an absent input is ignorance, not permission - applied to a capability.
+
+**Nothing in it is evidence that a provider works.** No call in this repository has ever reached a
+public vendor, every test uses the cassette transport, and the prices in the catalogue are the
+vendors' published list prices rather than measurements - which is why they are only ever used to
+*refuse* a call before it is made, and why the spend meter reads the tokens the provider said it
+billed. The first successful round trip reopens ADR-0063's criteria.
+
 
 **All thirty phases are implemented, and the eight process gaps the independent review found are
 closed.** `docs/progress/PHASE-01-30-REVIEW.md` is the review; its section 10 is what was done

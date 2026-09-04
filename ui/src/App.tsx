@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api, asIpcError, inTauri } from './ipc/client';
 import { AiKeysPanel } from './components/AiKeysPanel';
+import { AiSetup } from './components/AiSetup';
 import { CacheSettings } from './components/CacheSettings';
 import { Filmstrip } from './components/Filmstrip';
 import { HardwarePanel } from './components/HardwarePanel';
@@ -49,6 +50,15 @@ export function App(): JSX.Element {
   // of a judgement the product has already made. `null` is "no filter", never "no matches".
   const [workspace, setWorkspace] = useState<WorkspaceId>('library');
   const [filtered, setFiltered] = useState<string[] | null>(null);
+
+  // Whether the AI question has been answered, and whether the screen that asks it is open.
+  //
+  // `null` is "we have not looked yet", which is a third state rather than a missing boolean:
+  // rendering the setup screen while the answer is still in flight would flash it in front of
+  // every photographer who answered it months ago. The screen appears only once the catalog has
+  // said the question is outstanding.
+  const [aiAnswered, setAiAnswered] = useState<boolean | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   const setProjects = useStore((state) => state.setProjects);
   const setActiveProject = useStore((state) => state.setActiveProject);
@@ -103,6 +113,28 @@ export function App(): JSX.Element {
   useEffect(() => {
     void refreshProjects();
   }, [refreshProjects]);
+
+  // The AI setup question, asked once. It is deliberately not gated on a project: choosing a
+  // provider is a decision about this installation rather than about one wedding, and asking it
+  // before the first import is what makes it the *first* thing rather than an interruption in
+  // the middle of one.
+  useEffect(() => {
+    if (!inTauri()) {
+      setAiAnswered(true);
+      return;
+    }
+    void api
+      .aiSetupStatus()
+      .then((status) => {
+        setAiAnswered(status.completed);
+        setSetupOpen(!status.completed);
+      })
+      .catch(() => {
+        // A credential store that will not answer must not stop the application opening.
+        // The AI panel reports the same failure in a place where it is actionable.
+        setAiAnswered(true);
+      });
+  }, []);
 
   // A different wedding is a different set of pixels; keeping the old bitmaps
   // would show the previous couple's frames for a few hundred milliseconds.
@@ -265,6 +297,16 @@ export function App(): JSX.Element {
 
   return (
     <div className="app">
+      {setupOpen && aiAnswered !== null ? (
+        <AiSetup
+          onDone={(status) => {
+            setAiAnswered(status.completed);
+            setSetupOpen(false);
+          }}
+          onDismiss={() => setSetupOpen(false)}
+          onError={setError}
+        />
+      ) : null}
       <aside className="sidebar">
         <ProjectSwitcher
           projects={projects}
@@ -283,7 +325,11 @@ export function App(): JSX.Element {
         <ProblemsPanel problems={problems} />
         <CacheSettings projectId={activeProjectId} onError={setError} />
         <HardwarePanel onError={setError} />
-        <AiKeysPanel projectId={activeProjectId} onError={setError} />
+        <AiKeysPanel
+          projectId={activeProjectId}
+          onError={setError}
+          onOpenSetup={() => setSetupOpen(true)}
+        />
         {/* PHASE-25. The one panel in the sidebar whose subject is the whole wedding rather
             than the selected photograph, which is why it renders nothing until a project is
             open rather than showing an empty frame. */}

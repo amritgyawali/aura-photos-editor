@@ -8,6 +8,13 @@ authors.workspace      = true
 publish.workspace      = true
 description  = "The governed cloud AI gateway: the only crate in AURA allowed to open a socket"
 
+[features]
+# On by default. Off is the state phase 04 shipped in: `http://` endpoints only,
+# which means a local or studio-network server and no public vendor at all.
+# `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` has the argument.
+default = ["tls"]
+tls     = ["dep:rustls", "dep:rustls-rustcrypto", "dep:webpki-roots"]
+
 [dependencies]
 aura-core    = { path = "../aura-core" }
 aura-catalog = { path = "../aura-catalog" }
@@ -20,6 +27,13 @@ serde_json   = { workspace = true }
 time         = { workspace = true }
 tracing      = { workspace = true }
 uuid         = { workspace = true }
+
+# TLS. Pure Rust, because the reference build machine has no C toolchain and both
+# of the crypto providers rustls ships with compile C and assembly. See
+# `src/tls.rs` for what that costs and ADR-0063 for why it is accepted.
+rustls            = { workspace = true, optional = true }
+rustls-rustcrypto = { workspace = true, optional = true }
+webpki-roots      = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

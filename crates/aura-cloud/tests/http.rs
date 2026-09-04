@@ -203,7 +203,7 @@ fn a_non_2xx_status_is_a_response_not_a_transport_error() {
 }
 
 #[test]
-fn an_https_url_is_refused_with_an_answerable_message() {
+fn a_scheme_this_transport_has_no_connector_for_is_refused_and_says_which_it_has() {
     let canned = Arc::new(Canned::new("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n"));
     let transport = HttpTransport::with_connector(canned as Arc<dyn Connector>);
     let err = transport
@@ -211,10 +211,30 @@ fn an_https_url_is_refused_with_an_answerable_message() {
             &request("https://api.anthropic.com/v1/messages"),
             Duration::from_secs(1),
         )
-        .expect_err("this build has no TLS");
+        .expect_err("a plain-TCP-only transport cannot reach https");
     assert_eq!(err.code.0, "AURA-CLOUD-6003");
-    assert!(err.detail.contains("TLS"), "{}", err.detail);
-    assert!(err.detail.contains("ADR-0009"), "{}", err.detail);
+    assert!(err.detail.contains("http"), "{}", err.detail);
+    assert!(err.detail.contains("https"), "{}", err.detail);
+}
+
+/// The default transport reaches both schemes, which is what makes the setup
+/// screen's provider list honest: sixteen of the nineteen rows in the catalog are
+/// HTTPS-only, and collecting a key for one of them on a build that could not
+/// reach it would be worse than not offering it.
+#[cfg(feature = "tls")]
+#[test]
+fn the_default_transport_reaches_http_and_https() {
+    let schemes = HttpTransport::new().schemes();
+    assert!(schemes.contains(&"http"), "{schemes:?}");
+    assert!(schemes.contains(&"https"), "{schemes:?}");
+}
+
+/// Without the feature the product is back where phase 04 left it, and the error
+/// a photographer sees says so rather than being silent about it.
+#[cfg(not(feature = "tls"))]
+#[test]
+fn without_the_tls_feature_only_plain_http_is_reachable() {
+    assert_eq!(HttpTransport::new().schemes(), vec!["http"]);
 }
 
 #[test]

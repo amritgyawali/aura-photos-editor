@@ -455,3 +455,203 @@ button:focus-visible,
   padding: 0;
   text-decoration: underline;
 }
+
+/* The first-run AI setup screen.
+
+   It covers the application rather than sitting inside it, because it is asked
+   before there is a wedding to be inside of. Everything here is plain for the
+   reason the rest of this file is plain: the design system lands later, and a
+   setup screen that is legible and keyboard-first is worth more today than one
+   that is decorated. */
+.ai-setup {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 32px 16px;
+  background: rgba(10, 11, 14, 0.88);
+}
+
+.ai-setup-sheet {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  max-width: 880px;
+  padding: 24px;
+  width: 100%;
+}
+
+.ai-setup-header h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+
+.ai-setup-headline,
+.ai-setup-blurb,
+.ai-setup-storage,
+.ai-setup-keys-url,
+.ai-setup-endpoint-fixed,
+.ai-setup-empty {
+  color: var(--muted);
+  margin: 6px 0;
+}
+
+.ai-setup-offline {
+  border-left: 3px solid var(--warn);
+  color: var(--warn);
+  margin: 12px 0;
+  padding-left: 8px;
+}
+
+.ai-setup-search {
+  display: block;
+  margin: 16px 0 8px;
+}
+
+.ai-setup-search input {
+  display: block;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.ai-setup-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ai-setup-card {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  height: 100%;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.ai-setup-card:hover,
+.ai-setup-card:focus-visible {
+  border-color: var(--accent);
+}
+
+.ai-setup-card-label {
+  display: block;
+  font-weight: 600;
+}
+
+.ai-setup-card-keyed {
+  color: var(--accent);
+  display: block;
+  font-size: 12px;
+}
+
+.ai-setup-card-blurb,
+.ai-setup-card-price {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.ai-setup-card-price {
+  overflow-wrap: anywhere;
+}
+
+.ai-setup-connect h2 {
+  font-size: 17px;
+  margin: 16px 0 0;
+}
+
+.ai-setup-tiers,
+.ai-setup-notes {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.ai-setup-tiers li {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ai-setup-notes li {
+  border-left: 3px solid var(--warn);
+  color: var(--warn);
+  margin: 6px 0;
+  padding-left: 8px;
+}
+
+.ai-setup-key,
+.ai-setup-endpoint,
+.ai-setup-advanced label {
+  display: block;
+  margin: 12px 0 0;
+}
+
+.ai-setup-key input,
+.ai-setup-endpoint input,
+.ai-setup-advanced input {
+  display: block;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.ai-setup-advanced-toggle,
+.ai-keys-open-setup {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  margin: 12px 0 0;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.ai-setup-advanced p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ai-setup-check {
+  border-left: 3px solid var(--accent);
+  margin: 12px 0;
+  padding-left: 8px;
+}
+
+.ai-setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.ai-setup-footer {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 12px;
+}
+
+.ai-setup-skip {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+}

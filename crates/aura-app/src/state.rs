@@ -33,6 +33,7 @@ use aura_cloud::keys::{KeyStore, OsKeyStore, Platform};
 use aura_cloud::provider::{
     Provider, ProviderClient, ProviderConfig, ProviderKind, ThreadSleeper, Transport,
 };
+use aura_cloud::catalog::ModelChoice;
 use aura_cloud::{CloudAiGateway, CloudPolicy};
 use aura_core::clock::{Clock, SystemClock};
 use aura_core::progress::CancelToken;
@@ -160,9 +161,19 @@ struct CloudSlot {
     keys: Option<Arc<dyn KeyStore>>,
     provider: ProviderKind,
     endpoint: Option<String>,
+    /// The model names the photographer chose, per tier. Empty is the ordinary
+    /// state and means the catalog's own names apply.
+    models: ModelChoice,
     policy: CloudPolicy,
     /// Swapped for a cassette transport by the tests and the phase gate.
     transport: Option<Arc<dyn Transport>>,
+    /// True once the stored choice has been read back from the catalog.
+    ///
+    /// Without this the provider resets to the built-in default on every launch,
+    /// which is what phase 04 shipped: a photographer chose Groq, closed the
+    /// application, and reopened it pointed at Anthropic with a key it did not
+    /// have. The read happens once, lazily, beside the first gateway build.
+    restored: bool,
 }
 
 impl Default for CloudSlot {
@@ -172,8 +183,10 @@ impl Default for CloudSlot {
             keys: None,
             provider: ProviderKind::Anthropic,
             endpoint: None,
+            models: ModelChoice::default(),
             policy: CloudPolicy::default(),
             transport: None,
+            restored: false,
         }
     }
 }
@@ -1649,9 +1662,95 @@ impl AppState {
         provider: ProviderKind,
         endpoint: Option<&str>,
     ) -> AuraResult<()> {
+        let models = self.cloud.lock().models.clone();
+        self.set_cloud_provider_with_models(provider, endpoint, &models)
+    }
+
+    /// Choose the provider, its endpoint and the three model names.
+    ///
+    /// In memory only. [`AppState::save_ai_setup`] is what makes a choice
+    /// survive a restart, and the two are separate because the Check button
+    /// changes what this process is pointed at without committing anybody to it.
+    ///
+    /// # Errors
+    ///
+    /// Never in itself; the signature matches the other setters.
+    pub fn set_cloud_provider_with_models(
+        &self,
+        provider: ProviderKind,
+        endpoint: Option<&str>,
+        models: &ModelChoice,
+    ) -> AuraResult<()> {
         let mut slot = self.cloud.lock();
         slot.provider = provider;
         slot.endpoint = endpoint.map(ToString::to_string);
+        slot.models = models.clone();
+        slot.restored = true;
+        slot.gateway = None;
+        Ok(())
+    }
+
+    /// What is pointed at right now: the provider, its endpoint and its models.
+    ///
+    /// Reads the stored choice first if this process has not yet.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the stored choice cannot be read.
+    pub fn cloud_selection(&self) -> AuraResult<(ProviderKind, Option<String>, ModelChoice)> {
+        self.restore_ai_setup()?;
+        let slot = self.cloud.lock();
+        Ok((slot.provider, slot.endpoint.clone(), slot.models.clone()))
+    }
+
+    /// The stored setup record, whether or not it has been applied.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the catalog cannot be read.
+    pub fn ai_setup(&self) -> AuraResult<crate::ai_settings::AiSetup> {
+        self.catalog.read(crate::ai_settings::read)
+    }
+
+    /// Write the setup record and point this process at it.
+    ///
+    /// One call rather than two, because a stored choice the running process has
+    /// not adopted is a settings panel that disagrees with the next call it
+    /// makes.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the record cannot be written.
+    pub fn save_ai_setup(&self, setup: &crate::ai_settings::AiSetup) -> AuraResult<()> {
+        let now = aura_catalog::rfc3339(self.clock.now_utc());
+        let stored = setup.clone();
+        self.catalog
+            .writer()
+            .with(move |conn| crate::ai_settings::write(conn, &stored, &now))?;
+        self.set_cloud_provider_with_models(setup.kind(), setup.endpoint(), &setup.models())
+    }
+
+    /// Adopt the stored choice, once per process.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the catalog cannot be read.
+    fn restore_ai_setup(&self) -> AuraResult<()> {
+        if self.cloud.lock().restored {
+            return Ok(());
+        }
+        let stored = self.catalog.read(crate::ai_settings::read)?;
+        let mut slot = self.cloud.lock();
+        // Checked again under the lock: two commands arriving together would
+        // otherwise both read and both apply, and the second would discard a
+        // provider the first had already been told to use.
+        if slot.restored {
+            return Ok(());
+        }
+        slot.provider = stored.kind();
+        slot.endpoint = stored.endpoint().map(ToString::to_string);
+        slot.models = stored.models();
+        slot.restored = true;
         slot.gateway = None;
         Ok(())
     }
@@ -1670,10 +1769,12 @@ impl AppState {
                 return Ok(Arc::clone(gateway));
             }
         }
+        self.restore_ai_setup()?;
         let keys = self.key_store()?;
 
         let mut slot = self.cloud.lock();
-        let provider = build_provider(slot.provider, slot.endpoint.as_deref());
+        let provider =
+            aura_cloud::catalog::build(slot.provider, slot.endpoint.as_deref(), &slot.models);
         let transport = slot.transport.clone().unwrap_or_else(|| {
             Arc::new(aura_cloud::http::HttpTransport::new()) as Arc<dyn Transport>
         });
@@ -2406,9 +2507,11 @@ impl AppState {
     /// Each is attached when its tables open and named in a warning when they do not - phase 19's
     /// rule that a phase owns no fallback for another phase's output.
     ///
-    /// **No editorial judge is attached either.** TLS is waived (ADR-0009), so no public vision
-    /// provider is reachable from this build; the pass behaves exactly as it does with an
-    /// unreachable one, which is that every proposal in the judgement band waits for a person.
+    /// **No editorial judge is attached either.** Wiring one is a later change than this pass;
+    /// the pass behaves exactly as it does with an unreachable provider, which is that every
+    /// proposal in the judgement band waits for a person. ADR-0063 made a public provider
+    /// reachable - the reason nothing is attached here is that nothing attaches it, and phase
+    /// 24's rule is that the absence produces a refusal rather than a silent approval.
     ///
     /// # Errors
     ///
@@ -2897,27 +3000,13 @@ impl AppState {
 
 /// Build a provider for one vendor at one endpoint.
 ///
-/// The endpoint is the user's when they gave one, so a region-pinned or
-/// self-hosted deployment is a setting rather than a rebuild.
-fn build_provider(kind: ProviderKind, endpoint: Option<&str>) -> Arc<dyn Provider> {
-    match kind {
-        ProviderKind::Anthropic => Arc::new(aura_cloud::anthropic::AnthropicProvider::new(
-            endpoint.unwrap_or(aura_cloud::anthropic::DEFAULT_ENDPOINT),
-        )),
-        ProviderKind::OpenAi => Arc::new(aura_cloud::openai::OpenAiProvider::new(
-            endpoint.unwrap_or(aura_cloud::openai::DEFAULT_ENDPOINT),
-        )),
-        ProviderKind::Google => Arc::new(aura_cloud::google::GoogleProvider::new(
-            endpoint.unwrap_or(aura_cloud::google::DEFAULT_ENDPOINT),
-        )),
-        // A compatible server runs whatever the user loaded into it, so there is
-        // no default model name worth guessing. `local-model` is what Ollama and
-        // LM Studio both accept as an alias, and Settings overwrites it.
-        ProviderKind::Compat => Arc::new(aura_cloud::compat::provider(
-            endpoint.unwrap_or(aura_cloud::compat::DEFAULT_ENDPOINT),
-            "local-model",
-        )),
-    }
+/// Every provider AURA knows how to reach is a row in `aura_cloud::catalog`, so
+/// this crate does no matching of its own: adding the twentieth vendor is a row
+/// in that table rather than an arm here. The endpoint is the photographer's when
+/// they gave one and the catalog says that provider's address is theirs to set.
+#[must_use]
+pub fn build_provider(kind: ProviderKind, endpoint: Option<&str>) -> Arc<dyn Provider> {
+    aura_cloud::catalog::build(kind, endpoint, &ModelChoice::default())
 }
 
 /// Fold an endpoint into a configuration without rebuilding the alias table.

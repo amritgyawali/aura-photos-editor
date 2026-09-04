@@ -187,6 +187,58 @@ export type KeyCheckDto = {
   message: string;
 };
 
+/** One model on one provider, as the setup screen shows it. */
+export type AiModelDto = {
+  tier: string;
+  model: string;
+  inputPerMtokUsd: number;
+  outputPerMtokUsd: number;
+};
+
+/**
+ * One provider AURA knows how to reach.
+ *
+ * Static: it says nothing about what this machine has stored. Whether a key
+ * exists is in `AiSetupStatusDto.keyedProviders`, because that answer costs a
+ * read of the operating system's credential store and this one costs nothing.
+ */
+export type AiProviderDto = {
+  id: string;
+  label: string;
+  blurb: string;
+  wire: string;
+  endpoint: string;
+  endpointEditable: boolean;
+  requiresKey: boolean;
+  keyHint: string;
+  keysUrl: string;
+  images: boolean;
+  models: AiModelDto[];
+};
+
+export type AiSetupStatusDto = {
+  completed: boolean;
+  skipped: boolean;
+  provider: string;
+  endpoint: string | null;
+  /** Cheapest first. An empty string means "use the catalogue's own name". */
+  models: string[];
+  keyedProviders: string[];
+  /** The URL schemes this build can reach: `http`, `https`. */
+  schemes: string[];
+  offlineStudioMode: boolean;
+};
+
+export type SaveAiSetupInput = {
+  provider: string;
+  endpoint: string | null;
+  cheapModel: string | null;
+  balancedModel: string | null;
+  reasoningModel: string | null;
+  completed: boolean;
+  skipped: boolean;
+};
+
 export type SetCloudBudgetInput = {
   projectId: string;
   capUsd: number;

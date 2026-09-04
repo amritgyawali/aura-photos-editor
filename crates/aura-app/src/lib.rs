@@ -48,6 +48,7 @@
 //! No command may take longer than 50 ms. Anything heavier returns a job handle
 //! and streams progress events.
 
+pub mod ai_settings;
 pub mod autopilot_commands;
 pub mod biometric_keys;
 pub mod camera_commands;
@@ -103,8 +104,9 @@ pub use cleanup_commands::{
     decide_cleanup, disable_cleanup, image_cleanup, manual_remove,
 };
 pub use cloud_commands::{
-    check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend, cloud_status,
-    purge_cloud_cache, set_ai_key, set_cloud_budget, set_cloud_privacy,
+    ai_setup_status, check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend,
+    cloud_status, list_ai_providers, purge_cloud_cache, save_ai_setup, set_ai_key,
+    set_cloud_budget, set_cloud_privacy, skip_ai_setup,
 };
 pub use colour_commands::{
     accept_colour, colour_review_queue, colour_status, estimate_colour, image_colour,

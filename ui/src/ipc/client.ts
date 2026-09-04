@@ -78,6 +78,9 @@ import type {
   CloudCallDto,
   CloudEvent,
   CloudSpendDto,
+  AiProviderDto,
+  AiSetupStatusDto,
+  SaveAiSetupInput,
   CloudStatusDto,
   ColourDto,
   ColourPassDto,
@@ -417,6 +420,22 @@ export const api = {
     invoke<CloudStatusDto>('clear_ai_key', { provider }),
 
   checkAiKey: (): Promise<KeyCheckDto> => invoke<KeyCheckDto>('check_ai_key'),
+
+  /** Every provider AURA knows how to reach. Static, and cheap to ask for. */
+  listAiProviders: (): Promise<AiProviderDto[]> =>
+    invoke<AiProviderDto[]>('list_ai_providers'),
+
+  /** What the first-run screen and the AI panel both need to know. */
+  aiSetupStatus: (): Promise<AiSetupStatusDto> =>
+    invoke<AiSetupStatusDto>('ai_setup_status'),
+
+  /** Record the provider choice. The key is not part of this; `setAiKey` is. */
+  saveAiSetup: (input: SaveAiSetupInput): Promise<AiSetupStatusDto> =>
+    invoke<AiSetupStatusDto>('save_ai_setup', { input }),
+
+  /** Answer the first-run screen by declining it. Records no provider. */
+  skipAiSetup: (): Promise<AiSetupStatusDto> =>
+    invoke<AiSetupStatusDto>('skip_ai_setup'),
 
   setCloudBudget: (input: SetCloudBudgetInput): Promise<CloudSpendDto> =>
     invoke<CloudSpendDto>('set_cloud_budget', { input }),

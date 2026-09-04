@@ -102,7 +102,8 @@ use aura_app::contract::ipc::{
 // The types the ninety newly registered commands name.
 use aura_app::contract::ipc::{
     AnalyseIntegrityInput, CacheStatsDto, ChapterHandleDto, ClassifyScenesInput,
-    CloudCacheStatsDto, CloudCallDto, CloudSpendDto, CloudStatusDto, DescriptorsDto,
+    AiProviderDto, AiSetupStatusDto, CloudCacheStatsDto, CloudCallDto, CloudSpendDto,
+    CloudStatusDto, DescriptorsDto,
     DevelopImageInput, DevelopStatusDto, DismissFlagInput, DuplicateSetDto, EditMaskInput,
     EmbedProgressDto, EmbedProjectInput, EmotionDto, EmotionPassDto, EmotionStatusDto,
     EnsureMasksInput, EraseBiometricsDto, EraseBiometricsInput, FaceCropDto, FindSimilarInput,
@@ -115,7 +116,8 @@ use aura_app::contract::ipc::{
     MomentStatusDto, MomentsInput, MoveBoundaryInput, PeopleStatusDto, PreferInput, PrefetchInput,
     PreviewPayload, RankedByEmotionDto, RankedFrameDto, RankedInput, ReactionLinkDto, RecipeDto,
     RenameIdentityInput, RenderCapsDto, RenderDto, RenderImageInput, ScanFacesDto, ScanFacesInput,
-    SceneDto, SceneProfileDto, ScoreEmotionInput, SetAiKeyInput, SetCacheBudgetInput,
+    SaveAiSetupInput, SceneDto, SceneProfileDto, ScoreEmotionInput, SetAiKeyInput,
+    SetCacheBudgetInput,
     SetChapterInput, SetCloudBudgetInput, SetCloudPrivacyInput, SetExecutionProviderInput,
     SetIdentityImportanceInput, SetIdentityRoleInput, SetKeepHintInput, SetParamDto, SetParamInput,
     SetPeakInput, SimilarResultDto, SnapshotInput, SplitChapterInput, SplitIdentityInput,
@@ -1094,6 +1096,42 @@ async fn plan_geometry(
 // a command that opens a catalog, decodes a proxy or renders must not run on the thread
 // the window paints from.
 
+// PHASE-04, extended for the provider catalogue and the first-run setup screen.
+#[tauri::command]
+async fn list_ai_providers(state: State<'_, AppState>) -> IpcResult<Vec<AiProviderDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::list_ai_providers(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn ai_setup_status(state: State<'_, AppState>) -> IpcResult<AiSetupStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::ai_setup_status(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn save_ai_setup(
+    state: State<'_, AppState>,
+    input: SaveAiSetupInput,
+) -> IpcResult<AiSetupStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::save_ai_setup(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn skip_ai_setup(state: State<'_, AppState>) -> IpcResult<AiSetupStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::skip_ai_setup(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 // PHASE-04. The cloud AI gateway.
 #[tauri::command]
 async fn check_ai_key(state: State<'_, AppState>) -> IpcResult<KeyCheckDto> {
@@ -1848,7 +1886,7 @@ async fn split_identity(
 async fn cancel_previews(
     state: State<'_, AppState>,
     project_id: String,
-    photo_ids: [String],
+    photo_ids: Vec<String>,
 ) -> IpcResult<i64> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -3068,6 +3106,7 @@ fn main() {
             analyse_integrity,
             build_index,
             cancel_previews,
+            ai_setup_status,
             check_ai_key,
             classify_scenes,
             clear_ai_key,
@@ -3141,7 +3180,10 @@ fn main() {
             scene_profiles,
             score_emotion,
             segment_story,
+            list_ai_providers,
+            save_ai_setup,
             set_ai_key,
+            skip_ai_setup,
             set_cache_budget,
             set_chapter,
             set_cloud_budget,
@@ -3160,8 +3202,8 @@ fn main() {
             story_status,
             undo_moment_edit,
             warmup_models,
-            within_moment
-                    autopilot_status,
+            within_moment,
+            autopilot_status,
             autopilot_preflight,
             autopilot_start,
             autopilot_progress,

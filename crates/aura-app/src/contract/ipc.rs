@@ -471,6 +471,104 @@ pub struct KeyCheckDto {
     pub message: String,
 }
 
+/// One model on one provider, as the setup screen shows it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiModelDto {
+    /// `cheap`, `balanced` or `reasoning`.
+    pub tier: String,
+    /// The vendor's own identifier, which is what goes on the wire.
+    pub model: String,
+    /// US dollars per million input tokens, as the vendor publishes it.
+    pub input_per_mtok_usd: f64,
+    /// US dollars per million output tokens, as the vendor publishes it.
+    pub output_per_mtok_usd: f64,
+}
+
+/// One provider AURA knows how to reach.
+///
+/// Everything here is static: it comes from `aura_cloud::catalog` and says
+/// nothing about what this machine has stored. Whether a key exists is in
+/// [`AiSetupStatusDto::keyed_providers`], because that answer costs a read of the
+/// operating system's credential store and this one costs nothing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiProviderDto {
+    /// The identifier a key is filed under: `anthropic`, `groq`, `ollama`, ...
+    pub id: String,
+    /// What a photographer reads in the picker.
+    pub label: String,
+    /// One sentence on why somebody would choose this one.
+    pub blurb: String,
+    /// Which request shape it speaks, for the diagnostics line.
+    pub wire: String,
+    /// Where it lives.
+    pub endpoint: String,
+    /// True when the address is the photographer's to set.
+    pub endpoint_editable: bool,
+    /// True when a key must be stored before a call can be made.
+    pub requires_key: bool,
+    /// What the key looks like, so a paste into the wrong provider is visible.
+    pub key_hint: String,
+    /// Where the vendor issues keys. Shown as text; the app opens no browser.
+    pub keys_url: String,
+    /// True when the default models here can see a photograph.
+    pub images: bool,
+    /// The three tiers, cheapest first.
+    pub models: Vec<AiModelDto>,
+}
+
+/// What the first-run screen and the AI panel both need to know.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiSetupStatusDto {
+    /// True once the first-run question has been answered, either way.
+    pub completed: bool,
+    /// True when it was answered by declining rather than by choosing.
+    pub skipped: bool,
+    /// The chosen provider's identifier.
+    pub provider: String,
+    /// The chosen endpoint, when the provider allows one to be chosen.
+    pub endpoint: Option<String>,
+    /// The three chosen model names, cheapest first. Empty means "use the
+    /// catalog's own name for this tier".
+    pub models: Vec<String>,
+    /// Which providers have a key stored on this machine.
+    pub keyed_providers: Vec<String>,
+    /// The URL schemes this build's transport can reach: `http`, `https`.
+    ///
+    /// On the wire because a build without TLS can store an Anthropic key and
+    /// never reach Anthropic, and a setup screen that did not say so would be
+    /// collecting a key it cannot use.
+    pub schemes: Vec<String>,
+    /// The global privacy switch, which overrides everything above.
+    pub offline_studio_mode: bool,
+}
+
+/// Record the provider choice made on the setup screen or in the AI panel.
+///
+/// The key is not here. It travels through [`SetAiKeyInput`] and nothing else,
+/// so this record can be logged, exported in a support bundle and read back
+/// without any of that touching a secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveAiSetupInput {
+    /// The provider identifier. Unknown text resolves to the compatible server.
+    pub provider: String,
+    /// The address, for a provider whose address is the photographer's to set.
+    pub endpoint: Option<String>,
+    /// The cheap tier's model, when one was named.
+    pub cheap_model: Option<String>,
+    /// The balanced tier's model, when one was named.
+    pub balanced_model: Option<String>,
+    /// The reasoning tier's model, when one was named.
+    pub reasoning_model: Option<String>,
+    /// True when the photographer finished the screen rather than declining.
+    pub completed: bool,
+    /// True when they declined. Both may be true: declining answers the question.
+    pub skipped: bool,
+}
+
 /// Set the spending caps.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

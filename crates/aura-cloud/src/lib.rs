@@ -73,24 +73,30 @@
 //! ## Two ports, neither of them frozen
 //!
 //! [`provider::Provider`] turns the gateway's vocabulary into a vendor's;
-//! [`provider::Transport`] carries the bytes. Four providers and three transports
-//! ship. Neither trait is a frozen contract, deliberately: a new vendor or a TLS
-//! stack must be addable without an ADR and without a caller noticing, in exactly
-//! the way `Backend` works inside `aura-infer`.
+//! [`provider::Transport`] carries the bytes. Nineteen providers over three wire
+//! formats, and three transports. Neither trait is a frozen contract,
+//! deliberately: a new vendor or a TLS stack must be addable without an ADR and
+//! without a caller noticing, in exactly the way `Backend` works inside
+//! `aura-infer`. Both of those have since happened, and neither needed a caller
+//! to change - [`catalog`] is the vendor list as data, and [`tls`] is the stack.
 //!
 //! What *is* frozen is [`contract::cloud`], and phases 07, 10, 12, 13, 24, 27, 28,
 //! 29 and 30 are written against it.
 //!
 //! ## What this build can and cannot reach
 //!
-//! [`http::HttpTransport`] is a complete HTTP/1.1 client, and it does not speak
-//! TLS. It therefore reaches `http://` endpoints - a local or studio-network
-//! OpenAI-compatible server, which is what [`compat`] exists for - and not the
-//! public HTTPS endpoints of Anthropic, OpenAI or Google. Those providers'
-//! request shaping, response parsing, error mapping and pricing are complete and
-//! tested against cassettes; only the socket underneath is waived. The reasoning,
-//! and the condition on which the waiver expires, is in
-//! `docs/adr/ADR-0009-cloud-ai-policy.md`.
+//! [`http::HttpTransport`] is a complete HTTP/1.1 client and it holds one
+//! connector per scheme: plain TCP, and TLS when the `tls` feature is on, which it
+//! is by default. Both a local server and the public HTTPS endpoints of the
+//! nineteen providers in [`catalog`] are reachable.
+//! `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` discharges the waiver
+//! ADR-0009 recorded and says what the pure-Rust crypto provider trades.
+//!
+//! **No call in this repository has ever reached a public vendor.** Request
+//! shaping, response parsing, error mapping and pricing are complete and tested
+//! against cassettes; a live round trip is not. The prices in [`catalog`] are the
+//! vendors' published list prices rather than measurements, which is why they are
+//! only ever used to *refuse* a call before it is made.
 //!
 //! CI never touches a network. [`cassette::CassetteTransport`] replays recorded
 //! responses, and it is what every test and `aura-cli verify --phase 04` run
@@ -102,6 +108,7 @@ pub mod audit;
 pub mod budget;
 pub mod cache;
 pub mod cassette;
+pub mod catalog;
 pub mod cleanup_judgement;
 pub mod compat;
 pub mod couple_hint;
@@ -118,6 +125,8 @@ pub mod redact;
 pub mod repair;
 pub mod schema;
 pub mod tasks;
+#[cfg(feature = "tls")]
+pub mod tls;
 pub mod validate;
 
 /// Frozen contracts. Changing anything in here requires an ADR.

@@ -294,6 +294,21 @@ pub trait KeyStore: Send + Sync + fmt::Debug {
     ///
     /// `AURA-CLOUD-6012` when the store refuses.
     fn delete(&self, account: &str) -> AuraResult<()>;
+
+    /// Whether a key exists, without reading it.
+    ///
+    /// The settings panel asks this about every provider in the catalog at once,
+    /// which is nineteen questions on one panel open. Reading nineteen secrets to
+    /// answer them would be nineteen decryptions of something nobody asked to
+    /// see - so the default answer is derived from a load, and an implementation
+    /// that can do better overrides it.
+    ///
+    /// # Errors
+    ///
+    /// As [`KeyStore::load`].
+    fn has(&self, account: &str) -> AuraResult<bool> {
+        Ok(self.load(account)?.is_some())
+    }
 }
 
 /// The platform credential store, driven by its own command-line tool.
@@ -561,6 +576,18 @@ impl KeyStore for OsKeyStore {
             return Ok(None);
         }
         Ok(Some(secret))
+    }
+
+    fn has(&self, account: &str) -> AuraResult<bool> {
+        // On Windows the secret is a DPAPI blob at a path this type computes, so
+        // "is there a key" is a stat rather than a PowerShell process. The panel
+        // asks this nineteen times on open and the difference is several seconds.
+        // The other two platforms keep their secret inside their own store and
+        // have nothing to stat, so they answer the long way.
+        if self.platform == Platform::Windows {
+            return Ok(self.blob_path(account).is_file());
+        }
+        Ok(self.load(account)?.is_some())
     }
 
     fn delete(&self, account: &str) -> AuraResult<()> {
