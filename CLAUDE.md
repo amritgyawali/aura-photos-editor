@@ -185,6 +185,16 @@ RUSTUP_TOOLCHAIN=1.97.1-x86_64-pc-windows-gnu cargo test --workspace --all-targe
 `windows-sys` needs `dlltool` for a release import library and MinGW is not
 installed. Run xtask in debug (`cargo xtask ...`, which is what the alias does).
 
+**This machine needs `AURA_PERF_HOST_SCALE=6`**, for `cargo test -p aura-perf` and
+for `scripts/check-phase-gates.sh` alike. Every wall-clock budget in the product is
+stated against a reference machine and multiplied by that variable; without it
+phase 04's call-overhead budget and phase 14's proxy guardrail both fail on timing
+alone, which reads as a regression and is a measurement of this laptop.
+
+```bash
+AURA_PERF_HOST_SCALE=6 scripts/check-phase-gates.sh
+```
+
 ## Current state
 
 **Bring your own AI (post-30).** The cloud gateway reaches nineteen providers rather than four,
