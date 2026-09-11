@@ -380,7 +380,7 @@ impl OsKeyStore {
                              if(-not (Test-Path $d)){{New-Item -ItemType Directory -Force $d|Out-Null}}; \
                              ConvertTo-SecureString $s -AsPlainText -Force | \
                              ConvertFrom-SecureString | \
-                             Set-Content -Path '{path}' -Encoding ascii",
+                             Set-Content -Path '{path}' -Encoding ascii -NoNewline",
                             path = path.display()
                         ),
                     ],
@@ -421,6 +421,14 @@ impl OsKeyStore {
     #[must_use]
     pub fn load_command(&self, account: &str) -> KeyCommand {
         match self.platform {
+            // `.Trim()` is load-bearing rather than tidy. `ConvertFrom-SecureString`
+            // produces one line of hex and `Set-Content` used to append a newline to
+            // it, so `-Raw` read the blob back with a trailing CRLF and
+            // `ConvertTo-SecureString` refused it as "Input string was not in a correct
+            // format". A key could be written and never read again: every session
+            // stored one and every session reported no key. The writer no longer adds
+            // the newline, and this trims it so a blob written by an earlier build
+            // still opens.
             Platform::Windows => {
                 let path = self.blob_path(account);
                 KeyCommand {
@@ -432,7 +440,7 @@ impl OsKeyStore {
                         format!(
                             "$ErrorActionPreference='Stop'; \
                              if(-not (Test-Path '{path}')){{exit 44}}; \
-                             $sec=Get-Content -Path '{path}' -Raw | ConvertTo-SecureString; \
+                             $sec=(Get-Content -Path '{path}' -Raw).Trim() | ConvertTo-SecureString; \
                              $b=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec); \
                              [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b)",
                             path = path.display()

@@ -105,7 +105,11 @@ fn extract(
         let stream = bytes
             .get(preview.offset..preview.offset.saturating_add(preview.len))
             .ok_or_else(|| aura_core::errors::raw::corrupt("preview range is outside the file"))?;
-        let image = codec::decode_jpeg(stream, limits)?;
+        let image = if meta.format == crate::RawFormat::Png {
+            codec::decode_png(stream, limits)?
+        } else {
+            codec::decode_jpeg(stream, limits)?
+        };
         return Ok(Extracted {
             image,
             source: PixelSource::Embedded,

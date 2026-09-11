@@ -56,6 +56,24 @@ pub struct JobHandle {
     pub job_id: String,
 }
 
+/// How far an import has got.
+///
+/// Four fields rather than a percentage, because the panel has three states to draw and a
+/// percentage collapses two of them: a run that has not counted its files yet reports
+/// `total` zero, and a run this process never started reports `known` false.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IngestProgressDto {
+    /// Whether this process started the job at all.
+    pub known: bool,
+    /// Files finished so far.
+    pub done: u64,
+    /// Files expected, zero while the walker is still counting.
+    pub total: u64,
+    /// Whether the worker is still going.
+    pub running: bool,
+}
+
 /// Page request for the virtualised grid.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -8671,4 +8689,29 @@ pub struct DiagnosticsDto {
     pub providers: Vec<ProviderDto>,
     /// The last few error codes, newest first, with their runbooks.
     pub recent_errors: Vec<IpcError>,
+}
+/// One reversible automatic edit. ADR-0064.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoAutoEditInput {
+    /// Owning project.
+    pub project_id: String,
+    /// Imported photograph.
+    pub photo_id: String,
+    /// Client-generated cancellation handle.
+    pub job_id: String,
+}
+
+/// Result with actual provenance rather than an assumed AI success.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoAutoEditDto {
+    /// Saved recipe.
+    pub recipe: RecipeDto,
+    /// Cloud, cache or local_fallback.
+    pub source: String,
+    /// Model that answered, or local.
+    pub model: String,
+    /// Plain-language explanation.
+    pub reasons: Vec<String>,
 }

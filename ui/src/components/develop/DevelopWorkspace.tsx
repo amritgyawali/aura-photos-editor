@@ -46,6 +46,7 @@ import { MicroRetouchPanel } from './MicroRetouchPanel';
 import { RestorePanel } from './RestorePanel';
 import { RetouchPanel } from './RetouchPanel';
 import { TonePanel } from './TonePanel';
+import { PhotoEditor } from './PhotoEditor';
 
 /**
  * The container that wires the eleven develop views to the commands behind them.
@@ -240,14 +241,18 @@ export function DevelopWorkspace({
       return;
     }
     try {
-      const [nextRecipe, nextHistory, nextTone, nextColour] = await Promise.all([
+      const [nextRecipe, nextHistory, nextRender] = await Promise.all([
         developApi.imageRecipe({ photoId }),
         developApi.imageHistory({ photoId }),
-        toneApi.imageTone(photoId),
-        colourApi.imageColour(photoId),
+        developApi.renderImage({ photoId, level: 'proxy2048', purpose: 'interactive' }),
       ]);
       setRecipe(nextRecipe);
       setHistory(nextHistory);
+      setRender(nextRender);
+      const [nextTone, nextColour] = await Promise.all([
+        toneApi.imageTone(photoId),
+        colourApi.imageColour(photoId),
+      ]);
       setTone(nextTone);
       setColour(nextColour);
 
@@ -264,9 +269,6 @@ export function DevelopWorkspace({
       setRestorePlan(nextRestore);
       setGeometryPlan(nextGeometry);
 
-      setRender(
-        await developApi.renderImage({ photoId, level: 'proxy2048', purpose: 'interactive' }),
-      );
     } catch (error) {
       fail(error);
     }
@@ -322,6 +324,7 @@ export function DevelopWorkspace({
   if (!recipe || !history) {
     return (
       <section className="develop-workspace" aria-busy="true">
+        <PhotoEditor key={photoId} projectId={projectId} photoId={photoId} onChanged={reloadPhoto} render={render} recipe={recipe} history={history} />
         <p>Loading the edit…</p>
       </section>
     );
@@ -332,6 +335,7 @@ export function DevelopWorkspace({
 
   return (
     <section className="develop-workspace" aria-label="Develop">
+      <PhotoEditor key={photoId} projectId={projectId} photoId={photoId} onChanged={reloadPhoto} render={render} recipe={recipe} history={history} />
       <header className="develop-workspace__header">
         <h2>Develop</h2>
         <p className="develop-workspace__source">{provenance(recipe)}</p>

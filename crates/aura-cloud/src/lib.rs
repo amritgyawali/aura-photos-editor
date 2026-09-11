@@ -120,6 +120,7 @@ pub mod http;
 pub mod moment_significance;
 pub mod openai;
 pub mod payload;
+pub mod photo_adjustment;
 pub mod provider;
 pub mod redact;
 pub mod repair;

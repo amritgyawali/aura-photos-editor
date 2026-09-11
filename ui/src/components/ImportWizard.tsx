@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { asIpcError, inTauri, pickImportPaths } from '../ipc/client';
 
 export type ImportWizardProps = {
   disabled: boolean;
@@ -24,6 +25,21 @@ export function ImportWizard({
 }: ImportWizardProps): JSX.Element {
   const [draft, setDraft] = useState('');
   const [roots, setRoots] = useState<string[]>([]);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+
+  const browse = async (directory: boolean): Promise<void> => {
+    setPicking(true);
+    setPickerError(null);
+    try {
+      const paths = await pickImportPaths(directory);
+      setRoots((current) => [...new Set([...current, ...paths])]);
+    } catch (error) {
+      setPickerError(asIpcError(error).message);
+    } finally {
+      setPicking(false);
+    }
+  };
 
   const addRoot = (): void => {
     const trimmed = draft.trim();
@@ -38,6 +54,12 @@ export function ImportWizard({
   return (
     <section className="panel" aria-label="Import">
       <h2>Import</h2>
+      {inTauri() && <div className="row">
+        <button type="button" disabled={disabled || running || picking} onClick={() => void browse(false)}>Choose photos</button>
+        <button type="button" disabled={disabled || running || picking} onClick={() => void browse(true)}>Choose folders</button>
+      </div>}
+      <p>JPEG, PNG and supported camera RAW files. Originals stay in their current location.</p>
+      {pickerError && <p role="alert">{pickerError}</p>}
 
       <div className="row">
         <label htmlFor="root-input">Card or folder</label>

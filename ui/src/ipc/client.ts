@@ -1,5 +1,17 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import type { PhotoAutoEditInput, PhotoAutoEditDto } from './types';
+
+export const photoAutoEdit = (input: PhotoAutoEditInput): Promise<PhotoAutoEditDto> =>
+  invoke<PhotoAutoEditDto>('photo_auto_edit', { input });
+
+export async function pickImportPaths(directory: boolean): Promise<string[]> {
+  const result = await invoke<string | string[] | null>('plugin:dialog|open', {
+    options: { directory, multiple: true, title: directory ? 'Choose photo folders' : 'Choose photographs',
+      filters: directory ? [] : [{ name: 'Photographs', extensions: ['jpg', 'jpeg', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef', 'tif', 'tiff'] }] },
+  });
+  return result === null ? [] : typeof result === 'string' ? [result] : result;
+}
 
 import type {
   // PHASE-28.
@@ -155,6 +167,7 @@ import type {
   InferEvent,
   InferStatsDto,
   IngestEvent,
+  IngestProgressDto,
   IntegrityDto,
   IntegrityEvent,
   IntegrityPassDto,
@@ -345,6 +358,9 @@ export const api = {
     invoke<JobHandle>('start_ingest', { input }),
 
   cancelJob: (jobId: string): Promise<boolean> => invoke<boolean>('cancel_job', { jobId }),
+
+  ingestProgress: (jobId: string): Promise<IngestProgressDto> =>
+    invoke<IngestProgressDto>('ingest_progress', { jobId }),
 
   listImages: (input: ListImagesInput): Promise<ImageRowLite[]> =>
     invoke<ImageRowLite[]>('list_images', { input }),

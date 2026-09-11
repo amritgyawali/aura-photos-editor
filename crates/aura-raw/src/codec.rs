@@ -21,6 +21,66 @@ pub struct Rgb8 {
     pub data: Vec<u8>,
 }
 
+/// Decode PNG, expanding palettes and greyscale and compositing alpha over white.
+///
+/// # Errors
+/// Refuses corrupt images and dimensions beyond the decode allocation limits.
+pub fn decode_png(bytes: &[u8], limits: DecodeLimits) -> AuraResult<Rgb8> {
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    decoder.set_limits(png::Limits {
+        bytes: usize::try_from(limits.max_alloc_bytes).unwrap_or(usize::MAX),
+    });
+    let mut reader = decoder
+        .read_info()
+        .map_err(|e| corrupt(format!("PNG header: {e}")))?;
+    let info = reader.info();
+    check_dimensions(info.width, info.height, 8, limits)?;
+    let mut samples = vec![0; reader.output_buffer_size()];
+    let info = reader
+        .next_frame(&mut samples)
+        .map_err(|e| corrupt(format!("PNG pixels: {e}")))?;
+    let channels = info.color_type.samples();
+    let mut data = Vec::with_capacity(info.width as usize * info.height as usize * 3);
+    for pixel in samples
+        .get(..info.buffer_size())
+        .ok_or_else(|| corrupt("truncated PNG output"))?
+        .chunks_exact(channels)
+    {
+        let first = pixel.first().copied().unwrap_or(0);
+        let (red, green, blue, alpha) = match info.color_type {
+            png::ColorType::Rgb => (
+                first,
+                pixel.get(1).copied().unwrap_or(0),
+                pixel.get(2).copied().unwrap_or(0),
+                255,
+            ),
+            png::ColorType::Rgba => (
+                first,
+                pixel.get(1).copied().unwrap_or(0),
+                pixel.get(2).copied().unwrap_or(0),
+                pixel.get(3).copied().unwrap_or(255),
+            ),
+            png::ColorType::Grayscale => (first, first, first, 255),
+            png::ColorType::GrayscaleAlpha => {
+                (first, first, first, pixel.get(1).copied().unwrap_or(255))
+            }
+            png::ColorType::Indexed => return Err(corrupt("PNG palette was not expanded")),
+        };
+        for value in [red, green, blue] {
+            data.push(
+                ((u32::from(value) * u32::from(alpha) + 255 * (255 - u32::from(alpha)) + 127) / 255)
+                    as u8,
+            );
+        }
+    }
+    Ok(Rgb8 {
+        width: info.width,
+        height: info.height,
+        data,
+    })
+}
+
 /// Decode a baseline or progressive JPEG into interleaved RGB.
 ///
 /// # Errors
@@ -100,4 +160,44 @@ pub fn encode_jpeg(image: &Rgb8, quality: u8) -> AuraResult<Vec<u8>> {
         .encode(&image.data, width, height, jpeg_encoder::ColorType::Rgb)
         .map_err(|e| corrupt(format!("jpeg encode failed: {e}")))?;
     Ok(out)
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod png_tests {
+    use super::*;
+
+    #[test]
+    fn transparent_png_decodes_and_reaches_all_preview_tiers() {
+        let mut encoded = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut encoded, 2, 1);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().expect("PNG header");
+            writer
+                .write_image_data(&[255, 0, 0, 255, 0, 0, 255, 0])
+                .expect("PNG pixels");
+        }
+        let image = decode_png(&encoded, DecodeLimits::tier1()).expect("decode PNG");
+        assert_eq!(image.data, [255, 0, 0, 255, 255, 255]);
+        let path = std::path::Path::new("photo.png");
+        let meta = crate::read_meta(&encoded, path).expect("PNG metadata");
+        assert_eq!(meta.format, crate::RawFormat::Png);
+        let clock = aura_core::clock::SystemClock::default();
+        let thumb = crate::thumb::tier1(&encoded, &meta, 512, DecodeLimits::tier1(), &clock, path)
+            .expect("thumbnail");
+        assert_eq!((thumb.buffer.width, thumb.buffer.height), (2, 1));
+        let full = crate::full::tier3(&encoded, &meta, DecodeLimits::tier3(), &clock)
+            .expect("full resolution PNG");
+        assert_eq!((full.width, full.height), (2, 1));
+        assert!(decode_png(
+            &encoded,
+            DecodeLimits {
+                max_pixels: 1,
+                ..DecodeLimits::tier1()
+            }
+        )
+        .is_err());
+    }
 }

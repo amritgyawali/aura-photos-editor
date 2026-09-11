@@ -197,6 +197,62 @@ export function App(): JSX.Element {
     }
   }, [activeProjectId, loadPage, setError, setProblems]);
 
+  // The import bar, and the only thing that ever clears it.
+  //
+  // `startImport` sets `running` and returns; nothing here used to ask what happened, so the
+  // wizard read "0 of ? files" for the life of the window, the Stop button stayed live, and the
+  // grid did not refresh until the project was switched away and back. The counts come from the
+  // pass itself rather than from counting rows, because a file that turned out to be a duplicate
+  // is a file the import finished and not a photograph it created.
+  useEffect(() => {
+    if (!progress.running || !progress.jobId || !inTauri()) {
+      return;
+    }
+    const jobId = progress.jobId;
+    let cancelled = false;
+
+    const finish = (): void => {
+      setProgress({ running: false, jobId: null });
+      void refreshProjects();
+      if (activeProjectId) {
+        void loadPage(activeProjectId, 0, true);
+        void api.listProblems(activeProjectId).then(setProblems).catch(() => undefined);
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      void api
+        .ingestProgress(jobId)
+        .then((update) => {
+          if (cancelled) {
+            return;
+          }
+          setProgress({ done: update.done, total: update.total });
+          if (!update.running) {
+            finish();
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            finish();
+          }
+        });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [
+    progress.running,
+    progress.jobId,
+    activeProjectId,
+    loadPage,
+    setProblems,
+    setProgress,
+    refreshProjects,
+  ]);
+
   useEffect(() => {
     if (!inTauri()) {
       return;
@@ -423,6 +479,7 @@ export function App(): JSX.Element {
             {workspace === 'develop' ? (
               <div className="workspace">
                 <DevelopWorkspace
+                  key={`${activeProjectId}:${focusedPhotoId}`}
                   projectId={activeProjectId}
                   photoId={focusedPhotoId}
                   onError={setError}

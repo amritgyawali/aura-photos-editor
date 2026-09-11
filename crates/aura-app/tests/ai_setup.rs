@@ -136,7 +136,12 @@ fn the_catalogue_offers_more_than_ten_providers_and_prices_every_tier() {
             "{} has no endpoint",
             provider.id
         );
-        assert_eq!(provider.models.len(), 3, "{} is missing a tier", provider.id);
+        assert_eq!(
+            provider.models.len(),
+            3,
+            "{} is missing a tier",
+            provider.id
+        );
         for model in &provider.models {
             assert!(!model.model.is_empty(), "{} has a blank model", provider.id);
             assert!(model.input_per_mtok_usd >= 0.0);
@@ -210,7 +215,10 @@ fn a_choice_survives_a_restart() {
     assert_eq!(status.provider, "groq");
     assert!(status.completed);
     assert!(!status.skipped);
-    assert_eq!(status.models.get(1).map(String::as_str), Some("llama-4-scout"));
+    assert_eq!(
+        status.models.get(1).map(String::as_str),
+        Some("llama-4-scout")
+    );
 
     // And the gateway is actually pointed there, rather than the panel merely
     // saying so: the model the balanced tier resolves to is the chosen one.
@@ -239,7 +247,10 @@ fn skipping_answers_the_question_without_choosing_anybody() {
     let reopened = open(dir.path(), keys);
     let status = aura_app::ai_setup_status(&reopened).expect("a status");
     assert!(status.completed, "nobody should be asked twice");
-    assert!(status.skipped, "and the product must remember it was declined");
+    assert!(
+        status.skipped,
+        "and the product must remember it was declined"
+    );
     assert!(status.keyed_providers.is_empty(), "no key was stored");
 }
 
@@ -310,7 +321,11 @@ fn three_providers_can_be_set_up_and_switched_between() {
         },
     )
     .expect("a switch");
-    assert!(aura_app::cloud_status(&state).expect("a status").key_present);
+    assert!(
+        aura_app::cloud_status(&state)
+            .expect("a status")
+            .key_present
+    );
 }
 
 /// A photographer's own server may be pointed anywhere; a public vendor may not.

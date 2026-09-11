@@ -28,6 +28,14 @@ export type JobHandle = {
   jobId: string;
 };
 
+/** How far an import has got. `known` false means this process never started that job. */
+export type IngestProgressDto = {
+  known: boolean;
+  done: number;
+  total: number;
+  running: boolean;
+};
+
 export type ListImagesInput = {
   projectId: string;
   offset: number;
@@ -5044,4 +5052,16 @@ export type DiagnosticsDto = {
   trainedModels: boolean;
   providers: ProviderDto[];
   recentErrors: IpcError[];
+};
+export type PhotoAutoEditInput = {
+  projectId: string;
+  photoId: string;
+  jobId: string;
+};
+
+export type PhotoAutoEditDto = {
+  recipe: RecipeDto;
+  source: string;
+  model: string;
+  reasons: string[];
 };

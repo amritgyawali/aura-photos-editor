@@ -54,6 +54,7 @@ const fixtures = vi.hoisted(() => {
 });
 
 vi.mock('../../ipc/client', () => ({
+  api: { getPreview: vi.fn().mockResolvedValue({ dataUrl: 'data:image/jpeg;base64,AAAA' }), cancelJob: vi.fn().mockResolvedValue(true) },
   inTauri: () => true,
   asIpcError: (error: unknown) => ({ code: 'AURA-TEST-0001', message: String(error) }),
   develop: {

@@ -26,3 +26,40 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
+
+# The shell is its own cargo root, so it does NOT inherit the workspace profiles
+# in the root `Cargo.toml`. Cargo's defaults are wrong for it in two ways, and
+# both of them show up on a photographer's machine rather than in CI.
+#
+# `debug = 2` - the default - emits full debug info for all thirty AURA crates
+# as well as the Tauri stack. The resulting `libaura_app` rlib is large enough
+# that rustc's mmap of it fails on an 8 GB machine with OS error 1455, "the
+# paging file is too small for this operation to complete". That surfaces as a
+# compiler crash and a corrupted incremental cache, which is what it looked like
+# for as long as nobody read the note under the error.
+#
+# `opt-level = 0` for dependencies is the second: the CPU render path is ~210 ms
+# for a 2048 px proxy in release, and seconds per photograph unoptimised. Every
+# slider drag would stall the window, so an unoptimised dependency build is not
+# a debug build of this application - it is a different, unusable one.
+#
+# `incremental = false` because the incremental cache is the thing that gets
+# corrupted when a build runs out of commit charge, and a stale-cache ICE costs
+# more than the rebuild it saves.
+[profile.dev]
+debug           = "line-tables-only"
+overflow-checks = true
+incremental     = false
+
+[profile.dev.package."*"]
+opt-level = 2
+
+# Deliberately NOT `panic = "abort"`, unlike the workspace release profile. Every
+# heavy command runs under `tauri::async_runtime::spawn_blocking`, which turns a
+# panic into a `JoinError` this shell reports as one failed request. Aborting
+# would take the whole window down with the photographer's unsaved work.
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1
+strip         = "debuginfo"

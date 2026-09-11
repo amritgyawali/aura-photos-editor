@@ -3,34 +3,78 @@
 // lives here: the shell must stay thin enough to replace.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use aura_app::contract::ipc::{PhotoAutoEditDto, PhotoAutoEditInput};
 use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
+    AcceptToneInput,
     // PHASE-28.
-    AutopilotEventDto, AutopilotPreflightDto, AutopilotProgressDto, AutopilotSettingsInput,
-    AutopilotStageDto, AutopilotStartInput, AutopilotStatusDto, AutopilotSummaryDto,
-    // PHASE-29.
-    CurateAlbumDto, CurateBwDto, CurateDecideInput, CurateExportDto, CurateExportInput,
-    CurateHeroDto, CurateOrderInput, CuratePickDto, CurateProjectInput, CurateSocialDto,
-    CurateSpreadDto, CurateStatusDto,
+    AutopilotEventDto,
+    AutopilotPreflightDto,
+    AutopilotProgressDto,
+    AutopilotSettingsInput,
+    AutopilotStageDto,
+    AutopilotStartInput,
+    AutopilotStatusDto,
+    AutopilotSummaryDto,
+    CleanupBlockedDto,
+    CleanupDisclosureDto,
+    CleanupPassDto,
+    CleanupPassInput,
+    CleanupProposalDto,
+    CleanupReasonDto,
+    CleanupStatusDto,
     // PHASE-30.
-    ConsentDto, DeliveryInput, DeliveryManifestDto, DeliveryStatusDto, DiagnosticsDto,
-    ExportFileDto, ExportJobInput, ExportNameDto, ExportPresetDto, ExportStatusDto,
-    LearnBucketDto, LearnComparisonDto, LearnStatusDto, ProviderDto, UploadItemDto,
-    AcceptToneInput, CleanupBlockedDto, CleanupDisclosureDto, CleanupPassDto, CleanupPassInput,
-    CleanupProposalDto, CleanupReasonDto, CleanupStatusDto, DecideCleanupInput,
-    DisableCleanupInput, EstimateToneInput, ManualRemoveDto, ManualRemoveInput, ReferenceFrameDto,
-    ReferenceFramesInput, SetToneOverrideDto, SetToneOverrideInput, ToneDto, TonePassDto,
-    ToneReviewInput, ToneStatusDto,
+    ConsentDto,
+    // PHASE-29.
+    CurateAlbumDto,
+    CurateBwDto,
+    CurateDecideInput,
+    CurateExportDto,
+    CurateExportInput,
+    CurateHeroDto,
+    CurateOrderInput,
+    CuratePickDto,
+    CurateProjectInput,
+    CurateSocialDto,
+    CurateSpreadDto,
+    CurateStatusDto,
+    DecideCleanupInput,
+    DeliveryInput,
+    DeliveryManifestDto,
+    DeliveryStatusDto,
+    DiagnosticsDto,
+    DisableCleanupInput,
+    EstimateToneInput,
+    ExportFileDto,
+    ExportJobInput,
+    ExportNameDto,
+    ExportPresetDto,
+    ExportStatusDto,
+    LearnBucketDto,
+    LearnComparisonDto,
+    LearnStatusDto,
+    ManualRemoveDto,
+    ManualRemoveInput,
+    ProviderDto,
+    ReferenceFrameDto,
+    ReferenceFramesInput,
+    SetToneOverrideDto,
+    SetToneOverrideInput,
+    ToneDto,
+    TonePassDto,
+    ToneReviewInput,
+    ToneStatusDto,
+    UploadItemDto,
 };
 use aura_app::contract::ipc::{
     AnalyseCompositionInput, CompositionDto, CompositionPassDto, CompositionStatusDto,
     CreateProjectInput, CullPassDto, CullProjectInput, CullStatusDto, DecisionDto,
     DismissCompositionFlagInput, ExplainPanelDto, ExportBundleInput, FlaggedCompositionInput,
-    ImageRowLite, IpcError, JobHandle, LedgerDecisionDto, LedgerStatusDto, ListImagesInput,
-    OverrideDecisionInput, ProblemRow, ProjectHandle, ProjectSummary, RecordDecisionsDto,
-    RecordDecisionsInput, ResizeGalleryInput, ReviewQueueInput, SelectionDto, SetCameraLabelInput,
-    SetCullModeInput, StartIngestInput, SupportBundleDto,
+    ImageRowLite, IngestProgressDto, IpcError, JobHandle, LedgerDecisionDto, LedgerStatusDto,
+    ListImagesInput, OverrideDecisionInput, ProblemRow, ProjectHandle, ProjectSummary,
+    RecordDecisionsDto, RecordDecisionsInput, ResizeGalleryInput, ReviewQueueInput, SelectionDto,
+    SetCameraLabelInput, SetCullModeInput, StartIngestInput, SupportBundleDto,
 };
 // PHASE-16.
 // PHASE-17.
@@ -101,27 +145,27 @@ use aura_app::contract::ipc::{
 };
 // The types the ninety newly registered commands name.
 use aura_app::contract::ipc::{
-    AnalyseIntegrityInput, CacheStatsDto, ChapterHandleDto, ClassifyScenesInput,
-    AiProviderDto, AiSetupStatusDto, CloudCacheStatsDto, CloudCallDto, CloudSpendDto,
-    CloudStatusDto, DescriptorsDto,
-    DevelopImageInput, DevelopStatusDto, DismissFlagInput, DuplicateSetDto, EditMaskInput,
-    EmbedProgressDto, EmbedProjectInput, EmotionDto, EmotionPassDto, EmotionStatusDto,
-    EnsureMasksInput, EraseBiometricsDto, EraseBiometricsInput, FaceCropDto, FindSimilarInput,
-    FlaggedInput, GetPreviewInput, GroupMomentsInput, GroupPeopleDto, GroupPeopleInput,
-    HardwarePlanDto, HistoryDto, HistoryStepInput, IdentityCardDto, IdentityHandleDto,
-    IdentityTimelineDto, ImageSubjectsDto, IndexStatusDto, InferStatsDto, IntegrityDto,
-    IntegrityPassDto, IntegrityStatusDto, KeyCheckDto, LockMomentInput, MaskAllowanceDto, MaskDto,
-    MaskOverlayDto, MaskStatusDto, MergeChaptersInput, MergeIdentitiesInput, MergeMomentsInput,
-    ModelStatusDto, MomentDto, MomentEditDto, MomentHandleDto, MomentListDto, MomentPeakDto,
-    MomentStatusDto, MomentsInput, MoveBoundaryInput, PeopleStatusDto, PreferInput, PrefetchInput,
-    PreviewPayload, RankedByEmotionDto, RankedFrameDto, RankedInput, ReactionLinkDto, RecipeDto,
-    RenameIdentityInput, RenderCapsDto, RenderDto, RenderImageInput, ScanFacesDto, ScanFacesInput,
-    SaveAiSetupInput, SceneDto, SceneProfileDto, ScoreEmotionInput, SetAiKeyInput,
-    SetCacheBudgetInput,
-    SetChapterInput, SetCloudBudgetInput, SetCloudPrivacyInput, SetExecutionProviderInput,
-    SetIdentityImportanceInput, SetIdentityRoleInput, SetKeepHintInput, SetParamDto, SetParamInput,
-    SetPeakInput, SimilarResultDto, SnapshotInput, SplitChapterInput, SplitIdentityInput,
-    SplitMomentInput, StoryOutlineDto, StoryStatusDto, WarmupReportDto, WithinMomentInput,
+    AiProviderDto, AiSetupStatusDto, AnalyseIntegrityInput, CacheStatsDto, ChapterHandleDto,
+    ClassifyScenesInput, CloudCacheStatsDto, CloudCallDto, CloudSpendDto, CloudStatusDto,
+    DescriptorsDto, DevelopImageInput, DevelopStatusDto, DismissFlagInput, DuplicateSetDto,
+    EditMaskInput, EmbedProgressDto, EmbedProjectInput, EmotionDto, EmotionPassDto,
+    EmotionStatusDto, EnsureMasksInput, EraseBiometricsDto, EraseBiometricsInput, FaceCropDto,
+    FindSimilarInput, FlaggedInput, GetPreviewInput, GroupMomentsInput, GroupPeopleDto,
+    GroupPeopleInput, HardwarePlanDto, HistoryDto, HistoryStepInput, IdentityCardDto,
+    IdentityHandleDto, IdentityTimelineDto, ImageSubjectsDto, IndexStatusDto, InferStatsDto,
+    IntegrityDto, IntegrityPassDto, IntegrityStatusDto, KeyCheckDto, LockMomentInput,
+    MaskAllowanceDto, MaskDto, MaskOverlayDto, MaskStatusDto, MergeChaptersInput,
+    MergeIdentitiesInput, MergeMomentsInput, ModelStatusDto, MomentDto, MomentEditDto,
+    MomentHandleDto, MomentListDto, MomentPeakDto, MomentStatusDto, MomentsInput,
+    MoveBoundaryInput, PeopleStatusDto, PreferInput, PrefetchInput, PreviewPayload,
+    RankedByEmotionDto, RankedFrameDto, RankedInput, ReactionLinkDto, RecipeDto,
+    RenameIdentityInput, RenderCapsDto, RenderDto, RenderImageInput, SaveAiSetupInput,
+    ScanFacesDto, ScanFacesInput, SceneDto, SceneProfileDto, ScoreEmotionInput, SetAiKeyInput,
+    SetCacheBudgetInput, SetChapterInput, SetCloudBudgetInput, SetCloudPrivacyInput,
+    SetExecutionProviderInput, SetIdentityImportanceInput, SetIdentityRoleInput, SetKeepHintInput,
+    SetParamDto, SetParamInput, SetPeakInput, SimilarResultDto, SnapshotInput, SplitChapterInput,
+    SplitIdentityInput, SplitMomentInput, StoryOutlineDto, StoryStatusDto, WarmupReportDto,
+    WithinMomentInput,
 };
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
@@ -150,6 +194,11 @@ fn start_ingest(state: State<'_, AppState>, input: StartIngestInput) -> IpcResul
 #[tauri::command]
 fn cancel_job(state: State<'_, AppState>, job_id: String) -> IpcResult<bool> {
     aura_app::cancel_job(&state, &job_id)
+}
+
+#[tauri::command]
+fn ingest_progress(state: State<'_, AppState>, job_id: String) -> IpcResult<IngestProgressDto> {
+    aura_app::ingest_progress(&state, &job_id)
 }
 
 #[tauri::command]
@@ -2333,9 +2382,11 @@ async fn qc_queue_grouped(
     limit: usize,
 ) -> IpcResult<Vec<QcGroupDto>> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::qc_queue_grouped(&app, &project_id, limit))
-        .await
-        .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::qc_queue_grouped(&app, &project_id, limit)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -2353,11 +2404,9 @@ async fn qc_rounds(
     ticket_id: String,
 ) -> IpcResult<Vec<QcRoundDto>> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        aura_app::qc_rounds(&app, &project_id, &ticket_id)
-    })
-    .await
-    .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_rounds(&app, &project_id, &ticket_id))
+        .await
+        .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -2633,10 +2682,7 @@ async fn curate_project(
 }
 
 #[tauri::command]
-async fn curate_bw(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> IpcResult<Vec<CurateBwDto>> {
+async fn curate_bw(state: State<'_, AppState>, project_id: String) -> IpcResult<Vec<CurateBwDto>> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::curate_bw(&app, &project_id))
         .await
@@ -2727,8 +2773,6 @@ async fn curate_export(
         .await
         .map_err(|_| background_request_failed())?
 }
-
-
 
 // ---------------------------------------------------------------------------
 // PHASE-30. Delivery, learning and diagnostics.
@@ -2884,10 +2928,7 @@ async fn learn_compare(
 }
 
 #[tauri::command]
-async fn learn_adopt(
-    state: State<'_, AppState>,
-    profile_id: String,
-) -> IpcResult<LearnStatusDto> {
+async fn learn_adopt(state: State<'_, AppState>, profile_id: String) -> IpcResult<LearnStatusDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::learn_adopt(&app, &profile_id))
         .await
@@ -2903,10 +2944,7 @@ async fn learn_roll_back(state: State<'_, AppState>, profile_id: String) -> IpcR
 }
 
 #[tauri::command]
-async fn learn_consent(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> IpcResult<ConsentDto> {
+async fn learn_consent(state: State<'_, AppState>, project_id: String) -> IpcResult<ConsentDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::learn_consent(&app, &project_id))
         .await
@@ -2914,10 +2952,7 @@ async fn learn_consent(
 }
 
 #[tauri::command]
-async fn learn_set_consent(
-    state: State<'_, AppState>,
-    input: ConsentDto,
-) -> IpcResult<ConsentDto> {
+async fn learn_set_consent(state: State<'_, AppState>, input: ConsentDto) -> IpcResult<ConsentDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::learn_set_consent(&app, input))
         .await
@@ -2928,6 +2963,17 @@ async fn learn_set_consent(
 async fn diagnostics_report(state: State<'_, AppState>) -> IpcResult<DiagnosticsDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::diagnostics_report(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_auto_edit(
+    state: State<'_, AppState>,
+    input: PhotoAutoEditInput,
+) -> IpcResult<PhotoAutoEditDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_auto_edit(&app, &input))
         .await
         .map_err(|_| background_request_failed())?
 }
@@ -2974,10 +3020,12 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            photo_auto_edit,
             create_project,
             list_projects,
             start_ingest,
             cancel_job,
+            ingest_progress,
             list_images,
             set_camera_label,
             list_problems,

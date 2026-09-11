@@ -16,3 +16,4 @@ graphify-out/
 *.aura-license
 __pycache__/
 *.pyc
+/.work-checks/

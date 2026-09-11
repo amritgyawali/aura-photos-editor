@@ -9,6 +9,7 @@ import type {
   ManualRemoveDto,
 } from '../../ipc/types';
 import { BeforeAfter } from './BeforeAfter';
+import { rgbDataUrl } from '../develop/rgbImage';
 import { ManualRemove } from './ManualRemove';
 import { ProposalQueue } from './ProposalQueue';
 
@@ -137,7 +138,7 @@ export function CleanupPanel({ projectId, photoId, onError }: CleanupPanelProps)
           level: 'proxy2048',
           purpose: 'interactive',
         });
-        setBeforeSrc(`data:image/png;base64,${render.rgbBase64}`);
+        setBeforeSrc(rgbDataUrl(render));
       } catch (error) {
         fail(error);
       }

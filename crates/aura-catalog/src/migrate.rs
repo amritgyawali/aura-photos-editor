@@ -270,8 +270,10 @@ fn reconcile_legacy_phase_numbering(
 /// photographer's point of view it is one, and the recovery - stop, keep the
 /// catalog as it is, ask for help - is identical.
 fn missing_migration(version: i64) -> aura_core::AuraError {
-    migration_failed(version, &rusqlite::Error::InvalidQuery)
-        .with_context("detail", format!("migration {version} is not registered in this build"))
+    migration_failed(version, &rusqlite::Error::InvalidQuery).with_context(
+        "detail",
+        format!("migration {version} is not registered in this build"),
+    )
 }
 
 /// The SQL of one registered migration, by version.

@@ -113,8 +113,8 @@ pub use colour_commands::{
     select_colour_variant, set_colour_override,
 };
 pub use commands::{
-    cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
-    start_ingest,
+    cancel_job, create_project, ingest_progress, list_images, list_problems, list_projects,
+    set_camera_label, start_ingest,
 };
 pub use composition_commands::{
     analyse_composition, composition_status, dismiss_composition_flag, flagged_composition,
@@ -205,6 +205,8 @@ pub use retouch_commands::{
     retouch_status, set_protection, set_retouch,
 };
 pub use state::AppState;
+mod auto_edit_commands;
+pub use auto_edit_commands::photo_auto_edit;
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
     segment_story, set_chapter, split_chapter, story_outline, story_status,

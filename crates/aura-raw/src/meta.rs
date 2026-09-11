@@ -300,6 +300,20 @@ fn default_meta(format: RawFormat) -> RawMeta {
 /// `AURA-RAW-2002` when it is recognised but inconsistent.
 pub fn read(bytes: &[u8], path: &std::path::Path) -> AuraResult<RawMeta> {
     match sniff(bytes) {
+        RawFormat::Png => {
+            let decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+            let reader = decoder
+                .read_info()
+                .map_err(|e| aura_core::errors::raw::corrupt(format!("PNG header: {e}")))?;
+            let mut meta = default_meta(RawFormat::Png);
+            meta.previews.push(PreviewRef {
+                offset: 0,
+                len: bytes.len(),
+                width: reader.info().width,
+                height: reader.info().height,
+            });
+            Ok(meta)
+        }
         RawFormat::Jpeg => read_jpeg(bytes),
         RawFormat::Raf => read_raf(bytes),
         RawFormat::Cr3 => read_cr3(bytes),

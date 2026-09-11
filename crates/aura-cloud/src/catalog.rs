@@ -178,10 +178,7 @@ impl ProviderSpec {
                 (
                     tier.tier,
                     ModelAlias {
-                        model: chosen
-                            .for_tier(tier.tier)
-                            .unwrap_or(tier.model)
-                            .to_string(),
+                        model: chosen.for_tier(tier.tier).unwrap_or(tier.model).to_string(),
                         input_per_mtok_usd: tier.input_per_mtok_usd,
                         output_per_mtok_usd: tier.output_per_mtok_usd,
                         image_tokens_per_mpixel: self.image_tokens_per_mpixel,
@@ -345,7 +342,8 @@ const fn tier(
 const COMPAT: ProviderSpec = ProviderSpec {
     kind: ProviderKind::Compat,
     label: "My own server (OpenAI-compatible)",
-    blurb: "Any endpoint that speaks OpenAI's chat format: vLLM, llama.cpp, LiteLLM, a studio gateway.",
+    blurb:
+        "Any endpoint that speaks OpenAI's chat format: vLLM, llama.cpp, LiteLLM, a studio gateway.",
     wire: Wire::OpenAiPlain,
     endpoint: "http://127.0.0.1:8000",
     endpoint_editable: true,

@@ -243,7 +243,7 @@ impl Provider for OpenAiProvider {
         })?;
 
         Ok(CloudResponse {
-            text: choice.message.content.clone().unwrap_or_default(),
+            text: choice.message.answer(),
             tokens_in: parsed.usage.prompt_tokens,
             tokens_out: parsed.usage.completion_tokens,
             model: parsed.model,
@@ -331,6 +331,31 @@ struct Choice {
 struct ReplyMessage {
     #[serde(default)]
     content: Option<String>,
+    // Reasoning models - GLM, DeepSeek-R1, OpenAI's o-series - answer in two
+    // fields: the thinking in `reasoning_content` and the answer in `content`.
+    // Reading only `content` turns a reasoning model into an empty answer
+    // whenever the token budget runs out mid-thought, which reads downstream as
+    // "no JSON in the reply" and burns the repair attempt on a response that
+    // was never there. The chain in `validate.rs` extracts JSON from fenced or
+    // preamble-wrapped text, so an answer that spilled into the reasoning field
+    // is still recoverable here.
+    #[serde(default)]
+    reasoning_content: Option<String>,
+}
+
+impl ReplyMessage {
+    /// The text to validate, preferring the answer over the thinking.
+    fn answer(&self) -> String {
+        let content = self.content.as_deref().unwrap_or_default().trim();
+        if !content.is_empty() {
+            return content.to_string();
+        }
+        self.reasoning_content
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]

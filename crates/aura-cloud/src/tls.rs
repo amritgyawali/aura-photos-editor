@@ -61,7 +61,9 @@ struct TlsStream {
 
 impl fmt::Debug for TlsStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TlsStream").field("host", &self.host).finish()
+        f.debug_struct("TlsStream")
+            .field("host", &self.host)
+            .finish()
     }
 }
 
@@ -111,11 +113,12 @@ fn client_config() -> Option<Arc<ClientConfig>> {
             let roots = RootCertStore {
                 roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
             };
-            let built = ClientConfig::builder_with_provider(Arc::new(rustls_rustcrypto::provider()))
-                .with_safe_default_protocol_versions()
-                .ok()?
-                .with_root_certificates(roots)
-                .with_no_client_auth();
+            let built =
+                ClientConfig::builder_with_provider(Arc::new(rustls_rustcrypto::provider()))
+                    .with_safe_default_protocol_versions()
+                    .ok()?
+                    .with_root_certificates(roots)
+                    .with_no_client_auth();
             Some(Arc::new(built))
         })
         .clone()
@@ -134,8 +137,12 @@ impl Connector for TlsConnector {
         // valid DNS name or IP address cannot be verified against a certificate,
         // and connecting first would mean sending bytes to something we have
         // already decided we cannot authenticate.
-        let server_name = ServerName::try_from(host.to_string())
-            .map_err(|_| unreachable(host, format!("{host} is not a name a certificate can be checked against")))?;
+        let server_name = ServerName::try_from(host.to_string()).map_err(|_| {
+            unreachable(
+                host,
+                format!("{host} is not a name a certificate can be checked against"),
+            )
+        })?;
 
         // Resolved explicitly for the same reason [`crate::http::TcpConnector`]
         // does it: the string form of `connect` has no deadline.
@@ -155,7 +162,10 @@ impl Connector for TlsConnector {
             .map_err(|err| unreachable(host, format!("could not set a deadline: {err}")))?;
 
         let session = ClientConnection::new(config, server_name).map_err(|err| {
-            unreachable(host, format!("could not start a TLS session with {host}: {err}"))
+            unreachable(
+                host,
+                format!("could not start a TLS session with {host}: {err}"),
+            )
         })?;
 
         Ok(Box::new(TlsStream {

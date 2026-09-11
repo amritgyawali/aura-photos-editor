@@ -689,7 +689,7 @@ impl ToneStore {
                 .query_row(
                     "SELECT COUNT(*) FROM (
                          SELECT r.segment_id FROM segment_reference_frames r
-                           JOIN segments s ON s.segment_id = r.segment_id
+                           JOIN segments s ON s.id = r.segment_id
                           WHERE s.project_id = ?1
                           GROUP BY r.segment_id
                          HAVING COUNT(*) >= ?2)",
@@ -873,8 +873,8 @@ impl ToneStore {
         self.catalog.read(move |conn| {
             let mut statement = conn
                 .prepare(
-                    "SELECT segment_id FROM segments WHERE project_id = ?1
-                      ORDER BY start_ts, segment_id",
+                    "SELECT id FROM segments WHERE project_id = ?1
+                      ORDER BY start_ts, id",
                 )
                 .map_err(|e| statement_failed("could not list the segments", &e))?;
             let mut out = Vec::new();
@@ -906,7 +906,7 @@ impl ToneStore {
                 .prepare(
                     "SELECT p.photo_id
                        FROM photo p
-                       JOIN segments s ON s.segment_id = ?1
+                       JOIN segments s ON s.id = ?1
                       WHERE p.project_id = s.project_id
                         AND p.timeline_time >= s.start_ts
                         AND p.timeline_time <= s.end_ts

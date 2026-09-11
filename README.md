@@ -55,6 +55,10 @@ tests/fixtures/            generated reference weddings (not committed)
 
 ## Getting started
 
+For the desktop import → automatic edit → export workflow, see
+[Photo editing quickstart](docs/photo-editing-quickstart.md). Cloud vision editing
+uses the configured provider; local enhancement works without an API key.
+
 ```bash
 rustup show                       # installs the pinned toolchain from rust-toolchain.toml
 just setup                        # git hooks + npm install
