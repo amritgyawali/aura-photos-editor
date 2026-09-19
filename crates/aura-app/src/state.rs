@@ -2650,6 +2650,30 @@ impl AppState {
         Arc::new(Style::new(self.style_store()))
     }
 
+    // -----------------------------------------------------------------
+    // PHASE-31 - matching a look somebody else published
+    // -----------------------------------------------------------------
+
+    /// Migration 31's tables.
+    #[must_use]
+    pub fn look_store(&self) -> Arc<aura_look::store::LookStore> {
+        Arc::new(aura_look::store::LookStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `LookService` for this catalog. PHASE-31.
+    ///
+    /// Separate from [`AppState::style`] and deliberately so: phase 17's profile is fitted from
+    /// a photographer's own delivered pairs and this one is measured off somebody else's
+    /// finished JPEGs, and a caller that could not tell them apart would report the second with
+    /// the confidence of the first.
+    #[must_use]
+    pub fn look(&self) -> Arc<aura_look::Look> {
+        Arc::new(aura_look::Look::new(self.look_store()))
+    }
+
     /// The signing identity this installation exports profiles with.
     ///
     /// Derived from the catalog's own path rather than stored, which is a **deliberate

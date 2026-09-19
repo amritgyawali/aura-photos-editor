@@ -2,6 +2,80 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Phase 31 - Matching a look somebody else published
+
+The thing photographers actually ask for: point at an account whose photographs you want yours to
+look like, and get there.
+
+**A look is measured from appearance, never recovered as an edit.** Phase 17 is handed a RAW and the
+JPEG somebody made from it, so it can ask what they *did*. Here there is only the JPEG - nobody
+knows what the reference photographer started with, what camera made it, or how much of what is on
+the screen is the edit and how much is the light that afternoon. So AURA measures eleven
+distribution statistics over each reference photograph - seven tone landmarks, three zone tints,
+eight hue bands, two chroma quantiles, a rendered white point - takes their robust middle over the
+whole page, and compares that against the same measurements of **your own photographs as phases 15
+and 16 have already decided to render them**. The difference is the look. That makes it a residual
+by construction, so a reference your gallery already matches asks for nothing, and there is no state
+of this feature in which switching it on makes a photograph worse than leaving it off.
+
+**The scale constants are authored and the answer is measured.** The first guess comes from a table
+of mappings nobody fitted - there is no data in this repository to fit them on. What makes that
+acceptable is that the guess is then rendered through the *real* renderer, measured against the
+reference, and walked parameter by parameter until the distance stops falling. The constants decide
+where the search starts; what ships is a measurement. A project with no analysed frames gets the
+guess, labelled as one, and cannot apply it: the database refuses a selection for a look nobody has
+measured.
+
+**AURA does not download the photographs, and says so with the alternative in the same breath.** Two
+separate facts point the same way. This repository fails the build on an outbound socket anywhere
+outside the cloud gateway, and that transport has no TLS - so there is no route from this process to
+an `https://` host at all, which is what lets AURA claim your photographs never leave your machine.
+And reading a page's media in bulk is something Instagram grants to the account that owns the page;
+the unofficial routes are against its terms and can get an account restricted. The route is
+**offered, disabled, and explained** rather than omitted, because a photographer who came here to
+paste a link will otherwise hunt for a setting they think they missed. The link is still parsed,
+validated and stored, so every report says which page the look is from - and the panel never renders
+a tick, because nothing was resolved.
+
+**Nothing is learned about skin, and the schema cannot express it.** Fifth application of the rule
+phase 15 wrote, and the hardest version to see: finding skin in a stranger's photograph means
+declaring a hue window and calling what falls inside it skin, which is the fixed skin constant this
+product has refused four times wearing a measurement's clothes. There is no skin field on the
+profile, no skin column in migration 31, and zero written into every band's hue - because a rotation
+solved from a whole-frame statistic is applied to every pixel in that band, and most of a face at
+every skin tone is in the orange band. What protects skin instead is phase 16's guard, which grades
+your own frame's own skin through the renderer after the look is applied and withdraws the colour
+half if it moved.
+
+**A look is about light, not about subject, and the report says so on every look.** A reference
+photograph does not say whether it is a ceremony or a reception, so there is one axis - ten kinds of
+light - and no code path that could invent a second. `SceneAxisNotLearned`, `SkinNotLearned` and
+`HueRotationWithheld` are on every look that worked, because a note that only appeared when
+something went wrong would let a photographer assume the opposite every other time.
+
+**The bounds are tighter than phase 17's and the asymmetry is the point.** Half a stop against two
+thirds, 600 kelvin against 800. Teaching AURA from your own archive is telling it about decisions
+you made; pointing at a page is expressing a preference about photographs somebody else made
+somewhere you have never been, and a page that reads bright may be bright because that photographer
+shoots in Greece. The strength slider goes down and never up, in three places - the command, the
+override and a database CHECK.
+
+**The report leads with how much of the gap closed**, not with whether a threshold was met. Phase
+27's rule in the feature that would most easily have shipped the other one: a look that closed
+ninety per cent of a large difference worked, and one that landed inside the ceiling because there
+was nothing to close is not a result.
+
+New crate `aura-look`; migration 31 with six tables, two views and three triggers; three error codes
+with runbooks; ten IPC commands; a panel mounted first in the sidebar; `aura-cli verify --phase 31`
+as the gate. ADR-0063 and ADR-0064 record the decisions, `docs/match-a-look.md` says it in the
+product's own words.
+
+**What is not proved:** nobody has shown a photographer a matched gallery beside the page it was
+matched to. Every number was measured against synthetic references this repository generated,
+carrying looks it applied itself. The arithmetic is real and tested; whether the result is what
+somebody meant when they pointed at an account is unmeasured, and it is the first condition that
+should close.
+
 ## Phase 30 - Delivery: getting it out, learning from it, and shipping the thing
 
 The last phase of the plan. Export, backup, client galleries, the Lightroom and Photoshop hand-off,

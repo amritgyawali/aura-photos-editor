@@ -4993,3 +4993,242 @@ export type DiagnosticsDto = {
   providers: ProviderDto[];
   recentErrors: IpcError[];
 };
+
+// ---------------------------------------------------------------------------
+// PHASE-31. Matching a look somebody else published.
+// ---------------------------------------------------------------------------
+
+/**
+ * What the match-a-look card on the first screen shows.
+ *
+ * `networkTransportAvailable` is **false** on this build and it is on the wire rather than
+ * hard-coded in the panel: the card reads it and offers the folder picker as the route that
+ * works, instead of a fetch button that always fails. See `docs/match-a-look.md` for the two
+ * separate reasons - one about this repository, one about the platform.
+ */
+export interface LookStatusDto {
+  /** Looks in the catalog. */
+  profiles: number;
+  /** The look this project uses, when one is selected. */
+  selected: string | null;
+  /** What it is called. */
+  selectedName: string;
+  /** Which page it came from, rendered for a person. */
+  selectedOrigin: string;
+  /** How strongly it is applied, `0..1`. Never above one. */
+  strength: number;
+  /** How many of this project's photographs a look can be applied to. */
+  appliable: number;
+  /** How many photographs the project holds. */
+  photographs: number;
+  /**
+   * What fraction carries a phase 15 and 16 decision, `0..1`.
+   *
+   * The denominator, beside the numerator. A look over 40 % of a wedding is a look over 40 % of
+   * a wedding, and a card that showed only the ratio would let somebody read it as quality.
+   */
+  baselineCoverage: number;
+  /** False on this build. */
+  networkTransportAvailable: boolean;
+}
+
+/** One reason, with its number and what it was held to. */
+export interface LookReasonDto {
+  /** The stable slug. */
+  code: string;
+  /** The sentence, rendered from the code rather than stored. */
+  sentence: string;
+  /** The measurement, when there is one. */
+  value: number | null;
+  /** What it was compared against, when there is one. */
+  threshold: number | null;
+  /** True when a photographer can do something about it. */
+  actionable: boolean;
+}
+
+/** One stored look, as the panel lists it. */
+export interface LookProfileDto {
+  /** The look. */
+  id: string;
+  /** What the photographer calls it. */
+  name: string;
+  /** Which page or body of work it came from. */
+  origin: string;
+  /** `instagram`, `web` or `local`. */
+  originKind: string;
+  /** `folder`, `instagram_export` or `public_url`. */
+  source: string;
+  /** How many reference photographs it was measured from. */
+  references: number;
+  /** How strong it is, `0..1`. */
+  strength: number;
+  /** How many lighting buckets it answers for. */
+  buckets: number;
+  /** When it was measured, in milliseconds since the Unix epoch. */
+  measuredAt: number;
+  /** The one sentence. */
+  summary: string;
+  /** Why, strongest doubt first. */
+  reasons: LookReasonDto[];
+  /** True when the renderer has moved since it was measured, so it is not applied. */
+  stale: boolean;
+}
+
+/** One kind of light, as the matrix renders it. */
+export interface LookBucketDto {
+  /** The lighting slug. */
+  lighting: string;
+  /** What the matrix calls it. */
+  title: string;
+  /** How many reference photographs are in it. */
+  samples: number;
+  /** How sure it is, `0..1`. */
+  confidence: number;
+  /** True when it is at or below the weak threshold. */
+  weak: boolean;
+  /** True when it is applied at all. */
+  applied: boolean;
+  /** Stops. */
+  exposure: number;
+  /** Kelvin. */
+  temperatureK: number;
+  /** Recipe units. */
+  tint: number;
+  /** Recipe units. */
+  contrast: number;
+  /** Recipe units. */
+  vibrance: number;
+  /** Recipe units. */
+  saturation: number;
+  /**
+   * The measured distance this bucket reached.
+   *
+   * `null` rather than zero when nothing was measured: a zero in a dE00 field is rendered by
+   * somebody, once, as a perfect match.
+   */
+  afterDe00: number | null;
+}
+
+/** One bucket's measured movement. */
+export interface LookBucketResidualDto {
+  /** The lighting slug. */
+  lighting: string;
+  /** What the panel calls it. */
+  title: string;
+  /** Before, in dE00. */
+  beforeDe00: number;
+  /** After, in dE00. */
+  afterDe00: number;
+  /** What fraction of the gap closed, `0..1`. */
+  realisedShare: number;
+  /** How many frames. */
+  frames: number;
+}
+
+/** What matching a look did to a project, measured through the real renderer. */
+export interface LookMatchDto {
+  /** Which look. */
+  profile: string;
+  /** How far the gallery sat from the reference before, in dE00. */
+  beforeDe00: number;
+  /** How far it sits after. */
+  afterDe00: number;
+  /** What fraction of the gap was closed, `0..1`. What the panel leads with. */
+  realisedShare: number;
+  /** True when the whole match reached the ceiling. */
+  reached: boolean;
+  /** How many frames it was measured over. */
+  frames: number;
+  /** How many carried a hand edit, which was preserved. */
+  userEdited: number;
+  /** One row per lighting bucket that had frames on both sides. */
+  buckets: LookBucketResidualDto[];
+  /** Why, strongest doubt first. */
+  reasons: LookReasonDto[];
+}
+
+/**
+ * What a photographer typed into the address box, read back as they type.
+ *
+ * It resolves nothing and contacts nothing, so the box shows the handle it understood and
+ * never a tick: a handle that does not exist parses exactly as well as one that does.
+ */
+export interface ReferenceOriginDto {
+  /** `instagram`, `web` or `local`. */
+  kind: string;
+  /** The handle, the address or the label. */
+  title: string;
+  /** The catalog key. */
+  key: string;
+  /** True when the text parsed at all. */
+  understood: boolean;
+  /** Why not, when it did not. */
+  refusal: string | null;
+}
+
+/** Where to measure a look from. */
+export interface MeasureLookInput {
+  /** The project the look is measured against and stored for. */
+  projectId: string;
+  /** What the photographer typed into the address box. May be empty. */
+  address: string;
+  /** `folder`, `instagram_export` or `public_url`. */
+  source: string;
+  /** The folder of reference photographs. */
+  folder?: string | null;
+  /** What to call the look. Empty means the origin's own title. */
+  name: string;
+  /** How many of the project's own frames to measure the baseline over. */
+  baselineFrames?: number | null;
+}
+
+/** What a measuring pass did. */
+export interface MeasureLookDto {
+  /** The look that came out, when one did. */
+  profile: string | null;
+  /** Reference photographs the walk found. */
+  found: number;
+  /** Reference photographs that read. */
+  measured: number;
+  /** Reference photographs that were refused. */
+  refused: number;
+  /** The photographer's own frames the baseline was measured over. */
+  baselineFrames: number;
+  /** Lighting buckets populated. */
+  buckets: number;
+  /** What the match measured, when there were frames to measure it on. */
+  matched: LookMatchDto | null;
+  /** The one sentence. */
+  summary: string;
+  /** Why, strongest doubt first. */
+  reasons: LookReasonDto[];
+}
+
+/** Point a project at a look, or at none. */
+export interface SelectLookInput {
+  /** The project. */
+  projectId: string;
+  /** The look, or `null` to go back to the baseline. */
+  profileId: string | null;
+}
+
+/**
+ * Apply a look at less than its measured strength.
+ *
+ * There is no field here that could ask for more than the reference, and there is not going to
+ * be one: `fraction` is clamped to `0..=1` in three places.
+ */
+export interface SetLookStrengthInput {
+  /** The project. */
+  projectId: string;
+  /** The fraction, `0..=1`. */
+  fraction: number;
+}
+
+/** Rename or forget a look. */
+export interface LookProfileInput {
+  /** The look. */
+  profileId: string;
+  /** What to call it, when renaming. */
+  name?: string | null;
+}

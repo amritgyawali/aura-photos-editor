@@ -46,6 +46,7 @@ aura-geometry      = { path = "../aura-geometry" }
 aura-generative    = { path = "../aura-generative" }
 aura-recipe        = { path = "../aura-recipe" }
 aura-render        = { path = "../aura-render" }
+aura-look          = { path = "../aura-look" }
 aura-style         = { path = "../aura-style" }
 # PHASE-27. The quality-control agent. `aura-qc` depends on none of the thirteen deciding
 # crates; `AppState::qc_frame` is the adapter that reads them on its behalf, and `qc_commands`

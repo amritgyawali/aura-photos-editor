@@ -152,6 +152,10 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // PHASE-30. The last migration. Every migration has been a frozen contract since phase 01;
     // phase 16 found 15 missing and phase 28 found 28 missing, both the same way.
     "crates/aura-catalog/migrations/0030_delivery.sql",
+    // PHASE-31. The migration. `docs/plan/CLAUDE.md` has listed every migration as a frozen
+    // contract since phase 01, and phases 16 and 28 each found one missing from this list after
+    // it had shipped - so it goes in with the phase rather than after it.
+    "crates/aura-catalog/migrations/0031_look.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];

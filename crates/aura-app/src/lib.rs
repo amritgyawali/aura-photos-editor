@@ -76,6 +76,7 @@ pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
 pub mod local_commands;
+pub mod look_commands;
 pub mod mask_commands;
 pub mod micro_commands;
 pub mod moment_commands;
@@ -206,6 +207,10 @@ pub use state::AppState;
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
     segment_story, set_chapter, split_chapter, story_outline, story_status,
+};
+pub use look_commands::{
+    forget_look, list_looks, look_buckets, look_match_report, look_status, measure_look,
+    parse_reference, rename_look, select_look, set_look_strength,
 };
 pub use style_commands::{
     adopt_profile, compare_profiles, export_profile, import_profile, list_profiles, profile_pairs,

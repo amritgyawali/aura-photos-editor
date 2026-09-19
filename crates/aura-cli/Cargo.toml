@@ -39,6 +39,7 @@ aura-curate   = { path = "../aura-curate" }
 # PHASE-30. The gate drives the real writers, the real resume state machine and the real
 # aggregation over a real catalog, which is the whole point of a mechanical gate.
 aura-export   = { path = "../aura-export" }
+aura-look     = { path = "../aura-look" }
 aura-delivery = { path = "../aura-delivery" }
 aura-learn    = { path = "../aura-learn" }
 aura-cull          = { path = "../aura-cull" }

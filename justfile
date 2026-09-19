@@ -445,6 +445,13 @@ phase-29-verify:
 phase-30-verify:
     cargo run --release --package aura-cli -- verify --phase 30 --work target/phase30-verify
 
+# The phase 31 mechanical gate: migration 31 and its objects, the schema scanned for a stored
+# sentence and for a skin target, a real folder of reference JPEGs walked and measured, a look
+# solved in the right direction and inside every bound, the two triggers with a control each, and
+# the six conditions it does NOT close printed on every run.
+phase-31-verify:
+    cargo run --release --package aura-cli -- verify --phase 31 --work target/phase31-verify
+
 # The phase 29 gates from the catalog side. Reads a real project read-only and reports the three
 # numbers no fixture can supply: how much of AURA's portfolio a photographer kept, how much of the
 # album they moved, and how many of the offered monochrome conversions they took. A project nobody
