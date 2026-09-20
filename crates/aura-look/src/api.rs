@@ -309,9 +309,12 @@ impl MeasurePass {
     ///
     /// [`aura_core::errors::ml::ML_LOOK_REFERENCE_REFUSED`] when the reference will not resolve,
     /// or `AURA-DB-3006` when the catalog refuses the write.
-    pub fn run<F>(&self, request: &MeasureRequest<'_>, mut cancelled: F) -> AuraResult<MeasureReport>
+    /// `cancelled` is `Fn` rather than `FnMut` deliberately: it is called from the pass *and*
+    /// borrowed by the solver's refinement, which is the half that actually takes minutes, and
+    /// an `FnMut` cannot be handed to both.
+    pub fn run<F>(&self, request: &MeasureRequest<'_>, cancelled: F) -> AuraResult<MeasureReport>
     where
-        F: FnMut() -> bool,
+        F: Fn() -> bool,
     {
         let MeasureRequest {
             address,
@@ -363,8 +366,23 @@ impl MeasurePass {
         report.baseline_frames = baseline_readings.len();
 
         // --- 4 and 5. solve, then refine --------------------------------
-        let mut look = self.assemble(&reference, &readings, &baseline_readings, frames, renderer);
+        let mut look = self.assemble(
+            &reference,
+            &readings,
+            &baseline_readings,
+            frames,
+            renderer,
+            &cancelled,
+        );
         report.buckets = look.buckets.len();
+
+        // Checked again after the solve, which is the long half. A pass stopped here has
+        // measured a reference and solved a look and stores neither, which is the point: a
+        // cancelled measurement leaves the catalog exactly as it was.
+        if cancelled() {
+            report.cancelled = true;
+            return Ok(report);
+        }
 
         // --- 6. verify ---------------------------------------------------
         let matched = if frames.is_empty() {
@@ -373,14 +391,16 @@ impl MeasurePass {
             let residuals = verify::measure(&look, renderer, frames);
             let user_edited = frames.iter().filter(|frame| frame.user_edited).count();
             let user_edited = u32::try_from(user_edited).unwrap_or(0);
+            let applied = u32::try_from(frames.len()).unwrap_or(u32::MAX);
             Some(LookMatchReport {
                 profile: look.id,
                 project,
                 before_de00: verify::weighted(&residuals, |row| row.before_de00),
                 after_de00: verify::weighted(&residuals, |row| row.after_de00),
-                frames: u32::try_from(frames.len()).unwrap_or(u32::MAX),
+                frames: applied,
+                measured_frames: verify::measured_frames(&residuals),
                 user_edited,
-                reasons: verify::reasons_for(&residuals, user_edited),
+                reasons: verify::reasons_for(&residuals, applied, user_edited),
                 buckets: residuals,
             })
         };
@@ -408,6 +428,7 @@ impl MeasurePass {
         baseline_readings: &[ReferenceReading],
         frames: &[OwnFrame],
         renderer: &Renderer,
+        cancelled: &dyn Fn() -> bool,
     ) -> LookProfile {
         let engine = aura_recipe::contract::recipe::ENGINE;
         let mut look = LookProfile::empty(ProfileId::new(), self.name.clone(), engine);
@@ -423,7 +444,14 @@ impl MeasurePass {
         let mut reasons = standing_reasons(reference, readings.len(), baseline_readings.len());
 
         // The global lean, refined against every frame the photographer has.
-        look.global = Self::solve_one(&reference_global, &baseline_global, frames, renderer, None);
+        look.global = Self::solve_one(
+            &reference_global,
+            &baseline_global,
+            frames,
+            renderer,
+            None,
+            cancelled,
+        );
 
         // One bucket per light, each shrunk toward the global lean.
         let by_light = aggregate::by_lighting(readings);
@@ -451,13 +479,18 @@ impl MeasurePass {
                 frames,
                 renderer,
                 Some(&frames_here),
+                cancelled,
             );
             // The bucket contributes on top of the global lean, so what is stored is the
             // difference between the two rather than the absolute answer. `LookProfile::resolve`
             // adds them back, and storing the absolute would make a bucket that happens to match
             // the global apply it twice.
             let contribution = difference(&solved, &look.global);
-            let shrunk = solve::shrink(&contribution, &StyleDelta::neutral(), reference_bucket.samples);
+            let shrunk = solve::shrink(
+                &contribution,
+                &StyleDelta::neutral(),
+                reference_bucket.samples,
+            );
 
             let mut bucket_reasons = Vec::new();
             if reference_bucket.is_weak() {
@@ -519,6 +552,7 @@ impl MeasurePass {
         all_frames: &[OwnFrame],
         renderer: &Renderer,
         subset: Option<&[&OwnFrame]>,
+        cancelled: &dyn Fn() -> bool,
     ) -> StyleDelta {
         let initial = solve::initial(reference, baseline);
         // Nothing to render against means nothing to refine with, and the authored mapping's
@@ -530,11 +564,11 @@ impl MeasurePass {
             Some([]) => initial,
             Some(frames) => {
                 let probe = FrameProbe::over(renderer, frames);
-                solve::refine(&initial, reference, &probe).0
+                solve::refine_until(&initial, reference, &probe, cancelled).0
             }
             None => {
                 let probe = FrameProbe::new(renderer, all_frames);
-                solve::refine(&initial, reference, &probe).0
+                solve::refine_until(&initial, reference, &probe, cancelled).0
             }
         }
     }

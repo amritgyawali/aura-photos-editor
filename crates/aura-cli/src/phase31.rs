@@ -166,7 +166,11 @@ pub fn verify(args: &[String]) -> ExitCode {
     // the order matters: a refusal that arrived after a disk scan would be a refusal that had
     // already done the work.
     // ---------------------------------------------------------------------------------------
-    match source::resolve("https://instagram.com/somebody", MediaSource::PublicUrl, None) {
+    match source::resolve(
+        "https://instagram.com/somebody",
+        MediaSource::PublicUrl,
+        None,
+    ) {
         Ok(_) => {
             eprintln!("fetch refusal: this build claimed it can fetch a page");
             failures += 1;
@@ -385,6 +389,7 @@ pub fn verify(args: &[String]) -> ExitCode {
         before_de00: 6.0,
         after_de00: 2.2,
         frames: 30,
+        measured_frames: 30,
         user_edited: 0,
         reasons: Vec::new(),
     };

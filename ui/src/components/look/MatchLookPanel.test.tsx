@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LookMatchDto, LookStatusDto, ReferenceOriginDto } from '../../ipc/types';
+import type {
+  LookBucketDto,
+  LookMatchDto,
+  LookStatusDto,
+  ReferenceOriginDto,
+} from '../../ipc/types';
 import {
   FETCH_UNAVAILABLE,
   SOURCE_CHOICES,
+  bucketSentence,
   coverageSentence,
   matchSentence,
   originSentence,
@@ -46,9 +52,30 @@ function matched(overrides: Partial<LookMatchDto> = {}): LookMatchDto {
     realisedShare: 0.667,
     reached: true,
     frames: 60,
+    measuredFrames: 60,
+    measuredCoverage: 1,
     userEdited: 0,
     buckets: [],
     reasons: [],
+    ...overrides,
+  };
+}
+
+function bucket(overrides: Partial<LookBucketDto> = {}): LookBucketDto {
+  return {
+    lighting: 'daylight',
+    title: 'Daylight',
+    samples: 18,
+    confidence: 0.8,
+    weak: false,
+    applied: true,
+    exposure: 0.22,
+    temperatureK: 160,
+    tint: 0,
+    contrast: 4,
+    vibrance: -3,
+    saturation: 0,
+    afterDe00: 2.1,
     ...overrides,
   };
 }
@@ -143,6 +170,50 @@ describe('MatchLookPanel', () => {
   it('says a look has not been measured rather than showing a zero', () => {
     expect(matchSentence(null)).toContain('not measured');
     expect(matchSentence(matched({ frames: 0 }))).toContain('no analysed photographs');
+  });
+
+  // The defect this pair of tests exists for: the distance is computed over the buckets that
+  // exist, and a bucket exists only where both sides had frames in that light. Reporting only
+  // `frames` would describe twelve photographs as sixty.
+  it('says both denominators when the figure covers only part of the gallery', () => {
+    const sentence = matchSentence(matched({ frames: 60, measuredFrames: 12 }));
+    expect(sentence).toContain('12');
+    expect(sentence).toContain('60');
+    expect(sentence).toContain('applies to');
+  });
+
+  it('says all of them when the figure covers the whole gallery', () => {
+    const sentence = matchSentence(matched({ frames: 60, measuredFrames: 60 }));
+    expect(sentence).toContain('all 60');
+  });
+
+  it('refuses to report a distance when nothing was measured', () => {
+    // `afterDe00` on an empty set of buckets is zero, which is the most flattering possible way
+    // to report having measured nothing.
+    const sentence = matchSentence(
+      matched({ frames: 60, measuredFrames: 0, beforeDe00: 0, afterDe00: 0 }),
+    );
+    expect(sentence).toContain('no figure');
+    expect(sentence).not.toContain('0%');
+    expect(sentence).toContain('still applies');
+  });
+
+  it('describes what a bucket changes in words rather than in slider values', () => {
+    const sentence = bucketSentence(bucket());
+    expect(sentence).toContain('EV');
+    expect(sentence).toContain('warmer');
+  });
+
+  it('says a bucket with too little behind it falls back rather than showing numbers', () => {
+    expect(bucketSentence(bucket({ applied: false }))).toContain('overall look');
+  });
+
+  it('says nothing changes rather than listing movements below what anyone can see', () => {
+    expect(
+      bucketSentence(
+        bucket({ exposure: 0.001, temperatureK: 2, contrast: 0.1, vibrance: 0, saturation: 0 }),
+      ),
+    ).toContain('Nothing to change');
   });
 
   it('never shows a strength above what the reference asked for', () => {

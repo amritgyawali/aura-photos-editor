@@ -8660,6 +8660,20 @@ pub struct LookReasonDto {
     pub actionable: bool,
 }
 
+/// Which look's buckets to read, and which project's measurements to put beside them.
+///
+/// Two arguments because they are two facts. A look is stored once and can be measured against
+/// several projects, so "what does this look ask for" and "what did it do here" are different
+/// questions - and `afterDe00` is the second one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookBucketsInput {
+    /// The look.
+    pub profile_id: String,
+    /// The project whose measured match fills `afterDe00`, when there is one.
+    pub project_id: Option<String>,
+}
+
 /// One kind of light, as the matrix renders it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -8710,8 +8724,17 @@ pub struct LookMatchDto {
     pub realised_share: f32,
     /// True when the whole match reached the ceiling.
     pub reached: bool,
-    /// How many frames it was measured over.
+    /// How many of the project's frames the look was applied to.
     pub frames: u32,
+    /// How many of them the distance was actually computed over.
+    ///
+    /// **Both numbers, because they differ.** A bucket exists only where the reference and this
+    /// wedding both had frames in that light, so a wedding shot mostly under a light the
+    /// reference never worked in produces a real figure about a small slice of it. Reporting
+    /// only `frames` would say "measured over sixty" about a number that came from twelve.
+    pub measured_frames: u32,
+    /// What share of the applied frames that is, `0..1`.
+    pub measured_coverage: f32,
     /// How many carried an edit the photographer made by hand, which was preserved.
     pub user_edited: u32,
     /// One row per lighting bucket that had frames on both sides.
@@ -8777,6 +8800,13 @@ pub struct MeasureLookInput {
     /// A cap rather than a preference: the baseline is a median, and a median over sixty frames
     /// and one over a thousand differ by far less than the time the second costs.
     pub baseline_frames: Option<u32>,
+    /// A handle the caller can pass to `cancel_job` to stop the pass.
+    ///
+    /// Measuring a look decodes every reference photograph and renders a sample of the wedding
+    /// twice, so it runs for minutes on a real reference. A long operation with no way to stop
+    /// it is one a photographer force-quits, and a force-quit during a catalog write is the one
+    /// thing this product spends a lot of effort making survivable.
+    pub cancel_id: Option<String>,
 }
 
 /// What a measuring pass did.
@@ -8784,7 +8814,12 @@ pub struct MeasureLookInput {
 #[serde(rename_all = "camelCase")]
 pub struct MeasureLookDto {
     /// The look that came out, when one did.
+    ///
+    /// `None` when the pass was cancelled, which is a normal outcome and not a failure: nothing
+    /// was stored and nothing was changed.
     pub profile: Option<String>,
+    /// True when the photographer stopped it.
+    pub cancelled: bool,
     /// Reference photographs the walk found.
     pub found: u32,
     /// Reference photographs that read.

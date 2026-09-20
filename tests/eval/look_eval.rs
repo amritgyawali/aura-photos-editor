@@ -267,6 +267,90 @@ const _: () = assert!(
     "the refusal floor is at or above the usable count, so no look can be weak"
 );
 
+// ---------------------------------------------------------------------------
+// 10.1 row 8: stopping is safe
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_cancelled_refinement_returns_the_best_it_had_rather_than_a_half_move() {
+    let baseline = fixtures::aggregate(24, SyntheticLook::neutral());
+    let reference = fixtures::aggregate(24, SyntheticLook::light_and_airy());
+    let probe = AnalyticProbe {
+        base: baseline.clone(),
+    };
+    let initial = solve::initial(&reference, &baseline);
+
+    // Cancelled before the first axis is tried, which is the worst case: the search has scored
+    // the initial delta and nothing else.
+    let (stopped, stopped_distance) = solve::refine_until(&initial, &reference, &probe, &|| true);
+    let initial_distance = solve::distance(&probe.aggregate_with(&initial), &reference);
+
+    assert_eq!(
+        stopped, initial,
+        "a refinement cancelled before it moved must return what it was given"
+    );
+    assert!(
+        (stopped_distance - initial_distance).abs() < 1e-4,
+        "the reported distance is not the one the returned delta reaches"
+    );
+
+    // And a cancelled refinement is never worse than the initial - it can only have accepted
+    // moves that strictly improved, so stopping mid-search is safe at every point.
+    let (finished, finished_distance) = solve::refine(&initial, &reference, &probe);
+    assert!(
+        finished_distance <= stopped_distance + 1e-4,
+        "finishing the search was worse than stopping it"
+    );
+    let _ = finished;
+}
+
+#[test]
+fn a_match_measured_over_part_of_a_gallery_says_so() {
+    use aura_core::contract::look::{BucketResidual, LookCode, MEASURED_COVERAGE_FLOOR};
+    use aura_core::contract::style::LightingBucket;
+    use aura_look::verify;
+
+    // Twelve frames measured, sixty the look applies to: the case where reporting one number
+    // would describe twelve photographs as sixty.
+    let residuals = vec![BucketResidual {
+        lighting: LightingBucket::Daylight,
+        before_de00: 6.0,
+        after_de00: 2.0,
+        frames: 12,
+    }];
+
+    assert_eq!(verify::measured_frames(&residuals), 12);
+
+    let thin = verify::reasons_for(&residuals, 60, 0);
+    assert_eq!(
+        thin.first().map(|reason| reason.code),
+        Some(LookCode::MatchPartlyMeasured),
+        "the sentence that decides what the figure is worth must come first"
+    );
+    assert!(
+        LookCode::MatchPartlyMeasured.is_actionable(),
+        "a photographer can shoot the missing light, so this is something to act on"
+    );
+
+    // The control: the same residuals over a gallery they actually cover raise nothing.
+    let full = verify::reasons_for(&residuals, 12, 0);
+    assert!(
+        !full
+            .iter()
+            .any(|reason| reason.code == LookCode::MatchPartlyMeasured),
+        "a fully measured match was reported as partial"
+    );
+
+    // And the boundary is the documented one rather than an accident of the fixture. The guard
+    // is a `const` block so it fails at compile time if the floor ever moves above this ratio,
+    // which would leave the assertion below proving nothing.
+    const { assert!(12.0 / 16.0_f32 >= MEASURED_COVERAGE_FLOOR) };
+    let at_floor = verify::reasons_for(&residuals, 16, 0);
+    assert!(!at_floor
+        .iter()
+        .any(|reason| reason.code == LookCode::MatchPartlyMeasured));
+}
+
 #[test]
 fn an_empty_aggregate_solves_to_nothing_rather_than_to_a_guess() {
     let empty = LookAggregate::default();

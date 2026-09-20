@@ -102,6 +102,7 @@ fn a_match(look: &LookProfile, project: ProjectId, after: f32) -> LookMatchRepor
         before_de00: 6.0,
         after_de00: after,
         frames: 30,
+        measured_frames: 30,
         user_edited: 2,
         reasons: Vec::new(),
     }
@@ -160,13 +161,20 @@ fn re_measuring_replaces_a_look_rather_than_adding_to_it() {
     );
     store.put(&look, &readings).expect("second");
 
-    let read = store.profile(look.id).expect("the fixture must hold").expect("the fixture must hold");
+    let read = store
+        .profile(look.id)
+        .expect("the fixture must hold")
+        .expect("the fixture must hold");
     assert_eq!(
         read.buckets.len(),
         2,
         "a re-measure must replace the buckets rather than leave two measurements side by side"
     );
-    assert_eq!(store.profiles().expect("the fixture must hold").len(), 1, "a look was duplicated");
+    assert_eq!(
+        store.profiles().expect("the fixture must hold").len(),
+        1,
+        "a look was duplicated"
+    );
 }
 
 #[test]
@@ -222,7 +230,10 @@ fn a_record_of_what_was_measured_cannot_be_edited() {
     );
 
     // And the most recent one is the one that comes back.
-    let latest = store.last_match(project).expect("the fixture must hold").expect("the fixture must hold");
+    let latest = store
+        .last_match(project)
+        .expect("the fixture must hold")
+        .expect("the fixture must hold");
     assert!((latest.after_de00 - 1.8).abs() < 1e-4);
 }
 
@@ -235,16 +246,38 @@ fn strength_is_bounded_below_one_and_at_one() {
     store
         .put_match(&a_match(&look, project, 2.0), "engine-test")
         .expect("the fixture must hold");
-    store.select(project, Some(look.id)).expect("the fixture must hold");
+    store
+        .select(project, Some(look.id))
+        .expect("the fixture must hold");
 
     store.set_strength(project, 0.5).expect("half is allowed");
-    assert!((store.selected(project).expect("the fixture must hold").expect("the fixture must hold").1 - 0.5).abs() < 1e-4);
+    assert!(
+        (store
+            .selected(project)
+            .expect("the fixture must hold")
+            .expect("the fixture must hold")
+            .1
+            - 0.5)
+            .abs()
+            < 1e-4
+    );
 
     // A value above one is clamped rather than refused, so the column's CHECK is never the
     // thing a photographer meets. Phase 21's rule: a ceiling can be lowered by a studio and
     // raised by nobody.
-    store.set_strength(project, 4.0).expect("clamped, not refused");
-    assert!((store.selected(project).expect("the fixture must hold").expect("the fixture must hold").1 - 1.0).abs() < 1e-4);
+    store
+        .set_strength(project, 4.0)
+        .expect("clamped, not refused");
+    assert!(
+        (store
+            .selected(project)
+            .expect("the fixture must hold")
+            .expect("the fixture must hold")
+            .1
+            - 1.0)
+            .abs()
+            < 1e-4
+    );
 }
 
 #[test]
@@ -256,14 +289,92 @@ fn forgetting_a_look_leaves_the_project_on_the_baseline() {
     store
         .put_match(&a_match(&look, project, 2.0), "engine-test")
         .expect("the fixture must hold");
-    store.select(project, Some(look.id)).expect("the fixture must hold");
+    store
+        .select(project, Some(look.id))
+        .expect("the fixture must hold");
 
     store.forget(look.id).expect("forget");
 
-    assert!(store.profile(look.id).expect("the fixture must hold").is_none());
+    assert!(store
+        .profile(look.id)
+        .expect("the fixture must hold")
+        .is_none());
     assert!(
-        store.selected(project).expect("the fixture must hold").is_none(),
+        store
+            .selected(project)
+            .expect("the fixture must hold")
+            .is_none(),
         "a project kept pointing at a look that no longer exists"
+    );
+}
+
+#[test]
+fn a_match_reports_both_denominators_and_derives_the_second() {
+    let (_dir, catalog, project) = fresh();
+    let store = LookStore::new(catalog, test_clock());
+    let look = a_look();
+    store.put(&look, &[]).expect("the fixture must hold");
+
+    // Sixty frames the look applies to, twelve it was measured over. The stored row carries the
+    // first; the second is derived from the bucket rows on read, so the two cannot disagree.
+    let mut report = a_match(&look, project, 2.1);
+    report.frames = 60;
+    report.measured_frames = 999; // deliberately wrong: the store must not believe it
+    report.buckets = vec![BucketResidual {
+        lighting: LightingBucket::Daylight,
+        before_de00: 6.0,
+        after_de00: 2.1,
+        frames: 12,
+    }];
+    store
+        .put_match(&report, "engine-test")
+        .expect("the fixture must hold");
+
+    let read = store
+        .last_match(project)
+        .expect("the fixture must hold")
+        .expect("a match was stored");
+
+    assert_eq!(read.frames, 60);
+    assert_eq!(
+        read.measured_frames, 12,
+        "the measured count must come from the bucket rows, not from a column that can drift"
+    );
+    assert!((read.measured_coverage() - 0.2).abs() < 1e-4);
+    assert!(
+        read.reasons
+            .iter()
+            .any(|reason| reason.code == LookCode::MatchPartlyMeasured),
+        "a match covering a fifth of the gallery did not say so"
+    );
+}
+
+#[test]
+fn a_match_that_measured_nothing_has_not_reached_anything() {
+    let (_dir, catalog, project) = fresh();
+    let store = LookStore::new(catalog, test_clock());
+    let look = a_look();
+    store.put(&look, &[]).expect("the fixture must hold");
+
+    // No buckets: every frame was in a light the reference never worked in. `after_de00` is
+    // zero, which without the guard would read as the best possible match.
+    let mut report = a_match(&look, project, 0.0);
+    report.before_de00 = 0.0;
+    report.frames = 40;
+    report.buckets = Vec::new();
+    store
+        .put_match(&report, "engine-test")
+        .expect("the fixture must hold");
+
+    let read = store
+        .last_match(project)
+        .expect("the fixture must hold")
+        .expect("a match was stored");
+
+    assert_eq!(read.measured_frames, 0);
+    assert!(
+        !read.reached(),
+        "a match measured over nothing reported itself as reached"
     );
 }
 

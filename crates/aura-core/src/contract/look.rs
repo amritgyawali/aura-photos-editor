@@ -124,6 +124,14 @@ pub const REFERENCE_LONG_EDGE: u32 = 512;
 /// two numbers are not comparable and giving this one phase 17's value would imply they were.
 pub const MATCH_DE00_CEILING: f32 = 3.0;
 
+/// Below this share of applied frames, a match figure is called partly measured and said so.
+///
+/// Three quarters. Above it the number describes most of the gallery and the distinction is
+/// pedantic; below it a photographer reading "2.1 dE00 over sixty photographs" would be reading
+/// a figure that came from twelve of them. The threshold is a *reporting* boundary and changes
+/// no arithmetic - the distance is computed the same way either side of it.
+pub const MEASURED_COVERAGE_FLOOR: f32 = 0.75;
+
 /// Below this confidence a lighting bucket's delta is not applied at all.
 ///
 /// The same value and the same argument as [`crate::contract::style::APPLY_ABOVE`]: a bucket
@@ -154,7 +162,9 @@ pub const MAX_TEMPERATURE_DELTA_K: f32 = 600.0;
 /// declared rather than omitted for the reason `aura_generative::inpaint` declares a diffusion
 /// tier it refuses on every call: a route the product does not have is a sentence a photographer
 /// can read, and a variant that does not exist is a feature request nobody can see the shape of.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum MediaSource {
     /// A folder of image files the photographer pointed at.
@@ -306,7 +316,9 @@ impl ReferenceOrigin {
             .strip_prefix("https://")
             .or_else(|| lowered.strip_prefix("http://"))
             .unwrap_or(&lowered);
-        let without_www = without_scheme.strip_prefix("www.").unwrap_or(without_scheme);
+        let without_www = without_scheme
+            .strip_prefix("www.")
+            .unwrap_or(without_scheme);
 
         // An explicit `@` is a handle and nothing else, whatever is in it.
         if let Some(handle) = without_www.strip_prefix('@') {
@@ -334,7 +346,10 @@ impl ReferenceOrigin {
         // this check it would be recorded as one - a label, never dereferenced, but a label a
         // photographer would see and a support case would have to explain.
         if had_scheme || without_www.contains('/') {
-            let host = without_www.split(['/', '?', '#']).next().unwrap_or_default();
+            let host = without_www
+                .split(['/', '?', '#'])
+                .next()
+                .unwrap_or_default();
             if !is_hostname(host) {
                 return Err(crate::errors::ml::look_reference_refused(
                     "that looks like a file path rather than a page",
@@ -889,11 +904,18 @@ pub enum LookCode {
     MatchShort,
     /// A photographer's own edit was found on a frame and was not overwritten.
     UserEditPreserved,
+    /// The match was measured over fewer frames than the look was applied to.
+    ///
+    /// Raised when [`LookMatchReport::measured_coverage`] is below
+    /// [`MEASURED_COVERAGE_FLOOR`]. The look still applies everywhere - the global lean always
+    /// resolves - but the number beside it describes only the frames in a light the reference
+    /// also worked in.
+    MatchPartlyMeasured,
 }
 
 impl LookCode {
     /// Every code, in the order the reference document lists them.
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 23] = [
         Self::TooFewReferences,
         Self::ReferencesBelowUsable,
         Self::ReferenceUnreadable,
@@ -916,6 +938,7 @@ impl LookCode {
         Self::MatchReached,
         Self::MatchShort,
         Self::UserEditPreserved,
+        Self::MatchPartlyMeasured,
     ];
 
     /// The stable slug, stored and sent on the wire.
@@ -944,6 +967,7 @@ impl LookCode {
             Self::MatchReached => "match_reached",
             Self::MatchShort => "match_short",
             Self::UserEditPreserved => "user_edit_preserved",
+            Self::MatchPartlyMeasured => "match_partly_measured",
         }
     }
 
@@ -1018,10 +1042,12 @@ impl LookCode {
             }
             Self::DeltaClamped => "Part of this look was stronger than AURA will apply.",
             Self::MatchReached => "Your photographs now sit where that reference sits.",
-            Self::MatchShort => {
-                "Your photographs moved toward that reference without reaching it."
-            }
+            Self::MatchShort => "Your photographs moved toward that reference without reaching it.",
             Self::UserEditPreserved => "A change you made by hand was kept.",
+            Self::MatchPartlyMeasured => {
+                "Some of your photographs were made in light this reference never worked in. The \
+                 look still applies to them; the figure beside it does not describe them."
+            }
         }
     }
 
@@ -1035,6 +1061,7 @@ impl LookCode {
                 | Self::NetworkTransportAbsent
                 | Self::BaselineAbsent
                 | Self::BaselineThin
+                | Self::MatchPartlyMeasured
         )
     }
 }
@@ -1146,8 +1173,20 @@ pub struct LookMatchReport {
     pub before_de00: f32,
     /// The frame-weighted appearance distance after, in dE00.
     pub after_de00: f32,
-    /// How many frames were measured.
+    /// How many of the project's frames the look was applied to.
     pub frames: u32,
+    /// How many of them the distance was actually computed over.
+    ///
+    /// **Two numbers rather than one, and this is the important one.** The distance is a
+    /// frame-weighted mean over the buckets in [`LookMatchReport::buckets`], and a bucket only
+    /// exists where the reference *and* the photographer's own work both had frames in that
+    /// light. A wedding shot mostly under a light the reference page never worked in therefore
+    /// produces a perfectly real dE00 that describes a small slice of it.
+    ///
+    /// Reporting only `frames` would say "measured over sixty photographs" about a number that
+    /// came from twelve. Phase 18's rule - say what the denominator is, and put both numbers on
+    /// the wire - in the place where one number would have been most flattering.
+    pub measured_frames: u32,
     /// How many carried an edit the photographer made by hand, which was preserved.
     pub user_edited: u32,
     /// Why, strongest doubt first.
@@ -1156,9 +1195,33 @@ pub struct LookMatchReport {
 
 impl LookMatchReport {
     /// True when the whole match reached [`MATCH_DE00_CEILING`].
+    ///
+    /// Gated on [`LookMatchReport::measured_frames`] rather than on
+    /// [`LookMatchReport::frames`], because a report whose distance was computed over nothing
+    /// has not reached anything - and `after_de00` on an empty set of buckets is zero, which
+    /// would otherwise read as a perfect match.
     #[must_use]
     pub fn reached(&self) -> bool {
-        self.frames > 0 && self.after_de00 <= MATCH_DE00_CEILING
+        self.measured_frames > 0 && self.after_de00 <= MATCH_DE00_CEILING
+    }
+
+    /// What fraction of the applied frames the distance was measured over, `0..1`.
+    ///
+    /// What the panel says out loud when it is below one. A look can be applied to a frame in
+    /// any light - the global lean always resolves - but it can only be *measured* where the
+    /// reference had something to compare against.
+    #[must_use]
+    pub fn measured_coverage(&self) -> f32 {
+        if self.frames == 0 {
+            return 0.0;
+        }
+        // The same scoped allow `ProfileDiagnostics::acceptance` uses, and for the same reason:
+        // both counts are frame counts, a wedding that reached 2^24 of them has other problems,
+        // and `aura-core` carries no blanket allow because most of it has no business casting.
+        #[allow(clippy::cast_precision_loss)]
+        {
+            (self.measured_frames as f32 / self.frames as f32).clamp(0.0, 1.0)
+        }
     }
 
     /// What fraction of the overall gap the look closed, `0..1`.

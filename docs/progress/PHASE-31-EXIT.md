@@ -30,12 +30,12 @@ decisions and `docs/match-a-look.md` says them in the product's own words.
 
 | What | Result |
 |---|---|
-| `tests/eval/look_eval.rs` | 10 tests, all pass |
+| `tests/eval/look_eval.rs` | 12 tests, all pass |
 | `crates/aura-look/tests/source.rs` | 14 tests, all pass |
-| `crates/aura-look/tests/store.rs` | 7 tests, all pass |
+| `crates/aura-look/tests/store.rs` | 9 tests, all pass |
 | `crates/aura-look/tests/render_match.rs` | 3 tests, all pass |
 | `crates/aura-look/tests/no_network.rs`, `no_recipe_writes.rs` | 6 tests, all pass |
-| `ui/src/components/look/MatchLookPanel.test.tsx` | 15 tests, all pass |
+| `ui/src/components/look/MatchLookPanel.test.tsx` | 21 tests, all pass |
 | `aura-cli verify --phase 31` | every check passes on 30 real JPEGs |
 | `scripts/check-ipc-surface.sh` | 269 = 269 = 269 |
 | `cargo xtask contracts --check` | 83 entries, all locked |
@@ -103,12 +103,18 @@ correct for that purpose - but it is not an illuminant estimate and must never b
 - **A look is applied before the guards, and every guard re-runs after it.** Phase 17's rule,
   inherited unchanged and load-bearing here: it is the whole of this phase's skin defence, because
   there is no skin term in the look itself to bound.
+- **A long job is stoppable, and stopping stores nothing.** Measuring renders a sample of the
+  wedding twice and refines over eleven axes, so it runs for minutes. The cancellation check sits
+  between *axes* rather than between sweeps, because a sweep is hundreds of renders and a Stop
+  button that takes a sweep to respond is a Stop button nobody believes. A cancelled pass returns
+  the best delta it had - always at least as good as its starting point, never a half-applied
+  one - and writes none of it.
 - **A result that cannot be measured is not produced.** `materialise::into_style` takes the measured
   report as an argument rather than an `Option`, because `ProfileDiagnostics::overall_de00` is an
   `f32` and a look materialised before `verify::measure` ran would put a zero where every panel in
   the product renders a perfect match.
 
-## Three things phase 31 got wrong first
+## Four things phase 31 got wrong first
 
 **A handle parser that read `@some.photographer` as a web address.** The first rule was "no dot and
 no slash means a handle", and Instagram handles legitimately contain dots - so the most ordinary
@@ -125,6 +131,17 @@ have spent a hundred and thirty thousand renders to pin down a median that eight
 pin down. `MAX_REFINE_FRAMES` is eight, sampled on a deterministic stride so a wedding that starts
 in one room and ends in another is sampled across both. The *measurement* is uncapped, because that
 number is about the photographer's gallery rather than about a sample of it.
+
+**A match figure that described twelve photographs as sixty.** `LookMatchReport::frames` was the
+number of frames the look was applied to, and the distance beside it was a frame-weighted mean over
+`buckets` - which only exist where the reference *and* this wedding both had frames in that light.
+A wedding shot mostly under a light the reference page never worked in therefore produced a
+perfectly real dE00 about a small slice of it, reported over the whole gallery. `measured_frames`
+is the second number, derived from the bucket rows rather than stored in a column of its own, and
+`MatchPartlyMeasured` is raised below `MEASURED_COVERAGE_FLOOR`. A match that measured nothing now
+answers `reached()` with false instead of taking `after_de00 == 0.0` as a perfect score. Phase
+18's rule - say what the denominator is, and put both numbers on the wire - in the place where one
+number was the most flattering thing available.
 
 **A baseline that would have been a measurement of mid grey.** `CatalogFrames` returns a neutral
 frame for a photograph whose proxy is not built, which is right for a develop panel that has to open

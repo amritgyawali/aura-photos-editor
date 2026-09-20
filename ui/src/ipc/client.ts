@@ -298,6 +298,7 @@ import type {
   StylePairDto,
   StyleProfileDto,
   LookBucketDto,
+  LookBucketsInput,
   LookMatchDto,
   LookProfileDto,
   LookProfileInput,
@@ -1964,9 +1965,14 @@ export const look = {
   parseReference: (address: string): Promise<ReferenceOriginDto> =>
     invoke<ReferenceOriginDto>('parse_reference', { address }),
 
-  /** One look's lighting buckets, as the matrix renders them. */
-  lookBuckets: (profileId: string): Promise<LookBucketDto[]> =>
-    invoke<LookBucketDto[]>('look_buckets', { profileId }),
+  /**
+   * One look's lighting buckets, as the matrix renders them.
+   *
+   * Pass the project to fill each row's measured `afterDe00`; without it a row says what the
+   * look asks for and stays `null` about what it did.
+   */
+  lookBuckets: (input: LookBucketsInput): Promise<LookBucketDto[]> =>
+    invoke<LookBucketDto[]>('look_buckets', { input }),
 
   /** The last measured match on one project, or `null` when nothing has been measured. */
   lookMatchReport: (projectId: string): Promise<LookMatchDto | null> =>

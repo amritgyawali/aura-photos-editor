@@ -129,7 +129,9 @@ fn samples_of(image: &Rgb8, long_edge: u32) -> Samples {
     let width = image.width.max(1);
     let height = image.height.max(1);
     let longest = width.max(height);
-    let stride = usize::try_from(longest.div_ceil(long_edge.max(1))).unwrap_or(1).max(1);
+    let stride = usize::try_from(longest.div_ceil(long_edge.max(1)))
+        .unwrap_or(1)
+        .max(1);
 
     let capacity = (width as usize / stride + 1) * (height as usize / stride + 1);
     let mut lab = Vec::with_capacity(capacity);
@@ -145,11 +147,7 @@ fn samples_of(image: &Rgb8, long_edge: u32) -> Samples {
                 [r, g, b] => (*r, *g, *b),
                 _ => continue,
             };
-            let xyz = linear_srgb_to_xyz(
-                srgb_to_linear(r),
-                srgb_to_linear(g),
-                srgb_to_linear(b),
-            );
+            let xyz = linear_srgb_to_xyz(srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b));
             lab.push(xyz_d65_to_lab(xyz));
             hue_deg.push(hsv_hue(r, g, b).unwrap_or(f32::NAN));
         }
@@ -387,11 +385,7 @@ fn lab_to_xyz(lab: Lab) -> [f64; 3] {
     let fy = (lab.l + 16.0) / 116.0;
     let fx = fy + lab.a / 500.0;
     let fz = fy - lab.b / 200.0;
-    [
-        inverse(fx) * 0.950_47,
-        inverse(fy),
-        inverse(fz) * 1.088_83,
-    ]
+    [inverse(fx) * 0.950_47, inverse(fy), inverse(fz) * 1.088_83]
 }
 
 /// Everything one reference photograph says about a look.
@@ -421,7 +415,11 @@ pub fn read_at(key: impl Into<String>, image: &Rgb8, long_edge: u32) -> Referenc
     // L* rather than a linear or gamma-encoded luminance. "My blacks are lifted" is a statement
     // about where a tone *looks* to sit, and the whole comparison downstream is between two
     // galleries somebody is going to look at.
-    let mut luma: Vec<f32> = samples.lab.iter().map(|lab| (lab.l / 100.0) as f32).collect();
+    let mut luma: Vec<f32> = samples
+        .lab
+        .iter()
+        .map(|lab| (lab.l / 100.0) as f32)
+        .collect();
     sort_floats(&mut luma);
     let tone = ToneLandmarks::from_array([
         quantile(&luma, 0.01),

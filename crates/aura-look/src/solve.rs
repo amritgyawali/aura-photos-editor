@@ -35,9 +35,7 @@
 //! `aura_core::contract::look`'s header, third thing.
 
 use aura_core::contract::colour::{HslBand, HslShift};
-use aura_core::contract::look::{
-    LookAggregate, MAX_EXPOSURE_DELTA_EV, MAX_TEMPERATURE_DELTA_K,
-};
+use aura_core::contract::look::{LookAggregate, MAX_EXPOSURE_DELTA_EV, MAX_TEMPERATURE_DELTA_K};
 use aura_core::contract::style::{CurveShift, StyleDelta, MAX_PARAM_DELTA};
 use aura_raw::colour::de2000::{ciede2000, Lab};
 
@@ -168,7 +166,9 @@ pub fn initial(reference: &LookAggregate, baseline: &LookAggregate) -> StyleDelt
     // L* is not linear in light, so a log2 of two L* values is not a number of stops.
     let ref_y = luma_of(reference.tone.p50);
     let base_y = luma_of(baseline.tone.p50);
-    delta.exposure = (ref_y / base_y).log2().clamp(-MAX_EXPOSURE_DELTA_EV, MAX_EXPOSURE_DELTA_EV);
+    delta.exposure = (ref_y / base_y)
+        .log2()
+        .clamp(-MAX_EXPOSURE_DELTA_EV, MAX_EXPOSURE_DELTA_EV);
 
     // --- contrast and the four end-point parameters ---------------------
     delta.contrast = ratio(
@@ -234,11 +234,19 @@ pub fn initial(reference: &LookAggregate, baseline: &LookAggregate) -> StyleDelt
     };
     let exposure_carry = reference.tone.p50 - baseline.tone.p50;
     delta.curve_shift = CurveShift::from_array([
-        residual(reference.tone.p01, baseline.tone.p01, delta.blacks / BLACKS_PER_LUMA),
+        residual(
+            reference.tone.p01,
+            baseline.tone.p01,
+            delta.blacks / BLACKS_PER_LUMA,
+        ),
         residual(reference.tone.p25, baseline.tone.p25, exposure_carry),
         0.0,
         residual(reference.tone.p75, baseline.tone.p75, exposure_carry),
-        residual(reference.tone.p99, baseline.tone.p99, delta.whites / WHITES_PER_LUMA),
+        residual(
+            reference.tone.p99,
+            baseline.tone.p99,
+            delta.whites / WHITES_PER_LUMA,
+        ),
     ]);
 
     delta.samples = reference.samples;
@@ -341,10 +349,7 @@ pub fn distance(one: &LookAggregate, two: &LookAggregate) -> f32 {
         b: f64::from(tint.b),
     };
 
-    let shadow = ciede2000(
-        lab(one.tone.p05, one.shadow),
-        lab(two.tone.p05, two.shadow),
-    ) as f32;
+    let shadow = ciede2000(lab(one.tone.p05, one.shadow), lab(two.tone.p05, two.shadow)) as f32;
     let mid = ciede2000(lab(one.tone.p50, one.mid), lab(two.tone.p50, two.mid)) as f32;
     let high = ciede2000(lab(one.tone.p95, one.high), lab(two.tone.p95, two.high)) as f32;
 
@@ -397,13 +402,41 @@ pub const REFINE_STEPS: [f32; 4] = [0.5, 0.75, 1.25, 1.6];
 /// delta is scored first and is returned unchanged when no step beats it, so a refinement that
 /// finds nothing costs renders and changes nothing.
 #[must_use]
-pub fn refine(initial: &StyleDelta, target: &LookAggregate, probe: &dyn Probe) -> (StyleDelta, f32) {
+pub fn refine(
+    initial: &StyleDelta,
+    target: &LookAggregate,
+    probe: &dyn Probe,
+) -> (StyleDelta, f32) {
+    refine_until(initial, target, probe, &|| false)
+}
+
+/// [`refine`], stoppable.
+///
+/// The cancellation check is **between axes rather than between sweeps**, and that is the whole
+/// point of the function: one sweep is eleven axes times four steps times
+/// [`crate::verify::MAX_REFINE_FRAMES`] renders, so a check that only ran between sweeps would
+/// leave a photographer waiting through hundreds of renders after pressing stop. It is not
+/// checked between individual *steps*, because `best` is only consistent at an axis boundary.
+///
+/// Stopping returns the best delta found **so far**, which is always at least as good as the
+/// initial one - a cancelled refinement is a worse answer than a finished one and never a wrong
+/// one. The caller discards it anyway: `MeasurePass::run` stores nothing on a cancelled pass.
+#[must_use]
+pub fn refine_until(
+    initial: &StyleDelta,
+    target: &LookAggregate,
+    probe: &dyn Probe,
+    cancelled: &dyn Fn() -> bool,
+) -> (StyleDelta, f32) {
     let mut best = initial.clamped();
     let mut best_distance = distance(&probe.aggregate_with(&best), target);
 
     for _ in 0..REFINE_SWEEPS {
         let mut improved = false;
         for axis in Axis::ALL {
+            if cancelled() {
+                return (best, best_distance);
+            }
             for step in REFINE_STEPS {
                 let candidate = axis.scaled(&best, step);
                 let scored = distance(&probe.aggregate_with(&candidate), target);

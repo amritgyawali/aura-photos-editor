@@ -16,7 +16,8 @@ fn every_way_of_writing_an_instagram_page_parses_to_one_handle() {
         "some.photographer",
         "  Some.Photographer  ",
     ] {
-        let parsed = ReferenceOrigin::parse(text).unwrap_or_else(|error| panic!("{text} did not parse: {error:?}"));
+        let parsed = ReferenceOrigin::parse(text)
+            .unwrap_or_else(|error| panic!("{text} did not parse: {error:?}"));
         assert_eq!(
             parsed,
             ReferenceOrigin::Instagram {
@@ -31,7 +32,8 @@ fn every_way_of_writing_an_instagram_page_parses_to_one_handle() {
 fn a_post_or_a_reel_names_the_page_it_is_on() {
     // This phase is about a page rather than about one photograph on it, so everything after
     // the first path segment is dropped rather than refused.
-    let parsed = ReferenceOrigin::parse("https://instagram.com/somebody/p/Cabc123/").expect("the fixture must hold");
+    let parsed = ReferenceOrigin::parse("https://instagram.com/somebody/p/Cabc123/")
+        .expect("the fixture must hold");
     assert_eq!(
         parsed,
         ReferenceOrigin::Instagram {
@@ -42,7 +44,8 @@ fn a_post_or_a_reel_names_the_page_it_is_on() {
 
 #[test]
 fn something_that_is_not_instagram_stays_a_web_reference() {
-    let parsed = ReferenceOrigin::parse("https://somebody.photography/portfolio").expect("the fixture must hold");
+    let parsed = ReferenceOrigin::parse("https://somebody.photography/portfolio")
+        .expect("the fixture must hold");
     assert!(matches!(parsed, ReferenceOrigin::Web { .. }));
 }
 
@@ -148,7 +151,11 @@ fn the_walk_returns_the_same_order_twice() {
     let dir = tempfile::tempdir().expect("the fixture must hold");
     let root = dir.path();
     for index in 0..12 {
-        fs::write(root.join(format!("{index:02}.jpg")), format!("body-{index}")).expect("the fixture must hold");
+        fs::write(
+            root.join(format!("{index:02}.jpg")),
+            format!("body-{index}"),
+        )
+        .expect("the fixture must hold");
     }
 
     let (one, _) = source::walk(root);
@@ -161,7 +168,8 @@ fn the_walk_returns_the_same_order_twice() {
 fn a_folder_with_too_few_photographs_is_refused_rather_than_measured() {
     let dir = tempfile::tempdir().expect("the fixture must hold");
     for index in 0..3 {
-        fs::write(dir.path().join(format!("{index}.jpg")), format!("{index}")).expect("the fixture must hold");
+        fs::write(dir.path().join(format!("{index}.jpg")), format!("{index}"))
+            .expect("the fixture must hold");
     }
 
     let error = source::resolve("", MediaSource::Folder, Some(dir.path()))
@@ -179,30 +187,28 @@ fn an_instagram_export_layout_is_found_and_named() {
     let posts = dir.path().join("media").join("posts");
     fs::create_dir_all(&posts).expect("the fixture must hold");
     for index in 0..10 {
-        fs::write(posts.join(format!("{index}.jpg")), format!("post-{index}")).expect("the fixture must hold");
+        fs::write(posts.join(format!("{index}.jpg")), format!("post-{index}"))
+            .expect("the fixture must hold");
     }
     // A file outside the posts folder that must not be measured: a profile picture is not the
     // photographer's work.
     fs::write(dir.path().join("profile.jpg"), b"avatar").expect("the fixture must hold");
 
-    let reference = source::resolve(
-        "@somebody",
-        MediaSource::InstagramExport,
-        Some(dir.path()),
-    )
-    .expect("the fixture must hold");
+    let reference = source::resolve("@somebody", MediaSource::InstagramExport, Some(dir.path()))
+        .expect("the fixture must hold");
 
     assert_eq!(reference.len(), 10, "the walk left the posts folder");
     assert!(reference
         .reasons
         .iter()
-        .any(|reason| reason.code
-            == aura_core::contract::look::LookCode::InstagramExportLayout));
-    assert!(reference
-        .reasons
-        .iter()
-        .any(|reason| reason.code
-            == aura_core::contract::look::LookCode::OriginRecordedNotFetched));
+        .any(|reason| reason.code == aura_core::contract::look::LookCode::InstagramExportLayout));
+    assert!(
+        reference
+            .reasons
+            .iter()
+            .any(|reason| reason.code
+                == aura_core::contract::look::LookCode::OriginRecordedNotFetched)
+    );
 }
 
 #[test]
@@ -211,10 +217,12 @@ fn an_export_whose_layout_has_moved_still_finds_the_photographs() {
     let deep = dir.path().join("something").join("unexpected");
     fs::create_dir_all(&deep).expect("the fixture must hold");
     for index in 0..10 {
-        fs::write(deep.join(format!("{index}.jpg")), format!("post-{index}")).expect("the fixture must hold");
+        fs::write(deep.join(format!("{index}.jpg")), format!("post-{index}"))
+            .expect("the fixture must hold");
     }
 
-    let reference = source::resolve("", MediaSource::InstagramExport, Some(dir.path())).expect("the fixture must hold");
+    let reference = source::resolve("", MediaSource::InstagramExport, Some(dir.path()))
+        .expect("the fixture must hold");
 
     assert_eq!(reference.len(), 10);
 }
@@ -223,7 +231,8 @@ fn an_export_whose_layout_has_moved_still_finds_the_photographs() {
 fn the_page_is_remembered_even_though_the_files_came_from_a_folder() {
     let dir = tempfile::tempdir().expect("the fixture must hold");
     for index in 0..10 {
-        fs::write(dir.path().join(format!("{index}.jpg")), format!("{index}")).expect("the fixture must hold");
+        fs::write(dir.path().join(format!("{index}.jpg")), format!("{index}"))
+            .expect("the fixture must hold");
     }
 
     let reference = source::resolve(

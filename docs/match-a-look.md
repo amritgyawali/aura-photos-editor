@@ -43,6 +43,17 @@ picture.
 **Paste the address anyway.** It costs nothing and it means every report says which page this look
 came from, instead of saying "a folder".
 
+## Stopping
+
+Measuring reads every reference photograph and renders a sample of your wedding twice, so it takes
+minutes on a large reference. There is a Stop button, and it works: the pass checks between each
+parameter it is testing rather than only between passes, so stopping takes seconds rather than
+finishing the sweep first.
+
+**Stopping stores nothing.** A cancelled measurement leaves your catalog exactly as it was - no
+half-written look, no partial buckets, nothing selected. You can start again from the same folder
+whenever you like.
+
 ## What AURA needs
 
 **At least eight photographs**, and it will tell you the look is rough until there are
@@ -115,8 +126,20 @@ moved toward the reference, as a percentage of how far apart they were. A look t
 per cent of a big difference did its job. A look that "passed" because there was nothing to close
 did not do anything at all, and AURA says so in those words.
 
-**How many of your photographs it was measured over**, and how many of them you had already edited
-by hand.
+**Two counts, not one.** How many photographs the look was *applied* to, and how many it was
+*measured* over. Those are different numbers and the difference matters. A look applies everywhere -
+the overall lean reaches every frame - but AURA can only measure how close you landed in a light the
+reference also worked in. If you shot half your reception under stage lighting and the page you
+matched has none, that half is edited and unmeasured, and the report says so rather than quoting one
+figure over the whole gallery. If *none* of your photographs were made in a light the reference
+worked in, AURA says it has no figure at all rather than showing you a zero.
+
+**How many of them you had already edited by hand**, which were left alone.
+
+**What this look does in each light**, as a table: how many reference photographs are behind each
+kind of light, what it changes there, and how close your own photographs in that light actually
+landed. A light with too few reference photographs behind it says so and falls back on the overall
+look rather than pretending.
 
 **What it could not learn.** Every look carries the same three notes, whatever else is true of it:
 there is no scene axis, nothing was learned about skin, and no hue was rotated. They are there on a

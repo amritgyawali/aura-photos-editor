@@ -261,7 +261,10 @@ pub fn gallery(count: u32, look: SyntheticLook) -> Vec<Rgb8> {
 
 /// A gallery, already measured.
 #[must_use]
-pub fn readings(count: u32, look: SyntheticLook) -> Vec<aura_core::contract::look::ReferenceReading> {
+pub fn readings(
+    count: u32,
+    look: SyntheticLook,
+) -> Vec<aura_core::contract::look::ReferenceReading> {
     gallery(count, look)
         .iter()
         .enumerate()

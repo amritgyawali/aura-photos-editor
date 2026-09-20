@@ -41,7 +41,8 @@ use aura_app::contract::ipc::{
 use aura_app::contract::ipc::{
     AdoptProfileInput, CompareProfilesInput, ExportProfileDto, ExportProfileInput,
     ImportProfileDto, ImportProfileInput, ProfileReportDto, ScanArchiveDto, ScanArchiveInput,
-    LookBucketDto, LookMatchDto, LookProfileDto, LookProfileInput, LookStatusDto,
+    LookBucketDto, LookBucketsInput, LookMatchDto, LookProfileDto, LookProfileInput,
+    LookStatusDto,
     MeasureLookDto, MeasureLookInput, ReferenceOriginDto, SelectLookInput,
     SetLookStrengthInput,
     SetProjectProfileInput, StyleComparisonDto, StylePairDto, StyleProfileDto, StyleStatusDto,
@@ -510,10 +511,10 @@ fn parse_reference(address: String) -> IpcResult<ReferenceOriginDto> {
 #[tauri::command]
 async fn look_buckets(
     state: State<'_, AppState>,
-    profile_id: String,
+    input: LookBucketsInput,
 ) -> IpcResult<Vec<LookBucketDto>> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::look_buckets(&app, &profile_id))
+    tauri::async_runtime::spawn_blocking(move || aura_app::look_buckets(&app, &input))
         .await
         .map_err(|_| background_request_failed())?
 }

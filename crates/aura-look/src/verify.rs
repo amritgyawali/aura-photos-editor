@@ -32,6 +32,7 @@ use aura_core::clock::Clock;
 use aura_core::contract::error::AuraResult;
 use aura_core::contract::look::{
     BucketResidual, LookAggregate, LookCode, LookProfile, LookReason, MATCH_DE00_CEILING,
+    MEASURED_COVERAGE_FLOOR,
 };
 use aura_core::contract::style::{LightingBucket, StyleDelta};
 use aura_raw::codec::Rgb8;
@@ -187,7 +188,11 @@ fn sample(frames: &[OwnFrame]) -> Vec<&OwnFrame> {
         return frames.iter().collect();
     }
     let stride = frames.len().div_ceil(MAX_REFINE_FRAMES).max(1);
-    frames.iter().step_by(stride).take(MAX_REFINE_FRAMES).collect()
+    frames
+        .iter()
+        .step_by(stride)
+        .take(MAX_REFINE_FRAMES)
+        .collect()
 }
 
 /// The probe [`crate::solve::refine`] walks against: the photographer's own frames, rendered.
@@ -306,13 +311,33 @@ pub fn weighted(residuals: &[BucketResidual], pick: fn(&BucketResidual) -> f32) 
         / total as f32
 }
 
-/// The reasons a set of residuals raises.
+/// How many frames a set of residuals was actually computed over.
+///
+/// The sum of the per-bucket counts, which is **not** the number of frames the look applies to:
+/// a bucket exists only where the reference and the photographer's own work both had frames in
+/// that light, and the global lean resolves for every frame regardless. See
+/// `LookMatchReport::measured_frames`.
 #[must_use]
-pub fn reasons_for(residuals: &[BucketResidual], user_edited: u32) -> Vec<LookReason> {
+pub fn measured_frames(residuals: &[BucketResidual]) -> u32 {
+    residuals
+        .iter()
+        .fold(0_u32, |total, row| total.saturating_add(row.frames))
+}
+
+/// The reasons a set of residuals raises.
+///
+/// `applied` is how many frames the look reaches, which is every frame handed to the pass.
+#[must_use]
+pub fn reasons_for(
+    residuals: &[BucketResidual],
+    applied: u32,
+    user_edited: u32,
+) -> Vec<LookReason> {
     let mut reasons = Vec::new();
     let after = weighted(residuals, |row| row.after_de00);
+    let measured = measured_frames(residuals);
 
-    if !residuals.is_empty() {
+    if measured > 0 {
         if after <= MATCH_DE00_CEILING {
             reasons.push(LookReason::measured(
                 LookCode::MatchReached,
@@ -327,6 +352,23 @@ pub fn reasons_for(residuals: &[BucketResidual], user_edited: u32) -> Vec<LookRe
             ));
         }
     }
+
+    // Raised before the two above would be read, because it is the sentence that decides how
+    // much either of them is worth.
+    if applied > 0 {
+        let coverage = measured as f32 / applied as f32;
+        if coverage < MEASURED_COVERAGE_FLOOR {
+            reasons.insert(
+                0,
+                LookReason::measured(
+                    LookCode::MatchPartlyMeasured,
+                    coverage,
+                    MEASURED_COVERAGE_FLOOR,
+                ),
+            );
+        }
+    }
+
     if user_edited > 0 {
         reasons.push(LookReason::counted(
             LookCode::UserEditPreserved,

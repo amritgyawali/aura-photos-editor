@@ -79,7 +79,29 @@ rather than a disabled button with no reason beside it.
 - because phase 18's rule is that a denominator goes on the wire, and a look applied over 40 % of a
 wedding is a look over 40 % of a wedding.
 
-## Decision 7 - `look` is its own client namespace
+## Decision 7 - `measure_look` is stoppable, through the command every long job uses
+
+`MeasureLookInput::cancel_id` registers a `CancelToken` with `AppState`, and the existing
+`cancel_job` command stops it. A second mechanism here would be a second answer to "is this still
+running", which is the shape phase 28 spent a rule avoiding.
+
+The check runs **between axes of the refinement**, not between its sweeps. One sweep is eleven axes
+times four steps times eight frames of rendering, so a check that only ran between sweeps would
+leave a photographer waiting through hundreds of renders after pressing Stop. It does not run
+between individual steps, because the running best is only consistent at an axis boundary.
+
+`MeasureLookDto::cancelled` is a field rather than an error, because stopping is a normal outcome:
+nothing was stored, nothing changed, and an error banner would read as a failure.
+
+## Decision 8 - `look_buckets` takes the project as well as the look
+
+A look is stored once and can be measured against several projects, so "what does this look ask for"
+and "what did it do here" are different questions. The first is answerable from the look alone; the
+second needs a project. Passing the project fills each row's `afterDe00` from that project's match
+report, and passing nothing leaves it `null` - which is the honest answer, because what a look did
+to one wedding says nothing about another.
+
+## Decision 9 - `look` is its own client namespace
 
 `ui/src/ipc/client.ts` has one namespace per phase and this is not folded into `style`. The two
 answer different questions from different evidence, and a caller that could reach either by
@@ -93,9 +115,9 @@ twenty-four JPEGs as a trained personal profile.
 | `look_status` | reads | Carries `networkTransportAvailable`, and both coverage numbers. |
 | `list_looks` | reads | Marks a look `stale` when the renderer has moved. |
 | `parse_reference` | reads | Synchronous, infallible, resolves nothing. |
-| `look_buckets` | reads | The matrix. Ten rows at most, one per kind of light. |
+| `look_buckets` | reads | The matrix. Ten rows at most, one per kind of light. Takes the project, to fill the measured column. |
 | `look_match_report` | reads | `null` until something has been measured. |
-| `measure_look` | acts | The only long one. Walks, decodes, renders, refines, stores. |
+| `measure_look` | acts | The only long one. Walks, decodes, renders, refines, stores. Stoppable via `cancel_job`. |
 | `select_look` | acts | Refused by the database for a look nobody has measured. |
 | `set_look_strength` | acts | Down only. |
 | `rename_look` | acts | |

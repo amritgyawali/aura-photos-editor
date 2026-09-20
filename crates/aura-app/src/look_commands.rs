@@ -40,6 +40,7 @@ use aura_core::contract::look::{
 };
 use aura_core::contract::style::LightingBucket;
 use aura_core::contract::tone::ToneService;
+use aura_core::progress::CancelToken;
 use aura_core::{PhotoId, ProfileId, ProjectId};
 use aura_look::verify::{OwnFrame, Renderer};
 use aura_look::MeasurePass;
@@ -49,9 +50,9 @@ use aura_render::cpu::Frame;
 
 use crate::commands::IpcResult;
 use crate::contract::ipc::{
-    IpcError, LookBucketDto, LookBucketResidualDto, LookMatchDto, LookProfileDto, LookProfileInput,
-    LookReasonDto, LookStatusDto, MeasureLookDto, MeasureLookInput, ReferenceOriginDto,
-    SelectLookInput, SetLookStrengthInput,
+    IpcError, LookBucketDto, LookBucketResidualDto, LookBucketsInput, LookMatchDto, LookProfileDto,
+    LookProfileInput, LookReasonDto, LookStatusDto, MeasureLookDto, MeasureLookInput,
+    ReferenceOriginDto, SelectLookInput, SetLookStrengthInput,
 };
 use crate::state::AppState;
 
@@ -145,12 +146,26 @@ pub fn parse_reference(address: &str) -> ReferenceOriginDto {
 /// # Errors
 ///
 /// `AURA-ML-5147` when the look is not stored.
-pub fn look_buckets(state: &AppState, profile_id: &str) -> IpcResult<Vec<LookBucketDto>> {
-    let id = parse_profile(profile_id)?;
+pub fn look_buckets(state: &AppState, input: &LookBucketsInput) -> IpcResult<Vec<LookBucketDto>> {
+    let id = parse_profile(&input.profile_id)?;
     let Some(look) = state.look().profile(id)? else {
         return Err(IpcError::from(aura_core::errors::ml::look_refused(
             "that look is not stored",
         )));
+    };
+
+    // What this look actually did on this project, when it has been measured here. A look
+    // measured on a different project has no row and every `afterDe00` stays `None` - which is
+    // the honest answer, because what a look did to one wedding says nothing about another.
+    let measured = match input.project_id.as_deref() {
+        Some(project) => {
+            let project = parse_project(project)?;
+            state
+                .look()
+                .match_report(project)?
+                .filter(|report| report.profile == id)
+        }
+        None => None,
     };
 
     Ok(LightingBucket::ALL
@@ -170,9 +185,16 @@ pub fn look_buckets(state: &AppState, profile_id: &str) -> IpcResult<Vec<LookBuc
                 contrast: bucket.delta.contrast,
                 vibrance: bucket.delta.vibrance,
                 saturation: bucket.delta.saturation,
-                // Filled from the match report rather than from the bucket, because a bucket
-                // knows what it asked for and only a measurement knows what happened.
-                after_de00: None,
+                // From the match report rather than from the bucket, because a bucket knows what
+                // it asked for and only a measurement knows what happened. `None` where nothing
+                // was measured in this light, never zero.
+                after_de00: measured.as_ref().and_then(|report| {
+                    report
+                        .buckets
+                        .iter()
+                        .find(|row| row.lighting == lighting)
+                        .map(|row| row.after_de00)
+                }),
             })
         })
         .collect())
@@ -218,6 +240,13 @@ pub fn measure_look(state: &AppState, input: &MeasureLookInput) -> IpcResult<Mea
     let frames = own_frames(state, project, cap)?;
     let renderer = Renderer::new(Arc::clone(state.clock()), OutputSpec::default());
 
+    // Registered before the pass starts and removed however it ends, including on the error
+    // path - a token left in the map is a job id that can never be reused and a `cancel_job`
+    // that silently succeeds against nothing.
+    let cancel = CancelToken::new();
+    if let Some(id) = input.cancel_id.as_deref() {
+        state.register_job(id, cancel.clone());
+    }
     let pass = MeasurePass::new(state.look_store(), Arc::clone(state.clock()), name);
     let request = aura_look::api::MeasureRequest {
         address: &input.address,
@@ -227,7 +256,11 @@ pub fn measure_look(state: &AppState, input: &MeasureLookInput) -> IpcResult<Mea
         frames: &frames,
         renderer: &renderer,
     };
-    let report = pass.run(&request, || false)?;
+    let report = pass.run(&request, || cancel.is_cancelled());
+    if let Some(id) = input.cancel_id.as_deref() {
+        state.finish_job(id);
+    }
+    let report = report?;
 
     let stored = match report.profile {
         Some(id) => state.look().profile(id)?,
@@ -240,6 +273,7 @@ pub fn measure_look(state: &AppState, input: &MeasureLookInput) -> IpcResult<Mea
 
     Ok(MeasureLookDto {
         profile: report.profile.map(|id| id.to_db()),
+        cancelled: report.cancelled,
         found: u32::try_from(report.found).unwrap_or(u32::MAX),
         measured: u32::try_from(report.measured).unwrap_or(u32::MAX),
         refused: u32::try_from(report.refused).unwrap_or(u32::MAX),
@@ -512,6 +546,8 @@ fn match_dto(report: &LookMatchReport) -> LookMatchDto {
         realised_share: report.realised_share(),
         reached: report.reached(),
         frames: report.frames,
+        measured_frames: report.measured_frames,
+        measured_coverage: report.measured_coverage(),
         user_edited: report.user_edited,
         buckets: report
             .buckets

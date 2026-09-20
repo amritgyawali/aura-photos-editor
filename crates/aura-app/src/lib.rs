@@ -169,6 +169,10 @@ pub use learn_commands::{
 pub use local_commands::{
     accept_local, image_local, local_review_queue, local_status, sculpt_local, set_local_strength,
 };
+pub use look_commands::{
+    forget_look, list_looks, look_buckets, look_match_report, look_status, measure_look,
+    parse_reference, rename_look, select_look, set_look_strength,
+};
 pub use mask_commands::{
     edit_mask, ensure_masks, image_masks, mask_allowance, mask_kinds, mask_overlay, mask_status,
     regenerate_mask,
@@ -207,10 +211,6 @@ pub use state::AppState;
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
     segment_story, set_chapter, split_chapter, story_outline, story_status,
-};
-pub use look_commands::{
-    forget_look, list_looks, look_buckets, look_match_report, look_status, measure_look,
-    parse_reference, rename_look, select_look, set_look_strength,
 };
 pub use style_commands::{
     adopt_profile, compare_profiles, export_profile, import_profile, list_profiles, profile_pairs,

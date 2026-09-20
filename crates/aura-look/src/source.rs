@@ -107,9 +107,8 @@ impl Reference {
 /// [`LookCode::ReferenceUnreadable`] and carries on with the rest of the folder, because one
 /// unreadable file in a folder of four hundred is not a reason to refuse a look.
 pub fn decode(file: &ReferenceFile) -> AuraResult<Rgb8> {
-    let bytes = std::fs::read(&file.path).map_err(|error| {
-        look_reference_refused(format!("{}: {error}", file.path.display()))
-    })?;
+    let bytes = std::fs::read(&file.path)
+        .map_err(|error| look_reference_refused(format!("{}: {error}", file.path.display())))?;
     decode_jpeg(&bytes, DecodeLimits::tier1())
 }
 
@@ -141,11 +140,7 @@ pub fn export_media_root(root: &Path) -> Option<PathBuf> {
 /// [`aura_core::errors::ml::ML_LOOK_REFERENCE_REFUSED`] when the address will not parse, when the
 /// route is one this build cannot fetch through, when the folder is not a folder, or when it
 /// holds fewer than [`MIN_REFERENCES`] readable photographs.
-pub fn resolve(
-    address: &str,
-    source: MediaSource,
-    folder: Option<&Path>,
-) -> AuraResult<Reference> {
+pub fn resolve(address: &str, source: MediaSource, folder: Option<&Path>) -> AuraResult<Reference> {
     let origin = if address.trim().is_empty() {
         ReferenceOrigin::Local {
             label: folder
@@ -178,7 +173,10 @@ pub fn resolve(
     }
 
     let mut reasons = Vec::new();
-    if matches!(origin, ReferenceOrigin::Instagram { .. } | ReferenceOrigin::Web { .. }) {
+    if matches!(
+        origin,
+        ReferenceOrigin::Instagram { .. } | ReferenceOrigin::Web { .. }
+    ) {
         reasons.push(LookReason::bare(LookCode::OriginRecordedNotFetched));
     }
 

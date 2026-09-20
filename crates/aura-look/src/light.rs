@@ -125,8 +125,10 @@ pub fn bucket(reading: &ReferenceReading) -> (LightingBucket, f32) {
     // 2,600 K is a tungsten room with one fluorescent in the corner, and the room is what the
     // photographer graded for.
     let bucket = if reading.mid.a <= ARTIFICIAL_GREEN
-        && matches!(bucket, LightingBucket::GoldenHour | LightingBucket::Daylight)
-    {
+        && matches!(
+            bucket,
+            LightingBucket::GoldenHour | LightingBucket::Daylight
+        ) {
         LightingBucket::Artificial
     } else {
         bucket

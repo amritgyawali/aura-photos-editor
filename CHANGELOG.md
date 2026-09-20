@@ -65,6 +65,23 @@ override and a database CHECK.
 ninety per cent of a large difference worked, and one that landed inside the ceiling because there
 was nothing to close is not a result.
 
+**And it says how much of the gallery that figure describes.** The distance is a frame-weighted mean
+over the lighting buckets, and a bucket exists only where the reference *and* this wedding both had
+frames in that light - so a wedding shot mostly under a light the page never worked in produces a
+real number about a small slice of it. `measured_frames` sits beside `frames`, derived from the
+bucket rows rather than stored where it could drift, and a match that measured nothing reports that
+rather than reading `0.0 dE00` as a perfect score. Phase 18's rule where one number was the most
+flattering thing available.
+
+**Measuring is stoppable and stopping stores nothing.** It renders a sample of the wedding twice and
+refines over eleven axes, so it runs for minutes. The cancellation check sits between axes rather
+than between sweeps - a sweep is hundreds of renders, and a Stop button that takes one to respond is
+a Stop button nobody believes. A cancelled pass leaves the catalog exactly as it was.
+
+**The panel shows what a look does in each light**, as a table with the reference count behind each
+row, what it changes there, and how close that light's own photographs actually landed - a dash
+rather than a zero where nothing was measured.
+
 New crate `aura-look`; migration 31 with six tables, two views and three triggers; three error codes
 with runbooks; ten IPC commands; a panel mounted first in the sidebar; `aura-cli verify --phase 31`
 as the gate. ADR-0063 and ADR-0064 record the decisions, `docs/match-a-look.md` says it in the

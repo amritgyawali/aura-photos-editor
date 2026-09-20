@@ -5137,8 +5137,18 @@ export interface LookMatchDto {
   realisedShare: number;
   /** True when the whole match reached the ceiling. */
   reached: boolean;
-  /** How many frames it was measured over. */
+  /** How many of the project's frames the look was applied to. */
   frames: number;
+  /**
+   * How many of them the distance was actually computed over.
+   *
+   * Both numbers, because they differ. A bucket exists only where the reference and this
+   * wedding both had frames in that light, so a wedding shot mostly under a light the reference
+   * never worked in produces a real figure about a small slice of it.
+   */
+  measuredFrames: number;
+  /** What share of the applied frames that is, `0..1`. */
+  measuredCoverage: number;
   /** How many carried a hand edit, which was preserved. */
   userEdited: number;
   /** One row per lighting bucket that had frames on both sides. */
@@ -5180,12 +5190,33 @@ export interface MeasureLookInput {
   name: string;
   /** How many of the project's own frames to measure the baseline over. */
   baselineFrames?: number | null;
+  /**
+   * A handle to pass to `cancelJob` to stop the pass.
+   *
+   * Measuring decodes every reference photograph and renders a sample of the wedding twice, so
+   * it runs for minutes. A long operation with no way to stop it is one somebody force-quits.
+   */
+  cancelId?: string | null;
+}
+
+/** Which look's buckets to read, and which project's measurements to put beside them. */
+export interface LookBucketsInput {
+  /** The look. */
+  profileId: string;
+  /** The project whose measured match fills `afterDe00`, when there is one. */
+  projectId?: string | null;
 }
 
 /** What a measuring pass did. */
 export interface MeasureLookDto {
-  /** The look that came out, when one did. */
+  /**
+   * The look that came out, when one did.
+   *
+   * `null` when the pass was cancelled, which is a normal outcome: nothing was stored.
+   */
   profile: string | null;
+  /** True when the photographer stopped it. */
+  cancelled: boolean;
   /** Reference photographs the walk found. */
   found: number;
   /** Reference photographs that read. */

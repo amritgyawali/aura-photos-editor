@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { asIpcError, inTauri, look as lookApi } from '../../ipc/client';
+import { api, asIpcError, inTauri, look as lookApi } from '../../ipc/client';
 import type {
+  LookBucketDto,
   LookMatchDto,
   LookProfileDto,
   LookStatusDto,
@@ -92,15 +93,59 @@ export function matchSentence(matched: LookMatchDto | null): string {
   if (matched.frames === 0) {
     return 'There were no analysed photographs to measure this look against.';
   }
+  if (matched.measuredFrames === 0) {
+    // The look still applies - the overall lean reaches every frame - but nothing in this
+    // wedding was made in a light the reference also worked in, so there is no figure. Saying
+    // "0.0 dE00" here would be the most flattering possible way to report having measured
+    // nothing.
+    return 'None of your photographs were made in light this reference also worked in, so AURA has no figure for how close they are. The look still applies.';
+  }
   if (matched.beforeDe00 <= 0.0001) {
     return 'Your photographs already sat where that reference sits, so nothing needed to change.';
   }
   const closed = percent(matched.realisedShare);
-  const base = `Your photographs moved ${closed} of the way toward that reference, measured over ${matched.frames} of them.`;
+  // Both denominators when they differ. The figure describes the frames it was computed over,
+  // and claiming it describes the whole gallery is the one thing this sentence must not do.
+  const over =
+    matched.measuredFrames < matched.frames
+      ? `measured over ${matched.measuredFrames} of the ${matched.frames} it applies to`
+      : `measured over all ${matched.frames} of them`;
+  const base = `Your photographs moved ${closed} of the way toward that reference, ${over}.`;
   if (matched.userEdited > 0) {
     return `${base} ${matched.userEdited} you had edited by hand were left exactly as you made them.`;
   }
   return base;
+}
+
+/**
+ * What one row of the bucket matrix says.
+ *
+ * A look is conditioned on light and on nothing else, so this is the only place a photographer
+ * can see that it treats candlelight differently from open shade. `afterDe00` is `null` where
+ * nothing was measured in that light, and the row says so rather than showing a zero.
+ */
+export function bucketSentence(bucket: LookBucketDto): string {
+  if (!bucket.applied) {
+    return 'Too few reference photographs in this light to be sure, so the overall look is used.';
+  }
+  const moves: string[] = [];
+  if (Math.abs(bucket.exposure) >= 0.02) {
+    moves.push(`${bucket.exposure > 0 ? '+' : ''}${bucket.exposure.toFixed(2)} EV`);
+  }
+  if (Math.abs(bucket.temperatureK) >= 10) {
+    moves.push(`${bucket.temperatureK > 0 ? 'warmer' : 'cooler'} by ${Math.abs(Math.round(bucket.temperatureK))} K`);
+  }
+  if (Math.abs(bucket.contrast) >= 1) {
+    moves.push(`${bucket.contrast > 0 ? 'more' : 'less'} contrast`);
+  }
+  if (Math.abs(bucket.vibrance) >= 1 || Math.abs(bucket.saturation) >= 1) {
+    const strength = bucket.vibrance + bucket.saturation;
+    moves.push(`${strength > 0 ? 'stronger' : 'softer'} colour`);
+  }
+  if (moves.length === 0) {
+    return 'Nothing to change in this light.';
+  }
+  return moves.join(', ');
 }
 
 /**
@@ -146,9 +191,12 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
   const [folder, setFolder] = useState('');
   const [name, setName] = useState('');
 
+  const [buckets, setBuckets] = useState<LookBucketDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [result, setResult] = useState<MeasureLookDto | null>(null);
+  // Stable for the life of the panel, so a stop press always names the pass that is running.
+  const [cancelId] = useState(() => `look-${Math.random().toString(36).slice(2, 10)}`);
 
   const report = useCallback(
     (error: unknown) => {
@@ -183,6 +231,27 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
       report(error);
     }
   }, [projectId, report]);
+
+  // The matrix for whichever look this project uses. Passing the project is what fills each
+  // row's measured figure; without it a row can only say what the look asks for.
+  useEffect(() => {
+    if (!inTauri() || !status?.selected) {
+      setBuckets([]);
+      return;
+    }
+    let cancelled = false;
+    void lookApi
+      .lookBuckets({ profileId: status.selected, projectId })
+      .then((rows: LookBucketDto[]) => {
+        if (!cancelled) {
+          setBuckets(rows);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, status?.selected]);
 
   useEffect(() => {
     void refresh();
@@ -223,6 +292,7 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
         source,
         folder: folder.trim().length > 0 ? folder.trim() : null,
         name: name.trim(),
+        cancelId,
       });
       setResult(next);
       setMatched(next.matched);
@@ -234,7 +304,22 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
     } finally {
       setBusy(false);
     }
-  }, [address, busy, folder, name, projectId, refresh, report, source]);
+  }, [address, busy, cancelId, folder, name, projectId, refresh, report, source]);
+
+  // Stopping is its own call rather than a flag on the pass: `cancel_job` is the command every
+  // long job in this product is stopped with, and a second mechanism here would be a second
+  // answer to "is this still running".
+  const stop = useCallback(async () => {
+    if (!inTauri() || !busy) {
+      return;
+    }
+    setProgress('Stopping...');
+    try {
+      await api.cancelJob(cancelId);
+    } catch (error) {
+      report(error);
+    }
+  }, [busy, cancelId, report]);
 
   const select = useCallback(
     async (profileId: string | null) => {
@@ -349,12 +434,31 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
 
       <p className="match-look-coverage">{coverageSentence(status)}</p>
 
-      <button type="button" onClick={() => void measure()} disabled={!canMeasure}>
-        {busy ? 'Measuring...' : 'Measure this look'}
-      </button>
+      <div className="match-look-actions">
+        <button type="button" onClick={() => void measure()} disabled={!canMeasure}>
+          {busy ? 'Measuring...' : 'Measure this look'}
+        </button>
+        {busy && (
+          <button type="button" className="match-look-stop" onClick={() => void stop()}>
+            Stop
+          </button>
+        )}
+      </div>
       {progress && <p className="match-look-progress">{progress}</p>}
+      {busy && (
+        <p className="match-look-note">
+          AURA is reading every reference photograph and rendering a sample of your wedding twice.
+          On a large reference this takes a few minutes. Stopping leaves everything as it is.
+        </p>
+      )}
 
-      {result && (
+      {result?.cancelled && (
+        <p className="match-look-result" role="status">
+          You stopped that measurement, so nothing was stored and nothing changed.
+        </p>
+      )}
+
+      {result && !result.cancelled && (
         <div className="match-look-result" role="status">
           <p>
             Read {result.measured} of {result.found} reference photographs
@@ -400,6 +504,43 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {buckets.length > 0 && (
+        <div className="match-look-matrix">
+          <h3>What this look does in each light</h3>
+          {/* The only axis this look has. A reference photograph does not say whether it is a
+              ceremony or a reception, so there is nothing here about subject - and the note
+              below says so rather than leaving a photographer to infer it. */}
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Light</th>
+                <th scope="col">Reference photographs</th>
+                <th scope="col">What it changes</th>
+                <th scope="col">How close yours land</th>
+              </tr>
+            </thead>
+            <tbody>
+              {buckets.map((bucket) => (
+                <tr key={bucket.lighting} className={bucket.weak ? 'weak' : undefined}>
+                  <th scope="row">{bucket.title}</th>
+                  <td>{bucket.samples}</td>
+                  <td>{bucketSentence(bucket)}</td>
+                  <td>
+                    {/* `null` and zero mean opposite things here, so they never render the
+                        same: nothing measured in this light is a dash. */}
+                    {bucket.afterDe00 === null ? '—' : `${bucket.afterDe00.toFixed(1)} dE00`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="match-look-note">
+            A look is measured by kind of light, not by what the photograph is of. A page does not
+            say which of its photographs are ceremonies, so AURA does not guess.
+          </p>
         </div>
       )}
 

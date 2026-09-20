@@ -237,9 +237,11 @@ impl LookStore {
                 })
                 .map_err(|err| statement_failed("query look_profile row", &err))?;
             match rows.next() {
-                Some(row) => Ok(Some(
-                    row.map_err(|err| statement_failed("read look_profile row", &err))?,
-                )),
+                Some(row) => {
+                    Ok(Some(row.map_err(|err| {
+                        statement_failed("read look_profile row", &err)
+                    })?))
+                }
                 None => Ok(None),
             }
         })?;
@@ -446,9 +448,11 @@ impl LookStore {
                 })
                 .map_err(|err| statement_failed("query look_match", &err))?;
             match rows.next() {
-                Some(row) => Ok(Some(
-                    row.map_err(|err| statement_failed("read look_match", &err))?,
-                )),
+                Some(row) => {
+                    Ok(Some(row.map_err(|err| {
+                        statement_failed("read look_match", &err)
+                    })?))
+                }
                 None => Ok(None),
             }
         })?;
@@ -462,14 +466,21 @@ impl LookStore {
 
         let buckets: Vec<BucketResidual> = serde_json::from_str(&buckets).unwrap_or_default();
         let user_edited = u32::try_from(user_edited).unwrap_or(0);
+        let applied = u32::try_from(frames).unwrap_or(0);
+        // Derived from the stored bucket rows rather than kept in a column of its own. It is a
+        // sum of numbers already on the row, and a second copy of a derived value is a second
+        // copy that can disagree with the first - which is the defect phase 26 found in its own
+        // storage note and phase 31's `shrink_of` avoids the same way.
+        let measured = crate::verify::measured_frames(&buckets);
         Ok(Some(LookMatchReport {
             profile,
             project,
-            reasons: crate::verify::reasons_for(&buckets, user_edited),
+            reasons: crate::verify::reasons_for(&buckets, applied, user_edited),
             buckets,
             before_de00: before as f32,
             after_de00: after as f32,
-            frames: u32::try_from(frames).unwrap_or(0),
+            frames: applied,
+            measured_frames: measured,
             user_edited,
         }))
     }
@@ -565,9 +576,11 @@ impl LookStore {
                 })
                 .map_err(|err| statement_failed("query project_look", &err))?;
             match rows.next() {
-                Some(row) => Ok(Some(
-                    row.map_err(|err| statement_failed("read project_look", &err))?,
-                )),
+                Some(row) => {
+                    Ok(Some(row.map_err(|err| {
+                        statement_failed("read project_look", &err)
+                    })?))
+                }
                 None => Ok(None),
             }
         })?;
