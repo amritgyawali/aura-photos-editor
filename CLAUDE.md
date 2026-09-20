@@ -143,6 +143,9 @@ Never load two phase files into one session.
 | Release checklist, signing, rollout and flags | `ops/release/`, `ops/sign/`, `ops/notarise/`, `ops/update/`, `ops/flags/` |
 | How a release ships | `docs/release-process.md` |
 | What leaves the machine, and what does not | `docs/privacy.md` |
+| Reference-look decisions | `docs/adr/ADR-0063-reference-look-matching.md` |
+| What matching a look does, in the product's own words | `docs/match-a-look.md` |
+| Look evaluation gates | `tests/eval/look_eval.rs` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build
@@ -1891,6 +1894,82 @@ first fixture proposed 45 changes and `LearningUpdate::validate` refuses anythin
 be recorded - `AURA-ML-5054` refuses a code that is not in the shipped registry, and every unit test
 passed because each exercised the kind that worked. The registry now covers `ToneCode`, `ColourCode`,
 `CurateCode` and `QcCode`, and `docs/reason-codes.md` is regenerated at 227 codes.
+
+Phase 31 is implemented conditionally, and it is the first phase past the end of the plan.
+`aura-core::contract::look` freezes the three media sources, the reference origin, the seven tone
+landmarks, the zone tint, the band reading, the reference reading, the aggregate, the bucket, the
+diagnostics, the profile, twenty-two reason codes, the bucket residual, the match report, the
+outline, the override and `LookService`; `aura-look` measures somebody else's finished work.
+`source.rs` turns an address into provenance and a folder into files, understands an Instagram data
+export's own layout, and **refuses the one route a photographer actually wants**; `measure.rs`
+decodes once and takes eleven readings in two colour spaces on purpose; `light.rs` sorts a frame
+into one of ten lights from its pixels alone and never returns `Flash`; `aggregate.rs` folds with
+medians and a MAD; `solve.rs` subtracts, shrinks, bounds, and then walks every parameter **through
+the real renderer** until the distance stops falling; `verify.rs` renders both sides and measures
+what moved; `materialise.rs` writes the answer into phase 17's frozen `StyleProfile`; `store.rs`
+owns migration 31 and `api.rs` is the frozen service and the pass. Migration 31 stores six tables,
+two views and three triggers; three error codes ship with runbooks; ten IPC commands (ADR-0064) feed
+a panel mounted **first** in the sidebar; and `aura-cli verify --phase 31` is the executable gate.
+Its exit report is `docs/progress/PHASE-31-EXIT.md`.
+
+**This phase ships no model** - the eleventh since phase 08 - and the reason is phase 27's rather
+than phase 24's: a model would be worse than a measurement. What a reference photograph says about
+a look is a set of distribution statistics, whose failure mode is describing a page imprecisely; a
+head trained to "recognise a look" on data that does not exist would describe it confidently and
+wrongly. Every gate is measured against synthetic pages whose look was authored, applied by an
+analytic transform, and read back through the real measurer. That is condition C1 and a Sev 2
+trigger. **C2 is the headline and it is the one to close first: nobody has shown a photographer a
+matched gallery beside the page it was matched to**, so the claim the whole feature exists to make
+is unmeasured. C3 is that nothing can be fetched.
+
+Five rules that phase 31 adds and every later phase inherits:
+
+- **`LookService` is the only way to ask what somebody else's look is.** Twenty-eighth service of
+  its kind and the first whose subject is **another person's work**. Deliberately not
+  `StyleService`: a profile fitted from three hundred of a photographer's own matched pairs and a
+  look measured off twenty-four of somebody else's JPEGs carry different evidence, and a caller that
+  could not tell them apart would report the second with the confidence of the first.
+- **A reference is measured, never reverse-engineered.** There is no fitter here and there could not
+  be one, because the input has no original. Phase 17 asks "what did they do"; this asks "what does
+  it look like", and the second question is the only one a finished JPEG can answer. Any later phase
+  recovering an edit from a file it did not make has misunderstood what it has to work with.
+- **A capability the build does not have is a sentence, not an omission.** `MediaSource::PublicUrl`
+  is offered, disabled, and explained with what to do instead in the same breath. Omitting it is
+  tidier and leaves a photographer hunting for the setting they think they missed. Phase 03 put the
+  hardware on the wire and phase 30 put `NETWORK_TRANSPORT_AVAILABLE` there; this is the first time
+  the missing capability is the thing somebody came for.
+- **A look is applied before the guards, and every guard re-runs after it.** Phase 17's rule
+  inherited unchanged and load-bearing here rather than merely true: it is the *whole* of this
+  phase's skin defence, because there is no skin term in a look to bound. There is no skin field on
+  the profile, no skin column in migration 31, and a zero written into every band's hue - a rotation
+  solved from a whole-frame statistic moves every pixel in that band, and most of a face at every
+  skin tone is in the orange one.
+- **A result that cannot be measured is not produced.** `materialise::into_style` takes the measured
+  report as an argument rather than an `Option`, because `ProfileDiagnostics::overall_de00` is an
+  `f32` and a look materialised before `verify::measure` ran would put a zero exactly where every
+  panel in this product renders a perfect match.
+
+Three things phase 31 got wrong first, all worth generalising:
+
+**A handle parser that read the most ordinary input as something else.** The first rule was "no dot
+and no slash means a handle", and Instagram handles legitimately contain dots - so `@some.photographer`
+went down the web-address branch. The fix made the rule about *structure* rather than about
+punctuation, and closed a worse half of the same defect: `../../etc/passwd` has a dot and a slash and
+was being recorded as a web reference. It is only ever a label and nothing dereferences it, which is
+exactly why it would have survived review.
+
+**A refinement whose cost grew with the size of the wedding.** The probe rendered every frame it was
+given and the search calls it a hundred and thirty-two times, so a thousand-frame project would have
+spent a hundred and thirty thousand renders pinning down a median that eight frames already pin
+down. The bound is on the *refinement* and not on the measurement, because the measured figure is
+about a photographer's gallery rather than about a sample of it - and conflating the two is how a
+report starts flattering itself.
+
+**A baseline that would have been a measurement of mid grey.** `CatalogFrames` returns a neutral
+frame for a photograph whose proxy is not built yet, which is right for a develop panel that must
+open on the night of a wedding and catastrophic for a residual: every look would have been the
+difference between a page and a rectangle. `own_frames` reads the real proxy and **skips** what it
+cannot get. Fourth time this product has chosen a smaller honest answer over a larger silent one.
 
 Five rules that phase 13 adds and every later phase inherits:
 

@@ -76,6 +76,7 @@ pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
 pub mod local_commands;
+pub mod look_commands;
 pub mod mask_commands;
 pub mod micro_commands;
 pub mod moment_commands;
@@ -167,6 +168,10 @@ pub use learn_commands::{
 };
 pub use local_commands::{
     accept_local, image_local, local_review_queue, local_status, sculpt_local, set_local_strength,
+};
+pub use look_commands::{
+    forget_look, list_looks, look_buckets, look_match_report, look_status, measure_look,
+    parse_reference, rename_look, select_look, set_look_strength,
 };
 pub use mask_commands::{
     edit_mask, ensure_masks, image_masks, mask_allowance, mask_kinds, mask_overlay, mask_status,

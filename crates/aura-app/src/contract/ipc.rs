@@ -8574,3 +8574,300 @@ pub struct DiagnosticsDto {
     /// The last few error codes, newest first, with their runbooks.
     pub recent_errors: Vec<IpcError>,
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-31. Matching a look somebody else published.
+// ---------------------------------------------------------------------------
+
+/// What the match-a-look card on the first screen shows.
+///
+/// **`networkTransportAvailable` is on the wire and it is false**, which is the one thing a
+/// photographer needs to know before they paste a link. The panel reads it and renders the
+/// folder picker as the route that works, rather than offering a fetch button that always
+/// fails. Phase 03 put `hardware` on the wire for the same reason and phase 30 put
+/// `NETWORK_TRANSPORT_AVAILABLE` there: a capability this build does not have is a sentence a
+/// photographer reads, not a support case.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookStatusDto {
+    /// Looks in the catalog.
+    pub profiles: u32,
+    /// The look this project uses, when one is selected.
+    pub selected: Option<String>,
+    /// What it is called.
+    pub selected_name: String,
+    /// Which page it came from, rendered.
+    pub selected_origin: String,
+    /// How strongly it is applied, `0..1`.
+    pub strength: f32,
+    /// How many of this project's photographs a look can be applied to.
+    pub appliable: u32,
+    /// How many photographs the project holds.
+    pub photographs: u32,
+    /// What fraction carries a phase 15 and 16 decision, `0..1`.
+    ///
+    /// The denominator, on the wire beside the numerator. Phase 18's rule: a look over 40 % of
+    /// a wedding is a look over 40 % of a wedding, and a panel that showed only the ratio would
+    /// let somebody read it as a quality figure.
+    pub baseline_coverage: f32,
+    /// False on this build. See the type's own documentation.
+    pub network_transport_available: bool,
+}
+
+/// One stored look, as the panel lists it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookProfileDto {
+    /// The look.
+    pub id: String,
+    /// What the photographer calls it.
+    pub name: String,
+    /// Which page or body of work it came from, rendered for a person.
+    pub origin: String,
+    /// The origin's kind: `instagram`, `web` or `local`.
+    pub origin_kind: String,
+    /// How the files arrived: `folder`, `instagram_export` or `public_url`.
+    pub source: String,
+    /// How many reference photographs it was measured from.
+    pub references: u32,
+    /// How strong it is, `0..1`.
+    pub strength: f32,
+    /// How many lighting buckets it answers for.
+    pub buckets: u32,
+    /// When it was measured, in milliseconds since the Unix epoch.
+    pub measured_at: i64,
+    /// The one sentence, rendered from codes rather than stored.
+    pub summary: String,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<LookReasonDto>,
+    /// True when the renderer has moved since it was measured, so it is not applied.
+    pub stale: bool,
+}
+
+/// One reason, with its number and what it was held to.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookReasonDto {
+    /// The stable slug.
+    pub code: String,
+    /// The sentence, rendered from the code. Never stored.
+    pub sentence: String,
+    /// The measurement, when there is one.
+    pub value: Option<f32>,
+    /// What it was compared against, when there is one.
+    pub threshold: Option<f32>,
+    /// True when a photographer can do something about it.
+    pub actionable: bool,
+}
+
+/// Which look's buckets to read, and which project's measurements to put beside them.
+///
+/// Two arguments because they are two facts. A look is stored once and can be measured against
+/// several projects, so "what does this look ask for" and "what did it do here" are different
+/// questions - and `afterDe00` is the second one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookBucketsInput {
+    /// The look.
+    pub profile_id: String,
+    /// The project whose measured match fills `afterDe00`, when there is one.
+    pub project_id: Option<String>,
+}
+
+/// One kind of light, as the matrix renders it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookBucketDto {
+    /// The lighting slug.
+    pub lighting: String,
+    /// What the matrix calls it.
+    pub title: String,
+    /// How many reference photographs are in it.
+    pub samples: u32,
+    /// How sure it is, `0..1`.
+    pub confidence: f32,
+    /// True when it is at or below the weak threshold.
+    pub weak: bool,
+    /// True when it is applied at all, which needs confidence above the apply threshold.
+    pub applied: bool,
+    /// The shift, as the panel's sliders read it.
+    pub exposure: f32,
+    /// Kelvin.
+    pub temperature_k: f32,
+    /// Recipe units.
+    pub tint: f32,
+    /// Recipe units.
+    pub contrast: f32,
+    /// Recipe units.
+    pub vibrance: f32,
+    /// Recipe units.
+    pub saturation: f32,
+    /// The measured distance this bucket reached, when a match has been measured.
+    ///
+    /// `None` rather than zero when nothing was measured. Phase 17's own comment about
+    /// `match_de00` and phase 29's about a tuple's third element: a zero in a dE00 field is
+    /// rendered by somebody, once, as a perfect match.
+    pub after_de00: Option<f32>,
+}
+
+/// What matching a look did to a project, measured.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookMatchDto {
+    /// Which look.
+    pub profile: String,
+    /// How far the gallery sat from the reference before, in dE00.
+    pub before_de00: f32,
+    /// How far it sits after.
+    pub after_de00: f32,
+    /// What fraction of the gap was closed, `0..1`. What the panel leads with.
+    pub realised_share: f32,
+    /// True when the whole match reached the ceiling.
+    pub reached: bool,
+    /// How many of the project's frames the look was applied to.
+    pub frames: u32,
+    /// How many of them the distance was actually computed over.
+    ///
+    /// **Both numbers, because they differ.** A bucket exists only where the reference and this
+    /// wedding both had frames in that light, so a wedding shot mostly under a light the
+    /// reference never worked in produces a real figure about a small slice of it. Reporting
+    /// only `frames` would say "measured over sixty" about a number that came from twelve.
+    pub measured_frames: u32,
+    /// What share of the applied frames that is, `0..1`.
+    pub measured_coverage: f32,
+    /// How many carried an edit the photographer made by hand, which was preserved.
+    pub user_edited: u32,
+    /// One row per lighting bucket that had frames on both sides.
+    pub buckets: Vec<LookBucketResidualDto>,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<LookReasonDto>,
+}
+
+/// One bucket's measured movement.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookBucketResidualDto {
+    /// The lighting slug.
+    pub lighting: String,
+    /// What the panel calls it.
+    pub title: String,
+    /// Before, in dE00.
+    pub before_de00: f32,
+    /// After, in dE00.
+    pub after_de00: f32,
+    /// What fraction of the gap closed, `0..1`.
+    pub realised_share: f32,
+    /// How many frames.
+    pub frames: u32,
+}
+
+/// What a photographer typed into the address box, read back.
+///
+/// Returned as they type so the box can show the handle it understood. **It resolves nothing
+/// and contacts nothing** - a handle that does not exist reads exactly as well as one that
+/// does - so the panel never renders a tick, only the parsed name.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceOriginDto {
+    /// `instagram`, `web` or `local`.
+    pub kind: String,
+    /// The handle, the address or the label.
+    pub title: String,
+    /// The catalog key, for a caller that wants to store it.
+    pub key: String,
+    /// True when the text parsed at all.
+    pub understood: bool,
+    /// Why not, when it did not. A sentence from the error rather than free text.
+    pub refusal: Option<String>,
+}
+
+/// Where to measure a look from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeasureLookInput {
+    /// The project the look is measured against and stored for.
+    pub project_id: String,
+    /// What the photographer typed into the address box. May be empty.
+    pub address: String,
+    /// Which route: `folder`, `instagram_export` or `public_url`.
+    pub source: String,
+    /// The folder of reference photographs.
+    pub folder: Option<String>,
+    /// What to call the look. Empty means the origin's own title.
+    pub name: String,
+    /// How many of the project's own frames to measure the baseline over.
+    ///
+    /// A cap rather than a preference: the baseline is a median, and a median over sixty frames
+    /// and one over a thousand differ by far less than the time the second costs.
+    pub baseline_frames: Option<u32>,
+    /// A handle the caller can pass to `cancel_job` to stop the pass.
+    ///
+    /// Measuring a look decodes every reference photograph and renders a sample of the wedding
+    /// twice, so it runs for minutes on a real reference. A long operation with no way to stop
+    /// it is one a photographer force-quits, and a force-quit during a catalog write is the one
+    /// thing this product spends a lot of effort making survivable.
+    pub cancel_id: Option<String>,
+}
+
+/// What a measuring pass did.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MeasureLookDto {
+    /// The look that came out, when one did.
+    ///
+    /// `None` when the pass was cancelled, which is a normal outcome and not a failure: nothing
+    /// was stored and nothing was changed.
+    pub profile: Option<String>,
+    /// True when the photographer stopped it.
+    pub cancelled: bool,
+    /// Reference photographs the walk found.
+    pub found: u32,
+    /// Reference photographs that read.
+    pub measured: u32,
+    /// Reference photographs that were refused.
+    pub refused: u32,
+    /// The photographer's own frames the baseline was measured over.
+    pub baseline_frames: u32,
+    /// Lighting buckets populated.
+    pub buckets: u32,
+    /// What the match measured, when there were frames to measure it on.
+    pub matched: Option<LookMatchDto>,
+    /// The one sentence.
+    pub summary: String,
+    /// Why, strongest doubt first.
+    pub reasons: Vec<LookReasonDto>,
+}
+
+/// Point a project at a look, or at none.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectLookInput {
+    /// The project.
+    pub project_id: String,
+    /// The look, or `None` to go back to the baseline.
+    pub profile_id: Option<String>,
+}
+
+/// Apply a look at less than its measured strength.
+///
+/// **There is no field here that could ask for more than the reference.** `fraction` is clamped
+/// to `0..=1` on the way in, migration 31's CHECK is the second lock, and there is no
+/// `boost`, no `multiplier` and no `intensity` anywhere on this surface. Phase 21's rule.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetLookStrengthInput {
+    /// The project.
+    pub project_id: String,
+    /// The fraction, `0..=1`.
+    pub fraction: f32,
+}
+
+/// Rename or forget a look.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LookProfileInput {
+    /// The look.
+    pub profile_id: String,
+    /// What to call it, when renaming.
+    pub name: Option<String>,
+}

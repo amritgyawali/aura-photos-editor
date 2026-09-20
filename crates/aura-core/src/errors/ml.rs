@@ -484,3 +484,79 @@ pub fn curate_policy_refused(detail: impl Into<String>) -> AuraError {
          has not curated anything. Restore the file or reinstall.",
     )
 }
+
+// ---------------------------------------------------------------------------
+// PHASE-31. Matching a look somebody else published.
+// ---------------------------------------------------------------------------
+
+/// A reference a photographer pointed at could not be used.
+pub const ML_LOOK_REFERENCE_REFUSED: ErrorCode = ErrorCode("AURA-ML-5146");
+
+/// A reference could not be used, and nothing was measured from it.
+///
+/// One code for four situations that are the same fact from a photographer's point of view -
+/// the address made no sense, the folder held too few photographs, the folder held none this
+/// build reads, or the source was the one this build cannot fetch through. They are separate
+/// [`crate::contract::look::LookCode`]s in the report, which is where the distinction is worth
+/// drawing; at the error boundary they are all "that reference did not work, here is why".
+///
+/// **A refusal rather than a weak look**, below
+/// [`crate::contract::look::MIN_REFERENCES`], for phase 17's reason in a harsher form: a look
+/// measured from four photographs is not a weak claim about a page, it is a confident claim
+/// about four photographs. Section 12's second failure mode.
+#[must_use]
+pub fn look_reference_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_LOOK_REFERENCE_REFUSED,
+        Severity::RunBlocking,
+        Recovery::AskUser,
+        detail,
+        "AURA could not read a look from that reference, so nothing has changed. Point it at a \
+         folder holding more of the photographs you want to match.",
+    )
+}
+
+/// A look could not be measured, selected, applied or forgotten.
+pub const ML_LOOK_REFUSED: ErrorCode = ErrorCode("AURA-ML-5147");
+
+/// A look was refused. Nothing about the photographs changed.
+///
+/// The second of this phase's two codes, and the one that covers everything after the reference
+/// has been read: no baseline to be a residual from, a look that is not stored, an override on a
+/// project that has none selected.
+///
+/// **Nothing in this phase writes a pixel on a failure**, because nothing in this phase writes a
+/// pixel at all. A look is a shift that phases 15 and 16 add to what they already decided, so a
+/// refused look leaves every photograph exactly as the baseline rendered it - which is phase
+/// 17's guarantee inherited rather than restated.
+#[must_use]
+pub fn look_refused(detail: impl Into<String>) -> AuraError {
+    AuraError::new(
+        ML_LOOK_REFUSED,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        detail,
+        "AURA could not apply that look. Your photographs are exactly as they were.",
+    )
+}
+
+/// A look was measured against a different render engine or measurer.
+pub const ML_LOOK_VERSION_MISMATCH: ErrorCode = ErrorCode("AURA-ML-5148");
+
+/// A stored look was measured by a build whose renderer or measurer has since moved.
+///
+/// The eighth version-drift code in the product, and it exists for the reason the other seven
+/// do: a look is a difference between two appearance measurements, and comparing one taken with
+/// this build's renderer against one taken with a previous build's returns a plausible number
+/// that means nothing. The look is re-measured rather than applied.
+#[must_use]
+pub fn look_version_mismatch(stored: &str, current: &str) -> AuraError {
+    AuraError::new(
+        ML_LOOK_VERSION_MISMATCH,
+        Severity::Degraded,
+        Recovery::Fallback,
+        format!("look measured against {stored}, this build renders with {current}"),
+        "That look was worked out by an earlier version of AURA, so it is being measured again \
+         before it is used.",
+    )
+}

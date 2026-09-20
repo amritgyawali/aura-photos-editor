@@ -1,0 +1,61 @@
+[package]
+name         = "aura-look"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Matching a look somebody else published: measuring a reference gallery's appearance and expressing it as a shift from what phases 15 and 16 already decided (phase 31)"
+
+[dependencies]
+aura-core    = { path = "../aura-core" }
+aura-catalog = { path = "../aura-catalog" }
+# `codec::decode_jpeg` for a reference photograph, `colour::de2000` for every appearance
+# distance in the phase, and `container::jpeg` for the probe that refuses a file that is not
+# one. The decoder is phase 02's and there is not a second one here, for the reason phase 23
+# put the lens polynomial in this crate: two decoders is two answers to what a photograph's
+# pixels are.
+aura-raw     = { path = "../aura-raw" }
+# The match is measured by rendering the photographer's own frames with the look applied and
+# comparing the result, exactly as phase 16's skin guard and phase 17's fitter measure through
+# the real renderer. A model of the renderer here would make every measured dE00 a statement
+# about the model.
+aura-render  = { path = "../aura-render" }
+aura-recipe  = { path = "../aura-recipe" }
+# Phase 17 owns "a baseline with a style delta applied to it" - `api::styled`, over
+# `extract::TheirParams` - and this phase uses it rather than writing a second one. A look is a
+# `StyleDelta`, which is phase 17's frozen shape, so there is exactly one piece of code in the
+# workspace that knows what adding one to a recipe means. The dependency runs one way only:
+# nothing in phase 17 knows this crate exists.
+aura-style   = { path = "../aura-style" }
+blake3       = { workspace = true }
+rusqlite     = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+time         = { workspace = true }
+tracing      = { workspace = true }
+uuid         = { workspace = true }
+walkdir      = { workspace = true }
+
+# Deliberately absent: `aura-cloud`, and every brain crate.
+#
+# `aura-cloud` is absent because this phase reaches no provider and must be unable to. A
+# reference is a folder on a disk; the one thing a photographer would reasonably expect this
+# feature to do - go and fetch the page - is the thing `scripts/check-banned.sh` forbids and
+# ADR-0063 section 4 explains. A dependency that does not exist cannot be used by a hurried
+# change. `tests/no_network.rs` fails the build if it ever appears.
+#
+# Every brain crate is absent for the reason every crate since phase 09 has kept them out:
+# everything this crate needs from phases 15 and 16 it takes through the frozen traits in
+# `aura-core`. The baseline this phase is a residual from arrives as readings, measured by the
+# caller and handed in - which is what keeps `aura-look` from having an opinion about how a
+# photograph should be exposed.
+
+[dev-dependencies]
+tempfile     = { workspace = true }
+
+# The section 10.1 gates, run as an ordinary test so a red gate is a red build.
+[[test]]
+name = "look_eval"
+path = "../../tests/eval/look_eval.rs"

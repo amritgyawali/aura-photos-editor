@@ -9,6 +9,7 @@ import { ImportWizard } from './components/ImportWizard';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
 import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
+import { MatchLookPanel } from './components/look/MatchLookPanel';
 import { CuratePanel } from './components/curate/CuratePanel';
 import { DeliveryPanel } from './components/delivery/DeliveryPanel';
 import { CompositionCard } from './components/explain/CompositionCard';
@@ -231,6 +232,13 @@ export function App(): JSX.Element {
           onCancel={() => void cancelImport()}
         />
         <ProblemsPanel problems={problems} />
+        {/* PHASE-31. The first feature panel in the sidebar, and deliberately the first: a
+            photographer who has come to AURA because they want their wedding to look like
+            somebody's page should meet that on the way in rather than find it under a menu.
+            It renders whatever the project's state is - a wedding with nothing analysed yet
+            gets the sentence explaining what has to happen first, rather than a disabled
+            button with no reason beside it. */}
+        <MatchLookPanel projectId={activeProjectId} onError={setError} />
         <CacheSettings projectId={activeProjectId} onError={setError} />
         <HardwarePanel onError={setError} />
         <AiKeysPanel projectId={activeProjectId} onError={setError} />
