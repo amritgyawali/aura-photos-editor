@@ -2,6 +2,125 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Bring your own AI - nineteen providers, a first-run setup screen, and TLS
+
+Not a phase. Phase 04 shipped a governed cloud gateway that could reach four vendors, and the
+photographer met it through a dropdown with four strings in it, in a settings panel they had to go
+looking for. Three things change and they are one change.
+
+**The provider list is data now, and it is nineteen rows long.** `aura_cloud::catalog` holds one
+row per provider - the wire format, the address, whether that address is the photographer's to
+set, whether a key is needed, what a key looks like, whether the models can see a photograph, and
+three models with three prices. Anthropic, OpenAI, Google, Azure OpenAI, OpenRouter, Groq,
+Mistral, DeepSeek, xAI, Together, Fireworks, DeepInfra, Cerebras, Moonshot, NVIDIA NIM,
+Perplexity, Ollama, LM Studio, and anything else that speaks OpenAI's chat format. `catalog::build`
+is the only place that turns a choice into something which can speak to a vendor, so the twentieth
+provider is a row in a table rather than an edit in three crates.
+
+**It is the first thing a photographer sees, and it can always be declined.** A full-screen setup
+step with a searchable grid of providers, what each one costs per million tokens, what its keys
+look like and where they come from, an address field for the servers whose address is theirs, a
+model name per tier for anybody who wants to name one, and a Check button that spends one round
+trip before a four-thousand-frame run does. "Not now" is a first-class button, it is a complete
+answer, and nobody is asked twice. Invariant 6 is unchanged: the product edits a whole wedding
+with none of this.
+
+**TLS ships, which is what makes the other two mean anything.** ADR-0009 waived it in phase 04 and
+`docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` discharges the waiver. Sixteen of those
+nineteen rows are HTTPS-only, and *a setup screen that collects a key it cannot use is worse than
+no setup screen*. It arrives exactly where phase 04's own module comment said it would - through
+the `Connector` port - and `HttpTransport` now holds one connector per scheme, so a hosted key and
+Ollama on the same machine are not a restart apart. The crypto provider is pure Rust
+(`rustls-rustcrypto`) because both of the providers rustls ships with compile C and the reference
+build machine has no C toolchain; the ADR says plainly that this is the weakest dependency in the
+product sitting in its most sensitive path, and what was traded for it. Certificate verification
+is on and there is no switch that turns it off.
+
+**Two things that were in memory are now written down.** The provider choice and the model names
+go to the `setting` table - which has been in migration 0001 since phase 01 and had never been
+written to, so no migration was added. Phase 04 kept them in memory: a photographer picked Google,
+pasted a key, closed the application, and reopened it pointed at Anthropic with no key, which
+reads as the key having been lost. The two integration tests that matter open the catalog **twice**,
+because a single-process test cannot tell a stored choice from a cached one. The key itself is not
+in that row and cannot be - it stays in the operating system's credential store, filed per
+provider, so three can be kept and switched between without pasting anything again, and a catalog
+copied to a second machine carries the choice and not the secret.
+
+Four commands are added (`list_ai_providers`, `ai_setup_status`, `save_ai_setup`, `skip_ai_setup`)
+and `crates/aura-app/src/contract/ipc.rs` gains four types, which is a frozen contract amended
+with an ADR and a re-lock - the sixth amendment in the product's history. `check-ipc-surface.sh`
+reports 263 = 263 = 263.
+
+**What is still not proved.** No call in this repository has ever reached a public vendor. This
+machine cannot compile the desktop shell, every test uses the cassette transport, and the prices
+in the table are the vendors' published list prices rather than anything measured here - which is
+why they are only ever used to *refuse* a call, and why the spend meter reads the tokens the
+provider said it billed. The first successful round trip to any of the nineteen reopens ADR-0063's
+criteria the way the first real camera file reopens phase 02's.
+
+## Post-review - the application becomes reachable, and every gate becomes enforced
+
+Not a phase. This is the engineering work the independent review of phases 01 to 30 asked for
+(`docs/progress/PHASE-01-30-REVIEW.md` section 7.3), all eight items of it, and nothing else. No
+contract moved, no migration was added and no decision anywhere in the product changed.
+
+**Four fifths of what had been built was reachable from the application by no path at all.**
+Forty-two of the eighty-two UI source files - the whole develop stack, people, story, style, cull,
+cleanup, camera matching and most of the explain rail - had passing tests, had answering commands
+behind them, and had nothing that mounted them. There is now a workspace shell with nine
+workspaces, four new containers wiring the pure views to the commands they belong to, a
+per-photograph inspector rail, and a review queue for the frames whose white balance is worth a
+second look. Nothing is unreachable.
+
+**The way that stays true is a test rather than a promise.** `ui/src/reachability.test.ts` walks
+the import graph from `main.tsx` and fails on a single orphaned file. A component test proves a
+component works; it cannot prove the component is mounted, and the failure mode is silent in
+exactly the way the review found - green build, green tests, finished feature, and an application
+that does not have it.
+
+**Sixteen of the thirty phase gates were run by nothing on a push.** Among them phase 30's, which
+checks the delivery guarantee, and phase 13's, which checks that nothing acts unattended while the
+product is uncalibrated. `scripts/check-phase-gates.sh` now runs all thirty, and it refuses to run
+at all unless it finds thirty gate modules in `aura-cli` - so a phase added without its gate wired
+in is a red build rather than a silent gap. It is a CI lane and a release gate.
+
+**The desktop shell had never been compiled by anything.** 3,211 lines of Rust and every IPC
+handler, excluded from the workspace by design and built by no CI job, no release gate and no
+recipe but `dev`. There is now a CI lane that installs Tauri's Linux prerequisites and runs
+`check`, `clippy -D warnings` and `fmt --check` over it. **This is the one fix in this changeset
+that could not be verified where it was written** - the reference Windows machine has no linker
+for it - so the first CI run is what proves it. The attempt did get far enough to resolve
+dependencies, and `ui/src-tauri/Cargo.lock` moved by 158 lines: it was missing **nine crates
+`aura-app` has depended on since phase 22**. A lockfile drifts only when nothing resolves
+against it.
+
+**`aura-cull` and `aura-explain` had no in-crate tests**, which is the culling engine that decides
+what a client receives and the ledger that is the only record of why. They have 37 and 41.
+
+Writing them found a defect. `Calibrator::fit_isotonic` guarded on the number of outcomes and not
+on the fitted map, so outcomes that were all correct, all wrong, or all at one confidence produced
+a calibration that returned **one constant for every input** - which puts every decision in the
+product into one autonomy band and destroys the ordering the review queue is sorted by. Its own
+doc comment had said it returned the identity in that case since phase 13. **A guard written in a
+doc comment is not a guard**, and a crate with no unit tests is where that goes unnoticed.
+
+**Running all thirty gates found a second host-sensitive one.** Phase 04's gateway-overhead row
+asserts 15 ms per cached call, measured 66.7 ms on the reference Windows machine, and had never
+honoured `AURA_PERF_HOST_SCALE` - phase 14's guardrail multiplies by it and this one did not, so
+the container the review first ran on cleared 15 ms and the question never came up. It applies the
+scale now, exactly as phase 14 does, and the developer-machine figure in the source is unchanged.
+Two of thirty gates are host-sensitive rather than one, and both are timing rows on a build with
+no GPU backend.
+
+Also: doctests are run (there are none; the next one is now compiled), `eval_cleanup.py` has the
+`--self-test` every other harness had, the `justfile` has the `phase-12-verify` recipe every other
+phase had, and 1.9 MB of a code-graph tool's AST cache with stale Windows paths is out of the
+repository.
+
+**None of this is evidence about a photograph.** Every model-capability flag is still false, no
+camera file has been decoded, nothing is calibrated and nothing has been signed. Section 7 of the
+review is the list, and it is unchanged.
+
 ## Phase 30 - Delivery: getting it out, learning from it, and shipping the thing
 
 The last phase of the plan. Export, backup, client galleries, the Lightroom and Photoshop hand-off,

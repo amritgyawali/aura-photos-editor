@@ -1,11 +1,12 @@
 //! Providers, the transport port, model aliasing, retries and the breaker.
 //!
-//! Four vendors, one shape. A task never names a vendor or a model; it names a
-//! [`Tier`], and the provider's alias table turns that into a model string and a
-//! price. That indirection is what lets the same `SegmentNaming` task run against
-//! Anthropic, OpenAI, Google or a local OpenAI-compatible server and produce the
-//! same typed answer - which is acceptance criterion 7 of section 10.1, and the
-//! reason the alias table is data rather than code.
+//! Nineteen vendors, three wire formats, one shape. A task never names a vendor or
+//! a model; it names a [`Tier`], and the provider's alias table turns that into a
+//! model string and a price. That indirection is what lets the same
+//! `SegmentNaming` task run against Anthropic, Groq, Ollama or anything else in
+//! [`crate::catalog`] and produce the same typed answer - which is acceptance
+//! criterion 7 of section 10.1, and the reason the alias table is data rather
+//! than code.
 //!
 //! ## The transport port
 //!
@@ -14,8 +15,9 @@
 //! whole gateway with no network stack at all. Three implementations ship:
 //! [`crate::cassette::CassetteTransport`] replays recorded responses,
 //! [`OfflineTransport`] refuses everything, and [`crate::http::HttpTransport`]
-//! is a real HTTP/1.1 client. See `docs/adr/ADR-0009-cloud-ai-policy.md` for why
-//! that last one does not speak TLS in this build.
+//! is a real HTTP/1.1 client that speaks TLS through [`crate::tls`]. See
+//! `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` for what the pure-Rust
+//! crypto provider under it trades.
 //!
 //! ## Retries, and why they are bounded so tightly
 //!
@@ -42,7 +44,14 @@ use aura_core::AuraResult;
 use crate::contract::cloud::{PromptSpec, Tier};
 use crate::keys::SecretKey;
 
-/// Which vendor's wire format a provider speaks.
+/// Which provider a key belongs to, and which wire format it speaks.
+///
+/// This is an identity rather than a protocol: several of these speak the same
+/// Chat Completions dialect and differ only in where they live and what they
+/// charge. What makes each one its own variant is that each one has its **own
+/// key**, filed under its own account in the credential store, so a photographer
+/// can keep three of them stored and switch between them without retyping
+/// anything. [`crate::catalog`] holds everything else about them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ProviderKind {
     /// Anthropic Messages API.
@@ -51,19 +60,94 @@ pub enum ProviderKind {
     OpenAi,
     /// Google Generative Language `generateContent`.
     Google,
-    /// Anything speaking the OpenAI Chat Completions shape at another host:
-    /// Ollama, LM Studio, llama.cpp, vLLM, LiteLLM, an enterprise gateway.
+    /// OpenAI's models inside a customer's own Azure tenancy.
+    AzureOpenAi,
+    /// OpenRouter, which fronts most of the others behind one key.
+    OpenRouter,
+    /// Groq's inference service.
+    Groq,
+    /// Mistral's hosted endpoint.
+    Mistral,
+    /// DeepSeek's hosted endpoint.
+    DeepSeek,
+    /// xAI's Grok endpoint.
+    XAi,
+    /// Together AI.
+    Together,
+    /// Fireworks AI.
+    Fireworks,
+    /// DeepInfra.
+    DeepInfra,
+    /// Cerebras.
+    Cerebras,
+    /// Moonshot, whose models are branded Kimi.
+    Moonshot,
+    /// NVIDIA's hosted NIM catalogue.
+    Nvidia,
+    /// Perplexity's Sonar models.
+    Perplexity,
+    /// Ollama, on the photographer's own machine.
+    Ollama,
+    /// LM Studio, on the photographer's own machine.
+    LmStudio,
+    /// Anything else speaking the OpenAI Chat Completions shape at another host:
+    /// llama.cpp, vLLM, LiteLLM, an enterprise gateway.
     Compat,
 }
 
 impl ProviderKind {
+    /// Every provider, in the order the picker shows them.
+    ///
+    /// The catalog is checked against this list by a test, so a variant added
+    /// here without a row there is a red build rather than a provider that is
+    /// silently unreachable.
+    pub const ALL: &'static [Self] = &[
+        Self::Anthropic,
+        Self::OpenAi,
+        Self::Google,
+        Self::AzureOpenAi,
+        Self::OpenRouter,
+        Self::Groq,
+        Self::Mistral,
+        Self::DeepSeek,
+        Self::XAi,
+        Self::Together,
+        Self::Fireworks,
+        Self::DeepInfra,
+        Self::Cerebras,
+        Self::Moonshot,
+        Self::Nvidia,
+        Self::Perplexity,
+        Self::Ollama,
+        Self::LmStudio,
+        Self::Compat,
+    ];
+
     /// Stable text for the settings panel, the audit row and telemetry.
+    ///
+    /// These strings are also the credential-store account names, so changing one
+    /// orphans a stored key. They do not move.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Anthropic => "anthropic",
             Self::OpenAi => "openai",
             Self::Google => "google",
+            Self::AzureOpenAi => "azure_openai",
+            Self::OpenRouter => "openrouter",
+            Self::Groq => "groq",
+            Self::Mistral => "mistral",
+            Self::DeepSeek => "deepseek",
+            Self::XAi => "xai",
+            Self::Together => "together",
+            Self::Fireworks => "fireworks",
+            Self::DeepInfra => "deepinfra",
+            Self::Cerebras => "cerebras",
+            Self::Moonshot => "moonshot",
+            Self::Nvidia => "nvidia",
+            Self::Perplexity => "perplexity",
+            Self::Ollama => "ollama",
+            Self::LmStudio => "lmstudio",
             Self::Compat => "compat",
         }
     }
@@ -73,12 +157,12 @@ impl ProviderKind {
     /// something we have never heard of.
     #[must_use]
     pub fn parse(text: &str) -> Self {
-        match text {
-            "anthropic" => Self::Anthropic,
-            "openai" => Self::OpenAi,
-            "google" => Self::Google,
-            _ => Self::Compat,
-        }
+        let wanted = text.trim();
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|kind| kind.as_str() == wanted)
+            .unwrap_or(Self::Compat)
     }
 
     /// The keychain account name this provider's key is filed under.
@@ -317,6 +401,16 @@ pub trait Transport: Send + Sync + fmt::Debug {
 
     /// Stable name for the audit row: `cassette`, `offline`, `http`.
     fn name(&self) -> &'static str;
+
+    /// The URL schemes this transport can actually reach.
+    ///
+    /// On the wire, because a build that cannot speak TLS will store an Anthropic
+    /// key and never reach Anthropic, and a setup screen that did not know would
+    /// be collecting a key it cannot use. Empty means "none of them", which is the
+    /// honest answer for [`OfflineTransport`].
+    fn schemes(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
 }
 
 /// A transport that refuses everything. Offline studio mode, and the offline test.
@@ -333,6 +427,10 @@ impl Transport for OfflineTransport {
 
     fn name(&self) -> &'static str {
         "offline"
+    }
+
+    fn schemes(&self) -> Vec<&'static str> {
+        Vec::new()
     }
 }
 
@@ -634,6 +732,16 @@ impl ProviderClient {
     #[must_use]
     pub fn transport_name(&self) -> &'static str {
         self.transport.name()
+    }
+
+    /// The URL schemes this build can reach, for the setup screen.
+    #[must_use]
+    pub fn transport_schemes(&self) -> Vec<String> {
+        self.transport
+            .schemes()
+            .into_iter()
+            .map(ToString::to_string)
+            .collect()
     }
 
     /// The breaker, so Settings can show why calls stopped and reset it.

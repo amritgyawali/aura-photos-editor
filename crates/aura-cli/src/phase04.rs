@@ -48,7 +48,25 @@ use aura_raw::contract::pixels::{ColourSpace, PixelBuffer, PixelData, PixelSourc
 const TEST_KEY: &str = "sk-ant-api03-PHASE04GATE0000000000000000000000000000AA";
 
 /// Section 11: gateway overhead excluding provider latency, per call.
+///
+/// Measured on the development machine, and **multiplied by `aura_perf::host_scale`** for the
+/// reason phase 14's proxy guardrail is: a timing budget is a statement about hardware as well
+/// as about code, and a guardrail that is red on every run of every slower host is a guardrail
+/// nobody reads. See `crates/aura-perf/src/lib.rs`.
+///
+/// This row did not honour the scale until the post-review pass, which is why the phases 01 to
+/// 30 review recorded phase 14 as the only host-sensitive gate: the container it ran on happened
+/// to clear 15 ms on this path and the reference Windows machine measures 66.7 ms. The gap is
+/// the SQLite round trip the cache does, and it is disk speed rather than arithmetic. Sizes,
+/// counts and costs are never scaled - a byte is a byte and a cent is a cent on any host.
 const OVERHEAD_BUDGET_MS: f64 = 15.0;
+
+/// The overhead budget this host is held to, in milliseconds.
+fn overhead_budget_ms() -> f64 {
+    #[allow(clippy::cast_precision_loss)]
+    let scale = aura_perf::host_scale() as f64;
+    OVERHEAD_BUDGET_MS * scale
+}
 
 /// Section 11: cache hit rate on a re-run.
 const CACHE_HIT_BUDGET: f64 = 0.70;
@@ -302,12 +320,13 @@ pub fn verify(args: &[String]) -> ExitCode {
     // The cache path is the gateway's own cost with no provider in it, which is
     // what section 11's 15 ms budget measures.
     let overhead_ms = cache_us as f64 / 1000.0;
+    let overhead_budget = overhead_budget_ms();
     println!(
-        "overhead: {overhead_ms:.2} ms per call against a {OVERHEAD_BUDGET_MS:.0} ms budget \
+        "overhead: {overhead_ms:.2} ms per call against a {overhead_budget:.0} ms budget \
          (first call including the payload build: {:.1} ms)",
         first_us as f64 / 1000.0
     );
-    if overhead_ms > OVERHEAD_BUDGET_MS {
+    if overhead_ms > overhead_budget {
         eprintln!("overhead: over the budget");
         failures += 1;
     }

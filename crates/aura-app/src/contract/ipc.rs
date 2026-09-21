@@ -56,6 +56,24 @@ pub struct JobHandle {
     pub job_id: String,
 }
 
+/// How far an import has got.
+///
+/// Four fields rather than a percentage, because the panel has three states to draw and a
+/// percentage collapses two of them: a run that has not counted its files yet reports
+/// `total` zero, and a run this process never started reports `known` false.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IngestProgressDto {
+    /// Whether this process started the job at all.
+    pub known: bool,
+    /// Files finished so far.
+    pub done: u64,
+    /// Files expected, zero while the walker is still counting.
+    pub total: u64,
+    /// Whether the worker is still going.
+    pub running: bool,
+}
+
 /// Page request for the virtualised grid.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -469,6 +487,104 @@ pub struct KeyCheckDto {
     pub model: String,
     /// A sentence for the panel, whether it worked or not.
     pub message: String,
+}
+
+/// One model on one provider, as the setup screen shows it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiModelDto {
+    /// `cheap`, `balanced` or `reasoning`.
+    pub tier: String,
+    /// The vendor's own identifier, which is what goes on the wire.
+    pub model: String,
+    /// US dollars per million input tokens, as the vendor publishes it.
+    pub input_per_mtok_usd: f64,
+    /// US dollars per million output tokens, as the vendor publishes it.
+    pub output_per_mtok_usd: f64,
+}
+
+/// One provider AURA knows how to reach.
+///
+/// Everything here is static: it comes from `aura_cloud::catalog` and says
+/// nothing about what this machine has stored. Whether a key exists is in
+/// [`AiSetupStatusDto::keyed_providers`], because that answer costs a read of the
+/// operating system's credential store and this one costs nothing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiProviderDto {
+    /// The identifier a key is filed under: `anthropic`, `groq`, `ollama`, ...
+    pub id: String,
+    /// What a photographer reads in the picker.
+    pub label: String,
+    /// One sentence on why somebody would choose this one.
+    pub blurb: String,
+    /// Which request shape it speaks, for the diagnostics line.
+    pub wire: String,
+    /// Where it lives.
+    pub endpoint: String,
+    /// True when the address is the photographer's to set.
+    pub endpoint_editable: bool,
+    /// True when a key must be stored before a call can be made.
+    pub requires_key: bool,
+    /// What the key looks like, so a paste into the wrong provider is visible.
+    pub key_hint: String,
+    /// Where the vendor issues keys. Shown as text; the app opens no browser.
+    pub keys_url: String,
+    /// True when the default models here can see a photograph.
+    pub images: bool,
+    /// The three tiers, cheapest first.
+    pub models: Vec<AiModelDto>,
+}
+
+/// What the first-run screen and the AI panel both need to know.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiSetupStatusDto {
+    /// True once the first-run question has been answered, either way.
+    pub completed: bool,
+    /// True when it was answered by declining rather than by choosing.
+    pub skipped: bool,
+    /// The chosen provider's identifier.
+    pub provider: String,
+    /// The chosen endpoint, when the provider allows one to be chosen.
+    pub endpoint: Option<String>,
+    /// The three chosen model names, cheapest first. Empty means "use the
+    /// catalog's own name for this tier".
+    pub models: Vec<String>,
+    /// Which providers have a key stored on this machine.
+    pub keyed_providers: Vec<String>,
+    /// The URL schemes this build's transport can reach: `http`, `https`.
+    ///
+    /// On the wire because a build without TLS can store an Anthropic key and
+    /// never reach Anthropic, and a setup screen that did not say so would be
+    /// collecting a key it cannot use.
+    pub schemes: Vec<String>,
+    /// The global privacy switch, which overrides everything above.
+    pub offline_studio_mode: bool,
+}
+
+/// Record the provider choice made on the setup screen or in the AI panel.
+///
+/// The key is not here. It travels through [`SetAiKeyInput`] and nothing else,
+/// so this record can be logged, exported in a support bundle and read back
+/// without any of that touching a secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveAiSetupInput {
+    /// The provider identifier. Unknown text resolves to the compatible server.
+    pub provider: String,
+    /// The address, for a provider whose address is the photographer's to set.
+    pub endpoint: Option<String>,
+    /// The cheap tier's model, when one was named.
+    pub cheap_model: Option<String>,
+    /// The balanced tier's model, when one was named.
+    pub balanced_model: Option<String>,
+    /// The reasoning tier's model, when one was named.
+    pub reasoning_model: Option<String>,
+    /// True when the photographer finished the screen rather than declining.
+    pub completed: bool,
+    /// True when they declined. Both may be true: declining answers the question.
+    pub skipped: bool,
 }
 
 /// Set the spending caps.
@@ -8573,4 +8689,130 @@ pub struct DiagnosticsDto {
     pub providers: Vec<ProviderDto>,
     /// The last few error codes, newest first, with their runbooks.
     pub recent_errors: Vec<IpcError>,
+}
+/// One reversible automatic edit. ADR-0064.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoAutoEditInput {
+    /// Owning project.
+    pub project_id: String,
+    /// Imported photograph.
+    pub photo_id: String,
+    /// Client-generated cancellation handle.
+    pub job_id: String,
+}
+
+/// Result with actual provenance rather than an assumed AI success.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoAutoEditDto {
+    /// Saved recipe.
+    pub recipe: RecipeDto,
+    /// Cloud, cache or local_fallback.
+    pub source: String,
+    /// Model that answered, or local.
+    pub model: String,
+    /// Plain-language explanation.
+    pub reasons: Vec<String>,
+}
+
+/// Start the one-click finish: analysis, framing, cull, per-frame AI edit and
+/// delivery, in one command. ADR-0065.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OneClickFinishInput {
+    /// The wedding.
+    pub project_id: String,
+    /// Absolute export folder, or empty for a unique folder under Pictures/AURA Exports.
+    /// The chosen folder is returned in progress. See ADR-0066.
+    pub destination: String,
+    /// The import to wait for, when the wizard has one still running.
+    pub ingest_job_id: Option<String>,
+}
+
+/// The job handle; progress is `one_click_status`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OneClickFinishDto {
+    /// The id this process knows the run by.
+    pub job_id: String,
+}
+
+/// The live row behind the button: what phase is running, and what each phase did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OneClickStatusDto {
+    /// Photos measured from original pixels.
+    #[serde(default)]
+    pub analyzed: u64,
+    /// Photos whose edit failed; never counted as successful local edits.
+    #[serde(default)]
+    pub failed_edits: u64,
+    /// The run.
+    pub job_id: String,
+    /// `running`, `cancelling`, `completed`, `completed_with_issues`, `failed` or `cancelled`.
+    pub status: String,
+    /// The phase slug: `queue`, `ingest`, `cloud`, `analyze`, `geometry`, `cull`,
+    /// `edit`, `export`, `done`.
+    pub phase: String,
+    /// The sentence the panel shows, changed as the phases move.
+    pub phase_label: String,
+    /// Units the current phase finished.
+    pub items_done: u64,
+    /// Units the current phase has to do; zero means unknown.
+    pub items_total: u64,
+    /// Frames the run will deliver.
+    pub frames: u64,
+    /// Frames the provider graded.
+    pub ai_edited: u64,
+    /// Frames successfully graded locally. Failed edits are counted separately.
+    pub local_edited: u64,
+    /// Frames the cull selected.
+    pub selected: u64,
+    /// Files written.
+    pub written: u64,
+    /// Files read back and hashed.
+    pub verified: u64,
+    /// Where the files went.
+    pub destination: String,
+    /// The model answering, or `local reference`.
+    pub model: String,
+    /// Every refusal and degradation the run met, deduplicated. The honesty field.
+    pub notes: Vec<String>,
+}
+
+/// Pixel measurements and a conservative recommendation, independently of optional models.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoAnalysisDto {
+    /// Imported photograph.
+    pub photo_id: String,
+    /// Measured preview statistics (snake-case fields).
+    pub readings: aura_cloud::photo_adjustment::PhotoReadings,
+    /// Local starting point; the configured vision model can refine this during editing.
+    pub recommendation: aura_cloud::photo_adjustment::PhotoAdjustment,
+}
+
+/// Selection alone starts an unattended run; output location is chosen by the application.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomaticStartInput {
+    /// Selected photographs or folders.
+    pub roots: Vec<String>,
+    /// Existing project, or create one from the selection.
+    pub project_id: Option<String>,
+}
+
+/// Everything the UI needs to follow a native background run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomaticStartDto {
+    /// Created or selected project.
+    pub project_id: String,
+    /// Pipeline handle.
+    pub job_id: String,
+    /// Import handle.
+    pub ingest_job_id: String,
+    /// Unique output directory, never an original file.
+    pub destination: String,
 }

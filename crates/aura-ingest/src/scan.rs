@@ -15,6 +15,8 @@ pub const RAW_EXT: &[&str] = &[
 ];
 /// JPEG extensions.
 pub const JPEG_EXT: &[&str] = &["jpg", "jpeg", "jpe"];
+/// PNG extensions.
+pub const PNG_EXT: &[&str] = &["png"];
 /// HEIF family extensions.
 pub const HEIF_EXT: &[&str] = &["heic", "heif", "avif"];
 /// TIFF extensions.
@@ -38,7 +40,7 @@ pub fn classify(ext_lower: &str) -> FileKind {
         FileKind::Heif
     } else if TIFF_EXT.contains(&ext_lower) {
         FileKind::Tiff
-    } else if ext_lower == "png" {
+    } else if PNG_EXT.contains(&ext_lower) {
         FileKind::Png
     } else if SIDECAR_EXT.contains(&ext_lower) {
         FileKind::SidecarXmp
@@ -119,6 +121,7 @@ pub fn scan_root(root: &Path, plan: &ImportPlan, now_ms: i64) -> AuraResult<Scan
         RAW_EXT
             .iter()
             .chain(JPEG_EXT)
+            .chain(PNG_EXT)
             .chain(HEIF_EXT)
             .chain(TIFF_EXT)
             .chain(SIDECAR_EXT)

@@ -307,6 +307,11 @@ impl Transport for CassetteTransport {
     fn name(&self) -> &'static str {
         "cassette"
     }
+
+    /// A recording was made over both, and replaying one costs no socket at all.
+    fn schemes(&self) -> Vec<&'static str> {
+        vec!["http", "https"]
+    }
 }
 
 impl fmt::Display for CassetteTransport {

@@ -28,6 +28,14 @@ export type JobHandle = {
   jobId: string;
 };
 
+/** How far an import has got. `known` false means this process never started that job. */
+export type IngestProgressDto = {
+  known: boolean;
+  done: number;
+  total: number;
+  running: boolean;
+};
+
 export type ListImagesInput = {
   projectId: string;
   offset: number;
@@ -185,6 +193,58 @@ export type KeyCheckDto = {
   ok: boolean;
   model: string;
   message: string;
+};
+
+/** One model on one provider, as the setup screen shows it. */
+export type AiModelDto = {
+  tier: string;
+  model: string;
+  inputPerMtokUsd: number;
+  outputPerMtokUsd: number;
+};
+
+/**
+ * One provider AURA knows how to reach.
+ *
+ * Static: it says nothing about what this machine has stored. Whether a key
+ * exists is in `AiSetupStatusDto.keyedProviders`, because that answer costs a
+ * read of the operating system's credential store and this one costs nothing.
+ */
+export type AiProviderDto = {
+  id: string;
+  label: string;
+  blurb: string;
+  wire: string;
+  endpoint: string;
+  endpointEditable: boolean;
+  requiresKey: boolean;
+  keyHint: string;
+  keysUrl: string;
+  images: boolean;
+  models: AiModelDto[];
+};
+
+export type AiSetupStatusDto = {
+  completed: boolean;
+  skipped: boolean;
+  provider: string;
+  endpoint: string | null;
+  /** Cheapest first. An empty string means "use the catalogue's own name". */
+  models: string[];
+  keyedProviders: string[];
+  /** The URL schemes this build can reach: `http`, `https`. */
+  schemes: string[];
+  offlineStudioMode: boolean;
+};
+
+export type SaveAiSetupInput = {
+  provider: string;
+  endpoint: string | null;
+  cheapModel: string | null;
+  balancedModel: string | null;
+  reasoningModel: string | null;
+  completed: boolean;
+  skipped: boolean;
 };
 
 export type SetCloudBudgetInput = {
@@ -4992,4 +5052,59 @@ export type DiagnosticsDto = {
   trainedModels: boolean;
   providers: ProviderDto[];
   recentErrors: IpcError[];
+};
+export type PhotoAutoEditInput = {
+  projectId: string;
+  photoId: string;
+  jobId: string;
+};
+
+export type PhotoAutoEditDto = {
+  recipe: RecipeDto;
+  source: string;
+  model: string;
+  reasons: string[];
+};
+
+/** ADR-0065. Start the one-click finish. */
+export type OneClickFinishInput = {
+  projectId: string;
+  destination: string;
+  ingestJobId: string | null;
+};
+
+/** The job handle; progress is `oneClickStatus`. */
+export type OneClickFinishDto = {
+  jobId: string;
+};
+
+/** The live row behind the button. */
+export type OneClickStatusDto = {
+  analyzed?: number;
+  failedEdits?: number;
+  jobId: string;
+  /** `running` | `cancelling` | `completed` | `completed_with_issues` | `failed` | `cancelled`. */
+  status: string;
+  /** `queue` | `ingest` | `cloud` | `analyze` | `geometry` | `cull` | `edit` | `export` | `done`. */
+  phase: string;
+  phaseLabel: string;
+  itemsDone: number;
+  itemsTotal: number;
+  frames: number;
+  aiEdited: number;
+  localEdited: number;
+  selected: number;
+  written: number;
+  verified: number;
+  destination: string;
+  model: string;
+  /** Every refusal and degradation the run met. The honesty field. */
+  notes: string[];
+};
+
+export type AutomaticStartDto = { projectId: string; jobId: string; ingestJobId: string; destination: string };
+export type PhotoAnalysisDto = {
+  photoId: string;
+  readings: { clipped_bp: number; black_bp: number; neutral_pixels: number; pixels: number };
+  recommendation: { preset: string; exposure: number; temperature: number; tint: number; reasons: string[] };
 };

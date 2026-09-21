@@ -66,10 +66,30 @@ pub fn camera_to_working(xyz_to_camera: Mat3, source_white: Vec3) -> Option<Mat3
 /// reach into the matrix module for one constant.
 pub const D50: Vec3 = WHITE_D50;
 
+/// Linear sRGB to linear Rec.2020, the matrix that brings a display-referred
+/// buffer back into the working space.
+#[must_use]
+pub fn srgb_to_rec2020() -> Mat3 {
+    static CACHE: OnceLock<Mat3> = OnceLock::new();
+    *CACHE.get_or_init(|| mul(xyz_d65_to_rec2020(), SRGB_TO_XYZ_D65))
+}
+
 /// Convert one triple from the working space into linear sRGB.
 #[must_use]
 pub fn working_to_linear_srgb(rgb: Vec3) -> Vec3 {
     apply(rec2020_to_srgb(), rgb)
+}
+
+/// Convert one triple of linear sRGB into the working space.
+///
+/// The inverse of [`working_to_linear_srgb`], and it exists because the phase 02
+/// proxy is cached as an 8-bit sRGB JPEG: the develop panel and the exporter read
+/// that buffer back, and a buffer decoded through the sRGB curve is still in sRGB
+/// *primaries*. Rendering it as though it were already Rec.2020 leaves every
+/// saturated colour in the frame rotated toward the achromatic axis.
+#[must_use]
+pub fn linear_srgb_to_working(rgb: Vec3) -> Vec3 {
+    apply(srgb_to_rec2020(), rgb)
 }
 
 /// Convert one triple from the working space into CIE XYZ (D65), the input of

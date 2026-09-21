@@ -68,7 +68,9 @@ Four rules the compiler enforces and one it cannot:
 | `contract/cloud` | The frozen contract. Changing it needs an ADR. |
 | `gateway` | The seven steps, and every audit row |
 | `keys` | The credential store, by command invocation - never FFI, never `argv` |
-| `provider`, `anthropic`, `openai`, `google`, `compat` | Four vendors, one shape |
+| `provider`, `anthropic`, `openai`, `google`, `compat` | Three wire formats, one shape |
+| `catalog` | The nineteen providers as data: address, key, models, prices |
+| `tls` | HTTPS, behind the `Connector` port and the `tls` feature |
 | `http`, `cassette` | A real HTTP/1.1 client; recorded responses for CI |
 | `payload`, `redact` | The only things that may be uploaded, and what is stripped |
 | `schema`, `validate`, `repair`, `fallback` | Text in, typed value or local answer out |
@@ -78,14 +80,23 @@ Four rules the compiler enforces and one it cannot:
 
 ## What this build can reach
 
-`HttpTransport` is a complete HTTP/1.1 client and **does not speak TLS**. It
-therefore reaches `http://` endpoints - a local or studio-network
-OpenAI-compatible server, which is what `compat` exists for - and not the public
-HTTPS endpoints of Anthropic, OpenAI or Google. Those providers' request shaping,
-response parsing, error mapping and pricing are complete and tested against
-cassettes; only the socket underneath is waived. See
-`docs/adr/ADR-0009-cloud-ai-policy.md` for why, and for the condition on which
-the waiver expires.
+`HttpTransport` holds one connector per scheme: plain TCP always, and TLS when
+the `tls` feature is on, which it is by default. Both `http://` - a local or
+studio-network OpenAI-compatible server - and the public HTTPS endpoints of the
+nineteen providers in `catalog` are therefore reachable.
+`docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` discharges the waiver
+ADR-0009 recorded, and says plainly what the pure-Rust crypto provider trades.
+
+**No call in this repository has ever reached a public vendor.** Every test uses
+the cassette transport, and the prices in `catalog` are the vendors' published
+list prices rather than anything measured here - which is why they are only ever
+used to *refuse* a call before it is made, and why the spend meter reads the
+tokens the provider said it billed. Request shaping, response parsing, error
+mapping and pricing are complete and tested against cassettes; what is untested
+is a live round trip.
+
+Building with `--no-default-features` gives byte for byte the transport phase 04
+shipped: `http://` only, with the error naming the schemes it can reach.
 
 ## Testing
 

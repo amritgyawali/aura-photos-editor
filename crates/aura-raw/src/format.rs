@@ -35,6 +35,8 @@ pub enum RawFormat {
     Tiff,
     /// A JPEG, which a photographer may well have shot alongside the RAWs.
     Jpeg,
+    /// A PNG photograph or lossless raster image.
+    Png,
     /// HEIF or HEIC.
     Heif,
     /// Nothing we recognise.
@@ -58,6 +60,7 @@ impl RawFormat {
             Self::Srw => "srw",
             Self::Tiff => "tiff",
             Self::Jpeg => "jpeg",
+            Self::Png => "png",
             Self::Heif => "heif",
             Self::Unknown => "unknown",
         }
@@ -97,6 +100,9 @@ impl RawFormat {
 /// the manufacturer string.
 #[must_use]
 pub fn sniff(bytes: &[u8]) -> RawFormat {
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return RawFormat::Png;
+    }
     if jpeg::looks_like_jpeg(bytes) {
         return RawFormat::Jpeg;
     }

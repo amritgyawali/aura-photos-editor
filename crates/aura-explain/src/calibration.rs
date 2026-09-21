@@ -196,6 +196,31 @@ impl Reliability {
     }
 }
 
+/// True when a fitted map would return the same number for every input.
+///
+/// Two shapes reach here and both are degenerate. A set of outcomes that were all correct or
+/// all wrong pools into knots whose *outputs* are identical; a set whose raw confidences are
+/// all the same pools into knots whose *inputs* are. Either way `apply` returns one constant
+/// for every raw confidence in `0..1`.
+///
+/// That is the case the doc comment on [`Calibrator::fit_isotonic`] has always described as
+/// returning the identity, and until the phases 01 to 30 review added unit tests to this crate
+/// nothing checked it: `fit_isotonic` guarded on the *outcome* count and not on the fitted
+/// map, so a hundred identical outcomes produced a hundred identical knots, `knots.len() < 2`
+/// was false, and the result was a "calibration" that reported **every** decision in the
+/// product at the same confidence.
+///
+/// It is the worst possible failure of this module rather than a cosmetic one. A constant at
+/// 1.0 would put every decision in the `Auto` band; a constant at 0.0 would put every decision
+/// in review; and in both cases the ordering the review queue is sorted by is destroyed, which
+/// is the sentence the doc comment already gave as the reason.
+fn is_constant(knots: &[(f32, f32)]) -> bool {
+    let (Some(first), Some(last)) = (knots.first(), knots.last()) else {
+        return true;
+    };
+    (last.0 - first.0).abs() < f32::EPSILON || (last.1 - first.1).abs() < f32::EPSILON
+}
+
 /// Which bin a confidence falls in.
 fn bin_of(confidence: f32) -> usize {
     let scaled = (confidence.clamp(0.0, 1.0) * ECE_BINS as f32) as usize;
@@ -344,7 +369,7 @@ impl Calibrator {
             })
             .collect();
 
-        if knots.len() < 2 {
+        if knots.len() < 2 || is_constant(&knots) {
             return Self::identity();
         }
         Self {
@@ -499,4 +524,198 @@ fn logit(probability: f32) -> f32 {
 /// The inverse of [`logit`].
 fn sigmoid(value: f32) -> f32 {
     1.0 / (1.0 + (-value).exp())
+}
+
+#[cfg(test)]
+mod tests {
+    use aura_core::contract::ledger::LedgerDecision;
+
+    use super::{Calibrator, Method, Outcome, Reliability, ECE_BINS, ECE_GATE, ECE_GATE_SAMPLES};
+
+    /// `n` outcomes whose stated confidence is exactly how often they are right.
+    fn perfectly_calibrated(n: usize) -> Vec<Outcome> {
+        (0..n)
+            .map(|index| {
+                let raw = 0.05 + 0.9 * (index % 10) as f32 / 9.0;
+                // Right exactly `raw` of the time, by construction rather than by chance.
+                let correct = ((index / 10) % 100) < (raw * 100.0) as usize;
+                Outcome::new(raw, correct)
+            })
+            .collect()
+    }
+
+    /// `n` outcomes that always claim 0.95 and are right half the time.
+    fn overconfident(n: usize) -> Vec<Outcome> {
+        (0..n)
+            .map(|index| Outcome::new(0.95, index % 2 == 0))
+            .collect()
+    }
+
+    #[test]
+    fn an_overconfident_predictor_is_caught() {
+        // The whole point of the estimator. A model that says 0.95 and is right half the time
+        // has an ECE near 0.45, which is nine times the gate.
+        let reliability = Reliability::measure(&overconfident(1_000));
+        assert!(reliability.ece > 0.4, "{}", reliability.ece);
+        assert!(!reliability.passes_gate());
+    }
+
+    #[test]
+    fn a_well_calibrated_predictor_passes() {
+        let reliability = Reliability::measure(&perfectly_calibrated(1_000));
+        assert!(reliability.ece <= ECE_GATE, "{}", reliability.ece);
+        assert!(reliability.passes_gate());
+    }
+
+    #[test]
+    fn a_predictor_that_always_says_half_has_a_good_ece_and_a_bad_brier() {
+        // "They fail differently: a model that always says 0.5 has a poor Brier score and can
+        // have an excellent ECE, and a product that gated only on ECE would ship it." This is
+        // that sentence as a test, and it is why both numbers are on the struct.
+        let outcomes: Vec<_> = (0..1_000)
+            .map(|index| Outcome::new(0.5, index % 2 == 0))
+            .collect();
+        let reliability = Reliability::measure(&outcomes);
+        assert!(reliability.ece < 0.01, "ece {}", reliability.ece);
+        assert!(reliability.brier > 0.2, "brier {}", reliability.brier);
+    }
+
+    #[test]
+    fn a_gate_over_too_few_samples_passes_rather_than_failing_at_random() {
+        // "An ECE over forty samples is an estimate with a confidence interval wider than the
+        // threshold, and gating on it would fail builds at random."
+        let few = Reliability::measure(&overconfident(ECE_GATE_SAMPLES - 1));
+        assert!(few.ece > ECE_GATE);
+        assert!(few.passes_gate(), "a small sample failed the gate");
+
+        let many = Reliability::measure(&overconfident(ECE_GATE_SAMPLES));
+        assert!(!many.passes_gate());
+    }
+
+    #[test]
+    fn measuring_nothing_reports_nothing_rather_than_a_perfect_score() {
+        let reliability = Reliability::measure(&[]);
+        assert_eq!(reliability.samples, 0);
+        assert!(reliability.bins.is_empty());
+    }
+
+    #[test]
+    fn every_bin_is_reported_with_its_count_so_a_diagram_can_be_drawn() {
+        let reliability = Reliability::measure(&perfectly_calibrated(1_000));
+        assert!(!reliability.bins.is_empty());
+        assert!(reliability.bins.len() <= ECE_BINS);
+        assert_eq!(
+            reliability.bins.iter().map(|(_, _, n)| n).sum::<usize>(),
+            1_000
+        );
+    }
+
+    #[test]
+    fn the_identity_map_is_what_ships_and_it_says_so() {
+        // Condition C2 of the phase 13 exit report: nothing in this build is calibrated. The
+        // version is what tells every downstream reader, and zero is reserved for it.
+        let calibrator = Calibrator::identity();
+        assert_eq!(calibrator.version, LedgerDecision::UNCALIBRATED);
+        assert!(!calibrator.is_fitted());
+        assert_eq!(calibrator.method, Method::Identity);
+        for raw in [0.0, 0.25, 0.5, 0.99, 1.0] {
+            assert!((calibrator.apply(raw) - raw).abs() < f32::EPSILON);
+        }
+    }
+
+    #[test]
+    fn a_fit_over_nothing_returns_the_identity_rather_than_a_constant() {
+        // "A constant confidence is worse than an uncalibrated one because it destroys the
+        // ordering the review queue is sorted by."
+        assert!(!Calibrator::fit_isotonic(&[], 7).is_fitted());
+        assert!(!Calibrator::fit_isotonic(&[Outcome::new(0.5, true)], 7).is_fitted());
+        let all_the_same: Vec<_> = (0..100).map(|_| Outcome::new(0.5, true)).collect();
+        assert!(!Calibrator::fit_isotonic(&all_the_same, 7).is_fitted());
+    }
+
+    #[test]
+    fn an_isotonic_fit_pulls_an_overconfident_predictor_back_toward_the_truth() {
+        // Two clusters, both overconfident and in the right order: frames it claimed 0.9 for
+        // and is right 60 % of the time, and frames it claimed 0.3 for and is right 20 % of
+        // the time. The order is what lets a *monotone* map separate them; two clusters with
+        // the same accuracy pool into one block and the fit is correctly refused as constant.
+        let mut outcomes = Vec::new();
+        for index in 0..500 {
+            outcomes.push(Outcome::new(0.9, index % 10 < 6));
+        }
+        for index in 0..500 {
+            outcomes.push(Outcome::new(0.3, index % 10 < 2));
+        }
+        let fitted = Calibrator::fit_isotonic(&outcomes, 5);
+        assert!(fitted.is_fitted());
+        assert_eq!(fitted.version, 5);
+        assert!(
+            fitted.apply(0.9) < 0.9,
+            "an overconfident 0.9 stayed at {}",
+            fitted.apply(0.9)
+        );
+    }
+
+    #[test]
+    fn a_fitted_map_is_monotone_and_interpolates_rather_than_stepping() {
+        // "A step function makes the panel's confidence jump when a score moves by a
+        // thousandth, and a photographer watching a badge flip between two values while
+        // nothing changes has been shown a bug rather than a calibration."
+        let outcomes: Vec<_> = (0..1_000)
+            .map(|index| {
+                let raw = index as f32 / 1_000.0;
+                Outcome::new(raw, index % 100 < (raw * 50.0) as usize)
+            })
+            .collect();
+        let fitted = Calibrator::fit_isotonic(&outcomes, 9);
+        let mut previous = -1.0;
+        for step in 0..=100 {
+            let value = fitted.apply(step as f32 / 100.0);
+            assert!(value >= previous - 1e-6, "not monotone at {step}: {value}");
+            assert!((0.0..=1.0).contains(&value));
+            previous = value;
+        }
+    }
+
+    #[test]
+    fn an_unreadable_method_reads_as_the_identity_rather_than_as_a_fit() {
+        // The direction that claims least: an unreadable method read as a fitted one would let
+        // an unfitted map be reported as calibrated.
+        assert_eq!(Method::from_str_or_identity("isotonic"), Method::Isotonic);
+        assert_eq!(
+            Method::from_str_or_identity("temperature"),
+            Method::Temperature
+        );
+        assert_eq!(Method::from_str_or_identity(""), Method::Identity);
+        assert_eq!(Method::from_str_or_identity("bayesian"), Method::Identity);
+        for method in [Method::Identity, Method::Isotonic, Method::Temperature] {
+            assert_eq!(Method::from_str_or_identity(method.as_str()), method);
+        }
+    }
+
+    #[test]
+    fn a_temperature_above_one_lowers_a_confident_prediction_and_raises_a_diffident_one() {
+        let mut calibrator = Calibrator::identity();
+        calibrator.method = Method::Temperature;
+        calibrator.temperature = 2.0;
+        calibrator.version = 3;
+        assert!(calibrator.apply(0.95) < 0.95);
+        assert!(calibrator.apply(0.05) > 0.05);
+        // The fixed point is a half: an even prediction has no log-odds to divide.
+        assert!((calibrator.apply(0.5) - 0.5).abs() < 1e-5);
+    }
+
+    #[test]
+    fn a_zero_temperature_is_treated_as_one_rather_than_dividing_by_it() {
+        let mut calibrator = Calibrator::identity();
+        calibrator.method = Method::Temperature;
+        calibrator.temperature = 0.0;
+        assert!(calibrator.apply(0.8).is_finite());
+    }
+
+    #[test]
+    fn an_outcome_cannot_carry_a_confidence_outside_its_range() {
+        assert_eq!(Outcome::new(-1.0, true).raw, 0.0);
+        assert_eq!(Outcome::new(2.0, true).raw, 1.0);
+    }
 }

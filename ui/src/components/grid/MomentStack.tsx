@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../../ipc/client';
 import type { DuplicateSetDto, MomentDto, MomentListDto, MomentStatusDto } from '../../ipc/types';
+import { DuplicatePanel } from './DuplicatePanel';
 
 /**
  * The moments view: three thousand loose files as a few hundred stacked cells.
@@ -301,6 +302,28 @@ export function MomentStack({ projectId }: { projectId: string }): JSX.Element {
     }
   }, []);
 
+  /**
+   * Choose which frame of a duplicate set is the one kept.
+   *
+   * A hint, not a deletion. Nothing on this surface removes a photograph - phase 08's rule that
+   * a grouping is evidence and the deciding phase owns the cull - and `set_keep_hint` is the
+   * only write behind this control.
+   */
+  const keep = useCallback(
+    async (momentId: string, photoId: string) => {
+      if (!inTauri()) {
+        return;
+      }
+      try {
+        await api.setKeepHint({ momentId, photoId });
+        setSets(await api.momentDuplicates(momentId));
+      } catch (raised) {
+        setError(asIpcError(raised).message);
+      }
+    },
+    [],
+  );
+
   const lock = useCallback(
     async (momentId: string, locked: boolean) => {
       if (!inTauri()) {
@@ -421,12 +444,15 @@ export function MomentStack({ projectId }: { projectId: string }): JSX.Element {
                 >
                   {moment.userLocked ? 'Let AURA regroup this' : 'Keep this grouping'}
                 </button>
-                {sets.length > 0 ? (
-                  <p className="moment-sets">
-                    {sets.length} set{sets.length === 1 ? '' : 's'} of duplicates inside this
-                    moment.
-                  </p>
-                ) : null}
+                {/* The duplicate sets, drawn rather than counted. The count alone was what
+                    this rendered until the phases 01-30 review found `DuplicatePanel`
+                    imported by nothing: a photographer needs the comparison and the
+                    consequence, and `keep_hint` is spelled *hint* in every layer, so the
+                    control below sets it rather than deleting anything. */}
+                <DuplicatePanel
+                  sets={sets}
+                  onKeep={(photoId) => void keep(moment.momentId, photoId)}
+                />
               </div>
             ) : null}
           </li>

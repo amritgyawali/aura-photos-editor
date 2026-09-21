@@ -122,3 +122,120 @@ fn flag_delta(mode: CullMode) -> f32 {
         CullMode::Aggressive => FLAG_BELOW_AGGRESSIVE_DELTA,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use aura_core::{CullMode, SceneId};
+
+    use super::{
+        target_scale, tune, FLAG_BELOW_AGGRESSIVE_DELTA, FLAG_BELOW_BALANCED,
+        FLAG_BELOW_CONSERVATIVE_DELTA,
+    };
+    use crate::weights::{WeightTable, MAX_KEEPERS_CAP};
+
+    fn table() -> WeightTable {
+        WeightTable::embedded().expect("the shipped weight table has to load")
+    }
+
+    #[test]
+    fn the_three_modes_order_the_floor_the_way_they_are_described() {
+        // "Keeps more" and "keeps fewer" are the whole of what a mode is, and the floor is
+        // where that happens. Conservative below balanced below aggressive, on every scene.
+        let table = table();
+        for scene in [SceneId::Vows, SceneId::DanceFloor, SceneId::Unknown] {
+            let conservative = tune(&table, CullMode::Conservative, scene).floor;
+            let balanced = tune(&table, CullMode::Balanced, scene).floor;
+            let aggressive = tune(&table, CullMode::Aggressive, scene).floor;
+            assert!(
+                conservative < balanced && balanced < aggressive,
+                "{scene:?}: {conservative} {balanced} {aggressive}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_asymmetry_favours_keeping_a_frame_nobody_can_get_back() {
+        // "An over-full gallery costs a photographer ten minutes with the slider. An
+        // over-culled one costs a frame nobody can get back." The two shifts are therefore not
+        // the same size, and the larger one is the one that keeps more.
+        let table = table();
+        let balanced = tune(&table, CullMode::Balanced, SceneId::Vows).floor;
+        let down = balanced - tune(&table, CullMode::Conservative, SceneId::Vows).floor;
+        let up = tune(&table, CullMode::Aggressive, SceneId::Vows).floor - balanced;
+        assert!(
+            down > up,
+            "conservative moved {down}, aggressive moved {up}"
+        );
+    }
+
+    #[test]
+    fn no_mode_can_reduce_a_moment_to_no_keepers() {
+        // The difference between culling a moment and deleting it. Phase 08's whole grouping
+        // exists so that every moment is represented.
+        let table = table();
+        for mode in [
+            CullMode::Conservative,
+            CullMode::Balanced,
+            CullMode::Aggressive,
+        ] {
+            for scene in SceneId::ALL {
+                let tuning = tune(&table, mode, scene);
+                assert!(tuning.max_keepers >= 1, "{mode:?}/{scene:?}");
+                assert!(tuning.max_keepers <= MAX_KEEPERS_CAP, "{mode:?}/{scene:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn conservative_flags_more_and_aggressive_flags_less() {
+        // Section 2.1's "keeps more, flags more" is two behaviours, and only one of them is a
+        // threshold. A mode that quietly filled a gallery with decisions it was unsure of
+        // would be worse than one that culled hard and said so.
+        let table = table();
+        let conservative = tune(&table, CullMode::Conservative, SceneId::Vows).flag_below;
+        let balanced = tune(&table, CullMode::Balanced, SceneId::Vows).flag_below;
+        let aggressive = tune(&table, CullMode::Aggressive, SceneId::Vows).flag_below;
+        assert!((balanced - FLAG_BELOW_BALANCED).abs() < f32::EPSILON);
+        assert!(
+            (conservative - (FLAG_BELOW_BALANCED + FLAG_BELOW_CONSERVATIVE_DELTA)).abs() < 1e-6
+        );
+        assert!((aggressive - (FLAG_BELOW_BALANCED + FLAG_BELOW_AGGRESSIVE_DELTA)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn the_mode_scale_orders_the_gallery_sizes_the_same_way() {
+        let table = table();
+        assert!(
+            target_scale(&table, CullMode::Conservative) > target_scale(&table, CullMode::Balanced)
+                && target_scale(&table, CullMode::Balanced)
+                    > target_scale(&table, CullMode::Aggressive)
+        );
+    }
+
+    #[test]
+    fn a_scene_with_no_row_of_its_own_says_so_rather_than_borrowing_silently() {
+        // An unweighted scene is judged against a *documented* neutral row rather than a
+        // guess, which is a weaker claim and not a worse one - but only because the tuning
+        // carries the fact, which is what pays for the confidence penalty downstream.
+        let table = table();
+        let tuning = tune(&table, CullMode::Balanced, SceneId::Unknown);
+        assert!(tuning.unweighted);
+        assert!(!tune(&table, CullMode::Balanced, SceneId::Vows).unweighted);
+    }
+
+    #[test]
+    fn a_tuning_has_no_field_a_coverage_rule_could_be_expressed_in() {
+        // Section 6.4: "modes shift thresholds and k-values, **never the coverage rules** -
+        // even `Aggressive` cannot drop a must-have." This module does not import the rule
+        // table at all, and the four fields below are all a mode can produce. The assertion is
+        // a compile-time one: the destructuring fails to build if a fifth field appears, which
+        // is the review friction the decision deserves.
+        let table = table();
+        let super::Tuning {
+            floor: _,
+            max_keepers: _,
+            flag_below: _,
+            unweighted: _,
+        } = tune(&table, CullMode::Aggressive, SceneId::Vows);
+    }
+}

@@ -205,7 +205,11 @@ fn render_working(
         let stream = bytes
             .get(reference.offset..reference.offset.saturating_add(reference.len))
             .ok_or_else(|| aura_core::errors::raw::corrupt("preview range is outside the file"))?;
-        codec::decode_jpeg(stream, limits)?
+        if meta.format == crate::RawFormat::Png {
+            codec::decode_png(stream, limits)?
+        } else {
+            codec::decode_jpeg(stream, limits)?
+        }
     };
 
     let linear_srgb = demosaic::from_srgb8(&preview.data, preview.width, preview.height);

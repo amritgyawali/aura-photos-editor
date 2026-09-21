@@ -24,10 +24,12 @@ use aura_cloud::contract::cloud::Tier;
 use aura_cloud::keys::SecretKey;
 use aura_cloud::provider::ProviderKind;
 
+use crate::ai_settings::AiSetup;
 use crate::commands::IpcResult;
 use crate::contract::ipc::{
-    CloudCacheStatsDto, CloudCallDto, CloudSpendDto, CloudStatusDto, KeyCheckDto, SetAiKeyInput,
-    SetCloudBudgetInput, SetCloudPrivacyInput,
+    AiModelDto, AiProviderDto, AiSetupStatusDto, CloudCacheStatsDto, CloudCallDto, CloudSpendDto,
+    CloudStatusDto, KeyCheckDto, SaveAiSetupInput, SetAiKeyInput, SetCloudBudgetInput,
+    SetCloudPrivacyInput,
 };
 use crate::state::AppState;
 
@@ -77,7 +79,18 @@ pub fn set_ai_key(state: &AppState, input: &SetAiKeyInput) -> IpcResult<CloudSta
     let kind = ProviderKind::parse(&input.provider);
     let secret = SecretKey::new(input.key.clone());
     state.key_store()?.store(&kind.account(), &secret)?;
-    state.set_cloud_provider(kind, input.endpoint.as_deref())?;
+
+    // Storing a key *is* choosing a provider, and the choice is written down
+    // rather than left in memory. Phase 04 left it in memory: a photographer
+    // picked Google, pasted a key, closed the application, and reopened it
+    // pointed at Anthropic with no key - which reads as the key having been lost.
+    let mut setup = state.ai_setup()?;
+    setup.provider = kind.as_str().to_string();
+    setup.endpoint = input.endpoint.clone();
+    setup.completed = true;
+    setup.skipped = false;
+    state.save_ai_setup(&setup)?;
+
     tracing::info!(
         target: "cloud.key_stored",
         provider = kind.as_str(),
@@ -109,14 +122,23 @@ pub fn clear_ai_key(state: &AppState, provider: &str) -> IpcResult<CloudStatusDt
 /// `AURA-CLOUD-6012` when the credential store cannot be read.
 pub fn check_ai_key(state: &AppState) -> IpcResult<KeyCheckDto> {
     let cloud = state.cloud()?;
-    let account = cloud.client().provider().config().kind.account();
+    let kind = cloud.client().provider().config().kind;
 
-    let Some(secret) = state.key_store()?.load(&account)? else {
-        return Ok(KeyCheckDto {
-            ok: false,
-            model: String::new(),
-            message: "No key is stored for this provider yet.".to_string(),
-        });
+    let stored = state.key_store()?.load(&kind.account())?;
+    let secret = match stored {
+        Some(secret) => secret,
+        // A local server has no key, and "check" is the most useful button on the
+        // screen for one: the thing most likely to be wrong about Ollama is that it
+        // is not running. Probing with an empty secret sends no credential header
+        // at all, which is exactly what such a server expects.
+        None if !aura_cloud::catalog::spec(kind).requires_key => SecretKey::new(String::new()),
+        None => {
+            return Ok(KeyCheckDto {
+                ok: false,
+                model: String::new(),
+                message: "No key is stored for this provider yet.".to_string(),
+            })
+        }
     };
 
     match cloud.validate_key(&secret) {
@@ -130,6 +152,138 @@ pub fn check_ai_key(state: &AppState) -> IpcResult<KeyCheckDto> {
             model: String::new(),
             message: err.user_message.clone(),
         }),
+    }
+}
+
+/// Every provider AURA knows how to reach.
+///
+/// Static, and deliberately says nothing about this machine. Whether a key is
+/// stored is in [`ai_setup_status`], because that answer costs a read of the
+/// credential store and this one costs nothing - a picker that had to wait for
+/// nineteen keychain reads before it could draw would be a picker that feels
+/// broken on the one screen a photographer meets first.
+///
+/// # Errors
+///
+/// Never. The signature matches every other command so a caller does not have to
+/// know which of them can fail.
+pub fn list_ai_providers(_state: &AppState) -> IpcResult<Vec<AiProviderDto>> {
+    Ok(aura_cloud::catalog::all()
+        .iter()
+        .map(|spec| AiProviderDto {
+            id: spec.kind.as_str().to_string(),
+            label: spec.label.to_string(),
+            blurb: spec.blurb.to_string(),
+            wire: spec.wire.as_str().to_string(),
+            endpoint: spec.endpoint.to_string(),
+            endpoint_editable: spec.endpoint_editable,
+            requires_key: spec.requires_key,
+            key_hint: spec.key_hint.to_string(),
+            keys_url: spec.keys_url.to_string(),
+            images: spec.images,
+            models: spec
+                .tiers
+                .iter()
+                .map(|entry| AiModelDto {
+                    tier: tier_name(entry.tier).to_string(),
+                    model: entry.model.to_string(),
+                    input_per_mtok_usd: entry.input_per_mtok_usd,
+                    output_per_mtok_usd: entry.output_per_mtok_usd,
+                })
+                .collect(),
+        })
+        .collect())
+}
+
+/// What the first-run screen and the AI panel both need to know.
+///
+/// # Errors
+///
+/// `AURA-CLOUD-6012` when the credential store cannot be reached at all.
+pub fn ai_setup_status(state: &AppState) -> IpcResult<AiSetupStatusDto> {
+    let stored = state.ai_setup()?;
+    let keys = state.key_store()?;
+
+    // A provider whose key cannot be read is reported as *not* keyed rather than
+    // failing the whole panel. One broken entry in a credential store must not be
+    // able to hide the other eighteen providers from somebody trying to get set
+    // up, and the Check button is what turns a wrong answer here into a sentence.
+    let keyed = ProviderKind::ALL
+        .iter()
+        .filter(|kind| keys.has(&kind.account()).unwrap_or(false))
+        .map(|kind| kind.as_str().to_string())
+        .collect();
+
+    let models = stored.models();
+    Ok(AiSetupStatusDto {
+        completed: stored.completed,
+        skipped: stored.skipped,
+        provider: stored.kind().as_str().to_string(),
+        endpoint: stored.endpoint().map(ToString::to_string),
+        models: [Tier::Cheap, Tier::Balanced, Tier::Reasoning]
+            .iter()
+            .map(|tier| models.for_tier(*tier).unwrap_or_default().to_string())
+            .collect(),
+        keyed_providers: keyed,
+        schemes: state.cloud()?.client().transport_schemes(),
+        offline_studio_mode: state.cloud_policy().offline_studio_mode,
+    })
+}
+
+/// Record the provider choice, and point this process at it.
+///
+/// Writes the setting row and rebuilds the gateway, so the next call goes where
+/// the panel says it will. The key is not part of this: it travels through
+/// [`set_ai_key`] and nothing else.
+///
+/// # Errors
+///
+/// `AURA-DB-3006` when the setting row cannot be written.
+pub fn save_ai_setup(state: &AppState, input: &SaveAiSetupInput) -> IpcResult<AiSetupStatusDto> {
+    let kind = ProviderKind::parse(&input.provider);
+    let setup = AiSetup {
+        provider: kind.as_str().to_string(),
+        endpoint: input.endpoint.clone(),
+        cheap_model: input.cheap_model.clone(),
+        balanced_model: input.balanced_model.clone(),
+        reasoning_model: input.reasoning_model.clone(),
+        completed: input.completed,
+        skipped: input.skipped,
+    };
+    state.save_ai_setup(&setup)?;
+    tracing::info!(
+        target: "cloud.setup",
+        provider = kind.as_str(),
+        skipped = input.skipped,
+        "the AI provider choice was recorded; no key is part of this row"
+    );
+    ai_setup_status(state)
+}
+
+/// Answer the first-run screen by declining it.
+///
+/// A separate command rather than a flag on [`save_ai_setup`], because declining
+/// must not be able to record a provider. Somebody who pressed "not now" has not
+/// chosen Anthropic, and a panel that later showed them a configured-looking
+/// Anthropic with no key behind it would be reporting a decision nobody made.
+///
+/// # Errors
+///
+/// `AURA-DB-3006` when the setting row cannot be written.
+pub fn skip_ai_setup(state: &AppState) -> IpcResult<AiSetupStatusDto> {
+    let mut setup = state.ai_setup()?;
+    setup.completed = true;
+    setup.skipped = true;
+    state.save_ai_setup(&setup)?;
+    ai_setup_status(state)
+}
+
+/// `cheap`, `balanced` or `reasoning`, as the wire spells them.
+const fn tier_name(tier: Tier) -> &'static str {
+    match tier {
+        Tier::Cheap => "cheap",
+        Tier::Balanced => "balanced",
+        Tier::Reasoning => "reasoning",
     }
 }
 

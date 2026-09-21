@@ -48,6 +48,7 @@
 //! No command may take longer than 50 ms. Anything heavier returns a job handle
 //! and streams progress events.
 
+pub mod ai_settings;
 pub mod autopilot_commands;
 pub mod biometric_keys;
 pub mod camera_commands;
@@ -103,16 +104,17 @@ pub use cleanup_commands::{
     decide_cleanup, disable_cleanup, image_cleanup, manual_remove,
 };
 pub use cloud_commands::{
-    check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend, cloud_status,
-    purge_cloud_cache, set_ai_key, set_cloud_budget, set_cloud_privacy,
+    ai_setup_status, check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend,
+    cloud_status, list_ai_providers, purge_cloud_cache, save_ai_setup, set_ai_key,
+    set_cloud_budget, set_cloud_privacy, skip_ai_setup,
 };
 pub use colour_commands::{
     accept_colour, colour_review_queue, colour_status, estimate_colour, image_colour,
     select_colour_variant, set_colour_override,
 };
 pub use commands::{
-    cancel_job, create_project, list_images, list_problems, list_projects, set_camera_label,
-    start_ingest,
+    cancel_job, create_project, ingest_progress, list_images, list_problems, list_projects,
+    set_camera_label, start_ingest,
 };
 pub use composition_commands::{
     analyse_composition, composition_status, dismiss_composition_flag, flagged_composition,
@@ -203,6 +205,13 @@ pub use retouch_commands::{
     retouch_status, set_protection, set_retouch,
 };
 pub use state::AppState;
+mod auto_edit_commands;
+// ADR-0065. The one-click finish, and its three commands.
+pub mod one_click_commands;
+pub use auto_edit_commands::{photo_analysis, photo_auto_edit};
+pub use one_click_commands::{
+    automatic_start, one_click_cancel, one_click_finish, one_click_status,
+};
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
     segment_story, set_chapter, split_chapter, story_outline, story_status,

@@ -10,14 +10,16 @@
 //! whose network layer is auditable in one sitting is worth more here than one
 //! that supports HTTP/2.
 //!
-//! What is given up: TLS, connection reuse, redirects, compression and HTTP/2.
+//! What is given up: connection reuse, redirects, compression and HTTP/2.
 //! Redirects and compression are refused rather than followed - a provider that
 //!302s us somewhere is a provider we should not silently follow, and every
-//! vendor here returns identity-encoded JSON. TLS is the significant one, and
-//! `docs/adr/ADR-0009-cloud-ai-policy.md` records the waiver: this transport
-//! reaches `http://` endpoints, which in practice means a local or studio-network
-//! OpenAI-compatible server, and the [`Connector`] port is where a `TlsStream`
-//! lands when the supply-chain review of a TLS stack clears.
+//! vendor here returns identity-encoded JSON.
+//!
+//! TLS was on that list until `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md`
+//! discharged the waiver phase 04 recorded in ADR-0009. It arrives exactly where
+//! the original module said it would - through the [`Connector`] port, in
+//! [`crate::tls`] - and nothing else in this file knows about it. A build with
+//! the `tls` feature off is byte for byte the transport phase 04 shipped.
 //!
 //! Everything above this module is unaware of any of it. [`crate::provider::Transport`]
 //! is the boundary, and the cassette transport satisfies it identically.
@@ -169,25 +171,60 @@ impl Target {
     }
 }
 
-/// HTTP/1.1 over whatever the connector provides.
+/// HTTP/1.1 over whatever the connectors provide.
+///
+/// One connector per scheme rather than one connector. A photographer with a key
+/// for a hosted vendor and Ollama on the machine under the desk is the ordinary
+/// case, not the exotic one, and the two are `https` and `http` respectively - so
+/// a transport that could only serve one of them would make "switch provider" a
+/// restart.
 #[derive(Debug)]
 pub struct HttpTransport {
-    connector: Arc<dyn Connector>,
+    connectors: Vec<Arc<dyn Connector>>,
 }
 
 impl HttpTransport {
-    /// A transport over plain TCP.
+    /// A transport that serves every scheme this build was compiled for.
+    ///
+    /// Plain TCP always; TLS when the `tls` feature is on, which it is by
+    /// default. A build without it reaches `http://` endpoints only and says so
+    /// in the error, which is the state phase 04 shipped in.
     #[must_use]
     pub fn new() -> Self {
+        let mut connectors: Vec<Arc<dyn Connector>> = vec![Arc::new(TcpConnector)];
+        #[cfg(feature = "tls")]
+        connectors.push(Arc::new(crate::tls::TlsConnector::new()));
+        Self { connectors }
+    }
+
+    /// A transport over one supplied connector, and nothing else.
+    #[must_use]
+    pub fn with_connector(connector: Arc<dyn Connector>) -> Self {
         Self {
-            connector: Arc::new(TcpConnector),
+            connectors: vec![connector],
         }
     }
 
-    /// A transport over a supplied connector.
+    /// A transport over a supplied set of connectors.
     #[must_use]
-    pub fn with_connector(connector: Arc<dyn Connector>) -> Self {
-        Self { connector }
+    pub fn with_connectors(connectors: Vec<Arc<dyn Connector>>) -> Self {
+        Self { connectors }
+    }
+
+    /// The schemes this transport can reach, in the order they were registered.
+    #[must_use]
+    pub fn schemes(&self) -> Vec<&'static str> {
+        self.connectors
+            .iter()
+            .map(|connector| connector.scheme())
+            .collect()
+    }
+
+    /// The connector for one scheme, if this build has one.
+    fn connector_for(&self, scheme: &str) -> Option<&Arc<dyn Connector>> {
+        self.connectors
+            .iter()
+            .find(|connector| connector.scheme() == scheme)
     }
 }
 
@@ -200,25 +237,28 @@ impl Default for HttpTransport {
 impl Transport for HttpTransport {
     fn send(&self, request: &HttpRequest, timeout: Duration) -> AuraResult<HttpResponse> {
         let target = Target::parse(&request.url)?;
-        if target.scheme != self.connector.scheme() {
-            return Err(unreachable(
+        let connector = self.connector_for(&target.scheme).ok_or_else(|| {
+            unreachable(
                 &target.host,
                 format!(
-                    "this build can reach {} endpoints only; {} needs a TLS transport, which is \
-                     waived in ADR-0009",
-                    self.connector.scheme(),
+                    "this build can reach {} endpoints; {} is not one of them",
+                    self.schemes().join(" and "),
                     target.scheme
                 ),
-            ));
-        }
+            )
+        })?;
 
-        let mut stream = self.connector.connect(&target.host, target.port, timeout)?;
+        let mut stream = connector.connect(&target.host, target.port, timeout)?;
         write_request(stream.as_mut(), request, &target)?;
         read_response(stream.as_mut(), &target.host)
     }
 
     fn name(&self) -> &'static str {
         "http"
+    }
+
+    fn schemes(&self) -> Vec<&'static str> {
+        Self::schemes(self)
     }
 }
 

@@ -3,6 +3,7 @@
 # Tauri writes its capability schemas here on every build. Generated, not authored.
 /ui/src-tauri/gen
 /graphify-out
+graphify-out/
 /ui/node_modules
 /ui/dist
 /tests/fixtures/generated
@@ -15,3 +16,4 @@
 *.aura-license
 __pycache__/
 *.pyc
+/.work-checks/

@@ -349,3 +349,161 @@ pub fn rank(mut reasons: Vec<LedgerReason>, limit: usize) -> Vec<LedgerReason> {
     reasons.truncate(limit);
     reasons
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use aura_core::contract::ledger::LedgerReason;
+
+    use super::{canonical_json, inputs_hash, json_string, quantise, rank, QUANTISATION};
+
+    fn reason(code: &str, weight: f32) -> LedgerReason {
+        LedgerReason::plain(code, "a sentence", weight)
+    }
+
+    #[test]
+    fn quantisation_is_what_makes_a_replay_comparable() {
+        // A stored f32 at full precision cannot be compared across a rebuild: the same
+        // arithmetic on a different target produces a value one ulp away, and a replay that
+        // compared those would report every decision as changed.
+        assert_eq!(quantise(0.5), 500);
+        assert_eq!(quantise(0.123_456_7), 123);
+        assert_eq!(quantise(0.123_4), quantise(0.123_449));
+        assert_eq!(QUANTISATION, 1_000.0);
+    }
+
+    #[test]
+    fn a_weight_outside_its_range_is_clamped_rather_than_becoming_a_distinct_question() {
+        assert_eq!(quantise(5.0), 1_000);
+        assert_eq!(quantise(-5.0), -1_000);
+    }
+
+    #[test]
+    fn the_canonical_form_sorts_its_keys_so_two_producers_agree() {
+        let mut fields = BTreeMap::new();
+        fields.insert("zebra".to_owned(), "1".to_owned());
+        fields.insert("alpha".to_owned(), "2".to_owned());
+        assert_eq!(canonical_json(&fields), r#"{"alpha":2,"zebra":1}"#);
+    }
+
+    #[test]
+    fn the_canonical_form_of_nothing_is_an_empty_object_rather_than_an_empty_string() {
+        assert_eq!(canonical_json(&BTreeMap::new()), "{}");
+    }
+
+    #[test]
+    fn a_string_carrying_a_quote_a_backslash_or_a_newline_is_escaped() {
+        assert_eq!(json_string("a\"b"), r#""a\"b""#);
+        assert_eq!(json_string("a\\b"), r#""a\\b""#);
+        assert_eq!(json_string("a\nb"), r#""a\nb""#);
+        assert_eq!(json_string("a\tb"), r#""a\tb""#);
+        assert_eq!(json_string("a\rb"), r#""a\rb""#);
+    }
+
+    #[test]
+    fn a_control_character_becomes_the_four_hex_digit_escape_json_requires() {
+        // The inputs are written as codepoints rather than as literals: a control
+        // character pasted into a source file is invisible, and a test whose expectation
+        // is invisible is a test nobody can read.
+        assert_eq!(json_string("a\u{1}b"), r#""a\u0001b""#);
+        assert_eq!(json_string("\u{1f}"), r#""\u001f""#);
+    }
+
+    #[test]
+    fn the_inputs_hash_moves_when_any_input_moves() {
+        let models = BTreeMap::from([("focus".to_owned(), 1u16)]);
+        let configs = BTreeMap::from([("cull_weights".to_owned(), 3u16)]);
+        let base = inputs_hash(&[("a".to_owned(), "1".to_owned())], &models, &configs);
+
+        assert_ne!(
+            base,
+            inputs_hash(&[("a".to_owned(), "2".to_owned())], &models, &configs)
+        );
+        assert_ne!(
+            base,
+            inputs_hash(&[("b".to_owned(), "1".to_owned())], &models, &configs)
+        );
+        assert_ne!(
+            base,
+            inputs_hash(
+                &[("a".to_owned(), "1".to_owned())],
+                &BTreeMap::from([("focus".to_owned(), 2u16)]),
+                &configs
+            )
+        );
+        assert_ne!(
+            base,
+            inputs_hash(
+                &[("a".to_owned(), "1".to_owned())],
+                &models,
+                &BTreeMap::from([("cull_weights".to_owned(), 4u16)])
+            )
+        );
+    }
+
+    #[test]
+    fn the_inputs_hash_is_stable_for_the_same_inputs() {
+        let models = BTreeMap::from([("focus".to_owned(), 1u16)]);
+        let configs = BTreeMap::from([("cull_weights".to_owned(), 3u16)]);
+        let inputs = [("a".to_owned(), "1".to_owned())];
+        assert_eq!(
+            inputs_hash(&inputs, &models, &configs),
+            inputs_hash(&inputs, &models, &configs)
+        );
+    }
+
+    #[test]
+    fn a_name_and_a_value_cannot_be_confused_for_each_other() {
+        // The separators in the hash exist for this: `("ab", "c")` and `("a", "bc")` are
+        // different declarations and must not collide.
+        let models = BTreeMap::new();
+        let configs = BTreeMap::new();
+        assert_ne!(
+            inputs_hash(&[("ab".to_owned(), "c".to_owned())], &models, &configs),
+            inputs_hash(&[("a".to_owned(), "bc".to_owned())], &models, &configs)
+        );
+    }
+
+    #[test]
+    fn reasons_are_ordered_by_how_much_they_moved_the_decision_and_not_by_sign() {
+        // A reason that argued *against* a decision by 0.8 is more worth reading than one that
+        // argued for it by 0.1. Absolute weight, which is why an exoneration can lead the list.
+        let ordered = rank(
+            vec![reason("weak_for", 0.1), reason("strong_against", -0.8)],
+            5,
+        );
+        assert_eq!(ordered[0].code, "strong_against");
+    }
+
+    #[test]
+    fn ties_break_on_the_code_so_the_list_does_not_depend_on_producer_order() {
+        // "Which ones survive is a decision that must not depend on the order a producer
+        // happened to push them in."
+        let forwards = rank(vec![reason("b", 0.5), reason("a", 0.5)], 1);
+        let backwards = rank(vec![reason("a", 0.5), reason("b", 0.5)], 1);
+        assert_eq!(forwards[0].code, "a");
+        assert_eq!(backwards[0].code, "a");
+    }
+
+    #[test]
+    fn the_list_is_cut_to_the_limit_and_keeps_the_strongest() {
+        let ordered = rank(
+            vec![
+                reason("weakest", 0.1),
+                reason("strongest", 0.9),
+                reason("middle", 0.5),
+            ],
+            2,
+        );
+        assert_eq!(ordered.len(), 2);
+        assert_eq!(ordered[0].code, "strongest");
+        assert_eq!(ordered[1].code, "middle");
+    }
+
+    #[test]
+    fn ranking_nothing_returns_nothing_rather_than_panicking() {
+        assert!(rank(Vec::new(), 3).is_empty());
+        assert!(rank(vec![reason("a", 0.5)], 0).is_empty());
+    }
+}

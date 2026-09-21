@@ -21,6 +21,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::catalog::ModelChoice;
 use crate::contract::cloud::Tier;
 use crate::openai::{Dialect, OpenAiProvider};
 use crate::provider::{ModelAlias, ProviderConfig, ProviderKind};
@@ -36,22 +37,7 @@ pub const DEFAULT_ENDPOINT: &str = "http://127.0.0.1:11434";
 /// at all and the marginal cost is zero.
 #[must_use]
 pub fn aliases_for(model: &str) -> BTreeMap<Tier, ModelAlias> {
-    let mut aliases = BTreeMap::new();
-    for tier in [Tier::Cheap, Tier::Balanced, Tier::Reasoning] {
-        aliases.insert(
-            tier,
-            ModelAlias {
-                model: model.to_string(),
-                input_per_mtok_usd: 0.0,
-                output_per_mtok_usd: 0.0,
-                // Still counted, even at zero cost: the *token* estimate also
-                // drives the truncation warning and the context-window check.
-                image_tokens_per_mpixel: 1_500,
-                max_output_tokens: 4_096,
-            },
-        );
-    }
-    aliases
+    crate::catalog::spec(ProviderKind::Compat).aliases_with(&ModelChoice::uniform(model))
 }
 
 /// A provider pointed at a compatible server running one model.

@@ -54,7 +54,21 @@ id      = "tests"
 command = "cargo test --workspace --all-targets"
 owner   = "QAL"
 blocking = true
-why     = "Including every phase gate, which run as ordinary tests so a red gate is a red build."
+why     = "The whole suite. It does NOT include the phase gates - those are `aura-cli verify` subcommands rather than test functions, and the `phases` row below is what runs them. The wording here claimed otherwise until the phases 01-30 review checked."
+
+[[gate]]
+id      = "doctests"
+command = "cargo test --workspace --doc"
+owner   = "QAL"
+blocking = true
+why     = "`--all-targets` excludes doctests. There are none today; a documentation example added tomorrow would otherwise ship unverified. Seconds of runtime. PHASE-01-30-REVIEW.md section 6.8."
+
+[[gate]]
+id      = "phases"
+command = "bash scripts/check-phase-gates.sh"
+owner   = "QAL"
+blocking = true
+why     = "All thirty phase gates. Sixteen of them ran nowhere on a push until the phases 01-30 review found it - including phase 30's, which checks the delivery guarantee, and phase 13's, which checks that nothing acts unattended while the product is uncalibrated."
 
 [[gate]]
 id      = "budgets"

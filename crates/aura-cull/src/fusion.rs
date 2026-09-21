@@ -259,3 +259,224 @@ pub const NO_MOMENT_PENALTY: f32 = 0.05;
 pub fn veto_text(code: CullCode) -> &'static str {
     code.user_text()
 }
+
+#[cfg(test)]
+mod tests {
+    use aura_core::{ChapterId, CullCode, KeepScore, SceneId};
+    use uuid::Uuid;
+
+    use super::{confidence, fuse, veto_text, Calibration, SCORE_EPS};
+    use crate::input::Candidate;
+    use crate::weights::SceneWeights;
+
+    fn image(n: u128) -> aura_core::contract::cull::ImageId {
+        aura_core::PhotoId::from_uuid(Uuid::from_u128(n))
+    }
+
+    /// A frame with four equal sub-scores and every input present.
+    fn candidate(value: f32) -> Candidate {
+        let mut candidate = Candidate::unanalysed(image(1), 1_000);
+        candidate.analysed = true;
+        candidate.has_emotion = true;
+        candidate.has_composition = true;
+        candidate.scene = SceneId::Vows;
+        candidate.chapter = ChapterId::Ceremony;
+        candidate.technical = value;
+        candidate.emotion = value;
+        candidate.composition = value;
+        candidate.prominence = value;
+        candidate.confidence = 0.9;
+        candidate
+    }
+
+    fn weights() -> SceneWeights {
+        SceneWeights {
+            technical: 1.0,
+            emotion: 1.0,
+            composition: 1.0,
+            prominence: 1.0,
+            floor: 0.35,
+            max_keepers: 3,
+        }
+    }
+
+    #[test]
+    fn four_equal_sub_scores_fuse_to_themselves() {
+        // A geometric mean of four equal numbers is that number. The cheapest possible check
+        // that the log-space arithmetic is not off by a factor.
+        let score = fuse(&candidate(0.6), weights(), &Calibration::identity());
+        assert!((score.scene_weighted - 0.6).abs() < 1e-4, "{score:?}");
+    }
+
+    #[test]
+    fn one_catastrophic_sub_score_cannot_be_rescued_by_three_excellent_ones() {
+        // Section 6.1's whole reason for a geometric mean: "a catastrophic technical failure
+        // cannot be rescued by emotion and vice versa".
+        //
+        // The property is stated against the *sum*, which is what every competitor uses and
+        // what this exists instead of - not against a fixed number, because the value a
+        // correct implementation lands on depends on the scene's weights and pinning one here
+        // would make the test a restatement of the arithmetic rather than of the requirement.
+        let mut candidate = candidate(0.95);
+        candidate.technical = 0.03;
+        let sum = (candidate.technical
+            + candidate.emotion
+            + candidate.composition
+            + candidate.prominence)
+            / 4.0;
+        let fused = fuse(&candidate, weights(), &Calibration::identity()).scene_weighted;
+        assert!(
+            fused < sum * 0.6,
+            "the fusion is compensatory: {fused} against a sum of {sum}"
+        );
+    }
+
+    #[test]
+    fn a_scene_that_weights_technical_heavily_puts_a_lost_frame_under_its_own_floor() {
+        // The same frame under a real scene row rather than four equal weights. `Vows` weights
+        // whether the photograph worked above everything else, and a frame that did not work
+        // has to fall below the bar a keeper clears.
+        let mut candidate = candidate(0.95);
+        candidate.technical = 0.02;
+        let scene = SceneWeights {
+            technical: 3.0,
+            emotion: 1.0,
+            composition: 1.0,
+            prominence: 1.0,
+            floor: 0.35,
+            max_keepers: 3,
+        };
+        let fused = fuse(&candidate, scene, &Calibration::identity()).scene_weighted;
+        assert!(fused < scene.floor, "a lost frame scored {fused}");
+    }
+
+    #[test]
+    fn a_sub_score_below_the_floor_is_treated_as_the_floor_rather_than_as_zero() {
+        // `ln 0` is negative infinity, which would make every fused score zero and every
+        // frame indistinguishable. Two frames below `SCORE_EPS` fuse to the same number, and
+        // that is deliberate: the difference between very bad and catastrophically bad is not
+        // information a gallery needs.
+        let mut worse = candidate(0.5);
+        worse.technical = 0.0;
+        let mut bad = candidate(0.5);
+        bad.technical = SCORE_EPS / 2.0;
+        let a = fuse(&worse, weights(), &Calibration::identity());
+        let b = fuse(&bad, weights(), &Calibration::identity());
+        assert!(a.scene_weighted.is_finite());
+        assert!((a.scene_weighted - b.scene_weighted).abs() < 1e-6);
+        assert!(a.scene_weighted > 0.0);
+    }
+
+    #[test]
+    fn a_vetoed_frame_returns_a_sentinel_rather_than_a_small_score() {
+        // Zero here is a sentinel and not a measurement, which is why callers are told to read
+        // `is_vetoed` rather than compare the number.
+        let mut candidate = candidate(0.9);
+        candidate.veto = Some(CullCode::VetoOutOfFocus);
+        let score = fuse(&candidate, weights(), &Calibration::identity());
+        assert_eq!(score.scene_weighted, 0.0);
+        assert!(score.is_vetoed());
+    }
+
+    #[test]
+    fn an_unanalysed_frame_is_not_a_frame_that_scored_zero() {
+        // `AURA-ML-5050`'s reason for existing: a frame nobody analysed must never be rendered
+        // as a frame that lost.
+        let candidate = Candidate::unanalysed(image(2), 5_000);
+        let score = fuse(&candidate, weights(), &Calibration::identity());
+        assert_eq!(score.scene_weighted, 0.0);
+        assert!(!candidate.is_eligible());
+    }
+
+    #[test]
+    fn the_weights_decide_which_signal_dominates() {
+        let mut candidate = candidate(0.9);
+        candidate.technical = 0.3;
+        let technical_heavy = SceneWeights {
+            technical: 4.0,
+            ..weights()
+        };
+        let emotion_heavy = SceneWeights {
+            emotion: 4.0,
+            ..weights()
+        };
+        let a = fuse(&candidate, technical_heavy, &Calibration::identity()).scene_weighted;
+        let b = fuse(&candidate, emotion_heavy, &Calibration::identity()).scene_weighted;
+        assert!(
+            a < b,
+            "weighting technical up should lower this frame: {a} vs {b}"
+        );
+    }
+
+    #[test]
+    fn the_identity_calibration_changes_nothing_and_says_so() {
+        let calibration = Calibration::identity();
+        assert_eq!(calibration.version(), KeepScore::UNCALIBRATED);
+        assert!((calibration.apply(SceneId::Vows, 0.42) - 0.42).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn a_fitted_calibration_interpolates_and_clamps_at_both_ends() {
+        let calibration = Calibration::fitted(
+            3,
+            vec![(SceneId::Vows, vec![(0.0, 0.1), (0.5, 0.5), (1.0, 0.9)])],
+        );
+        assert_eq!(calibration.version(), 3);
+        assert!((calibration.apply(SceneId::Vows, 0.25) - 0.3).abs() < 1e-5);
+        assert!((calibration.apply(SceneId::Vows, -1.0) - 0.1).abs() < 1e-5);
+        assert!((calibration.apply(SceneId::Vows, 2.0) - 0.9).abs() < 1e-5);
+        // A scene with no knots is untouched, rather than borrowing another scene's map.
+        assert!((calibration.apply(SceneId::DanceFloor, 0.25) - 0.25).abs() < 1e-5);
+    }
+
+    #[test]
+    fn unsorted_knots_are_sorted_rather_than_refused() {
+        // A monotone map built from sorted knots is still a monotone map, and refusing would
+        // lose a fit to a data-preparation slip.
+        let calibration = Calibration::fitted(
+            4,
+            vec![(SceneId::Vows, vec![(1.0, 0.9), (0.0, 0.1), (0.5, 0.5)])],
+        );
+        assert!((calibration.apply(SceneId::Vows, 0.25) - 0.3).abs() < 1e-5);
+    }
+
+    #[test]
+    fn every_missing_input_lowers_the_confidence_and_none_of_them_takes_it_negative() {
+        let mut bare = Candidate::unanalysed(image(3), 1_000);
+        bare.confidence = 0.2;
+        let reduced = confidence(&bare, true);
+        assert!((0.0..=1.0).contains(&reduced), "{reduced}");
+        assert_eq!(reduced, 0.0);
+
+        let full = confidence(&candidate(0.6), false);
+        let missing_emotion = {
+            let mut candidate = candidate(0.6);
+            candidate.has_emotion = false;
+            confidence(&candidate, false)
+        };
+        assert!(missing_emotion < full);
+    }
+
+    #[test]
+    fn a_confidence_penalty_is_small_enough_that_a_partly_analysed_wedding_is_still_readable() {
+        // A product that reported 0.2 confidence on every frame of a wedding whose phase 10
+        // pass had not run would train photographers to ignore the number.
+        let mut candidate = candidate(0.6);
+        candidate.has_emotion = false;
+        candidate.has_composition = false;
+        assert!(confidence(&candidate, false) > 0.6);
+    }
+
+    #[test]
+    fn a_veto_reads_as_a_physical_fact_rather_than_as_a_number() {
+        // "This scored 0.19" is not an explanation a photographer can argue with.
+        for code in CullCode::VETOES {
+            let text = veto_text(code);
+            assert!(!text.is_empty());
+            assert!(
+                !text.contains("0."),
+                "{code:?} explains itself with a score: {text}"
+            );
+        }
+    }
+}

@@ -39,7 +39,39 @@ pub enum Dialect {
     Official,
     /// A compatible server: `max_tokens`, no JSON mode, no organisation header.
     Compatible,
+    /// A hosted vendor that copied the shape and implements JSON mode:
+    /// OpenRouter, Groq, Mistral, DeepSeek, xAI, Together, Fireworks and the
+    /// rest. `max_tokens`, because none of them took the newer field name.
+    CompatibleJson,
+    /// Azure OpenAI: the deployment name is in the path, the key travels in
+    /// `api-key` rather than in `Authorization`, and the API version is a query
+    /// parameter that is not optional.
+    Azure,
 }
+
+impl Dialect {
+    /// True when this dialect uses the newer `max_completion_tokens` field.
+    const fn newer_token_field(self) -> bool {
+        matches!(self, Self::Official)
+    }
+
+    /// True when `response_format: {"type":"json_object"}` is understood.
+    ///
+    /// Opt-in rather than opt-out: several local servers answer a field they do
+    /// not implement with a 400 rather than by ignoring it, which turns the first
+    /// call a photographer ever makes into an error about a field they did not
+    /// set.
+    const fn json_mode(self) -> bool {
+        matches!(self, Self::Official | Self::CompatibleJson | Self::Azure)
+    }
+}
+
+/// The Azure API version this build speaks.
+///
+/// Azure refuses a request without one, and the value is a date rather than a
+/// number. It is a constant rather than a setting because a tenancy that needs a
+/// different one needs a different request body as well.
+pub const AZURE_API_VERSION: &str = "2024-10-21";
 
 /// OpenAI, or anything that speaks its dialect.
 #[derive(Debug, Clone)]
@@ -85,38 +117,7 @@ impl Default for OpenAiProvider {
 /// The shipped alias table for the official endpoint.
 #[must_use]
 pub fn default_aliases() -> BTreeMap<Tier, ModelAlias> {
-    let mut aliases = BTreeMap::new();
-    aliases.insert(
-        Tier::Reasoning,
-        ModelAlias {
-            model: "gpt-5".to_string(),
-            input_per_mtok_usd: 1.25,
-            output_per_mtok_usd: 10.00,
-            image_tokens_per_mpixel: 1_500,
-            max_output_tokens: 8_192,
-        },
-    );
-    aliases.insert(
-        Tier::Balanced,
-        ModelAlias {
-            model: "gpt-5-mini".to_string(),
-            input_per_mtok_usd: 0.25,
-            output_per_mtok_usd: 2.00,
-            image_tokens_per_mpixel: 1_500,
-            max_output_tokens: 8_192,
-        },
-    );
-    aliases.insert(
-        Tier::Cheap,
-        ModelAlias {
-            model: "gpt-5-nano".to_string(),
-            input_per_mtok_usd: 0.05,
-            output_per_mtok_usd: 0.40,
-            image_tokens_per_mpixel: 1_500,
-            max_output_tokens: 4_096,
-        },
-    );
-    aliases
+    crate::catalog::spec(ProviderKind::OpenAi).aliases()
 }
 
 impl Provider for OpenAiProvider {
@@ -166,13 +167,13 @@ impl Provider for OpenAiProvider {
             });
         }
 
-        let official = self.dialect == Dialect::Official;
+        let newer = self.dialect.newer_token_field();
         let body = Body {
             model: request.model.clone(),
             temperature: request.prompt.temperature,
-            max_tokens: (!official).then_some(request.prompt.max_tokens),
-            max_completion_tokens: official.then_some(request.prompt.max_tokens),
-            response_format: official.then_some(ResponseFormat {
+            max_tokens: (!newer).then_some(request.prompt.max_tokens),
+            max_completion_tokens: newer.then_some(request.prompt.max_tokens),
+            response_format: self.dialect.json_mode().then_some(ResponseFormat {
                 kind: "json_object",
             }),
             stream: false,
@@ -182,17 +183,41 @@ impl Provider for OpenAiProvider {
             payload_refused(format!("could not serialise the OpenAI request: {err}"))
         })?;
 
-        Ok(HttpRequest {
-            method: "POST".to_string(),
-            url: format!("{}/v1/chat/completions", self.config.endpoint),
-            headers: vec![
-                ("content-type".to_string(), "application/json".to_string()),
-                ("accept".to_string(), "application/json".to_string()),
-                (
+        let url = if self.dialect == Dialect::Azure {
+            // The deployment name is the path segment, and it is the name the
+            // customer chose in their own resource rather than a model name we
+            // could guess - which is why the Azure row in the catalog ships
+            // placeholders and the panel asks for the three deployments.
+            format!(
+                "{}/openai/deployments/{}/chat/completions?api-version={AZURE_API_VERSION}",
+                self.config.endpoint, request.model
+            )
+        } else {
+            format!("{}/v1/chat/completions", self.config.endpoint)
+        };
+
+        let mut headers = vec![
+            ("content-type".to_string(), "application/json".to_string()),
+            ("accept".to_string(), "application/json".to_string()),
+        ];
+        // A local server usually wants no credential at all, and an empty bearer
+        // is a header some of them reject rather than ignore. No key means no
+        // header; the gateway has already decided whether one was required.
+        if !key.is_empty() {
+            if self.dialect == Dialect::Azure {
+                headers.push(("api-key".to_string(), key.expose().to_string()));
+            } else {
+                headers.push((
                     "authorization".to_string(),
                     format!("Bearer {}", key.expose()),
-                ),
-            ],
+                ));
+            }
+        }
+
+        Ok(HttpRequest {
+            method: "POST".to_string(),
+            url,
+            headers,
             body: bytes,
         })
     }
@@ -218,7 +243,7 @@ impl Provider for OpenAiProvider {
         })?;
 
         Ok(CloudResponse {
-            text: choice.message.content.clone().unwrap_or_default(),
+            text: choice.message.answer(),
             tokens_in: parsed.usage.prompt_tokens,
             tokens_out: parsed.usage.completion_tokens,
             model: parsed.model,
@@ -306,6 +331,31 @@ struct Choice {
 struct ReplyMessage {
     #[serde(default)]
     content: Option<String>,
+    // Reasoning models - GLM, DeepSeek-R1, OpenAI's o-series - answer in two
+    // fields: the thinking in `reasoning_content` and the answer in `content`.
+    // Reading only `content` turns a reasoning model into an empty answer
+    // whenever the token budget runs out mid-thought, which reads downstream as
+    // "no JSON in the reply" and burns the repair attempt on a response that
+    // was never there. The chain in `validate.rs` extracts JSON from fenced or
+    // preamble-wrapped text, so an answer that spilled into the reasoning field
+    // is still recoverable here.
+    #[serde(default)]
+    reasoning_content: Option<String>,
+}
+
+impl ReplyMessage {
+    /// The text to validate, preferring the answer over the thinking.
+    fn answer(&self) -> String {
+        let content = self.content.as_deref().unwrap_or_default().trim();
+        if !content.is_empty() {
+            return content.to_string();
+        }
+        self.reasoning_content
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]

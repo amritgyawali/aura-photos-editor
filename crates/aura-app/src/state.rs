@@ -29,13 +29,14 @@ use aura_catalog::Catalog;
 use aura_cloud::audit::{AuditSink, CatalogAudit};
 use aura_cloud::budget::{CatalogBudget, CostGovernor};
 use aura_cloud::cache::{CatalogCache, ResponseCache};
+use aura_cloud::catalog::ModelChoice;
 use aura_cloud::keys::{KeyStore, OsKeyStore, Platform};
 use aura_cloud::provider::{
     Provider, ProviderClient, ProviderConfig, ProviderKind, ThreadSleeper, Transport,
 };
 use aura_cloud::{CloudAiGateway, CloudPolicy};
 use aura_core::clock::{Clock, SystemClock};
-use aura_core::progress::CancelToken;
+use aura_core::progress::{CancelToken, ProgressCounter};
 use aura_core::{AuraResult, PhotoId, ProjectId};
 use aura_cull::gather::Gatherer;
 use aura_cull::store::CullStore;
@@ -85,12 +86,53 @@ pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// deleting the judgements already stored in the catalog.
 pub const COMPOSITION_ENABLED_ENV: &str = "AURA_COMPOSITION_ENABLED";
 
+/// One import's counter and whether its worker is still running.
+#[derive(Debug, Clone)]
+struct ImportWatch {
+    counter: ProgressCounter,
+    running: bool,
+}
+
+/// A [`ProgressSink`] that folds every update into one counter.
+///
+/// The ingest pass reports `(done, total)` after each batch; the panel polls for the latest
+/// pair. Nothing is queued and nothing is dropped, which is what
+/// "implementations must never block the caller" asks for.
+#[derive(Debug, Clone)]
+pub struct CountingProgress {
+    counter: ProgressCounter,
+}
+
+impl CountingProgress {
+    /// Wrap a counter.
+    #[must_use]
+    pub const fn new(counter: ProgressCounter) -> Self {
+        Self { counter }
+    }
+}
+
+impl aura_core::progress::ProgressSink for CountingProgress {
+    fn report(&self, update: aura_core::progress::ProgressUpdate) {
+        self.counter.set_total(update.total);
+        // `set_done` rather than `advance`: the pass reports a running total, so adding it
+        // would count every batch again on top of the ones before it.
+        self.counter.set_done(update.done);
+    }
+}
+
 /// Everything a command needs. Cheap to clone: the catalog lives behind an `Arc`.
 #[derive(Debug, Clone)]
 pub struct AppState {
     catalog: Arc<Catalog>,
     clock: Arc<dyn Clock>,
     jobs: Arc<Mutex<BTreeMap<String, CancelToken>>>,
+    /// What each import has counted so far, so the wizard can draw a bar.
+    ///
+    /// Separate from `jobs` rather than a second field on it because a cancel token is what
+    /// *every* long pass registers and a file count is what only an import has. The entry
+    /// outlives the worker: the panel has to be able to ask one more time after the run ends
+    /// and be told it finished, rather than reading a missing key as "still going".
+    imports: Arc<Mutex<BTreeMap<String, ImportWatch>>>,
     // PHASE-28. The autopilot run in flight for each project, so the progress panel can read a
     // watch that a worker thread is writing to.
     //
@@ -160,9 +202,19 @@ struct CloudSlot {
     keys: Option<Arc<dyn KeyStore>>,
     provider: ProviderKind,
     endpoint: Option<String>,
+    /// The model names the photographer chose, per tier. Empty is the ordinary
+    /// state and means the catalog's own names apply.
+    models: ModelChoice,
     policy: CloudPolicy,
     /// Swapped for a cassette transport by the tests and the phase gate.
     transport: Option<Arc<dyn Transport>>,
+    /// True once the stored choice has been read back from the catalog.
+    ///
+    /// Without this the provider resets to the built-in default on every launch,
+    /// which is what phase 04 shipped: a photographer chose Groq, closed the
+    /// application, and reopened it pointed at Anthropic with a key it did not
+    /// have. The read happens once, lazily, beside the first gateway build.
+    restored: bool,
 }
 
 impl Default for CloudSlot {
@@ -172,8 +224,10 @@ impl Default for CloudSlot {
             keys: None,
             provider: ProviderKind::Anthropic,
             endpoint: None,
+            models: ModelChoice::default(),
             policy: CloudPolicy::default(),
             transport: None,
+            restored: false,
         }
     }
 }
@@ -219,6 +273,7 @@ impl AppState {
             catalog: Arc::new(catalog),
             clock,
             jobs: Arc::new(Mutex::new(BTreeMap::new())),
+            imports: Arc::new(Mutex::new(BTreeMap::new())),
             runs: Arc::new(Mutex::new(BTreeMap::new())),
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             cache_root,
@@ -240,6 +295,7 @@ impl AppState {
             catalog,
             clock,
             jobs: Arc::new(Mutex::new(BTreeMap::new())),
+            imports: Arc::new(Mutex::new(BTreeMap::new())),
             runs: Arc::new(Mutex::new(BTreeMap::new())),
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             cache_root,
@@ -1649,9 +1705,95 @@ impl AppState {
         provider: ProviderKind,
         endpoint: Option<&str>,
     ) -> AuraResult<()> {
+        let models = self.cloud.lock().models.clone();
+        self.set_cloud_provider_with_models(provider, endpoint, &models)
+    }
+
+    /// Choose the provider, its endpoint and the three model names.
+    ///
+    /// In memory only. [`AppState::save_ai_setup`] is what makes a choice
+    /// survive a restart, and the two are separate because the Check button
+    /// changes what this process is pointed at without committing anybody to it.
+    ///
+    /// # Errors
+    ///
+    /// Never in itself; the signature matches the other setters.
+    pub fn set_cloud_provider_with_models(
+        &self,
+        provider: ProviderKind,
+        endpoint: Option<&str>,
+        models: &ModelChoice,
+    ) -> AuraResult<()> {
         let mut slot = self.cloud.lock();
         slot.provider = provider;
         slot.endpoint = endpoint.map(ToString::to_string);
+        slot.models = models.clone();
+        slot.restored = true;
+        slot.gateway = None;
+        Ok(())
+    }
+
+    /// What is pointed at right now: the provider, its endpoint and its models.
+    ///
+    /// Reads the stored choice first if this process has not yet.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the stored choice cannot be read.
+    pub fn cloud_selection(&self) -> AuraResult<(ProviderKind, Option<String>, ModelChoice)> {
+        self.restore_ai_setup()?;
+        let slot = self.cloud.lock();
+        Ok((slot.provider, slot.endpoint.clone(), slot.models.clone()))
+    }
+
+    /// The stored setup record, whether or not it has been applied.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the catalog cannot be read.
+    pub fn ai_setup(&self) -> AuraResult<crate::ai_settings::AiSetup> {
+        self.catalog.read(crate::ai_settings::read)
+    }
+
+    /// Write the setup record and point this process at it.
+    ///
+    /// One call rather than two, because a stored choice the running process has
+    /// not adopted is a settings panel that disagrees with the next call it
+    /// makes.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the record cannot be written.
+    pub fn save_ai_setup(&self, setup: &crate::ai_settings::AiSetup) -> AuraResult<()> {
+        let now = aura_catalog::rfc3339(self.clock.now_utc());
+        let stored = setup.clone();
+        self.catalog
+            .writer()
+            .with(move |conn| crate::ai_settings::write(conn, &stored, &now))?;
+        self.set_cloud_provider_with_models(setup.kind(), setup.endpoint(), &setup.models())
+    }
+
+    /// Adopt the stored choice, once per process.
+    ///
+    /// # Errors
+    ///
+    /// `AURA-DB-3006` when the catalog cannot be read.
+    fn restore_ai_setup(&self) -> AuraResult<()> {
+        if self.cloud.lock().restored {
+            return Ok(());
+        }
+        let stored = self.catalog.read(crate::ai_settings::read)?;
+        let mut slot = self.cloud.lock();
+        // Checked again under the lock: two commands arriving together would
+        // otherwise both read and both apply, and the second would discard a
+        // provider the first had already been told to use.
+        if slot.restored {
+            return Ok(());
+        }
+        slot.provider = stored.kind();
+        slot.endpoint = stored.endpoint().map(ToString::to_string);
+        slot.models = stored.models();
+        slot.restored = true;
         slot.gateway = None;
         Ok(())
     }
@@ -1670,10 +1812,12 @@ impl AppState {
                 return Ok(Arc::clone(gateway));
             }
         }
+        self.restore_ai_setup()?;
         let keys = self.key_store()?;
 
         let mut slot = self.cloud.lock();
-        let provider = build_provider(slot.provider, slot.endpoint.as_deref());
+        let provider =
+            aura_cloud::catalog::build(slot.provider, slot.endpoint.as_deref(), &slot.models);
         let transport = slot.transport.clone().unwrap_or_else(|| {
             Arc::new(aura_cloud::http::HttpTransport::new()) as Arc<dyn Transport>
         });
@@ -2406,9 +2550,11 @@ impl AppState {
     /// Each is attached when its tables open and named in a warning when they do not - phase 19's
     /// rule that a phase owns no fallback for another phase's output.
     ///
-    /// **No editorial judge is attached either.** TLS is waived (ADR-0009), so no public vision
-    /// provider is reachable from this build; the pass behaves exactly as it does with an
-    /// unreachable one, which is that every proposal in the judgement band waits for a person.
+    /// **No editorial judge is attached either.** Wiring one is a later change than this pass;
+    /// the pass behaves exactly as it does with an unreachable provider, which is that every
+    /// proposal in the judgement band waits for a person. ADR-0063 made a public provider
+    /// reachable - the reason nothing is attached here is that nothing attaches it, and phase
+    /// 24's rule is that the absence produces a refusal rather than a silent approval.
     ///
     /// # Errors
     ///
@@ -2792,7 +2938,7 @@ impl AppState {
     /// a public signature later is worse than carrying an unused `Result` now.
     pub fn render(&self) -> AuraResult<Arc<aura_render::CpuEngine>> {
         let source: Arc<dyn aura_render::FrameSource> = Arc::new(CatalogFrames {
-            catalog: Arc::clone(&self.catalog),
+            state: self.clone(),
         });
         Ok(Arc::new(aura_render::CpuEngine::new(
             source,
@@ -2854,6 +3000,40 @@ impl AppState {
         self.jobs.lock().insert(job_id.to_string(), token);
     }
 
+    /// Start counting an import, and hand back the counter its worker writes into.
+    #[must_use]
+    pub fn register_import(&self, job_id: &str) -> ProgressCounter {
+        let counter = ProgressCounter::default();
+        self.imports.lock().insert(
+            job_id.to_string(),
+            ImportWatch {
+                counter: counter.clone(),
+                running: true,
+            },
+        );
+        counter
+    }
+
+    /// Mark an import finished, keeping its final counts for the panel to read once more.
+    pub fn finish_import(&self, job_id: &str) {
+        if let Some(watch) = self.imports.lock().get_mut(job_id) {
+            watch.running = false;
+        }
+    }
+
+    /// How far one import has got: units done, units expected, and whether it is still going.
+    ///
+    /// `None` for a job this process never started, which is a different answer from a job
+    /// that finished - a panel restored after a reload must not draw a bar for work it cannot
+    /// see the end of.
+    #[must_use]
+    pub fn import_watch(&self, job_id: &str) -> Option<(u64, u64, bool)> {
+        self.imports
+            .lock()
+            .get(job_id)
+            .map(|watch| (watch.counter.done(), watch.counter.total(), watch.running))
+    }
+
     /// Signal cancellation. Returns false when the job is already gone.
     #[must_use]
     pub fn cancel_job(&self, job_id: &str) -> bool {
@@ -2897,27 +3077,13 @@ impl AppState {
 
 /// Build a provider for one vendor at one endpoint.
 ///
-/// The endpoint is the user's when they gave one, so a region-pinned or
-/// self-hosted deployment is a setting rather than a rebuild.
-fn build_provider(kind: ProviderKind, endpoint: Option<&str>) -> Arc<dyn Provider> {
-    match kind {
-        ProviderKind::Anthropic => Arc::new(aura_cloud::anthropic::AnthropicProvider::new(
-            endpoint.unwrap_or(aura_cloud::anthropic::DEFAULT_ENDPOINT),
-        )),
-        ProviderKind::OpenAi => Arc::new(aura_cloud::openai::OpenAiProvider::new(
-            endpoint.unwrap_or(aura_cloud::openai::DEFAULT_ENDPOINT),
-        )),
-        ProviderKind::Google => Arc::new(aura_cloud::google::GoogleProvider::new(
-            endpoint.unwrap_or(aura_cloud::google::DEFAULT_ENDPOINT),
-        )),
-        // A compatible server runs whatever the user loaded into it, so there is
-        // no default model name worth guessing. `local-model` is what Ollama and
-        // LM Studio both accept as an alias, and Settings overwrites it.
-        ProviderKind::Compat => Arc::new(aura_cloud::compat::provider(
-            endpoint.unwrap_or(aura_cloud::compat::DEFAULT_ENDPOINT),
-            "local-model",
-        )),
-    }
+/// Every provider AURA knows how to reach is a row in `aura_cloud::catalog`, so
+/// this crate does no matching of its own: adding the twentieth vendor is a row
+/// in that table rather than an arm here. The endpoint is the photographer's when
+/// they gave one and the catalog says that provider's address is theirs to set.
+#[must_use]
+pub fn build_provider(kind: ProviderKind, endpoint: Option<&str>) -> Arc<dyn Provider> {
+    aura_cloud::catalog::build(kind, endpoint, &ModelChoice::default())
 }
 
 /// Fold an endpoint into a configuration without rebuilding the alias table.
@@ -2929,11 +3095,24 @@ pub fn config_at(mut config: ProviderConfig, endpoint: &str) -> ProviderConfig {
 
 /// Where the credential blob lives on the one platform that needs a file.
 ///
-/// Beside the models rather than beside a catalog: a key belongs to the machine
-/// and its user, not to one wedding, and a photographer who archives a project
-/// folder must not archive their API key with it.
+/// In the per-user data directory, beside the catalogs rather than inside any one of
+/// them: a key belongs to the machine and its user, not to one wedding, and a
+/// photographer who archives a project folder must not archive their API key with it.
+///
+/// **It used to be the relative path `credentials`, and that is a bug rather than a
+/// simplification.** A relative path resolves against the process's working directory,
+/// which for a windowed application is whatever launched it - the shell's folder from a
+/// double-click, `C:\Windows\System32` from some launchers, the repository root when a
+/// developer runs it from a terminal. So the same installation wrote its keys to
+/// different places on different launches, could not read back what it had written, and
+/// on a directory it may not write to failed outright with `AURA-CLOUD-6012`. The
+/// relative path survives only as the fallback for a platform that exposes no data
+/// directory at all, which is the same condition `AppPaths::resolve` already refuses on.
 fn default_key_dir() -> PathBuf {
-    PathBuf::from("credentials")
+    aura_core::paths::AppPaths::resolve().map_or_else(
+        |_| PathBuf::from("credentials"),
+        |paths| paths.data_dir.join("credentials"),
+    )
 }
 
 /// Models live with the installation rather than with a catalog: one pack serves
@@ -2995,13 +3174,103 @@ mod tests {
 /// A port implementation, not a contract: `aura_render::FrameSource` is deliberately not
 /// frozen, so the day the proxy pipeline changes shape this is the only file that moves.
 ///
-/// **It opens no RAW.** Phase 02's cache is what holds pixels, and a photograph whose proxy
-/// has not been built yet renders as a neutral grey frame rather than as an error, because a
-/// develop panel that refuses to open until the whole wedding is decoded is a develop panel
-/// nobody can use on the night of a wedding.
-#[derive(Debug)]
+/// **It opens no RAW itself.** Phase 02's `PreviewService` is the only thing in the product
+/// that turns a file into pixels, and this asks it for the rung the requested render level
+/// needs. If neither the requested level nor a proxy can be decoded, the request
+/// returns a typed error. Missing pixels must never become a successful placeholder export.
 struct CatalogFrames {
-    catalog: Arc<Catalog>,
+    state: AppState,
+}
+
+impl std::fmt::Debug for CatalogFrames {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("CatalogFrames")
+    }
+}
+
+impl CatalogFrames {
+    /// Which cached rung serves a render level.
+    ///
+    /// `Screen` asks for a thumbnail only when it wants less than a thumbnail is; anything
+    /// larger comes off the proxy, because upscaling a 512 px thumbnail into a 1920 px panel
+    /// is a soft photograph that looks like a focus failure.
+    fn rung(level: aura_render::RenderLevel) -> aura_raw::PixelLevel {
+        match level {
+            aura_render::RenderLevel::Full => aura_raw::PixelLevel::Full,
+            aura_render::RenderLevel::Proxy2048 => aura_raw::PixelLevel::Proxy2048,
+            aura_render::RenderLevel::Screen(w, h) => {
+                let edge = w.max(h).max(1);
+                if edge <= 512 {
+                    aura_raw::PixelLevel::Thumb(edge)
+                } else {
+                    aura_raw::PixelLevel::Proxy2048
+                }
+            }
+        }
+    }
+
+    /// Turn a cached buffer into working-space samples.
+    ///
+    /// Two encodings arrive here and they need different treatment. `Linear16` is already the
+    /// working space - the proxy pipeline put it there through the camera matrix - and only
+    /// needs the scene curve undone. `Srgb8` is what a cached proxy JPEG decodes to, and it is
+    /// display-encoded **in sRGB primaries**: the transfer function comes off first and then
+    /// the primaries are rotated, because doing only the first leaves every saturated colour
+    /// rotated toward grey.
+    fn working_samples(buffer: &aura_raw::contract::pixels::PixelBuffer) -> Option<Vec<f32>> {
+        use aura_raw::colour::{curve, working_space};
+        use aura_raw::contract::pixels::PixelData;
+
+        let want = (buffer.width as usize)
+            .saturating_mul(buffer.height as usize)
+            .saturating_mul(3);
+        if want == 0 {
+            return None;
+        }
+
+        match &buffer.data {
+            PixelData::Srgb8(bytes) => {
+                if bytes.len() < want {
+                    return None;
+                }
+                let mut out: Vec<f32> = Vec::with_capacity(want);
+                for pixel in bytes.chunks_exact(3).take(want / 3) {
+                    let linear = [
+                        f64::from(curve::srgb_decode(f32::from(pixel[0]) / 255.0)),
+                        f64::from(curve::srgb_decode(f32::from(pixel[1]) / 255.0)),
+                        f64::from(curve::srgb_decode(f32::from(pixel[2]) / 255.0)),
+                    ];
+                    let working = working_space::linear_srgb_to_working(linear);
+                    out.extend_from_slice(&[
+                        working[0] as f32,
+                        working[1] as f32,
+                        working[2] as f32,
+                    ]);
+                }
+                Some(out)
+            }
+            PixelData::Linear16(codes) => {
+                if codes.len() < want {
+                    return None;
+                }
+                Some(
+                    codes
+                        .iter()
+                        .take(want)
+                        .map(|c| curve::linear_u16_to_scene(*c))
+                        .collect(),
+                )
+            }
+            // A tiled full decode is the exporter's business and it does not come through
+            // this port; treating it as unavailable is honest rather than clever.
+            PixelData::Tiled(tiles) => Some(
+                aura_raw::full::assemble(tiles, buffer.width, buffer.height)
+                    .iter()
+                    .map(|sample| curve::linear_u16_to_scene(*sample))
+                    .collect(),
+            ),
+        }
+    }
 }
 
 impl aura_render::FrameSource for CatalogFrames {
@@ -3016,48 +3285,127 @@ impl aura_render::FrameSource for CatalogFrames {
         level: aura_render::RenderLevel,
     ) -> AuraResult<aura_render::Frame> {
         let key = image.to_db();
-        let size: Option<(i64, i64)> = self
+        let row: Option<(Option<i64>, Option<i64>, Option<String>, String)> = self
+            .state
             .catalog
             .read(move |conn| {
                 conn.query_row(
-                    "SELECT width_px, height_px FROM photo WHERE photo_id = ?1",
+                    "SELECT width_px, height_px, camera_model, project_id
+                       FROM photo WHERE photo_id = ?1",
                     rusqlite::params![key],
-                    |row| Ok((row.get::<_, Option<i64>>(0)?, row.get::<_, Option<i64>>(1)?)),
+                    |row| {
+                        Ok((
+                            row.get::<_, Option<i64>>(0)?,
+                            row.get::<_, Option<i64>>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                            row.get::<_, String>(3)?,
+                        ))
+                    },
                 )
                 .optional()
-                .map(|found| found.and_then(|(w, h)| w.zip(h)))
-                .map_err(|e| aura_core::errors::db::statement_failed("photo size", &e))
+                .map_err(|e| aura_core::errors::db::statement_failed("photo row", &e))
             })
             .unwrap_or(None);
 
+        let (declared, camera, project) = match row {
+            Some((w, h, camera, project)) => (w.zip(h), camera.unwrap_or_default(), Some(project)),
+            None => (None, String::new(), None),
+        };
+
+        // The declared size is EXIF's, and a photograph whose file carries none has NULL here.
+        // It is only used to bound screen output; the real
+        // dimensions come from the buffer the preview service returns.
         let (width, height) =
-            size.map_or((2048, 1365), |(w, h)| (w.max(1) as u32, h.max(1) as u32));
+            declared.map_or((2048, 1365), |(w, h)| (w.max(1) as u32, h.max(1) as u32));
         let edge = level.long_edge().unwrap_or(width.max(height));
         let scale = f64::from(edge) / f64::from(width.max(height).max(1));
         let out_w = ((f64::from(width) * scale).round() as u32).clamp(1, width.max(1));
         let out_h = ((f64::from(height) * scale).round() as u32).clamp(1, height.max(1));
 
-        let key = image.to_db();
-        let camera = self
-            .catalog
-            .read(move |conn| {
-                conn.query_row(
-                    "SELECT camera_model FROM photo WHERE photo_id = ?1",
-                    rusqlite::params![key],
-                    |row| row.get::<_, Option<String>>(0),
-                )
-                .optional()
-                .map(Option::flatten)
-                .map_err(|e| aura_core::errors::db::statement_failed("camera model", &e))
-            })
-            .ok()
-            .flatten()
-            .unwrap_or_default();
+        let pixels = project.and_then(|project| {
+            use aura_preview::contract::service::{PreviewService, Priority};
+
+            let service = match self.state.previews(&project) {
+                Ok(service) => service,
+                Err(error) => {
+                    tracing::warn!(
+                        target: "render",
+                        image = %image.to_db(),
+                        code = error.code.0,
+                        detail = %error.detail,
+                        "no preview cache for this project; rendering unavailable"
+                    );
+                    return None;
+                }
+            };
+
+            // The requested rung first, then the proxy. The second attempt is what a
+            // full-resolution export of a camera file this build cannot demosaic falls back
+            // on: `AURA-RAW-2007` on a Canon CR2 is a *smaller* photograph, and delivering one
+            // is a far better answer than delivering a grey rectangle at the right size. It is
+            // skipped when the request was already the proxy, so an ordinary failure stays one
+            // attempt rather than two.
+            let mut rungs = vec![Self::rung(level)];
+            if rungs[0] != aura_raw::PixelLevel::Proxy2048 {
+                rungs.push(aura_raw::PixelLevel::Proxy2048);
+            }
+
+            for rung in rungs {
+                match service.get(*image, rung, Priority::Interactive) {
+                    Ok(buffer) => match Self::working_samples(&buffer) {
+                        Some(data) => {
+                            return Some(aura_raw::demosaic::RgbF32 {
+                                width: buffer.width,
+                                height: buffer.height,
+                                data,
+                            })
+                        }
+                        None => tracing::warn!(
+                            target: "render",
+                            image = %image.to_db(),
+                            "the cached buffer was tiled or truncated"
+                        ),
+                    },
+                    Err(error) => tracing::warn!(
+                        target: "render",
+                        image = %image.to_db(),
+                        code = error.code.0,
+                        detail = %error.detail,
+                        "this rung could not be produced"
+                    ),
+                }
+            }
+            tracing::warn!(
+                target: "render",
+                image = %image.to_db(),
+                "no pixels for this photograph at any rung; refusing render"
+            );
+            None
+        });
+
+        let Some(image_rgb) = pixels else {
+            return Err(aura_core::errors::raw::corrupt(
+                "The photograph could not be decoded. Check that its original file is available and its format is supported.",
+            ));
+        };
+
+        // A cached rung is whatever size the proxy pipeline produced. `Proxy2048` and `Full`
+        // take it as it is; a `Screen` request is a panel asking for a specific box and is
+        // resampled to it, downscaling only - enlarging a proxy to fill a 4K window would
+        // manufacture detail the photograph does not have.
+        let resampled = match level {
+            aura_render::RenderLevel::Screen(_, _)
+                if image_rgb.width > out_w || image_rgb.height > out_h =>
+            {
+                aura_raw::demosaic::resize(&image_rgb, out_w.max(1), out_h.max(1))
+            }
+            _ => image_rgb,
+        };
 
         Ok(aura_render::Frame::working(
-            vec![0.18f32; (out_w as usize) * (out_h as usize) * 3],
-            out_w,
-            out_h,
+            resampled.data,
+            resampled.width,
+            resampled.height,
             &camera,
         ))
     }

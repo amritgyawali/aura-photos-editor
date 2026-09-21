@@ -1,5 +1,127 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import type { AutomaticStartDto, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
+
+import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
+
+/**
+ * Every command in the product passes through here, and the audit log hangs off
+ * this one line: started, ok with latency, or refused with the error's code and
+ * message. That is why no call site logs anything - a per-site log is one forgotten
+ * site at a time, and this surface has 220 of them.
+ *
+ * The high-frequency reads are the exception and `isQuietIpc` names them: a grid
+ * scrolling a wedding fires `get_preview` faster than a log can hold it, and the
+ * lines would crowd out the clicks the log exists for. Their failures are still
+ * always recorded. `ui_audit` is exempt from logging too: it is the log's own pipe,
+ * and watching the watcher doubles the traffic it exists to reduce.
+ */
+function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const quiet = isQuietIpc(command);
+  const relay = command === 'ui_audit';
+  if (!quiet && !relay) {
+    audit('ipc', command, { phase: 'start' });
+  }
+  const startedAt = Date.now();
+  return rawInvoke<T>(command, args).then(
+    (value) => {
+      const ms = Date.now() - startedAt;
+      if (!quiet && !relay) {
+        audit('ipc', command, { phase: 'ok', ms });
+      } else if (!relay && ms > 5000) {
+        audit('warning', `slow ${command}`, { ms });
+      }
+      return value;
+    },
+    (error: unknown) => {
+      if (!relay) {
+        const code =
+          typeof error === 'object' && error !== null && 'code' in error
+            ? String((error as { code: unknown }).code)
+            : 'IPC-UNKNOWN';
+        // `message` is the field the shell serialises; `user_message` is the
+        // AuraError shape the panels read through `asIpcError`. Either is worth a
+        // line, and a refusal with no readable message is still a refusal.
+        const record =
+          typeof error === 'object' && error !== null
+            ? (error as Record<string, unknown>)
+            : {};
+        const message =
+          typeof record['message'] === 'string'
+            ? record['message']
+            : typeof record['user_message'] === 'string'
+              ? record['user_message']
+              : String(error).slice(0, 200);
+        audit('ipc-error', `${code} in ${command}`, {
+          ms: Date.now() - startedAt,
+          message: String(message).slice(0, 200),
+        });
+        // A failure is exactly the moment the file needs the lines around it, so the
+        // queue goes to disk now rather than on the next tick.
+        flushAuditToFile();
+      }
+      throw error;
+    },
+  );
+}
+
+/**
+ * Push the queued lines into the shell's file log.
+ *
+ * Batched on an interval and flushed on errors and at page hide, because a command
+ * per line would make the relay itself one of the loudest things in the log. The
+ * call is deliberately not awaited and never logs or retries: if the shell cannot
+ * take the lines, they still live in memory and localStorage for the panel.
+ */
+function flushAuditToFile(): void {
+  if (!inTauri()) {
+    return;
+  }
+  const batch = drainAuditBatch();
+  if (batch.length === 0) {
+    return;
+  }
+  // Through the wrapper rather than `rawInvoke` on purpose: the parity check reads
+  // command strings out of this file case-sensitively, and `ui_audit` has to appear
+  // as an invoked name or it reads as a command the client never calls. The wrapper
+  // recognises the relay by name and does not log it, so nothing recurses.
+  invoke<void>('ui_audit', { batch }).catch(() => undefined);
+}
+
+const relayTimer = setInterval(flushAuditToFile, 5000);
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushAuditToFile);
+}
+void relayTimer;
+
+export const photoAutoEdit = (input: PhotoAutoEditInput): Promise<PhotoAutoEditDto> =>
+  invoke<PhotoAutoEditDto>('photo_auto_edit', { input });
+
+export const photoAnalysis = (input: PhotoAutoEditInput): Promise<PhotoAnalysisDto> =>
+  invoke<PhotoAnalysisDto>('photo_analysis', { input });
+
+export const automaticStart = (input: { roots: string[]; projectId: string | null }): Promise<AutomaticStartDto> =>
+  invoke<AutomaticStartDto>('automatic_start', { input });
+
+/** ADR-0065. Start the whole delivery pipeline. Returns immediately; poll `oneClickStatus`. */
+export const oneClickFinish = (input: OneClickFinishInput): Promise<OneClickFinishDto> =>
+  invoke<OneClickFinishDto>('one_click_finish', { input });
+
+/** The live row behind the button. Rejects with `AURA-IO-1001` once the run leaves memory. */
+export const oneClickStatus = (jobId: string): Promise<OneClickStatusDto> =>
+  invoke<OneClickStatusDto>('one_click_status', { jobId });
+
+/** Stop between photographs. True when the id was known. */
+export const oneClickCancel = (jobId: string): Promise<boolean> =>
+  invoke<boolean>('one_click_cancel', { jobId });
+
+export async function pickImportPaths(directory: boolean): Promise<string[]> {
+  const result = await invoke<string | string[] | null>('plugin:dialog|open', {
+    options: { directory, multiple: true, title: directory ? 'Choose photo folders' : 'Choose photographs',
+      filters: directory ? [] : [{ name: 'Photographs', extensions: ['jpg', 'jpeg', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef', 'tif', 'tiff'] }] },
+  });
+  return result === null ? [] : typeof result === 'string' ? [result] : result;
+}
 
 import type {
   // PHASE-28.
@@ -78,6 +200,9 @@ import type {
   CloudCallDto,
   CloudEvent,
   CloudSpendDto,
+  AiProviderDto,
+  AiSetupStatusDto,
+  SaveAiSetupInput,
   CloudStatusDto,
   ColourDto,
   ColourPassDto,
@@ -152,6 +277,7 @@ import type {
   InferEvent,
   InferStatsDto,
   IngestEvent,
+  IngestProgressDto,
   IntegrityDto,
   IntegrityEvent,
   IntegrityPassDto,
@@ -343,6 +469,9 @@ export const api = {
 
   cancelJob: (jobId: string): Promise<boolean> => invoke<boolean>('cancel_job', { jobId }),
 
+  ingestProgress: (jobId: string): Promise<IngestProgressDto> =>
+    invoke<IngestProgressDto>('ingest_progress', { jobId }),
+
   listImages: (input: ListImagesInput): Promise<ImageRowLite[]> =>
     invoke<ImageRowLite[]>('list_images', { input }),
 
@@ -417,6 +546,22 @@ export const api = {
     invoke<CloudStatusDto>('clear_ai_key', { provider }),
 
   checkAiKey: (): Promise<KeyCheckDto> => invoke<KeyCheckDto>('check_ai_key'),
+
+  /** Every provider AURA knows how to reach. Static, and cheap to ask for. */
+  listAiProviders: (): Promise<AiProviderDto[]> =>
+    invoke<AiProviderDto[]>('list_ai_providers'),
+
+  /** What the first-run screen and the AI panel both need to know. */
+  aiSetupStatus: (): Promise<AiSetupStatusDto> =>
+    invoke<AiSetupStatusDto>('ai_setup_status'),
+
+  /** Record the provider choice. The key is not part of this; `setAiKey` is. */
+  saveAiSetup: (input: SaveAiSetupInput): Promise<AiSetupStatusDto> =>
+    invoke<AiSetupStatusDto>('save_ai_setup', { input }),
+
+  /** Answer the first-run screen by declining it. Records no provider. */
+  skipAiSetup: (): Promise<AiSetupStatusDto> =>
+    invoke<AiSetupStatusDto>('skip_ai_setup'),
 
   setCloudBudget: (input: SetCloudBudgetInput): Promise<CloudSpendDto> =>
     invoke<CloudSpendDto>('set_cloud_budget', { input }),

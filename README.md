@@ -55,6 +55,17 @@ tests/fixtures/            generated reference weddings (not committed)
 
 ## Getting started
 
+On Windows, open **Start AURA.cmd** from this folder. It opens the native app
+with the UI bundled inside, without a browser or development server. Add Desktop
+and Start menu shortcuts with `& '.\Start AURA.cmd' -InstallShortcuts` in PowerShell.
+The launcher builds automatically if the executable is missing or source files
+have changed. Close AURA and open it again to pick up code changes; `-Rebuild`
+forces a rebuild when needed. Building requires the tools listed below.
+
+For the desktop import → automatic edit → export workflow, see
+[Photo editing quickstart](docs/photo-editing-quickstart.md). Cloud vision editing
+uses the configured provider; local enhancement works without an API key.
+
 ```bash
 rustup show                       # installs the pinned toolchain from rust-toolchain.toml
 just setup                        # git hooks + npm install

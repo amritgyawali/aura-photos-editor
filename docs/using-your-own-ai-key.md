@@ -16,21 +16,71 @@ If you never add one, nothing is broken and nothing nags you.
 
 ## Adding a key
 
-**Settings > AI keys.**
+The first time you open AURA it asks. There is a **Not now** button on that
+screen and pressing it is a complete answer - you will not be asked again, and
+you can come back to it from **Settings > AI keys > Browse all providers**
+whenever you like.
 
-1. Choose your provider: Anthropic, OpenAI, Google, or your own server.
-2. Paste the key.
-3. Press **Save key**, then **Check**.
+1. Pick a provider from the list. Search it if you know what you want.
+2. Paste the key. The screen tells you what that provider's keys look like and
+   where they come from.
+3. Press **Save and use this**, then **Check**.
 
 Check makes one tiny request - about a hundredth of a cent - and tells you which
 model answered. If it fails, the message says whether the provider rejected the
 key or could not be reached, which are different problems.
 
+### Which providers
+
+Nineteen, and you only ever need one:
+
+| | |
+|---|---|
+| **Anthropic (Claude)** | Strong at reading a scene and explaining why. What AURA was built against. |
+| **OpenAI (GPT)** | The widest model range. |
+| **Google (Gemini)** | The cheapest way to look at a lot of photographs. |
+| **Azure OpenAI** | OpenAI's models inside your own Azure tenancy. |
+| **OpenRouter** | One key, most of the others behind it. The easiest way to try several. |
+| **Groq** | The fastest answers here by a wide margin. |
+| **Mistral** | European hosting. |
+| **DeepSeek** | The cheapest reasoning. Text only. |
+| **xAI (Grok)** | Reads images, priced against Gemini rather than GPT. |
+| **Together AI**, **Fireworks AI**, **DeepInfra** | Open-weight models at hosted speed. |
+| **Cerebras** | Very fast text reasoning. No vision. |
+| **Moonshot (Kimi)** | Long context and a vision line. |
+| **NVIDIA NIM** | NVIDIA's catalogue, free credits to begin with. |
+| **Perplexity** | Answers with citations from the web. Text only. |
+| **Ollama**, **LM Studio** | On your own computer. No key, no bill, nothing leaves the machine. |
+| **My own server** | Anything else that speaks OpenAI's chat format. |
+
+Some of these cannot see a photograph. The setup screen says so on the ones that
+cannot, and anything that needs to look at a frame quietly uses AURA's own models
+instead - it is a smaller feature, not a broken one.
+
+### Choosing the models yourself
+
+Every provider ships with three models: a cheap one, a balanced one, and one for
+the hardest questions. AURA picks between them per task, and you never have to
+think about it.
+
+If you want to, **Choose model names** on the setup screen lets you name all
+three. Leave a box empty to keep the default. A model AURA has never heard of is
+fine - what your provider accepts is what matters. This is also how you point
+Azure at your own deployment names, and how you tell AURA which model you have
+pulled into Ollama.
+
 ### Your own server
 
-If you run Ollama, LM Studio, llama.cpp or a company gateway, choose **My own
-server** and enter its address, usually `http://127.0.0.1:11434`. Nothing leaves
+If you run Ollama, LM Studio, llama.cpp or a company gateway, pick it from the
+list - or **My own server** - and enter its address. Ollama's is usually
+`http://127.0.0.1:11434` and LM Studio's `http://127.0.0.1:1234`. Nothing leaves
 your network, and nothing is billed.
+
+### More than one
+
+Keys are kept per provider, so you can set up three and switch between them from
+the dropdown in **Settings > AI keys** without pasting anything again. The ones
+you have already set up are marked *key saved*.
 
 ### Where the key is kept
 
@@ -42,6 +92,10 @@ you can tell which key is saved, and nothing in between.
 
 If your computer refuses to store it, AURA tells you and stores it nowhere else.
 A key that cannot be kept safely is a key AURA will not keep.
+
+Which provider you chose *is* written down, in the catalog beside the wedding.
+That is a setting rather than a secret, and it is why a catalog you copy to
+another machine remembers the choice and still asks that machine for its own key.
 
 ---
 

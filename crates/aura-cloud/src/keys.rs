@@ -294,6 +294,21 @@ pub trait KeyStore: Send + Sync + fmt::Debug {
     ///
     /// `AURA-CLOUD-6012` when the store refuses.
     fn delete(&self, account: &str) -> AuraResult<()>;
+
+    /// Whether a key exists, without reading it.
+    ///
+    /// The settings panel asks this about every provider in the catalog at once,
+    /// which is nineteen questions on one panel open. Reading nineteen secrets to
+    /// answer them would be nineteen decryptions of something nobody asked to
+    /// see - so the default answer is derived from a load, and an implementation
+    /// that can do better overrides it.
+    ///
+    /// # Errors
+    ///
+    /// As [`KeyStore::load`].
+    fn has(&self, account: &str) -> AuraResult<bool> {
+        Ok(self.load(account)?.is_some())
+    }
 }
 
 /// The platform credential store, driven by its own command-line tool.
@@ -365,7 +380,7 @@ impl OsKeyStore {
                              if(-not (Test-Path $d)){{New-Item -ItemType Directory -Force $d|Out-Null}}; \
                              ConvertTo-SecureString $s -AsPlainText -Force | \
                              ConvertFrom-SecureString | \
-                             Set-Content -Path '{path}' -Encoding ascii",
+                             Set-Content -Path '{path}' -Encoding ascii -NoNewline",
                             path = path.display()
                         ),
                     ],
@@ -406,6 +421,14 @@ impl OsKeyStore {
     #[must_use]
     pub fn load_command(&self, account: &str) -> KeyCommand {
         match self.platform {
+            // `.Trim()` is load-bearing rather than tidy. `ConvertFrom-SecureString`
+            // produces one line of hex and `Set-Content` used to append a newline to
+            // it, so `-Raw` read the blob back with a trailing CRLF and
+            // `ConvertTo-SecureString` refused it as "Input string was not in a correct
+            // format". A key could be written and never read again: every session
+            // stored one and every session reported no key. The writer no longer adds
+            // the newline, and this trims it so a blob written by an earlier build
+            // still opens.
             Platform::Windows => {
                 let path = self.blob_path(account);
                 KeyCommand {
@@ -417,7 +440,9 @@ impl OsKeyStore {
                         format!(
                             "$ErrorActionPreference='Stop'; \
                              if(-not (Test-Path '{path}')){{exit 44}}; \
-                             $sec=Get-Content -Path '{path}' -Raw | ConvertTo-SecureString; \
+                             $raw=(Get-Content -Path '{path}' -Raw).Trim(); \
+                             if(-not $raw){{exit 44}}; \
+                             $sec=$raw | ConvertTo-SecureString; \
                              $b=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec); \
                              [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b)",
                             path = path.display()
@@ -561,6 +586,18 @@ impl KeyStore for OsKeyStore {
             return Ok(None);
         }
         Ok(Some(secret))
+    }
+
+    fn has(&self, account: &str) -> AuraResult<bool> {
+        // On Windows the secret is a DPAPI blob at a path this type computes, so
+        // "is there a key" is a stat rather than a PowerShell process. The panel
+        // asks this nineteen times on open and the difference is several seconds.
+        // The other two platforms keep their secret inside their own store and
+        // have nothing to stat, so they answer the long way.
+        if self.platform == Platform::Windows {
+            return Ok(self.blob_path(account).is_file());
+        }
+        Ok(self.load(account)?.is_some())
     }
 
     fn delete(&self, account: &str) -> AuraResult<()> {

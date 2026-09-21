@@ -8,6 +8,12 @@ publish = false
 [dependencies]
 aura-infer  = { path = "../crates/aura-infer" }
 aura-models = { path = "../crates/aura-models" }
+# PHASE-30 follow-up. `ai-provision` drives the product's own commands, so it
+# needs the app and the cloud crate; they do not link anything xtask could not
+# already build in debug.
+aura-app    = { path = "../crates/aura-app" }
+aura-cloud  = { path = "../crates/aura-cloud" }
+aura-core   = { path = "../crates/aura-core" }
 blake3.workspace     = true
 walkdir.workspace    = true
 serde.workspace      = true

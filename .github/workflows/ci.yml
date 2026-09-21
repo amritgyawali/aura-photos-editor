@@ -66,6 +66,13 @@ jobs:
       - name: cargo test
         run: cargo test --workspace --all-targets
 
+      # `--all-targets` excludes doctests, which is the one thing the command everybody
+      # reaches for does not cover. There are none today; the point is that a documentation
+      # example added tomorrow is compiled rather than decorative.
+      # PHASE-01-30-REVIEW.md section 6.8.
+      - name: cargo test --doc
+        run: cargo test --workspace --doc
+
       - name: phase 01 verify on the reference fixtures
         run: cargo run --release --package aura-cli -- verify --work target/phase01-verify
 
@@ -140,6 +147,38 @@ jobs:
       - name: qc agreement self-test
         run: python ml/eval/qc_agreement.py --self-test
 
+  # Lane 3 - every phase gate that lane 2 does not already run.
+  #
+  # The independent review of phases 01 to 30 (docs/progress/PHASE-01-30-REVIEW.md section 6.1)
+  # found sixteen gates that were invoked by nothing on a push - including phase 30's, which
+  # checks the delivery guarantee, and phase 13's, which checks that nothing acts unattended
+  # while the product is uncalibrated. They all passed when run by hand; nothing would have
+  # caught it if they had stopped.
+  #
+  # This lane runs the whole set through `scripts/check-phase-gates.sh`, which enumerates the
+  # gate modules `aura-cli` compiles and refuses to run if there are not thirty of them. A
+  # workflow that named each gate as its own step is a workflow somebody forgets to extend,
+  # which is precisely how sixteen of them went unenforced.
+  #
+  # Ubuntu only. Lane 2 already runs the phase 01 to 05, 14, 19, 23, 25, 26 and 27 gates on all
+  # three operating systems, which is where a platform difference would show; running thirty
+  # gates three times over would add an hour to every push for no additional signal.
+  phase-gates:
+    name: phase gates 01-30
+    needs: gates
+    runs-on: ubuntu-latest
+    env:
+      AURA_PERF_HOST_SCALE: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: every phase gate
+        run: bash scripts/check-phase-gates.sh
+
   # Lane 3 - the UI. Type errors here are runtime crashes for a photographer.
   ui:
     name: ui type-check, tests and build
@@ -167,6 +206,73 @@ jobs:
       - name: build
         working-directory: ui
         run: npx vite build
+
+  # Lane 4 - the desktop shell, compiled.
+  #
+  # `ui/src-tauri` is deliberately not a workspace member: it pulls the whole Tauri toolchain and
+  # `cargo test --workspace` has to stay fast and headless. The consequence, which the phases 01
+  # to 30 review found (docs/progress/PHASE-01-30-REVIEW.md section 6.3), is that **3,211 lines of
+  # Rust and every one of the IPC command handlers were compiled by nothing** - no CI job, no
+  # release gate, no justfile recipe but `dev`. The boundary between the library code and the
+  # application a photographer runs had never been type-checked.
+  #
+  # `scripts/check-ipc-surface.sh` cross-checks the names and says in its own header that it
+  # proves the names and the syntax and **not the types**. This lane is what proves the types.
+  #
+  # `cargo check` rather than `cargo build`: the shell is not shipped from CI - `ops/release`
+  # does that on a signing machine - and what is being defended against is a handler whose
+  # argument type stopped matching the `aura-app` function behind it. That is a type error, and
+  # `check` is the cheapest thing that finds it.
+  #
+  # The apt list is Tauri v2's own Linux prerequisite set. `libwebkit2gtk-4.1-dev` is the one
+  # that matters; the rest are what its pkg-config files pull in.
+  shell:
+    name: desktop shell type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ui/src-tauri
+
+      - name: tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            build-essential \
+            file \
+            patchelf
+
+      # The shell embeds `ui/dist`, so the front end has to have been built first.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: build the front end
+        working-directory: ui
+        run: |
+          npm ci || npm install
+          npx vite build
+
+      - name: cargo check the shell
+        run: cargo check --manifest-path ui/src-tauri/Cargo.toml --all-targets
+
+      - name: cargo clippy the shell
+        run: cargo clippy --manifest-path ui/src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: cargo fmt the shell
+        run: cargo fmt --manifest-path ui/src-tauri/Cargo.toml -- --check
 
   # Lane 4 - supply chain. Advisory and licence failures block the merge.
   supply-chain:
@@ -329,3 +435,4 @@ jobs:
           python ml/models/restore/train_face_recovery.py --self-test
           python ml/models/restore/eval_restore.py --self-test
           python ml/models/restore/export.py --verify models
+          python ml/models/generative/eval_cleanup.py --self-test
