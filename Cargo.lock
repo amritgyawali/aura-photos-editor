@@ -91,6 +91,7 @@ dependencies = [
  "blake3",
  "fs4",
  "parking_lot",
+ "png",
  "rusqlite",
  "serde",
  "serde_json",

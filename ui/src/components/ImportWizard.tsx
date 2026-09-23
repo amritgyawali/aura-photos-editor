@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { asIpcError, inTauri, pickPhotoFolder, pickPhotos } from '../ipc/client';
 
 export type ImportWizardProps = {
   disabled: boolean;
@@ -24,6 +25,17 @@ export function ImportWizard({
 }: ImportWizardProps): JSX.Element {
   const [draft, setDraft] = useState('');
   const [roots, setRoots] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+
+  const choose = async (individual = false) => {
+    setPicking(true); setError(null);
+    try {
+      const paths = individual ? await pickPhotos() : [await pickPhotoFolder()].filter((path): path is string => path !== null);
+      if (paths.length) onStart(paths);
+    } catch (cause) { setError(asIpcError(cause).message); }
+    finally { setPicking(false); }
+  };
 
   const addRoot = (): void => {
     const trimmed = draft.trim();
@@ -37,7 +49,16 @@ export function ImportWizard({
 
   return (
     <section className="panel" aria-label="Import">
-      <h2>Import</h2>
+      <h2>Add your photos</h2>
+      <p>Choose one photo or a whole collection. AURA adjusts each photo’s light and contrast automatically. Your originals stay untouched.</p>
+      <div className="import-actions">
+        <button className="is-primary" type="button" disabled={disabled || running || picking || !inTauri()} onClick={() => void choose(true)}>{picking ? 'Choosing…' : 'Choose photos'}</button>
+        <button type="button" disabled={disabled || running || picking || !inTauri()} onClick={() => void choose()}>Choose photo folder</button>
+      </div>
+      <p className="studio-footnote">JPEG, PNG and supported camera RAWs · Local editing · Undo anytime</p>
+      {error && <p role="alert">{error}</p>}
+      <details className="import-manual"><summary>Enter folders manually</summary>
+      <fieldset className="import-paths" disabled={disabled || running || picking}>
 
       <div className="row">
         <label htmlFor="root-input">Card or folder</label>
@@ -88,12 +109,17 @@ export function ImportWizard({
         </button>
       </div>
 
+      </fieldset></details>
+
       {running && (
+        <div>
+        <button type="button" onClick={onCancel}>Stop import</button>
         <div className="progress" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
           <div className="progress-bar" style={{ width: `${percent}%` }} />
           <span className="progress-label">
             {done} of {total || '?'} files
           </span>
+        </div>
         </div>
       )}
     </section>

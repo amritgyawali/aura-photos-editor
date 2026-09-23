@@ -21,6 +21,58 @@ pub struct Rgb8 {
     pub data: Vec<u8>,
 }
 
+/// Decode PNG to the editor's sRGB8 surface. Alpha is composited on white;
+/// 16-bit samples are reduced to 8-bit. Original files remain untouched.
+///
+/// # Errors
+/// Returns a typed decode error for corrupt data or excessive dimensions.
+pub fn decode_png(bytes: &[u8], limits: DecodeLimits) -> AuraResult<Rgb8> {
+    let mut decoder = png::Decoder::new_with_limits(
+        std::io::Cursor::new(bytes),
+        png::Limits {
+            bytes: usize::try_from(limits.max_alloc_bytes).unwrap_or(usize::MAX),
+        },
+    );
+    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = decoder
+        .read_info()
+        .map_err(|e| corrupt(format!("PNG header: {e}")))?;
+    let info = reader.info();
+    check_dimensions(info.width, info.height, 8, limits)?;
+    let mut decoded = vec![0; reader.output_buffer_size()];
+    let frame = reader
+        .next_frame(&mut decoded)
+        .map_err(|e| corrupt(format!("PNG pixels: {e}")))?;
+    let samples = frame.color_type.samples();
+    let mut pixels = Vec::with_capacity(frame.width as usize * frame.height as usize * 3);
+    for pixel in decoded
+        .get(..frame.buffer_size())
+        .unwrap_or_default()
+        .chunks_exact(samples)
+    {
+        let (rgb, alpha) = match pixel {
+            [gray] => ([*gray; 3], 255),
+            [gray, alpha] => ([*gray; 3], *alpha),
+            [r, g, b] => ([*r, *g, *b], 255),
+            [r, g, b, alpha] => ([*r, *g, *b], *alpha),
+            _ => return Err(corrupt("Unsupported PNG channel layout")),
+        };
+        for value in rgb {
+            // Composite in linear light so translucent edges retain their color.
+            let a = f32::from(alpha) / 255.0;
+            let linear = crate::colour::curve::srgb_decode(f32::from(value) / 255.0);
+            pixels.push(crate::colour::curve::quantise_u8(
+                crate::colour::curve::srgb_encode(linear * a + 1.0 - a),
+            ));
+        }
+    }
+    Ok(Rgb8 {
+        width: frame.width,
+        height: frame.height,
+        data: pixels,
+    })
+}
+
 /// Decode a baseline or progressive JPEG into interleaved RGB.
 ///
 /// # Errors

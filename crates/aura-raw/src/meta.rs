@@ -301,6 +301,7 @@ fn default_meta(format: RawFormat) -> RawMeta {
 pub fn read(bytes: &[u8], path: &std::path::Path) -> AuraResult<RawMeta> {
     match sniff(bytes) {
         RawFormat::Jpeg => read_jpeg(bytes),
+        RawFormat::Png => Ok(default_meta(RawFormat::Png)),
         RawFormat::Raf => read_raf(bytes),
         RawFormat::Cr3 => read_cr3(bytes),
         format if format.is_tiff_family() => read_tiff_family(bytes, format),

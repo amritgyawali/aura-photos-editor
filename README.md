@@ -55,6 +55,9 @@ tests/fixtures/            generated reference weddings (not committed)
 
 ## Getting started
 
+See [Photo Studio](docs/photo-studio.md) for automatic editing after import,
+reviewing every edit, matching reference colors, and rendering the final photos.
+
 ```bash
 rustup show                       # installs the pinned toolchain from rust-toolchain.toml
 just setup                        # git hooks + npm install

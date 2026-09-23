@@ -969,7 +969,8 @@ pub fn primary_file_for_photo(
     photo_id: &str,
 ) -> AuraResult<Option<(String, String)>> {
     conn.query_row(
-        "SELECT r.abs_path || '/' || f.rel_path, f.content_hash
+        "SELECT CASE WHEN f.rel_path = '' THEN r.abs_path
+                     ELSE r.abs_path || '/' || f.rel_path END, f.content_hash
            FROM photo_file f
            JOIN source_root r ON r.root_id = f.root_id
           WHERE f.photo_id = ?1

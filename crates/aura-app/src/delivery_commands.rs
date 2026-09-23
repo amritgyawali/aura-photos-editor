@@ -82,7 +82,7 @@ pub fn selected_images(state: &AppState, project: ProjectId) -> Result<Vec<Image
         .read(move |conn| {
             let mut stmt = conn
                 .prepare(
-                    "SELECT p.photo_id FROM selection_keep k
+                    "SELECT p.photo_id FROM selection k
                      JOIN photo p ON p.photo_id = k.photo_id
                      WHERE p.project_id = ?1
                      ORDER BY p.timeline_time, p.photo_id",
@@ -158,7 +158,7 @@ impl ExportField {
                 // answer, and is why both are on the outline.
                 let selected: i64 = conn
                     .query_row(
-                        "SELECT COUNT(*) FROM selection_keep k JOIN photo p
+                        "SELECT COUNT(*) FROM selection k JOIN photo p
                          ON p.photo_id = k.photo_id WHERE p.project_id = ?1",
                         rusqlite::params![key],
                         |row| row.get(0),

@@ -1,6 +1,37 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
+export type ReferenceAnalysis = {
+  id: string; origin: string; measured: number; skipped: number; colors: string[];
+  brightness: number; contrast: number; warmth: number; saturation: number;
+};
+export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
+export type FetchReport = { folder: string; fetched: number; skipped: number; complete: boolean; message: string };
+export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
+
+export const referenceStyle = {
+  fetch: (address: string, limit: number, cancelId: string) => invoke<FetchReport>('fetch_instagram_references', { input: { address, limit, cancelId } }),
+  analyse: (address: string, folder: string, cancelId: string) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId } }),
+  apply: (photoId: string, referenceId: string, strength: number) => invoke<ApplyReport>('apply_reference_style', { input: { photoId, referenceId, strength } }),
+};
+
+/** Ask the desktop for a folder; cancel leaves the current selection intact. */
+export async function pickPhotoFolder(title = 'Choose a photo folder'): Promise<string | null> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: true, multiple: false, title },
+  });
+  return Array.isArray(result) ? result[0] ?? null : result;
+}
+
+/** Select individual photographs without importing their entire folder. */
+export async function pickPhotos(): Promise<string[]> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: false, multiple: true, title: 'Choose photos to edit',
+      filters: [{ name: 'Photos', extensions: ['jpg', 'jpeg', 'jpe', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef'] }] },
+  });
+  return result === null ? [] : Array.isArray(result) ? result : [result];
+}
+
 import type {
   // PHASE-28.
   AutopilotEventDto,
@@ -894,6 +925,8 @@ export const explain = {
  * same merge in Rust with an automated source and is refused there.
  */
 export const develop = {
+  enhancePhoto: (input: DevelopImageInput): Promise<RecipeDto> =>
+    invoke<RecipeDto>('enhance_photo', { input }),
   /** One photograph's edit, or the camera's own starting point when it has none. */
   imageRecipe: (input: DevelopImageInput): Promise<RecipeDto> =>
     invoke<RecipeDto>('image_recipe', { input }),

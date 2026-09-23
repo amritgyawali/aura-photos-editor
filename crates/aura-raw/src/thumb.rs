@@ -101,6 +101,14 @@ fn extract(
     limits: DecodeLimits,
     path: &std::path::Path,
 ) -> AuraResult<Extracted> {
+    if meta.format == crate::RawFormat::Png {
+        return Ok(Extracted {
+            image: codec::decode_png(bytes, limits)?,
+            source: PixelSource::Embedded,
+            warning: None,
+            render_path: "png_srgb",
+        });
+    }
     if let Some(preview) = meta.best_preview() {
         let stream = bytes
             .get(preview.offset..preview.offset.saturating_add(preview.len))

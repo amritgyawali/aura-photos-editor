@@ -6,22 +6,65 @@
 use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
+    AcceptToneInput,
     // PHASE-28.
-    AutopilotEventDto, AutopilotPreflightDto, AutopilotProgressDto, AutopilotSettingsInput,
-    AutopilotStageDto, AutopilotStartInput, AutopilotStatusDto, AutopilotSummaryDto,
-    // PHASE-29.
-    CurateAlbumDto, CurateBwDto, CurateDecideInput, CurateExportDto, CurateExportInput,
-    CurateHeroDto, CurateOrderInput, CuratePickDto, CurateProjectInput, CurateSocialDto,
-    CurateSpreadDto, CurateStatusDto,
+    AutopilotEventDto,
+    AutopilotPreflightDto,
+    AutopilotProgressDto,
+    AutopilotSettingsInput,
+    AutopilotStageDto,
+    AutopilotStartInput,
+    AutopilotStatusDto,
+    AutopilotSummaryDto,
+    CleanupBlockedDto,
+    CleanupDisclosureDto,
+    CleanupPassDto,
+    CleanupPassInput,
+    CleanupProposalDto,
+    CleanupReasonDto,
+    CleanupStatusDto,
     // PHASE-30.
-    ConsentDto, DeliveryInput, DeliveryManifestDto, DeliveryStatusDto, DiagnosticsDto,
-    ExportFileDto, ExportJobInput, ExportNameDto, ExportPresetDto, ExportStatusDto,
-    LearnBucketDto, LearnComparisonDto, LearnStatusDto, ProviderDto, UploadItemDto,
-    AcceptToneInput, CleanupBlockedDto, CleanupDisclosureDto, CleanupPassDto, CleanupPassInput,
-    CleanupProposalDto, CleanupReasonDto, CleanupStatusDto, DecideCleanupInput,
-    DisableCleanupInput, EstimateToneInput, ManualRemoveDto, ManualRemoveInput, ReferenceFrameDto,
-    ReferenceFramesInput, SetToneOverrideDto, SetToneOverrideInput, ToneDto, TonePassDto,
-    ToneReviewInput, ToneStatusDto,
+    ConsentDto,
+    // PHASE-29.
+    CurateAlbumDto,
+    CurateBwDto,
+    CurateDecideInput,
+    CurateExportDto,
+    CurateExportInput,
+    CurateHeroDto,
+    CurateOrderInput,
+    CuratePickDto,
+    CurateProjectInput,
+    CurateSocialDto,
+    CurateSpreadDto,
+    CurateStatusDto,
+    DecideCleanupInput,
+    DeliveryInput,
+    DeliveryManifestDto,
+    DeliveryStatusDto,
+    DiagnosticsDto,
+    DisableCleanupInput,
+    EstimateToneInput,
+    ExportFileDto,
+    ExportJobInput,
+    ExportNameDto,
+    ExportPresetDto,
+    ExportStatusDto,
+    LearnBucketDto,
+    LearnComparisonDto,
+    LearnStatusDto,
+    ManualRemoveDto,
+    ManualRemoveInput,
+    ProviderDto,
+    ReferenceFrameDto,
+    ReferenceFramesInput,
+    SetToneOverrideDto,
+    SetToneOverrideInput,
+    ToneDto,
+    TonePassDto,
+    ToneReviewInput,
+    ToneStatusDto,
+    UploadItemDto,
 };
 use aura_app::contract::ipc::{
     AnalyseCompositionInput, CompositionDto, CompositionPassDto, CompositionStatusDto,
@@ -40,13 +83,11 @@ use aura_app::contract::ipc::{
 };
 use aura_app::contract::ipc::{
     AdoptProfileInput, CompareProfilesInput, ExportProfileDto, ExportProfileInput,
-    ImportProfileDto, ImportProfileInput, ProfileReportDto, ScanArchiveDto, ScanArchiveInput,
-    LookBucketDto, LookBucketsInput, LookMatchDto, LookProfileDto, LookProfileInput,
-    LookStatusDto,
-    MeasureLookDto, MeasureLookInput, ReferenceOriginDto, SelectLookInput,
-    SetLookStrengthInput,
-    SetProjectProfileInput, StyleComparisonDto, StylePairDto, StyleProfileDto, StyleStatusDto,
-    TrainProfileDto, TrainProfileInput,
+    ImportProfileDto, ImportProfileInput, LookBucketDto, LookBucketsInput, LookMatchDto,
+    LookProfileDto, LookProfileInput, LookStatusDto, MeasureLookDto, MeasureLookInput,
+    ProfileReportDto, ReferenceOriginDto, ScanArchiveDto, ScanArchiveInput, SelectLookInput,
+    SetLookStrengthInput, SetProjectProfileInput, StyleComparisonDto, StylePairDto,
+    StyleProfileDto, StyleStatusDto, TrainProfileDto, TrainProfileInput,
 };
 // PHASE-25. The gallery consistency surface: nine commands whose subject is a wedding
 // rather than a photograph. `GalleryStatusDto` carries two denominators and a panel has to
@@ -1957,7 +1998,7 @@ async fn split_identity(
 async fn cancel_previews(
     state: State<'_, AppState>,
     project_id: String,
-    photo_ids: [String],
+    photo_ids: Vec<String>,
 ) -> IpcResult<i64> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -2404,9 +2445,11 @@ async fn qc_queue_grouped(
     limit: usize,
 ) -> IpcResult<Vec<QcGroupDto>> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::qc_queue_grouped(&app, &project_id, limit))
-        .await
-        .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::qc_queue_grouped(&app, &project_id, limit)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -2424,11 +2467,9 @@ async fn qc_rounds(
     ticket_id: String,
 ) -> IpcResult<Vec<QcRoundDto>> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        aura_app::qc_rounds(&app, &project_id, &ticket_id)
-    })
-    .await
-    .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || aura_app::qc_rounds(&app, &project_id, &ticket_id))
+        .await
+        .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -2704,10 +2745,7 @@ async fn curate_project(
 }
 
 #[tauri::command]
-async fn curate_bw(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> IpcResult<Vec<CurateBwDto>> {
+async fn curate_bw(state: State<'_, AppState>, project_id: String) -> IpcResult<Vec<CurateBwDto>> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::curate_bw(&app, &project_id))
         .await
@@ -2798,8 +2836,6 @@ async fn curate_export(
         .await
         .map_err(|_| background_request_failed())?
 }
-
-
 
 // ---------------------------------------------------------------------------
 // PHASE-30. Delivery, learning and diagnostics.
@@ -2955,10 +2991,7 @@ async fn learn_compare(
 }
 
 #[tauri::command]
-async fn learn_adopt(
-    state: State<'_, AppState>,
-    profile_id: String,
-) -> IpcResult<LearnStatusDto> {
+async fn learn_adopt(state: State<'_, AppState>, profile_id: String) -> IpcResult<LearnStatusDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::learn_adopt(&app, &profile_id))
         .await
@@ -2974,10 +3007,7 @@ async fn learn_roll_back(state: State<'_, AppState>, profile_id: String) -> IpcR
 }
 
 #[tauri::command]
-async fn learn_consent(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> IpcResult<ConsentDto> {
+async fn learn_consent(state: State<'_, AppState>, project_id: String) -> IpcResult<ConsentDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::learn_consent(&app, &project_id))
         .await
@@ -2985,10 +3015,7 @@ async fn learn_consent(
 }
 
 #[tauri::command]
-async fn learn_set_consent(
-    state: State<'_, AppState>,
-    input: ConsentDto,
-) -> IpcResult<ConsentDto> {
+async fn learn_set_consent(state: State<'_, AppState>, input: ConsentDto) -> IpcResult<ConsentDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::learn_set_consent(&app, input))
         .await
@@ -3001,6 +3028,58 @@ async fn diagnostics_report(state: State<'_, AppState>) -> IpcResult<Diagnostics
     tauri::async_runtime::spawn_blocking(move || aura_app::diagnostics_report(&app))
         .await
         .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn enhance_photo(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::DevelopImageInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::photo_enhance::enhance_photo(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn fetch_instagram_references(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::FetchInstagramInput,
+) -> IpcResult<aura_app::reference_style::FetchReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::fetch_instagram(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn analyse_reference_style(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::AnalyseReferenceInput,
+) -> IpcResult<aura_app::reference_style::ReferenceAnalysis> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::analyse_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn apply_reference_style(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::ApplyReferenceInput,
+) -> IpcResult<aura_app::reference_style::ApplyReferenceReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::apply_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 fn main() {
@@ -3045,6 +3124,10 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            fetch_instagram_references,
+            analyse_reference_style,
+            apply_reference_style,
+            enhance_photo,
             create_project,
             list_projects,
             start_ingest,
@@ -3279,8 +3362,8 @@ fn main() {
             story_status,
             undo_moment_edit,
             warmup_models,
-            within_moment
-                    autopilot_status,
+            within_moment,
+            autopilot_status,
             autopilot_preflight,
             autopilot_start,
             autopilot_progress,

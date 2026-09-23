@@ -121,6 +121,7 @@ pub fn scan_root(root: &Path, plan: &ImportPlan, now_ms: i64) -> AuraResult<Scan
             .chain(JPEG_EXT)
             .chain(HEIF_EXT)
             .chain(TIFF_EXT)
+            .chain(["png"].iter())
             .chain(SIDECAR_EXT)
             .map(|s| (*s).to_string())
             .collect()

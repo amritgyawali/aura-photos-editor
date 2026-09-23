@@ -1,6 +1,8 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, asIpcError, inTauri } from './ipc/client';
+import { api, asIpcError, inTauri, pickPhotos } from './ipc/client';
+import { InstagramStyle } from './components/look/InstagramStyle';
+import { readReferenceSelection, saveReferenceSelection, type ReferenceSelection } from './components/look/referenceStyle';
 import { AiKeysPanel } from './components/AiKeysPanel';
 import { CacheSettings } from './components/CacheSettings';
 import { Filmstrip } from './components/Filmstrip';
@@ -12,7 +14,7 @@ import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
 import { MatchLookPanel } from './components/look/MatchLookPanel';
 import { CuratePanel } from './components/curate/CuratePanel';
 import { DeliveryPanel } from './components/delivery/DeliveryPanel';
-import { CompositionCard } from './components/explain/CompositionCard';
+import { PhotoStudio } from './components/develop/PhotoStudio';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
@@ -20,6 +22,27 @@ import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
 
 export function App(): JSX.Element {
+  const [workspace, setWorkspace] = useState('library');
+  const [reference, setReference] = useState<ReferenceSelection | null>(readReferenceSelection);
+  const [analysingReference, setAnalysingReference] = useState(false);
+  const [choosingPhotos, setChoosingPhotos] = useState(false);
+  const [queuedImport, setQueuedImport] = useState<{ projectId: string; roots: string[] } | null>(null);
+  const [ingestReady, setIngestReady] = useState<string | null>(null);
+  const changeReference = useCallback((next: ReferenceSelection | null) => { setReference(next); saveReferenceSelection(next); }, []);
+  const [editing, setEditing] = useState(false);
+  const [matching, setMatching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [automaticRequest, setAutomaticRequest] = useState(0);
+  const automaticSequence = useRef(0);
+  const automaticConsumed = useCallback(() => setAutomaticRequest(0), []);
+  const editAfterImport = useRef(false);
+  const importFinished = useRef(false);
+  const editBusyChanged = useCallback((busy: boolean) => {
+    setEditing(busy);
+    if (!busy) setRevision(value => value + 1);
+  }, []);
   const projects = useStore((state) => state.projects);
   const activeProjectId = useStore((state) => state.activeProjectId);
   const rows = useStore((state) => state.rows);
@@ -149,12 +172,21 @@ export function App(): JSX.Element {
       return;
     }
     let dispose: (() => void) | null = null;
+    let disposed = false;
     void api
       .onIngestEvent((event) => {
+        if (disposed) return;
         if (event.kind === 'progress') {
           setProgress({ done: event.done, total: event.total, running: true });
         } else if (event.kind === 'finished') {
+          importFinished.current = true;
           setProgress({ running: false, jobId: null });
+          if (editAfterImport.current && event.inserted > 0) {
+            editAfterImport.current = false;
+            setWorkspace('edit');
+            setAutomaticRequest(++automaticSequence.current);
+          }
+          editAfterImport.current = false;
           if (activeProjectId) {
             void loadPage(activeProjectId, 0, true);
             void api.listProblems(activeProjectId).then(setProblems).catch(() => undefined);
@@ -165,9 +197,12 @@ export function App(): JSX.Element {
         }
       })
       .then((unlisten) => {
+        if (disposed) { unlisten(); return; }
         dispose = unlisten;
-      });
+        setIngestReady(activeProjectId);
+      }).catch(cause => { if (!disposed) { setQueuedImport(null); const error = asIpcError(cause); setError({ code: error.code, message: error.message }); } });
     return () => {
+      disposed = true;
       dispose?.();
     };
   }, [activeProjectId, loadPage, refreshProjects, setError, setProblems, setProgress]);
@@ -178,9 +213,17 @@ export function App(): JSX.Element {
         return;
       }
       try {
+        editAfterImport.current = true;
+        importFinished.current = false;
+        setProgress({ running: true, jobId: null, done: 0, total: 0 });
         const handle = await api.startIngest({ projectId: activeProjectId, roots });
-        setProgress({ running: true, jobId: handle.jobId, done: 0, total: 0 });
+        if (!importFinished.current) {
+          setProgress({ running: true, jobId: handle.jobId, done: 0, total: 0 });
+          if (!editAfterImport.current) await api.cancelJob(handle.jobId);
+        }
       } catch (error) {
+        editAfterImport.current = false;
+        setProgress({ running: false, jobId: null });
         const ipc = asIpcError(error);
         setError({ code: ipc.code, message: ipc.message });
       }
@@ -189,11 +232,20 @@ export function App(): JSX.Element {
   );
 
   const cancelImport = useCallback(async () => {
+    editAfterImport.current = false;
     if (progress.jobId && inTauri()) {
-      await api.cancelJob(progress.jobId);
-      setProgress({ running: false, jobId: null });
+      try { await api.cancelJob(progress.jobId); }
+      catch (error) { const ipc = asIpcError(error); setError({ code: ipc.code, message: ipc.message }); }
     }
-  }, [progress.jobId, setProgress]);
+  }, [progress.jobId, setError]);
+
+  useEffect(() => {
+    if (queuedImport && queuedImport.projectId === activeProjectId && ingestReady === activeProjectId) {
+      const roots = queuedImport.roots;
+      setQueuedImport(null);
+      void startImport(roots);
+    }
+  }, [activeProjectId, ingestReady, queuedImport, startImport]);
 
   const createProject = useCallback(
     async (name: string) => {
@@ -204,6 +256,7 @@ export function App(): JSX.Element {
         const handle = await api.createProject({ name, coupleNames: null, eventDate: null });
         await refreshProjects();
         setActiveProject(handle.id);
+        return handle.id;
       } catch (error) {
         const ipc = asIpcError(error);
         setError({ code: ipc.code, message: ipc.message });
@@ -214,82 +267,87 @@ export function App(): JSX.Element {
 
   const focusedPhoto = rows[focusedIndex] ?? null;
 
+  const chooseAndImport = async () => {
+    if (choosingPhotos) return;
+    setChoosingPhotos(true);
+    try {
+      const roots = await pickPhotos();
+      if (!roots.length) return;
+      const target = activeProjectId ?? await createProject('My photo collection');
+      if (target) { setWorkspace('library'); setQueuedImport({ projectId: target, roots }); }
+    } catch (cause) { const error = asIpcError(cause); setError({ code: error.code, message: error.message }); }
+    finally { setChoosingPhotos(false); }
+  };
+
+  const locked = editing || matching || saving || exporting || progress.running || analysingReference || choosingPhotos || queuedImport !== null;
+  const tabs = [
+    ['library', 'Photos', 'Browse your collection'],
+    ['edit', 'Auto edit', 'One click, start to finish'],
+    ['look', 'Instagram style', 'Your reference, your photos'],
+    ['export', 'Export', 'Ready to share'],
+    ['advanced', 'Advanced', 'Quality, curation & settings'],
+  ];
+
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <ProjectSwitcher
-          projects={projects}
-          activeProjectId={activeProjectId}
-          onSelect={setActiveProject}
-          onCreate={(name) => void createProject(name)}
-        />
-        <ImportWizard
-          disabled={activeProjectId === null}
-          running={progress.running}
-          done={progress.done}
-          total={progress.total}
-          onStart={(roots) => void startImport(roots)}
-          onCancel={() => void cancelImport()}
-        />
-        <ProblemsPanel problems={problems} />
-        {/* PHASE-31. The first feature panel in the sidebar, and deliberately the first: a
-            photographer who has come to AURA because they want their wedding to look like
-            somebody's page should meet that on the way in rather than find it under a menu.
-            It renders whatever the project's state is - a wedding with nothing analysed yet
-            gets the sentence explaining what has to happen first, rather than a disabled
-            button with no reason beside it. */}
-        <MatchLookPanel projectId={activeProjectId} onError={setError} />
-        <CacheSettings projectId={activeProjectId} onError={setError} />
-        <HardwarePanel onError={setError} />
-        <AiKeysPanel projectId={activeProjectId} onError={setError} />
-        {/* PHASE-25. The one panel in the sidebar whose subject is the whole wedding rather
-            than the selected photograph, which is why it renders nothing until a project is
-            open rather than showing an empty frame. */}
-        <GalleryPanel projectId={activeProjectId} onError={setError} />
-        {/* PHASE-27. The second whole-wedding panel, and it sits under the first deliberately:
-            phase 25 makes a gallery coherent and this checks whether it is. It is the last thing
-            a photographer looks at before they deliver, so it is the last thing in the sidebar. */}
-        <AutopilotPanel projectId={activeProjectId} onError={setError} />
-        <QcPanel projectId={activeProjectId} onError={setError} />
-        <CuratePanel projectId={activeProjectId} onError={setError} />
-        {/* PHASE-30. The last panel, and the first whose button writes files. `profileId` is null
-            until a photographer has trained a style profile, which is what makes the learning
-            review show its buckets and no comparison - the ordinary state of the feature. */}
-        <DeliveryPanel projectId={activeProjectId} profileId={null} onError={setError} />
+    <div className="app aura-studio">
+      <aside className="sidebar studio-sidebar">
+        <div className="studio-brand"><span className="brand-mark" aria-hidden="true">a</span><div><strong>AURA</strong><span>PHOTO STUDIO</span></div></div>
+        <nav className="studio-nav" aria-label="Workspace">
+          {tabs.map(([id, title, description]) => <button key={id} type="button" aria-current={workspace === id ? 'page' : undefined}
+            disabled={locked && workspace !== id} onClick={() => setWorkspace(id ?? 'library')}><strong>{title}</strong><span>{description}</span></button>)}
+        </nav>
+        <fieldset className="project-picker" disabled={locked}>
+          <ProjectSwitcher projects={projects} activeProjectId={activeProjectId} onSelect={setActiveProject} onCreate={name => void createProject(name)} />
+        </fieldset>
+        <p className="sidebar-note">A little direction.<br />A look that feels like you.</p>
       </aside>
-
-      <main className="main">
-        {lastError && (
-          <div className="banner" role="alert">
-            <strong>{lastError.code}</strong> {lastError.message}
-            <button type="button" onClick={() => setError(null)}>
-              Dismiss
-            </button>
+      <main className="main studio-main">
+        <header className="studio-topbar">
+          <span>{projects.find(project => project.id === activeProjectId)?.name ?? 'Your creative workspace'}</span>
+          <span>{activeProjectId ? `${projects.find(project => project.id === activeProjectId)?.photoCount ?? rows.length} photos` : 'Welcome to AURA'}</span>
+        </header>
+        {lastError && <div className="banner" role="alert"><span>{lastError.message}</span><button type="button" onClick={() => setError(null)}>Dismiss</button></div>}
+        <div className="studio-content">
+          <div hidden={workspace !== 'library' && workspace !== 'look'}>
+            <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}
+              onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} />
           </div>
-        )}
-
-        {activeProjectId === null ? (
-          <p className="empty">Create a wedding, then point AURA at your cards.</p>
-        ) : (
-          <>
-            <div className="workspace">
-              <div className="photo-browser">
-                <VirtualGrid
-                  rows={rows}
-                  onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)}
-                />
-                <Filmstrip rows={rows} />
-              </div>
-              <aside className="explain-panel" aria-label="Explain selected photograph">
-                {focusedPhoto ? (
-                  <CompositionCard photoId={focusedPhoto.id} />
-                ) : (
-                  <p className="empty">Select a photograph to inspect its composition.</p>
-                )}
-              </aside>
+          {!activeProjectId ? <section className="studio-welcome">
+            <span className="eyebrow">LESS EDITING. MORE CREATING.</span>
+            <h1>Or start with<br /><em>your own photos.</em></h1>
+            <p>Portraits, travel, family, or everyday moments. Start a collection, choose your photos, and let AURA balance the light. Review the result, add your touch, and export.</p>
+            <button className="is-primary" type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport()}>Choose photos to auto edit</button>
+            {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
+            <div className="welcome-contact-sheet" aria-hidden="true"><div /><div /><div /><div /><div /><div /></div>
+            <div className="welcome-features"><div><strong>One-click editing</strong><span>Light, color and a consistent finish.</span></div><div><strong>Reference matching</strong><span>Learn a look from saved photos.</span></div><div><strong>Always your original</strong><span>Saved edits with undo and reset.</span></div></div>
+          </section> : <>
+            {workspace === 'library' && <>
+              <header className="workspace-heading"><div><span className="eyebrow">YOUR COLLECTION</span><h1>Start with a great photo.</h1></div><button className="is-primary" type="button" disabled={locked || rows.length === 0} onClick={() => setWorkspace('edit')}>Go to auto edit →</button></header>
+              <ImportWizard disabled={locked} running={progress.running} done={progress.done} total={progress.total} onStart={roots => void startImport(roots)} onCancel={() => void cancelImport()} />
+              {rows.length > 0 ? <div className="studio-library"><VirtualGrid rows={rows} onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)} /></div> : <div className="studio-empty"><strong>Your next great edit starts here.</strong><p>Choose a folder above. Your photos will appear here.</p></div>}
+            </>}
+            <div hidden={workspace !== 'edit'}>
+              <div className="workspace-heading"><div><span className="eyebrow">LIGHT. COLOR. FINISH.</span><h1>A good starting point, in one click.</h1></div><button type="button" disabled={locked} onClick={() => setWorkspace('look')}>Match a reference look →</button></div>
+              <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
+                automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference} />
+              {workspace === 'edit' && focusedPhoto && <>
+                <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
+                <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} disabled={editing} revision={revision} onBusyChange={setSaving} />
+                <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
+              </>}
             </div>
-          </>
-        )}
+            {workspace === 'look' && <details className="advanced-tools"><summary>Advanced lighting-bucket look profiles</summary><MatchLookPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={setMatching} /></details>}
+            {workspace === 'export' && <><header className="workspace-heading"><div><span className="eyebrow">THE FINISHING TOUCH</span><h1>Render your final output.</h1></div></header><DeliveryPanel key={activeProjectId} projectId={activeProjectId} profileId={null} onError={setError} onBusyChange={setExporting} /></>}
+            {workspace === 'advanced' && <><header className="workspace-heading"><div><span className="eyebrow">MORE CONTROL</span><h1>The details make the difference.</h1></div></header>
+              <details className="advanced-tools"><summary>Quality review</summary><QcPanel projectId={activeProjectId} onError={setError} /></details>
+              <details className="advanced-tools"><summary>Gallery consistency</summary><GalleryPanel projectId={activeProjectId} onError={setError} /></details>
+              <details className="advanced-tools"><summary>Albums & curation</summary><CuratePanel projectId={activeProjectId} onError={setError} /></details>
+              <details className="advanced-tools"><summary>AI provider</summary><AiKeysPanel projectId={activeProjectId} onError={setError} /></details>
+              <details className="advanced-tools"><summary>Performance & storage</summary><HardwarePanel onError={setError} /><CacheSettings projectId={activeProjectId} onError={setError} /></details>
+            </>}
+            {problems.length > 0 && <details className="advanced-tools"><summary>Problems to review ({problems.length})</summary><ProblemsPanel problems={problems} /></details>}
+          </>}
+        </div>
       </main>
     </div>
   );

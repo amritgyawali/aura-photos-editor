@@ -109,7 +109,11 @@ impl Reference {
 pub fn decode(file: &ReferenceFile) -> AuraResult<Rgb8> {
     let bytes = std::fs::read(&file.path)
         .map_err(|error| look_reference_refused(format!("{}: {error}", file.path.display())))?;
-    decode_jpeg(&bytes, DecodeLimits::tier1())
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        aura_raw::codec::decode_png(&bytes, DecodeLimits::tier1())
+    } else {
+        decode_jpeg(&bytes, DecodeLimits::tier1())
+    }
 }
 
 /// True when this path has an extension this build reads.

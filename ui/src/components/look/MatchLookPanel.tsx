@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, asIpcError, inTauri, look as lookApi } from '../../ipc/client';
+import { api, asIpcError, inTauri, look as lookApi, pickPhotoFolder } from '../../ipc/client';
+import { renderSelectedLook } from './applyLook';
 import type {
   LookBucketDto,
   LookMatchDto,
@@ -13,6 +14,7 @@ import type {
 export type MatchLookPanelProps = {
   projectId: string | null;
   onError?: (error: { code: string; message: string }) => void;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 /** The routes a photographer may choose, in the order the panel offers them. */
@@ -180,7 +182,7 @@ export function coverageSentence(status: LookStatusDto | null): string {
  * refuses a selection without one, and the panel does not offer the button until the number
  * exists.
  */
-export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX.Element {
+export function MatchLookPanel({ projectId, onError, onBusyChange }: MatchLookPanelProps): JSX.Element {
   const [status, setStatus] = useState<LookStatusDto | null>(null);
   const [looks, setLooks] = useState<LookProfileDto[]>([]);
   const [matched, setMatched] = useState<LookMatchDto | null>(null);
@@ -195,12 +197,18 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [result, setResult] = useState<MeasureLookDto | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [strength, setStrengthDraft] = useState(100);
+  const stopped = useRef(false);
+  useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
+  useEffect(() => { setStrengthDraft(Math.round((status?.strength ?? 1) * 100)); }, [status?.strength]);
   // Stable for the life of the panel, so a stop press always names the pass that is running.
   const [cancelId] = useState(() => `look-${Math.random().toString(36).slice(2, 10)}`);
 
   const report = useCallback(
     (error: unknown) => {
       const ipc = asIpcError(error);
+      setError(ipc.message);
       onError?.({ code: ipc.code, message: ipc.message });
     },
     [onError],
@@ -283,6 +291,8 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
       return;
     }
     setBusy(true);
+    stopped.current = false;
+    setError(null);
     setResult(null);
     setProgress('Reading the reference photographs...');
     try {
@@ -296,7 +306,11 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
       });
       setResult(next);
       setMatched(next.matched);
-      setProgress(null);
+      if (!next.cancelled && next.profile && !stopped.current) {
+        setProgress('Applying tone and color to your photos…');
+        await lookApi.selectLook({ projectId, profileId: next.profile });
+        setProgress(await renderSelectedLook(projectId, cancelId, () => stopped.current));
+      } else setProgress('Stopped. No look was applied.');
       await refresh();
     } catch (error) {
       setProgress(null);
@@ -314,6 +328,7 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
       return;
     }
     setProgress('Stopping...');
+    stopped.current = true;
     try {
       await api.cancelJob(cancelId);
     } catch (error) {
@@ -327,16 +342,21 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
         return;
       }
       setBusy(true);
+      stopped.current = false;
+      setError(null);
+      setProgress('Applying tone and color to your photos…');
       try {
         await lookApi.selectLook({ projectId, profileId });
+        setProgress(await renderSelectedLook(projectId, cancelId, () => stopped.current));
         await refresh();
       } catch (error) {
+        setProgress(null);
         report(error);
       } finally {
         setBusy(false);
       }
     },
-    [projectId, refresh, report],
+    [cancelId, projectId, refresh, report],
   );
 
   const setStrength = useCallback(
@@ -344,29 +364,37 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
       if (!inTauri() || !projectId) {
         return;
       }
+      setBusy(true);
+      stopped.current = false;
+      setError(null);
+      setProgress('Updating look strength…');
       try {
         await lookApi.setLookStrength({ projectId, fraction });
+        setProgress(await renderSelectedLook(projectId, cancelId, () => stopped.current));
         await refresh();
       } catch (error) {
+        setProgress(null);
         report(error);
-      }
+      } finally { setBusy(false); }
     },
-    [projectId, refresh, report],
+    [cancelId, projectId, refresh, report],
   );
 
   const fetchBlocked = !routeWorks(source) || status?.networkTransportAvailable === false;
   const canMeasure =
-    Boolean(projectId) && routeWorks(source) && folder.trim().length > 0 && !busy;
+    Boolean(projectId) && inTauri() && (status?.appliable ?? 0) > 0 && routeWorks(source) && folder.trim().length > 0 && !busy;
 
   return (
     <section className="match-look-panel" aria-label="Match a look">
-      <h2>Match a look</h2>
+      <h2>Your photos. A look you love.</h2>
 
       <p className="match-look-intro">
-        Point AURA at photographs whose colour and tone you want yours to have. It measures what
-        they do - the exposure, the white balance, the contrast, how strong the colours are, which
-        way the shadows and highlights lean - and shifts your own photographs toward it.
+        Match the color grading of an Instagram feed, a mood board, or your own work.
+        Choose at least 8 saved reference photos in a folder; 24 or more gives a stronger starting point.
       </p>
+      <p className="match-look-note">A profile link labels your look. Add saved photos to measure its colors; AURA does not download the profile.</p>
+      {error && <p role="alert">{error} The selected look may be saved; retry applying to finish the edits.</p>}
+      <fieldset className="look-inputs" disabled={busy}>
 
       <label className="match-look-address">
         The page this look is from
@@ -420,6 +448,9 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
           />
         </label>
       )}
+      <button type="button" disabled={busy || !inTauri()} onClick={() => {
+        void pickPhotoFolder('Choose a folder of reference photos').then(path => { if (path) setFolder(path); }).catch(report);
+      }}>Choose reference folder</button>
 
       <label className="match-look-name">
         Call this look
@@ -431,12 +462,13 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
           aria-label="Look name"
         />
       </label>
+      </fieldset>
 
       <p className="match-look-coverage">{coverageSentence(status)}</p>
 
       <div className="match-look-actions">
         <button type="button" onClick={() => void measure()} disabled={!canMeasure}>
-          {busy ? 'Measuring...' : 'Measure this look'}
+          {busy ? 'Working…' : 'Match and apply look'}
         </button>
         {busy && (
           <button type="button" className="match-look-stop" onClick={() => void stop()}>
@@ -444,11 +476,11 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
           </button>
         )}
       </div>
-      {progress && <p className="match-look-progress">{progress}</p>}
+      {progress && <p role="status" className="match-look-progress">{progress}</p>}
       {busy && (
         <p className="match-look-note">
-          AURA is reading every reference photograph and rendering a sample of your wedding twice.
-          On a large reference this takes a few minutes. Stopping leaves everything as it is.
+          AURA measures the references, then applies the look through tone and color editing.
+          This can take a few minutes. Stopping keeps edits already completed.
         </p>
       )}
 
@@ -497,9 +529,9 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
                 <button
                   type="button"
                   onClick={() => void select(look.id)}
-                  disabled={busy || look.stale || status?.selected === look.id}
+                  disabled={busy || !projectId || look.stale}
                 >
-                  {status?.selected === look.id ? 'Applied' : 'Apply'}
+                  {status?.selected === look.id ? 'Apply again' : 'Apply'}
                 </button>
               </li>
             ))}
@@ -547,7 +579,7 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
       {status?.selected && (
         <div className="match-look-selected">
           <p>
-            This wedding is matched to <strong>{status.selectedName}</strong>
+            Selected look: <strong>{status.selectedName}</strong>
             {status.selectedOrigin.length > 0 ? ` (${status.selectedOrigin})` : ''}.
           </p>
           <label>
@@ -556,13 +588,15 @@ export function MatchLookPanel({ projectId, onError }: MatchLookPanelProps): JSX
               type="range"
               min={0}
               max={100}
-              value={Math.round(status.strength * 100)}
-              onChange={(event) => void setStrength(Number(event.target.value) / 100)}
+              disabled={busy}
+              value={strength}
+              onChange={(event) => setStrengthDraft(Number(event.target.value))}
               aria-label="Look strength"
             />
-            <span>{percent(status.strength)}</span>
+            <span>{strength}%</span>
           </label>
-          <p className="match-look-measured">{matchSentence(matched)}</p>
+          <button type="button" disabled={busy || strength === Math.round(status.strength * 100)} onClick={() => void setStrength(strength / 100)}>Apply strength</button>
+          <p className="match-look-measured">Reference measurement at full strength: {matchSentence(matched)}</p>
           <button type="button" onClick={() => void select(null)} disabled={busy}>
             Go back to AURA's own look
           </button>
