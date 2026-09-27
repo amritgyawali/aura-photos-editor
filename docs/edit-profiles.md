@@ -87,9 +87,12 @@ cannot do is know that this particular frame needed another stop. The profile cl
 gap on unseen photographs, which is the retoucher's consistent taste; the rest is per-photo
 judgement. The held-out sets are small (5 to 9 photographs), so treat the numbers as indicative.
 
-The recipe schema has no split-toning, grain or colour-grading wheels, so looks that use them in
-Lightroom are expressed through temperature, tint, the point curve and the eight HSL bands - which
-is how teal-and-orange was built before colour grading existed. The vignette is a radial mask.
+Profiles use Lightroom's own panels (ADR-0065): colour grading for split-toned looks (teal and
+orange, film, moody, monochrome toning), film grain, camera calibration (the landscape "blue
+primary" trick), the parametric curve, and a highlight-priority post-crop vignette. Colour grading
+in a profile is capped on the midtones (20) and highlights (30) wheels, because those wheels colour
+every face in the frame. Every Lightroom panel is also in the photo studio's Develop panel for a
+photographer who wants to take over - see [lightroom-parity.md](lightroom-parity.md).
 
 ## Learned profiles: copying a retoucher's settings from RAW before-and-afters
 

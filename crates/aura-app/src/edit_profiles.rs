@@ -27,9 +27,9 @@
 //!   takes the median over many pairs of what the retoucher did *beyond* AURA's own correction.
 //!   Each learned profile carries its held-out measurement in `evidence`.
 //!
-//! The recipe schema has no split-toning, grain or colour-grading wheels, so a look that needs
-//! them is expressed through temperature, tint, the point curve and the eight HSL bands - which
-//! is how most published walkthroughs build teal-and-orange before colour grading existed.
+//! Looks use Lightroom's own panels - colour grading, grain, calibration, the parametric curve and
+//! a highlight-priority post-crop vignette (ADR-0065) - with a skin ceiling on the grading wheels
+//! that colour faces.
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;

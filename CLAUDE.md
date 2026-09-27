@@ -148,6 +148,8 @@ Never load two phase files into one session.
 | Look evaluation gates | `tests/eval/look_eval.rs` |
 | Edit profiles (the start screen's looks, validated JSON) | `crates/aura-app/config/edit_profiles.json` |
 | How edit profiles adapt, and how learned ones are measured | `docs/edit-profiles.md` |
+| Lightroom panel parity decisions | `docs/adr/ADR-0065-lightroom-panel-parity.md` |
+| Every Lightroom feature and where it lives in AURA | `docs/lightroom-parity.md` |
 | Learning a profile from RAW before/after pairs | `ml/edit-profiles/fetch_fivek_pairs.py` + `crates/aura-app/tests/profile_fit.rs` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 

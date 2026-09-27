@@ -2,6 +2,27 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Lightroom parity: every Develop panel, and one click that uses them
+
+**Every Lightroom Develop panel is in the photo studio**: Basic, Tone Curve (point, red, green,
+blue and parametric), Color Mixer, Black & White, Color Grading, Detail, Lens Corrections,
+Transform & Crop, Effects (post-crop vignette and grain) and Calibration, plus Auto, Presets with a
+strength slider and Sync Settings. Each control writes one recipe path as the photographer's own
+setting, which no automatic pass changes again. `docs/lightroom-parity.md` maps every Lightroom
+feature to where it lives here and says plainly what is not built yet (HDR and panorama merge, soft
+proofing, AI masks and content-aware remove on real photos, a GPU backend).
+
+**Five recipe blocks and four render stages, without moving a stored hash** (ADR-0065). Parametric
+and RGB curves compose into the existing curve stage; calibration, colour grading, the post-crop
+vignette and grain are new stages; all five blocks are absent from the canonical form while
+neutral. Streamed and whole-frame renders agree to the byte, and the XMP sidecar carries all of it
+in Lightroom's own attribute names. The merge now returns an omitted block to neutral, can turn
+black-and-white on (it could not set a leaf inside a null block), and will not let automation turn
+a person's monochrome off.
+
+**The one-click profiles use the real panels**: split-toned teal and orange, graded and grained
+film, toned monochromes, calibrated landscapes, and a highlight-priority vignette.
+
 ## Edit profiles, a three-step start screen, and a DNG decoder that reads converted files
 
 **The start screen is now three steps: choose a look, optionally match an Instagram reference, and
