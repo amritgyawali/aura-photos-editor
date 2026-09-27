@@ -150,6 +150,269 @@ pub struct Global {
     pub sharpen: Sharpen,
     /// Noise reduction.
     pub noise: Noise,
+    /// Lightroom's parametric tone curve: four regions and their three splits.
+    ///
+    /// **Added by ADR-0065.** Every block from here down is optional and absent from the
+    /// canonical form while it is neutral, so a recipe written before it existed hashes exactly
+    /// as it did - no stored render hash moves - and an older reader simply never sees it.
+    #[serde(default, skip_serializing_if = "ParametricCurve::is_neutral")]
+    pub parametric: ParametricCurve,
+    /// Per-channel point curves, applied after the luminance curve. ADR-0065.
+    #[serde(default, skip_serializing_if = "ChannelCurves::is_identity")]
+    pub channel_curves: ChannelCurves,
+    /// Three-way colour grading plus a global wheel: Lightroom's Color Grading panel.
+    /// ADR-0065.
+    #[serde(default, skip_serializing_if = "ColourGrade::is_neutral")]
+    pub colour_grade: ColourGrade,
+    /// Camera calibration: the shadow tint and the three primaries. ADR-0065.
+    #[serde(default, skip_serializing_if = "Calibration::is_neutral")]
+    pub calibration: Calibration,
+    /// Post-crop vignette and film grain: Lightroom's Effects panel. ADR-0065.
+    #[serde(default, skip_serializing_if = "Effects::is_neutral")]
+    pub effects: Effects,
+}
+
+/// The parametric tone curve. Amounts `-100 ..= 100`; splits `5 ..= 95`, increasing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ParametricCurve {
+    /// The brightest region, above the highlight split.
+    pub highlights: i16,
+    /// Between the midtone and highlight splits.
+    pub lights: i16,
+    /// Between the shadow and midtone splits.
+    pub darks: i16,
+    /// The darkest region, below the shadow split.
+    pub shadows: i16,
+    /// Where shadows end and darks begin. `25` by default.
+    pub shadow_split: i16,
+    /// Where darks end and lights begin. `50` by default.
+    pub midtone_split: i16,
+    /// Where lights end and highlights begin. `75` by default.
+    pub highlight_split: i16,
+}
+
+impl Default for ParametricCurve {
+    fn default() -> Self {
+        Self {
+            highlights: 0,
+            lights: 0,
+            darks: 0,
+            shadows: 0,
+            shadow_split: 25,
+            midtone_split: 50,
+            highlight_split: 75,
+        }
+    }
+}
+
+impl ParametricCurve {
+    /// True when this curve changes nothing and says nothing.
+    #[must_use]
+    pub fn is_neutral(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// True when the four amounts are all zero, whatever the splits say.
+    #[must_use]
+    pub const fn is_flat(&self) -> bool {
+        self.highlights == 0 && self.lights == 0 && self.darks == 0 && self.shadows == 0
+    }
+}
+
+/// Red, green and blue point curves, in the same units as [`Curve`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ChannelCurves {
+    /// The red channel.
+    pub red: Curve,
+    /// The green channel.
+    pub green: Curve,
+    /// The blue channel.
+    pub blue: Curve,
+}
+
+impl Default for ChannelCurves {
+    fn default() -> Self {
+        Self {
+            red: Curve::identity(),
+            green: Curve::identity(),
+            blue: Curve::identity(),
+        }
+    }
+}
+
+impl ChannelCurves {
+    /// True when all three channels are untouched.
+    #[must_use]
+    pub fn is_identity(&self) -> bool {
+        self.red.is_identity() && self.green.is_identity() && self.blue.is_identity()
+    }
+}
+
+/// One colour-grading wheel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GradeWheel {
+    /// Hue in degrees, `0 ..= 359`.
+    pub hue: i16,
+    /// How much of that hue, `0 ..= 100`.
+    pub saturation: i16,
+    /// Brightness of the region, `-100 ..= 100`.
+    pub luminance: i16,
+}
+
+impl GradeWheel {
+    /// True when the wheel changes nothing.
+    #[must_use]
+    pub const fn is_neutral(&self) -> bool {
+        self.saturation == 0 && self.luminance == 0
+    }
+}
+
+/// Lightroom's Color Grading panel: shadows, midtones, highlights and a global wheel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ColourGrade {
+    /// The shadows wheel.
+    pub shadows: GradeWheel,
+    /// The midtones wheel.
+    pub midtones: GradeWheel,
+    /// The highlights wheel.
+    pub highlights: GradeWheel,
+    /// Applied to every tone.
+    pub global: GradeWheel,
+    /// How far the three regions overlap, `0 ..= 100`. `50` by default.
+    pub blending: i16,
+    /// Moves the split between shadows and highlights, `-100 ..= 100`.
+    pub balance: i16,
+}
+
+impl Default for ColourGrade {
+    fn default() -> Self {
+        Self {
+            shadows: GradeWheel::default(),
+            midtones: GradeWheel::default(),
+            highlights: GradeWheel::default(),
+            global: GradeWheel::default(),
+            blending: 50,
+            balance: 0,
+        }
+    }
+}
+
+impl ColourGrade {
+    /// True when the grade changes nothing and says nothing.
+    #[must_use]
+    pub fn is_neutral(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// True when no wheel moves a pixel, whatever blending and balance say.
+    #[must_use]
+    pub const fn is_inert(&self) -> bool {
+        self.shadows.is_neutral()
+            && self.midtones.is_neutral()
+            && self.highlights.is_neutral()
+            && self.global.is_neutral()
+    }
+}
+
+/// Camera calibration. Every field `-100 ..= 100`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Calibration {
+    /// Green-magenta tint of the shadows.
+    pub shadows_tint: i16,
+    /// Hue of the red primary.
+    pub red_hue: i16,
+    /// Saturation of the red primary.
+    pub red_saturation: i16,
+    /// Hue of the green primary.
+    pub green_hue: i16,
+    /// Saturation of the green primary.
+    pub green_saturation: i16,
+    /// Hue of the blue primary.
+    pub blue_hue: i16,
+    /// Saturation of the blue primary.
+    pub blue_saturation: i16,
+}
+
+impl Calibration {
+    /// True when calibration changes nothing.
+    #[must_use]
+    pub fn is_neutral(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+/// The post-crop vignette. It is drawn on the *cropped* frame, which is what separates it
+/// from a lens vignette correction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PostCropVignette {
+    /// Darkening (negative) or lightening (positive) at the edges, `-100 ..= 100`.
+    pub amount: i16,
+    /// How far in from the corners it starts, `0 ..= 100`. `50` by default.
+    pub midpoint: i16,
+    /// `-100` follows the frame's rectangle, `100` is a circle. `0` by default.
+    pub roundness: i16,
+    /// Softness of the transition, `0 ..= 100`. `50` by default.
+    pub feather: i16,
+    /// How much bright areas are spared, `0 ..= 100`.
+    pub highlights: i16,
+}
+
+impl Default for PostCropVignette {
+    fn default() -> Self {
+        Self {
+            amount: 0,
+            midpoint: 50,
+            roundness: 0,
+            feather: 50,
+            highlights: 0,
+        }
+    }
+}
+
+/// Film grain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Grain {
+    /// Strength, `0 ..= 100`.
+    pub amount: i16,
+    /// Grain size, `0 ..= 100`. `25` by default.
+    pub size: i16,
+    /// Irregularity, `0 ..= 100`. `50` by default.
+    pub roughness: i16,
+}
+
+impl Default for Grain {
+    fn default() -> Self {
+        Self {
+            amount: 0,
+            size: 25,
+            roughness: 50,
+        }
+    }
+}
+
+/// Lightroom's Effects panel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Effects {
+    /// The post-crop vignette.
+    pub vignette: PostCropVignette,
+    /// Film grain.
+    pub grain: Grain,
+}
+
+impl Effects {
+    /// True when neither effect is configured.
+    #[must_use]
+    pub fn is_neutral(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 /// The point curve, in 0-255 input and output units.

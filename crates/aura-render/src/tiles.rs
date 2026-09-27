@@ -105,6 +105,9 @@ pub fn render_streamed(
     // The geometry stage must not run inside a tile: the crop *is* the tile grid.
     let mut tile_recipe = clamped.clone();
     tile_recipe.geometry = aura_recipe::Geometry::default();
+    // ADR-0065. The post-crop effects are drawn in *output raster* coordinates below, not in
+    // the tile's source coordinates, so they are stripped here and applied after the commit.
+    tile_recipe.global.effects = aura_recipe::Effects::default();
     let tile_plan = graph::plan(
         &tile_recipe,
         purpose,
@@ -166,7 +169,20 @@ pub fn render_streamed(
             );
 
             // Commit the middle of the tile, which is the part the halo protected.
-            let committed = crop_out(&rendered, rw, ox, oy, tile_w, tile_h);
+            let mut committed = crop_out(&rendered, rw, ox, oy, tile_w, tile_h);
+            crate::cpu::apply_post_crop(
+                &mut committed,
+                tile_w,
+                tile_h,
+                &clamped,
+                &plan,
+                spatial::Position {
+                    x: x - left,
+                    y: y - top,
+                    full_width: out_width,
+                    full_height: out_height,
+                },
+            );
             let quantised = crate::output::transform(
                 &committed,
                 tile_w,

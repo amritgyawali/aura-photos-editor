@@ -250,7 +250,10 @@ impl CpuEngine {
         }
 
         let multipliers = white_balance(g.temperature as f32, f32::from(g.tint));
-        let curve = CurveLut::build(&g.curve);
+        let curve = crate::creative::luminance_lut(&g.curve, &g.parametric);
+        let channels = crate::creative::ChannelLuts::build(&g.channel_curves);
+        let grade = crate::creative::GradePlan::new(&g.colour_grade);
+        let calibration = crate::creative::CalibrationPlan::new(&g.calibration);
         let tone = Tone {
             highlights: f32::from(g.highlights) / 100.0,
             shadows: f32::from(g.shadows) / 100.0,
@@ -283,6 +286,20 @@ impl CpuEngine {
                 if wants_matrix {
                     value = apply_f32(matrix, value);
                 }
+                for (slot, out) in pixel.iter_mut().zip(value.iter()) {
+                    *slot = *out;
+                }
+            });
+        }
+
+        // ---- calibration: the primaries every later colour control works on -----------
+        if plan.stages.contains(&Stage::Calibration) {
+            rgb.par_chunks_mut(3).for_each(|pixel| {
+                let value = calibration.apply([
+                    pixel.first().copied().unwrap_or(0.0),
+                    pixel.get(1).copied().unwrap_or(0.0),
+                    pixel.get(2).copied().unwrap_or(0.0),
+                ]);
                 for (slot, out) in pixel.iter_mut().zip(value.iter()) {
                     *slot = *out;
                 }
@@ -346,6 +363,7 @@ impl CpuEngine {
         let wants_hsl = plan.stages.contains(&Stage::Hsl);
         let wants_vibrance = plan.stages.contains(&Stage::Vibrance);
         let wants_bw = plan.stages.contains(&Stage::Monochrome);
+        let wants_grade = plan.stages.contains(&Stage::ColourGrade);
 
         if wants_exposure
             || wants_tone
@@ -354,6 +372,7 @@ impl CpuEngine {
             || wants_hsl
             || wants_vibrance
             || wants_bw
+            || wants_grade
         {
             let vibrance = f32::from(g.vibrance) / 100.0;
             let saturation = f32::from(g.saturation) / 100.0;
@@ -375,6 +394,7 @@ impl CpuEngine {
                 }
                 if wants_curve {
                     value = tonemap::apply_curve(value, &curve);
+                    value = channels.apply(value);
                 }
                 if wants_hsl {
                     value = tonemap::hsl(value, &g.hsl);
@@ -386,6 +406,9 @@ impl CpuEngine {
                     if let Some(bw) = &recipe.bw {
                         value = tonemap::monochrome(value, bw);
                     }
+                }
+                if wants_grade {
+                    value = grade.apply(value);
                 }
                 for (slot, out) in pixel.iter_mut().zip(value.iter()) {
                     *slot = *out;
@@ -462,6 +485,13 @@ impl CpuEngine {
             height = h as u32;
         }
 
+        // ---- the post-crop effects ----------------------------------------------------
+        //
+        // On the buffer the crop just produced, which *is* the delivered frame. The tiler strips
+        // these from its per-tile recipe and applies them to each committed tile in output
+        // raster coordinates instead, so a streamed export draws the same vignette and grain.
+        apply_post_crop(&mut rgb, width, height, recipe, plan, spatial::Position::whole(width, height));
+
         (rgb, width, height, notes)
     }
 
@@ -474,6 +504,24 @@ impl CpuEngine {
         } else {
             None
         }
+    }
+}
+
+/// The post-crop vignette and grain, on a buffer at `position` inside the delivered frame.
+pub fn apply_post_crop(
+    rgb: &mut [f32],
+    width: u32,
+    _height: u32,
+    recipe: &Recipe,
+    plan: &Plan,
+    position: spatial::Position,
+) {
+    let effects = &recipe.global.effects;
+    if plan.stages.contains(&Stage::PostCropVignette) {
+        crate::creative::vignette(rgb, width as usize, position, &effects.vignette);
+    }
+    if plan.stages.contains(&Stage::Grain) {
+        crate::creative::grain(rgb, width as usize, position, &effects.grain);
     }
 }
 

@@ -48,6 +48,20 @@ const IDENTITY_PATHS: [&str; 5] = [
 /// same failure `Explain::record` overwrites the autonomy band to prevent.
 const METADATA_PREFIX: &str = "provenance";
 
+/// Blocks that are absent from the canonical form while they are neutral. ADR-0065.
+///
+/// A proposal that returns one of them to neutral *omits* it, and "omitted" must mean "back to
+/// neutral" rather than "not mentioned" - otherwise applying a look with a colour grade and
+/// then one without it would leave the first grade behind forever, which is exactly the
+/// compounding every automated pass promises not to do.
+pub const OPTIONAL_BLOCKS: [&str; 5] = [
+    "global.parametric",
+    "global.channel_curves",
+    "global.colour_grade",
+    "global.calibration",
+    "global.effects",
+];
+
 /// What a merge did.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct MergeReport {
@@ -142,6 +156,25 @@ pub fn merge(
         }
         set_path(&mut merged, path, (*value).clone());
         changed.push(path.clone());
+    }
+
+    // An optional block the proposal omitted has gone back to neutral. Remove it unless a
+    // person set something inside it, in which case it stays and the refusal is reported.
+    for block in OPTIONAL_BLOCKS {
+        let prefix = format!("{block}.");
+        let in_base: Vec<&String> = base_leaves
+            .keys()
+            .filter(|path| path.starts_with(&prefix))
+            .collect();
+        if in_base.is_empty() || proposal_leaves.keys().any(|p| p.starts_with(&prefix)) {
+            continue;
+        }
+        if source.is_automated() && in_base.iter().any(|p| is_protected(&protected, p)) {
+            refused.push(block.to_string());
+            continue;
+        }
+        remove_path(&mut merged, block);
+        changed.push(block.to_string());
     }
 
     let mut result: Recipe =
@@ -251,6 +284,20 @@ fn walk<'a>(value: &'a Value, prefix: String, out: &mut BTreeMap<String, &'a Val
     }
 }
 
+fn remove_path(root: &mut Value, path: &str) {
+    let mut cursor = root;
+    let mut parts = path.split('.').peekable();
+    while let Some(part) = parts.next() {
+        let Value::Object(map) = cursor else { return };
+        if parts.peek().is_none() {
+            map.remove(part);
+            return;
+        }
+        let Some(next) = map.get_mut(part) else { return };
+        cursor = next;
+    }
+}
+
 fn set_path(root: &mut Value, path: &str, value: Value) {
     let mut cursor = root;
     let mut parts = path.split('.').peekable();
@@ -302,6 +349,20 @@ impl Validation {
             return Err(recipe_invalid(field, "not a finite number"));
         }
         Self::check_curve(&recipe.global.curve)?;
+        for curve in [
+            &recipe.global.channel_curves.red,
+            &recipe.global.channel_curves.green,
+            &recipe.global.channel_curves.blue,
+        ] {
+            Self::check_curve(curve)?;
+        }
+        let p = &recipe.global.parametric;
+        if !(p.shadow_split < p.midtone_split && p.midtone_split < p.highlight_split) {
+            return Err(recipe_invalid(
+                "global.parametric",
+                "the three splits must increase",
+            ));
+        }
         for band in recipe.global.hsl.keys() {
             if !HSL_BANDS.contains(&band.as_str()) {
                 return Err(recipe_invalid("global.hsl", "unknown hue band"));
@@ -457,6 +518,50 @@ impl Recipe {
             shift.s = shift.s.clamp(-100, 100);
             shift.l = shift.l.clamp(-100, 100);
         }
+        // ADR-0065. The splits are clamped apart from each other so a clamped curve is always a
+        // valid one; the amounts are ordinary sliders.
+        let p = &mut g.parametric;
+        for amount in [&mut p.highlights, &mut p.lights, &mut p.darks, &mut p.shadows] {
+            *amount = (*amount).clamp(-100, 100);
+        }
+        p.shadow_split = p.shadow_split.clamp(5, 85);
+        p.midtone_split = p.midtone_split.clamp(p.shadow_split + 5, 90);
+        p.highlight_split = p.highlight_split.clamp(p.midtone_split + 5, 95);
+        let grade = &mut g.colour_grade;
+        for wheel in [
+            &mut grade.shadows,
+            &mut grade.midtones,
+            &mut grade.highlights,
+            &mut grade.global,
+        ] {
+            wheel.hue = wheel.hue.rem_euclid(360);
+            wheel.saturation = wheel.saturation.clamp(0, 100);
+            wheel.luminance = wheel.luminance.clamp(-100, 100);
+        }
+        grade.blending = grade.blending.clamp(0, 100);
+        grade.balance = grade.balance.clamp(-100, 100);
+        let c = &mut g.calibration;
+        for value in [
+            &mut c.shadows_tint,
+            &mut c.red_hue,
+            &mut c.red_saturation,
+            &mut c.green_hue,
+            &mut c.green_saturation,
+            &mut c.blue_hue,
+            &mut c.blue_saturation,
+        ] {
+            *value = (*value).clamp(-100, 100);
+        }
+        let v = &mut g.effects.vignette;
+        v.amount = v.amount.clamp(-100, 100);
+        v.midpoint = v.midpoint.clamp(0, 100);
+        v.roundness = v.roundness.clamp(-100, 100);
+        v.feather = v.feather.clamp(0, 100);
+        v.highlights = v.highlights.clamp(0, 100);
+        let grain = &mut g.effects.grain;
+        grain.amount = grain.amount.clamp(0, 100);
+        grain.size = grain.size.clamp(0, 100);
+        grain.roughness = grain.roughness.clamp(0, 100);
 
         out.lens.vignette = out.lens.vignette.clamp(0, 100);
         out.geometry.rotate = out.geometry.rotate.clamp(-45.0, 45.0);
@@ -499,6 +604,61 @@ mod tests {
     use super::*;
     use crate::contract::recipe::{Mask, MaskKind, MaskParams, RetouchOp};
     use crate::fixtures;
+
+    #[test]
+    fn a_neutral_new_block_leaves_the_canonical_form_and_the_hash_unchanged() {
+        // ADR-0065: the Lightroom-parity blocks must not move a single stored hash.
+        let recipe = fixtures::reference();
+        let text = crate::canonical(&recipe).expect("canonical");
+        for block in ["parametric", "channel_curves", "colour_grade", "calibration", "effects"] {
+            assert!(!text.contains(block), "{block} leaked into a neutral recipe");
+        }
+        let mut graded = recipe.clone();
+        graded.global.effects.grain.amount = 20;
+        assert!(crate::canonical(&graded).expect("canonical").contains("grain"));
+    }
+
+    #[test]
+    fn an_automated_pass_that_drops_a_block_returns_it_to_neutral() {
+        let base = {
+            let mut r = fixtures::reference();
+            r.global.colour_grade.shadows.saturation = 30;
+            r
+        };
+        let (merged, report) =
+            merge(&base, &fixtures::reference(), EditSource::Ai).expect("merge");
+        assert!(merged.global.colour_grade.is_neutral());
+        assert!(report.changed.iter().any(|p| p == "global.colour_grade"));
+
+        let mut protected = base.clone();
+        protected.provenance.user_edited_fields =
+            vec!["global.colour_grade.shadows.saturation".to_string()];
+        let (kept, report) =
+            merge(&protected, &fixtures::reference(), EditSource::Ai).expect("merge");
+        assert_eq!(kept.global.colour_grade.shadows.saturation, 30);
+        assert!(report.refused.iter().any(|p| p == "global.colour_grade"));
+    }
+
+    #[test]
+    fn the_new_blocks_are_clamped_and_their_curves_validated() {
+        let mut recipe = fixtures::reference();
+        recipe.global.colour_grade.highlights.hue = 400;
+        recipe.global.colour_grade.highlights.saturation = 300;
+        recipe.global.effects.vignette.amount = -900;
+        recipe.global.parametric.shadow_split = 90;
+        recipe.global.parametric.midtone_split = 10;
+        let clamped = recipe.clamped();
+        assert_eq!(clamped.global.colour_grade.highlights.hue, 40);
+        assert_eq!(clamped.global.colour_grade.highlights.saturation, 100);
+        assert_eq!(clamped.global.effects.vignette.amount, -100);
+        Validation::check(&clamped).expect("a clamped recipe is valid");
+
+        let mut backwards = fixtures::reference();
+        backwards.global.channel_curves.red = Curve {
+            points: vec![[0, 0], [128, 90], [64, 100], [255, 255]],
+        };
+        assert!(Validation::check(&backwards).is_err());
+    }
 
     #[test]
     fn a_value_out_of_range_is_clamped_rather_than_refused() {

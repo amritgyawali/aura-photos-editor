@@ -101,6 +101,7 @@ pub mod bands;
 pub mod cleanup;
 pub mod colour;
 pub mod cpu;
+pub mod creative;
 pub mod errors;
 pub mod fixtures;
 pub mod geometry;
