@@ -34,7 +34,7 @@ use crate::contract::render::{
 use crate::geometry;
 use crate::graph::{self, Capabilities, InputKind, Plan, Stage};
 use crate::spatial;
-use crate::tonemap::{self, CurveLut, Tone};
+use crate::tonemap::{self, Tone};
 
 /// The working buffer's bytes per pixel: three `f32`.
 pub const BYTES_PER_PIXEL: u64 = 12;
