@@ -12,7 +12,9 @@
 //! tonality in the curve domain, the same invertible gamma-2.2 coordinate the point curve uses,
 //! so "shadows" means the same tones in the colour grade as in the parametric curve.
 
-use aura_recipe::{Calibration, ChannelCurves, ColourGrade, Grain, ParametricCurve, PostCropVignette};
+use aura_recipe::{
+    Calibration, ChannelCurves, ColourGrade, Grain, ParametricCurve, PostCropVignette,
+};
 
 use crate::colour::{luma, set_luma};
 use crate::spatial::Position;
@@ -68,7 +70,11 @@ pub fn parametric(x: f32, p: &ParametricCurve) -> f32 {
         (f32::from(p.shadows), s1 * 0.5, s1.max(0.05)),
         (f32::from(p.darks), (s1 + s2) * 0.5, (s2 - s1).max(0.05)),
         (f32::from(p.lights), (s2 + s3) * 0.5, (s3 - s2).max(0.05)),
-        (f32::from(p.highlights), (s3 + 1.0) * 0.5, (1.0 - s3).max(0.05)),
+        (
+            f32::from(p.highlights),
+            (s3 + 1.0) * 0.5,
+            (1.0 - s3).max(0.05),
+        ),
     ];
     let taper = smoothstep(x, 0.0, 0.06) * smoothstep(1.0 - x, 0.0, 0.06);
     let lift: f32 = regions
@@ -337,39 +343,41 @@ pub fn vignette(rgb: &mut [f32], width: usize, position: Position, settings: &Po
     let highlights = f32::from(settings.highlights) / 100.0;
     let lo = midpoint * (1.0 - feather);
     let hi = (midpoint + (1.0 - midpoint) * feather).max(lo + 0.02);
-    rgb.par_chunks_mut(3).enumerate().for_each(|(index, pixel)| {
-        let (u, v, aspect) = centred(index, width, position);
-        // Roundness +1 is a circle in the frame's own pixels; 0 is an ellipse that follows the
-        // frame; -1 squares it toward the rectangle with a higher superellipse exponent.
-        // A circle in pixels divides the short axis by the aspect ratio.
-        let (su, sv) = if roundness > 0.0 {
-            let (cu, cv) = if aspect >= 1.0 {
-                (1.0, aspect)
+    rgb.par_chunks_mut(3)
+        .enumerate()
+        .for_each(|(index, pixel)| {
+            let (u, v, aspect) = centred(index, width, position);
+            // Roundness +1 is a circle in the frame's own pixels; 0 is an ellipse that follows the
+            // frame; -1 squares it toward the rectangle with a higher superellipse exponent.
+            // A circle in pixels divides the short axis by the aspect ratio.
+            let (su, sv) = if roundness > 0.0 {
+                let (cu, cv) = if aspect >= 1.0 {
+                    (1.0, aspect)
+                } else {
+                    (1.0 / aspect, 1.0)
+                };
+                (1.0 + (cu - 1.0) * roundness, 1.0 + (cv - 1.0) * roundness)
             } else {
-                (1.0 / aspect, 1.0)
+                (1.0, 1.0)
             };
-            (1.0 + (cu - 1.0) * roundness, 1.0 + (cv - 1.0) * roundness)
-        } else {
-            (1.0, 1.0)
-        };
-        let power = 2.0 + 4.0 * (-roundness).max(0.0);
-        let d = ((u / su).abs().powf(power) + (v / sv).abs().powf(power)).powf(1.0 / power)
-            / 2.0_f32.powf(1.0 / power);
-        let mut weight = smoothstep(d, lo, hi);
-        let [r, g, b] = [
-            pixel.first().copied().unwrap_or(0.0),
-            pixel.get(1).copied().unwrap_or(0.0),
-            pixel.get(2).copied().unwrap_or(0.0),
-        ];
-        if highlights > 0.0 && amount < 0.0 {
-            let t = curve_domain_encode(luma([r, g, b]).max(0.0));
-            weight *= 1.0 - highlights * smoothstep(t, 0.55, 0.95);
-        }
-        let gain = (amount * VIGNETTE_STOPS * weight).exp2();
-        for (slot, value) in pixel.iter_mut().zip([r, g, b]) {
-            *slot = value * gain;
-        }
-    });
+            let power = 2.0 + 4.0 * (-roundness).max(0.0);
+            let d = ((u / su).abs().powf(power) + (v / sv).abs().powf(power)).powf(1.0 / power)
+                / 2.0_f32.powf(1.0 / power);
+            let mut weight = smoothstep(d, lo, hi);
+            let [r, g, b] = [
+                pixel.first().copied().unwrap_or(0.0),
+                pixel.get(1).copied().unwrap_or(0.0),
+                pixel.get(2).copied().unwrap_or(0.0),
+            ];
+            if highlights > 0.0 && amount < 0.0 {
+                let t = curve_domain_encode(luma([r, g, b]).max(0.0));
+                weight *= 1.0 - highlights * smoothstep(t, 0.55, 0.95);
+            }
+            let gain = (amount * VIGNETTE_STOPS * weight).exp2();
+            for (slot, value) in pixel.iter_mut().zip([r, g, b]) {
+                *slot = value * gain;
+            }
+        });
 }
 
 /// A deterministic value in `-1..1` for an integer lattice point.
@@ -417,29 +425,31 @@ pub fn grain(rgb: &mut [f32], width: usize, position: Position, g: &Grain) {
     let long = position.full_width.max(position.full_height).max(1) as f32;
     let cell = ((0.6 + f32::from(g.size) / 100.0 * 3.4) * long / 2400.0).max(0.5);
     let rough = f32::from(g.roughness) / 100.0;
-    rgb.par_chunks_mut(3).enumerate().for_each(|(index, pixel)| {
-        let x = (index % width.max(1)) as f32 + position.x as f32;
-        let y = (index / width.max(1)) as f32 + position.y as f32;
-        let fine = value_noise(x, y, cell, 0x6752_4149_4e21);
-        let coarse = value_noise(x, y, cell * 2.3, 0x4155_5241_0001);
-        let n = fine * (1.0 - 0.5 * rough) + coarse * 0.5 * rough;
-        let value = [
-            pixel.first().copied().unwrap_or(0.0),
-            pixel.get(1).copied().unwrap_or(0.0),
-            pixel.get(2).copied().unwrap_or(0.0),
-        ];
-        let l = luma(value);
-        if l <= 1e-6 {
-            return;
-        }
-        let t = curve_domain_encode(l).clamp(0.0, 1.0);
-        let midtones = 4.0 * t * (1.0 - t);
-        let shifted = (t + n * amount * GRAIN_STRENGTH * midtones).clamp(0.0, 1.0);
-        let out = set_luma(value, curve_domain_decode(shifted));
-        for (slot, v) in pixel.iter_mut().zip(out) {
-            *slot = v;
-        }
-    });
+    rgb.par_chunks_mut(3)
+        .enumerate()
+        .for_each(|(index, pixel)| {
+            let x = (index % width.max(1)) as f32 + position.x as f32;
+            let y = (index / width.max(1)) as f32 + position.y as f32;
+            let fine = value_noise(x, y, cell, 0x6752_4149_4e21);
+            let coarse = value_noise(x, y, cell * 2.3, 0x4155_5241_0001);
+            let n = fine * (1.0 - 0.5 * rough) + coarse * 0.5 * rough;
+            let value = [
+                pixel.first().copied().unwrap_or(0.0),
+                pixel.get(1).copied().unwrap_or(0.0),
+                pixel.get(2).copied().unwrap_or(0.0),
+            ];
+            let l = luma(value);
+            if l <= 1e-6 {
+                return;
+            }
+            let t = curve_domain_encode(l).clamp(0.0, 1.0);
+            let midtones = 4.0 * t * (1.0 - t);
+            let shifted = (t + n * amount * GRAIN_STRENGTH * midtones).clamp(0.0, 1.0);
+            let out = set_luma(value, curve_domain_decode(shifted));
+            for (slot, v) in pixel.iter_mut().zip(out) {
+                *slot = v;
+            }
+        });
 }
 
 #[cfg(test)]
@@ -466,9 +476,15 @@ mod tests {
             assert!(y >= last - 1e-6, "not monotone at {i}");
             last = y;
         }
-        assert!(lut.lookup(0.2) > 0.2 + 0.05, "shadows +100 lifts the shadows");
+        assert!(
+            lut.lookup(0.2) > 0.2 + 0.05,
+            "shadows +100 lifts the shadows"
+        );
         assert!(lut.lookup(0.0) < 0.01, "the black point does not move");
-        assert!((lut.lookup(0.9) - 0.9).abs() < 0.03, "highlights barely move");
+        assert!(
+            (lut.lookup(0.9) - 0.9).abs() < 0.03,
+            "highlights barely move"
+        );
     }
 
     #[test]
@@ -501,7 +517,10 @@ mod tests {
         let shadow = plan.apply([0.01, 0.01, 0.01]);
         let highlight = plan.apply([0.7, 0.7, 0.7]);
         assert!(shadow[2] > shadow[0], "teal shadows: {shadow:?}");
-        assert!(highlight[0] > highlight[2], "orange highlights: {highlight:?}");
+        assert!(
+            highlight[0] > highlight[2],
+            "orange highlights: {highlight:?}"
+        );
         assert!((luma(shadow) - 0.01).abs() < 1e-4);
         assert!((luma(highlight) - 0.7).abs() < 1e-3);
     }
@@ -518,7 +537,10 @@ mod tests {
             assert!((v - 0.5).abs() < 1e-4, "white moved: {white:?}");
         }
         let red = plan.apply([0.6, 0.1, 0.1]);
-        assert!((red[1] - 0.1).abs() > 0.005, "a red hue shift moves red: {red:?}");
+        assert!(
+            (red[1] - 0.1).abs() > 0.005,
+            "a red hue shift moves red: {red:?}"
+        );
     }
 
     #[test]
@@ -540,11 +562,12 @@ mod tests {
     fn grain_is_the_same_in_a_tile_as_in_the_whole_frame() {
         let (w, h) = (64_usize, 48_usize);
         let make = || -> Vec<f32> {
-            (0..w * h).flat_map(|i| {
-                let v = 0.05 + (i % w) as f32 / w as f32 * 0.5;
-                [v, v * 0.9, v * 0.8]
-            })
-            .collect()
+            (0..w * h)
+                .flat_map(|i| {
+                    let v = 0.05 + (i % w) as f32 / w as f32 * 0.5;
+                    [v, v * 0.9, v * 0.8]
+                })
+                .collect()
         };
         let g = Grain {
             amount: 60,

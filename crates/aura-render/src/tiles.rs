@@ -477,8 +477,17 @@ mod tests {
                 &OutputSpec::default(),
             )
             .expect("whole");
-        for stage in ["calibration", "curve", "colour_grade", "post_crop_vignette", "grain"] {
-            assert!(whole.stages_run.iter().any(|s| s == stage), "{stage} did not run");
+        for stage in [
+            "calibration",
+            "curve",
+            "colour_grade",
+            "post_crop_vignette",
+            "grain",
+        ] {
+            assert!(
+                whole.stages_run.iter().any(|s| s == stage),
+                "{stage} did not run"
+            );
         }
         let streamed = render_streamed(
             &engine,
@@ -572,4 +581,3 @@ mod tests {
         assert_eq!(whole.data, streamed.data);
     }
 }
-

@@ -490,7 +490,14 @@ impl CpuEngine {
         // On the buffer the crop just produced, which *is* the delivered frame. The tiler strips
         // these from its per-tile recipe and applies them to each committed tile in output
         // raster coordinates instead, so a streamed export draws the same vignette and grain.
-        apply_post_crop(&mut rgb, width, height, recipe, plan, spatial::Position::whole(width, height));
+        apply_post_crop(
+            &mut rgb,
+            width,
+            height,
+            recipe,
+            plan,
+            spatial::Position::whole(width, height),
+        );
 
         (rgb, width, height, notes)
     }

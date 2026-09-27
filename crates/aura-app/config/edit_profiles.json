@@ -64,7 +64,8 @@
         "Open the shadows, but keep a real black so the image keeps depth",
         "Lift the darks in the tone curve and soften the top for a matte glow",
         "Mute and brighten greens and yellows in HSL; brighten skin slightly",
-        "A little warmth, a little lower clarity for softness"
+        "A little warmth, a little lower clarity for softness",
+        "Parametric curve: shadows and darks lifted; a hint of warm highlight grading"
       ],
       "origin": "researched",
       "sources": [
@@ -144,6 +145,17 @@
             "s": -15,
             "l": 10
           }
+        },
+        "colourGrade": {
+          "highlights": {
+            "hue": 40,
+            "saturation": 6,
+            "luminance": 0
+          }
+        },
+        "parametric": {
+          "shadows": 10,
+          "darks": 5
         }
       }
     },
@@ -164,7 +176,8 @@
         "Open the shadows a little so faces stay readable",
         "Lift the black point in the tone curve for a matte fade",
         "Desaturate and darken greens, blues and yellows; keep skin warm",
-        "Clarity up a touch, saturation down, then a vignette"
+        "Clarity up a touch, saturation down, then a vignette",
+        "Colour grading: cool blue-teal shadows at low saturation; a touch of grain"
       ],
       "origin": "researched",
       "sources": [
@@ -244,7 +257,24 @@
             "l": -4
           }
         },
-        "vignette": 0.3
+        "vignette": 0.3,
+        "colourGrade": {
+          "shadows": {
+            "hue": 210,
+            "saturation": 15,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 40,
+            "saturation": 10,
+            "luminance": 0
+          }
+        },
+        "grain": {
+          "amount": 12,
+          "size": 25,
+          "roughness": 50
+        }
       }
     },
     {
@@ -264,7 +294,8 @@
         "Rotate greens and blues toward teal in HSL and darken them",
         "Keep orange hue near zero, lift its luminance a little to protect skin",
         "Slight warmth overall so highlights read amber",
-        "Keep the effect felt rather than seen - saturation stays moderate"
+        "Keep the effect felt rather than seen - saturation stays moderate",
+        "Colour grading: teal shadows (hue 200, 28) and amber highlights (hue 38, 22), balance -10"
       ],
       "origin": "researched",
       "sources": [
@@ -350,7 +381,20 @@
             "l": 0
           }
         },
-        "vignette": 0.22
+        "vignette": 0.22,
+        "colourGrade": {
+          "shadows": {
+            "hue": 200,
+            "saturation": 28,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 38,
+            "saturation": 22,
+            "luminance": 0
+          },
+          "balance": -10
+        }
       }
     },
     {
@@ -370,7 +414,8 @@
         "Lift the black point to a warm grey",
         "Warm the white balance slightly and add a hint of magenta",
         "Shift yellows and greens toward olive and mute them; soften blues",
-        "Lower texture a little; never reach for the saturation slider"
+        "Lower texture a little; never reach for the saturation slider",
+        "Colour grading: warm shadows (hue 35, 12) and soft warm highlights; fine grain"
       ],
       "origin": "researched",
       "sources": [
@@ -458,6 +503,23 @@
             "s": -20,
             "l": 8
           }
+        },
+        "colourGrade": {
+          "shadows": {
+            "hue": 35,
+            "saturation": 12,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 45,
+            "saturation": 8,
+            "luminance": 0
+          }
+        },
+        "grain": {
+          "amount": 18,
+          "size": 30,
+          "roughness": 50
         }
       }
     },
@@ -477,7 +539,8 @@
         "Fade the curve at both ends - lifted blacks, lowered whites",
         "Lower contrast and saturation; warm the white balance",
         "Push greens toward yellow and blues toward cyan, then mute both",
-        "Soften clarity and add a vignette"
+        "Soften clarity and add a vignette",
+        "Colour grading: cool shadows, warm highlights; coarse grain and a faded vignette"
       ],
       "origin": "researched",
       "sources": [
@@ -552,7 +615,24 @@
             "l": 0
           }
         },
-        "vignette": 0.3
+        "vignette": 0.3,
+        "colourGrade": {
+          "shadows": {
+            "hue": 220,
+            "saturation": 12,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 45,
+            "saturation": 18,
+            "luminance": 0
+          }
+        },
+        "grain": {
+          "amount": 30,
+          "size": 40,
+          "roughness": 60
+        }
       }
     },
     {
@@ -571,7 +651,8 @@
         "Warm white balance and a touch of magenta",
         "Recover highlights so the sun keeps its shape",
         "Brighten and enrich yellows and oranges; move greens toward yellow",
-        "Lower clarity and dehaze slightly for glow; vibrance up"
+        "Lower clarity and dehaze slightly for glow; vibrance up",
+        "Colour grading: golden highlights and warm midtones"
       ],
       "origin": "researched",
       "sources": [
@@ -647,6 +728,18 @@
             "s": -20,
             "l": 5
           }
+        },
+        "colourGrade": {
+          "highlights": {
+            "hue": 42,
+            "saturation": 25,
+            "luminance": 0
+          },
+          "midtones": {
+            "hue": 35,
+            "saturation": 10,
+            "luminance": 0
+          }
         }
       }
     },
@@ -666,7 +759,8 @@
         "Convert with a custom mix: reds and oranges up for skin, blues down for sky",
         "Highlights down, shadows up, then set true whites and blacks",
         "A gentle S-curve and clarity for tonal separation",
-        "A light vignette and sharpening"
+        "A light vignette and sharpening",
+        "Split-tone the monochrome: cool shadows, warm highlights, very low saturation; fine grain"
       ],
       "origin": "researched",
       "sources": [
@@ -727,6 +821,23 @@
           "blue": -25,
           "purple": -5,
           "magenta": 5
+        },
+        "colourGrade": {
+          "shadows": {
+            "hue": 215,
+            "saturation": 6,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 45,
+            "saturation": 8,
+            "luminance": 0
+          }
+        },
+        "grain": {
+          "amount": 15,
+          "size": 25,
+          "roughness": 50
         }
       }
     },
@@ -746,7 +857,8 @@
         "Red-filter mix: reds, oranges and yellows up; blues and aqua far down",
         "Strong contrast and a steep S-curve",
         "Whites up, blacks crushed, clarity high",
-        "Heavy vignette to close the frame"
+        "Heavy vignette to close the frame",
+        "Heavy, rough grain like pushed film"
       ],
       "origin": "researched",
       "sources": [
@@ -803,6 +915,11 @@
           "blue": -45,
           "purple": -10,
           "magenta": 0
+        },
+        "grain": {
+          "amount": 35,
+          "size": 35,
+          "roughness": 65
         }
       }
     },
@@ -823,7 +940,8 @@
         "Clarity +15 to +25, a little dehaze and texture",
         "Vibrance around +20",
         "Darken and saturate blues; enrich greens and yellows",
-        "Output sharpening"
+        "Output sharpening",
+        "Calibration: blue primary saturation up - the landscape photographer's sky trick"
       ],
       "origin": "researched",
       "sources": [
@@ -885,7 +1003,11 @@
             "l": 0
           }
         },
-        "sharpen": 45
+        "sharpen": 45,
+        "calibration": {
+          "blue_saturation": 20,
+          "red_saturation": 5
+        }
       }
     },
     {
@@ -974,7 +1096,8 @@
         "Pull highlights hard so lamps keep their shape; open shadows",
         "Enrich blue, purple, magenta and orange lights",
         "Clarity and a little dehaze for crisp edges",
-        "Luminance and colour noise reduction for high ISO"
+        "Luminance and colour noise reduction for high ISO",
+        "Colour grading: blue shadows, warm highlights for street lamps"
       ],
       "origin": "researched",
       "sources": [
@@ -1033,7 +1156,19 @@
           }
         },
         "sharpen": 20,
-        "noise": 25
+        "noise": 25,
+        "colourGrade": {
+          "shadows": {
+            "hue": 225,
+            "saturation": 20,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 30,
+            "saturation": 12,
+            "luminance": 0
+          }
+        }
       }
     },
     {
@@ -1052,7 +1187,8 @@
         "Matte curve: black point lifted, highlights slightly rolled off",
         "Saturation down, vibrance up a touch so colour stays even",
         "Mute greens and blues; keep neutrals neutral",
-        "Clarity up slightly for crisp edges"
+        "Clarity up slightly for crisp edges",
+        "Parametric curve: darks lifted, lights eased for the matte finish"
       ],
       "origin": "researched",
       "sources": [
@@ -1113,6 +1249,17 @@
             "s": -12,
             "l": 0
           }
+        },
+        "colourGrade": {
+          "global": {
+            "hue": 30,
+            "saturation": 4,
+            "luminance": 0
+          }
+        },
+        "parametric": {
+          "darks": 8,
+          "lights": -4
         }
       }
     },
@@ -1132,7 +1279,8 @@
         "Exposure up a little with whites set clean",
         "Texture and clarity up for surface detail",
         "Vibrance up; enrich red, orange, yellow and green",
-        "Slight warmth, strong sharpening"
+        "Slight warmth, strong sharpening",
+        "Calibration: red primary saturation up for appetising colour"
       ],
       "origin": "researched",
       "sources": [
@@ -1186,7 +1334,10 @@
             "l": 0
           }
         },
-        "sharpen": 50
+        "sharpen": 50,
+        "calibration": {
+          "red_saturation": 10
+        }
       }
     },
     {
@@ -1206,7 +1357,8 @@
         "Soft curve with lifted blacks",
         "Warm white balance with a touch of magenta",
         "Sage greens (muted, slightly lighter), pale blues, light skin",
-        "Lower clarity and texture for a soft glow"
+        "Lower clarity and texture for a soft glow",
+        "Colour grading: warm highlights, faint warm shadows"
       ],
       "origin": "researched",
       "sources": [
@@ -1286,6 +1438,18 @@
             "s": -20,
             "l": 5
           }
+        },
+        "colourGrade": {
+          "highlights": {
+            "hue": 35,
+            "saturation": 10,
+            "luminance": 0
+          },
+          "shadows": {
+            "hue": 20,
+            "saturation": 6,
+            "luminance": 0
+          }
         }
       }
     },
@@ -1305,7 +1469,8 @@
         "Cool the white balance",
         "Mute saturation overall, especially yellows and greens",
         "Push greens toward teal",
-        "Slight black fade and crisp clarity"
+        "Slight black fade and crisp clarity",
+        "Colour grading: cool shadows; calibration: bluer blues"
       ],
       "origin": "researched",
       "sources": [
@@ -1378,6 +1543,16 @@
             "s": -10,
             "l": 0
           }
+        },
+        "colourGrade": {
+          "shadows": {
+            "hue": 200,
+            "saturation": 12,
+            "luminance": 0
+          }
+        },
+        "calibration": {
+          "blue_saturation": 10
         }
       }
     },

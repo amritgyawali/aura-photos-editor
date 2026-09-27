@@ -1,18 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, asIpcError, develop, inTauri } from '../../ipc/client';
+import { api, asIpcError, develop, editProfiles, inTauri, syncSettings, type EditProfile } from '../../ipc/client';
 import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { rgbDataUrl } from './rgbImage';
-
-const CONTROLS = [
-  ['global.exposure', 'Exposure', -5, 5, 0.1, 0],
-  ['global.temperature', 'Warmth', 2000, 12000, 100, 5500],
-  ['global.tint', 'Tint', -150, 150, 1, 0],
-  ['global.contrast', 'Contrast', -100, 100, 1, 0],
-  ['global.highlights', 'Highlights', -100, 100, 1, 0],
-  ['global.shadows', 'Shadows', -100, 100, 1, 0],
-  ['global.vibrance', 'Vibrance', -100, 100, 1, 0],
-  ['global.saturation', 'Saturation', -100, 100, 1, 0],
-] as const;
+import { LightroomPanel } from './LightroomPanel';
 
 export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusyChange }: {
   projectId: string; photoId: string; disabled: boolean; revision?: number; onBusyChange: (busy: boolean) => void;
@@ -26,6 +16,10 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const [view, setView] = useState<'edited' | 'original' | 'split'>('edited');
   const [split, setSplit] = useState(50);
   const [refresh, setRefresh] = useState(0);
+  const [profiles, setProfiles] = useState<EditProfile[]>([]);
+  const [aspect, setAspect] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => { if (inTauri()) editProfiles.list().then(setProfiles).catch(() => undefined); }, []);
   useEffect(() => { onBusyChange(busy); }, [busy, onBusyChange]);
   const edited = useMemo(() => render ? rgbDataUrl(render) : null, [render]);
   useEffect(() => {
@@ -63,6 +57,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
         <div className="studio-canvas">
           {edited && original ? <>
             <img src={view === 'original' ? original : edited} alt={view === 'original' ? 'Original photograph' : 'Edited photograph'} />
+            <img src={original} alt="" hidden onLoad={event => { const img = event.currentTarget; if (img.naturalHeight) setAspect(img.naturalWidth / img.naturalHeight); }} />
             {view === 'split' && <img className="studio-original-overlay" src={original} alt="Original side of comparison" style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }} />}
             {view === 'split' && <div className="studio-divider" style={{ left: `${split}%` }} aria-hidden="true" />}
             <span className="studio-caption">{view === 'split' ? 'Original / Edited' : view === 'original' ? 'Original' : 'Edited'}</span>
@@ -72,22 +67,21 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
         <p className="studio-footnote">Edits are saved automatically. Your original stays untouched.</p>
         {render?.notes.filter(note => note.isCaveat).map(note => <p className="studio-footnote" key={`${note.stage}:${note.reason}`}>{note.detail ?? note.reason}</p>)}
       </div>
-      <fieldset className="studio-adjustments" disabled={disabled || busy || !recipe}>
-        <legend>Fine-tune</legend>
-        <button type="button" className="is-primary" onClick={() => void write(() => develop.enhancePhoto({ photoId }))}>{busy ? 'Saving…' : 'Auto enhance photo'}</button>
-        <p>Local light and contrast correction. No AI setup needed.</p>
-        <p>Adjust only what needs a personal touch.</p>
-        {CONTROLS.map(([path, label, min, max, step, fallback]) => {
-          const param = recipe?.params.find(item => item.path === path);
-          const value = Number(param?.value ?? fallback);
-          return <label className="studio-control" key={`${path}:${value}`}><span>{label}{param?.protected && <small> · Your setting</small>}</span>
-            <input type="number" min={min} max={max} step={step} defaultValue={value} onBlur={event => {
-              const next = event.target.valueAsNumber;
-              if (!Number.isFinite(next) || next < min || next > max) { event.target.value = String(value); return; }
-              if (next !== value) void write(() => develop.setParam({ projectId, photoId, path, value: next, label }));
-            }} />
-          </label>;
-        })}
+      <fieldset className="studio-adjustments lr-adjustments" disabled={disabled || busy || !recipe}>
+        <legend>Develop</legend>
+        <p>Every Lightroom panel. <strong>Auto</strong> measures this photo and edits it in one click; anything you move stays yours.</p>
+        {notice && <p role="status" className="lr-notice">{notice}</p>}
+        <LightroomPanel recipe={recipe} disabled={disabled || busy || !recipe} aspect={aspect} profiles={profiles}
+          onSetParam={(path, value, label) => void write(() => develop.setParam({ projectId, photoId, path, value, label }))}
+          onAuto={() => void write(() => develop.enhancePhoto({ photoId }))}
+          onApplyProfile={(profileId, strength) => void write(async () => {
+            const report = await editProfiles.apply(photoId, profileId, strength);
+            setNotice(report.adaptations.length ? report.adaptations.join(' ') : `Applied ${profiles.find(p => p.id === profileId)?.name ?? profileId}.`);
+          })}
+          onSync={includeGeometry => void write(async () => {
+            const report = await syncSettings(projectId, photoId, [], includeGeometry);
+            setNotice(`Settings synced to ${report.synced} photo${report.synced === 1 ? '' : 's'}.${report.failed.length ? ` ${report.failed.length} could not be updated.` : ''}`);
+          })} />
         <div className="studio-history">
           <button type="button" disabled={!history?.canUndo} onClick={() => void write(() => develop.historyStep({ projectId, photoId, action: 'undo' }))}>Undo</button>
           <button type="button" disabled={!history?.canRedo} onClick={() => void write(() => develop.historyStep({ projectId, photoId, action: 'redo' }))}>Redo</button>

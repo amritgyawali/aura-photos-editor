@@ -207,6 +207,12 @@ fn is_protected(protected: &BTreeSet<&str>, path: &str) -> bool {
     if protected.contains(path) {
         return true;
     }
+    // A proposal that replaces a whole subtree - `bw` back to `null` - would take every field
+    // a person set inside it with it, so a protected descendant protects the subtree too.
+    let subtree = format!("{path}.");
+    if protected.iter().any(|p| p.starts_with(&subtree)) {
+        return true;
+    }
     let mut cut = path;
     while let Some(dot) = cut.rfind('.') {
         cut = &cut[..dot];
@@ -293,7 +299,9 @@ fn remove_path(root: &mut Value, path: &str) {
             map.remove(part);
             return;
         }
-        let Some(next) = map.get_mut(part) else { return };
+        let Some(next) = map.get_mut(part) else {
+            return;
+        };
         cursor = next;
     }
 }
@@ -309,9 +317,16 @@ fn set_path(root: &mut Value, path: &str, value: Value) {
             return;
         }
         let Value::Object(map) = cursor else { return };
-        cursor = map
+        let child = map
             .entry(part.to_string())
             .or_insert_with(|| Value::Object(serde_json::Map::new()));
+        // A block that is `null` in the base - a colour photograph's `bw` - becomes an object
+        // when a proposal sets something inside it. Without this, turning black-and-white on
+        // was silently a no-op: the leaf had nowhere to go.
+        if !child.is_object() {
+            *child = Value::Object(serde_json::Map::new());
+        }
+        cursor = child;
     }
 }
 
@@ -521,7 +536,12 @@ impl Recipe {
         // ADR-0065. The splits are clamped apart from each other so a clamped curve is always a
         // valid one; the amounts are ordinary sliders.
         let p = &mut g.parametric;
-        for amount in [&mut p.highlights, &mut p.lights, &mut p.darks, &mut p.shadows] {
+        for amount in [
+            &mut p.highlights,
+            &mut p.lights,
+            &mut p.darks,
+            &mut p.shadows,
+        ] {
             *amount = (*amount).clamp(-100, 100);
         }
         p.shadow_split = p.shadow_split.clamp(5, 85);
@@ -610,12 +630,43 @@ mod tests {
         // ADR-0065: the Lightroom-parity blocks must not move a single stored hash.
         let recipe = fixtures::reference();
         let text = crate::canonical(&recipe).expect("canonical");
-        for block in ["parametric", "channel_curves", "colour_grade", "calibration", "effects"] {
-            assert!(!text.contains(block), "{block} leaked into a neutral recipe");
+        for block in [
+            "parametric",
+            "channel_curves",
+            "colour_grade",
+            "calibration",
+            "effects",
+        ] {
+            assert!(
+                !text.contains(block),
+                "{block} leaked into a neutral recipe"
+            );
         }
         let mut graded = recipe.clone();
         graded.global.effects.grain.amount = 20;
-        assert!(crate::canonical(&graded).expect("canonical").contains("grain"));
+        assert!(crate::canonical(&graded)
+            .expect("canonical")
+            .contains("grain"));
+    }
+
+    #[test]
+    fn a_person_can_turn_black_and_white_on_and_automation_cannot_turn_it_off() {
+        let colour = fixtures::neutral(fixtures::FIXTURE_HASH, "Bench-01");
+        let mut on = colour.clone();
+        on.bw = Some(crate::contract::recipe::Bw::default());
+        let (merged, _) = merge(&colour, &on, EditSource::User).expect("merge");
+        assert!(merged.bw.is_some(), "a null block must accept an object");
+        let mut mixed = merged.clone();
+        if let Some(bw) = &mut mixed.bw {
+            bw.mix.insert("red".to_string(), 25);
+        }
+        let (mixed, _) = merge(&merged, &mixed, EditSource::User).expect("merge");
+        let (after_ai, report) = merge(&mixed, &colour, EditSource::Ai).expect("merge");
+        assert!(
+            after_ai.bw.is_some(),
+            "automation turned a person's monochrome off"
+        );
+        assert!(report.refused.iter().any(|p| p == "bw"));
     }
 
     #[test]
@@ -625,8 +676,7 @@ mod tests {
             r.global.colour_grade.shadows.saturation = 30;
             r
         };
-        let (merged, report) =
-            merge(&base, &fixtures::reference(), EditSource::Ai).expect("merge");
+        let (merged, report) = merge(&base, &fixtures::reference(), EditSource::Ai).expect("merge");
         assert!(merged.global.colour_grade.is_neutral());
         assert!(report.changed.iter().any(|p| p == "global.colour_grade"));
 

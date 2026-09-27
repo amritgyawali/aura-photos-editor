@@ -195,3 +195,33 @@ summary { cursor: pointer; padding: 12px 0; color: var(--muted); }
 .start-summary span { padding: 7px 13px; border: 1px solid #554760; border-radius: 20px; font-size: 12px; color: var(--muted); }
 .start-summary strong { color: var(--text); font-weight: 600; }
 @media (max-width: 900px) { .profile-detail { grid-template-columns: minmax(0, 1fr); } .profile-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); } }
+/* The Lightroom develop panel. */
+.lr-adjustments { max-height: min(78vh, 900px); overflow-y: auto; }
+.lr-panel { display: grid; gap: 6px; }
+.lr-quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.lr-quick select { flex: 1 1 120px; }
+.lr-quick input[type='range'] { flex: 1 1 80px; }
+.lr-section { border: 1px solid var(--line); border-radius: 9px; padding: 0 10px; background: #1f1d25; }
+.lr-section > summary { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--text); padding: 9px 0; }
+.lr-section-body { display: grid; gap: 7px; padding: 2px 0 12px; }
+.lr-slider { display: grid; grid-template-columns: 92px minmax(0, 1fr) 56px; align-items: center; gap: 8px; font-size: 11px; }
+.lr-slider-label { color: var(--muted); cursor: default; user-select: none; }
+.lr-slider-label small { color: var(--accent); }
+.lr-slider input[type='range'] { width: 100%; height: 4px; border-radius: 4px; }
+.lr-number { width: 56px; padding: 3px 5px !important; font-size: 11px; text-align: right; }
+.lr-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.lr-tabs button { font-size: 11px; padding: 5px 9px; }
+.lr-tabs button[aria-selected='true'] { border-color: var(--accent); color: var(--accent); }
+.lr-toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.lr-wheel { border: 1px solid #3a3642; border-radius: 8px; padding: 6px 8px 8px; margin: 0; display: grid; gap: 6px; }
+.lr-wheel legend { font-size: 11px; color: var(--muted); padding: 0 4px; }
+.lr-crops { display: flex; flex-wrap: wrap; gap: 5px; }
+.lr-crops button { font-size: 11px; padding: 5px 9px; }
+.lr-sync { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.lr-hint { font-size: 10px; color: var(--muted); margin: 0; }
+.lr-notice { font-size: 12px; color: var(--warn) !important; }
+.curve-editor { width: 100%; aspect-ratio: 1; background: #141218; border: 1px solid var(--line); border-radius: 6px; touch-action: none; cursor: crosshair; }
+.curve-grid { stroke: #2d2a33; stroke-width: 1; }
+.curve-diagonal { stroke: #3d3945; stroke-width: 1; stroke-dasharray: 4 4; }
+.curve-point { fill: #f1edf5; stroke: #19181e; stroke-width: 1.5; }
+@media (min-width: 1101px) { .studio-layout:has(.lr-adjustments) { grid-template-columns: minmax(0, 1fr) 340px; } }

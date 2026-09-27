@@ -3083,6 +3083,17 @@ async fn apply_reference_style(
 }
 
 #[tauri::command]
+async fn sync_settings(
+    state: State<'_, AppState>,
+    input: aura_app::develop_commands::SyncSettingsInput,
+) -> IpcResult<aura_app::develop_commands::SyncSettingsReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::sync_settings(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn list_edit_profiles() -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
     aura_app::edit_profiles::list_edit_profiles()
 }
@@ -3155,6 +3166,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            sync_settings,
             list_edit_profiles,
             apply_edit_profile,
             preview_edit_profile,

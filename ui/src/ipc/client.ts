@@ -26,6 +26,11 @@ export type ProfileSelection = { profileId: string; strength: number };
 export type ApplyProfileReport = { profileId: string; changed: number; protectedFields: string[]; adaptations: string[] };
 export type ProfilePreview = { profileId: string; before: string; after: string; adaptations: string[] };
 
+export type SyncSettingsReport = { synced: number; failed: string[] };
+/** Lightroom's Sync Settings: copy one photo's develop settings onto others, as your own edit. */
+export const syncSettings = (projectId: string, sourcePhotoId: string, targetPhotoIds: string[] = [], includeGeometry = false) =>
+  invoke<SyncSettingsReport>('sync_settings', { input: { projectId, sourcePhotoId, targetPhotoIds, includeGeometry } });
+
 /** Named, adaptive looks. Every application starts from the measured correction, never compounds. */
 export const editProfiles = {
   list: () => invoke<EditProfile[]>('list_edit_profiles'),

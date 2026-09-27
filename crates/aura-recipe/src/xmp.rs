@@ -294,7 +294,10 @@ fn read_creative(attrs: &BTreeMap<String, String>, xml: &str, out: &mut Recipe) 
     set("SplitToningShadowHue", &mut c.shadows.hue);
     set("SplitToningShadowSaturation", &mut c.shadows.saturation);
     set("SplitToningHighlightHue", &mut c.highlights.hue);
-    set("SplitToningHighlightSaturation", &mut c.highlights.saturation);
+    set(
+        "SplitToningHighlightSaturation",
+        &mut c.highlights.saturation,
+    );
     set("SplitToningBalance", &mut c.balance);
     set("ColorGradeShadowLum", &mut c.shadows.luminance);
     set("ColorGradeHighlightLum", &mut c.highlights.luminance);
@@ -707,7 +710,10 @@ mod tests {
         assert_eq!(back.global.calibration, recipe.global.calibration);
         assert_eq!(back.global.effects, recipe.global.effects);
         assert_eq!(back.global.channel_curves, recipe.global.channel_curves);
-        assert_eq!(back.global.curve, recipe.global.curve, "the luminance curve is not a channel");
+        assert_eq!(
+            back.global.curve, recipe.global.curve,
+            "the luminance curve is not a channel"
+        );
     }
 
     #[test]

@@ -36,7 +36,10 @@ use std::sync::OnceLock;
 
 use aura_core::{AuraError, AuraResult, PhotoId, ProjectId};
 use aura_preview::contract::service::{PreviewService, Priority};
-use aura_recipe::{schema, Bw, Curve, EditSource, HslShift, Mask, MaskKind, MaskParams, Recipe};
+use aura_recipe::{
+    schema, Bw, Calibration, ChannelCurves, ColourGrade, Curve, EditSource, GradeWheel, Grain,
+    HslShift, ParametricCurve, Recipe,
+};
 use aura_render::{
     OutputSpec, RenderLevel, RenderPurpose, RenderRequest, RenderService, RenderedData,
 };
@@ -121,8 +124,18 @@ pub struct ProfileAdjust {
     pub sharpen: i16,
     /// Luminance noise reduction, `0..=100`.
     pub noise: i16,
-    /// Edge darkening in stops, `0..=1`, drawn with a radial mask.
+    /// Edge darkening, `0..=1`, drawn as Lightroom's post-crop vignette (`1` is amount -100).
     pub vignette: f32,
+    /// Lightroom's parametric tone curve, scaled by strength. ADR-0065.
+    pub parametric: Option<ParametricCurve>,
+    /// Red, green and blue curves, blended toward identity by strength. ADR-0065.
+    pub channel_curves: Option<ChannelCurves>,
+    /// Colour grading wheels; saturation and luminance scale with strength. ADR-0065.
+    pub colour_grade: Option<ColourGrade>,
+    /// Camera calibration, scaled by strength. ADR-0065.
+    pub calibration: Option<Calibration>,
+    /// Film grain; the amount scales with strength. ADR-0065.
+    pub grain: Option<Grain>,
     /// A black-and-white mix, keys from the eight bands. `None` keeps colour.
     pub bw: Option<BTreeMap<String, i16>>,
     /// Strength multiplier on a photograph that is already developed - a JPEG or PNG, or a
@@ -314,6 +327,31 @@ fn validate(profile: &EditProfile) -> Result<(), String> {
         .is_some_and(|k| !(0.0..=1.0).contains(&k))
     {
         return bad("developed strength must be 0..1");
+    }
+    if let Some(grade) = &a.colour_grade {
+        let wheels = [
+            grade.shadows,
+            grade.midtones,
+            grade.highlights,
+            grade.global,
+        ];
+        if wheels.iter().any(|w| {
+            !(0..360).contains(&w.hue)
+                || !(0..=100).contains(&w.saturation)
+                || !(-100..=100).contains(&w.luminance)
+        }) {
+            return bad("a colour grading wheel is out of range");
+        }
+    }
+    if let Some(curves) = &a.channel_curves {
+        let mut probe = aura_recipe::fixtures::neutral(&"0".repeat(64), "");
+        probe.global.channel_curves = curves.clone();
+        schema::Validation::check(&probe).map_err(|e| format!("{}: {}", profile.id, e.detail))?;
+    }
+    if let Some(p) = &a.parametric {
+        if !(p.shadow_split < p.midtone_split && p.midtone_split < p.highlight_split) {
+            return bad("parametric splits must increase");
+        }
     }
     if !(0..=150).contains(&a.sharpen) || !(0..=100).contains(&a.noise) {
         return bad("sharpen or noise out of range");
@@ -657,21 +695,87 @@ pub fn build(
         }
 
         if a.vignette > 0.0 {
-            // The renderer's radial mask is one at the centre and falls to zero at a third of
-            // the frame, so the edge darkening is a global move with the centre lifted back.
-            let v = (a.vignette * s).min(1.0);
-            g.exposure = (g.exposure - v).clamp(-5.0, 5.0);
-            proposal.masks.push(Mask {
-                id: format!("{PROFILE_MASK_PREFIX}vignette"),
-                kind: MaskKind::Radial,
-                target: None,
-                invert_of: None,
-                feather: 1.0,
-                params: MaskParams {
-                    exposure: Some(v * 1.1),
-                    ..MaskParams::default()
-                },
-            });
+            // Lightroom's post-crop vignette, highlight priority: the corners darken and
+            // anything bright in them - a window, a veil - keeps its detail.
+            let v = &mut g.effects.vignette;
+            v.amount = -(a.vignette * s * 100.0).round().clamp(0.0, 100.0) as i16;
+            v.midpoint = 40;
+            v.feather = 65;
+            v.highlights = 30;
+        }
+        if let Some(p) = &a.parametric {
+            let scale = |v: i16| scaled(v, s).clamp(-100, 100);
+            g.parametric = ParametricCurve {
+                highlights: scale(p.highlights),
+                lights: scale(p.lights),
+                darks: scale(p.darks),
+                shadows: scale(p.shadows),
+                ..*p
+            };
+        }
+        if let Some(curves) = &a.channel_curves {
+            let blend = s.min(1.0);
+            let towards = |curve: &Curve| Curve {
+                points: curve
+                    .points
+                    .iter()
+                    .map(|[x, y]| {
+                        let (xf, yf) = (f32::from(*x), f32::from(*y));
+                        [
+                            *x,
+                            (xf + (yf - xf) * blend).round().clamp(0.0, 255.0) as u16,
+                        ]
+                    })
+                    .collect(),
+            };
+            g.channel_curves = ChannelCurves {
+                red: towards(&curves.red),
+                green: towards(&curves.green),
+                blue: towards(&curves.blue),
+            };
+        }
+        if let Some(grade) = &a.colour_grade {
+            // Guard 6 - skin again. The midtones and highlights wheels colour every face in the
+            // frame; a strong tint there is how a gallery ends up with orange or green people.
+            let mut capped = false;
+            let mut wheel = |w: &GradeWheel, ceiling: i16| {
+                let saturation = scaled(w.saturation, s).clamp(0, 100);
+                capped |= saturation > ceiling;
+                GradeWheel {
+                    hue: w.hue,
+                    saturation: saturation.min(ceiling),
+                    luminance: scaled(w.luminance, s).clamp(-100, 100),
+                }
+            };
+            g.colour_grade = ColourGrade {
+                shadows: wheel(&grade.shadows, 40),
+                midtones: wheel(&grade.midtones, 20),
+                highlights: wheel(&grade.highlights, 30),
+                global: wheel(&grade.global, 15),
+                ..*grade
+            };
+            if capped {
+                notes
+                    .push("Colour grading held back so skin keeps its natural colour.".to_string());
+            }
+        }
+        if let Some(c) = &a.calibration {
+            let scale = |v: i16| scaled(v, s).clamp(-100, 100);
+            g.calibration = Calibration {
+                shadows_tint: scale(c.shadows_tint),
+                red_hue: scale(c.red_hue),
+                red_saturation: scale(c.red_saturation),
+                green_hue: scale(c.green_hue),
+                green_saturation: scale(c.green_saturation),
+                blue_hue: scale(c.blue_hue),
+                blue_saturation: scale(c.blue_saturation),
+            };
+        }
+        if let Some(grain) = &a.grain {
+            g.effects.grain = Grain {
+                amount: scaled(grain.amount, s.min(1.0)).clamp(0, 100),
+                ..*grain
+            };
         }
 
         if let Some(mix) = &a.bw {
@@ -1103,6 +1207,17 @@ mod tests {
             if recipe.bw.is_none() {
                 let orange = recipe.global.hsl.get("orange").copied().unwrap_or_default();
                 assert!(orange.h.abs() <= 6, "{} rotates skin", profile.id);
+                let grade = recipe.global.colour_grade;
+                assert!(
+                    grade.midtones.saturation <= 20,
+                    "{} tints faces",
+                    profile.id
+                );
+                assert!(
+                    grade.highlights.saturation <= 30,
+                    "{} tints faces",
+                    profile.id
+                );
                 assert!(
                     (-20..=15).contains(&orange.s),
                     "{} over-shifts skin",
@@ -1205,6 +1320,80 @@ mod tests {
         .unwrap();
         assert!(on_jpeg.global.vibrance < on_raw.global.vibrance);
         assert!(notes.iter().any(|n| n.contains("learned from RAW")));
+    }
+
+    #[test]
+    fn looks_use_lightroom_s_own_panels_rather_than_approximations() {
+        let teal = profile("cinematic-teal-orange").unwrap();
+        let (recipe, _, _) = build(
+            &neutral(),
+            Some(teal),
+            1.0,
+            AutoCorrection::default(),
+            stats(),
+        )
+        .unwrap();
+        assert!(
+            recipe.global.colour_grade.shadows.saturation > 0,
+            "split toning"
+        );
+        assert!(
+            recipe.global.effects.vignette.amount < 0,
+            "a post-crop vignette"
+        );
+        assert!(recipe.masks.is_empty(), "no radial-mask stand-in");
+        let portra = profile("film-portra").unwrap();
+        let (film, _, _) = build(
+            &neutral(),
+            Some(portra),
+            1.0,
+            AutoCorrection::default(),
+            stats(),
+        )
+        .unwrap();
+        assert!(film.global.effects.grain.amount > 0, "film grain");
+        // Switching to a look without them returns every block to neutral.
+        let natural = profile("true-natural").unwrap();
+        let (back, _, _) = build(
+            &film,
+            Some(natural),
+            1.0,
+            AutoCorrection::default(),
+            stats(),
+        )
+        .unwrap();
+        assert!(back.global.effects.is_neutral());
+        assert!(back.global.colour_grade.is_neutral());
+    }
+
+    #[test]
+    fn no_key_in_the_profile_table_is_silently_ignored() {
+        // The recipe blocks accept unknown keys for forward compatibility, so a misspelled key
+        // in the table would parse and do nothing. Every key written must survive a round trip.
+        fn keys(value: &serde_json::Value, prefix: &str, out: &mut Vec<String>) {
+            if let serde_json::Value::Object(map) = value {
+                for (k, v) in map {
+                    let path = format!("{prefix}.{k}");
+                    out.push(path.clone());
+                    keys(v, &path, out);
+                }
+            }
+        }
+        let raw: serde_json::Value = serde_json::from_str(PROFILES_JSON).unwrap();
+        let parsed = serde_json::to_value(profiles().unwrap()).unwrap();
+        for (index, profile) in raw["profiles"].as_array().unwrap().iter().enumerate() {
+            let mut mine = Vec::new();
+            keys(&profile["adjust"], "", &mut mine);
+            let mut theirs = Vec::new();
+            keys(&parsed[index]["adjust"], "", &mut theirs);
+            for key in mine {
+                assert!(
+                    theirs.contains(&key),
+                    "{}: {key} is not a field",
+                    profile["id"]
+                );
+            }
+        }
     }
 
     #[test]

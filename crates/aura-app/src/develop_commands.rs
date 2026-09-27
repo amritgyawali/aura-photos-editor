@@ -392,6 +392,21 @@ fn apply_path(base: &Recipe, path: &str, value: &serde_json::Value) -> Result<Re
     let parts: Vec<&str> = path.split('.').collect();
     let mut cursor = &mut document;
     for (index, part) in parts.iter().enumerate() {
+        // ADR-0065. A neutral optional block, an untouched HSL band and a colour photograph's
+        // black-and-white block are *absent* from the document rather than present and zero,
+        // so the first time a person sets one of their fields the block is filled in with its
+        // defaults here. Only blocks the schema defines can be created; anything else is still
+        // "no such field".
+        let prefix = parts.get(..index).map(|p| p.join(".")).unwrap_or_default();
+        if let serde_json::Value::Object(map) = cursor {
+            let missing =
+                !map.contains_key(*part) || map.get(*part).is_some_and(serde_json::Value::is_null);
+            if missing && index + 1 < parts.len() {
+                if let Some(block) = default_block(&prefix, part) {
+                    map.insert((*part).to_string(), block);
+                }
+            }
+        }
         if index + 1 == parts.len() {
             let serde_json::Value::Object(map) = cursor else {
                 return Err(aura_core::errors::render::recipe_invalid(
@@ -399,7 +414,9 @@ fn apply_path(base: &Recipe, path: &str, value: &serde_json::Value) -> Result<Re
                     "no such field",
                 ));
             };
-            if !map.contains_key(*part) {
+            // The black-and-white mix is a map keyed by band, and a band nobody moved is absent.
+            let mix_band = prefix == "bw.mix" && aura_recipe::HSL_BANDS.contains(part);
+            if !map.contains_key(*part) && !mix_band {
                 return Err(aura_core::errors::render::recipe_invalid(
                     path,
                     "no such field",
@@ -421,6 +438,121 @@ fn apply_path(base: &Recipe, path: &str, value: &serde_json::Value) -> Result<Re
 
     serde_json::from_value(document)
         .map_err(|e| aura_core::errors::render::recipe_invalid(path, &e.to_string()))
+}
+
+/// Input to [`sync_settings`]: Lightroom's Sync Settings.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncSettingsInput {
+    /// The collection.
+    pub project_id: String,
+    /// The photograph whose develop settings are copied.
+    pub source_photo_id: String,
+    /// The photographs to copy onto; empty means every other photograph in the collection.
+    #[serde(default)]
+    pub target_photo_ids: Vec<String>,
+    /// Also copy the crop and straighten. Off by default, as in Lightroom: a crop belongs to
+    /// the composition of one frame.
+    #[serde(default)]
+    pub include_geometry: bool,
+}
+
+/// What [`sync_settings`] did.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncSettingsReport {
+    /// Photographs whose settings now match the source.
+    pub synced: usize,
+    /// Photographs that could not be written, with the reason.
+    pub failed: Vec<String>,
+}
+
+/// Copy one photograph's develop settings onto others, as a person's edit.
+///
+/// Recorded as [`EditSource::User`], because choosing to sync is a person's decision about those
+/// photographs: every copied field is protected from later automatic passes, exactly as if it had
+/// been set by hand on each frame. Identity, masks, retouching and cleanup are never copied - they
+/// describe one frame's pixels.
+///
+/// # Errors
+///
+/// `AURA-RENDER-8002` for an invalid identifier, `AURA-DB-3006` when the catalog cannot be read.
+pub fn sync_settings(state: &AppState, input: &SyncSettingsInput) -> IpcResult<SyncSettingsReport> {
+    let project = parse_project(&input.project_id)?;
+    let source_id = parse_photo(&input.source_photo_id)?;
+    let source = load_or_neutral(state, source_id)?;
+    let targets: Vec<String> = if input.target_photo_ids.is_empty() {
+        let key = input.project_id.clone();
+        state.catalog().read(move |conn| {
+            let mut stmt = conn
+                .prepare("SELECT photo_id FROM photo WHERE project_id = ?1 ORDER BY photo_id")
+                .map_err(|e| aura_core::errors::db::statement_failed("sync targets", &e))?;
+            let rows = stmt
+                .query_map([key], |row| row.get::<_, String>(0))
+                .map_err(|e| aura_core::errors::db::statement_failed("sync targets", &e))?;
+            Ok(rows.filter_map(Result::ok).collect())
+        })?
+    } else {
+        input.target_photo_ids.clone()
+    };
+    let mut report = SyncSettingsReport {
+        synced: 0,
+        failed: Vec::new(),
+    };
+    for target in targets.iter().filter(|id| **id != input.source_photo_id) {
+        let result = (|| -> Result<(), AuraError> {
+            let photo = PhotoId::from_db(target).map_err(|_| {
+                aura_core::errors::render::recipe_invalid("photo", "invalid photo identifier")
+            })?;
+            let base = load_or_neutral(state, photo)?;
+            let mut proposal = base.clone();
+            proposal.global = source.global.clone();
+            // Every band spelled out, so a band the source leaves neutral clears the target's.
+            for band in aura_recipe::HSL_BANDS {
+                proposal.global.hsl.entry(band.to_string()).or_default();
+            }
+            proposal.bw.clone_from(&source.bw);
+            proposal.lens.vignette = source.lens.vignette;
+            if input.include_geometry {
+                proposal.geometry = source.geometry.clone();
+            }
+            let (merged, change) = schema::merge(&base, &proposal, EditSource::User)?;
+            let merged = merged.clamped();
+            schema::Validation::check(&merged)?;
+            state.recipe_store().save(
+                &project,
+                &photo,
+                &merged,
+                &change.changed,
+                "Synced settings",
+            )?;
+            Ok(())
+        })();
+        match result {
+            Ok(()) => report.synced += 1,
+            Err(error) => report
+                .failed
+                .push(format!("{target}: {}", error.user_message)),
+        }
+    }
+    Ok(report)
+}
+
+/// The defaults of a block that may be absent from a recipe's document.
+fn default_block(parent: &str, key: &str) -> Option<serde_json::Value> {
+    let value = match (parent, key) {
+        ("global", "parametric") => serde_json::to_value(aura_recipe::ParametricCurve::default()),
+        ("global", "channel_curves") => serde_json::to_value(aura_recipe::ChannelCurves::default()),
+        ("global", "colour_grade") => serde_json::to_value(aura_recipe::ColourGrade::default()),
+        ("global", "calibration") => serde_json::to_value(aura_recipe::Calibration::default()),
+        ("global", "effects") => serde_json::to_value(aura_recipe::Effects::default()),
+        ("global.hsl", band) if aura_recipe::HSL_BANDS.contains(&band) => {
+            serde_json::to_value(aura_recipe::HslShift::default())
+        }
+        ("", "bw") => serde_json::to_value(aura_recipe::Bw::default()),
+        _ => return None,
+    };
+    value.ok()
 }
 
 /// The label the history panel shows for a control the caller did not name.

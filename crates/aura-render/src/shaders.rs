@@ -173,8 +173,14 @@ pub fn shared_constants() -> Vec<(&'static str, String)> {
             "GRADE_LUMA_STOPS",
             format!("{:.2}", crate::creative::GRADE_LUMA_STOPS),
         ),
-        ("VIGNETTE_STOPS", format!("{:.2}", crate::creative::VIGNETTE_STOPS)),
-        ("GRAIN_STRENGTH", format!("{:.2}", crate::creative::GRAIN_STRENGTH)),
+        (
+            "VIGNETTE_STOPS",
+            format!("{:.2}", crate::creative::VIGNETTE_STOPS),
+        ),
+        (
+            "GRAIN_STRENGTH",
+            format!("{:.2}", crate::creative::GRAIN_STRENGTH),
+        ),
         ("CURVE_GAMMA", format!("{:.1}", crate::tonemap::CURVE_GAMMA)),
         ("KNEE", format!("{:.1}", aura_raw::colour::curve::KNEE)),
         ("luma.r", "0.262700".to_string()),

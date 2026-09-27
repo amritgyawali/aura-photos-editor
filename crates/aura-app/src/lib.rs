@@ -137,7 +137,7 @@ pub use delivery_commands::{
 };
 pub use develop_commands::{
     develop_status, history_step, image_history, image_recipe, render_caps, render_image,
-    set_param, snapshot,
+    set_param, snapshot, sync_settings,
 };
 pub use emotion_commands::{
     emotion_status, image_emotion, moment_peak, prefer_frame, ranked_by_emotion, reactions_of,

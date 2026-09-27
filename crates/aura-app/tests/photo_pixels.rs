@@ -281,6 +281,64 @@ fn photo_roundtrip(is_png: bool) {
     let layered_twice = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
     assert_eq!(layered_once.recipe_hash, layered_twice.recipe_hash);
 
+    // Every Lightroom panel is reachable by path, including blocks a neutral recipe omits.
+    for (path, value) in [
+        ("global.effects.grain.amount", serde_json::json!(20)),
+        ("global.effects.vignette.amount", serde_json::json!(-30)),
+        (
+            "global.colour_grade.shadows.saturation",
+            serde_json::json!(25),
+        ),
+        ("global.colour_grade.shadows.hue", serde_json::json!(200)),
+        ("global.calibration.blue_saturation", serde_json::json!(15)),
+        ("global.parametric.darks", serde_json::json!(-10)),
+        (
+            "global.channel_curves.blue.points",
+            serde_json::json!([[0, 12], [255, 245]]),
+        ),
+        ("global.hsl.blue.s", serde_json::json!(-30)),
+        ("bw", serde_json::json!({"mix": {}, "grade": null})),
+        ("bw.mix.red", serde_json::json!(25)),
+    ] {
+        aura_app::set_param(
+            &state,
+            &SetParamInput {
+                project_id: project.id.clone(),
+                photo_id: photo.clone(),
+                path: path.into(),
+                value,
+                label: None,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{path}: {}", e.message));
+    }
+    let lightroom = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    for path in [
+        "global.effects.grain.amount",
+        "global.colour_grade.shadows.saturation",
+        "global.hsl.blue.s",
+        "bw.mix.red",
+    ] {
+        assert!(
+            lightroom
+                .params
+                .iter()
+                .any(|p| p.path == path && p.protected),
+            "{path} is not stored as the photographer's setting"
+        );
+    }
+    let synced = aura_app::sync_settings(
+        &state,
+        &aura_app::develop_commands::SyncSettingsInput {
+            project_id: project.id.clone(),
+            source_photo_id: photo.clone(),
+            target_photo_ids: vec![],
+            include_geometry: false,
+        },
+    )
+    .expect("sync");
+    assert_eq!(synced.synced, 0, "the only photo is the source");
+
     let after = aura_app::render_image(&state, &request)
         .expect("valid photo fixture and successful operation");
     assert_ne!(before.rgb_base64, after.rgb_base64);
