@@ -18,7 +18,7 @@ const props = (overrides: Partial<Parameters<typeof LightroomPanel>[0]> = {}) =>
 it('shows every Lightroom panel', () => {
   render(<LightroomPanel {...props()} />);
   for (const title of ['Basic', 'Tone Curve', 'Color Mixer', 'Black & White', 'Color Grading', 'Detail', 'Lens Corrections', 'Transform & Crop', 'Effects', 'Calibration']) {
-    expect(screen.getByText(title)).toBeTruthy();
+    expect(screen.getByText(title, { selector: 'summary' })).toBeTruthy();
   }
 });
 
