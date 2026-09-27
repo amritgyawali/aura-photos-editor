@@ -61,7 +61,11 @@ pub fn enhance_photo(state: &AppState, input: &DevelopImageInput) -> IpcResult<R
 
 // The rounded integer controls are clamped to at most 25 in magnitude before conversion.
 #[allow(clippy::cast_possible_truncation)]
-pub(crate) fn correction(rgb: &[u8]) -> aura_core::AuraResult<(f32, i16, i16, i16)> {
+/// The measured exposure, highlight, shadow and contrast correction for an sRGB preview.
+///
+/// # Errors
+/// `AURA-RAW-2002` for an empty or truncated buffer.
+pub fn correction(rgb: &[u8]) -> aura_core::AuraResult<(f32, i16, i16, i16)> {
     if rgb.is_empty() || !rgb.len().is_multiple_of(3) {
         return Err(aura_core::errors::raw::corrupt(
             "Incomplete enhancement pixels",

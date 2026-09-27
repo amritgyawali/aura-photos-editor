@@ -3082,6 +3082,37 @@ async fn apply_reference_style(
     .map_err(|_| background_request_failed())?
 }
 
+#[tauri::command]
+async fn list_edit_profiles() -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
+    aura_app::edit_profiles::list_edit_profiles()
+}
+
+#[tauri::command]
+async fn apply_edit_profile(
+    state: State<'_, AppState>,
+    input: aura_app::edit_profiles::ApplyProfileInput,
+) -> IpcResult<aura_app::edit_profiles::ApplyProfileReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::edit_profiles::apply_edit_profile(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn preview_edit_profile(
+    state: State<'_, AppState>,
+    input: aura_app::edit_profiles::PreviewProfileInput,
+) -> IpcResult<aura_app::edit_profiles::ProfilePreview> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::edit_profiles::preview_edit_profile(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -3124,6 +3155,9 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_edit_profiles,
+            apply_edit_profile,
+            preview_edit_profile,
             fetch_instagram_references,
             analyse_reference_style,
             apply_reference_style,

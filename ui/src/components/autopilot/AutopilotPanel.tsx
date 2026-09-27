@@ -12,6 +12,7 @@ import type {
 import { Autopilot } from './Autopilot';
 import { prepareCollection, type PreparedPhoto } from './prepareCollection';
 import type { ReferenceSelection } from '../look/referenceStyle';
+import type { ProfileSelection } from '../../ipc/client';
 
 /**
  * PHASE-28. The container that wires the five autopilot views to the nine autopilot commands.
@@ -50,6 +51,9 @@ export type AutopilotPanelProps = {
   onAutomaticConsumed?: () => void;
   onRender?: () => void;
   reference?: ReferenceSelection | null;
+  /** The edit profile chosen on the start screen, and its display name. */
+  profile?: ProfileSelection | null;
+  profileName?: string;
 };
 
 /** How often the panel asks what the run is doing, while one is running. */
@@ -64,7 +68,7 @@ function toBanner(error: unknown): { code: string; message: string } {
   };
 }
 
-export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequest = 0, onAutomaticConsumed, onRender, reference }: AutopilotPanelProps) {
+export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequest = 0, onAutomaticConsumed, onRender, reference, profile, profileName }: AutopilotPanelProps) {
   const [status, setStatus] = useState<AutopilotStatusDto | null>(null);
   const [stages, setStages] = useState<AutopilotStageDto[]>([]);
   const [summary, setSummary] = useState<AutopilotSummaryDto | null>(null);
@@ -149,7 +153,7 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     setPrepared([]);
     try {
       const results = await prepareCollection(projectId, () => stopPreparation.current, setPreparation,
-        photo => setPrepared(current => [...current, photo]), reference);
+        photo => setPrepared(current => [...current, photo]), reference, profile, profileName);
       setPrepared(results);
       if (stopPreparation.current) { setPreparation('Stopped. Completed edits are saved.'); return; }
       const ready = results.filter(photo => photo.outcome === 'ready').length;
@@ -162,7 +166,7 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     } catch (error) {
       onError(toBanner(error));
     } finally { startingRef.current = false; setStarting(false); }
-  }, [disabled, onError, projectId, zeroTouch, reference]);
+  }, [disabled, onError, projectId, zeroTouch, reference, profile, profileName]);
 
   useEffect(() => {
     if (automaticRequest > 0 && consumedRequest.current !== automaticRequest && projectId) {
@@ -253,7 +257,9 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     <div aria-busy={starting}>
     <section className="quick-edit" aria-label="Automatic photo editing">
       <div><span className="eyebrow">MADE FOR YOUR PHOTO</span><h2>Good light. A natural finish.</h2>
-        <p>{reference ? `Your photos will be matched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength, with individual tone and color adjustments.` : 'Each photo gets its own exposure, shadow and highlight adjustments. Works locally, with no model downloads or account.'}</p></div>
+        <p>{[profile ? `The ${profileName ?? profile.profileId} profile at ${Math.round(profile.strength * 100)}% adapts to each photo's own light.` : '',
+          reference ? `Your photos will be matched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength, with individual tone and color adjustments.` : '',
+          !profile && !reference ? 'Each photo gets its own exposure, shadow and highlight adjustments. Works locally, with no model downloads or account.' : ''].filter(Boolean).join(' ')}</p></div>
       <button type="button" className="is-primary" disabled={starting || progress !== null} onClick={() => void openPreflight(false)}>{starting ? 'Editing your photos…' : 'Auto edit all photos'}</button>
     </section>
     {preparation && <section className="automatic-result" aria-label="Automatic preparation">

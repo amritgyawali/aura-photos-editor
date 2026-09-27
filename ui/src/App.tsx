@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, asIpcError, inTauri, pickPhotos } from './ipc/client';
+import { api, asIpcError, editProfiles, inTauri, pickPhotoFolder, pickPhotos, type ProfileSelection } from './ipc/client';
+import { ProfileGallery } from './components/profiles/ProfileGallery';
+import { readProfileSelection, saveProfileSelection } from './components/profiles/profileSelection';
 import { InstagramStyle } from './components/look/InstagramStyle';
 import { readReferenceSelection, saveReferenceSelection, type ReferenceSelection } from './components/look/referenceStyle';
 import { AiKeysPanel } from './components/AiKeysPanel';
@@ -22,7 +24,10 @@ import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
 
 export function App(): JSX.Element {
-  const [workspace, setWorkspace] = useState('library');
+  const [workspace, setWorkspace] = useState('start');
+  const [profile, setProfile] = useState<ProfileSelection | null>(readProfileSelection);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
+  const changeProfile = useCallback((next: ProfileSelection | null) => { setProfile(next); saveProfileSelection(next); }, []);
   const [reference, setReference] = useState<ReferenceSelection | null>(readReferenceSelection);
   const [analysingReference, setAnalysingReference] = useState(false);
   const [choosingPhotos, setChoosingPhotos] = useState(false);
@@ -105,6 +110,11 @@ export function App(): JSX.Element {
   useEffect(() => {
     void refreshProjects();
   }, [refreshProjects]);
+
+  useEffect(() => {
+    if (!inTauri()) return;
+    editProfiles.list().then(list => setProfileNames(Object.fromEntries(list.map(p => [p.id, p.name])))).catch(() => undefined);
+  }, []);
 
   // A different wedding is a different set of pixels; keeping the old bitmaps
   // would show the previous couple's frames for a few hundred milliseconds.
@@ -267,11 +277,11 @@ export function App(): JSX.Element {
 
   const focusedPhoto = rows[focusedIndex] ?? null;
 
-  const chooseAndImport = async () => {
+  const chooseAndImport = async (folder = false) => {
     if (choosingPhotos) return;
     setChoosingPhotos(true);
     try {
-      const roots = await pickPhotos();
+      const roots = folder ? [await pickPhotoFolder('Choose a folder of photos to edit')].filter((path): path is string => path !== null) : await pickPhotos();
       if (!roots.length) return;
       const target = activeProjectId ?? await createProject('My photo collection');
       if (target) { setWorkspace('library'); setQueuedImport({ projectId: target, roots }); }
@@ -280,7 +290,9 @@ export function App(): JSX.Element {
   };
 
   const locked = editing || matching || saving || exporting || progress.running || analysingReference || choosingPhotos || queuedImport !== null;
+  const profileName = profile ? profileNames[profile.profileId] ?? profile.profileId : undefined;
   const tabs = [
+    ['start', 'Start', 'Look, reference, photos'],
     ['library', 'Photos', 'Browse your collection'],
     ['edit', 'Auto edit', 'One click, start to finish'],
     ['look', 'Instagram style', 'Your reference, your photos'],
@@ -308,15 +320,38 @@ export function App(): JSX.Element {
         </header>
         {lastError && <div className="banner" role="alert"><span>{lastError.message}</span><button type="button" onClick={() => setError(null)}>Dismiss</button></div>}
         <div className="studio-content">
-          <div hidden={workspace !== 'library' && workspace !== 'look'}>
+          {workspace === 'start' && <div className="start-flow">
+            <header className="start-hero"><span className="eyebrow">LESS EDITING. MORE CREATING.</span>
+              <h1>Choose a look. Add a reference.<br /><em>Drop in your photos.</em></h1>
+              <p>Three steps to a finished, consistent set. AURA measures each photograph first, then applies your look on top - so bright, dark, warm and cool frames all land in the same place.</p></header>
+            <ProfileGallery selection={profile} disabled={locked} onChange={changeProfile} previewPhotoId={focusedPhoto?.id ?? null} />
+          </div>}
+          <div hidden={workspace !== 'start' && workspace !== 'look'} className={workspace === 'start' ? 'start-reference' : undefined}>
             <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}
-              onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} />
+              onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
+              heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a photographer’s Instagram</h2>
+                <p>Paste a public profile link to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
           </div>
-          {!activeProjectId ? <section className="studio-welcome">
+          {workspace === 'start' && <section className="start-step start-upload" aria-label="Add photos">
+            <header className="step-heading"><span className="step-number">3</span><div><span className="eyebrow">YOUR PHOTOS</span><h2>Upload a photo or a whole folder</h2>
+              <p>JPEG, PNG and supported camera RAW files. Your originals are never changed; every edit can be undone.</p></div></header>
+            <div className="start-summary" aria-label="What will be applied">
+              <span>Look: <strong>{profileName ?? 'Auto only'}</strong>{profile ? ` · ${Math.round(profile.strength * 100)}%` : ''}</span>
+              <span>Reference: <strong>{reference ? reference.analysis.origin || 'Saved photos' : 'None'}</strong></span>
+            </div>
+            <div className="import-actions">
+              <button className="is-primary" type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport()}>{choosingPhotos ? 'Choosing…' : 'Choose photos'}</button>
+              <button type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport(true)}>Choose a folder</button>
+              {activeProjectId && rows.length > 0 && <button type="button" disabled={locked} onClick={() => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}>Apply to the {rows.length} photos in this collection</button>}
+            </div>
+            {progress.running && <p role="status">Importing {progress.done} of {progress.total || '…'} photos. Editing starts automatically when the import finishes.</p>}
+            {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
+          </section>}
+          {!activeProjectId ? workspace === 'start' ? null : <section className="studio-welcome">
             <span className="eyebrow">LESS EDITING. MORE CREATING.</span>
             <h1>Or start with<br /><em>your own photos.</em></h1>
             <p>Portraits, travel, family, or everyday moments. Start a collection, choose your photos, and let AURA balance the light. Review the result, add your touch, and export.</p>
-            <button className="is-primary" type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport()}>Choose photos to auto edit</button>
+            <button className="is-primary" type="button" disabled={!inTauri() || locked} onClick={() => setWorkspace('start')}>Choose a look and photos</button>
             {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
             <div className="welcome-contact-sheet" aria-hidden="true"><div /><div /><div /><div /><div /><div /></div>
             <div className="welcome-features"><div><strong>One-click editing</strong><span>Light, color and a consistent finish.</span></div><div><strong>Reference matching</strong><span>Learn a look from saved photos.</span></div><div><strong>Always your original</strong><span>Saved edits with undo and reset.</span></div></div>
@@ -329,7 +364,8 @@ export function App(): JSX.Element {
             <div hidden={workspace !== 'edit'}>
               <div className="workspace-heading"><div><span className="eyebrow">LIGHT. COLOR. FINISH.</span><h1>A good starting point, in one click.</h1></div><button type="button" disabled={locked} onClick={() => setWorkspace('look')}>Match a reference look →</button></div>
               <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
-                automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference} />
+                automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference}
+                profile={profile} profileName={profileName} />
               {workspace === 'edit' && focusedPhoto && <>
                 <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
                 <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} disabled={editing} revision={revision} onBusyChange={setSaving} />

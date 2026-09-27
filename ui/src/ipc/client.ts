@@ -9,10 +9,37 @@ export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number
 export type FetchReport = { folder: string; fetched: number; skipped: number; complete: boolean; message: string };
 export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
 
+export type HslShift = { h: number; s: number; l: number };
+export type ProfileAdjust = {
+  exposure?: number; contrast?: number; highlights?: number; shadows?: number; whites?: number; blacks?: number;
+  temperature?: number; tint?: number; clarity?: number; texture?: number; dehaze?: number; vibrance?: number;
+  saturation?: number; curve?: [number, number][]; hsl?: Record<string, HslShift>; sharpen?: number; noise?: number;
+  vignette?: number; bw?: Record<string, number> | null; developedStrength?: number | null;
+};
+export type EditProfile = {
+  id: string; name: string; category: string; tagline: string; description: string; bestFor: string[];
+  technique: string[]; origin: 'researched' | 'learned'; sources: { title: string; url: string }[];
+  evidence: { dataset: string; trainingPairs: number; heldOutPairs: number; autoDe00: number; profileDe00: number } | null;
+  swatch: string[]; adjust: ProfileAdjust;
+};
+export type ProfileSelection = { profileId: string; strength: number };
+export type ApplyProfileReport = { profileId: string; changed: number; protectedFields: string[]; adaptations: string[] };
+export type ProfilePreview = { profileId: string; before: string; after: string; adaptations: string[] };
+
+/** Named, adaptive looks. Every application starts from the measured correction, never compounds. */
+export const editProfiles = {
+  list: () => invoke<EditProfile[]>('list_edit_profiles'),
+  apply: (photoId: string, profileId: string, strength: number) =>
+    invoke<ApplyProfileReport>('apply_edit_profile', { input: { photoId, profileId, strength } }),
+  preview: (profileId: string, strength: number, photoId?: string | null, size?: number) =>
+    invoke<ProfilePreview>('preview_edit_profile', { input: { profileId, strength, photoId: photoId ?? null, size: size ?? null } }),
+};
+
 export const referenceStyle = {
   fetch: (address: string, limit: number, cancelId: string) => invoke<FetchReport>('fetch_instagram_references', { input: { address, limit, cancelId } }),
   analyse: (address: string, folder: string, cancelId: string) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId } }),
-  apply: (photoId: string, referenceId: string, strength: number) => invoke<ApplyReport>('apply_reference_style', { input: { photoId, referenceId, strength } }),
+  apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null) => invoke<ApplyReport>('apply_reference_style', {
+    input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null } }),
 };
 
 /** Ask the desktop for a folder; cancel leaves the current selection intact. */

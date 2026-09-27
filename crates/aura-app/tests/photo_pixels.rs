@@ -179,8 +179,10 @@ fn photo_roundtrip(is_png: bool) {
     assert!(!style.colors.is_empty());
     let apply = aura_app::reference_style::ApplyReferenceInput {
         photo_id: photo.clone(),
-        reference_id: style.id,
+        reference_id: style.id.clone(),
         strength: 0.8,
+        profile_id: None,
+        profile_strength: None,
     };
     let report = aura_app::reference_style::apply_reference(&state, &apply)
         .expect("valid photo fixture and successful operation");
@@ -212,6 +214,73 @@ fn photo_roundtrip(is_png: bool) {
             .value,
         serde_json::Value::from(1.0)
     );
+    // An edit profile on the same imported photo: saved, never compounding, the manual exposure
+    // untouched, and gentler because a JPEG or PNG is already developed.
+    let profile = aura_app::edit_profiles::ApplyProfileInput {
+        photo_id: photo.clone(),
+        profile_id: "fivek-expert-c".into(),
+        strength: 1.0,
+    };
+    let applied = aura_app::edit_profiles::apply_edit_profile(&state, &profile)
+        .expect("profile applies to an imported photo");
+    assert!(
+        applied.changed > 0,
+        "a learned profile must change the edit"
+    );
+    assert!(applied
+        .protected_fields
+        .iter()
+        .any(|f| f == "global.exposure"));
+    assert!(
+        applied
+            .adaptations
+            .iter()
+            .any(|n| n.contains("learned from RAW")),
+        "a developed photo gets the RAW-learned look at reduced strength: {:?}",
+        applied.adaptations
+    );
+    let once = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    aura_app::edit_profiles::apply_edit_profile(&state, &profile).expect("profile again");
+    let twice = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    assert_eq!(
+        once.recipe_hash, twice.recipe_hash,
+        "a profile must not compound"
+    );
+    let preview = aura_app::edit_profiles::preview_edit_profile(
+        &state,
+        &aura_app::edit_profiles::PreviewProfileInput {
+            profile_id: "film-portra".into(),
+            photo_id: Some(photo.clone()),
+            strength: 1.0,
+            size: Some(128),
+        },
+    )
+    .expect("preview on the imported photo");
+    assert!(preview.before.starts_with("data:image/jpeg;base64,"));
+    assert_ne!(preview.before, preview.after);
+    let sample = aura_app::edit_profiles::preview_edit_profile(
+        &state,
+        &aura_app::edit_profiles::PreviewProfileInput {
+            profile_id: "bw-noir".into(),
+            photo_id: None,
+            strength: 1.0,
+            size: Some(96),
+        },
+    )
+    .expect("preview on the sample scene");
+    assert_ne!(sample.before, sample.after);
+    // The reference can be fitted on top of a profile, and still never compounds.
+    let layered = aura_app::reference_style::ApplyReferenceInput {
+        profile_id: Some("film-portra".into()),
+        profile_strength: Some(0.8),
+        ..apply
+    };
+    aura_app::reference_style::apply_reference(&state, &layered).expect("reference over profile");
+    let layered_once = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    aura_app::reference_style::apply_reference(&state, &layered).expect("again");
+    let layered_twice = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    assert_eq!(layered_once.recipe_hash, layered_twice.recipe_hash);
+
     let after = aura_app::render_image(&state, &request)
         .expect("valid photo fixture and successful operation");
     assert_ne!(before.rgb_base64, after.rgb_base64);

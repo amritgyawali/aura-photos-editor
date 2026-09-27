@@ -95,6 +95,25 @@ pub struct MosaicRef {
     pub segments: Vec<(usize, usize)>,
     /// Rows in each strip; equals `height` when the image is a single strip.
     pub rows_per_strip: u32,
+    /// `(tile width, tile length)` when `segments` are tiles rather than strips.
+    ///
+    /// Adobe DNG Converter writes lossless-JPEG DNGs as 256 x 256 tiles, so without this every
+    /// converted DNG - the most common DNG there is - was read as if its first tile were the
+    /// first rows of the frame and refused.
+    pub tile: Option<(u32, u32)>,
+    /// The rectangle that holds image data, `[top, left, bottom, right]` in photosites.
+    ///
+    /// A DNG converted from a Canon or Nikon RAW keeps the sensor's masked optical-black border
+    /// outside this rectangle; rendering it produces black strips and the wrong aspect ratio.
+    pub active_area: Option<[u32; 4]>,
+    /// The picture the camera intended, `[x, y, width, height]` inside the active area.
+    pub default_crop: Option<[u32; 4]>,
+    /// DNG `LinearizationTable`: stored code `n` means linear sensor value `table[n]`.
+    ///
+    /// A DNG converted from a compressed NEF stores the camera's tone-curve indices, not sensor
+    /// values - on a Nikon D70s the stored codes stop at 682 while white is 4,095. Rendering
+    /// the indices as values produced a dark, clipped, magenta frame.
+    pub linearization: Option<Vec<u16>>,
 }
 
 /// Fujifilm's 6x6 X-Trans layout, as the bodies write it: 0 red, 1 green,
@@ -355,6 +374,10 @@ fn read_raf(bytes: &[u8]) -> AuraResult<RawMeta> {
             scheme,
             segments: vec![(header.cfa_offset, header.cfa_len)],
             rows_per_strip: sensor.height,
+            tile: None,
+            active_area: None,
+            default_crop: None,
+            linearization: None,
         });
         meta.little_endian = true;
     }
@@ -585,10 +608,25 @@ fn mosaic_from_ifd(
         .and_then(|entry| file.u64s(entry).first().copied())
         .unwrap_or(16) as u16;
 
-    let (offsets_tag, counts_tag) = if ifd.get(tiff::tag::TILE_OFFSETS).is_some() {
+    let tiled = ifd.get(tiff::tag::TILE_OFFSETS).is_some();
+    let (offsets_tag, counts_tag) = if tiled {
         (tiff::tag::TILE_OFFSETS, tiff::tag::TILE_BYTE_COUNTS)
     } else {
         (tiff::tag::STRIP_OFFSETS, tiff::tag::STRIP_BYTE_COUNTS)
+    };
+    let tile = if tiled {
+        let dimension = |tag| {
+            ifd.get(tag)
+                .and_then(|entry| file.u64s(entry).first().copied())
+                .and_then(|v| u32::try_from(v).ok())
+                .filter(|v| *v > 0)
+        };
+        Some((
+            dimension(tiff::tag::TILE_WIDTH)?,
+            dimension(tiff::tag::TILE_LENGTH)?,
+        ))
+    } else {
+        None
     };
     let offsets = file.u64s(ifd.get(offsets_tag)?);
     let counts = ifd
@@ -608,6 +646,50 @@ fn mosaic_from_ifd(
             )
         })
         .collect();
+
+    let rational = |tag| {
+        ifd.get(tag)
+            .map(|entry| file.f64s(entry))
+            .unwrap_or_default()
+    };
+    let whole = |v: f64| {
+        if v.is_finite() && v >= 0.0 {
+            v.round() as u32
+        } else {
+            0
+        }
+    };
+    let active_area = match rational(tiff::tag::ACTIVE_AREA).as_slice() {
+        [top, left, bottom, right]
+            if whole(*bottom) > whole(*top)
+                && whole(*right) > whole(*left)
+                && whole(*bottom) <= height
+                && whole(*right) <= width =>
+        {
+            Some([whole(*top), whole(*left), whole(*bottom), whole(*right)])
+        }
+        _ => None,
+    };
+    let default_crop = match (
+        rational(tiff::tag::DEFAULT_CROP_ORIGIN).as_slice(),
+        rational(tiff::tag::DEFAULT_CROP_SIZE).as_slice(),
+    ) {
+        ([x, y], [w, h]) if whole(*w) > 0 && whole(*h) > 0 => {
+            Some([whole(*x), whole(*y), whole(*w), whole(*h)])
+        }
+        _ => None,
+    };
+
+    let linearization = ifd
+        .get(tiff::tag::LINEARIZATION_TABLE)
+        .map(|entry| file.u64s(entry))
+        .filter(|table| table.len() >= 2)
+        .map(|table| {
+            table
+                .into_iter()
+                .map(|v| u16::try_from(v).unwrap_or(u16::MAX))
+                .collect::<Vec<u16>>()
+        });
 
     let rows_per_strip = ifd
         .get(tiff::tag::ROWS_PER_STRIP)
@@ -634,6 +716,10 @@ fn mosaic_from_ifd(
         scheme,
         segments,
         rows_per_strip: rows_per_strip.max(1),
+        tile,
+        active_area,
+        default_crop,
+        linearization,
     })
 }
 
@@ -757,8 +843,29 @@ fn apply_common_tags(file: &tiff::TiffFile<'_>, meta: &mut RawMeta) {
             meta.as_shot_neutral = [reciprocal(neutral_r), 1.0, reciprocal(neutral_b)];
         }
     }
-    if let Some(black) = file.scalar(tiff::tag::BLACK_LEVEL) {
-        meta.black_level = black as u32;
+    if let Some(entry) = file.find(tiff::tag::BLACK_LEVEL) {
+        // DNG allows one black level per CFA position, stored as rationals, plus per-row and
+        // per-column offsets. Adobe DNG Converter writes a zero here and the real black -
+        // about 1,024 codes on a 14-bit Canon - into BlackLevelDeltaV, so reading only the
+        // first value left every converted Canon DNG with a lifted, magenta shadow haze.
+        let mean = |values: Vec<f64>| {
+            if values.is_empty() {
+                0.0
+            } else {
+                values.iter().sum::<f64>() / values.len() as f64
+            }
+        };
+        let base = mean(file.f64s(entry));
+        let rows = file
+            .find(tiff::tag::BLACK_LEVEL_DELTA_V)
+            .map_or(0.0, |e| mean(file.f64s(e)));
+        let columns = file
+            .find(tiff::tag::BLACK_LEVEL_DELTA_H)
+            .map_or(0.0, |e| mean(file.f64s(e)));
+        let black = base + rows + columns;
+        if black.is_finite() && black >= 0.0 {
+            meta.black_level = black.round() as u32;
+        }
     }
     if let Some(white) = file.scalar(tiff::tag::WHITE_LEVEL) {
         if white > 0 {

@@ -28,7 +28,7 @@ than AURA's, which is recorded in the sidecar (`source: embedded`), flagged with
 | Container | Tier 1 | Tier 2 from mosaic | Tier 3 | Notes |
 |---|---|---|---|---|
 | DNG, uncompressed or packed CFA | yes | **yes** | **yes** | The best case. Carries its own colour matrices. |
-| DNG, lossless JPEG (SOF3) | yes | **yes** | **yes** | The common Adobe-converted case. |
+| DNG, lossless JPEG (SOF3) | yes | **yes** | **yes** | The common Adobe-converted case, in strips or in tiles (Adobe DNG Converter writes 256 px tiles). `ActiveArea` and `DefaultCrop` are applied, and the black level includes `BlackLevelDeltaV`/`DeltaH` - see below. |
 | DNG, 6x6 X-Trans CFA | yes | **yes** | **yes** | A Fujifilm file converted by Adobe. Proxy is a third of the sensor, not a half. |
 | DNG, lossy JPEG (34892) | yes | no | no | Preview-only. |
 | Canon CR2 | yes | **yes** | **yes** | Lossless JPEG mosaic. CR2 slice reassembly is untested against a real body - see the caveat below. |
@@ -120,3 +120,29 @@ condition C2 in `progress/PHASE-09-EXIT.md`, blocked by the same missing input a
 - What the technical marks mean: [frame integrity](frame-integrity.md)
 - Colour pipeline: [ADR-0003](adr/ADR-0003-colour-pipeline.md)
 - Troubleshooting: [previews runbook](runbooks/previews.md)
+
+## Converted DNGs: tiles, masked borders and row black levels
+
+Verified against 50 real camera DNGs from the MIT-Adobe FiveK dataset - eleven bodies: Canon Rebel
+XSi, 5D, 5D Mark II, 1D Mark II and III, 10D and 20D; Nikon D70s, D80 and D700; Sony A900 - all
+converted by Adobe DNG Converter. Four things they needed and the decoder did not do
+before:
+
+* **Tiles.** The raw IFD stores lossless-JPEG *tiles* (`TileWidth`/`TileLength`), not strips. Each
+  tile is placed at its own position and the right and bottom tiles that overhang the frame are
+  cropped. Before this, every converted DNG was refused with "lossless frame is 256 samples wide".
+* **The masked border.** `ActiveArea` excludes the sensor's optical-black strip and `DefaultCrop`
+  gives the picture the camera intended. Both are applied to the mosaic; the crop origin is rounded
+  to an even photosite so the CFA phase is kept.
+* **Linearization tables.** A DNG converted from a compressed NEF stores the camera's tone-curve
+  *indices* and a `LinearizationTable` that maps them to sensor values - on a Nikon D70s the stored
+  codes stop at 682 while white is 4,095. The table is now applied after decoding; before, those
+  files rendered dark, clipped and magenta.
+* **Row black levels.** A converted Canon DNG writes `BlackLevel = 0` and puts the real black -
+  about 1,024 codes on a 14-bit body - in `BlackLevelDeltaV`. Reading only the first value left a
+  lifted, magenta shadow haze on every such file. The black level is now the mean of `BlackLevel`
+  plus the mean row and column deltas.
+
+Measured effect on the FiveK pairs: the recipe fitter's residual against a professional retoucher's
+final fell from 12-21 dE00 (the fitter was compensating for the decoder) to about 3 dE00, and on
+the Nikon D70s pair from 16.9 to 5.1 dE00.

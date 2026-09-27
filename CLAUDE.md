@@ -146,6 +146,9 @@ Never load two phase files into one session.
 | Reference-look decisions | `docs/adr/ADR-0063-reference-look-matching.md` |
 | What matching a look does, in the product's own words | `docs/match-a-look.md` |
 | Look evaluation gates | `tests/eval/look_eval.rs` |
+| Edit profiles (the start screen's looks, validated JSON) | `crates/aura-app/config/edit_profiles.json` |
+| How edit profiles adapt, and how learned ones are measured | `docs/edit-profiles.md` |
+| Learning a profile from RAW before/after pairs | `ml/edit-profiles/fetch_fivek_pairs.py` + `crates/aura-app/tests/profile_fit.rs` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build

@@ -43,7 +43,8 @@ fn the_extension_is_never_trusted() {
     // And an empty or short buffer is simply unknown, never a guess.
     assert_eq!(sniff(&[]), RawFormat::Unknown);
     assert_eq!(sniff(b"II"), RawFormat::Unknown);
-    assert_eq!(sniff(b"\x89PNG\r\n\x1a\n"), RawFormat::Unknown);
+    // A PNG signature is a PNG: PNG photographs import alongside JPEG and RAW.
+    assert_eq!(sniff(b"\x89PNG\r\n\x1a\n"), RawFormat::Png);
 }
 
 #[test]

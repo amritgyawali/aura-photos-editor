@@ -1,8 +1,23 @@
 # Photo Studio
 
+## The start screen: look, reference, photos
+
+AURA opens on **Start**, three steps on one page:
+
+1. **Pick an edit profile** - sixteen researched looks plus profiles learned from professional
+   RAW before-and-afters, each previewed by the export renderer. Choose one, set its strength and
+   compare before and after on the sample scene, or on your own photo once one is imported.
+2. **Match a photographer's Instagram** (optional) - described below. When you use both, the
+   reference is fitted on top of the profile.
+3. **Choose photos** or **Choose a folder**. The import starts and, when it finishes, every photo
+   is edited with your profile (and reference) automatically.
+
+How profiles adapt to each photo, and how the learned ones were measured, is in
+[edit-profiles.md](edit-profiles.md).
+
 ## Start with an Instagram reference
 
-The first section on the home screen is **Instagram style matching**. Paste a
+The second step on the start screen is **Instagram style matching**. Paste a
 public photographer profile and choose **Analyze Instagram style**, or use
 **Use saved reference photos** for a folder of at least 8 distinct JPEG/PNG images.
 Reference analysis works before a target collection exists. It shows the measured

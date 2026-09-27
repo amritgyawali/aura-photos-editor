@@ -2,6 +2,43 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Edit profiles, a three-step start screen, and a DNG decoder that reads converted files
+
+**The start screen is now three steps: choose a look, optionally match an Instagram reference, and
+upload a photo or a folder.** When the import finishes every photo is edited with the chosen look
+automatically; with a reference as well, the reference is fitted on top of the look.
+
+**Edit profiles are residuals on a measurement, not presets.** Sixteen researched looks - light and
+airy, dark and moody, teal and orange, Portra film, vintage fade, golden hour, two monochromes,
+vivid landscape, soft portrait, neon night, editorial matte, fresh and crisp, romantic wedding,
+Nordic cool and true natural - each built from published before-and-after walkthroughs whose
+sources ship with it. Every application starts again from AURA's own measured correction, adds the
+look scaled by strength, then runs six guards that can only make the look gentler: highlight
+headroom, low-key frames, the frame's own colour lean, already-vivid frames, a RAW-learned look on
+an already-developed JPEG, and skin (the orange
+band is bounded in every colour profile). Nothing compounds, and nothing a person set is touched.
+Every card and the before/after are rendered by the export renderer. `docs/edit-profiles.md`.
+
+**Learned profiles copy professional retouchers' settings from RAW before-and-afters.**
+`ml/edit-profiles/fetch_fivek_pairs.py` downloads MIT-Adobe FiveK pairs - the camera DNG and a
+retoucher's final - and `crates/aura-app/tests/profile_fit.rs` decodes the DNG with AURA's own
+decoder, recovers the recipe that reproduces the final through the real renderer, and keeps the
+median of what the retoucher did beyond AURA's correction. Five ship, one per FiveK retoucher,
+learned from 110 RAW before-and-afters across eleven camera bodies; on 29 held-out RAW photos they
+bring AURA 6-17 % closer to the retoucher's final than the automatic correction alone. Each carries
+its held-out measurement, and on a photo the camera already developed it applies at half strength.
+That makes 21 profiles.
+
+**Converted DNGs decode correctly.** Doing that exposed four decoder defects that affected DNGs
+from Adobe DNG Converter: lossless-JPEG tiles were refused, the masked sensor border and the
+default crop were rendered, the black level ignored `BlackLevelDeltaV` - which on a converted
+Canon is where the whole black level is - leaving a lifted magenta haze, and a converted NEF's
+`LinearizationTable` was ignored. All four are fixed and tested; the fitter's residual against a
+retoucher's final fell from 12-21 to about 3 dE00.
+
+Two stale tests from the PNG commit are corrected: a PNG signature now sniffs as PNG, and tier 3
+decodes a developed JPEG at full size.
+
 ## Phase 31 - Matching a look somebody else published
 
 The thing photographers actually ask for: point at an account whose photographs you want yours to

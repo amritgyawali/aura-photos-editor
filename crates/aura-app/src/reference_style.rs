@@ -61,6 +61,12 @@ pub struct ApplyReferenceInput {
     pub photo_id: String,
     pub reference_id: String,
     pub strength: f32,
+    /// An edit profile to fit the reference on top of, instead of the plain correction.
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    /// That profile's strength, `0..=1.5`; 1 when absent.
+    #[serde(default)]
+    pub profile_strength: Option<f32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -245,19 +251,24 @@ pub fn apply_reference(
         aura_raw::PixelLevel::Thumb(384),
         Priority::Interactive,
     )?;
-    let (exposure, highlights, shadows, contrast) = crate::photo_enhance::correction(
-        original
-            .as_srgb8()
-            .ok_or_else(|| refused("Photo preview is not sRGB"))?,
-    )?;
+    let preview = original
+        .as_srgb8()
+        .ok_or_else(|| refused("Photo preview is not sRGB"))?;
     let current = crate::develop_commands::load_or_neutral(state, photo)?;
-    let neutral = aura_recipe::fixtures::neutral(&input.photo_id, &current.image.camera);
-    let mut baseline = aura_style::extract::TheirParams::of_recipe(&neutral).into_recipe(&current);
-    baseline.global.exposure = exposure;
-    baseline.global.highlights = highlights;
-    baseline.global.shadows = shadows;
-    baseline.global.contrast = contrast;
-    baseline = schema::merge(&current, &baseline, EditSource::Ai)?.0;
+    // The baseline is the measured correction, or an edit profile over it: either way it is
+    // rebuilt from a neutral develop, so a repeated application never compounds.
+    let chosen = match input.profile_id.as_deref() {
+        None | Some("auto") => None,
+        Some(id) => Some(crate::edit_profiles::profile(id)?),
+    };
+    let baseline = crate::edit_profiles::build(
+        &current,
+        chosen,
+        input.profile_strength.unwrap_or(1.0),
+        crate::edit_profiles::AutoCorrection::measure(preview)?,
+        crate::edit_profiles::SceneStats::measure(preview)?,
+    )?
+    .0;
     let pixels = crate::photo_frames::CatalogFrames::new(state.clone())
         .frame(&photo, RenderLevel::Screen(384, 384))?;
     let mut frame = OwnFrame {
