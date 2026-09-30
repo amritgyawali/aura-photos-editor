@@ -190,11 +190,23 @@ fn measure(px: &Pixels<'_>, faces: &[PortraitFace]) -> Measure {
         } else {
             sat.iter().sum::<f32>() / sat.len() as f32
         },
-        sky: if top == 0 { 0.0 } else { sky as f32 / top as f32 },
+        sky: if top == 0 {
+            0.0
+        } else {
+            sky as f32 / top as f32
+        },
         horizon,
         sky_luma: if sky == 0 { 0.0 } else { sky_luma / sky as f32 },
-        sky_bottom: if bottom.0 == 0 { 0.0 } else { bottom.1 as f32 / bottom.0 as f32 },
-        foliage: if n == 0 { 0.0 } else { foliage as f32 / n as f32 },
+        sky_bottom: if bottom.0 == 0 {
+            0.0
+        } else {
+            bottom.1 as f32 / bottom.0 as f32
+        },
+        foliage: if n == 0 {
+            0.0
+        } else {
+            foliage as f32 / n as f32
+        },
         median: percentile(&mut lum, 0.5),
         high: percentile(&mut lum, 0.95),
         p02: percentile(&mut lum, 0.02),
@@ -247,7 +259,12 @@ fn noise_sigma(px: &Pixels<'_>) -> f32 {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Neutral {
     /// Both estimates agree on a cast; correct part of it.
-    Correct { kelvin: u32, tint: i16, cast: f32, coverage: f32 },
+    Correct {
+        kelvin: u32,
+        tint: i16,
+        cast: f32,
+        coverage: f32,
+    },
     /// Both estimates agree the light is already neutral.
     Neutral { coverage: f32 },
     /// Too few neutral areas, or the two estimates disagree (a coloured backdrop).
@@ -261,7 +278,9 @@ enum Neutral {
 fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral {
     let (w, h) = (frame.width as usize, frame.height as usize);
     if w < 4 || h < 4 {
-        return Neutral::Unsure { reason: "the frame is too small to measure" };
+        return Neutral::Unsure {
+            reason: "the frame is too small to measure",
+        };
     }
     let step = ((w * h) as f32 / 200_000.0).sqrt().ceil().max(1.0) as usize;
     let at = |x: usize, y: usize| -> Option<[f32; 3]> {
@@ -275,13 +294,21 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
     for y in (0..h - 1).step_by(step) {
         for x in (0..w - 1).step_by(step) {
             total += 1;
-            if in_faces(faces, (x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32) {
+            if in_faces(
+                faces,
+                (x as f32 + 0.5) / w as f32,
+                (y as f32 + 0.5) / h as f32,
+            ) {
                 continue;
             }
             let (Some(p), Some(right), Some(down)) = (at(x, y), at(x + 1, y), at(x, y + 1)) else {
                 continue;
             };
-            if p.iter().chain(&right).chain(&down).any(|v| !v.is_finite() || *v < 0.004 || *v > 0.9) {
+            if p.iter()
+                .chain(&right)
+                .chain(&down)
+                .any(|v| !v.is_finite() || *v < 0.004 || *v > 0.9)
+            {
                 continue;
             }
             for c in 0..3 {
@@ -298,7 +325,9 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
         }
     }
     if total == 0 || edges.iter().any(|e| *e <= 1e-6) {
-        return Neutral::Unsure { reason: "the frame has no usable detail" };
+        return Neutral::Unsure {
+            reason: "the frame has no usable detail",
+        };
     }
     let edge = (
         (edges[0] / edges[1]).ln() as f32,
@@ -323,13 +352,17 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
             }
         }
         if weight <= 0.0 {
-            return Neutral::Unsure { reason: "not enough reliable neutral areas" };
+            return Neutral::Unsure {
+                reason: "not enough reliable neutral areas",
+            };
         }
         centre = (sum.0 / weight, sum.1 / weight);
     }
     let coverage = used as f32 / total as f32;
     if coverage < 0.015 {
-        return Neutral::Unsure { reason: "not enough reliable neutral areas" };
+        return Neutral::Unsure {
+            reason: "not enough reliable neutral areas",
+        };
     }
     // With people in frame the edges include warm skin-adjacent detail, so allow a little
     // more disagreement there; without people, stay strict.
@@ -366,7 +399,9 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
             cast,
             coverage,
         },
-        Err(_) => Neutral::Unsure { reason: "the measured cast is outside the supported range" },
+        Err(_) => Neutral::Unsure {
+            reason: "the measured cast is outside the supported range",
+        },
     }
 }
 
@@ -431,7 +466,11 @@ pub fn analyse(
     } else {
         format!(
             "Vibrance unchanged: the frame is {} ({:.0}% average saturation).",
-            if m.saturation <= 0.02 { "monochrome" } else { "already colourful" },
+            if m.saturation <= 0.02 {
+                "monochrome"
+            } else {
+                "already colourful"
+            },
             m.saturation * 100.0
         )
     });
@@ -441,7 +480,9 @@ pub fn analyse(
         _ => 0,
     };
     if clarity > 0 {
-        decisions.push(format!("Clarity +{clarity} for structure; no faces to protect."));
+        decisions.push(format!(
+            "Clarity +{clarity} for structure; no faces to protect."
+        ));
     }
     // Haze is an outdoor property; a bright studio backdrop has a high floor too.
     let dehaze = if matches!(kind, SceneKind::Landscape | SceneKind::General)
@@ -524,7 +565,12 @@ pub fn analyse(
         }
     ));
     let white_balance = match frame.map(|f| white_balance(f, faces)) {
-        Some(Neutral::Correct { kelvin, tint, cast, coverage }) => {
+        Some(Neutral::Correct {
+            kelvin,
+            tint,
+            cast,
+            coverage,
+        }) => {
             decisions.push(format!(
                 "White balance {kelvin} K / tint {tint:+}: two independent estimates agreed on a cast; removed about {}% of it, measured on {:.0}% neutral areas with faces ignored.",
                 if cast > 0.25 { 50 } else { 65 },
@@ -605,7 +651,11 @@ pub fn analyse(
 /// Two relative checks, never a target brightness for skin: a subject that is already
 /// clearly brighter than the rest of the scene is a low-key portrait and keeps its mood, and
 /// no face may be pushed into clipping.
-fn face_exposure_cap(exposure: f32, px: &Pixels<'_>, faces: &[PortraitFace]) -> (f32, Option<String>) {
+fn face_exposure_cap(
+    exposure: f32,
+    px: &Pixels<'_>,
+    faces: &[PortraitFace],
+) -> (f32, Option<String>) {
     if faces.is_empty() {
         return (exposure, None);
     }
@@ -752,7 +802,11 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
     };
     // Fine features (spots, eyes, teeth, noise) need more pixels than the thumbnail has.
     let proxy = previews
-        .get(photo, aura_raw::PixelLevel::Proxy2048, Priority::Interactive)
+        .get(
+            photo,
+            aura_raw::PixelLevel::Proxy2048,
+            Priority::Interactive,
+        )
         .ok();
     let detail = proxy
         .as_ref()
@@ -857,13 +911,39 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
     let spots: usize = report.assessments.iter().map(|a| a.spots_healed).sum();
     let kept: usize = report.assessments.iter().map(|a| a.marks_kept).sum();
     for (group, title, detail) in [
-        (Group::Skin, "Skin", format!("Texture, tone evening and local light on {} face(s).", report.retouched_faces)),
-        (Group::Blemishes, "Blemishes", format!("Healed {spots} temporary-looking spot(s); kept {kept} possible permanent mark(s).")),
-        (Group::Eyes, "Eyes", "Iris detail, sclera redness, red-eye and under-eye shadows where measured.".into()),
-        (Group::Finishing, "Teeth & shine", "Teeth yellow cast and skin shine where measured.".into()),
+        (
+            Group::Skin,
+            "Skin",
+            format!(
+                "Texture, tone evening and local light on {} face(s).",
+                report.retouched_faces
+            ),
+        ),
+        (
+            Group::Blemishes,
+            "Blemishes",
+            format!(
+                "Healed {spots} temporary-looking spot(s); kept {kept} possible permanent mark(s)."
+            ),
+        ),
+        (
+            Group::Eyes,
+            "Eyes",
+            "Iris detail, sclera redness, red-eye and under-eye shadows where measured.".into(),
+        ),
+        (
+            Group::Finishing,
+            "Teeth & shine",
+            "Teeth yellow cast and skin shine where measured.".into(),
+        ),
     ] {
         if count(&groups, group) > 0 {
-            steps.push(Step { group: Some(group), title: title.into(), detail, operations: count(&groups, group) });
+            steps.push(Step {
+                group: Some(group),
+                title: title.into(),
+                detail,
+                operations: count(&groups, group),
+            });
         }
     }
     report.steps = steps
@@ -924,7 +1004,10 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
         )?;
         current = merged;
     }
-    Ok(crate::develop_commands::recipe_dto(&input.photo_id, &current))
+    Ok(crate::develop_commands::recipe_dto(
+        &input.photo_id,
+        &current,
+    ))
 }
 
 #[cfg(test)]
@@ -941,7 +1024,11 @@ mod tests {
         let mut rgb = Vec::new();
         for y in 0..h {
             for _ in 0..w {
-                rgb.extend(if y < 60 { [120, 170, 235] } else { [70, 120, 50] });
+                rgb.extend(if y < 60 {
+                    [150, 180, 225]
+                } else {
+                    [90, 120, 70]
+                });
             }
         }
         let plan = analyse(&pixels(&rgb, w, h), None, &[], 0.0);

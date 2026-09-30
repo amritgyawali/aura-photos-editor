@@ -20,9 +20,7 @@
     clippy::too_many_lines
 )]
 
-use aura_recipe::retouch_tools::{
-    BrushMask, BrushStroke, Edit, LuminanceRange, Selection, Tool,
-};
+use aura_recipe::retouch_tools::{BrushMask, BrushStroke, Edit, LuminanceRange, Selection, Tool};
 use aura_vision::portrait::PortraitFace;
 use serde::{Deserialize, Serialize};
 
@@ -192,7 +190,10 @@ impl Geometry {
         let u = [(eye_b[0] - eye_a[0]) / d, (eye_b[1] - eye_a[1]) / d];
         let mut v = [-u[1], u[0]];
         let mid = [(eye_a[0] + eye_b[0]) * 0.5, (eye_a[1] + eye_b[1]) * 0.5];
-        let mouth_centre = [(mouth_a[0] + mouth_b[0]) * 0.5, (mouth_a[1] + mouth_b[1]) * 0.5];
+        let mouth_centre = [
+            (mouth_a[0] + mouth_b[0]) * 0.5,
+            (mouth_a[1] + mouth_b[1]) * 0.5,
+        ];
         if (mouth_centre[0] - mid[0]) * v[0] + (mouth_centre[1] - mid[1]) * v[1] < 0.0 {
             v = [-v[0], -v[1]];
         }
@@ -536,8 +537,7 @@ fn blemishes(
             if !flag(&region, x, y) {
                 continue;
             }
-            let (Some((lb, n)), Some((rb, _))) =
-                (lum_bg.mean(x, y, k, h), red_bg.mean(x, y, k, h))
+            let (Some((lb, n)), Some((rb, _))) = (lum_bg.mean(x, y, k, h), red_bg.mean(x, y, k, h))
             else {
                 continue;
             };
@@ -615,9 +615,10 @@ fn blemishes(
         seen.insert((x, y));
         let mut members = Vec::new();
         let mut too_large = false;
+        let area_cap = (std::f32::consts::PI * r_max * r_max * 1.2) as usize;
         while let Some((cx, cy)) = stack.pop() {
             members.push((cx as f32, cy as f32));
-            if distance([cx as f32, cy as f32], [x as f32, y as f32]) > r_max {
+            if members.len() > area_cap {
                 too_large = true;
                 break;
             }
@@ -627,7 +628,12 @@ fn blemishes(
                 (cx, cy.wrapping_sub(1)),
                 (cx, cy + 1),
             ] {
-                if nx < w && ny < h && flag(&valid, nx, ny) && grows(nx, ny) && seen.insert((nx, ny)) {
+                if nx < w
+                    && ny < h
+                    && flag(&valid, nx, ny)
+                    && grows(nx, ny)
+                    && seen.insert((nx, ny))
+                {
                     stack.push((nx, ny));
                 }
             }
@@ -653,6 +659,14 @@ fn blemishes(
             sxy += (mx_ - mx) * (my_ - my);
         }
         let (sxx, syy, sxy) = (sxx / n, syy / n, sxy / n);
+        // Measured from the spot's own centre, not from its brightest pixel, so a flat-topped
+        // mark is judged by its real extent.
+        if members
+            .iter()
+            .any(|(px_, py_)| distance([*px_, *py_], [mx, my]) > r_max)
+        {
+            continue;
+        }
         let half = (sxx + syy) * 0.5;
         let root = (((sxx - syy) * 0.5).powi(2) + sxy * sxy).sqrt();
         let elongation = ((half + root).max(1e-6) / (half - root).max(1e-6)).sqrt();
@@ -660,15 +674,16 @@ fn blemishes(
             continue;
         }
         let r = (n / std::f32::consts::PI).sqrt().max(1.0);
-        let centre = [(x0 + x) as f32 + 0.5, (y0 + y) as f32 + 0.5];
+        let centre = [x0 as f32 + mx + 0.5, y0 as f32 + my + 0.5];
         // The ring around a real spot is skin; around an edge or a strand it is not.
         let (mut ring, mut ring_clean) = (0_usize, 0_usize);
-        let local = [x as f32 + 0.5, y as f32 + 0.5];
+        let local = [mx + 0.5, my + 0.5];
         let outer = 2.4 * r + 2.0;
         let inner = 1.4 * r + 1.0;
         let reach = outer.ceil() as usize;
-        for yy in y.saturating_sub(reach)..(y + reach + 1).min(h) {
-            for xx in x.saturating_sub(reach)..(x + reach + 1).min(w) {
+        let (ux, uy) = (mx.round().max(0.0) as usize, my.round().max(0.0) as usize);
+        for yy in uy.saturating_sub(reach + 1)..(uy + reach + 2).min(h) {
+            for xx in ux.saturating_sub(reach + 1)..(ux + reach + 2).min(w) {
                 let dist = distance([xx as f32 + 0.5, yy as f32 + 0.5], local);
                 if dist <= outer && dist > inner {
                     ring += 1;
@@ -680,7 +695,10 @@ fn blemishes(
             continue;
         }
         if mole {
-            if kept_marks.iter().all(|m| distance(*m, centre) > r_max * 2.0) {
+            if kept_marks
+                .iter()
+                .all(|m| distance(*m, centre) > r_max * 2.0)
+            {
                 kept_marks.push(centre);
             }
             continue;
@@ -729,7 +747,11 @@ fn blemishes(
             "Blemishes: healed {} small spot{} that {} redder than the surrounding skin.",
             out.blemishes.len(),
             plural(out.blemishes.len()),
-            if out.blemishes.len() == 1 { "was" } else { "were" }
+            if out.blemishes.len() == 1 {
+                "was"
+            } else {
+                "were"
+            }
         ));
     }
     if !kept_marks.is_empty() {
@@ -755,7 +777,10 @@ fn donor(
     let mut best: Option<(f32, [f32; 2])> = None;
     for step in 0..8 {
         let angle = std::f32::consts::TAU * step as f32 / 8.0;
-        let c = [centre[0] + angle.cos() * reach, centre[1] + angle.sin() * reach];
+        let c = [
+            centre[0] + angle.cos() * reach,
+            centre[1] + angle.sin() * reach,
+        ];
         let mut values = Vec::new();
         let mut ok = true;
         Capsule::disk(c, radius * 1.3).each(px, |x, y| {
@@ -774,7 +799,8 @@ fn donor(
         }
         let mean = values.iter().sum::<f32>() / values.len() as f32;
         let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32;
-        let cost = var.sqrt() / mean.max(1e-4) + ((mean - skin.luma) / skin.luma.max(1e-4)).abs() * 0.3;
+        let cost =
+            var.sqrt() / mean.max(1e-4) + ((mean - skin.luma) / skin.luma.max(1e-4)).abs() * 0.3;
         if best.is_none_or(|(b, _)| cost < b) {
             best = Some((cost, c));
         }
@@ -793,9 +819,9 @@ fn eyes(
     out: &mut FeatureEdits,
 ) {
     if g.d < 40.0 {
-        out.report.findings.push(
-            "Eyes are too small at analysis resolution for automatic eye finishing.".into(),
-        );
+        out.report
+            .findings
+            .push("Eyes are too small at analysis resolution for automatic eye finishing.".into());
         return;
     }
     let short = px.width.min(px.height) as f32;
@@ -827,7 +853,10 @@ fn eyes(
                 n += 1.0;
             });
             sat.sort_by(f32::total_cmp);
-            (l / n.max(1.0), sat.get(sat.len() / 2).copied().unwrap_or(0.3))
+            (
+                l / n.max(1.0),
+                sat.get(sat.len() / 2).copied().unwrap_or(0.3),
+            )
         };
         let sat_limit = (cheek_sat * 0.85).min(0.4);
         let mut sides: [Vec<([f32; 2], [f32; 3])>; 2] = [Vec::new(), Vec::new()];
@@ -840,7 +869,11 @@ fn eyes(
             let point = [x as f32 + 0.5, y as f32 + 0.5];
             let along = (point[0] - centre[0]) * g.u[0] + (point[1] - centre[1]) * g.u[1];
             let l = q[0] * 0.2126 + q[1] * 0.7152 + q[2] * 0.0722;
-            if l > cheek_luma * 0.6 && (max - min) / max < sat_limit && max < 0.99 && along.abs() > 0.06 * d {
+            if l > cheek_luma * 0.6
+                && (max - min) / max < sat_limit
+                && max < 0.99
+                && along.abs() > 0.06 * d
+            {
                 if let Some(side) = sides.get_mut(usize::from(along > 0.0)) {
                     side.push((point, q));
                 }
@@ -973,13 +1006,22 @@ fn eyes(
     }
     let mut parts = Vec::new();
     if detailed > 0 {
-        parts.push(format!("added subtle iris detail to {detailed} eye{}", plural(detailed)));
+        parts.push(format!(
+            "added subtle iris detail to {detailed} eye{}",
+            plural(detailed)
+        ));
     }
     if cleaned > 0 {
-        parts.push(format!("reduced redness in {cleaned} eye{}", plural(cleaned)));
+        parts.push(format!(
+            "reduced redness in {cleaned} eye{}",
+            plural(cleaned)
+        ));
     }
     if red_eye > 0 {
-        parts.push(format!("corrected flash red-eye in {red_eye} pupil{}", plural(red_eye)));
+        parts.push(format!(
+            "corrected flash red-eye in {red_eye} pupil{}",
+            plural(red_eye)
+        ));
     }
     if lifted > 0 {
         parts.push(format!(
@@ -994,7 +1036,9 @@ fn eyes(
         ));
     }
     if !parts.is_empty() {
-        out.report.findings.push(format!("Eyes: {}.", parts.join("; ")));
+        out.report
+            .findings
+            .push(format!("Eyes: {}.", parts.join("; ")));
     }
 }
 
@@ -1138,7 +1182,13 @@ mod tests {
     fn face() -> PortraitFace {
         PortraitFace {
             bounds: [0.2, 0.1, 0.8, 0.95],
-            landmarks: [[0.38, 0.4], [0.62, 0.4], [0.5, 0.55], [0.41, 0.7], [0.59, 0.7]],
+            landmarks: [
+                [0.38, 0.4],
+                [0.62, 0.4],
+                [0.5, 0.55],
+                [0.41, 0.7],
+                [0.59, 0.7],
+            ],
             confidence: 0.95,
         }
     }
@@ -1168,14 +1218,29 @@ mod tests {
         ] {
             let mut rgb = canvas(size, skin);
             // Left cheek: a redder spot. Right cheek: a much darker, not-redder mark.
-            paint(&mut rgb, size, [0.38 * 400.0, 0.4 * 400.0 + 0.55 * 96.0], 3.5, spot);
-            paint(&mut rgb, size, [0.62 * 400.0, 0.4 * 400.0 + 0.55 * 96.0], 3.5, mole);
+            paint(
+                &mut rgb,
+                size,
+                [0.38 * 400.0, 0.4 * 400.0 + 0.55 * 96.0],
+                3.5,
+                spot,
+            );
+            paint(
+                &mut rgb,
+                size,
+                [0.62 * 400.0, 0.4 * 400.0 + 0.55 * 96.0],
+                3.5,
+                mole,
+            );
             let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
             let plan = plan(&face(), 0, &px, 0.0, "p-");
             assert_eq!(plan.report.spots_healed, 1, "{skin:?}: {:?}", plan.report);
             assert!(plan.report.marks_kept >= 1, "{skin:?}: {:?}", plan.report);
             let spot_edit = &plan.blemishes[0];
-            assert!(spot_edit.region[0] < 0.5, "the red spot is on the left cheek");
+            assert!(
+                spot_edit.region[0] < 0.5,
+                "the red spot is on the left cheek"
+            );
             let mut all = plan.blemishes.clone();
             all.extend(plan.eyes.clone());
             all.extend(plan.finishing.clone());
@@ -1201,7 +1266,10 @@ mod tests {
         let size = 400;
         let mut rgb = canvas(size, [170, 120, 95]);
         let d = 96.0;
-        for (x, sclera) in [(0.38 * 400.0, [235, 232, 228]), (0.62 * 400.0, [236, 165, 160])] {
+        for (x, sclera) in [
+            (0.38 * 400.0, [235, 232, 228]),
+            (0.62 * 400.0, [236, 165, 160]),
+        ] {
             let c = [x, 160.0];
             for dx in [-0.1, -0.05, 0.05, 0.1] {
                 paint(&mut rgb, size, [c[0] + dx * d, c[1]], 0.05 * d, sclera);
@@ -1211,7 +1279,11 @@ mod tests {
         let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
         let plan = plan(&face(), 0, &px, 0.0, "p-");
         let tools: Vec<_> = plan.eyes.iter().map(|e| (e.id.clone(), e.tool)).collect();
-        assert_eq!(tools.iter().filter(|(_, t)| *t == Tool::EyeDetail).count(), 2, "{tools:?}");
+        assert_eq!(
+            tools.iter().filter(|(_, t)| *t == Tool::EyeDetail).count(),
+            2,
+            "{tools:?}"
+        );
         let cleaned: Vec<_> = tools.iter().filter(|(_, t)| *t == Tool::EyeClean).collect();
         assert_eq!(cleaned.len(), 1, "{tools:?}");
         assert!(cleaned[0].0.ends_with("-b-clean"));

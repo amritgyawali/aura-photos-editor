@@ -136,7 +136,10 @@ pub fn history_step(state: &AppState, input: &HistoryStepInput) -> IpcResult<Set
                     .position(|entry| entry.seq == seq)
                     .map(|index| index + 1)
                     .ok_or_else(|| {
-                        aura_core::errors::render::recipe_invalid("history", "that step no longer exists")
+                        aura_core::errors::render::recipe_invalid(
+                            "history",
+                            "that step no longer exists",
+                        )
                     })?
             };
             let mut cursor = history_cursor(&history);
@@ -555,7 +558,10 @@ pub fn sync_settings(state: &AppState, input: &SyncSettingsInput) -> IpcResult<S
         failed: Vec::new(),
     };
     let unique: std::collections::BTreeSet<_> = targets.iter().collect();
-    for target in unique.into_iter().filter(|id| **id != input.source_photo_id) {
+    for target in unique
+        .into_iter()
+        .filter(|id| **id != input.source_photo_id)
+    {
         let result = (|| -> Result<(), AuraError> {
             crate::studio_tools::require_member(state, &input.project_id, target)?;
             let photo = PhotoId::from_db(target).map_err(|_| {
@@ -585,47 +591,87 @@ pub fn sync_settings(state: &AppState, input: &SyncSettingsInput) -> IpcResult<S
     Ok(report)
 }
 
-fn sync_proposal(base: &Recipe, source: &Recipe, input: &SyncSettingsInput) -> Result<Recipe, AuraError> {
+fn sync_proposal(
+    base: &Recipe,
+    source: &Recipe,
+    input: &SyncSettingsInput,
+) -> Result<Recipe, AuraError> {
     let mut proposal = base.clone();
     let Some(groups) = &input.groups else {
         proposal.global = source.global.clone();
         proposal.bw.clone_from(&source.bw);
         proposal.lens.vignette = source.lens.vignette;
-        if input.include_geometry { proposal.geometry = source.geometry.clone(); }
-        for band in aura_recipe::HSL_BANDS { proposal.global.hsl.entry(band.to_string()).or_default(); }
+        if input.include_geometry {
+            proposal.geometry = source.geometry.clone();
+        }
+        for band in aura_recipe::HSL_BANDS {
+            proposal.global.hsl.entry(band.to_string()).or_default();
+        }
         return Ok(proposal);
     };
     if groups.is_empty() {
-        return Err(aura_core::errors::render::recipe_invalid("groups", "Select at least one settings group"));
+        return Err(aura_core::errors::render::recipe_invalid(
+            "groups",
+            "Select at least one settings group",
+        ));
     }
     let src = &source.global;
     let dst = &mut proposal.global;
     for group in groups {
         match group.as_str() {
             "tone" => {
-                dst.exposure = src.exposure; dst.contrast = src.contrast;
-                dst.highlights = src.highlights; dst.shadows = src.shadows;
-                dst.whites = src.whites; dst.blacks = src.blacks;
-                dst.clarity = src.clarity; dst.texture = src.texture; dst.dehaze = src.dehaze;
+                dst.exposure = src.exposure;
+                dst.contrast = src.contrast;
+                dst.highlights = src.highlights;
+                dst.shadows = src.shadows;
+                dst.whites = src.whites;
+                dst.blacks = src.blacks;
+                dst.clarity = src.clarity;
+                dst.texture = src.texture;
+                dst.dehaze = src.dehaze;
             }
-            "white_balance" => { dst.temperature = src.temperature; dst.tint = src.tint; }
-            "curves" => { dst.curve.clone_from(&src.curve); dst.parametric = src.parametric; dst.channel_curves.clone_from(&src.channel_curves); }
+            "white_balance" => {
+                dst.temperature = src.temperature;
+                dst.tint = src.tint;
+            }
+            "curves" => {
+                dst.curve.clone_from(&src.curve);
+                dst.parametric = src.parametric;
+                dst.channel_curves.clone_from(&src.channel_curves);
+            }
             "color" => {
-                dst.vibrance = src.vibrance; dst.saturation = src.saturation;
-                dst.hsl.clone_from(&src.hsl); dst.colour_grade = src.colour_grade;
+                dst.vibrance = src.vibrance;
+                dst.saturation = src.saturation;
+                dst.hsl.clone_from(&src.hsl);
+                dst.colour_grade = src.colour_grade;
                 proposal.bw.clone_from(&source.bw);
-                for band in aura_recipe::HSL_BANDS { dst.hsl.entry(band.to_string()).or_default(); }
+                for band in aura_recipe::HSL_BANDS {
+                    dst.hsl.entry(band.to_string()).or_default();
+                }
             }
-            "detail" => { dst.sharpen = src.sharpen.clone(); dst.noise = src.noise.clone(); }
-            "effects" => { dst.effects = src.effects; proposal.lens.vignette = source.lens.vignette; }
-            "calibration" => { dst.calibration = src.calibration; }
+            "detail" => {
+                dst.sharpen = src.sharpen.clone();
+                dst.noise = src.noise.clone();
+            }
+            "effects" => {
+                dst.effects = src.effects;
+                proposal.lens.vignette = source.lens.vignette;
+            }
+            "calibration" => {
+                dst.calibration = src.calibration;
+            }
             "lens" => {
                 // Optical profiles belong to the target camera/lens, not the source frame.
                 proposal.lens.distortion = source.lens.distortion;
                 proposal.lens.ca = source.lens.ca;
             }
             "geometry" => proposal.geometry = source.geometry.clone(),
-            _ => return Err(aura_core::errors::render::recipe_invalid("groups", "Unknown settings group")),
+            _ => {
+                return Err(aura_core::errors::render::recipe_invalid(
+                    "groups",
+                    "Unknown settings group",
+                ))
+            }
         }
     }
     Ok(proposal)
@@ -716,7 +762,10 @@ fn replay_history(stored: History) -> History {
         if let Some(seq) = goto {
             if seq == 0 {
                 cursor = 0;
-            } else if let Some(index) = entries.iter().position(|e: &aura_recipe::history::HistoryEntry| e.seq == seq) {
+            } else if let Some(index) = entries
+                .iter()
+                .position(|e: &aura_recipe::history::HistoryEntry| e.seq == seq)
+            {
                 cursor = index + 1;
             }
         } else if entry.changed.iter().any(|path| path == "$history.undo") && cursor > 0 {
@@ -808,14 +857,36 @@ mod tests {
         source.global.exposure = -1.0;
         source.geometry.rotate = 2.0;
         source.lens.profile = Some("different lens".into());
-        let input = SyncSettingsInput { project_id: String::new(), source_photo_id: String::new(), target_photo_ids: vec![], include_geometry: true, groups: Some(vec!["white_balance".into(), "lens".into()]) };
+        let input = SyncSettingsInput {
+            project_id: String::new(),
+            source_photo_id: String::new(),
+            target_photo_ids: vec![],
+            include_geometry: true,
+            groups: Some(vec!["white_balance".into(), "lens".into()]),
+        };
         let copied = sync_proposal(&base, &source, &input).unwrap();
         assert_eq!(copied.global.temperature, 7200);
         assert_eq!(copied.global.exposure, base.global.exposure);
         assert_eq!(copied.geometry, base.geometry);
         assert_eq!(copied.lens.profile, base.lens.profile);
-        assert!(sync_proposal(&base, &source, &SyncSettingsInput { groups: Some(vec![]), ..input.clone() }).is_err());
-        assert!(sync_proposal(&base, &source, &SyncSettingsInput { groups: Some(vec!["everything".into()]), ..input }).is_err());
+        assert!(sync_proposal(
+            &base,
+            &source,
+            &SyncSettingsInput {
+                groups: Some(vec![]),
+                ..input.clone()
+            }
+        )
+        .is_err());
+        assert!(sync_proposal(
+            &base,
+            &source,
+            &SyncSettingsInput {
+                groups: Some(vec!["everything".into()]),
+                ..input
+            }
+        )
+        .is_err());
     }
     use super::*;
 
