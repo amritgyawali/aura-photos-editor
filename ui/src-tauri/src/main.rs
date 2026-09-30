@@ -186,8 +186,21 @@ fn list_projects(state: State<'_, AppState>) -> IpcResult<Vec<ProjectSummary>> {
 }
 
 #[tauri::command]
-fn start_ingest(state: State<'_, AppState>, input: StartIngestInput) -> IpcResult<JobHandle> {
-    aura_app::start_ingest(&state, &input)
+fn start_ingest(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    input: StartIngestInput,
+) -> IpcResult<JobHandle> {
+    use tauri::Emitter;
+    aura_app::commands::start_ingest_with_events(
+        &state,
+        &input,
+        std::sync::Arc::new(move |event| {
+            if let Err(error) = app.emit("ingest", event) {
+                tracing::error!(target: "ingest", %error, "could not deliver import event");
+            }
+        }),
+    )
 }
 
 #[tauri::command]

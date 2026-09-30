@@ -113,7 +113,16 @@ pub fn correction(rgb: &[u8]) -> aura_core::AuraResult<(f32, i16, i16, i16)> {
         0.75
     };
     let linear = aura_raw::colour::curve::srgb_decode(median).max(0.005);
-    let mut exposure = (0.18 / linear).log2().clamp(-limit, limit);
+    let measured = (0.18 / linear).log2().clamp(-limit, limit);
+    // A bright background or white clothing is not evidence that a face is
+    // overexposed. Preserve the normal display-lightness band instead of forcing
+    // every photograph towards middle grey. Without subject detection, keep any
+    // global darkening small; the separate highlight control handles bright detail.
+    let mut exposure = if (0.45..=0.78).contains(&median) {
+        0.0
+    } else {
+        measured.max(-0.25)
+    };
     // Lift backlit shadows locally instead of blowing out an already bright sky.
     if exposure > 0.0 {
         let headroom = (0.98 / aura_raw::colour::curve::srgb_decode(high).max(0.005))
@@ -141,6 +150,20 @@ pub fn correction(rgb: &[u8]) -> aura_core::AuraResult<(f32, i16, i16, i16)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn normal_portrait_brightness_is_preserved_and_darkening_is_restrained() {
+        for brightness in [120, 150, 175, 195] {
+            let (exposure, _, _, _) =
+                correction(&[brightness; 300]).expect("valid portrait brightness fixture");
+            assert!(exposure.abs() < f32::EPSILON);
+        }
+        let mut bright_background = vec![90; 120];
+        bright_background.extend([230; 180]);
+        let (exposure, highlights, _, _) =
+            correction(&bright_background).expect("valid high-key portrait fixture");
+        assert!(exposure >= -0.25);
+        assert!(highlights < 0);
+    }
     #[test]
     fn correction_is_bounded_and_responds_to_actual_brightness() {
         assert!(

@@ -59,3 +59,32 @@ it('keeps a curve valid for the recipe', () => {
   expect(normaliseCurve([[128, 140], [30, 20]])).toEqual([[0, 20], [30, 20], [128, 140], [255, 140]]);
   expect(normaliseCurve([[0, 10], [0, 30], [255, 250]])).toEqual([[0, 10], [255, 250]]);
 });
+
+it('offers essentials without hiding access to the original advanced controls', () => {
+  const onAuto = vi.fn();
+  const { rerender } = render(<LightroomPanel {...props({ mode: 'essentials', onAuto })} />);
+  expect(screen.getByText('Light & color', { selector: 'summary' })).toBeTruthy();
+  expect(screen.queryByText('Calibration', { selector: 'summary' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Auto enhance photo' }));
+  expect(onAuto).toHaveBeenCalledOnce();
+  rerender(<LightroomPanel {...props({ mode: 'advanced' })} />);
+  expect(screen.getByText('Calibration', { selector: 'summary' })).toBeTruthy();
+});
+
+it('does not save empty numbers, duplicate commits, or values from disabled labels', () => {
+  const onSetParam = vi.fn();
+  const { rerender } = render(<LightroomPanel {...props({ onSetParam })} />);
+  const input = screen.getByLabelText('Exposure value');
+  fireEvent.change(input, { target: { value: '' } });
+  fireEvent.blur(input);
+  expect((input as HTMLInputElement).value).toBe('0.5');
+  expect(onSetParam).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: '1.25' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  fireEvent.blur(input);
+  expect(onSetParam).toHaveBeenCalledOnce();
+  expect(onSetParam).toHaveBeenCalledWith('global.exposure', 1.25, 'Exposure');
+  rerender(<LightroomPanel {...props({ onSetParam, disabled: true })} />);
+  fireEvent.doubleClick(screen.getByText('Exposure', { selector: 'span' }));
+  expect(onSetParam).toHaveBeenCalledOnce();
+});

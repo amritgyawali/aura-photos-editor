@@ -1,0 +1,557 @@
+{
+  "adjust": {
+    "blacks": -36,
+    "bw": null,
+    "clarity": 0,
+    "contrast": 15,
+    "curve": [
+      [
+        0,
+        0
+      ],
+      [
+        64,
+        80
+      ],
+      [
+        192,
+        208
+      ],
+      [
+        255,
+        255
+      ]
+    ],
+    "dehaze": 0,
+    "developedStrength": null,
+    "exposure": -0.09000000357627869,
+    "highlights": 16,
+    "hsl": {},
+    "noise": 0,
+    "saturation": 40,
+    "shadows": 25,
+    "sharpen": 0,
+    "temperature": 800,
+    "texture": 0,
+    "tint": 0,
+    "vibrance": 8,
+    "vignette": 0.0,
+    "whites": -6
+  },
+  "evidence": {
+    "autoDe00": 16.010000228881836,
+    "dataset": "MIT-Adobe FiveK, expert E, camera RAW (DNG) to retoucher final",
+    "heldOutPairs": 5,
+    "profileDe00": 13.960000038146973,
+    "trainingPairs": 13
+  },
+  "expert": "e",
+  "heldOut": {
+    "autoDe00": 16.008554458618164,
+    "neutralDe00": 18.776622772216797,
+    "perPairFitDe00": 2.6854872703552246,
+    "profileDe00": 13.957550048828125
+  },
+  "pairs": [
+    {
+      "auto": {
+        "contrast": 0,
+        "exposure": 0.25,
+        "highlights": 0,
+        "shadows": 0
+      },
+      "fitted": {
+        "blacks": -18.0,
+        "contrast": 0.0,
+        "curve_high": 32.0,
+        "curve_low": 16.0,
+        "exposure": 0.6600000262260437,
+        "highlights": -4.0,
+        "saturation": 24.0,
+        "shadows": 8.0,
+        "temperature": 4700.0,
+        "tint": -6.0,
+        "vibrance": 20.0,
+        "whites": 30.0
+      },
+      "name": "a0044-JI2E0511",
+      "rejected": "UnmodelledWork",
+      "residualDe00": 0.8178936839103699
+    },
+    {
+      "auto": {
+        "contrast": 4,
+        "exposure": 0.25,
+        "highlights": 0,
+        "shadows": 0
+      },
+      "fitted": {
+        "blacks": 0.0,
+        "contrast": 24.0,
+        "curve_high": 0.0,
+        "curve_low": 16.0,
+        "exposure": 0.9900000095367432,
+        "highlights": 0.0,
+        "saturation": 8.0,
+        "shadows": 64.0,
+        "temperature": 3100.0,
+        "tint": 12.0,
+        "vibrance": -16.0,
+        "whites": -12.0
+      },
+      "name": "a0541-050618_215910__MG_2944",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 5.073511600494385
+    },
+    {
+      "auto": {
+        "contrast": 1,
+        "exposure": -0.13800840079784393,
+        "highlights": 0,
+        "shadows": 3
+      },
+      "fitted": {
+        "blacks": -42.0,
+        "contrast": 16.0,
+        "curve_high": 16.0,
+        "curve_low": 16.0,
+        "exposure": 0.33000001311302185,
+        "highlights": 24.0,
+        "saturation": 16.0,
+        "shadows": 40.0,
+        "temperature": 5900.0,
+        "tint": 18.0,
+        "vibrance": -56.0,
+        "whites": -36.0
+      },
+      "name": "a0683-DSC_0011-1",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.318385601043701
+    },
+    {
+      "auto": {
+        "contrast": 0,
+        "exposure": -0.40537309646606445,
+        "highlights": 0,
+        "shadows": 0
+      },
+      "fitted": {
+        "blacks": 0.0,
+        "contrast": 8.0,
+        "curve_high": 32.0,
+        "curve_low": -32.0,
+        "exposure": 0.6600000262260437,
+        "highlights": 8.0,
+        "saturation": -8.0,
+        "shadows": 16.0,
+        "temperature": 5900.0,
+        "tint": 36.0,
+        "vibrance": -16.0,
+        "whites": 18.0
+      },
+      "name": "a0862-IMG_0736",
+      "rejected": null,
+      "residualDe00": 1.5339821577072144
+    },
+    {
+      "auto": {
+        "contrast": 2,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 10
+      },
+      "fitted": {
+        "blacks": -18.0,
+        "contrast": 0.0,
+        "curve_high": 48.0,
+        "curve_low": 32.0,
+        "exposure": 0.33000001311302185,
+        "highlights": 24.0,
+        "saturation": 64.0,
+        "shadows": 24.0,
+        "temperature": 6300.0,
+        "tint": 6.0,
+        "vibrance": -40.0,
+        "whites": 24.0
+      },
+      "name": "a0869-20080629_at_19h10m02__MG_1342",
+      "rejected": null,
+      "residualDe00": 2.484787702560425
+    },
+    {
+      "auto": {
+        "contrast": 3,
+        "exposure": 0.25,
+        "highlights": 0,
+        "shadows": 0
+      },
+      "fitted": {
+        "blacks": -24.0,
+        "contrast": 8.0,
+        "curve_high": 16.0,
+        "curve_low": 16.0,
+        "exposure": 0.6600000262260437,
+        "highlights": 0.0,
+        "saturation": 48.0,
+        "shadows": 40.0,
+        "temperature": 3900.0,
+        "tint": 42.0,
+        "vibrance": 48.0,
+        "whites": 6.0
+      },
+      "name": "a1026-IMG_4256",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.2760605812072754
+    },
+    {
+      "auto": {
+        "contrast": 1,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 8
+      },
+      "fitted": {
+        "blacks": -36.0,
+        "contrast": 32.0,
+        "curve_high": 48.0,
+        "curve_low": 32.0,
+        "exposure": 0.6600000262260437,
+        "highlights": -8.0,
+        "saturation": 48.0,
+        "shadows": 48.0,
+        "temperature": 6700.0,
+        "tint": -6.0,
+        "vibrance": 24.0,
+        "whites": 18.0
+      },
+      "name": "a1413-07-11-21-at-16h37m24s-_MG_5983",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.3272697925567627
+    },
+    {
+      "auto": {
+        "contrast": 5,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 3
+      },
+      "fitted": {
+        "blacks": -12.0,
+        "contrast": 32.0,
+        "curve_high": 32.0,
+        "curve_low": 16.0,
+        "exposure": 0.33000001311302185,
+        "highlights": -8.0,
+        "saturation": 24.0,
+        "shadows": 32.0,
+        "temperature": 5900.0,
+        "tint": 0.0,
+        "vibrance": 16.0,
+        "whites": 18.0
+      },
+      "name": "a1736-IMG_0008",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.17964768409729
+    },
+    {
+      "auto": {
+        "contrast": 1,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 8
+      },
+      "fitted": {
+        "blacks": -30.0,
+        "contrast": 16.0,
+        "curve_high": 16.0,
+        "curve_low": 16.0,
+        "exposure": 0.33000001311302185,
+        "highlights": -16.0,
+        "saturation": 40.0,
+        "shadows": 0.0,
+        "temperature": 7100.0,
+        "tint": 6.0,
+        "vibrance": 8.0,
+        "whites": -24.0
+      },
+      "name": "a1973-060914_170620__MG_6779",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.681701183319092
+    },
+    {
+      "auto": {
+        "contrast": 7,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 0
+      },
+      "fitted": {
+        "blacks": -48.0,
+        "contrast": 24.0,
+        "curve_high": 16.0,
+        "curve_low": 16.0,
+        "exposure": 0.6600000262260437,
+        "highlights": 16.0,
+        "saturation": 40.0,
+        "shadows": -24.0,
+        "temperature": 7100.0,
+        "tint": 6.0,
+        "vibrance": 40.0,
+        "whites": 12.0
+      },
+      "name": "a2106-20041009_164255__E6B5580",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.1176059246063232
+    },
+    {
+      "auto": {
+        "contrast": 1,
+        "exposure": -0.5876202583312988,
+        "highlights": 0,
+        "shadows": 10
+      },
+      "fitted": {
+        "blacks": -42.0,
+        "contrast": 0.0,
+        "curve_high": 16.0,
+        "curve_low": 0.0,
+        "exposure": 0.33000001311302185,
+        "highlights": 24.0,
+        "saturation": -16.0,
+        "shadows": 56.0,
+        "temperature": 4300.0,
+        "tint": -6.0,
+        "vibrance": -56.0,
+        "whites": -24.0
+      },
+      "name": "a2270-_DSC0033",
+      "rejected": null,
+      "residualDe00": 2.6215357780456543
+    },
+    {
+      "auto": {
+        "contrast": 5,
+        "exposure": 0.01702450029551983,
+        "highlights": 0,
+        "shadows": 2
+      },
+      "fitted": {
+        "blacks": 12.0,
+        "contrast": 24.0,
+        "curve_high": 16.0,
+        "curve_low": 32.0,
+        "exposure": 0.6600000262260437,
+        "highlights": 24.0,
+        "saturation": 0.0,
+        "shadows": 16.0,
+        "temperature": 5500.0,
+        "tint": 12.0,
+        "vibrance": -8.0,
+        "whites": -18.0
+      },
+      "name": "a2354-IMG_3620",
+      "rejected": null,
+      "residualDe00": 1.9610507488250732
+    },
+    {
+      "auto": {
+        "contrast": 7,
+        "exposure": 0.25,
+        "highlights": 0,
+        "shadows": 0
+      },
+      "fitted": {
+        "blacks": -48.0,
+        "contrast": 48.0,
+        "curve_high": 32.0,
+        "curve_low": 16.0,
+        "exposure": 0.33000001311302185,
+        "highlights": 64.0,
+        "saturation": 48.0,
+        "shadows": 32.0,
+        "temperature": 6300.0,
+        "tint": 0.0,
+        "vibrance": 56.0,
+        "whites": -6.0
+      },
+      "name": "a2796-_I2E6925",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.738015651702881
+    },
+    {
+      "auto": {
+        "contrast": 0,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 16
+      },
+      "fitted": {
+        "blacks": -18.0,
+        "contrast": 32.0,
+        "curve_high": 32.0,
+        "curve_low": 32.0,
+        "exposure": 0.9900000095367432,
+        "highlights": -8.0,
+        "saturation": 64.0,
+        "shadows": 56.0,
+        "temperature": 5500.0,
+        "tint": 0.0,
+        "vibrance": -32.0,
+        "whites": -24.0
+      },
+      "name": "a3079-_MG_7179",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.603172779083252
+    },
+    {
+      "auto": {
+        "contrast": 1,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 0
+      },
+      "fitted": {
+        "blacks": -36.0,
+        "contrast": 48.0,
+        "curve_high": 48.0,
+        "curve_low": 16.0,
+        "exposure": 0.33000001311302185,
+        "highlights": 40.0,
+        "saturation": 16.0,
+        "shadows": 0.0,
+        "temperature": 5900.0,
+        "tint": -6.0,
+        "vibrance": 56.0,
+        "whites": 12.0
+      },
+      "name": "a3682-IMG_4735",
+      "rejected": null,
+      "residualDe00": 2.7484078407287598
+    },
+    {
+      "auto": {
+        "contrast": 1,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 7
+      },
+      "fitted": {
+        "blacks": -12.0,
+        "contrast": 8.0,
+        "curve_high": 32.0,
+        "curve_low": 16.0,
+        "exposure": 0.33000001311302185,
+        "highlights": 8.0,
+        "saturation": 24.0,
+        "shadows": 32.0,
+        "temperature": 3900.0,
+        "tint": 18.0,
+        "vibrance": -8.0,
+        "whites": 18.0
+      },
+      "name": "a4470-Duggan_090123_4566",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.325793743133545
+    },
+    {
+      "auto": {
+        "contrast": 0,
+        "exposure": 0.12884943187236786,
+        "highlights": -18,
+        "shadows": 4
+      },
+      "fitted": {
+        "blacks": 6.0,
+        "contrast": 8.0,
+        "curve_high": -48.0,
+        "curve_low": 0.0,
+        "exposure": 0.0,
+        "highlights": 0.0,
+        "saturation": 16.0,
+        "shadows": 8.0,
+        "temperature": 5500.0,
+        "tint": 0.0,
+        "vibrance": 0.0,
+        "whites": -42.0
+      },
+      "name": "a4678-DSC_0383",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.0359745025634766
+    },
+    {
+      "auto": {
+        "contrast": 1,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 15
+      },
+      "fitted": {
+        "blacks": 12.0,
+        "contrast": 8.0,
+        "curve_high": 64.0,
+        "curve_low": 32.0,
+        "exposure": 0.9900000095367432,
+        "highlights": 0.0,
+        "saturation": 16.0,
+        "shadows": 40.0,
+        "temperature": 6300.0,
+        "tint": 30.0,
+        "vibrance": 0.0,
+        "whites": 0.0
+      },
+      "name": "a4711-_DGW0312",
+      "rejected": null,
+      "residualDe00": 2.855053186416626
+    },
+    {
+      "auto": {
+        "contrast": 0,
+        "exposure": 0.5892254710197449,
+        "highlights": -1,
+        "shadows": 3
+      },
+      "fitted": {
+        "blacks": -48.0,
+        "contrast": 24.0,
+        "curve_high": 16.0,
+        "curve_low": 0.0,
+        "exposure": 0.33000001311302185,
+        "highlights": -16.0,
+        "saturation": 16.0,
+        "shadows": 8.0,
+        "temperature": 8700.0,
+        "tint": -30.0,
+        "vibrance": 48.0,
+        "whites": -6.0
+      },
+      "name": "a4737-DSC_0089",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.770367383956909
+    },
+    {
+      "auto": {
+        "contrast": 3,
+        "exposure": 0.75,
+        "highlights": 0,
+        "shadows": 7
+      },
+      "fitted": {
+        "blacks": -12.0,
+        "contrast": 0.0,
+        "curve_high": 48.0,
+        "curve_low": 16.0,
+        "exposure": 0.6600000262260437,
+        "highlights": 32.0,
+        "saturation": 40.0,
+        "shadows": 32.0,
+        "temperature": 4700.0,
+        "tint": -30.0,
+        "vibrance": -40.0,
+        "whites": 6.0
+      },
+      "name": "a4989-IMG_2346",
+      "rejected": "FitResidualTooHigh",
+      "residualDe00": 3.42696213722229
+    }
+  ]
+}

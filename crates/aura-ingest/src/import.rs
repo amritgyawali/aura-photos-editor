@@ -62,6 +62,18 @@ pub fn run(
     let started_ms = catalog.clock().monotonic_ms();
     let mut quarantine_counts: BTreeMap<String, u64> = BTreeMap::new();
 
+    // One plan owns one journal row, even when a file picker supplies many roots.
+    // The row references the first source; individual file rows retain their own roots.
+    if let Some(root) = plan.roots.first() {
+        let now = rfc3339(catalog.clock().now_utc());
+        let root_id = register_root(catalog, plan, root, &now)?;
+        let import_id = plan.import_id.to_db();
+        let project_id = plan.project_id.to_db();
+        catalog.writer().transact(move |tx| {
+            repo::import_run_start(tx, &import_id, &project_id, &root_id, APP_VERSION, &now)
+        })?;
+    }
+
     for root in &plan.roots {
         let outcome = import_root(
             catalog,
@@ -117,16 +129,6 @@ fn import_root(
         let now = rfc3339(catalog.clock().now_utc());
         let root_id = register_root(catalog, plan, root, &now)?;
         let import_id = plan.import_id.to_db();
-
-        catalog.writer().transact({
-            let import_id = import_id.clone();
-            let project_id = plan.project_id.to_db();
-            let root_id = root_id.clone();
-            let now = now.clone();
-            move |tx| {
-                repo::import_run_start(tx, &import_id, &project_id, &root_id, APP_VERSION, &now)
-            }
-        })?;
 
         let scan_started_ms = catalog.clock().now_utc().unix_timestamp() * 1000;
         let scan = crate::scan::scan_root(root, plan, scan_started_ms)?;
@@ -232,7 +234,8 @@ fn register_root(
     }
     let row = SourceRootRow {
         root_id: format!(
-            "src_{}",
+            "src_{}_{}",
+            plan.project_id.to_db(),
             blake3::hash(root.to_string_lossy().as_bytes()).to_hex()
         ),
         project_id: plan.project_id.to_db(),

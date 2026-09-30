@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RecipeDto } from '../../ipc/types';
 import type { EditProfile } from '../../ipc/client';
 import { PointCurveEditor, type CurvePoint } from './PointCurveEditor';
@@ -23,6 +23,7 @@ export type LightroomPanelProps = {
   onAuto: () => void;
   onApplyProfile: (profileId: string, strength: number) => void;
   onSync: (includeGeometry: boolean) => void;
+  mode?: 'essentials' | 'advanced';
 };
 
 type Control = { path: string; label: string; min: number; max: number; step?: number; fallback: number; hint?: string };
@@ -112,24 +113,41 @@ function Slider({ control, recipe, disabled, onSetParam, background }: {
 }): JSX.Element {
   const stored = Number(paramValue(recipe, control.path) ?? control.fallback);
   const [draft, setDraft] = useState(stored);
-  useEffect(() => setDraft(stored), [stored]);
+  const [numberText, setNumberText] = useState(String(stored));
+  const committed = useRef(stored);
+  useEffect(() => {
+    setDraft(stored); setNumberText(String(stored)); committed.current = stored;
+  }, [stored, recipe]);
+  const change = (value: number) => { setDraft(value); setNumberText(String(value)); };
   const commit = (value: number) => {
+    if (disabled || !Number.isFinite(value)) {
+      change(stored);
+      return;
+    }
     const clamped = Math.min(control.max, Math.max(control.min, value));
-    if (Number.isFinite(clamped) && Math.abs(clamped - stored) > 1e-9) onSetParam(control.path, clamped, control.label);
+    change(clamped);
+    if (Math.abs(clamped - committed.current) > 1e-9) {
+      committed.current = clamped;
+      onSetParam(control.path, clamped, control.label);
+    }
   };
-  const decimals = (control.step ?? 1) < 1 ? 2 : 0;
+  const commitNumber = () => commit(numberText.trim() === '' ? NaN : Number(numberText));
   return <label className="lr-slider" title={control.hint ?? 'Double-click to reset'}>
     <span className="lr-slider-label" onDoubleClick={() => commit(control.fallback)}>
       {control.label}{isProtected(recipe, control.path) && <small title="Your setting - automatic edits leave it alone"> ●</small>}
     </span>
     <input type="range" min={control.min} max={control.max} step={control.step ?? 1} value={draft} disabled={disabled}
+      aria-label={control.label}
       style={background ? { background } : undefined}
-      onChange={event => setDraft(Number(event.target.value))}
+      onChange={event => change(Number(event.target.value))}
       onPointerUp={() => commit(draft)} onKeyUp={() => commit(draft)} onBlur={() => commit(draft)} />
     <input className="lr-number" type="number" min={control.min} max={control.max} step={control.step ?? 1}
-      value={Number(draft.toFixed(decimals))} disabled={disabled}
-      onChange={event => setDraft(event.target.valueAsNumber)} onBlur={() => commit(draft)}
-      onKeyDown={event => { if (event.key === 'Enter') commit(draft); }} aria-label={`${control.label} value`} />
+      value={numberText} disabled={disabled}
+      onChange={event => setNumberText(event.target.value)} onBlur={commitNumber}
+      onKeyDown={event => {
+        if (event.key === 'Enter') commitNumber();
+        if (event.key === 'Escape') change(stored);
+      }} aria-label={`${control.label} value`} />
   </label>;
 }
 
@@ -139,7 +157,7 @@ function Section({ title, children, open = false }: { title: string; children: R
 
 const HUE_GRADIENT = 'linear-gradient(90deg, #e0473c, #e8d23d, #58b04a, #3fbfb4, #3f6fe0, #d84fb4, #e0473c)';
 
-export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam, onAuto, onApplyProfile, onSync }: LightroomPanelProps): JSX.Element {
+export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam, onAuto, onApplyProfile, onSync, mode = 'advanced' }: LightroomPanelProps): JSX.Element {
   const [mixer, setMixer] = useState<'h' | 's' | 'l'>('s');
   const [curve, setCurve] = useState(0);
   const [preset, setPreset] = useState('');
@@ -167,7 +185,7 @@ export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam,
 
   return <div className="lr-panel" aria-label="Develop">
     <div className="lr-quick">
-      <button type="button" className="is-primary" disabled={disabled} onClick={onAuto}>Auto</button>
+      <button type="button" className="is-primary" disabled={disabled} onClick={onAuto}>Auto enhance photo</button>
       <select aria-label="Preset" value={preset} disabled={disabled || profiles.length === 0} onChange={event => setPreset(event.target.value)}>
         <option value="">Presets…</option>
         {profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -177,11 +195,12 @@ export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam,
       <button type="button" disabled={disabled || !preset} onClick={() => onApplyProfile(preset, presetStrength / 100)}>Apply {presetStrength}%</button>
     </div>
 
-    <Section title="Basic" open>{BASIC.map(control => slider(control,
+    <Section title={mode === 'essentials' ? 'Light & color' : 'Basic'} open>{BASIC.filter(control => mode === 'advanced' ||
+      ['global.exposure', 'global.contrast', 'global.highlights', 'global.shadows', 'global.temperature', 'global.vibrance'].includes(control.path)).map(control => slider(control,
       control.path === 'global.temperature' ? 'linear-gradient(90deg, #4f7fe0, #e8e3d8, #e0a040)'
         : control.path === 'global.tint' ? 'linear-gradient(90deg, #58b04a, #e8e3d8, #d84fb4)' : undefined))}</Section>
 
-    <Section title="Tone Curve">
+    {mode === 'advanced' && <><Section title="Tone Curve">
       <div className="lr-tabs" role="tablist">{CURVES.map(([, label], index) =>
         <button key={label} type="button" role="tab" aria-selected={curve === index} onClick={() => setCurve(index)}>{label}</button>)}</div>
       <PointCurveEditor key={curveInfo[0]} points={curvePoints} colour={curveInfo[2]} disabled={disabled}
@@ -223,6 +242,7 @@ export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam,
       <label className="lr-toggle"><input type="checkbox" disabled={disabled} checked={paramValue(recipe, 'lens.ca') === true}
         onChange={event => onSetParam('lens.ca', event.target.checked, 'Chromatic aberration')} /> Remove chromatic aberration</label>
     </Section>
+    </>}
 
     <Section title="Transform & Crop">
       {slider(c('geometry.rotate', 'Straighten', -45, 45, 0, 0.1))}
@@ -230,9 +250,9 @@ export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam,
         <button key={label} type="button" disabled={disabled || (ratio !== null && !aspect)} onClick={() => crop(ratio)}>{label}</button>)}</div>
     </Section>
 
-    <Section title="Effects">{EFFECTS.map(control => slider(control))}</Section>
+    {mode === 'advanced' && <><Section title="Effects">{EFFECTS.map(control => slider(control))}</Section>
 
-    <Section title="Calibration">{CALIBRATION.map(control => slider(control))}</Section>
+    <Section title="Calibration">{CALIBRATION.map(control => slider(control))}</Section></>}
 
     <div className="lr-sync">
       <label className="lr-toggle"><input type="checkbox" checked={syncGeometry} onChange={event => setSyncGeometry(event.target.checked)} /> Include crop</label>

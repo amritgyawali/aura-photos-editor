@@ -2,6 +2,20 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Portrait editing: simpler controls and reliable review
+
+- Local auto enhancement preserves normally exposed portraits instead of forcing their median brightness toward middle gray; global darkening is limited to a quarter stop while highlights remain independently adjustable.
+- Fixed multi-file imports stopping after the first source: one import plan now creates one journal record, with counters spanning every source.
+- Source IDs include their collection so the same original folder can be used in separate collections without primary-key collisions.
+- The desktop now emits import completion and failure events, allowing the UI to release its import lock and start automatic editing after success.
+- Undo/redo navigation is replayed from persisted journal events. Saving an undo no longer discards the redo position; making a new edit still abandons the redo branch.
+- Essentials mode puts auto enhancement and everyday adjustments first; Advanced retains all Develop panels.
+- Filmstrip thumbnails show the actual imported photos and support Left/Right and Home/End navigation.
+- An RGB histogram reports the edited preview's tones and near-clipped pixel percentages.
+- Keep the last preview visible during saves and rendering; lock adjustments until refreshed state arrives and release the parent lock when the editor unmounts.
+- Numeric edits handle empty input, clamping and Escape; Enter/blur no longer submit the same edit twice. Disabled reset labels cannot change a recipe.
+- Added a repeatable native test for five real JPEG portraits, including full-size PNG export, original-file hashes, history and manual-setting protection.
+
 ## Lightroom parity: every Develop panel, and one click that uses them
 
 **Every Lightroom Develop panel is in the photo studio**: Basic, Tone Curve (point, red, green,

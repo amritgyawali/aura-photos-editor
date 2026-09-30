@@ -4,7 +4,9 @@ import type { RenderDto } from '../../ipc/types';
 export function rgbDataUrl(render: RenderDto): string | null {
   const { width, height } = render;
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1) return null;
-  const rgb = atob(render.rgbBase64);
+  let rgb: string;
+  try { rgb = atob(render.rgbBase64); }
+  catch { return null; } // An invalid payload must not crash the editor.
   if (rgb.length !== width * height * 3) return null;
   const stride = Math.ceil(width * 3 / 4) * 4;
   const bytes = new Uint8Array(54 + stride * height);

@@ -129,9 +129,17 @@ pub fn history_step(state: &AppState, input: &HistoryStepInput) -> IpcResult<Set
 
     let current = history.current().clone();
     let changed = aura_recipe::history::changed_paths(&before, &current);
+    // Navigation is an append-only journal event, not a new edit branch. These
+    // reserved paths cannot be authored by set_param or an automated recipe merge.
+    let mut recorded = changed.clone();
+    match input.action.as_str() {
+        "undo" => recorded.push("$history.undo".into()),
+        "redo" => recorded.push("$history.redo".into()),
+        _ => {}
+    }
     state
         .recipe_store()
-        .save(&project, &photo, &current, &changed, label)?;
+        .save(&project, &photo, &current, &recorded, label)?;
 
     Ok(SetParamDto {
         recipe: recipe_dto(&input.photo_id, &current),
@@ -593,7 +601,41 @@ fn load_history(state: &AppState, photo: PhotoId) -> Result<History, AuraError> 
             .unwrap_or_else(|| "0".repeat(64)),
         &state.photo_camera(photo).unwrap_or_default(),
     );
-    state.recipe_store().history(&photo, original)
+    state
+        .recipe_store()
+        .history(&photo, original)
+        .map(replay_history)
+}
+
+/// Reconstruct the active edit branch and its cursor from the saved journal.
+/// Navigation rows remain in `SQLite`, so redo also survives reopening the app.
+fn replay_history(stored: History) -> History {
+    let mut entries = Vec::new();
+    let mut cursor = 0;
+    for entry in stored.entries() {
+        if entry.changed.iter().any(|path| path == "$history.undo") && cursor > 0 {
+            cursor -= 1;
+        } else if entry.changed.iter().any(|path| path == "$history.redo") && cursor < entries.len()
+        {
+            cursor += 1;
+        } else {
+            // A new edit discards the redo branch. If the bounded journal no
+            // longer has a navigation target, its saved recipe is a checkpoint.
+            entries.truncate(cursor);
+            entries.push(entry.clone());
+            cursor = entries.len();
+        }
+    }
+    let head = entries.len();
+    let mut history = History::rehydrate(
+        stored.original().clone(),
+        entries,
+        stored.snapshots().to_vec(),
+    );
+    for _ in cursor..head {
+        history.undo();
+    }
+    history
 }
 
 /// Base64, written out rather than pulled in.
