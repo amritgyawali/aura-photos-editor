@@ -34,7 +34,12 @@ pub fn apply(rgb: &mut [f32], width: usize, height: usize, edits: &[Edit]) {
     }
     for edit in edits.iter().filter(|e| e.enabled && e.amount > 0.0) {
         let coverage = Coverage::new(edit, width, height);
-        if edit.tool == Tool::AutoBlemish {
+        if matches!(
+            edit.tool,
+            Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
+        ) {
+            crate::retouch_skin::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::AutoBlemish {
             auto_spots(rgb, width, height, edit, &coverage);
         } else {
             apply_one(rgb, width, height, edit, &coverage, None);
@@ -238,7 +243,10 @@ fn apply_one(
                         value[0] = (old[1] + old[2]) * 0.5;
                     }
                 }
-                Tool::AutoBlemish => {}
+                Tool::AutoBlemish
+                | Tool::SkinSmooth
+                | Tool::SkinUniformity
+                | Tool::PortraitDodgeBurn => {}
             }
             let out = std::array::from_fn::<_, 3, _>(|c| old[c] + a * (value[c] - old[c]));
             patches.push(((y * w + x) * 3, out));

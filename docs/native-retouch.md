@@ -1,7 +1,7 @@
 # Native portrait retouch
 
 Open **Photo Studio → Develop → Retouch**. Processing runs locally without an
-account or API key. The workspace provides 20 named workflows using AURA's own
+account or API key. The workspace provides 23 named workflows using AURA's own
 image-processing algorithms. It does not contain Retouch4me's proprietary code
 or trained models, and does not claim equivalent automatic results.
 
@@ -18,6 +18,9 @@ Clone and color matching require a source: Alt-click the photograph or choose
 | Clone | Copies a source patch with a feathered blend |
 | Auto blemish | Detects and repairs small dark local spots; review permanent marks |
 | Frequency separation | Adjusts low-frequency tone and high-frequency texture independently |
+| Skin smoothing · protect detail | Reduces middle-scale variation with edge protection; fine detail is retained at 100% |
+| Even sampled skin tone | Moves selected skin chroma toward a clean reference patch without changing luminance |
+| Skin dodge and burn · protect edges | Balances local light within a bounded exposure range and preserves RGB proportions |
 | Micro dodge and burn | Reduces small local luminance variations |
 | Dodge | Lightens locally |
 | Burn | Darkens locally |
@@ -80,6 +83,32 @@ gesture to 1,024 points. Larger work can be simplified into shorter strokes and
 fewer operations. The selection guide approximates stroke shape; the native
 preview shows the actual feathering and effect.
 
+## Sampled skin tools
+
+Choose a tool in **Sampled skin**, then **Pick skin sample on photo** and click a
+clean patch of skin. Numeric source coordinates work too. Choose an ellipse or
+painted mask; **Use full photo selection** extends the target to the whole image.
+The renderer then limits the effect to colors close to the sample within that
+target. The overlay shows the authored region; the preview shows the actual
+color-limited effect. Sampled color matching is not automatic face detection.
+
+Start with the default color tolerance and 100% fine detail. Increase tolerance
+to include more color variation; reduce it if lips or surroundings are affected.
+Edge protection reduces smoothing across abrupt brightness/color boundaries.
+Frequency radius separates fine detail from broader variations, and Tonal/Color
+evening controls correction before the overall Strength blend. Use Preview
+unsaved changes to review and Apply to save an undoable operation.
+
+Use a separate sample/selection for each person or lighting condition. Similar
+colors in clothing and backgrounds can match, so use the brush/eraser to refine
+the target. A black sample produces no change. These tools do not infer an
+ideal complexion or automatically distinguish skin from permanent marks.
+
+The [competitor audit](retouch-competitor-audit.md) records the remaining gaps
+against documented Retouch4me and SkinFiner behavior. Exact equivalence has not
+been established. [ADR-0070](adr/ADR-0070-sampled-skin-processing.md) describes
+the independent processing implementation.
+
 ## Current boundaries
 
 Targets are feathered ellipses or painted masks, with no automatic face/skin/eye
@@ -116,3 +145,5 @@ Evidence is written to the output folder rather than committed with the source.
 `scripts/test-precision-retouch.py` additionally checks painted/erased regions,
 draft history isolation, operation reordering/duplication, and real pointer
 interaction after zooming. It accepts the same command-line arguments.
+`scripts/test-sampled-skin.py` checks the three sampled-skin operations, their
+non-persistent previews, saved history, five portrait exports and sample controls.

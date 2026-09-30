@@ -6,6 +6,9 @@ export const RETOUCH_TOOLS = [
   ['clone', 'Clone stamp', 'Repair', 'Copies the selected source patch into the target.'],
   ['auto_blemish', 'Auto spot cleanup', 'Skin', 'Finds small dark spots inside your selection. Review permanent marks and fine details afterward.'],
   ['frequency', 'Frequency separation', 'Skin', 'Adjust tonal unevenness and fine texture independently.'],
+  ['skin_smooth', 'Skin smoothing · protect detail', 'Sampled skin', 'Smooths uneven texture between fine detail and facial form. Sample skin first; similar colors inside your selection receive the effect.'],
+  ['skin_uniformity', 'Even sampled skin tone', 'Sampled skin', 'Reduces color differences toward your skin sample while preserving brightness. Select one person at a time.'],
+  ['portrait_dodge_burn', 'Skin dodge and burn · protect edges', 'Sampled skin', 'Balances local light with bounded exposure changes while preserving RGB proportions. Sample skin and review facial edges.'],
   ['micro_dodge_burn', 'Micro dodge and burn', 'Light', 'Evens small luminance variations while retaining color.'],
   ['dodge', 'Dodge / highlight sculpting', 'Light', 'Lightens the selected region with a feathered mask.'],
   ['burn', 'Burn / shadow sculpting', 'Light', 'Darkens the selected region with a feathered mask.'],
@@ -27,11 +30,15 @@ export type RetouchTool = typeof RETOUCH_TOOLS[number][0];
 export type BrushPoint = [number, number, number];
 export type BrushStroke = { erase: boolean; radius: number; opacity: number; points: BrushPoint[] };
 export type BrushMask = { strokes: BrushStroke[] };
+export type SkinSettings = { tolerance: number; edgeProtection: number };
+export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8 };
+export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 export type NativeRetouchEdit = {
   id: string; tool: RetouchTool; enabled: boolean; region: [number, number, number, number];
   source: [number, number] | null; amount: number; feather: number; radius: number;
   texture: number; tone: number; warmth: number; tint: number;
   mask?: BrushMask | null;
+  skin?: SkinSettings | null;
 };
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
 export const nativeRetouch = {

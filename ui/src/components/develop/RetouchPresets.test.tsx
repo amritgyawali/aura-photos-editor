@@ -27,3 +27,12 @@ it('rejects corrupt storage and surfaces storage write failures', () => {
   expect(screen.getByRole('alert').textContent).toContain('Storage is full');
   spy.mockRestore();
 });
+it('round-trips skin controls, strips extra sample data and rejects an invalid range', () => {
+  const payload={version:1,items:[{name:'Portrait',settings:{...freshRetouch(),tool:'skin_smooth',
+    skin:{tolerance:.12,edgeProtection:.85,source:[.2,.3]}}}]};
+  const result=parseRetouchPresets(JSON.stringify(payload));
+  expect(result[0]?.settings.skin).toEqual({tolerance:.12,edgeProtection:.85});
+  expect(result[0]?.settings).not.toHaveProperty('source');
+  payload.items[0]!.settings.skin.tolerance=.9;
+  expect(()=>parseRetouchPresets(JSON.stringify(payload))).toThrow('invalid');
+});

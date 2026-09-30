@@ -25,6 +25,23 @@ pub struct BrushStroke {
     pub points: Vec<[f32; 3]>,
 }
 
+/// Sample-relative selection; it does not classify people or infer a skin tone.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SkinSettings {
+    pub tolerance: f32,
+    pub edge_protection: f32,
+}
+
+impl Default for SkinSettings {
+    fn default() -> Self {
+        Self {
+            tolerance: 0.08,
+            edge_protection: 0.8,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Tool {
@@ -48,6 +65,9 @@ pub enum Tool {
     Backdrop,
     Glare,
     Makeup,
+    SkinSmooth,
+    SkinUniformity,
+    PortraitDodgeBurn,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -72,6 +92,8 @@ pub struct Edit {
     pub tint: f32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mask: Option<BrushMask>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skin: Option<SkinSettings>,
 }
 
 pub fn validate(edits: &[Edit]) -> AuraResult<()> {
@@ -100,12 +122,26 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || !edit.tint.is_finite()
             || !(-1.0..=1.0).contains(&edit.tint)
             || edit.source.is_some_and(|p| !p.iter().all(|v| unit(*v)))
-            || (matches!(edit.tool, Tool::Clone | Tool::ColorMatch) && edit.source.is_none())
+            || (matches!(
+                edit.tool,
+                Tool::Clone
+                    | Tool::ColorMatch
+                    | Tool::SkinSmooth
+                    | Tool::SkinUniformity
+                    | Tool::PortraitDodgeBurn
+            ) && edit.source.is_none())
         {
             return Err(recipe_invalid(
                 KEY,
                 "invalid retouch parameters, duplicate ID, or missing source",
             ));
+        }
+        if edit.skin.is_some_and(|s| {
+            !s.tolerance.is_finite()
+                || !(0.015..=0.3).contains(&s.tolerance)
+                || !unit(s.edge_protection)
+        }) {
+            return Err(recipe_invalid(KEY, "invalid skin range or edge protection"));
         }
         if let Some(mask) = &edit.mask {
             if mask.strokes.len() > MAX_STROKES {

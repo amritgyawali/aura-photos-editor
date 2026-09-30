@@ -2,6 +2,13 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Sample-guided portrait retouching
+
+- Added skin smoothing with edge protection and adjustable fine detail, sampled skin-tone evening that preserves luminance, and bounded skin dodge/burn that preserves RGB proportions.
+- Skin color tolerance intersects the existing ellipse/painted mask. The photographer selects the reference patch; this is not automatic face detection.
+- Added sample controls, full-photo targeting and preset persistence for tolerance/edge settings. Existing retouch operations keep their previous algorithms and recipe serialization.
+- Added synthetic behavior tests and a five-portrait desktop verification workflow. The [competitor audit](docs/retouch-competitor-audit.md) distinguishes working native behavior from unverified Retouch4me/SkinFiner parity.
+
 ## Portrait editing: simpler controls and reliable review
 
 - Local auto enhancement preserves normally exposed portraits instead of forcing their median brightness toward middle gray; global darkening is limited to a quarter stop while highlights remain independently adjustable.

@@ -73,3 +73,19 @@ it('duplicates and reorders saved operations through native history actions',asy
   fireEvent.click(screen.getByLabelText('Duplicate retouch 1'));
   await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','duplicate',[],'one'));
 });
+it('requires a skin sample and saves range, detail and edge controls with full-frame selection',async()=>{
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'skin_smooth'}});
+  expect((screen.getByText('Apply retouch') as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText('Pick skin sample on photo')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Source X (%)'),{target:{value:'45'}});
+  fireEvent.change(screen.getByLabelText('Source Y (%)'),{target:{value:'40'}});
+  fireEvent.change(screen.getByLabelText('Skin color tolerance (8%)'),{target:{value:'0.12'}});
+  fireEvent.change(screen.getByLabelText('Edge protection (80%)'),{target:{value:'0.9'}});
+  fireEvent.change(screen.getByLabelText(/Fine detail \(100%\)/),{target:{value:'1.1'}});
+  fireEvent.click(screen.getByText('Use full photo selection'));
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'skin_smooth',source:[.45,.4],region:[.5,.5,1,1],mask:null,texture:1.1,skin:{tolerance:.12,edgeProtection:.9}})
+  ]));
+});

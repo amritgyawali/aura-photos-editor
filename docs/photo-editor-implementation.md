@@ -4,6 +4,29 @@ This tracks implementation after the [100-feature comparison](photo-editor-featu
 The comparison describes baseline `a69b236`; it is not a claim that AURA implements all
 100 feature families or matches the ten products in quality.
 
+## Sampled skin processing
+
+Three additional native tools provide sample-guided skin smoothing, color
+uniformity and dodge/burn. They share a color-range selection intersected with
+the photographer's ellipse or brush mask. The smoothing filter protects edges
+and retains the fine residual by default; uniformity preserves luminance; the
+dodge/burn correction is bounded and preserves RGB proportions. Named presets
+include tolerance and edge protection without copying source coordinates.
+
+This is not automatic face segmentation or exact Retouch4me/SkinFiner parity.
+See the [behavior audit](retouch-competitor-audit.md), [user guide](native-retouch.md)
+and [ADR-0070](adr/ADR-0070-sampled-skin-processing.md).
+
+Verification: 540 UI tests across 57 files, 18 native tests, TypeScript and the
+production UI build passed. The native desktop build passed with the local
+debug-information workaround recorded in the audit. Five real portraits passed
+all three tool previews, non-persistent draft checks, exact undo/redo, original
+hash checks, and pixel-identical full-render/PNG export comparison. Missing
+samples were rejected without changing history. The actual desktop sample
+controls, full-photo targeting, unsaved preview, comparison and return to Develop
+passed. Results and screenshots are in `.work-checks/sampled-skin-review/`;
+`scripts/test-sampled-skin.py` reproduces the workflow and supports `--resume`.
+
 ## Precision retouch batch
 
 The native workspace now shares painted masks, erasing, pressure-sensitive brush

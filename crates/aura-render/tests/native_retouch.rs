@@ -19,6 +19,7 @@ fn edit(tool: Tool) -> Edit {
         warmth: 0.3,
         tint: -0.2,
         mask: None,
+        skin: None,
     }
 }
 
@@ -46,6 +47,9 @@ fn every_tool_preserves_pixels_outside_the_selected_region() {
         Tool::Backdrop,
         Tool::Glare,
         Tool::Makeup,
+        Tool::SkinSmooth,
+        Tool::SkinUniformity,
+        Tool::PortraitDodgeBurn,
     ] {
         let mut operation = edit(tool);
         operation.source = Some([0.15, 0.15]);
@@ -284,6 +288,9 @@ fn every_tool_respects_painted_and_erased_pixels() {
         Tool::Backdrop,
         Tool::Glare,
         Tool::Makeup,
+        Tool::SkinSmooth,
+        Tool::SkinUniformity,
+        Tool::PortraitDodgeBurn,
     ] {
         let mut op = edit(tool);
         op.source = Some([0.1, 0.1]);
@@ -336,6 +343,7 @@ fn old_recipes_keep_their_shape_and_invalid_masks_are_rejected() {
     let op = edit(Tool::Dodge);
     let json = serde_json::to_value(&op).unwrap();
     assert!(json.get("mask").is_none());
+    assert!(json.get("skin").is_none());
     assert_eq!(serde_json::from_value::<Edit>(json).unwrap(), op);
     let mut invalid = op;
     invalid.mask = Some(BrushMask {

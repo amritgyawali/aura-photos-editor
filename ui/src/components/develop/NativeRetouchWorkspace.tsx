@@ -132,6 +132,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
       </div>
       <RetouchControls draft={draft} selected={selected} count={edits.length} disabled={blocked||!preview} sourceMode={sourceMode} live={live} dirty={dirty}
         onChange={change} onTool={chooseTool} onSourceMode={()=>{setSourceMode(v=>!v);setCompare(false);}} onLive={setLive} onApply={apply}
+        onSelectAll={()=>{setMode('ellipse');change({region:[.5,.5,1,1],mask:null,feather:0});}}
         onNew={()=>{setSelected(null);change({id:'draft',enabled:true});}} onDiscard={discard} onPreset={preset}/>
 
     </div>
