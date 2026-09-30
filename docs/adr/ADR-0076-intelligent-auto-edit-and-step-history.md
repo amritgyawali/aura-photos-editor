@@ -34,17 +34,29 @@ decision reversible and editable. A single history entry made it impossible to k
      from skin-coloured pixels only) and small. A mark that is much darker, or darker
      without being redder, is recorded as a possible permanent mark and kept. At most 12
      spots per face; each is an individual texture-aware patch heal with a skin donor.
-   - *Eyes*: iris detail only when an open eye is measured (sclera brighter than the
-     person's own skin); sclera redness reduced only when measured; flash red-eye only when
+   - *Eyes*: iris detail only when an open eye is measured (whites clearly less
+     saturated than the same person's cheek, in display values); sclera redness reduced only when clearly red (above 0.3, where healthy whites
+     measure 0.1-0.25), and only on the measured whites beside the iris; flash red-eye only when
      the pupil is dominantly red; under-eye lift only when darker than the same cheek.
    - *Teeth*: whitened only when visible and measurably yellow, with a luminance selection
      that excludes lips; *shine*: softened only when specular skin covers >1.5 %.
-   Eyes, brows, nostrils and lips are excluded from blemish search. Faces under 28 px
+   - *Lines & redness*: crow's feet and forehead lines softened (Wrinkle, fine band kept)
+     only where line energy exceeds 1.35x the same cheek's; smile lines lifted
+     (micro dodge and burn, at most 0.4) only where darker than the cheek beside them;
+     redness beside the nose evened toward the person's own cheek (colour match).
+   Eyes, brows, nostrils, lips and smile lines are excluded from blemish search. A spot must
+   be compact (elongation at most 2.2), ringed by clean skin, and exceed thresholds scaled by
+   the face's own texture; more than 15 such marks is treated as freckles and none are healed. Faces under 28 px
    between the eyes get skin retouch only.
 4. **Step history is navigable.** `history_step` accepts `goto:<seq>` (and `goto:0` for the
    original). It is recorded as one navigation row and replayed like undo/redo, so going
    back discards nothing until a new edit is made. The Develop history list has a
    "Go back to here" button per step.
+
+5. **Photographer-chosen automatic retouch.** `auto_retouch` takes an intensity (0.25-1.5)
+   and switches for blemishes, lines & redness, eyes and teeth. It is an explicit request, so
+   it replaces automatic operations even in an edited stack (manual operations are kept) and is
+   saved as a user edit. The choice is stored in the report and reused by later passes.
 
 ## Consequences
 

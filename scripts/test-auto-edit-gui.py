@@ -196,6 +196,33 @@ with sync_playwright() as pw:
         return {'status': body['studio_portrait_auto_v1']['status'], 'opsAfterRepeat': len(stack())}
     step('Repeat Auto enhance keeps manual retouch', protection)
 
+    def settings():
+        manual = call('native_retouch_edit', projectId=project, photoId=photo, action='append', id=None,
+                      edits=[dict(stack()[0], id='x', tool='dodge', amount=0.2, mask=None, skin=None, source=None, selection=None)])
+        own = [e['id'] for e in manual if not e['id'].startswith('auto-')]
+        page.reload()
+        os_click(page, page.get_by_role('button', name='Retouch', exact=True), 'open Retouch again')
+        expect(page.get_by_alt_text('Retouched photograph', exact=True)).to_be_visible()
+        os_click(page, page.get_by_text('Automatic face and skin retouch settings', exact=True), 'open settings')
+        slider = page.get_by_label('Automatic retouch strength')
+        slider.focus()
+        for _ in range(8):
+            os_keys('left', label='lower automatic strength')
+        os_click(page, page.get_by_label('Teeth', exact=True), 'switch off teeth')
+        os_click(page, page.get_by_role('button', name='Re-run automatic retouch', exact=True), 're-run automatic retouch')
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            body = json.loads(call('image_recipe', photoId=photo)['body'])
+            opts = body['studio_portrait_auto_v1'].get('options') or {}
+            if abs(opts.get('intensity', 1) - 1) > 1e-3:
+                break
+            time.sleep(1)
+        after = stack()
+        return {'options': opts, 'manualKept': all(any(e['id'] == i for e in after) for i in own),
+                'teethOps': sum(e['tool'] == 'teeth' for e in after), 'autoOps': sum(e['id'].startswith('auto-') for e in after),
+                'lastHistory': call('image_history', photoId=photo)['entries'][-1]['label']}
+    step('OS mouse/keyboard: automatic retouch settings, re-run', settings)
+
     report['final'] = frame('4-final')
     report['originalUnchanged'] = hashlib.sha256(SOURCE.read_bytes()).hexdigest() == source_hash
     report['history'] = [e['label'] for e in call('image_history', photoId=photo)['entries']]

@@ -12,11 +12,20 @@ back through. Nothing leaves your computer and your original file is never chang
 | 2. Sky balance | A bright sky above a measured horizon | A soft gradient that darkens only the bright sky pixels |
 | 3. Skin | Each face's own skin, sampled from its cheeks and forehead | Texture smoothing that keeps fine detail, tone evening, gentle local light |
 | 4. Blemishes | Small spots that are **redder** than the skin around them | Each spot healed separately with nearby skin. Darker marks that are not redder — moles, freckles, beauty marks — are kept and counted |
-| 5. Eyes | Whether an eye is open, whether the white of the eye is red, flash red-eye, and whether the under-eye is darker than the same cheek | Subtle iris detail, redness reduction, red-eye correction, under-eye lift — each only when measured |
-| 6. Teeth & shine | Visible teeth and their yellow cast; shiny skin highlights | Natural whitening that leaves lips alone; shine softened without flattening the skin |
+| 5. Lines & redness | Line texture beside the eyes and on the forehead compared with the same person's cheek; smile-line depth compared with the cheek beside it; redness beside the nose compared with the cheek | Fine lines softened with fine skin texture kept; smile lines lifted, never erased; redness evened toward the person's own cheek colour |
+| 6. Eyes | Whether an eye is open, whether the white of the eye is red, flash red-eye, and whether the under-eye is darker than the same cheek | Subtle iris detail, redness reduction, red-eye correction, under-eye lift — each only when measured |
+| 7. Teeth & shine | Visible teeth and their yellow cast; shiny skin highlights | Natural whitening that leaves lips alone; shine softened without flattening the skin |
 
 A step that finds nothing to do is not saved. Running Auto enhance again on an unchanged
 photo saves nothing new.
+
+### Choosing how much is done
+
+In **Retouch**, open **Automatic face and skin retouch settings**. Choose a strength
+(*Subtle* 25-75 %, *Natural* around 100 %, *Polished* up to 150 %) and switch blemish healing,
+lines and redness, eyes or teeth on or off, then press **Re-run automatic retouch**. Skin
+smoothing, tone and light always run. The automatic operations are replaced; operations you
+added yourself are kept, and the next **Auto enhance** remembers your choice.
 
 ## Going back and editing by hand
 

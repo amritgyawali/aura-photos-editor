@@ -16,6 +16,9 @@ All notable changes to AURA. One entry per phase, newest first.
   eyes, teeth & shine). `history_step` accepts `goto:<seq>`; Develop's history list has
   "Go back to here" for every step. Retouch tags automatic operations with their face.
 - Report explains every step, the scene decisions and per-face findings. ADR-0076.
+- Added measured fine-line, smile-line and nose-redness refinement, and a Retouch settings
+  panel (strength and feature switches) backed by the new `auto_retouch` command.
+- `scripts/check-ipc-surface.sh` now reads every typed IPC module, not only `client.ts`.
 
 ## Adaptive portrait retouch — 2026-09-30
 
