@@ -4,6 +4,7 @@ import type { BrushPoint, BrushStroke, NativeRetouchEdit } from '../../ipc/nativ
 export type RetouchMode = 'ellipse' | 'paint' | 'erase' | 'pan';
 type Props = {
   src: string | null; width: number; height: number; compare: boolean; disabled: boolean;
+  beforeSrc?: string | null; split?: boolean;
   draft: NativeRetouchEdit; mode: RetouchMode; radius: number; opacity: number;
   overlay: boolean; sourceMode: boolean;
   onTarget: (point: [number, number]) => void; onSource: (point: [number, number]) => void;
@@ -19,6 +20,15 @@ export function RetouchCanvas(props: Props) {
   const [cursor, setCursor] = useState<BrushPoint | null>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [zoom, setZoom] = useState(1);
+  const [splitPosition, setSplitPosition] = useState(50);
+  const dividerPointer = useRef<number | null>(null);
+  const split = Boolean(props.split && props.beforeSrc && src && !compare);
+  useEffect(() => {
+    dividerPointer.current = null;
+    gesture.current = null;
+    setActive(null);
+    setCursor(null);
+  }, [split]);
   const maskId = useId().replaceAll(':', '');
   useEffect(() => {
     const element = viewport.current;
@@ -49,7 +59,7 @@ export function RetouchCanvas(props: Props) {
   const start = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 && event.button !== 1) return;
     if (gesture.current) return;
-    const pan = mode === 'pan' || event.button === 1;
+    const pan = mode === 'pan' || event.button === 1 || split;
     if (!pan && (disabled || compare || !src)) return;
     event.preventDefault();
     event.currentTarget.focus({ preventScroll: true });
@@ -84,7 +94,7 @@ export function RetouchCanvas(props: Props) {
     if (!current || current.id !== event.pointerId) return;
     gesture.current = null; setActive(null);
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    if (!cancel && !disabled && !compare && current.stroke) {
+    if (!cancel && !disabled && !compare && !split && current.stroke) {
       const point = position(event);
       const last = current.stroke.points[current.stroke.points.length - 1];
       if (last && current.stroke.points.length < 1024 && (point[0] !== last[0] || point[1] !== last[1])) {
@@ -104,6 +114,17 @@ export function RetouchCanvas(props: Props) {
   </g>;
   // Previously painted paths are unchanged during pointer movement; only the active stroke redraws.
   const paintedGuide = useMemo(() => (draft.mask?.strokes ?? []).map(strokeShape), [draft.mask, width, height]);
+  const moveDivider = (event: PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    if (dividerPointer.current !== event.pointerId) return;
+    setSplitPosition(Math.round(position(event)[0] * 100));
+  };
+  const releaseDivider = (event: PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    if (dividerPointer.current !== event.pointerId) return;
+    dividerPointer.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
   return <div className="retouch-canvas">
     <div className="retouch-view-tools" aria-label="Photo zoom">
       <button type="button" onClick={() => setScale(1)}>Fit</button>
@@ -113,6 +134,13 @@ export function RetouchCanvas(props: Props) {
       <button type="button" onClick={() => setScale(1 / fit)}>1:1 preview</button>
       <span>Middle-drag or Hand to pan · + / − to zoom · 0 to fit</span>
     </div>
+    {split && <div className="retouch-comparison-tools">
+      <label>Before/after split<input type="range" min="0" max="100" step="1" value={splitPosition}
+        aria-valuetext={`${splitPosition}% before, ${100 - splitPosition}% retouched`}
+        onChange={event => setSplitPosition(Number(event.target.value))}/></label>
+      <button type="button" onClick={() => setSplitPosition(50)}>Center divider</button>
+      <p>Before is on the left; retouched is on the right. Drag the divider or use the slider. Drag the photo to pan.</p>
+    </div>}
     <div className="retouch-viewport" ref={viewport} role="region" aria-label="Retouch photo viewport" tabIndex={0}
       onKeyDown={event => {
         if (event.target !== event.currentTarget && event.target !== surface.current) return;
@@ -132,9 +160,22 @@ export function RetouchCanvas(props: Props) {
           onPointerLeave={() => setCursor(null)}
           onLostPointerCapture={event => finish(event, true)}
           style={{ width: imageWidth, height: imageHeight, left: (canvasWidth - imageWidth) / 2, top: (canvasHeight - imageHeight) / 2,
-            cursor: mode === 'pan' ? 'grab' : props.sourceMode ? 'copy' : 'crosshair' }}>
+            cursor: mode === 'pan' || split ? 'grab' : props.sourceMode ? 'copy' : 'crosshair' }}>
           {src ? <img src={src} draggable={false} alt={compare ? 'Before native retouch' : 'Retouched photograph'}/> : <p>Loading retouch preview…</p>}
-          {src && overlay && !compare && <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`}>
+          {split && <>
+            <img className="retouch-before-layer" src={props.beforeSrc ?? undefined} draggable={false} alt="Before native retouch comparison"
+              style={{ clipPath: `inset(0 ${100 - splitPosition}% 0 0)` }}/>
+            <div className="retouch-compare-labels" aria-hidden="true"><span>Before</span><span>Retouched</span></div>
+            <div className="retouch-compare-divider" style={{ left: `${splitPosition}%` }} aria-hidden="true"
+              onPointerDown={event => {
+                event.stopPropagation();
+                if (event.button !== 0 || dividerPointer.current !== null) return;
+                event.preventDefault(); dividerPointer.current = event.pointerId;
+                event.currentTarget.setPointerCapture?.(event.pointerId); moveDivider(event);
+              }} onPointerMove={moveDivider} onPointerUp={releaseDivider} onPointerCancel={releaseDivider}
+              onLostPointerCapture={releaseDivider}><span>↔</span></div>
+          </>}
+          {src && overlay && !compare && !split && <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`}>
             {draft.mask || active ? <>
               <defs><mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width={width} height={height}>
                 <rect width={width} height={height} fill="black"/>{paintedGuide}{active && strokeShape(active, 128)}
@@ -150,6 +191,6 @@ export function RetouchCanvas(props: Props) {
         </div>
       </div>
     </div>
-    <p className="lr-hint">{draft.mask ? `${draft.mask.strokes.length} mask strokes. Selection guide shows the painted area; Preview renders feathering.` : 'Click to place an ellipse. Brush adds coverage; Eraser removes it.'}</p>
+    <p className="lr-hint">{split ? 'Comparison only. Turn off Split comparison to paint or choose a source. Both views use the same zoom and pan.' : draft.mask ? `${draft.mask.strokes.length} mask strokes. Selection guide shows the painted area; Preview renders feathering.` : 'Click to place an ellipse. Brush adds coverage; Eraser removes it.'}</p>
   </div>;
 }

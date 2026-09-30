@@ -51,6 +51,19 @@ Undo/redo uses the normal durable recipe history. **Show before retouch** compar
 against the current global edit with native retouch removed. Original files are
 never overwritten. Develop and export render the saved stack in order.
 
+**Split comparison** places the before view on the left and the saved or unsaved
+retouch preview on the right. Drag the divider or use the **Before/after split**
+slider with the keyboard; **Center divider** returns to 50/50. Both sides share
+zoom and pan. Selection guides are hidden during comparison, and dragging the
+photo pans instead of painting. Turn off Split comparison to resume photo edits.
+The divider uses cached previews, so moving it does not trigger another render.
+
+Apply or discard an unsaved draft before selecting a saved operation, changing
+operation order/enabled state, deleting operations or using saved Undo/Redo.
+Ctrl/Cmd+Z can still remove a draft brush stroke. While refining a saved operation,
+finish or discard that draft before switching tools, starting another operation
+or applying a quick skin preset. Drafts are held in memory, not autosaved.
+
 The retouch view shows the full photograph before crop/perspective and post-crop
 effects, so selections stay anchored when a crop changes. Review the final
 composition and decoration after returning to Develop.

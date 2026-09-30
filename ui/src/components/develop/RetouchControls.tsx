@@ -43,7 +43,7 @@ export function RetouchControls(props: Props) {
       <label className="retouch-toggle"><input type="checkbox" checked={props.live} onChange={event => props.onLive(event.target.checked)}/>Preview unsaved changes</label>
       <button className="retouch-primary" type="button" disabled={!canApply} onClick={props.onApply}>{selected ? 'Update selected retouch' : 'Apply retouch'}</button>
       {props.dirty && <button type="button" onClick={props.onDiscard}>Discard draft</button>}
-      {selected && <button type="button" onClick={props.onNew}>Start another operation</button>}
+      {selected && <button type="button" disabled={props.dirty} onClick={props.onNew}>Start another operation</button>}
     </div>
     {sampled && <details open><summary>Sampled skin range</summary>
       <p className="lr-hint">Sample a clean skin patch. Matching colors are selected inside your ellipse or brush mask; this is not face detection. Similar-colored clothing or backgrounds may also match.</p>
@@ -82,8 +82,8 @@ export function RetouchControls(props: Props) {
       <input type="range" min="-1" max="1" step="0.01" value={draft[key]} onChange={event => onChange({ [key]: Number(event.target.value) })}/>
     </label>)}
     <details><summary>Quick skin presets</summary><p className="lr-hint">Target skin first. Adds three operations as one undoable change.</p>
-      <button type="button" disabled={!validRetouch({ ...draft, tool: 'frequency' }) || count > 253} onClick={() => props.onPreset(false)}>Natural skin in selection</button>
-      <button type="button" disabled={!validRetouch({ ...draft, tool: 'frequency' }) || count > 253} onClick={() => props.onPreset(true)}>Polished skin in selection</button>
+      <button type="button" disabled={Boolean(selected && props.dirty) || !validRetouch({ ...draft, tool: 'frequency' }) || count > 253} onClick={() => props.onPreset(false)}>Natural skin in selection</button>
+      <button type="button" disabled={Boolean(selected && props.dirty) || !validRetouch({ ...draft, tool: 'frequency' }) || count > 253} onClick={() => props.onPreset(true)}>Polished skin in selection</button>
     </details>
     <RetouchPresets draft={draft} disabled={disabled} onApply={settings => onChange(settings)}/>
   </fieldset>;

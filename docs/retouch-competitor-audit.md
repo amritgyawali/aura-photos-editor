@@ -91,6 +91,15 @@ workspace screenshot. These portraits verify integration; synthetic tests supply
 the isolated blemish and texture-transfer evidence. Healthy skin test patches do
 not establish real-acne removal quality or a comparison with commercial tools.
 
+The subsequent comparison and draft-protection UI update passed 546 tests across
+57 files, TypeScript/Vite and the Windows desktop build. The aligned split view
+uses cached native previews and supports keyboard/pointer inspection at shared
+zoom and pan. `scripts/test-retouch-comparison.py` passed on all five portraits,
+including unchanged recipes, history and original hashes. It also checked an
+unsaved refinement and Discard on the first portrait. This adds review controls
+and protects in-memory drafts; it does not change the retouch algorithms or
+establish competitor parity. See [ADR-0072](adr/ADR-0072-retouch-comparison-and-draft-protection.md).
+
 To establish closer parity, a future evaluation needs paired originals and
 competitor outputs with versions/settings recorded, face/skin reference masks,
 diverse lighting and complexions, and blind review of pores, hair, eyes, lips,

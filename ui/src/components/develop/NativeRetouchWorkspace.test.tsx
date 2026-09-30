@@ -13,6 +13,51 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('compares cached previews without editing the recipe or requesting another render',async()=>{
+  open();await screen.findByAltText('Retouched photograph');
+  const renders=vi.mocked(nativeRetouch.preview).mock.calls.length;
+  const edits=vi.mocked(nativeRetouch.edit).mock.calls.length;
+  fireEvent.click(screen.getByText('Split comparison'));
+  expect(screen.getByAltText('Before native retouch comparison')).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Before/after split'),{target:{value:'80'}});
+  fireEvent.click(screen.getByText('Show before retouch'));
+  expect(screen.queryByLabelText('Before/after split')).toBeNull();
+  fireEvent.click(screen.getByText('Split comparison'));
+  expect(screen.getByLabelText('Before/after split')).toBeTruthy();
+  expect(nativeRetouch.preview).toHaveBeenCalledTimes(renders);
+  expect(nativeRetouch.edit).toHaveBeenCalledTimes(edits);
+});
+it('preserves dirty drafts across saved-operation controls and history shortcuts',async()=>{
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved',tool:'frequency'}]);
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Center X (%)'),{target:{value:'61'}});
+  for(const name of ['Undo','Clear native retouch','Duplicate retouch 1','Remove retouch 1']) {
+    expect((screen.getByRole('button',{name}) as HTMLButtonElement).disabled).toBe(true);
+  }
+  expect((screen.getByRole('button',{name:/^1\. Frequency separation/}) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.keyDown(screen.getByLabelText('Retouch image interaction'),{key:'z',ctrlKey:true});
+  expect(develop.historyStep).not.toHaveBeenCalled();
+  expect((screen.getByLabelText('Center X (%)') as HTMLInputElement).value).toBe('61');
+  fireEvent.click(screen.getByText('Discard draft'));
+  await waitFor(()=>expect((screen.getByText('Undo') as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole('button',{name:/^1\. Frequency separation/}));
+  fireEvent.change(screen.getByLabelText('Texture gain (100%)'),{target:{value:'1.2'}});
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'burn'}});
+  expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('frequency');
+  expect((screen.getByText('Start another operation') as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByText('Natural skin in selection') as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByText('Update selected retouch'));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','update',[
+    expect.objectContaining({id:'saved',tool:'frequency',texture:1.2})
+  ]));
+});
+it('does not compare previews with different pixel dimensions',async()=>{
+  vi.mocked(nativeRetouch.preview).mockImplementation(async(_project,_photo,before)=>({
+    width:before?2:1,height:1,rgbBase64:btoa(String.fromCharCode(...Array(before?6:3).fill(100))),notes:[],
+  } as never));
+  open();await screen.findByAltText('Retouched photograph');
+  expect((screen.getByText('Split comparison') as HTMLButtonElement).disabled).toBe(true);
+});
 it('allows automatic small patch repairs and requires a source for larger or painted repairs',async()=>{
   open();await screen.findByAltText('Retouched photograph');
   fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'patch_heal'}});

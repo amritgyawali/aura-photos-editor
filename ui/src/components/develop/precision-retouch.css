@@ -12,6 +12,17 @@
 .retouch-photo-surface { position: absolute; touch-action: none; user-select: none; line-height: 0; }
 .retouch-photo-surface img, .retouch-photo-surface svg { display: block; width: 100%; height: 100%; }
 .retouch-photo-surface svg { position: absolute; inset: 0; pointer-events: none; }
+.retouch-photo-surface .retouch-before-layer { position: absolute; inset: 0; pointer-events: none; }
+.retouch-comparison-tools { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 12px; margin-bottom: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.retouch-comparison-tools label { display: grid; gap: 8px; flex: 1; min-width: 160px; font-size: 12px; }
+.retouch-comparison-tools input { width: 100%; min-height: 24px; }
+.retouch-comparison-tools button { min-height: 44px; }
+.retouch-comparison-tools p { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.retouch-compare-labels { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; line-height: 1.5; }
+.retouch-compare-labels span { background: rgb(0 0 0 / 75%); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+.retouch-compare-divider { position: absolute; top: 0; bottom: 0; width: 44px; transform: translateX(-50%); cursor: ew-resize; touch-action: none; }
+.retouch-compare-divider::before { content: ''; position: absolute; top: 0; bottom: 0; left: 21px; width: 2px; background: white; box-shadow: 0 0 2px black; }
+.retouch-compare-divider span { position: absolute; top: 50%; left: 4px; width: 36px; height: 44px; transform: translateY(-50%); display: grid; place-items: center; background: var(--panel); color: white; border: 2px solid white; border-radius: 12px; line-height: 1; font-size: 20px; }
 .retouch-viewport:focus-visible, .retouch-photo-surface:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .native-retouch-workspace .studio-layout > div { min-width: 0; }
 .native-retouch-workspace .studio-adjustments .retouch-toggle { display: flex; align-items: center; gap: 8px; }

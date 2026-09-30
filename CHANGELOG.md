@@ -2,6 +2,13 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Retouch comparison and draft protection
+
+- Added an aligned, draggable before/after split in Retouch, with shared zoom/pan, keyboard slider controls and comparison of unsaved previews.
+- Comparison gestures cannot paint or move a source. Moving the divider uses cached previews and does not change saved edits or exports.
+- Unsaved drafts now block saved-operation selection, stack changes and saved history navigation until Apply or Discard. Dirty saved-operation refinements also block tool switching, starting another operation and quick skin presets.
+- Added UI regression tests and a repeatable five-portrait desktop workflow in `scripts/test-retouch-comparison.py`.
+
 ## Texture-aware patch healing
 
 - Added a native patch repair tool with surrounding-texture donor matching and local tone blending; existing Heal operations retain their behavior.

@@ -17,6 +17,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const [preview,setPreview] = useState<RenderDto|null>(null);
   const [before,setBefore] = useState<RenderDto|null>(null);
   const [compare,setCompare] = useState(false);
+  const [split,setSplit] = useState(false);
   const [overlay,setOverlay] = useState(true);
   const [sourceMode,setSourceMode] = useState(false);
   const [history,setHistory] = useState<HistoryDto|null>(null);
@@ -44,7 +45,12 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const blocked = busy || disabled;
   const rendered=compare?before:draftState.image??preview;
   const src=useMemo(()=>rendered?rgbDataUrl(rendered):null,[rendered]);
-  const save=async(action:()=>Promise<unknown>)=>{
+  const beforeSrc=useMemo(()=>before?rgbDataUrl(before):null,[before]);
+  const comparisonReady=Boolean(before&&rendered&&before.width===rendered.width&&before.height===rendered.height);
+  const stackBlocked=blocked||dirty;
+  const draftNotice='Apply or discard your draft before selecting saved operations or changing history.';
+  const save=async(action:()=>Promise<unknown>, appliesDraft=false)=>{
+    if(dirty&&!appliesDraft){setError(draftNotice);return;}
     if(lock.current||blocked)return;
     lock.current=true;setBusy(true);setError(null);
     try {await action();if(mounted.current){setSelected(null);setDirty(false);setRefresh(v=>v+1);}}
@@ -53,6 +59,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   };
   const change=(patch:Partial<NativeRetouchEdit>)=>{setDraft(value=>({...value,...patch}));setDirty(true);setCompare(false);};
   const chooseTool=(tool:RetouchTool)=>{
+    if(selected&&dirty){setError('Apply or discard your changes before choosing another tool.');return;}
     setSelected(null);change({id:'draft',tool,enabled:true,amount:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:0,tint:tool==='makeup'?.2:0});
   };
   const chooseMode=(next:RetouchMode)=>{
@@ -68,12 +75,13 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     change({mask:{strokes:[...strokes,stroke]},...(!strokes.length&&first?{region:[first[0],first[1],draft.region[2],draft.region[3]] as NativeRetouchEdit['region']}:{})});
   };
   const undoStroke=()=>{if(!blocked&&draft.mask?.strokes.length)change({mask:{strokes:draft.mask.strokes.slice(0,-1)}});};
-  const apply=()=>{if(validRetouch(draft)&&(selected||edits.length<256)){setCompare(false);void save(()=>nativeRetouch.edit(projectId,photoId,selected?'update':'append',[draft]));}};
+  const apply=()=>{if(validRetouch(draft)&&(selected||edits.length<256)){setCompare(false);void save(()=>nativeRetouch.edit(projectId,photoId,selected?'update':'append',[draft]),true);}};
   const discard=()=>{const saved=edits.find(edit=>edit.id===selected);setDraft(saved??freshRetouch());setMode(saved?.mask?'paint':'ellipse');setDirty(false);setError(null);};
   const preset=(polished:boolean)=>{
+    if(selected&&dirty){setError(draftNotice);return;}
     const base={...draft,id:'draft',enabled:true,texture:1,source:null};
     const items:NativeRetouchEdit[]=[{...base,tool:'frequency',amount:polished?0.45:0.25,tone:0.5},{...base,tool:'micro_dodge_burn',amount:polished?0.35:0.18},{...base,tool:'mattify',amount:polished?0.35:0.2}];
-    void save(()=>nativeRetouch.edit(projectId,photoId,'append',items));
+    void save(()=>nativeRetouch.edit(projectId,photoId,'append',items),true);
   };
   return <section className="photo-studio native-retouch-workspace" aria-label="Native retouch workspace" onKeyDown={event=>{
     if(blocked||(event.target as HTMLElement).matches('input,select,textarea,button'))return;
@@ -106,37 +114,39 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     </div>}
     <div className="studio-layout">
       <div>
-        <RetouchCanvas src={src} width={rendered?.width??1200} height={rendered?.height??800} compare={compare} disabled={blocked}
+        <RetouchCanvas src={src} width={rendered?.width??1200} height={rendered?.height??800} compare={compare} beforeSrc={comparisonReady?beforeSrc:null} split={split&&!compare} disabled={blocked}
           draft={draft} mode={mode} radius={brushRadius} opacity={brushOpacity} overlay={overlay} sourceMode={sourceMode}
           onTarget={point=>change({region:[...point,draft.region[2],draft.region[3]]})}
           onSource={point=>{change({source:point});setSourceMode(false);}} onStroke={addStroke} onNotice={setError}/>
         <div className="studio-history">
           <button type="button" disabled={blocked||!before} aria-pressed={compare} onClick={()=>setCompare(v=>!v)}>{compare?'Show retouched':'Show before retouch'}</button>
+          <button type="button" disabled={!comparisonReady||blocked} aria-pressed={split&&!compare} onClick={()=>{setCompare(false);setSplit(v=>compare||!v);}}>Split comparison</button>
           <button type="button" aria-pressed={overlay} onClick={()=>setOverlay(v=>!v)}>Selection overlay</button>
-          <button type="button" disabled={blocked||!history?.canUndo} onClick={()=>void save(()=>develop.historyStep({projectId,photoId,action:'undo'}))}>Undo</button>
-          <button type="button" disabled={blocked||!history?.canRedo} onClick={()=>void save(()=>develop.historyStep({projectId,photoId,action:'redo'}))}>Redo</button>
+          <button type="button" disabled={stackBlocked||!history?.canUndo} onClick={()=>void save(()=>develop.historyStep({projectId,photoId,action:'undo'}))}>Undo</button>
+          <button type="button" disabled={stackBlocked||!history?.canRedo} onClick={()=>void save(()=>develop.historyStep({projectId,photoId,action:'redo'}))}>Redo</button>
         </div>
         <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}</p>
+        {dirty&&<p className="lr-hint">{draftNotice}</p>}
         <details open><summary>Saved retouch operations ({edits.length})</summary>
           <ol>{edits.map((edit,index)=><li key={edit.id}>
-            <button type="button" disabled={blocked} aria-pressed={selected===edit.id} onClick={()=>{setSelected(edit.id);setDirty(false);setMode(edit.mask?'paint':'ellipse');setDraft({...edit,region:[...edit.region],source:edit.source?[...edit.source]:null});setCompare(false);}}>{index+1}. {RETOUCH_TOOLS.find(t=>t[0]===edit.tool)?.[1]} · {Math.round(edit.amount*100)}%</button>
-            <label><input type="checkbox" checked={edit.enabled} disabled={blocked} onChange={event=>void save(()=>nativeRetouch.edit(projectId,photoId,'update',[{...edit,enabled:event.target.checked}]))}/>Enabled</label>
+            <button type="button" disabled={stackBlocked} aria-pressed={selected===edit.id} onClick={()=>{setSelected(edit.id);setDirty(false);setMode(edit.mask?'paint':'ellipse');setDraft({...edit,region:[...edit.region],source:edit.source?[...edit.source]:null});setCompare(false);}}>{index+1}. {RETOUCH_TOOLS.find(t=>t[0]===edit.tool)?.[1]} · {Math.round(edit.amount*100)}%</button>
+            <label><input type="checkbox" checked={edit.enabled} disabled={stackBlocked} onChange={event=>void save(()=>nativeRetouch.edit(projectId,photoId,'update',[{...edit,enabled:event.target.checked}]))}/>Enabled</label>
             <div className="retouch-operation-actions">
-              <button type="button" disabled={blocked||index===0} aria-label={`Move retouch ${index+1} earlier`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'earlier',[],edit.id))}>↑</button>
-              <button type="button" disabled={blocked||index===edits.length-1} aria-label={`Move retouch ${index+1} later`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'later',[],edit.id))}>↓</button>
-              <button type="button" disabled={blocked||edits.length>=256} aria-label={`Duplicate retouch ${index+1}`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'duplicate',[],edit.id))}>Duplicate</button>
+              <button type="button" disabled={stackBlocked||index===0} aria-label={`Move retouch ${index+1} earlier`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'earlier',[],edit.id))}>↑</button>
+              <button type="button" disabled={stackBlocked||index===edits.length-1} aria-label={`Move retouch ${index+1} later`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'later',[],edit.id))}>↓</button>
+              <button type="button" disabled={stackBlocked||edits.length>=256} aria-label={`Duplicate retouch ${index+1}`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'duplicate',[],edit.id))}>Duplicate</button>
             </div>
-            <button type="button" disabled={blocked} aria-label={`Remove retouch ${index+1}`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'remove',[],edit.id))}>Remove</button>
+            <button type="button" disabled={stackBlocked} aria-label={`Remove retouch ${index+1}`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'remove',[],edit.id))}>Remove</button>
           </li>)}</ol>
         </details>
       </div>
       <RetouchControls draft={draft} selected={selected} count={edits.length} disabled={blocked||!preview} sourceMode={sourceMode} live={live} dirty={dirty}
         onChange={change} onTool={chooseTool} onSourceMode={()=>{setSourceMode(v=>!v);setCompare(false);}} onLive={setLive} onApply={apply}
         onSelectAll={()=>{setMode('ellipse');change({region:[.5,.5,1,1],mask:null,feather:0});}}
-        onNew={()=>{setSelected(null);change({id:'draft',enabled:true});}} onDiscard={discard} onPreset={preset}/>
+        onNew={()=>{if(dirty){setError(draftNotice);return;}setSelected(null);change({id:'draft',enabled:true});}} onDiscard={discard} onPreset={preset}/>
 
     </div>
-    <button type="button" disabled={blocked||!edits.length} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'clear'))}>Clear native retouch</button>
+    <button type="button" disabled={stackBlocked||!edits.length} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'clear'))}>Clear native retouch</button>
     <details className="retouch-shortcuts"><summary>Keyboard shortcuts &amp; tips</summary>
       <p>B brush · E eraser · V ellipse · H hand · [ / ] brush size · Enter apply · Ctrl/Cmd+Z undo stroke or saved edit · Shift+Ctrl/Cmd+Z redo.</p>
       <p>Focus the photo to use shortcuts. Arrow keys pan; + / − zoom; 0 fits the preview. Numeric target coordinates and Dab at target coordinates provide an alternative to drawing. Pen pressure changes brush radius.</p>
