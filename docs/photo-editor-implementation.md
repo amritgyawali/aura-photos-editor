@@ -4,7 +4,36 @@ This tracks implementation after the [100-feature comparison](photo-editor-featu
 The comparison describes baseline `a69b236`; it is not a claim that AURA implements all
 100 feature families or matches the ten products in quality.
 
-## Native retouch batch
+## Precision retouch batch
+
+The native workspace now shares painted masks, erasing, pressure-sensitive brush
+radius, zoom/pan and keyboard controls across all 20 tools. Brush coverage uses the
+same Rust rasterizer in previews and exports. Erasing protects the removed area,
+and sparse pointer input produces continuous strokes.
+
+Unsaved previews render temporary recipes without writing history. The UI
+debounces requests, runs them sequentially, and ignores obsolete results. Saved
+operations can be duplicated and reordered through normal undoable history.
+Named local presets reuse settings without carrying masks or donor coordinates
+between photographs. Unsaved drafts block collection navigation until applied
+or discarded.
+
+The UI suite passed 538 tests across 57 files; eleven native rendering tests passed,
+including mask continuity, pressure, erasure across all tools, low-opacity
+automatic spot cleanup and old-recipe compatibility. Production UI and native
+desktop builds passed. Five real portraits passed draft-history isolation,
+painted-region and erased-pixel checks, and exact undo/redo. All five PNG exports
+passed read-back verification and matched the full renderer pixel for pixel.
+Source SHA-256 hashes still match the original downloads. Four completed photos
+retained identical operation IDs and pixels after restarting the desktop to
+resume an interrupted run. Operation duplication/reordering and actual pointer
+drawing at zoom with an unsaved preview also passed.
+
+Evidence is in `.work-checks/precision-retouch-review/results.json` and its
+adjacent screenshot and before/after images. See [ADR-0069](adr/ADR-0069-precision-retouch-authoring.md), the
+[tool guide](native-retouch.md) and `scripts/test-precision-retouch.py`.
+
+## Native retouch foundation
 
 **Photo Studio → Develop → Retouch** now provides 20 local workflows: sampled
 healing/cloning, selected-region spot detection, frequency tone/texture controls,
@@ -20,8 +49,8 @@ writes; external recipe revisions refresh the workspace.
 
 These are original deterministic AURA algorithms, with shared primitives across
 several named workflows. They do not reproduce Retouch4me's proprietary models
-or establish commercial quality parity. Automatic face/skin targeting, painted
-masks, layered frequency editing and reconstruction of obscured detail remain
+or establish commercial quality parity. Automatic face/skin targeting, layered frequency editing and reconstruction
+of obscured detail remain
 unimplemented in this workspace. See the [tool guide](native-retouch.md) and
 [ADR-0068](adr/ADR-0068-native-retouch-workspace.md).
 

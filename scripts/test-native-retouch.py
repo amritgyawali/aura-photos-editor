@@ -157,6 +157,7 @@ def main():
             page.get_by_role('button', name='Show before retouch', exact=True).click()
             expect(page.get_by_alt_text('Before native retouch')).to_be_visible()
             page.get_by_role('button', name='Show retouched', exact=True).click()
+            page.get_by_role('button', name='Discard draft', exact=True).click()
             page.get_by_role('button', name='Back to Develop', exact=True).click()
             expect(page.get_by_role('button', name='Retouch', exact=True)).to_be_enabled()
             report['ui'] = {'workspaceMounted': True, 'beforeAfter': True, 'developReturn': True}

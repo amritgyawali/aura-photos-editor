@@ -70,6 +70,22 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
                 return Err(invalid("Retouch operation no longer exists").into());
             }
         }
+        "duplicate" | "earlier" | "later" => {
+            let index = edits
+                .iter()
+                .position(|e| Some(e.id.as_str()) == input.id.as_deref())
+                .ok_or_else(|| invalid("Retouch operation no longer exists"))?;
+            match input.action.as_str() {
+                "duplicate" => {
+                    let mut copy = edits[index].clone();
+                    copy.id = uuid::Uuid::new_v4().to_string();
+                    edits.insert(index + 1, copy);
+                }
+                "earlier" if index > 0 => edits.swap(index, index - 1),
+                "later" if index + 1 < edits.len() => edits.swap(index, index + 1),
+                _ => return Ok(edits),
+            }
+        }
         "clear" => edits.clear(),
         _ => return Err(invalid("Unknown retouch action").into()),
     }
@@ -95,12 +111,59 @@ pub fn preview(state: &AppState, project: &str, photo: &str, before: bool) -> Ip
     crate::studio_tools::require_member(state, project, photo)?;
     let image_id = PhotoId::from_db(photo).map_err(|_| invalid("Invalid photo"))?;
     let mut recipe = crate::develop_commands::load_or_neutral(state, image_id)?;
-    recipe.geometry = aura_recipe::Geometry::default();
-    // Post-crop decoration is reviewed in Develop, not baked into a full-frame retouch view.
-    recipe.global.effects = aura_recipe::Effects::default();
     if before {
         recipe.extra.remove(retouch_tools::KEY);
     }
+    render_preview(state, image_id, recipe)
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DraftInput {
+    pub project_id: String,
+    pub photo_id: String,
+    pub edit: Edit,
+    pub replace_id: Option<String>,
+}
+
+/// Render a proposed edit without storing a recipe or history entry.
+/// # Errors
+/// Invalid targets, missing selected operation, invalid draft or render failure.
+pub fn draft_preview(state: &AppState, input: &DraftInput) -> IpcResult<RenderDto> {
+    crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
+    let image_id = PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo"))?;
+    let mut recipe = crate::develop_commands::load_or_neutral(state, image_id)?;
+    let mut edits = retouch_tools::read(&recipe)?;
+    let mut draft = input.edit.clone();
+    if let Some(id) = &input.replace_id {
+        let current = edits
+            .iter_mut()
+            .find(|e| &e.id == id)
+            .ok_or_else(|| invalid("Retouch operation no longer exists"))?;
+        draft.id = id.clone();
+        *current = draft;
+    } else {
+        // Stable unused ID keeps repeated draft renders cacheable without colliding with saved IDs.
+        let mut sequence = 0;
+        draft.id = format!("unsaved-preview-{sequence}");
+        while edits.iter().any(|e| e.id == draft.id) {
+            sequence += 1;
+            draft.id = format!("unsaved-preview-{sequence}");
+        }
+        edits.push(draft);
+    }
+    retouch_tools::write(&mut recipe, &edits)?;
+    render_preview(state, image_id, recipe)
+}
+
+fn render_preview(
+    state: &AppState,
+    image_id: PhotoId,
+    mut recipe: aura_recipe::Recipe,
+) -> IpcResult<RenderDto> {
+    recipe.geometry = aura_recipe::Geometry::default();
+    // Post-crop decoration is reviewed in Develop, not baked into a full-frame retouch view.
+    recipe.global.effects = aura_recipe::Effects::default();
     let result = state.render()?.render(aura_render::RenderRequest {
         image_id,
         recipe,

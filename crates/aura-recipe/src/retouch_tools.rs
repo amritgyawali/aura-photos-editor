@@ -5,6 +5,25 @@ use serde::{Deserialize, Serialize};
 
 pub const KEY: &str = "studio_retouch_v1";
 pub const MAX_EDITS: usize = 256;
+pub const MAX_STROKES: usize = 128;
+pub const MAX_POINTS: usize = 8192;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct BrushMask {
+    pub strokes: Vec<BrushStroke>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct BrushStroke {
+    pub erase: bool,
+    /// Radius relative to the shorter image edge, before pressure.
+    pub radius: f32,
+    pub opacity: f32,
+    /// Normalized x, y, pressure. Pressure changes radius, not repeated opacity.
+    pub points: Vec<[f32; 3]>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -51,6 +70,8 @@ pub struct Edit {
     pub tone: f32,
     pub warmth: f32,
     pub tint: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mask: Option<BrushMask>,
 }
 
 pub fn validate(edits: &[Edit]) -> AuraResult<()> {
@@ -58,6 +79,7 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
         return Err(recipe_invalid(KEY, "too many retouch operations"));
     }
     let mut ids = std::collections::BTreeSet::new();
+    let mut total_points = 0;
     for edit in edits {
         let unit = |v: f32| v.is_finite() && (0.0..=1.0).contains(&v);
         if edit.id.is_empty()
@@ -84,6 +106,23 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
                 KEY,
                 "invalid retouch parameters, duplicate ID, or missing source",
             ));
+        }
+        if let Some(mask) = &edit.mask {
+            if mask.strokes.len() > MAX_STROKES {
+                return Err(recipe_invalid(KEY, "too many mask strokes"));
+            }
+            for stroke in &mask.strokes {
+                total_points += stroke.points.len();
+                if stroke.points.is_empty()
+                    || total_points > MAX_POINTS
+                    || !stroke.radius.is_finite()
+                    || !(0.0005..=0.25).contains(&stroke.radius)
+                    || !unit(stroke.opacity)
+                    || !stroke.points.iter().flatten().all(|v| unit(*v))
+                {
+                    return Err(recipe_invalid(KEY, "invalid or oversized brush mask"));
+                }
+            }
         }
     }
     Ok(())

@@ -1,4 +1,5 @@
 //! Deterministic, explicitly targeted native retouching. No learned segmentation. ADR-0068.
+use crate::retouch_mask::Coverage;
 use aura_recipe::retouch_tools::{Edit, Tool};
 
 fn luma(v: [f32; 3]) -> f32 {
@@ -7,21 +8,6 @@ fn luma(v: [f32; 3]) -> f32 {
 fn pixel(rgb: &[f32], width: usize, x: usize, y: usize) -> [f32; 3] {
     let i = (y * width + x) * 3;
     [rgb[i], rgb[i + 1], rgb[i + 2]]
-}
-
-fn weight(edit: &Edit, x: usize, y: usize, width: usize, height: usize) -> f32 {
-    let [cx, cy, rx, ry] = edit.region;
-    let dx = ((x as f32 + 0.5) / width as f32 - cx) / rx;
-    let dy = ((y as f32 + 0.5) / height as f32 - cy) / ry;
-    let d = dx.hypot(dy);
-    if d >= 1.0 {
-        return 0.0;
-    }
-    if edit.feather < 0.001 {
-        return 1.0;
-    }
-    let t = ((1.0 - d) / edit.feather).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
 }
 
 fn sample(rgb: &[f32], w: usize, h: usize, point: [f32; 2]) -> [f32; 3] {
@@ -47,22 +33,27 @@ pub fn apply(rgb: &mut [f32], width: usize, height: usize, edits: &[Edit]) {
         return;
     }
     for edit in edits.iter().filter(|e| e.enabled && e.amount > 0.0) {
+        let coverage = Coverage::new(edit, width, height);
         if edit.tool == Tool::AutoBlemish {
-            auto_spots(rgb, width, height, edit);
+            auto_spots(rgb, width, height, edit, &coverage);
         } else {
-            apply_one(rgb, width, height, edit);
+            apply_one(rgb, width, height, edit, &coverage, None);
         }
     }
 }
 
-fn apply_one(rgb: &mut [f32], w: usize, h: usize, edit: &Edit) {
+fn apply_one(
+    rgb: &mut [f32],
+    w: usize,
+    h: usize,
+    edit: &Edit,
+    coverage: &Coverage,
+    clip: Option<&Coverage>,
+) {
     let [cx, cy, rx, ry] = edit.region;
     let radius = (edit.radius * w.min(h) as f32).round().max(1.0) as usize;
     let margin = radius * 12 + 2;
-    let x0 = ((cx - rx).max(0.0) * w as f32) as usize;
-    let y0 = ((cy - ry).max(0.0) * h as f32) as usize;
-    let x1 = (((cx + rx).min(1.0) * w as f32).ceil() as usize).min(w);
-    let y1 = (((cy + ry).min(1.0) * h as f32).ceil() as usize).min(h);
+    let [x0, y0, x1, y1] = coverage.bounds;
     if x1 <= x0 || y1 <= y0 {
         return;
     }
@@ -138,7 +129,9 @@ fn apply_one(rgb: &mut [f32], w: usize, h: usize, edit: &Edit) {
     let mut patches = Vec::with_capacity((x1 - x0) * (y1 - y0));
     for y in y0..y1 {
         for x in x0..x1 {
-            let a = weight(edit, x, y, w, h) * edit.amount;
+            let a = coverage.at(x, y, w, h)
+                * clip.map_or(1.0, |mask| mask.at(x, y, w, h))
+                * edit.amount;
             if a <= 0.0 {
                 continue;
             }
@@ -256,8 +249,14 @@ fn apply_one(rgb: &mut [f32], w: usize, h: usize, edit: &Edit) {
     }
 }
 
-fn auto_spots(rgb: &mut [f32], w: usize, h: usize, edit: &Edit) {
+fn auto_spots(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) {
     // Measured spot proposals within an explicit region; not a trained blemish classifier.
+    // Painted opacity controls repair strength, not whether a spot can be detected.
+    let min_coverage = if edit.mask.is_some() {
+        f32::EPSILON
+    } else {
+        0.9
+    };
     let plane: Vec<f32> = rgb
         .chunks_exact(3)
         .map(|p| luma([p[0], p[1], p[2]]))
@@ -267,7 +266,7 @@ fn auto_spots(rgb: &mut [f32], w: usize, h: usize, edit: &Edit) {
     let mut candidates = Vec::new();
     for y in r * 3..h.saturating_sub(r * 3) {
         for x in r * 3..w.saturating_sub(r * 3) {
-            if weight(edit, x, y, w, h) < 0.9 {
+            if coverage.at(x, y, w, h) < min_coverage {
                 continue;
             }
             let i = y * w + x;
@@ -299,21 +298,23 @@ fn auto_spots(rgb: &mut [f32], w: usize, h: usize, edit: &Edit) {
         let mut spot = edit.clone();
         spot.tool = Tool::Heal;
         spot.source = None;
+        spot.mask = None;
         spot.region = [
             (x as f32 + 0.5) / w as f32,
             (y as f32 + 0.5) / h as f32,
             r as f32 * 1.5 / w as f32,
             r as f32 * 1.5 / h as f32,
         ];
-        // Stay fully within the user's ellipse, including the repair edge.
-        if weight(edit, x.saturating_sub(r * 2), y, w, h) < 0.9
-            || weight(edit, (x + r * 2).min(w - 1), y, w, h) < 0.9
-            || weight(edit, x, y.saturating_sub(r * 2), w, h) < 0.9
-            || weight(edit, x, (y + r * 2).min(h - 1), w, h) < 0.9
+        // Stay within the selected area, including the repair edge.
+        if coverage.at(x.saturating_sub(r * 2), y, w, h) < min_coverage
+            || coverage.at((x + r * 2).min(w - 1), y, w, h) < min_coverage
+            || coverage.at(x, y.saturating_sub(r * 2), w, h) < min_coverage
+            || coverage.at(x, (y + r * 2).min(h - 1), w, h) < min_coverage
         {
             continue;
         }
-        apply_one(rgb, w, h, &spot);
+        let spot_coverage = Coverage::new(&spot, w, h);
+        apply_one(rgb, w, h, &spot, &spot_coverage, Some(coverage));
         chosen.push((x, y));
     }
 }

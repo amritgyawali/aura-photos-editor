@@ -116,6 +116,7 @@ pub mod profiles;
 pub mod restore;
 pub mod retouch;
 pub mod retouch_tools;
+mod retouch_mask;
 pub mod shaders;
 pub mod spatial;
 pub mod tiles;

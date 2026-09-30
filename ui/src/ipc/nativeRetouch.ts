@@ -24,13 +24,18 @@ export const RETOUCH_TOOLS = [
   ['makeup', 'Local cosmetic tint', 'Color', 'Applies a controlled warm or magenta tint to a chosen region.'],
 ] as const;
 export type RetouchTool = typeof RETOUCH_TOOLS[number][0];
+export type BrushPoint = [number, number, number];
+export type BrushStroke = { erase: boolean; radius: number; opacity: number; points: BrushPoint[] };
+export type BrushMask = { strokes: BrushStroke[] };
 export type NativeRetouchEdit = {
   id: string; tool: RetouchTool; enabled: boolean; region: [number, number, number, number];
   source: [number, number] | null; amount: number; feather: number; radius: number;
   texture: number; tone: number; warmth: number; tint: number;
+  mask?: BrushMask | null;
 };
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
 export const nativeRetouch = {
-  edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
+  edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
   preview: (projectId: string, photoId: string, before = false) => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before}),
+  draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId}}),
 };
