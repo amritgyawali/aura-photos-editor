@@ -366,7 +366,7 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
     }
     // With people in frame the edges include warm skin-adjacent detail, so allow a little
     // more disagreement there; without people, stay strict.
-    let tolerance = if faces.is_empty() { 0.1 } else { 0.2 };
+    let tolerance = if faces.is_empty() { 0.1 } else { 0.15 };
     if (centre.0 - edge.0).hypot(centre.1 - edge.1) > tolerance {
         return Neutral::Unsure {
             reason: "the neutral areas and the edges disagree about the light (a coloured backdrop or mixed light)",

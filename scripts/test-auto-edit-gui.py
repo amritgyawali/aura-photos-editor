@@ -221,7 +221,9 @@ with sync_playwright() as pw:
         return {'options': opts, 'manualKept': all(any(e['id'] == i for e in after) for i in own),
                 'teethOps': sum(e['tool'] == 'teeth' for e in after), 'autoOps': sum(e['id'].startswith('auto-') for e in after),
                 'lastHistory': call('image_history', photoId=photo)['entries'][-1]['label']}
-    step('OS mouse/keyboard: automatic retouch settings, re-run', settings)
+    # Needs a desktop build that includes the auto_retouch command (ADR-0076 section 5).
+    if not __import__('os').environ.get('AURA_SKIP_SETTINGS'):
+        step('OS mouse/keyboard: automatic retouch settings, re-run', settings)
 
     report['final'] = frame('4-final')
     report['originalUnchanged'] = hashlib.sha256(SOURCE.read_bytes()).hexdigest() == source_hash
