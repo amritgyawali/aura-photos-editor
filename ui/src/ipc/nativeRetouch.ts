@@ -38,6 +38,9 @@ export type RetouchSelection = {
   luminance?: { low: number; high: number; softness: number } | null;
 };
 export type SelectionPreview = Pick<RenderDto, 'width'|'height'|'rgbBase64'>;
+/** Which automatic finishing runs and how strongly; remembered by the next Auto enhance. */
+export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean };
+export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true };
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8 };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 export type NativeRetouchEdit = {
@@ -63,6 +66,7 @@ export function validRetouchSelection(edit: NativeRetouchEdit): boolean {
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
 export const nativeRetouch = {
   autoPortrait: (photoId: string) => invoke<RecipeDto>('enhance_portrait', { input: { photoId } }),
+  autoRetouch: (projectId: string, photoId: string, options: AutoRetouchOptions, global = false) => invoke<RecipeDto>('auto_retouch', { input: { projectId, photoId, global, options } }),
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
   preview: (projectId: string, photoId: string, before = false) => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before}),
   draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId}}),

@@ -71,6 +71,9 @@ pub struct Report {
     pub steps: Vec<StepSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scene: Option<SceneSummary>,
+    /// The finishing choices this pass used; a later pass repeats them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub options: Option<portrait_features::Options>,
 }
 
 /// The history step an automatic retouch operation belongs to. Order is save order.
@@ -79,15 +82,17 @@ pub enum Group {
     Scene,
     Skin,
     Blemishes,
+    Refine,
     Eyes,
     Finishing,
 }
 
 impl Group {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Scene,
         Self::Skin,
         Self::Blemishes,
+        Self::Refine,
         Self::Eyes,
         Self::Finishing,
     ];
@@ -102,6 +107,8 @@ pub fn group_of(id: &str) -> Option<Group> {
     let rest = id.strip_prefix(PREFIX)?;
     Some(if rest.contains("-spot-") {
         Group::Blemishes
+    } else if rest.contains("-lines-") || rest.contains("-fold-") || rest.contains("-redness-") {
+        Group::Refine
     } else if rest.contains("-eye-") || rest.contains("-undereye-") {
         Group::Eyes
     } else if rest.ends_with("-teeth") || rest.ends_with("-shine") {
@@ -188,7 +195,17 @@ pub fn plan(
     detail: Option<(&[u8], u32, u32)>,
     exposure: f32,
 ) -> AuraResult<Plan> {
-    plan_with_faces(proposal, rgb, width, height, detail, exposure, None)
+    plan_with_faces(
+        proposal,
+        rgb,
+        width,
+        height,
+        detail,
+        exposure,
+        None,
+        &portrait_features::Options::default(),
+        false,
+    )
 }
 
 /// [`plan`], reusing faces the caller already detected on the same `rgb` thumbnail.
@@ -202,10 +219,16 @@ pub fn plan_with_faces(
     detail: Option<(&[u8], u32, u32)>,
     exposure: f32,
     faces: Option<Vec<PortraitFace>>,
+    options: &portrait_features::Options,
+    explicit: bool,
 ) -> AuraResult<Plan> {
-    let protected = proposal.provenance.user_edited_fields.iter().any(|path| {
-        path == retouch_tools::KEY || path.starts_with(&format!("{}.", retouch_tools::KEY))
-    });
+    let options = options.sanitised();
+    // An explicit request from the photographer replaces automatic operations even in a stack
+    // they have edited; their own operations are always kept.
+    let protected = !explicit
+        && proposal.provenance.user_edited_fields.iter().any(|path| {
+            path == retouch_tools::KEY || path.starts_with(&format!("{}.", retouch_tools::KEY))
+        });
     let disabled = std::env::var_os("AURA_DISABLE_AUTO_PORTRAIT").is_some_and(|v| v == "1");
     let mut report = Report {
         model: portrait::VERSION.into(),
@@ -220,6 +243,7 @@ pub fn plan_with_faces(
         planner_version: format!("sample-consensus-v2+{}", portrait_features::VERSION),
         steps: Vec::new(),
         scene: None,
+        options: Some(options),
     };
     let mut groups = BTreeMap::new();
     if disabled || protected {
@@ -243,18 +267,22 @@ pub fn plan_with_faces(
     let detail_pixels = detail
         .and_then(|(data, w, h)| portrait_features::Pixels::new(data, w, h))
         .or_else(|| portrait_features::Pixels::new(rgb, width, height));
-    let mut planned: [Vec<Edit>; 4] = Default::default();
+    let mut planned: [Vec<Edit>; 5] = Default::default();
     for (index, face) in report.faces.iter().enumerate() {
         let mut plan = plan_face(face, index, rgb, width, height);
+        for edit in &mut plan.edits {
+            edit.amount = (edit.amount * options.intensity).clamp(0.05, 0.5);
+        }
         let mut features = portrait_features::FeatureEdits::default();
         if !plan.edits.is_empty() {
             if let Some(px) = &detail_pixels {
-                features = portrait_features::plan(face, index, px, exposure, PREFIX);
+                features = portrait_features::plan(face, index, px, exposure, PREFIX, &options);
             }
         }
         let used: usize = planned.iter().map(Vec::len).sum();
         let wanted = plan.edits.len()
             + features.blemishes.len()
+            + features.refine.len()
             + features.eyes.len()
             + features.finishing.len();
         if manual + scene_ops + used + wanted > retouch_tools::MAX_EDITS {
@@ -285,15 +313,17 @@ pub fn plan_with_faces(
         }
         report.retouched_faces += 1;
         report.operations += wanted;
-        let [skin, spots, eyes, finishing] = &mut planned;
+        let [skin, spots, refine, eyes, finishing] = &mut planned;
         skin.extend(plan.edits);
         spots.extend(features.blemishes);
+        refine.extend(features.refine);
         eyes.extend(features.eyes);
         finishing.extend(features.finishing);
     }
-    let [skin, spots, eyes, finishing] = planned;
+    let [skin, spots, refine, eyes, finishing] = planned;
     groups.insert(Group::Skin, skin);
     groups.insert(Group::Blemishes, spots);
+    groups.insert(Group::Refine, refine);
     groups.insert(Group::Eyes, eyes);
     groups.insert(Group::Finishing, finishing);
     let spots: usize = report.assessments.iter().map(|a| a.spots_healed).sum();

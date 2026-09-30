@@ -778,6 +778,43 @@ fn count(edits: &BTreeMap<Group, Vec<Edit>>, group: Group) -> usize {
 /// # Errors
 /// A typed decode, analysis or recipe storage error.
 pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResult<RecipeDto> {
+    run_with(state, &input.photo_id, global, None)
+}
+
+/// A photographer's request to re-run automatic retouch with their own choices.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AutoRetouchInput {
+    pub project_id: String,
+    pub photo_id: String,
+    /// Also measure light and colour, as Auto enhance does.
+    #[serde(default)]
+    pub global: bool,
+    pub options: crate::portrait_features::Options,
+}
+
+/// Re-run automatic editing with chosen finishing options and intensity.
+/// # Errors
+/// Membership, decode, analysis or storage failures.
+pub fn auto_retouch(state: &AppState, input: &AutoRetouchInput) -> IpcResult<RecipeDto> {
+    crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
+    run_with(
+        state,
+        &input.photo_id,
+        input.global,
+        Some(input.options.sanitised()),
+    )
+}
+
+fn run_with(
+    state: &AppState,
+    photo_id: &str,
+    global: bool,
+    chosen: Option<crate::portrait_features::Options>,
+) -> IpcResult<RecipeDto> {
+    let input = DevelopImageInput {
+        photo_id: photo_id.to_owned(),
+    };
     let invalid = |message: &str| aura_core::errors::render::recipe_invalid("photo", message);
     let photo =
         PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo identifier"))?;
@@ -813,6 +850,14 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
         .and_then(|p| p.as_srgb8().map(|data| (data, p.width, p.height)));
     let mut tone = crate::photo_enhance::correction(rgb)?;
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
+    // A later Auto enhance repeats whatever finishing the photographer last chose.
+    let options = chosen.unwrap_or_else(|| {
+        base.extra
+            .get(portrait_auto::KEY)
+            .and_then(|report| report.get("options"))
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+            .unwrap_or_default()
+    });
     let disabled = std::env::var_os("AURA_DISABLE_AUTO_PORTRAIT").is_some_and(|v| v == "1");
     let faces = if disabled {
         Vec::new()
@@ -837,6 +882,8 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
         detail,
         exposure,
         Some(faces.clone()),
+        &options,
+        chosen.is_some(),
     )?;
     let mut report = portrait.report.clone();
     let mut groups = portrait.groups.clone();
@@ -982,9 +1029,15 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
                 retouch_tools::write(&mut proposal, &stack)?;
             }
         }
-        proposal.provenance.source = EditSource::Ai;
+        // A re-run the photographer asked for with their own settings is their edit.
+        let source = if chosen.is_some() {
+            EditSource::User
+        } else {
+            EditSource::Ai
+        };
+        proposal.provenance.source = source;
         proposal.provenance.confidence = 0.35;
-        let (merged, changes) = schema::merge(&current, &proposal, EditSource::Ai)?;
+        let (merged, changes) = schema::merge(&current, &proposal, source)?;
         schema::Validation::check(&merged)?;
         if changes.changed.is_empty() || !saved_changed(&current, &merged)? {
             continue;
@@ -996,7 +1049,13 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
             &changes.changed,
             &format!(
                 "{} {}/{total} · {}: {}",
-                if global { "Auto edit" } else { "Auto portrait" },
+                if chosen.is_some() {
+                    "Auto retouch (your settings)"
+                } else if global {
+                    "Auto edit"
+                } else {
+                    "Auto portrait"
+                },
                 i + 1,
                 step.title,
                 step.detail

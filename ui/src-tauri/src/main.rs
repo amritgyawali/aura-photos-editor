@@ -3057,6 +3057,17 @@ async fn enhance_portrait(
 }
 
 #[tauri::command]
+async fn auto_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::smart_edit::AutoRetouchInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::smart_edit::auto_retouch(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn enhance_photo(
     state: State<'_, AppState>,
     input: aura_app::contract::ipc::DevelopImageInput,
@@ -3285,6 +3296,7 @@ fn main() {
             apply_reference_style,
             enhance_photo,
             enhance_portrait,
+            auto_retouch,
             create_project,
             list_projects,
             start_ingest,

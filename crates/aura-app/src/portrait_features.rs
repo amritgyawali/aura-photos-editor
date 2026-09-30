@@ -321,6 +321,7 @@ pub struct FeatureReport {
 #[derive(Debug, Clone, Default)]
 pub struct FeatureEdits {
     pub blemishes: Vec<Edit>,
+    pub refine: Vec<Edit>,
     pub eyes: Vec<Edit>,
     pub finishing: Vec<Edit>,
     pub report: FeatureReport,
@@ -381,7 +382,9 @@ pub fn plan(
     px: &Pixels<'_>,
     exposure: f32,
     prefix: &str,
+    options: &Options,
 ) -> FeatureEdits {
+    let options = options.sanitised();
     let mut out = FeatureEdits::default();
     let Some(g) = Geometry::new(face, px) else {
         return out;
@@ -399,11 +402,297 @@ pub fn plan(
             .push("No usable skin reference was found; finishing was skipped.".into());
         return out;
     };
-    blemishes(&g, &skin, px, index, prefix, &mut out);
-    eyes(&g, &skin, px, index, prefix, exposure, &mut out);
-    mouth(&g, &skin, px, index, prefix, exposure, &mut out);
+    if options.blemishes {
+        blemishes(&g, &skin, px, index, prefix, &mut out);
+    }
+    if options.refine {
+        refine(&g, &skin, px, index, prefix, &mut out);
+    }
+    if options.eyes {
+        eyes(&g, &skin, px, index, prefix, exposure, &mut out);
+    }
+    if options.teeth {
+        mouth(&g, &skin, px, index, prefix, exposure, &mut out);
+    }
     shine(&g, &skin, px, index, prefix, &mut out);
+    // A heal either repairs a spot or it does not; every other strength follows the chosen
+    // intensity, within each tool's own bounds.
+    for edit in out
+        .refine
+        .iter_mut()
+        .chain(&mut out.eyes)
+        .chain(&mut out.finishing)
+    {
+        if edit.tool != Tool::RedEye {
+            edit.amount = (edit.amount * options.intensity).clamp(0.05, 0.9);
+        }
+    }
     out
+}
+
+/// Which automatic finishing runs, and how strongly. Chosen by the photographer in Retouch and
+/// remembered in the recipe's report, so a later Auto enhance repeats the same choice.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Options {
+    /// Multiplies every measured strength. `0.5` is subtle, `1.0` natural, `1.5` polished.
+    pub intensity: f32,
+    pub blemishes: bool,
+    pub eyes: bool,
+    pub teeth: bool,
+    /// Fine lines, smile-line softening and local redness evening.
+    pub refine: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            intensity: 1.0,
+            blemishes: true,
+            eyes: true,
+            teeth: true,
+            refine: true,
+        }
+    }
+}
+
+impl Options {
+    /// Clamp values a caller might send out of range.
+    #[must_use]
+    pub fn sanitised(self) -> Self {
+        Self {
+            intensity: if self.intensity.is_finite() {
+                self.intensity.clamp(0.25, 1.5)
+            } else {
+                1.0
+            },
+            ..self
+        }
+    }
+}
+
+/// Mean absolute departure of luminance from its local mean at `k` pixels: texture and lines at
+/// that scale. Skin-coloured pixels only, so hair, brows and shadows do not count.
+fn line_energy(zone: Capsule, g: &Geometry, skin: &SkinReference, px: &Pixels<'_>) -> Option<f32> {
+    let k = ((0.03 * g.d).round() as usize).max(2);
+    let mut sum = 0.0_f32;
+    let mut n = 0.0_f32;
+    zone.each(px, |x, y| {
+        let p = px.linear(x, y);
+        if !skin.affine(p) {
+            return;
+        }
+        let (mut local, mut m) = (0.0_f32, 0.0_f32);
+        let step = (k / 3).max(1);
+        for yy in (y.saturating_sub(k)..=(y + k).min(px.height - 1)).step_by(step) {
+            for xx in (x.saturating_sub(k)..=(x + k).min(px.width - 1)).step_by(step) {
+                local += luma(px.linear(xx, yy));
+                m += 1.0;
+            }
+        }
+        let mean = local / m.max(1.0);
+        sum += (luma(p) - mean).abs() / mean.max(1e-4);
+        n += 1.0;
+    });
+    (n >= 20.0).then(|| sum / n)
+}
+
+fn mean_encoded_redness(zone: Capsule, skin: &SkinReference, px: &Pixels<'_>) -> Option<f32> {
+    let mut sum = 0.0_f32;
+    let mut n = 0.0_f32;
+    zone.each(px, |x, y| {
+        let p = px.linear(x, y);
+        let l = luma(p);
+        // Nostril shadows and highlights are not skin tone.
+        if l < skin.luma * 0.5 || l > skin.luma * 1.8 {
+            return;
+        }
+        let q = px.encoded(x, y);
+        sum += (q[0] - (q[1] + q[2]) * 0.5) / q[0].max(q[1]).max(q[2]).max(1e-4);
+        n += 1.0;
+    });
+    (n >= 12.0).then(|| sum / n)
+}
+
+/// Fine lines around the eyes and on the forehead, smile-line depth and local redness around
+/// the nose: each softened only when it measures stronger than the same person's cheek.
+fn refine(
+    g: &Geometry,
+    skin: &SkinReference,
+    px: &Pixels<'_>,
+    face: usize,
+    prefix: &str,
+    out: &mut FeatureEdits,
+) {
+    if g.d < 50.0 {
+        return;
+    }
+    let d = g.d;
+    let short = px.width.min(px.height) as f32;
+    let cheek_zone = Capsule::disk(add(g.eyes[0], g.v, 0.6 * d), 0.14 * d);
+    let cheek_zone_b = Capsule::disk(add(g.eyes[1], g.v, 0.6 * d), 0.14 * d);
+    let cheek = match (
+        line_energy(cheek_zone, g, skin, px),
+        line_energy(cheek_zone_b, g, skin, px),
+    ) {
+        (Some(a), Some(b)) => a.min(b),
+        (Some(a), None) | (None, Some(a)) => a,
+        (None, None) => return,
+    };
+    let mut parts = Vec::new();
+    // 1. Fine lines: crow's feet beside each eye and lines across the forehead.
+    let zones = [
+        (
+            "lines-a",
+            Capsule::disk(add(add(g.eyes[0], g.u, -0.4 * d), g.v, 0.04 * d), 0.1 * d),
+        ),
+        (
+            "lines-b",
+            Capsule::disk(add(add(g.eyes[1], g.u, 0.4 * d), g.v, 0.04 * d), 0.1 * d),
+        ),
+        (
+            "lines-forehead",
+            Capsule {
+                a: add(add(g.mid, g.v, -0.72 * d), g.u, -0.3 * d),
+                b: add(add(g.mid, g.v, -0.72 * d), g.u, 0.3 * d),
+                r: 0.09 * d,
+            },
+        ),
+    ];
+    let mut softened = 0;
+    for (name, zone) in zones {
+        let Some(energy) = line_energy(zone, g, skin, px) else {
+            continue;
+        };
+        let ratio = energy / cheek.max(1e-4);
+        if ratio < 1.35 {
+            continue;
+        }
+        let [cx, cy] = zone.a;
+        let mut edit = masked(
+            base_edit(
+                format!("{prefix}{face}-{name}"),
+                Tool::Wrinkle,
+                ((ratio - 1.2) * 0.5).clamp(0.15, 0.45),
+                px,
+                [
+                    cx,
+                    cy,
+                    zone.r * 1.5 + distance(zone.a, zone.b),
+                    zone.r * 1.5,
+                ],
+            ),
+            px,
+            &[zone],
+        );
+        edit.feather = 0.85;
+        edit.tone = 0.8;
+        edit.texture = 1.0;
+        edit.radius = (0.012 * d / short).clamp(0.0005, 0.05);
+        out.refine.push(edit);
+        softened += 1;
+    }
+    if softened > 0 {
+        parts.push(format!(
+            "softened fine lines in {softened} area{} where line texture measured stronger than the cheek (fine skin texture kept)",
+            plural(softened)
+        ));
+    }
+    // 2. Smile lines: lift the fold only where it is darker than the cheek beside it.
+    let mut folds = 0;
+    for (corner, side, name) in [(g.mouth[0], -1.0, "fold-a"), (g.mouth[1], 1.0, "fold-b")] {
+        let fold = Capsule {
+            a: add(g.nose, g.u, side * 0.28 * d),
+            b: add(corner, g.u, side * 0.08 * d),
+            r: 0.045 * d,
+        };
+        let beside = Capsule {
+            a: add(fold.a, g.u, side * 0.12 * d),
+            b: add(fold.b, g.u, side * 0.12 * d),
+            r: 0.045 * d,
+        };
+        let mean = |c: Capsule| {
+            let (mut sum, mut n) = (0.0_f32, 0.0_f32);
+            c.each(px, |x, y| {
+                let p = px.linear(x, y);
+                if skin.affine(p) {
+                    sum += luma(p);
+                    n += 1.0;
+                }
+            });
+            (n >= 12.0).then(|| sum / n)
+        };
+        if let (Some(f), Some(b)) = (mean(fold), mean(beside)) {
+            let drop = 1.0 - f / b.max(1e-4);
+            if drop > 0.08 {
+                let [cx, cy] = [(fold.a[0] + fold.b[0]) * 0.5, (fold.a[1] + fold.b[1]) * 0.5];
+                let mut edit = masked(
+                    base_edit(
+                        format!("{prefix}{face}-{name}"),
+                        Tool::MicroDodgeBurn,
+                        ((drop - 0.05) * 2.5).clamp(0.15, 0.4),
+                        px,
+                        [cx, cy, 0.3 * d, 0.3 * d],
+                    ),
+                    px,
+                    &[fold],
+                );
+                edit.feather = 0.9;
+                edit.radius = (0.03 * d / short).clamp(0.0005, 0.05);
+                out.refine.push(edit);
+                folds += 1;
+            }
+        }
+    }
+    if folds > 0 {
+        parts.push(format!(
+            "softened {folds} smile line{} that measured darker than the cheek beside {} (expression kept)",
+            plural(folds),
+            if folds == 1 { "it" } else { "them" }
+        ));
+    }
+    // 3. Local redness around the nose wings, evened toward this person's own cheek colour.
+    let reference = add(g.eyes[0], g.v, 0.6 * d);
+    let cheek_red = mean_encoded_redness(Capsule::disk(reference, 0.1 * d), skin, px);
+    let mut evened = 0;
+    for (side, name) in [(-1.0, "redness-a"), (1.0, "redness-b")] {
+        let zone = Capsule::disk(add(add(g.nose, g.u, side * 0.2 * d), g.v, 0.0), 0.08 * d);
+        if let (Some(zone_red), Some(base)) = (mean_encoded_redness(zone, skin, px), cheek_red) {
+            let excess = zone_red - base;
+            if excess > 0.05 {
+                let (w, h) = (px.width as f32, px.height as f32);
+                let mut edit = masked(
+                    base_edit(
+                        format!("{prefix}{face}-{name}"),
+                        Tool::ColorMatch,
+                        (excess * 5.0).clamp(0.2, 0.6),
+                        px,
+                        [zone.a[0], zone.a[1], 0.12 * d, 0.12 * d],
+                    ),
+                    px,
+                    &[zone],
+                );
+                edit.source = Some([
+                    (reference[0] / w).clamp(0.0, 1.0),
+                    (reference[1] / h).clamp(0.0, 1.0),
+                ]);
+                edit.feather = 0.9;
+                out.refine.push(edit);
+                evened += 1;
+            }
+        }
+    }
+    if evened > 0 {
+        parts.push(format!(
+            "evened redness beside the nose on {evened} side{} toward the same person's cheek colour",
+            plural(evened)
+        ));
+    }
+    if !parts.is_empty() {
+        out.report
+            .findings
+            .push(format!("Refine: {}.", parts.join("; ")));
+    }
 }
 
 /// Box mean of `value` over masked pixels, using integral images.
@@ -1233,7 +1522,7 @@ mod tests {
                 mole,
             );
             let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
-            let plan = plan(&face(), 0, &px, 0.0, "p-");
+            let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
             assert_eq!(plan.report.spots_healed, 1, "{skin:?}: {:?}", plan.report);
             assert!(plan.report.marks_kept >= 1, "{skin:?}: {:?}", plan.report);
             let spot_edit = &plan.blemishes[0];
@@ -1252,12 +1541,12 @@ mod tests {
     fn a_clean_face_gets_no_blemish_or_teeth_edits_and_is_deterministic() {
         let rgb = canvas(300, [180, 130, 105]);
         let px = Pixels::new(&rgb, 300, 300).unwrap();
-        let a = plan(&face(), 0, &px, 0.0, "p-");
+        let a = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
         assert!(a.blemishes.is_empty());
         assert!(a.finishing.is_empty());
         // A uniform canvas has no open eye (no sclera brighter than skin).
         assert!(a.eyes.is_empty(), "{:?}", a.report);
-        let b = plan(&face(), 0, &px, 0.0, "p-");
+        let b = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
         assert_eq!(a.report, b.report);
     }
 
@@ -1277,7 +1566,7 @@ mod tests {
             paint(&mut rgb, size, c, 0.035 * d, [40, 30, 25]);
         }
         let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
-        let plan = plan(&face(), 0, &px, 0.0, "p-");
+        let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
         let tools: Vec<_> = plan.eyes.iter().map(|e| (e.id.clone(), e.tool)).collect();
         assert_eq!(
             tools.iter().filter(|(_, t)| *t == Tool::EyeDetail).count(),
@@ -1299,9 +1588,94 @@ mod tests {
                 paint(&mut rgb, size, [200.0 + dx as f32 * 3.0, 280.0], 4.5, teeth);
             }
             let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
-            let plan = plan(&face(), 0, &px, 0.0, "p-");
+            let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
             let whitened = plan.finishing.iter().any(|e| e.tool == Tool::Teeth);
             assert_eq!(whitened, expect, "{:?}", plan.report);
+        }
+    }
+
+    #[test]
+    fn measured_lines_folds_and_nose_redness_are_softened_and_options_are_respected() {
+        let size = 400;
+        let skin = [170, 125, 100];
+        let mut rgb = canvas(size, skin);
+        let d = 96.0;
+        let (eye_a, nose, mouth_a) = ([0.38 * 400.0, 160.0], [200.0, 220.0], [164.0, 280.0]);
+        // Crow's feet beside eye a: thin darker lines at the line scale.
+        let c = [eye_a[0] - 0.4 * d, eye_a[1] + 0.04 * d];
+        for k in -3..=3 {
+            let y = c[1] + k as f32 * 3.0;
+            for x in (c[0] - 8.0) as usize..(c[0] + 8.0) as usize {
+                let i = (y as usize * size + x) * 3;
+                rgb[i..i + 3].copy_from_slice(&[140, 100, 80]);
+            }
+        }
+        // A smile line from the nose wing to the mouth corner, darker than the cheek beside it.
+        for t in 0..60 {
+            let f = t as f32 / 59.0;
+            let a = [nose[0] - 0.28 * d, nose[1]];
+            let b = [mouth_a[0] - 0.08 * d, mouth_a[1]];
+            paint(
+                &mut rgb,
+                size,
+                [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f],
+                3.0,
+                [135, 98, 80],
+            );
+        }
+        // Redness beside the other nose wing.
+        paint(
+            &mut rgb,
+            size,
+            [nose[0] + 0.2 * d, nose[1]],
+            0.07 * d,
+            [185, 110, 95],
+        );
+        let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
+        let all = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
+        let ids: Vec<_> = all.refine.iter().map(|e| (e.id.clone(), e.tool)).collect();
+        assert!(
+            ids.iter()
+                .any(|(id, t)| id.ends_with("-lines-a") && *t == Tool::Wrinkle),
+            "{ids:?} {:?}",
+            all.report
+        );
+        assert!(
+            ids.iter()
+                .any(|(id, t)| id.ends_with("-fold-a") && *t == Tool::MicroDodgeBurn),
+            "{ids:?}"
+        );
+        assert!(
+            ids.iter()
+                .any(|(id, t)| id.ends_with("-redness-b") && *t == Tool::ColorMatch),
+            "{ids:?}"
+        );
+        retouch_tools::validate(&all.refine).unwrap();
+        let off = plan(
+            &face(),
+            0,
+            &px,
+            0.0,
+            "p-",
+            &Options {
+                refine: false,
+                ..Options::default()
+            },
+        );
+        assert!(off.refine.is_empty());
+        let gentle = plan(
+            &face(),
+            0,
+            &px,
+            0.0,
+            "p-",
+            &Options {
+                intensity: 0.5,
+                ..Options::default()
+            },
+        );
+        for (a, b) in all.refine.iter().zip(&gentle.refine) {
+            assert!(b.amount < a.amount, "{} {} {}", a.id, a.amount, b.amount);
         }
     }
 
@@ -1309,7 +1683,7 @@ mod tests {
     fn tiny_faces_are_skipped_with_a_reason() {
         let rgb = canvas(60, [180, 130, 105]);
         let px = Pixels::new(&rgb, 60, 60).unwrap();
-        let plan = plan(&face(), 0, &px, 0.0, "p-");
+        let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
         assert!(plan.blemishes.is_empty() && plan.eyes.is_empty() && plan.finishing.is_empty());
         assert!(!plan.report.findings.is_empty());
     }
