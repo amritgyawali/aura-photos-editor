@@ -50,6 +50,7 @@ fn every_tool_preserves_pixels_outside_the_selected_region() {
         Tool::SkinSmooth,
         Tool::SkinUniformity,
         Tool::PortraitDodgeBurn,
+        Tool::PatchHeal,
     ] {
         let mut operation = edit(tool);
         operation.source = Some([0.15, 0.15]);
@@ -291,6 +292,7 @@ fn every_tool_respects_painted_and_erased_pixels() {
         Tool::SkinSmooth,
         Tool::SkinUniformity,
         Tool::PortraitDodgeBurn,
+        Tool::PatchHeal,
     ] {
         let mut op = edit(tool);
         op.source = Some([0.1, 0.1]);

@@ -39,6 +39,8 @@ pub fn apply(rgb: &mut [f32], width: usize, height: usize, edits: &[Edit]) {
             Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
         ) {
             crate::retouch_skin::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::PatchHeal {
+            crate::retouch_heal::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::AutoBlemish {
             auto_spots(rgb, width, height, edit, &coverage);
         } else {
@@ -243,7 +245,8 @@ fn apply_one(
                         value[0] = (old[1] + old[2]) * 0.5;
                     }
                 }
-                Tool::AutoBlemish
+                Tool::PatchHeal
+                | Tool::AutoBlemish
                 | Tool::SkinSmooth
                 | Tool::SkinUniformity
                 | Tool::PortraitDodgeBurn => {}

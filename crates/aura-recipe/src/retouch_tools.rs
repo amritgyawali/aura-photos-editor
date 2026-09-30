@@ -68,6 +68,7 @@ pub enum Tool {
     SkinSmooth,
     SkinUniformity,
     PortraitDodgeBurn,
+    PatchHeal,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -96,6 +97,11 @@ pub struct Edit {
     pub skin: Option<SkinSettings>,
 }
 
+/// Validate retouch parameters and aggregate authoring limits.
+///
+/// # Errors
+/// Returns a recipe error for invalid parameters, missing required sources,
+/// duplicate identifiers or excessive operations, strokes or points.
 pub fn validate(edits: &[Edit]) -> AuraResult<()> {
     if edits.len() > MAX_EDITS {
         return Err(recipe_invalid(KEY, "too many retouch operations"));
@@ -143,6 +149,15 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
         }) {
             return Err(recipe_invalid(KEY, "invalid skin range or edge protection"));
         }
+        if edit.tool == Tool::PatchHeal
+            && edit.source.is_none()
+            && (edit.mask.is_some() || edit.region[2] > 0.1 || edit.region[3] > 0.1)
+        {
+            return Err(recipe_invalid(
+                KEY,
+                "choose a source for painted or large patch repairs",
+            ));
+        }
         if let Some(mask) = &edit.mask {
             if mask.strokes.len() > MAX_STROKES {
                 return Err(recipe_invalid(KEY, "too many mask strokes"));
@@ -164,6 +179,10 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
     Ok(())
 }
 
+/// Read and validate the optional native retouch extension.
+///
+/// # Errors
+/// Returns a recipe error if the stored extension is malformed or fails validation.
 pub fn read(recipe: &Recipe) -> AuraResult<Vec<Edit>> {
     let Some(value) = recipe.extra.get(KEY) else {
         return Ok(Vec::new());
@@ -174,6 +193,10 @@ pub fn read(recipe: &Recipe) -> AuraResult<Vec<Edit>> {
     Ok(edits)
 }
 
+/// Store validated native operations without modifying other recipe fields.
+///
+/// # Errors
+/// Returns a recipe error if validation or serialization fails.
 pub fn write(recipe: &mut Recipe, edits: &[Edit]) -> AuraResult<()> {
     validate(edits)?;
     // Keep an empty array after clearing so merge records the deletion as a user edit.

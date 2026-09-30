@@ -2,6 +2,13 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Texture-aware patch healing
+
+- Added a native patch repair tool with surrounding-texture donor matching and local tone blending; existing Heal operations retain their behavior.
+- Small ellipses support automatic donor search. Painted and larger repairs require a chosen source, with validation in both the interface and native recipe path.
+- Fractional and overlapping source patches use immutable source pixels. Undo/redo, disposable previews, editable operations and export use the shared renderer.
+- Added behavior tests and extended the five-portrait desktop verification script with `--workflow patch-heal`.
+
 ## Sample-guided portrait retouching
 
 - Added skin smoothing with edge protection and adjustable fine detail, sampled skin-tone evening that preserves luminance, and bounded skin dodge/burn that preserves RGB proportions.

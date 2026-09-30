@@ -11,7 +11,7 @@ quality ranking has been established. There is no basis for calling AURA best.
 | Natural smoothing | SkinFiner describes smoothing with texture preservation | New sample-guided smoothing separates fine detail from middle-scale variation and protects edges. Detail defaults to 100% |
 | Uneven skin color | SkinFiner describes redness/yellow correction; Retouch4me Skin Tone describes skin-tone evening | New uniformity tool moves low-frequency chroma toward the chosen sample while preserving luminance. No automatic redness/yellowness classifier |
 | Dodge and burn | Retouch4me documents automated portrait correction and optional Soft Light output | New sampled skin dodge/burn uses bounded exposure correction and preserves RGB proportions. No face-aware learned decision or Soft Light layer export |
-| Blemishes | Retouch4me Heal documents automatic problem-area detection | Existing local-statistics dark-spot detection and sampled healing; no semantic distinction between temporary blemishes and permanent marks |
+| Blemishes | Retouch4me Heal documents automatic problem-area detection | Local-statistics dark-spot detection plus texture-aware patch matching and approximate harmonic tone blending; no semantic distinction between temporary blemishes and permanent marks |
 | Eye bags and facial features | SkinFiner describes eye-bag reduction on automatically detected faces | Existing under-eye tool needs manual selection; no automatic anatomical localization in this workspace |
 | Presets | SkinFiner documents built-in and custom presets | Existing local named presets now include skin tolerance/edge settings and omit photo-specific samples/masks |
 | Manual refinement | SkinFiner documents manual skin-mask refinement | AURA provides painted masks, erasure, pressure, feathering, numeric coordinates and sample picking |
@@ -32,9 +32,16 @@ independent proof of visual quality.
 
 ## Verification and remaining evidence
 
-The UI suite passed 540 tests across 57 files. Eighteen native tests passed
-(11 existing retouch tests extended to all 23 tools, plus seven sampled-skin
-tests). TypeScript and production UI builds passed.
+The UI suite passed 541 tests across 57 files. Twenty-three native tests passed
+(11 existing retouch tests extended to all 24 tools, seven sampled-skin tests,
+and five patch-healing tests). TypeScript and production UI builds passed.
+
+Strict Clippy checks were also run. They remain blocked by existing findings:
+three in recipe `xmp.rs`/`schema.rs` (single-letter bindings and function length),
+and 67 in render `retouch_tools.rs`/`retouch_mask.rs` (including bounded indexing).
+The new `retouch_heal.rs` module produced no findings. Missing error documentation
+in the touched recipe retouch API was fixed. This is not a clean repository lint
+gate; no lint rules were relaxed to obtain a passing claim.
 
 The native desktop build passed on this Windows machine using
 `CARGO_INCREMENTAL=0` and the command-line override
@@ -44,6 +51,9 @@ corrupt `aura-vision` archive under Rust 1.97.1. Disabling that package's debug
 information produced a structurally valid archive and completed the build.
 This is a local build workaround, not an identified root-cause fix; release
 profiles and repository build settings were not changed.
+The patch-heal build later hit LNK1143 in an `aura-brain-photo` archive. Adding
+`--config profile.dev.package.aura-brain-photo.debug=0` also rebuilt that package
+and completed the desktop build. These remain command-line workarounds.
 
 The sampled-skin tests measure luminance preservation, bounded exposure and chroma
 preservation, unchanged unmatched colors, neutral settings, serialization/input
@@ -51,7 +61,7 @@ validation, fine-detail retention and reduction of a synthetic tonal pattern.
 The same test pattern at several exposure levels checks signal-relative behavior;
 it does **not** establish fairness across real skin tones. Edge tests exercise a
 brightness boundary. Existing painted/erased-region isolation tests include all
-23 tools.
+24 tools.
 
 The repeatable desktop workflow is `scripts/test-sampled-skin.py`. It uses five
 real portrait JPEGs in a separate collection and verifies draft isolation,
@@ -68,6 +78,18 @@ Evidence is in `.work-checks/sampled-skin-review/results.json`, with full-size
 before/after images and a desktop screenshot alongside it. Individual native
 preview calls reported 878–2667 ms on this loaded development machine; this is
 not a controlled throughput benchmark or a comparison against either product.
+
+The patch-heal workflow also passed on the same five portraits in its own
+collection (`scripts/test-sampled-skin.py --workflow patch-heal`). Automatic and
+manual-source draft previews changed pixels without saving, saved repairs stayed
+inside target bounds, undo/redo restored exact pixels, and five verified PNGs
+matched the full renderer. Original hashes were unchanged. Desktop controls
+correctly required a source for painted repairs, and before/after, discard and
+return-to-Develop checks passed. Evidence is in
+`.work-checks/patch-heal-review/results.json` with before/after images and a
+workspace screenshot. These portraits verify integration; synthetic tests supply
+the isolated blemish and texture-transfer evidence. Healthy skin test patches do
+not establish real-acne removal quality or a comparison with commercial tools.
 
 To establish closer parity, a future evaluation needs paired originals and
 competitor outputs with versions/settings recorded, face/skin reference masks,

@@ -1,7 +1,7 @@
 # Native portrait retouch
 
 Open **Photo Studio → Develop → Retouch**. Processing runs locally without an
-account or API key. The workspace provides 23 named workflows using AURA's own
+account or API key. The workspace provides 24 named workflows using AURA's own
 image-processing algorithms. It does not contain Retouch4me's proprietary code
 or trained models, and does not claim equivalent automatic results.
 
@@ -15,6 +15,7 @@ Clone and color matching require a source: Alt-click the photograph or choose
 | Workflow | What it does in the selected area |
 | --- | --- |
 | Heal | Blends a sampled or nearby donor with local tone matching |
+| Texture-aware patch heal | Matches nearby texture around a small repair or uses a chosen source; blends the donor with surrounding light |
 | Clone | Copies a source patch with a feathered blend |
 | Auto blemish | Detects and repairs small dark local spots; review permanent marks |
 | Frequency separation | Adjusts low-frequency tone and high-frequency texture independently |
@@ -82,6 +83,26 @@ strokes; the saved stack supports 8,192 total brush points. The UI limits each
 gesture to 1,024 points. Larger work can be simplified into shorter strokes and
 fewer operations. The selection guide approximates stroke shape; the native
 preview shows the actual feathering and effect.
+
+## Texture-aware patch heal
+
+Choose **Texture-aware patch heal** under Repair. Place a small ellipse around the
+blemish and enable **Preview unsaved changes**. With no source chosen, AURA searches
+nearby patches using the texture surrounding the selection. Keep the ellipse close
+to the spot, with clean skin around its edge. Review pores and repeated patterns
+before applying. If no nearby donor fits inside the image, the repair has no effect.
+
+For more control, **Pick source on photo** or Alt-click a clean patch with similar
+texture. Painted repairs and ellipses with either radius above 10% require a source.
+Each operation uses one source offset; create separate operations for spots needing
+different texture. Feather and Strength control the final blend. Source pixels
+outside the photograph leave those target pixels unchanged.
+
+The tool blends surrounding tone using an approximate correction field. Large
+areas and sharp lighting boundaries may need smaller repairs or a different source.
+It does not decide which marks should be removed. Existing Heal operations keep
+their previous behavior. [ADR-0071](adr/ADR-0071-texture-aware-patch-heal.md) records
+the algorithm and its limits.
 
 ## Sampled skin tools
 

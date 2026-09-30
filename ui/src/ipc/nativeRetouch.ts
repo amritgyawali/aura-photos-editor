@@ -3,6 +3,7 @@ import type { RenderDto } from './types';
 
 export const RETOUCH_TOOLS = [
   ['heal', 'Heal blemish / flyaway / lint', 'Repair', 'Samples nearby pixels; choose a source for precise repairs.'],
+  ['patch_heal', 'Texture-aware patch heal', 'Repair', 'Matches nearby texture and blends surrounding light. Auto source works on small ellipses; choose a source for painted or larger repairs.'],
   ['clone', 'Clone stamp', 'Repair', 'Copies the selected source patch into the target.'],
   ['auto_blemish', 'Auto spot cleanup', 'Skin', 'Finds small dark spots inside your selection. Review permanent marks and fine details afterward.'],
   ['frequency', 'Frequency separation', 'Skin', 'Adjust tonal unevenness and fine texture independently.'],
@@ -40,6 +41,9 @@ export type NativeRetouchEdit = {
   mask?: BrushMask | null;
   skin?: SkinSettings | null;
 };
+export const needsRetouchSource = (edit: NativeRetouchEdit) => ['clone', 'color_match'].includes(edit.tool)
+  || isSampledSkinTool(edit.tool)
+  || (edit.tool === 'patch_heal' && (Boolean(edit.mask) || edit.region[2] > .1 || edit.region[3] > .1));
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
 export const nativeRetouch = {
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),

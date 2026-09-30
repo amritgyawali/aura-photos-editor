@@ -131,6 +131,20 @@ the original files before and after. Generated evidence stays under `.work-check
 This run's machine-readable results are in `.work-checks/studio-tools-review/results.json`;
 plain outputs, watermark proofs and interface screenshots are alongside them.
 
+## Texture-aware patch repair
+
+The native Retouch workspace now includes a separate texture-aware patch heal
+operation. Small ellipses can search nearby texture automatically; painted or
+larger repairs use a photographer-selected source. Approximate harmonic tone
+blending matches surrounding light while transferring donor detail. Old Heal
+operations retain their rendering behavior.
+
+The [native retouch guide](native-retouch.md) describes the controls and limits;
+[ADR-0071](adr/ADR-0071-texture-aware-patch-heal.md) records the independent
+algorithm. The five-portrait verification script accepts `--workflow patch-heal`.
+This feature does not provide semantic blemish detection or demonstrate exact
+Retouch4me/SkinFiner quality parity.
+
 ## Work still required for the full request
 
 All 100 features are **not implemented**. This batch expands the existing editor without

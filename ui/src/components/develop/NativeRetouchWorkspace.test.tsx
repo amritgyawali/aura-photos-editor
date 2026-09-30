@@ -13,6 +13,25 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('allows automatic small patch repairs and requires a source for larger or painted repairs',async()=>{
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'patch_heal'}});
+  const apply=screen.getByText('Apply retouch') as HTMLButtonElement;
+  expect(apply.disabled).toBe(false);
+  fireEvent.change(screen.getByLabelText('Horizontal radius (%)'),{target:{value:'11'}});
+  expect(apply.disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Horizontal radius (%)'),{target:{value:'3'}});
+  expect(apply.disabled).toBe(false);
+  fireEvent.click(screen.getByText('Brush (B)'));
+  fireEvent.click(screen.getByText('Dab at target coordinates'));
+  expect(apply.disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Source X (%)'),{target:{value:'40'}});
+  fireEvent.change(screen.getByLabelText('Source Y (%)'),{target:{value:'35'}});
+  fireEvent.click(apply);
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'patch_heal',source:[.4,.35],mask:{strokes:[expect.objectContaining({erase:false})]}})
+  ]));
+});
 it('blocks changes during collection editing and refreshes after external revisions',async()=>{
   const props={projectId:'project',photoId:'photo',onClose:vi.fn(),onBusyChange:vi.fn()};
   const view=render(<NativeRetouchWorkspace {...props} disabled revision={0}/>);
