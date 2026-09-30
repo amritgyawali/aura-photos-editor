@@ -1,0 +1,510 @@
+{
+  "asOf": "2026-09-30",
+  "baseline": "d01cacd",
+  "scope": "Twenty prioritized retouching capabilities across five selected professional reference products. This is a documented feature study and AURA target specification, not an independent product ranking or implementation-completion report.",
+  "products": [
+    {
+      "name": "Adobe Photoshop",
+      "focus": "Manual healing, cloning, tonal brushes and compositing.",
+      "note": "Manual tools are not evidence of automatic face-aware processing.",
+      "sources": [
+        "psHeal",
+        "psClone",
+        "psDB"
+      ]
+    },
+    {
+      "name": "Affinity",
+      "focus": "Editable frequency separation and precision texture work.",
+      "note": "Current Affinity Pixel studio documentation; not limited to the older Photo 2 edition.",
+      "sources": [
+        "affinity"
+      ]
+    },
+    {
+      "name": "Retouch4me",
+      "focus": "Specialist automated portrait and studio cleanup plugins.",
+      "note": "A suite of separate tools; access depends on the plugins and workflow purchased.",
+      "sources": [
+        "r4",
+        "r4FS"
+      ]
+    },
+    {
+      "name": "Evoto",
+      "focus": "Automated skin, complexion and portrait adjustments.",
+      "note": "The manual documents high/low-frequency sliders; this does not establish a general layer-stack editor.",
+      "sources": [
+        "evoto",
+        "evotoPortrait"
+      ]
+    },
+    {
+      "name": "PortraitPro",
+      "focus": "Portrait-specific skin, eyes, makeup and lighting controls.",
+      "note": "Automatic batch processing is documented for Studio Max; Photoshop Smart Filter integration for Studio and Studio Max.",
+      "sources": [
+        "portraitpro"
+      ]
+    }
+  ],
+  "sources": {
+    "psHeal": {
+      "title": "Photoshop Healing Brush",
+      "url": "https://helpx.adobe.com/photoshop/desktop/repair-retouch/clean-restore-images/healing-brush-tool.html"
+    },
+    "psClone": {
+      "title": "Photoshop Clone Stamp",
+      "url": "https://helpx.adobe.com/photoshop/desktop/repair-retouch/heal-clone/retouch-images-with-the-clone-stamp-tool.html"
+    },
+    "psDB": {
+      "title": "Photoshop Dodge and Burn",
+      "url": "https://helpx.adobe.com/photoshop/desktop/repair-retouch/adjust-light-tone/dodge-or-burn-image-areas.html"
+    },
+    "affinity": {
+      "title": "Affinity frequency separation workflow",
+      "url": "https://www.affinity.studio/blog/frequency-separation-explained"
+    },
+    "evoto": {
+      "title": "Evoto Skin Retouching manual",
+      "url": "https://support.evoto.ai/portrait-retouching-module-skin-retouching/"
+    },
+    "evotoPortrait": {
+      "title": "Evoto portrait retouching",
+      "url": "https://www.evoto.ai/features/portrait-retouching"
+    },
+    "r4": {
+      "title": "Retouch4me retouching plugins",
+      "url": "https://retouch4.me/retouchplugins"
+    },
+    "r4FS": {
+      "title": "Retouch4me Frequency Separation",
+      "url": "https://retouch4.me/products/retouch-plugins/116?lng=en"
+    },
+    "portraitpro": {
+      "title": "PortraitPro features and editions",
+      "url": "https://www.anthropics.com/portraitpro/"
+    }
+  },
+  "features": [
+    {
+      "id": 1,
+      "name": "Blemish and acne removal",
+      "category": "Skin",
+      "priority": "P0",
+      "products": [
+        "Retouch4me",
+        "Evoto",
+        "Adobe Photoshop"
+      ],
+      "sources": [
+        "r4",
+        "evotoPortrait",
+        "psHeal"
+      ],
+      "evidence": "Heal / blemish removal / Healing Brush.",
+      "target": "Remove temporary spots using nearby texture, with editable target and donor regions.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/blemish.rs",
+      "gap": "Detector and donor-patch renderer exist; editor controls and real-photo quality still need verification.",
+      "controls": "Sensitivity, size, strength, protect mark, brush override.",
+      "acceptance": "No spill outside the mask; reject poor donors and keep original pixels recoverable."
+    },
+    {
+      "id": 2,
+      "name": "Precision healing and clone brush",
+      "category": "Repair",
+      "priority": "P0",
+      "products": [
+        "Adobe Photoshop",
+        "Affinity"
+      ],
+      "sources": [
+        "psHeal",
+        "psClone",
+        "affinity"
+      ],
+      "evidence": "Healing Brush / Clone Stamp; Affinity high-band cloning.",
+      "target": "Provide user-selected sampling, source previews and repeatable strokes.",
+      "status": "New workflow",
+      "code": "crates/aura-render/src/retouch.rs",
+      "gap": "Automatic donor healing is not an interactive clone/heal brush.",
+      "controls": "Heal or clone, source point, radius, hardness, flow, aligned sampling.",
+      "acceptance": "Source coordinates remain correct after zoom/crop/rotation; undo and export reproduce the strokes."
+    },
+    {
+      "id": 3,
+      "name": "Editable frequency separation",
+      "category": "Skin",
+      "priority": "P0",
+      "products": [
+        "Affinity",
+        "Retouch4me",
+        "Evoto"
+      ],
+      "sources": [
+        "affinity",
+        "r4FS",
+        "evoto"
+      ],
+      "evidence": "Affinity editable bands; Retouch4me two/three-band Photoshop output; Evoto frequency sliders.",
+      "target": "Expose tone and texture independently through a reversible frequency operation.",
+      "status": "Foundation",
+      "code": "crates/aura-render/src/bands.rs",
+      "gap": "Band decomposition exists; editable frequency-layer authoring has not been established.",
+      "controls": "Radius, low/high amount, band preview, per-band mask; optional mid band later.",
+      "acceptance": "Neutral settings reconstruct the original within float tolerance; preview and full-size export use equivalent physical radii."
+    },
+    {
+      "id": 4,
+      "name": "Micro dodge and burn",
+      "category": "Light",
+      "priority": "P0",
+      "products": [
+        "Adobe Photoshop",
+        "Evoto",
+        "Retouch4me"
+      ],
+      "sources": [
+        "psDB",
+        "evoto",
+        "r4"
+      ],
+      "evidence": "Dodge/Burn brushes; Evoto Even with Dodge & Burn.",
+      "target": "Even small luminance variations while retaining the skin's fine detail.",
+      "status": "Foundation",
+      "code": "crates/aura-brain-photo/src/local/dodgeburn.rs",
+      "gap": "Evening logic exists; a dedicated manual/automatic Retouch workflow is not verified.",
+      "controls": "Auto amount, dodge/burn brush, flow, luminance range, mask.",
+      "acceptance": "Measure texture and hue drift; prevent highlight clipping and dark halos."
+    },
+    {
+      "id": 5,
+      "name": "Macro dodge and burn / portrait relighting",
+      "category": "Light",
+      "priority": "P1",
+      "products": [
+        "Evoto",
+        "Retouch4me",
+        "PortraitPro"
+      ],
+      "sources": [
+        "evoto",
+        "r4",
+        "portraitpro"
+      ],
+      "evidence": "Sculpt with Dodge & Burn / Portrait Volumes / Image Relighting.",
+      "target": "Refine broad facial illumination with separate controls from micro evening.",
+      "status": "Foundation",
+      "code": "crates/aura-brain-photo/src/local/dodgeburn.rs",
+      "gap": "Face zones and light-direction analysis exist; editor integration requires work.",
+      "controls": "Contour intensity, highlight/shadow amounts, lighting preview, local override.",
+      "acceptance": "No geometric movement; stable results across a person's frames without flattened facial structure."
+    },
+    {
+      "id": 6,
+      "name": "Selective skin color correction",
+      "category": "Color",
+      "priority": "P0",
+      "products": [
+        "Evoto",
+        "Retouch4me",
+        "Affinity"
+      ],
+      "sources": [
+        "evoto",
+        "r4",
+        "affinity"
+      ],
+      "evidence": "Skin tone controls; low-frequency color work.",
+      "target": "Correct local casts and redness while keeping skin luminance and texture separately controllable.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/evening.rs",
+      "gap": "Tone evening and global white balance are starting points, not complete skin-specific color controls.",
+      "controls": "Temperature, tint, hue/chroma, redness, luminance lock, sampled reference.",
+      "acceptance": "Skin-mask boundaries blend cleanly; hair, lips and background retain their intended colors."
+    },
+    {
+      "id": 7,
+      "name": "Face-to-body complexion matching",
+      "category": "Color",
+      "priority": "P1",
+      "products": [
+        "Evoto"
+      ],
+      "sources": [
+        "evoto"
+      ],
+      "evidence": "Unify Body Complexion and separate face/body complexion tools.",
+      "target": "Match face, neck and body color under inconsistent lighting.",
+      "status": "New workflow",
+      "code": "crates/aura-retouch/src/evening.rs",
+      "gap": "No complete face-to-body reference-matching workflow was established in the inspected surface.",
+      "controls": "Reference region, affected regions, color amount, luminance amount.",
+      "acceptance": "Respect different illumination; compare measured color changes inside and outside chosen skin regions."
+    },
+    {
+      "id": 8,
+      "name": "Texture-preserving skin smoothing",
+      "category": "Skin",
+      "priority": "P0",
+      "products": [
+        "Evoto",
+        "PortraitPro"
+      ],
+      "sources": [
+        "evoto",
+        "portraitpro"
+      ],
+      "evidence": "Textured Smoothing / ClearSkin.",
+      "target": "Smooth uneven tone with independently constrained texture changes.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/texture_guard.rs",
+      "gap": "Texture guard and tone-evening engine exist; real-portrait acceptance remains necessary.",
+      "controls": "Smoothing, texture retention, pore preview, protected regions.",
+      "acceptance": "Check actual rendered texture plus visual realism at 100%; band-energy alone does not prove pore fidelity."
+    },
+    {
+      "id": 9,
+      "name": "Shine and oily-highlight reduction",
+      "category": "Skin",
+      "priority": "P1",
+      "products": [
+        "Retouch4me"
+      ],
+      "sources": [
+        "r4"
+      ],
+      "evidence": "Mattifier.",
+      "target": "Reduce distracting specular shine without flattening all highlights.",
+      "status": "Foundation",
+      "code": "crates/aura-render/src/retouch.rs",
+      "gap": "Shine-reduce operation exists; selective control and real-photo behavior need verification.",
+      "controls": "Amount, highlight threshold, feathering, brush refinement.",
+      "acceptance": "Retain intended catchlights and luminous highlights; no gray patches."
+    },
+    {
+      "id": 10,
+      "name": "Under-eye shadow and bag correction",
+      "category": "Skin",
+      "priority": "P1",
+      "products": [
+        "Evoto",
+        "Retouch4me"
+      ],
+      "sources": [
+        "evotoPortrait",
+        "r4"
+      ],
+      "evidence": "Dark-circle / Dodge & Burn retouching.",
+      "target": "Lighten local under-eye shadows while preserving lower-eyelid texture and depth.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/undereye.rs",
+      "gap": "Under-eye analysis and renderer exist; manual bounds and review controls need integration.",
+      "controls": "Left/right strength, shadow lift, area refinement.",
+      "acceptance": "Keep eyelid edges intact and avoid a bright strip across the cheek."
+    },
+    {
+      "id": 11,
+      "name": "Wrinkle and fine-line softening",
+      "category": "Skin",
+      "priority": "P1",
+      "products": [
+        "Evoto",
+        "Affinity"
+      ],
+      "sources": [
+        "evotoPortrait",
+        "affinity"
+      ],
+      "evidence": "Wrinkle retouching and independent tone/texture repair.",
+      "target": "Offer selective reduction of distracting lines with an adjustable retained amount.",
+      "status": "New workflow",
+      "code": "crates/aura-retouch/src/texture_guard.rs",
+      "gap": "Generic smoothing is not a dedicated wrinkle-selection workflow.",
+      "controls": "Region brush, reduction amount, texture retention.",
+      "acceptance": "Retain expression and avoid erasing all facial lines; verify at original resolution."
+    },
+    {
+      "id": 12,
+      "name": "Eye redness and vessel cleanup",
+      "category": "Details",
+      "priority": "P1",
+      "products": [
+        "Retouch4me",
+        "PortraitPro"
+      ],
+      "sources": [
+        "r4",
+        "portraitpro"
+      ],
+      "evidence": "Eye Vessels; eye cleaning and red-eye correction.",
+      "target": "Separate sclera cleanup from flash red-eye correction.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/micro/eyes.rs",
+      "gap": "Sclera/iris analysis exists; pupil red-eye handling and dedicated controls remain to verify.",
+      "controls": "Redness, sclera amount, red-eye target, per-eye mask.",
+      "acceptance": "Do not bleach the sclera or spill into eyelids and iris."
+    },
+    {
+      "id": 13,
+      "name": "Iris, lash and catchlight refinement",
+      "category": "Details",
+      "priority": "P1",
+      "products": [
+        "PortraitPro",
+        "Retouch4me"
+      ],
+      "sources": [
+        "portraitpro",
+        "r4"
+      ],
+      "evidence": "Eye Enhancement / Eye Brilliance.",
+      "target": "Add controlled existing-eye detail and catchlight adjustment.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/micro/eyes.rs",
+      "gap": "Iris and catchlight guards provide a starting point, not the complete tool.",
+      "controls": "Iris detail, lash contrast, existing-catchlight intensity, left/right controls.",
+      "acceptance": "No invented iris detail in default enhancement; catchlight geometry remains stable."
+    },
+    {
+      "id": 14,
+      "name": "Natural teeth whitening",
+      "category": "Details",
+      "priority": "P1",
+      "products": [
+        "Retouch4me"
+      ],
+      "sources": [
+        "r4"
+      ],
+      "evidence": "White Teeth.",
+      "target": "Reduce distracting tooth color casts with bounded local luminance changes.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/micro/teeth.rs",
+      "gap": "Tooth-locus corrections exist; selection and individual controls need integration.",
+      "controls": "Warmth reduction, brightness, strength, tooth mask.",
+      "acceptance": "Preserve tooth shading and gum/lip colors; avoid clipped white teeth."
+    },
+    {
+      "id": 15,
+      "name": "Glasses reflection reduction",
+      "category": "Details",
+      "priority": "P2",
+      "products": [
+        "PortraitPro"
+      ],
+      "sources": [
+        "portraitpro"
+      ],
+      "evidence": "Reduce Reflections in Glasses.",
+      "target": "Reduce recoverable glare; allow aligned reference-frame repair when valid.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/micro/glare.rs",
+      "gap": "Glare and sibling-frame borrowing modules exist; broad single-image glare recovery is not established.",
+      "controls": "Glare mask, reduction, optional reference, alignment preview.",
+      "acceptance": "Do not claim to recover fully obscured detail without evidence; compare edges and alignment."
+    },
+    {
+      "id": 16,
+      "name": "Stray hair and flyaway cleanup",
+      "category": "Details",
+      "priority": "P1",
+      "products": [
+        "Retouch4me",
+        "Affinity"
+      ],
+      "sources": [
+        "r4",
+        "affinity"
+      ],
+      "evidence": "Stray Hairs; sampled high-frequency texture repair.",
+      "target": "Clean selected flyaways while retaining the hairline and intentional strands.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/micro/hair.rs",
+      "gap": "Measured stray-hair analysis exists; difficult backgrounds and editor brush control need validation.",
+      "controls": "Sensitivity, thickness, keep/remove brush, donor preview.",
+      "acceptance": "Protect hairline and foreground strands; no repeated background patterns."
+    },
+    {
+      "id": 17,
+      "name": "Lip and digital makeup refinement",
+      "category": "Creative",
+      "priority": "P2",
+      "products": [
+        "PortraitPro"
+      ],
+      "sources": [
+        "portraitpro"
+      ],
+      "evidence": "Digital Makeup.",
+      "target": "Apply user-chosen lip, cheek and eye color through editable feature masks.",
+      "status": "New workflow",
+      "code": "ui/src/components/develop/RetouchPanel.tsx",
+      "gap": "No complete makeup workflow was found in the inspected Retouch surface.",
+      "controls": "Lip color/opacity, blush, eye makeup, per-region masks.",
+      "acceptance": "Creative controls remain separately chosen; masks track features and preserve texture."
+    },
+    {
+      "id": 18,
+      "name": "Clothing lint and wrinkle cleanup",
+      "category": "Repair",
+      "priority": "P2",
+      "products": [
+        "Retouch4me"
+      ],
+      "sources": [
+        "r4"
+      ],
+      "evidence": "Fabric / Dust.",
+      "target": "Separate small lint repairs from broad fabric-fold smoothing.",
+      "status": "Foundation",
+      "code": "crates/aura-retouch/src/micro/clothing.rs",
+      "gap": "Clothing-issue analysis exists; broad fabric wrinkle removal is not proven.",
+      "controls": "Lint sensitivity, fold amount, garment mask, manual repair.",
+      "acceptance": "Preserve seams, logos and fabric weave without stretched textures."
+    },
+    {
+      "id": 19,
+      "name": "Studio backdrop cleanup",
+      "category": "Repair",
+      "priority": "P2",
+      "products": [
+        "Retouch4me",
+        "Adobe Photoshop"
+      ],
+      "sources": [
+        "r4",
+        "psClone"
+      ],
+      "evidence": "Clean Backdrop; manual cloning.",
+      "target": "Remove backdrop spots and small folds with subject-aware repair.",
+      "status": "New workflow",
+      "code": "crates/aura-retouch/src/micro/clothing.rs",
+      "gap": "Garment cleanup does not establish backdrop cleanup; needs its own region workflow.",
+      "controls": "Backdrop mask, dust size, fold amount, edge protection.",
+      "acceptance": "Keep hair and subject edges; avoid flattening intended background gradients."
+    },
+    {
+      "id": 20,
+      "name": "Batch retouching with individual overrides",
+      "category": "Workflow",
+      "priority": "P1",
+      "products": [
+        "PortraitPro",
+        "Evoto"
+      ],
+      "sources": [
+        "portraitpro",
+        "evotoPortrait"
+      ],
+      "evidence": "PortraitPro Studio Max batch mode; Evoto batch adjustments.",
+      "target": "Apply a selected retouch preset across photos with per-photo and per-person review.",
+      "status": "Foundation",
+      "code": "crates/aura-app/src/retouch_commands.rs",
+      "gap": "Project passes and per-identity strength contracts exist; the full editor workflow and mask recalculation need validation.",
+      "controls": "Preset, selected photos, per-person strength, review queue, cancel/resume.",
+      "acceptance": "Recompute image-specific masks and donors; never copy raw pixel coordinates across photographs."
+    }
+  ]
+}
