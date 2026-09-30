@@ -113,6 +113,7 @@
 //! two answers.
 
 pub mod api;
+pub mod watermark;
 pub mod errors;
 pub mod fixtures;
 pub mod icc;

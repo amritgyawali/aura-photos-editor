@@ -138,6 +138,79 @@ def main():
             report['originalsUnchanged'] = True
             report['exportFiles'] = exports
 
+            # Durable studio authoring tools use the real native catalog and recipe store.
+            first = photos[0]['id']
+            baseline = call('image_recipe', {'photoId': first})
+            call('snapshot', {'projectId': project, 'photoId': first, 'action': 'take', 'name': 'Before studio tools'})
+            assert 'Before studio tools' in call('image_history', {'photoId': first})['snapshots']
+            # Locate an actual neutral-looking midtone; the native picker decides usability.
+            with Image.open(paths[[p.name for p in paths].index(photos[0]['fileName'])]) as source:
+                sample = source.convert('RGB').resize((40, 40))
+                candidates = sorted(((max(pixel) - min(pixel), x, y) for y in range(3, 37) for x in range(3, 37)
+                                     if 40 < min(pixel := sample.getpixel((x, y))) and max(pixel) < 220))
+            picked = None
+            for _, x, y in candidates[:30]:
+                try:
+                    picked = call('pick_white_balance', {'projectId': project, 'photoId': first, 'x': (x + 0.5) / 40, 'y': (y + 0.5) / 40})
+                    break
+                except Exception:
+                    continue
+            assert picked is not None, 'No usable neutral-patch candidate'
+            assert all(next(p for p in picked['params'] if p['path'] == path)['protected'] for path in ['global.temperature', 'global.tint'])
+            call('history_step', {'projectId': project, 'photoId': first, 'action': 'undo'})
+            assert call('image_recipe', {'photoId': first})['recipeHash'] == baseline['recipeHash']
+            call('history_step', {'projectId': project, 'photoId': first, 'action': 'redo'})
+            assert call('image_recipe', {'photoId': first})['recipeHash'] == picked['recipeHash']
+            call('snapshot', {'projectId': project, 'photoId': first, 'action': 'restore', 'name': 'Before studio tools'})
+            assert call('image_recipe', {'photoId': first})['recipeHash'] == baseline['recipeHash']
+
+            target = photos[1]['id']
+            target_before = call('image_recipe', {'photoId': target})
+            call('snapshot', {'projectId': project, 'photoId': target, 'action': 'take', 'name': 'Before selective sync'})
+            call('set_param', {'projectId': project, 'photoId': first, 'path': 'global.temperature', 'value': 7300, 'label': 'Sync source temperature'})
+            synced = call('sync_settings', {'projectId': project, 'sourcePhotoId': first, 'targetPhotoIds': [target, target], 'groups': ['white_balance']})
+            assert synced == {'synced': 1, 'failed': []}, synced
+            target_after = call('image_recipe', {'photoId': target})
+            assert next(p['value'] for p in target_after['params'] if p['path'] == 'global.temperature') == 7300
+            before_values = {p['path']: p['value'] for p in target_before['params']}
+            after_values = {p['path']: p['value'] for p in target_after['params']}
+            assert all(after_values[path] == value for path, value in before_values.items() if path not in ['global.temperature', 'global.tint'])
+            foreign = call('create_project', {'name': 'Studio membership validation', 'coupleNames': None, 'eventDate': None})['id']
+            try:
+                call('sync_settings', {'projectId': foreign, 'sourcePhotoId': first, 'targetPhotoIds': [target], 'groups': ['tone']})
+                raise AssertionError('Cross-collection sync was accepted')
+            except Exception as error:
+                assert 'does not belong' in str(error), error
+            for photo, snapshot_name in [(first, 'Before studio tools'), (target, 'Before selective sync')]:
+                call('snapshot', {'projectId': project, 'photoId': photo, 'action': 'restore', 'name': snapshot_name})
+            report['studioTools'] = {'snapshotRestore': True, 'pickerUndoRedo': True, 'selectiveSync': True, 'deduplicatedTargets': True, 'membershipValidation': True}
+
+            watermarked = invoke('export_run_watermarked', {
+                'input': {
+                    'projectId': project, 'destination': str(output / 'watermarked'), 'destinationKind': 'folder',
+                    'copyright': None, 'contact': None, 'creator': None, 'keywords': [], 'stripGps': True, 'stripCameraSerial': True, 'verify': True,
+                    'sets': [{'name': 'watermark-proof', 'imageIds': [p['id'] for p in photos], 'format': 'png', 'quality': 95,
+                              'colour': 'srgb', 'bitDepth': 8, 'resize': 'full', 'sharpen': 'none', 'naming': '{seq}-watermark', 'sidecar': False}],
+                },
+                'watermark': {'width': 1, 'height': 1, 'rgba': [255, 255, 255, 128], 'opacity': 0.75, 'widthFraction': 0.1, 'marginFraction': 0.03, 'anchor': 'bottom_right'},
+            })
+            assert watermarked['written'] == 5 and watermarked['verified'] == 5 and watermarked['manifestSealed']
+            watermark_manifest = invoke('export_manifest', {'projectId': project})
+            watermark_versions = dict(watermark_manifest['engineVersions'])
+            watermark_asset = output / 'watermarked' / watermark_versions['watermark_asset']
+            archived = json.loads(watermark_asset.read_text())
+            assert archived['rgba'] == [255, 255, 255, 128] and archived['widthFraction'] == 0.1
+            assert len(watermark_versions['watermark_asset_blake3']) == 64
+            for item in invoke('export_files', {'projectId': project}):
+                photo = next(p for p in photos if p['id'] == item['imageId'])
+                with Image.open(output / 'watermarked' / item['path']) as marked, Image.open(output / f'{Path(photo["fileName"]).stem}-after.png') as plain:
+                    difference = ImageChops.difference(marked.convert('RGB'), plain.convert('RGB'))
+                    box = difference.getbbox()
+                    assert box is not None and box[0] > plain.width * 0.7 and box[1] > plain.height * 0.5, box
+                source = args.photos.resolve() / photo['fileName']
+                assert hashlib.sha256(source.read_bytes()).hexdigest() == original_hashes[source.name]
+            report['watermarkExport'] = {'fiveVerified': True, 'changesConfinedToWatermark': True, 'originalsUnchanged': True, 'graphicAndSettingsArchived': True}
+
             # The UI and export use the same real native collection; no IPC mocks.
             page.reload()
             page.get_by_role('button', name=f'{name} 5', exact=True).click()
@@ -148,6 +221,9 @@ def main():
             auto.click()
             expect(auto).to_be_enabled(timeout=60_000)
             expect(page.get_by_role('figure', name='Edited photo RGB histogram')).to_be_visible()
+            page.get_by_label('Clipping warnings').select_option('both')
+            expect(page.get_by_text('Edited preview only:', exact=False)).to_be_visible()
+            page.get_by_label('Clipping warnings').select_option('off')
             page.get_by_role('button', name='Compare', exact=True).click()
             divider = page.get_by_role('slider', name='Before and after divider')
             divider.press('ArrowLeft')
@@ -156,7 +232,7 @@ def main():
             expect(divider).to_have_value('50')
             page.locator('.photo-studio').screenshot(path=str(output / 'editor-essentials.png'))
             page.get_by_role('button', name='Advanced', exact=True).click()
-            expect(page.get_by_text('Calibration', exact=True)).to_be_visible()
+            expect(page.locator('summary').filter(has_text='Calibration')).to_be_visible()
             page.locator('.photo-studio').screenshot(path=str(output / 'editor-advanced.png'))
             page.get_by_role('button', name='Essentials', exact=True).click()
             options = page.get_by_role('listbox', name='Filmstrip').get_by_role('option')

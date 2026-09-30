@@ -157,6 +157,7 @@ pub fn history_step(state: &AppState, input: &HistoryStepInput) -> IpcResult<Set
 pub fn snapshot(state: &AppState, input: &SnapshotInput) -> IpcResult<HistoryDto> {
     let project = parse_project(&input.project_id)?;
     let photo = parse_photo(&input.photo_id)?;
+    crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
     let mut history = load_history(state, photo)?;
     let clock = state.clock();
 
@@ -463,6 +464,9 @@ pub struct SyncSettingsInput {
     /// the composition of one frame.
     #[serde(default)]
     pub include_geometry: bool,
+    /// Explicit groups; absent preserves the original sync command's behaviour.
+    #[serde(default)]
+    pub groups: Option<Vec<String>>,
 }
 
 /// What [`sync_settings`] did.
@@ -488,7 +492,10 @@ pub struct SyncSettingsReport {
 pub fn sync_settings(state: &AppState, input: &SyncSettingsInput) -> IpcResult<SyncSettingsReport> {
     let project = parse_project(&input.project_id)?;
     let source_id = parse_photo(&input.source_photo_id)?;
+    crate::studio_tools::require_member(state, &input.project_id, &input.source_photo_id)?;
     let source = load_or_neutral(state, source_id)?;
+    // Validate before touching any target, including an empty collection.
+    let _ = sync_proposal(&source, &source, input)?;
     let targets: Vec<String> = if input.target_photo_ids.is_empty() {
         let key = input.project_id.clone();
         state.catalog().read(move |conn| {
@@ -498,7 +505,8 @@ pub fn sync_settings(state: &AppState, input: &SyncSettingsInput) -> IpcResult<S
             let rows = stmt
                 .query_map([key], |row| row.get::<_, String>(0))
                 .map_err(|e| aura_core::errors::db::statement_failed("sync targets", &e))?;
-            Ok(rows.filter_map(Result::ok).collect())
+            rows.collect::<Result<Vec<String>, _>>()
+                .map_err(|e| aura_core::errors::db::statement_failed("sync targets", &e))
         })?
     } else {
         input.target_photo_ids.clone()
@@ -507,23 +515,15 @@ pub fn sync_settings(state: &AppState, input: &SyncSettingsInput) -> IpcResult<S
         synced: 0,
         failed: Vec::new(),
     };
-    for target in targets.iter().filter(|id| **id != input.source_photo_id) {
+    let unique: std::collections::BTreeSet<_> = targets.iter().collect();
+    for target in unique.into_iter().filter(|id| **id != input.source_photo_id) {
         let result = (|| -> Result<(), AuraError> {
+            crate::studio_tools::require_member(state, &input.project_id, target)?;
             let photo = PhotoId::from_db(target).map_err(|_| {
                 aura_core::errors::render::recipe_invalid("photo", "invalid photo identifier")
             })?;
             let base = load_or_neutral(state, photo)?;
-            let mut proposal = base.clone();
-            proposal.global = source.global.clone();
-            // Every band spelled out, so a band the source leaves neutral clears the target's.
-            for band in aura_recipe::HSL_BANDS {
-                proposal.global.hsl.entry(band.to_string()).or_default();
-            }
-            proposal.bw.clone_from(&source.bw);
-            proposal.lens.vignette = source.lens.vignette;
-            if input.include_geometry {
-                proposal.geometry = source.geometry.clone();
-            }
+            let proposal = sync_proposal(&base, &source, input)?;
             let (merged, change) = schema::merge(&base, &proposal, EditSource::User)?;
             let merged = merged.clamped();
             schema::Validation::check(&merged)?;
@@ -544,6 +544,52 @@ pub fn sync_settings(state: &AppState, input: &SyncSettingsInput) -> IpcResult<S
         }
     }
     Ok(report)
+}
+
+fn sync_proposal(base: &Recipe, source: &Recipe, input: &SyncSettingsInput) -> Result<Recipe, AuraError> {
+    let mut proposal = base.clone();
+    let Some(groups) = &input.groups else {
+        proposal.global = source.global.clone();
+        proposal.bw.clone_from(&source.bw);
+        proposal.lens.vignette = source.lens.vignette;
+        if input.include_geometry { proposal.geometry = source.geometry.clone(); }
+        for band in aura_recipe::HSL_BANDS { proposal.global.hsl.entry(band.to_string()).or_default(); }
+        return Ok(proposal);
+    };
+    if groups.is_empty() {
+        return Err(aura_core::errors::render::recipe_invalid("groups", "Select at least one settings group"));
+    }
+    let src = &source.global;
+    let dst = &mut proposal.global;
+    for group in groups {
+        match group.as_str() {
+            "tone" => {
+                dst.exposure = src.exposure; dst.contrast = src.contrast;
+                dst.highlights = src.highlights; dst.shadows = src.shadows;
+                dst.whites = src.whites; dst.blacks = src.blacks;
+                dst.clarity = src.clarity; dst.texture = src.texture; dst.dehaze = src.dehaze;
+            }
+            "white_balance" => { dst.temperature = src.temperature; dst.tint = src.tint; }
+            "curves" => { dst.curve.clone_from(&src.curve); dst.parametric = src.parametric; dst.channel_curves.clone_from(&src.channel_curves); }
+            "color" => {
+                dst.vibrance = src.vibrance; dst.saturation = src.saturation;
+                dst.hsl.clone_from(&src.hsl); dst.colour_grade = src.colour_grade;
+                proposal.bw.clone_from(&source.bw);
+                for band in aura_recipe::HSL_BANDS { dst.hsl.entry(band.to_string()).or_default(); }
+            }
+            "detail" => { dst.sharpen = src.sharpen.clone(); dst.noise = src.noise.clone(); }
+            "effects" => { dst.effects = src.effects; proposal.lens.vignette = source.lens.vignette; }
+            "calibration" => { dst.calibration = src.calibration; }
+            "lens" => {
+                // Optical profiles belong to the target camera/lens, not the source frame.
+                proposal.lens.distortion = source.lens.distortion;
+                proposal.lens.ca = source.lens.ca;
+            }
+            "geometry" => proposal.geometry = source.geometry.clone(),
+            _ => return Err(aura_core::errors::render::recipe_invalid("groups", "Unknown settings group")),
+        }
+    }
+    Ok(proposal)
 }
 
 /// The defaults of a block that may be absent from a recipe's document.
@@ -691,6 +737,26 @@ fn parse_photo(id: &str) -> Result<PhotoId, IpcError> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn selective_sync_preserves_unselected_controls_and_camera_specific_profiles() {
+        use super::*;
+        let mut base = recipe_fixtures::reference();
+        base.global.exposure = 1.25;
+        base.lens.profile = Some("target lens".into());
+        let mut source = base.clone();
+        source.global.temperature = 7200;
+        source.global.exposure = -1.0;
+        source.geometry.rotate = 2.0;
+        source.lens.profile = Some("different lens".into());
+        let input = SyncSettingsInput { project_id: String::new(), source_photo_id: String::new(), target_photo_ids: vec![], include_geometry: true, groups: Some(vec!["white_balance".into(), "lens".into()]) };
+        let copied = sync_proposal(&base, &source, &input).unwrap();
+        assert_eq!(copied.global.temperature, 7200);
+        assert_eq!(copied.global.exposure, base.global.exposure);
+        assert_eq!(copied.geometry, base.geometry);
+        assert_eq!(copied.lens.profile, base.lens.profile);
+        assert!(sync_proposal(&base, &source, &SyncSettingsInput { groups: Some(vec![]), ..input.clone() }).is_err());
+        assert!(sync_proposal(&base, &source, &SyncSettingsInput { groups: Some(vec!["everything".into()]), ..input }).is_err());
+    }
     use super::*;
 
     #[test]

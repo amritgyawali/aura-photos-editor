@@ -3107,8 +3107,22 @@ async fn sync_settings(
 }
 
 #[tauri::command]
+async fn pick_white_balance(state: State<'_, AppState>, input: aura_app::studio_tools::WhiteBalancePickInput) -> IpcResult<RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::studio_tools::pick_white_balance(&app, &input))
+        .await.map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn list_edit_profiles() -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
     aura_app::edit_profiles::list_edit_profiles()
+}
+
+#[tauri::command]
+async fn export_run_watermarked(state: State<'_, AppState>, input: ExportJobInput, watermark: aura_app::delivery_commands::Watermark) -> IpcResult<ExportStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::delivery_commands::export_run_with_watermark(&app, input, Some(watermark)))
+        .await.map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -3180,6 +3194,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             sync_settings,
+            pick_white_balance,
             list_edit_profiles,
             apply_edit_profile,
             preview_edit_profile,
@@ -3448,6 +3463,7 @@ fn main() {
             export_presets,
             export_preview_names,
             export_run,
+            export_run_watermarked,
             export_files,
             export_manifest,
             delivery_status,

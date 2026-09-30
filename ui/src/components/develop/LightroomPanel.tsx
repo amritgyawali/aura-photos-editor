@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { RecipeDto } from '../../ipc/types';
 import type { EditProfile } from '../../ipc/client';
 import { PointCurveEditor, type CurvePoint } from './PointCurveEditor';
@@ -24,6 +24,7 @@ export type LightroomPanelProps = {
   onApplyProfile: (profileId: string, strength: number) => void;
   onSync: (includeGeometry: boolean) => void;
   mode?: 'essentials' | 'advanced';
+  syncControls?: ReactNode;
 };
 
 type Control = { path: string; label: string; min: number; max: number; step?: number; fallback: number; hint?: string };
@@ -157,7 +158,7 @@ function Section({ title, children, open = false }: { title: string; children: R
 
 const HUE_GRADIENT = 'linear-gradient(90deg, #e0473c, #e8d23d, #58b04a, #3fbfb4, #3f6fe0, #d84fb4, #e0473c)';
 
-export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam, onAuto, onApplyProfile, onSync, mode = 'advanced' }: LightroomPanelProps): JSX.Element {
+export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam, onAuto, onApplyProfile, onSync, syncControls, mode = 'advanced' }: LightroomPanelProps): JSX.Element {
   const [mixer, setMixer] = useState<'h' | 's' | 'l'>('s');
   const [curve, setCurve] = useState(0);
   const [preset, setPreset] = useState('');
@@ -254,9 +255,9 @@ export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam,
 
     <Section title="Calibration">{CALIBRATION.map(control => slider(control))}</Section></>}
 
-    <div className="lr-sync">
+    {syncControls ?? <div className="lr-sync">
       <label className="lr-toggle"><input type="checkbox" checked={syncGeometry} onChange={event => setSyncGeometry(event.target.checked)} /> Include crop</label>
       <button type="button" disabled={disabled} onClick={() => onSync(syncGeometry)}>Sync settings to all photos</button>
-    </div>
+    </div>}
   </div>;
 }

@@ -330,6 +330,7 @@ fn photo_roundtrip(is_png: bool) {
     let synced = aura_app::sync_settings(
         &state,
         &aura_app::develop_commands::SyncSettingsInput {
+            groups: None,
             project_id: project.id.clone(),
             source_photo_id: photo.clone(),
             target_photo_ids: vec![],

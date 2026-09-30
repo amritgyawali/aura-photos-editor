@@ -27,9 +27,15 @@ export type ApplyProfileReport = { profileId: string; changed: number; protected
 export type ProfilePreview = { profileId: string; before: string; after: string; adaptations: string[] };
 
 export type SyncSettingsReport = { synced: number; failed: string[] };
+export type ExportWatermark = { width: number; height: number; rgba: number[]; opacity: number; widthFraction: number; marginFraction: number; anchor: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'center' };
+export const exportWatermarked = (input: ExportJobInput, watermark: ExportWatermark) =>
+  invoke<ExportStatusDto>('export_run_watermarked', { input, watermark });
 /** Lightroom's Sync Settings: copy one photo's develop settings onto others, as your own edit. */
-export const syncSettings = (projectId: string, sourcePhotoId: string, targetPhotoIds: string[] = [], includeGeometry = false) =>
-  invoke<SyncSettingsReport>('sync_settings', { input: { projectId, sourcePhotoId, targetPhotoIds, includeGeometry } });
+export const syncSettings = (projectId: string, sourcePhotoId: string, targetPhotoIds: string[] = [], includeGeometry = false, groups?: string[]) =>
+  invoke<SyncSettingsReport>('sync_settings', { input: { projectId, sourcePhotoId, targetPhotoIds, includeGeometry, groups } });
+
+export const pickWhiteBalance = (projectId: string, photoId: string, x: number, y: number) =>
+  invoke<RecipeDto>('pick_white_balance', { input: { projectId, photoId, x, y } });
 
 /** Named, adaptive looks. Every application starts from the measured correction, never compounds. */
 export const editProfiles = {

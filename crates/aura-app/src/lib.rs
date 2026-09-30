@@ -60,6 +60,7 @@ pub mod cull_commands;
 pub mod curate_commands;
 pub mod delivery_commands;
 pub mod develop_commands;
+pub mod studio_tools;
 pub mod edit_profiles;
 pub mod gallery_commands;
 pub mod learn_commands;
