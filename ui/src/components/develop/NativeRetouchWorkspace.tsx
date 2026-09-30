@@ -9,6 +9,14 @@ import { RetouchControls, validRetouch } from './RetouchControls';
 import { useRetouchDraftPreview } from './useRetouchDraftPreview';
 import './precision-retouch.css';
 
+/** A short provenance tag for operations the automatic pass wrote. */
+export function automaticLabel(id: string): string {
+  const scene = /^auto-scene-v\d+-/.exec(id);
+  if (scene) return ' · Auto (scene)';
+  const face = /^auto-portrait-v\d+-(\d+)-/.exec(id);
+  return face ? ` · Auto (face ${Number(face[1]) + 1})` : '';
+}
+
 export function NativeRetouchWorkspace({projectId, photoId, disabled = false, revision = 0, onClose, onBusyChange}: {
   projectId: string; photoId: string; disabled?: boolean; revision?: number; onClose: () => void; onBusyChange: (busy: boolean) => void;
 }) {
@@ -146,7 +154,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         {dirty&&<p className="lr-hint">{draftNotice}</p>}
         <details open><summary>Saved retouch operations ({edits.length})</summary>
           <ol>{edits.map((edit,index)=><li key={edit.id}>
-            <button type="button" disabled={stackBlocked} aria-pressed={selected===edit.id} onClick={()=>{setSelected(edit.id);setDirty(false);setMode(edit.selection?.gradient?'gradient':edit.mask?'paint':'ellipse');setDraft({...edit,region:[...edit.region],source:edit.source?[...edit.source]:null});setCompare(false);}}>{index+1}. {RETOUCH_TOOLS.find(t=>t[0]===edit.tool)?.[1]} · {Math.round(edit.amount*100)}%</button>
+            <button type="button" disabled={stackBlocked} aria-pressed={selected===edit.id} onClick={()=>{setSelected(edit.id);setDirty(false);setMode(edit.selection?.gradient?'gradient':edit.mask?'paint':'ellipse');setDraft({...edit,region:[...edit.region],source:edit.source?[...edit.source]:null});setCompare(false);}}>{index+1}. {RETOUCH_TOOLS.find(t=>t[0]===edit.tool)?.[1]} · {Math.round(edit.amount*100)}%{automaticLabel(edit.id)}</button>
             <label><input type="checkbox" checked={edit.enabled} disabled={stackBlocked} onChange={event=>void save(()=>nativeRetouch.edit(projectId,photoId,'update',[{...edit,enabled:event.target.checked}]))}/>Enabled</label>
             <div className="retouch-operation-actions">
               <button type="button" disabled={stackBlocked||index===0} aria-label={`Move retouch ${index+1} earlier`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'earlier',[],edit.id))}>↑</button>

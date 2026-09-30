@@ -33,6 +33,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const [picking, setPicking] = useState(false);
   const [pickX, setPickX] = useState(50);
   const [pickY, setPickY] = useState(50);
+  // Which history step is applied, when this view moved there; null means unknown or head.
+  const [position, setPosition] = useState<number | null>(null);
   useEffect(() => {
     let active = true;
     if (inTauri()) editProfiles.list().then(value => { if (active) setProfiles(value); })
@@ -47,7 +49,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   // Clear only when changing photographs; keep the last preview during a save.
   useEffect(() => {
     setRender(null); setRecipe(null); setHistory(null); setOriginal(null); setAspect(null); setNotice(null);
-    setPicking(false);
+    setPicking(false); setPosition(null);
   }, [photoId, projectId]);
   useEffect(() => {
     let active = true;
@@ -127,7 +129,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <button type="button" onClick={() => { setRetouchOpen(true); setPicking(false); }}>Retouch</button>
           {(['essentials', 'advanced'] as const).map(value => <button type="button" key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'essentials' ? 'Essentials' : 'Advanced'}</button>)}
         </div>
-        <p><strong>Auto enhance</strong> measures light, detects faces and applies natural skin retouch. Every step stays editable; your manual adjustments are protected.</p>
+        <p><strong>Auto enhance</strong> measures light, colour, noise and the scene, detects faces, then retouches skin, heals temporary blemishes and finishes eyes and teeth where it measures a need. Each stage is saved as its own step, so you can go back to any of them and edit by hand; your manual adjustments are protected.</p>
         <PortraitAutoReport recipe={recipe}/>
         {render && edited && <Histogram render={render} />}
         {notice && <p role="status" className="lr-notice">{notice}</p>}
@@ -145,7 +147,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
               setNotice(`Settings synced to ${report.synced} photos.${report.failed.length ? ` Failed: ${report.failed.join('; ')}` : ''}`);
             })} />}
           onSetParam={(path, value, label) => void write(() => develop.setParam({ projectId, photoId, path, value, label }))}
-          onAuto={() => void write(() => develop.enhancePhoto({ photoId }))}
+          onAuto={() => void write(async () => { await develop.enhancePhoto({ photoId }); setPosition(null); })}
           onApplyProfile={(profileId, strength) => void write(async () => {
             const report = await editProfiles.apply(photoId, profileId, strength);
             setNotice(report.adaptations.length ? report.adaptations.join(' ') : `Applied ${profiles.find(p => p.id === profileId)?.name ?? profileId}.`);
@@ -155,8 +157,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             setNotice(`Settings synced to ${report.synced} photo${report.synced === 1 ? '' : 's'}.${report.failed.length ? ` ${report.failed.length} could not be updated.` : ''}`);
           })} />
         <div className="studio-history">
-          <button type="button" disabled={!history?.canUndo} onClick={() => void write(() => develop.historyStep({ projectId, photoId, action: 'undo' }))}>Undo</button>
-          <button type="button" disabled={!history?.canRedo} onClick={() => void write(() => develop.historyStep({ projectId, photoId, action: 'redo' }))}>Redo</button>
+          <button type="button" disabled={!history?.canUndo} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'undo' }); setPosition(null); })}>Undo</button>
+          <button type="button" disabled={!history?.canRedo} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'redo' }); setPosition(null); })}>Redo</button>
           <button type="button" onClick={() => void write(() => develop.historyStep({ projectId, photoId, action: 'reset_original' }))}>Reset photo</button>
         </div>
         <SnapshotPanel key={photoId} names={history?.snapshots ?? []} disabled={disabled || busy || loading}
@@ -164,12 +166,17 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           onRestore={name => void write(() => develop.snapshot({ projectId, photoId, action: 'restore', name }))} />
       </fieldset>
     </div>
-    {history && <details className="advanced-tools"><summary>Review every edit on this photo ({history.entries.length})</summary>
-      {history.entries.length === 0 ? <p>No edits have been saved yet.</p> : <ol className="photo-edit-history">{history.entries.map(entry => <li key={entry.seq}>
+    {history && <details className="advanced-tools" open={history.entries.some(entry => entry.source !== 'user')}><summary>Review every edit on this photo ({history.entries.length})</summary>
+      {history.entries.length === 0 ? <p>No edits have been saved yet.</p> : <ol className="photo-edit-history">
+        <li key="original" aria-current={position === 0 ? 'step' : undefined}><strong>Original photograph</strong>
+          <button type="button" disabled={disabled || busy || loading} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'goto:0' }); setPosition(0); })}>Go back to here</button></li>
+        {history.entries.map(entry => <li key={entry.seq} aria-current={(position ?? (history.canRedo ? null : history.entries[history.entries.length - 1]?.seq)) === entry.seq ? 'step' : undefined}>
         <strong>{entry.label}</strong><p>{new Date(entry.atMs).toLocaleString()} · {entry.source === 'user' ? 'Your edit' : 'Automatic edit'}</p>
         <p>Changed: {entry.changed.join(', ') || 'No parameter changes'}</p>
+        <button type="button" disabled={disabled || busy || loading} aria-label={`Go back to step ${entry.seq}: ${entry.label}`}
+          onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: `goto:${entry.seq}` }); setPosition(entry.seq); })}>Go back to here</button>
       </li>)}</ol>}
-      <p>Use Undo and Redo to move through saved edits and compare the result.</p>
+      <p>Use Undo and Redo, or “Go back to here”, to move through saved edits. Going back discards nothing: Redo still moves forward, and a new edit continues from the step you chose.</p>
     </details>}
   </section>;
 }

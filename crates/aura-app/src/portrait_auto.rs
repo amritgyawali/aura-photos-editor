@@ -6,9 +6,15 @@ use aura_recipe::{
 };
 use aura_vision::portrait::{self, PortraitFace};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+use crate::portrait_features;
 
 pub const KEY: &str = "studio_portrait_auto_v1";
-const PREFIX: &str = "auto-portrait-v1-";
+/// Stable ID prefix of every automatic portrait operation.
+pub const PREFIX: &str = "auto-portrait-v1-";
+/// Stable ID prefix of every automatic scene operation (for example, sky balance).
+pub const SCENE_PREFIX: &str = "auto-scene-v1-";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +24,31 @@ pub struct FaceAssessment {
     pub confidence: f32,
     pub reason: String,
     pub strengths: [f32; 3],
+    /// Measured finishing decisions for this face: spots, eyes, teeth and shine. ADR-0076.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub findings: Vec<String>,
+    #[serde(default)]
+    pub spots_healed: usize,
+    #[serde(default)]
+    pub marks_kept: usize,
+}
+
+/// One saved history step of an automatic pass.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StepSummary {
+    pub step: usize,
+    pub title: String,
+    pub detail: String,
+    pub operations: usize,
+}
+
+/// What the scene analysis measured and decided.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneSummary {
+    pub kind: String,
+    pub decisions: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,12 +66,128 @@ pub struct Report {
     pub assessments: Vec<FaceAssessment>,
     #[serde(default)]
     pub planner_version: String,
+    /// The history steps the automatic pass saved, in order. Undo walks back through them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<StepSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scene: Option<SceneSummary>,
+}
+
+/// The history step an automatic retouch operation belongs to. Order is save order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Group {
+    Scene,
+    Skin,
+    Blemishes,
+    Eyes,
+    Finishing,
+}
+
+impl Group {
+    pub const ALL: [Self; 5] = [
+        Self::Scene,
+        Self::Skin,
+        Self::Blemishes,
+        Self::Eyes,
+        Self::Finishing,
+    ];
+}
+
+/// Operations written by automation carry a stable prefix; everything else is manual.
+#[must_use]
+pub fn group_of(id: &str) -> Option<Group> {
+    if id.starts_with(SCENE_PREFIX) {
+        return Some(Group::Scene);
+    }
+    let rest = id.strip_prefix(PREFIX)?;
+    Some(if rest.contains("-spot-") {
+        Group::Blemishes
+    } else if rest.contains("-eye-") || rest.contains("-undereye-") {
+        Group::Eyes
+    } else if rest.ends_with("-teeth") || rest.ends_with("-shine") {
+        Group::Finishing
+    } else {
+        Group::Skin
+    })
+}
+
+/// The retouch stack after saving every step up to and including `upto`.
+///
+/// Manual operations keep their order and come first. Each automatic group is either the
+/// newly planned one (when it has been reached and was planned) or whatever the stack held,
+/// so re-running an unchanged plan produces an identical stack at every step - which is what
+/// keeps a repeat pass from adding history entries.
+#[must_use]
+pub fn staged(current: &[Edit], planned: &BTreeMap<Group, Vec<Edit>>, upto: Group) -> Vec<Edit> {
+    let mut out: Vec<Edit> = current
+        .iter()
+        .filter(|e| group_of(&e.id).is_none())
+        .cloned()
+        .collect();
+    for group in Group::ALL {
+        match planned.get(&group) {
+            Some(edits) if group <= upto => out.extend(edits.iter().cloned()),
+            _ => out.extend(
+                current
+                    .iter()
+                    .filter(|e| group_of(&e.id) == Some(group))
+                    .cloned(),
+            ),
+        }
+    }
+    out
+}
+
+/// A full portrait plan, not yet written into a recipe.
+#[derive(Debug, Clone)]
+pub struct Plan {
+    pub report: Report,
+    /// Planned operations per group. A present-but-empty group removes older automatic work.
+    pub groups: BTreeMap<Group, Vec<Edit>>,
 }
 
 /// Add a bounded portrait plan to an AI proposal; manually authored stacks stay intact.
 /// # Errors
 /// Pixel analysis, recipe validation, or report serialization failed.
 pub fn apply(proposal: &mut Recipe, rgb: &[u8], width: u32, height: u32) -> AuraResult<Report> {
+    let plan = plan(proposal, rgb, width, height, None, 0.0)?;
+    let current = retouch_tools::read(proposal)?;
+    if !plan.groups.is_empty()
+        && (plan.report.operations > 0 || proposal.extra.contains_key(retouch_tools::KEY))
+    {
+        retouch_tools::write(proposal, &staged(&current, &plan.groups, Group::Finishing))?;
+    }
+    write_report(proposal, &plan.report)?;
+    Ok(plan.report)
+}
+
+/// Store the report in the recipe's extension map.
+/// # Errors
+/// Serialization failed.
+pub fn write_report(proposal: &mut Recipe, report: &Report) -> AuraResult<()> {
+    proposal.extra.insert(
+        KEY.into(),
+        serde_json::to_value(report)
+            .map_err(|e| aura_core::errors::render::recipe_invalid(KEY, &e.to_string()))?,
+    );
+    Ok(())
+}
+
+/// Detect faces and plan skin, blemish, eye and finishing operations.
+///
+/// `rgb` is the small analysis thumbnail the skin planner was tuned on; `detail` is an
+/// optional larger rendition of the same photograph for fine features. `exposure` is the
+/// global change the same pass applies, in stops.
+/// # Errors
+/// Invalid pixels or a failed model run.
+pub fn plan(
+    proposal: &Recipe,
+    rgb: &[u8],
+    width: u32,
+    height: u32,
+    detail: Option<(&[u8], u32, u32)>,
+    exposure: f32,
+) -> AuraResult<Plan> {
     let protected = proposal.provenance.user_edited_fields.iter().any(|path| {
         path == retouch_tools::KEY || path.starts_with(&format!("{}.", retouch_tools::KEY))
     });
@@ -55,61 +202,99 @@ pub fn apply(proposal: &mut Recipe, rgb: &[u8], width: u32, height: u32) -> Aura
         message: String::new(),
         faces: Vec::new(),
         assessments: Vec::new(),
-        planner_version: "sample-consensus-v2".into(),
+        planner_version: format!("sample-consensus-v2+{}", portrait_features::VERSION),
+        steps: Vec::new(),
+        scene: None,
     };
+    let mut groups = BTreeMap::new();
     if disabled || protected {
         report.status = if disabled { "disabled" } else { "protected" }.into();
         report.message = if disabled { "Automatic portrait retouch is disabled on this device." } else { "Your manual retouch steps are protected. Undo those steps to return to the automatic version." }.into();
-    } else {
-        report.faces = portrait::detect(rgb, width, height)?;
-        report.detected_faces = report.faces.len();
-        let mut edits = retouch_tools::read(proposal)?;
-        edits.retain(|e| !e.id.starts_with(PREFIX));
-        for (index, face) in report.faces.iter().enumerate() {
-            let mut plan = plan_face(face, index, rgb, width, height);
-            if edits.len() + plan.edits.len() > retouch_tools::MAX_EDITS {
-                plan = FacePlan::skip("The saved retouch stack has reached its operation limit.");
-            }
-            let mut strengths = [0.0; 3];
-            for (strength, edit) in strengths.iter_mut().zip(&plan.edits) {
-                *strength = edit.amount;
-            }
-            report.assessments.push(FaceAssessment {
-                face: index + 1,
-                status: if plan.edits.is_empty() {
-                    "skipped"
-                } else {
-                    "retouched"
-                }
-                .into(),
-                confidence: face.confidence,
-                reason: plan.reason,
-                strengths,
-            });
-            if plan.edits.is_empty() {
-                continue;
-            }
-            report.retouched_faces += 1;
-            report.operations += plan.edits.len();
-            edits.extend(plan.edits);
-        }
-        if report.operations > 0 || proposal.extra.contains_key(retouch_tools::KEY) {
-            retouch_tools::write(proposal, &edits)?;
-        }
-        report.message = if report.detected_faces == 0 {
-            "No confident, sufficiently large face found. Portrait retouch was skipped.".into()
-        } else if report.retouched_faces == 0 {
-            "Faces detected, but no suitable skin sample was found or the operation limit was reached. Portrait retouch was skipped.".into()
-        } else {
-            format!("Retouched {} of {} detected faces with {} editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.", report.retouched_faces, report.detected_faces, report.operations)
-        };
+        return Ok(Plan { report, groups });
     }
-    proposal.extra.insert(
-        KEY.into(),
-        serde_json::to_value(&report)
-            .map_err(|e| aura_core::errors::render::recipe_invalid(KEY, &e.to_string()))?,
-    );
-    Ok(report)
+    report.faces = portrait::detect(rgb, width, height)?;
+    report.detected_faces = report.faces.len();
+    let manual = retouch_tools::read(proposal)?
+        .into_iter()
+        .filter(|e| group_of(&e.id).is_none())
+        .count();
+    let scene_ops = retouch_tools::read(proposal)?
+        .into_iter()
+        .filter(|e| group_of(&e.id) == Some(Group::Scene))
+        .count();
+    let detail_pixels = detail
+        .and_then(|(data, w, h)| portrait_features::Pixels::new(data, w, h))
+        .or_else(|| portrait_features::Pixels::new(rgb, width, height));
+    let mut planned: [Vec<Edit>; 4] = Default::default();
+    for (index, face) in report.faces.iter().enumerate() {
+        let mut plan = plan_face(face, index, rgb, width, height);
+        let mut features = portrait_features::FeatureEdits::default();
+        if !plan.edits.is_empty() {
+            if let Some(px) = &detail_pixels {
+                features = portrait_features::plan(face, index, px, exposure, PREFIX);
+            }
+        }
+        let used: usize = planned.iter().map(Vec::len).sum();
+        let wanted = plan.edits.len()
+            + features.blemishes.len()
+            + features.eyes.len()
+            + features.finishing.len();
+        if manual + scene_ops + used + wanted > retouch_tools::MAX_EDITS {
+            plan = FacePlan::skip("The saved retouch stack has reached its operation limit.");
+            features = portrait_features::FeatureEdits::default();
+        }
+        let mut strengths = [0.0; 3];
+        for (strength, edit) in strengths.iter_mut().zip(&plan.edits) {
+            *strength = edit.amount;
+        }
+        report.assessments.push(FaceAssessment {
+            face: index + 1,
+            status: if plan.edits.is_empty() {
+                "skipped"
+            } else {
+                "retouched"
+            }
+            .into(),
+            confidence: face.confidence,
+            reason: plan.reason,
+            strengths,
+            findings: features.report.findings,
+            spots_healed: features.report.spots_healed,
+            marks_kept: features.report.marks_kept,
+        });
+        if plan.edits.is_empty() {
+            continue;
+        }
+        report.retouched_faces += 1;
+        report.operations += wanted;
+        let [skin, spots, eyes, finishing] = &mut planned;
+        skin.extend(plan.edits);
+        spots.extend(features.blemishes);
+        eyes.extend(features.eyes);
+        finishing.extend(features.finishing);
+    }
+    let [skin, spots, eyes, finishing] = planned;
+    groups.insert(Group::Skin, skin);
+    groups.insert(Group::Blemishes, spots);
+    groups.insert(Group::Eyes, eyes);
+    groups.insert(Group::Finishing, finishing);
+    let spots: usize = report.assessments.iter().map(|a| a.spots_healed).sum();
+    let kept: usize = report.assessments.iter().map(|a| a.marks_kept).sum();
+    report.message = if report.detected_faces == 0 {
+        "No confident, sufficiently large face found. Portrait retouch was skipped.".into()
+    } else if report.retouched_faces == 0 {
+        "Faces detected, but no suitable skin sample was found or the operation limit was reached. Portrait retouch was skipped.".into()
+    } else {
+        format!(
+            "Retouched {} of {} detected faces with {} editable steps: skin texture, tone and light{}, eye and teeth finishing where measured.{} Undo walks back one automatic step at a time.",
+            report.retouched_faces,
+            report.detected_faces,
+            report.operations,
+            if spots > 0 { format!(", {spots} healed spot{}", if spots == 1 { "" } else { "s" }) } else { String::new() },
+            if kept > 0 { format!(" {kept} possible permanent mark{} kept.", if kept == 1 { "" } else { "s" }) } else { String::new() },
+        )
+    };
+    Ok(Plan { report, groups })
 }
 
 struct FacePlan {

@@ -2,6 +2,21 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Intelligent one-click editing — 2026-09-30
+
+- Auto enhance now measures the scene (portrait, group, landscape, low light, general) and
+  sets white balance (partial gray-pixel correction, faces ignored), vibrance, clarity,
+  dehaze, noise reduction and sharpening in addition to exposure and tone.
+- Outdoor frames with a bright sky get a feathered, highlight-only sky gradient.
+- Per face, on the 2048-px proxy: temporary blemishes (redder than surrounding skin) are
+  healed individually while darker, non-red marks are kept and counted; iris detail,
+  sclera redness, flash red-eye and under-eye shadows are corrected only when measured;
+  yellow teeth are whitened and skin shine is softened only when measured.
+- The pass saves up to six separate history steps (light & colour, sky, skin, blemishes,
+  eyes, teeth & shine). `history_step` accepts `goto:<seq>`; Develop's history list has
+  "Go back to here" for every step. Retouch tags automatic operations with their face.
+- Report explains every step, the scene decisions and per-face findings. ADR-0076.
+
 ## Adaptive portrait retouch — 2026-09-30
 
 - Added bounded orientation fallbacks for sideways/upside-down face detection.

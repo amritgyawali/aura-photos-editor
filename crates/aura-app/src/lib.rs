@@ -86,6 +86,8 @@ pub mod moment_commands;
 pub mod people_commands;
 pub mod photo_enhance;
 pub mod portrait_auto;
+pub mod portrait_features;
+pub mod smart_edit;
 mod photo_frames;
 pub mod preview_commands;
 pub mod qc_commands;

@@ -151,6 +151,9 @@ Never load two phase files into one session.
 | Lightroom panel parity decisions | `docs/adr/ADR-0065-lightroom-panel-parity.md` |
 | Every Lightroom feature and where it lives in AURA | `docs/lightroom-parity.md` |
 | Learning a profile from RAW before/after pairs | `ml/edit-profiles/fetch_fivek_pairs.py` + `crates/aura-app/tests/profile_fit.rs` |
+| One-click intelligent editing and step history | `docs/adr/ADR-0076-intelligent-auto-edit-and-step-history.md`, `crates/aura-app/src/smart_edit.rs`, `crates/aura-app/src/portrait_features.rs` |
+| What Auto enhance does, in the product's own words | `docs/automatic-editing.md` |
+| Auto-edit qualification on the real app | `scripts/prepare-auto-edit-fixtures.py`, `scripts/test-auto-edit-v3.py`, `scripts/test-auto-edit-gui.py` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build

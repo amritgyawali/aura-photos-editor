@@ -120,6 +120,34 @@ pub fn history_step(state: &AppState, input: &HistoryStepInput) -> IpcResult<Set
             history.reset(ResetTo::AiSuggestion, clock.as_ref())?;
             "Reset to AI suggestion"
         }
+        other if other.starts_with("goto:") => {
+            // Jump to the state right after a listed step (`goto:0` is before every step).
+            // Recorded as one navigation row, so redo keeps working and nothing is discarded.
+            let seq: u64 = other
+                .trim_start_matches("goto:")
+                .parse()
+                .map_err(|_| aura_core::errors::render::recipe_invalid("action", other))?;
+            let target = if seq == 0 {
+                0
+            } else {
+                history
+                    .entries()
+                    .iter()
+                    .position(|entry| entry.seq == seq)
+                    .map(|index| index + 1)
+                    .ok_or_else(|| {
+                        aura_core::errors::render::recipe_invalid("history", "that step no longer exists")
+                    })?
+            };
+            let mut cursor = history_cursor(&history);
+            while cursor > target && history.undo().is_some() {
+                cursor -= 1;
+            }
+            while cursor < target && history.redo().is_some() {
+                cursor += 1;
+            }
+            "Go to step"
+        }
         other => {
             return Err(IpcError::from(aura_core::errors::render::recipe_invalid(
                 "action", other,
@@ -135,6 +163,17 @@ pub fn history_step(state: &AppState, input: &HistoryStepInput) -> IpcResult<Set
     match input.action.as_str() {
         "undo" => recorded.push("$history.undo".into()),
         "redo" => recorded.push("$history.redo".into()),
+        goto if goto.starts_with("goto:") => {
+            if changed.is_empty() {
+                // Already there: nothing to record.
+                return Ok(SetParamDto {
+                    recipe: recipe_dto(&input.photo_id, &current),
+                    changed: Vec::new(),
+                    invalidated_from: None,
+                });
+            }
+            recorded.push(format!("$history.{goto}"));
+        }
         _ => {}
     }
     state
@@ -653,13 +692,34 @@ fn load_history(state: &AppState, photo: PhotoId) -> Result<History, AuraError> 
         .map(replay_history)
 }
 
+/// The number of steps currently applied: 0 at the original, `entries().len()` at the head.
+fn history_cursor(history: &History) -> usize {
+    let current = history.current();
+    history
+        .entries()
+        .iter()
+        .position(|entry| std::ptr::eq(&entry.recipe, current))
+        .map_or(0, |index| index + 1)
+}
+
 /// Reconstruct the active edit branch and its cursor from the saved journal.
 /// Navigation rows remain in `SQLite`, so redo also survives reopening the app.
 fn replay_history(stored: History) -> History {
     let mut entries = Vec::new();
     let mut cursor = 0;
     for entry in stored.entries() {
-        if entry.changed.iter().any(|path| path == "$history.undo") && cursor > 0 {
+        let goto = entry
+            .changed
+            .iter()
+            .find_map(|path| path.strip_prefix("$history.goto:"))
+            .and_then(|seq| seq.parse::<u64>().ok());
+        if let Some(seq) = goto {
+            if seq == 0 {
+                cursor = 0;
+            } else if let Some(index) = entries.iter().position(|e: &aura_recipe::history::HistoryEntry| e.seq == seq) {
+                cursor = index + 1;
+            }
+        } else if entry.changed.iter().any(|path| path == "$history.undo") && cursor > 0 {
             cursor -= 1;
         } else if entry.changed.iter().any(|path| path == "$history.redo") && cursor < entries.len()
         {

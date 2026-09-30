@@ -84,3 +84,21 @@ it('offers recovery when a renderer payload cannot be displayed', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Retry preview' }));
   expect(await screen.findByAltText('Edited photograph')).toBeTruthy();
 });
+
+it('jumps back to any saved automatic step and marks where the photo now is', async () => {
+  vi.mocked(develop.imageHistory).mockResolvedValue({ entries: [
+    { seq: 1, atMs: 0, source: 'ai', changed: ['global.exposure'], label: 'Auto edit 1/3 · Light & colour: portrait' },
+    { seq: 2, atMs: 0, source: 'ai', changed: ['studio_retouch_v1'], label: 'Auto edit 2/3 · Skin: 1 face' },
+    { seq: 3, atMs: 0, source: 'ai', changed: ['studio_retouch_v1'], label: 'Auto edit 3/3 · Eyes: measured' },
+  ], snapshots: [], canUndo: true, canRedo: false } as never);
+  vi.mocked(develop.historyStep).mockResolvedValue({} as never);
+  render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Edited photograph');
+  const head = await screen.findByText('Auto edit 3/3 · Eyes: measured');
+  expect(head.closest('li')?.getAttribute('aria-current')).toBe('step');
+  const back = screen.getByRole('button', { name: 'Go back to step 2: Auto edit 2/3 · Skin: 1 face' });
+  await waitFor(() => expect((back as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(back);
+  await waitFor(() => expect(develop.historyStep).toHaveBeenCalledWith({ projectId: 'project', photoId: 'portrait', action: 'goto:2' }));
+  await waitFor(() => expect(screen.getByText('Auto edit 2/3 · Skin: 1 face').closest('li')?.getAttribute('aria-current')).toBe('step'));
+});

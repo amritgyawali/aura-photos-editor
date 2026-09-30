@@ -5,87 +5,26 @@ use crate::{
     contract::ipc::{DevelopImageInput, RecipeDto},
     AppState,
 };
-use aura_core::{PhotoId, ProjectId};
-use aura_preview::contract::service::{PreviewService, Priority};
+#[cfg(test)]
 use aura_recipe::{schema, EditSource};
 
-/// Measure the original and save a restrained, repeatable, protected correction.
+/// Measure the original and save a restrained, repeatable, protected edit as undoable steps:
+/// light and colour, sky, skin, blemishes, eyes, teeth and shine. See [`crate::smart_edit`].
 ///
 /// # Errors
 /// Returns a typed error if the original cannot be decoded or the edit cannot be saved.
 pub fn enhance_photo(state: &AppState, input: &DevelopImageInput) -> IpcResult<RecipeDto> {
-    enhance(state, input, true)
+    crate::smart_edit::run(state, input, true)
 }
 
 /// Detect and retouch portraits without changing global exposure or a selected look.
 /// # Errors
 /// Returns a typed analysis, decode or recipe storage error.
 pub fn enhance_portrait(state: &AppState, input: &DevelopImageInput) -> IpcResult<RecipeDto> {
-    enhance(state, input, false)
+    crate::smart_edit::run(state, input, false)
 }
 
-fn enhance(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResult<RecipeDto> {
-    let invalid = |message: &str| aura_core::errors::render::recipe_invalid("photo", message);
-    let photo =
-        PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo identifier"))?;
-    let project_id: String = state.catalog().read(|conn| {
-        conn.query_row(
-            "SELECT project_id FROM photo WHERE photo_id=?1",
-            [&input.photo_id],
-            |row| row.get(0),
-        )
-        .map_err(|e| aura_core::errors::db::statement_failed("enhance photo", &e))
-    })?;
-    let project =
-        ProjectId::from_db(&project_id).map_err(|_| invalid("Invalid project identifier"))?;
-    let pixels = state.previews(&project_id)?.get(
-        photo,
-        aura_raw::PixelLevel::Thumb(512),
-        Priority::Interactive,
-    )?;
-    let Some(rgb) = pixels.as_srgb8() else {
-        return Err(invalid("An sRGB preview is required").into());
-    };
-    let (exposure, highlights, shadows, contrast) = correction(rgb)?;
-    let base = crate::develop_commands::load_or_neutral(state, photo)?;
-    let mut proposal = base.clone();
-    if global {
-        proposal.global.exposure = exposure;
-        proposal.global.highlights = highlights;
-        proposal.global.shadows = shadows;
-        proposal.global.contrast = contrast;
-    }
-    let portrait = crate::portrait_auto::apply(&mut proposal, rgb, pixels.width, pixels.height)?;
-    proposal.provenance.source = EditSource::Ai;
-    proposal.provenance.confidence = 0.35;
-    let (merged, report) = schema::merge(&base, &proposal, EditSource::Ai)?;
-    schema::Validation::check(&merged)?;
-    // Recipe storage rounds floating-point extensions. Compare the persisted
-    // representation too, or a freshly inferred f32 adds an identical undo entry.
-    if report.changed.is_empty() || !saved_recipe_changed(&base, &merged)? {
-        return Ok(crate::develop_commands::recipe_dto(&input.photo_id, &base));
-    }
-    state.recipe_store().save(
-        &project,
-        &photo,
-        &merged,
-        &report.changed,
-        &format!(
-            "{}: {}",
-            if global {
-                "Auto enhance"
-            } else {
-                "Auto portrait"
-            },
-            portrait.message
-        ),
-    )?;
-    Ok(crate::develop_commands::recipe_dto(
-        &input.photo_id,
-        &merged,
-    ))
-}
-
+#[cfg(test)]
 fn saved_recipe_changed(
     base: &aura_recipe::Recipe,
     merged: &aura_recipe::Recipe,
