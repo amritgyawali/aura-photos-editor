@@ -2,6 +2,15 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Adaptive portrait retouch — 2026-09-30
+
+- Added bounded orientation fallbacks for sideways/upside-down face detection.
+- Added representative patch sampling, measured per-face retouch strengths and
+  an expandable explanation of automatic decisions in Develop and Retouch.
+- Fixed retouch-only Reset and snapshot restoration by tracking removed recipe
+  fields; manual merges and restored snapshots now record user provenance.
+- Retained offline processing, original-file preservation and manual protection.
+
 ## Automatic portrait editing
 
 - Bundled a hash-verified YuNet face detector for offline CPU analysis, including five facial landmarks and multiple-face suppression.

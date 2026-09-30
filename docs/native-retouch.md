@@ -1,5 +1,10 @@
 # Native portrait retouch
 
+See [adaptive portrait retouch](adaptive-portrait-retouch.md) for orientation
+fallbacks, per-face measured strengths and the **Automatic decisions by face**
+explanation panel. Reset and snapshot restoration now remove retouch-only edits,
+and manual edits carry user provenance.
+
 **Automatic editing:** collection preparation and **Auto enhance** now include
 offline face detection and skin retouch. **Auto portrait** in Retouch applies the
 same portrait pass without changing global exposure or your selected look.

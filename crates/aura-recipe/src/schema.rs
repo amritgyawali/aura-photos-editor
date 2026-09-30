@@ -183,6 +183,11 @@ pub fn merge(
     // Provenance is taken wholesale from the proposal - it describes the pass that just
     // ran - except for the protected list, which is the merge's own output.
     result.provenance = proposal.provenance.clone();
+    // A user's slider/retouch proposal often clones the previous AI recipe.
+    // The author of this merge is authoritative for a manual history entry.
+    if source == EditSource::User {
+        result.provenance.source = EditSource::User;
+    }
     result.provenance.user_edited_fields = if source == EditSource::User {
         let mut union: BTreeSet<String> = protected.iter().map(|s| (*s).to_string()).collect();
         union.extend(changed.iter().cloned());
@@ -625,6 +630,23 @@ mod tests {
     use super::*;
     use crate::contract::recipe::{Mask, MaskKind, MaskParams, RetouchOp};
     use crate::fixtures;
+
+    #[test]
+    fn manual_merge_records_the_user_after_an_automatic_edit() {
+        let mut base = fixtures::neutral(fixtures::FIXTURE_HASH, "test");
+        base.provenance.source = EditSource::Ai;
+        let mut proposal = base.clone();
+        proposal.global.exposure = 0.5;
+        let (merged, _) = merge(&base, &proposal, EditSource::User).unwrap();
+        assert_eq!(merged.provenance.source, EditSource::User);
+        assert!(merged
+            .provenance
+            .user_edited_fields
+            .contains(&"global.exposure".into()));
+        proposal.global.exposure = 1.0;
+        let (protected, _) = merge(&merged, &proposal, EditSource::Ai).unwrap();
+        assert_eq!(protected.global.exposure, 0.5);
+    }
 
     #[test]
     fn a_neutral_new_block_leaves_the_canonical_form_and_the_hash_unchanged() {

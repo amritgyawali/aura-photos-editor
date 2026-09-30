@@ -8,7 +8,7 @@ use aura_infer::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const VERSION: &str = "yunet-2023mar-aura320-v1";
+pub const VERSION: &str = "yunet-2023mar-aura320-rotation-v2";
 pub const MODEL_HASH: &str = "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431";
 const SIDE: usize = 320;
 const MODEL: &[u8] =
@@ -56,6 +56,8 @@ fn graph() -> AuraResult<&'static Mutex<Executable>> {
 
 /// Detect confident faces from oriented, packed sRGB pixels. Calls are serialized
 /// to bound memory use; the 320-pixel model intentionally skips small crowd faces.
+/// When upright detection is empty, try three quarter-turn views without
+/// allocating rotated full-size photographs. Return original-space geometry.
 /// # Errors
 /// Invalid pixels, a damaged bundled model, or an inference failure.
 pub fn detect(rgb: &[u8], width: u32, height: u32) -> AuraResult<Vec<PortraitFace>> {
@@ -64,6 +66,60 @@ pub fn detect(rgb: &[u8], width: u32, height: u32) -> AuraResult<Vec<PortraitFac
     if w == 0 || h == 0 || w.checked_mul(h).and_then(|n| n.checked_mul(3)) != Some(rgb.len()) {
         return Err(invalid("Invalid portrait analysis pixels"));
     }
+    for turns in [0, 1, 3, 2] {
+        let mut faces = detect_view(rgb, w, h, turns)?;
+        if !faces.is_empty() {
+            for face in &mut faces {
+                face.landmarks = face.landmarks.map(|p| original_point(p, turns));
+                let [l, t, r, b] = face.bounds;
+                let points = [[l, t], [r, t], [l, b], [r, b]].map(|p| original_point(p, turns));
+                face.bounds = [
+                    points.iter().map(|[x, _]| *x).fold(1.0, f32::min),
+                    points.iter().map(|[_, y]| *y).fold(1.0, f32::min),
+                    points.iter().map(|[x, _]| *x).fold(0.0, f32::max),
+                    points.iter().map(|[_, y]| *y).fold(0.0, f32::max),
+                ];
+            }
+            faces.sort_by(|a, b| {
+                let [ax, ay, _, _] = a.bounds;
+                let [bx, by, _, _] = b.bounds;
+                ax.total_cmp(&bx).then(ay.total_cmp(&by))
+            });
+            return Ok(faces);
+        }
+    }
+    Ok(Vec::new())
+}
+
+fn original_point([x, y]: [f32; 2], turns: u8) -> [f32; 2] {
+    match turns {
+        1 => [y, 1.0 - x],
+        2 => [1.0 - x, 1.0 - y],
+        3 => [1.0 - y, x],
+        _ => [x, y],
+    }
+}
+
+fn original_pixel(x: usize, y: usize, w: usize, h: usize, turns: u8) -> (usize, usize) {
+    match turns {
+        1 => (y, h - 1 - x),
+        2 => (w - 1 - x, h - 1 - y),
+        3 => (w - 1 - y, x),
+        _ => (x, y),
+    }
+}
+
+fn detect_view(
+    rgb: &[u8],
+    original_w: usize,
+    original_h: usize,
+    turns: u8,
+) -> AuraResult<Vec<PortraitFace>> {
+    let (w, h) = if turns % 2 == 1 {
+        (original_h, original_w)
+    } else {
+        (original_w, original_h)
+    };
     let scale = SIDE as f32 / w.max(h) as f32;
     let rw = (w as f32 * scale).round().max(1.0) as usize;
     let rh = (h as f32 * scale).round().max(1.0) as usize;
@@ -79,8 +135,14 @@ pub fn detect(rgb: &[u8], width: u32, height: u32) -> AuraResult<Vec<PortraitFac
             let x0 = (fx as usize).min(w - 1);
             let x1 = (x0 + 1).min(w - 1);
             for c in 0..3 {
-                let at =
-                    |xx, yy| f32::from(rgb.get((yy * w + xx) * 3 + (2 - c)).copied().unwrap_or(0));
+                let at = |xx, yy| {
+                    let (sx, sy) = original_pixel(xx, yy, original_w, original_h, turns);
+                    f32::from(
+                        rgb.get((sy * original_w + sx) * 3 + (2 - c))
+                            .copied()
+                            .unwrap_or(0),
+                    )
+                };
                 let dx = fx - x0 as f32;
                 let dy = fy - y0 as f32;
                 let top = at(x0, y0) * (1.0 - dx) + at(x1, y0) * dx;
@@ -207,6 +269,27 @@ fn overlap([ax, ay, ar, ab]: [f32; 4], [bx, by, br, bb]: [f32; 4]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rotated_views_map_every_pixel_and_landmark_to_the_original() {
+        for turns in 0..4 {
+            let (w, h) = if turns % 2 == 1 { (3, 5) } else { (5, 3) };
+            let mut visited = std::collections::BTreeSet::new();
+            for y in 0..h {
+                for x in 0..w {
+                    let (sx, sy) = original_pixel(x, y, 5, 3, turns);
+                    assert!(sx < 5 && sy < 3);
+                    assert!(visited.insert((sx, sy)));
+                    let point = original_point(
+                        [(x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32],
+                        turns,
+                    );
+                    assert!((point[0] - (sx as f32 + 0.5) / 5.0).abs() < 1e-6);
+                    assert!((point[1] - (sy as f32 + 0.5) / 3.0).abs() < 1e-6);
+                }
+            }
+            assert_eq!(visited.len(), 15);
+        }
+    }
     #[test]
     fn rejects_invalid_buffers_and_blank_frames_have_no_faces() {
         assert!(detect(&[0; 3], 2, 2).is_err());
