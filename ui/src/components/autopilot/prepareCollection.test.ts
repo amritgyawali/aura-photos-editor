@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { prepareCollection } from './prepareCollection';
 import { api, develop, editProfiles } from '../../ipc/client';
 import { referenceStyle } from '../look/referenceStyle';
+import { nativeRetouch } from '../../ipc/nativeRetouch';
+vi.mock('../../ipc/nativeRetouch', () => ({ nativeRetouch: { autoPortrait: vi.fn().mockResolvedValue({}) } }));
 vi.mock('../look/referenceStyle', () => ({ referenceStyle: { apply: vi.fn().mockResolvedValue({}) } }));
 vi.mock('../../ipc/client', () => ({
   api: { listImages: vi.fn() }, develop: { enhancePhoto: vi.fn(), renderImage: vi.fn() },
@@ -49,6 +51,8 @@ it('applies the chosen edit profile instead of the plain enhancement and reports
   const results = await prepareCollection('project', () => false, vi.fn(), vi.fn(), null, profile, 'Portra Film');
   expect(editProfiles.apply).toHaveBeenNthCalledWith(1, 'a', 'film-portra', 0.9);
   expect(develop.enhancePhoto).not.toHaveBeenCalled();
+  expect(nativeRetouch.autoPortrait).toHaveBeenNthCalledWith(1, 'a');
+  expect(nativeRetouch.autoPortrait).toHaveBeenNthCalledWith(2, 'b');
   expect(develop.renderImage).toHaveBeenCalledTimes(2);
   expect(results[0]?.detail).toContain('Portra Film profile at 90%');
   expect(results[0]?.detail).toContain('already warm');

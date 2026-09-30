@@ -2,6 +2,15 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Automatic portrait editing
+
+- Bundled a hash-verified YuNet face detector for offline CPU analysis, including five facial landmarks and multiple-face suppression.
+- Auto enhance and collection preparation now detect suitable faces, sample skin and save restrained texture, tone and dodge/burn adjustments as editable steps.
+- Added Auto portrait in Retouch, analysis feedback, persisted explanations and explicit no-face/manual-protection outcomes.
+- Repeat analysis keeps stable operation IDs and creates no duplicate history. Undo/redo and manual retouch protection remain available.
+- Fixed fresh-versus-cached preview differences so face analysis and editing previews stay consistent after restarting the app.
+- Added the bounded nearest/asymmetric/floor ONNX Resize operator and portrait integration checks. Small, occluded or unsuitable faces are skipped; targeting is landmark-guided, not semantic skin segmentation.
+
 ## Advanced retouch selections
 
 - Added linear gradients, outside-shape inversion and brightness ranges to all 24 native retouch tools, with shared preview/export coverage.

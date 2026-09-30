@@ -14,6 +14,17 @@ use aura_recipe::{schema, EditSource};
 /// # Errors
 /// Returns a typed error if the original cannot be decoded or the edit cannot be saved.
 pub fn enhance_photo(state: &AppState, input: &DevelopImageInput) -> IpcResult<RecipeDto> {
+    enhance(state, input, true)
+}
+
+/// Detect and retouch portraits without changing global exposure or a selected look.
+/// # Errors
+/// Returns a typed analysis, decode or recipe storage error.
+pub fn enhance_portrait(state: &AppState, input: &DevelopImageInput) -> IpcResult<RecipeDto> {
+    enhance(state, input, false)
+}
+
+fn enhance(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResult<RecipeDto> {
     let invalid = |message: &str| aura_core::errors::render::recipe_invalid("photo", message);
     let photo =
         PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo identifier"))?;
@@ -38,25 +49,48 @@ pub fn enhance_photo(state: &AppState, input: &DevelopImageInput) -> IpcResult<R
     let (exposure, highlights, shadows, contrast) = correction(rgb)?;
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
     let mut proposal = base.clone();
-    proposal.global.exposure = exposure;
-    proposal.global.highlights = highlights;
-    proposal.global.shadows = shadows;
-    proposal.global.contrast = contrast;
+    if global {
+        proposal.global.exposure = exposure;
+        proposal.global.highlights = highlights;
+        proposal.global.shadows = shadows;
+        proposal.global.contrast = contrast;
+    }
+    let portrait = crate::portrait_auto::apply(&mut proposal, rgb, pixels.width, pixels.height)?;
     proposal.provenance.source = EditSource::Ai;
     proposal.provenance.confidence = 0.35;
     let (merged, report) = schema::merge(&base, &proposal, EditSource::Ai)?;
     schema::Validation::check(&merged)?;
+    // Recipe storage rounds floating-point extensions. Compare the persisted
+    // representation too, or a freshly inferred f32 adds an identical undo entry.
+    if report.changed.is_empty() || !saved_recipe_changed(&base, &merged)? {
+        return Ok(crate::develop_commands::recipe_dto(&input.photo_id, &base));
+    }
     state.recipe_store().save(
         &project,
         &photo,
         &merged,
         &report.changed,
-        "Local auto enhancement: measured brightness and contrast; no trained model used",
+        &format!(
+            "{}: {}",
+            if global {
+                "Auto enhance"
+            } else {
+                "Auto portrait"
+            },
+            portrait.message
+        ),
     )?;
     Ok(crate::develop_commands::recipe_dto(
         &input.photo_id,
         &merged,
     ))
+}
+
+fn saved_recipe_changed(
+    base: &aura_recipe::Recipe,
+    merged: &aura_recipe::Recipe,
+) -> aura_core::AuraResult<bool> {
+    Ok(aura_recipe::recipe_hash(base)? != aura_recipe::recipe_hash(merged)?)
 }
 
 // The rounded integer controls are clamped to at most 25 in magnitude before conversion.
@@ -150,6 +184,24 @@ pub fn correction(rgb: &[u8]) -> aura_core::AuraResult<(f32, i16, i16, i16)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rounded_portrait_coordinates_do_not_create_another_saved_step() {
+        let mut proposal =
+            aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "test");
+        proposal.extra.insert(
+            "portrait_test".into(),
+            serde_json::json!({"point": 0.123456789_f32}),
+        );
+        let base = serde_json::from_str(&aura_recipe::canonical(&proposal).unwrap()).unwrap();
+        assert!(!schema::merge(&base, &proposal, EditSource::Ai)
+            .unwrap()
+            .1
+            .changed
+            .is_empty());
+        assert!(!saved_recipe_changed(&base, &proposal).unwrap());
+        proposal.global.exposure = 0.3;
+        assert!(saved_recipe_changed(&base, &proposal).unwrap());
+    }
     #[test]
     fn normal_portrait_brightness_is_preserved_and_darkening_is_restrained() {
         for brightness in [120, 150, 175, 195] {

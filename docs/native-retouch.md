@@ -1,5 +1,26 @@
 # Native portrait retouch
 
+**Automatic editing:** collection preparation and **Auto enhance** now include
+offline face detection and skin retouch. **Auto portrait** in Retouch applies the
+same portrait pass without changing global exposure or your selected look.
+No face selection or skin sample is required: AURA detects faces and five
+landmarks, chooses a low-variation cheek/forehead sample and protects eye/mouth
+areas. Texture smoothing, tone uniformity and local light balance appear as
+separate saved operations. Open any operation to adjust its strength, sample or
+mask; disable/remove/reorder it, or use Undo/Redo for the complete automatic pass.
+
+Automation protects a manually edited retouch stack. Undo your manual steps to
+return to the automatic version before rerunning. Repeating an unchanged pass
+does not accumulate effects or history entries. The last-pass explanation reports
+detected/retouched faces and explains skips. Manual changes after that pass may
+alter its result.
+
+The bundled YuNet detector runs locally; skin targeting combines facial geometry
+and sample similarity, not a neural semantic skin mask. Small, cropped, oblique or
+occluded faces may be skipped. Automatic editing excludes spot-removal and
+face-reshaping operations. Set `AURA_DISABLE_AUTO_PORTRAIT=1` before launching AURA to disable
+this pass while keeping measured global correction and manual tools.
+
 Open **Photo Studio → Develop → Retouch**. Processing runs locally without an
 account or API key. The workspace provides 24 named workflows using AURA's own
 image-processing algorithms. It does not contain Retouch4me's proprietary code

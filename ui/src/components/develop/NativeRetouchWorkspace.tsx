@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asIpcError, develop } from '../../ipc/client';
 import { freshRetouch, nativeRetouch, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool, type BrushStroke } from '../../ipc/nativeRetouch';
-import type { HistoryDto, RenderDto } from '../../ipc/types';
+import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
+import { PortraitAutoReport } from './PortraitAutoReport';
 import { rgbDataUrl } from './rgbImage';
 import { RetouchCanvas, type RetouchMode } from './RetouchCanvas';
 import { RetouchControls, validRetouch } from './RetouchControls';
@@ -12,6 +13,8 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   projectId: string; photoId: string; disabled?: boolean; revision?: number; onClose: () => void; onBusyChange: (busy: boolean) => void;
 }) {
   const [edits,setEdits] = useState<NativeRetouchEdit[]>([]);
+  const [recipe,setRecipe] = useState<RecipeDto|null>(null);
+  const [analysing,setAnalysing] = useState(false);
   const [draft,setDraft] = useState(freshRetouch);
   const [selected,setSelected] = useState<string|null>(null);
   const [preview,setPreview] = useState<RenderDto|null>(null);
@@ -37,8 +40,8 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   useEffect(()=>{onBusyChange(busy||draftState.pending||dirty);},[busy,draftState.pending,dirty,onBusyChange]);
   useEffect(()=>{
     let active=true; setBusy(true); setError(null);
-    void Promise.all([nativeRetouch.edit(projectId,photoId,'list'),nativeRetouch.preview(projectId,photoId),nativeRetouch.preview(projectId,photoId,true),develop.imageHistory({photoId})])
-      .then(([next,image,original,h])=>{if(active){setEdits(next);setPreview(image);setBefore(original);setHistory(h);}})
+    void Promise.all([nativeRetouch.edit(projectId,photoId,'list'),nativeRetouch.preview(projectId,photoId),nativeRetouch.preview(projectId,photoId,true),develop.imageHistory({photoId}),develop.imageRecipe({photoId})])
+      .then(([next,image,original,h,r])=>{if(active){setEdits(next);setPreview(image);setBefore(original);setHistory(h);setRecipe(r);}})
       .catch(cause=>{if(active)setError(asIpcError(cause).message);})
       .finally(()=>{if(active)setBusy(false);});
     return ()=>{active=false;};
@@ -59,6 +62,11 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     finally {lock.current=false;}
   };
   const change=(patch:Partial<NativeRetouchEdit>)=>{setDraft(value=>({...value,...patch}));setDirty(true);setCompare(false);};
+  const autoPortrait=()=>void save(async()=>{
+    setAnalysing(true);
+    try { await nativeRetouch.autoPortrait(photoId); }
+    finally { if(mounted.current)setAnalysing(false); }
+  });
   const chooseTool=(tool:RetouchTool)=>{
     if(selected&&dirty){setError('Apply or discard your changes before choosing another tool.');return;}
     setSelected(null);change({id:'draft',tool,enabled:true,amount:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:0,tint:tool==='makeup'?.2:0});
@@ -132,6 +140,9 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           <button type="button" disabled={stackBlocked||!history?.canRedo} onClick={()=>void save(()=>develop.historyStep({projectId,photoId,action:'redo'}))}>Redo</button>
         </div>
         <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}</p>
+        <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>
+        <p className="lr-hint">Automatically finds faces and samples cheek/forehead skin. All resulting steps can be edited below or undone.</p>
+        <PortraitAutoReport recipe={recipe}/>
         {dirty&&<p className="lr-hint">{draftNotice}</p>}
         <details open><summary>Saved retouch operations ({edits.length})</summary>
           <ol>{edits.map((edit,index)=><li key={edit.id}>

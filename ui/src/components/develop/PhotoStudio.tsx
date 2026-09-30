@@ -8,6 +8,7 @@ import { clippingPreview, imagePoint, type ClippingMode } from './previewTools';
 import { SnapshotPanel } from './SnapshotPanel';
 import { SyncSettingsPanel } from './SyncSettingsPanel';
 import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
+import { PortraitAutoReport } from './PortraitAutoReport';
 
 export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusyChange }: {
   projectId: string; photoId: string; disabled: boolean; revision?: number; onBusyChange: (busy: boolean) => void;
@@ -126,7 +127,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <button type="button" onClick={() => { setRetouchOpen(true); setPicking(false); }}>Retouch</button>
           {(['essentials', 'advanced'] as const).map(value => <button type="button" key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'essentials' ? 'Essentials' : 'Advanced'}</button>)}
         </div>
-        <p>Start with <strong>Auto enhance</strong>, then fine-tune. Automatic edits respect your manual adjustments.</p>
+        <p><strong>Auto enhance</strong> measures light, detects faces and applies natural skin retouch. Every step stays editable; your manual adjustments are protected.</p>
+        <PortraitAutoReport recipe={recipe}/>
         {render && edited && <Histogram render={render} />}
         {notice && <p role="status" className="lr-notice">{notice}</p>}
         <details className="lr-section"><summary>White balance picker</summary><div className="lr-section-body" onKeyDown={event => { if (event.key === 'Escape') setPicking(false); }}>

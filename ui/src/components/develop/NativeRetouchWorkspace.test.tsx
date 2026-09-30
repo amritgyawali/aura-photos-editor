@@ -4,8 +4,8 @@ import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { nativeRetouch, freshRetouch } from '../../ipc/nativeRetouch';
 import { develop } from '../../ipc/client';
 
-vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn()}}));
-vi.mock('../../ipc/client',()=>({asIpcError:(e:Error)=>({message:e.message}),develop:{imageHistory:vi.fn(),historyStep:vi.fn()}}));
+vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn()}}));
+vi.mock('../../ipc/client',()=>({asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
 beforeEach(()=>{
   vi.resetAllMocks();vi.mocked(nativeRetouch.edit).mockResolvedValue([]);
   vi.mocked(nativeRetouch.preview).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(120,100,90)),notes:[]} as never);
@@ -14,6 +14,28 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('automatically retouches once, refreshes saved steps and report, and supports undo',async()=>{
+  let finish: ()=>void = ()=>{};
+  vi.mocked(nativeRetouch.autoPortrait).mockImplementation(()=>new Promise(resolve=>{finish=()=>resolve({} as never);}));
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByText('Auto portrait'));
+  expect((screen.getByText('Detecting faces and preparing skin retouch…') as HTMLButtonElement).disabled).toBe(true);
+  expect(nativeRetouch.autoPortrait).toHaveBeenCalledTimes(1);
+  vi.mocked(develop.imageRecipe).mockResolvedValue({body:JSON.stringify({studio_portrait_auto_v1:{message:'Retouched 1 of 1 detected faces.'}})} as never);
+  finish();await screen.findByText('Last automatic pass: Retouched 1 of 1 detected faces.');
+  fireEvent.click(screen.getByText('Undo'));
+  await waitFor(()=>expect(develop.historyStep).toHaveBeenCalledWith({projectId:'project',photoId:'photo',action:'undo'}));
+});
+it('protects a draft from automatic editing and surfaces detection failures',async()=>{
+  vi.mocked(nativeRetouch.autoPortrait).mockRejectedValue(new Error('Portrait analysis failed'));
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'dodge'}});
+  expect((screen.getByText('Auto portrait') as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByText('Discard draft'));
+  fireEvent.click(screen.getByText('Auto portrait'));
+  await screen.findByText('Portrait analysis failed');
+  expect((screen.getByText('Auto portrait') as HTMLButtonElement).disabled).toBe(false);
+});
 it('previews and saves gradient inversion with a brightness range without saving during preview',async()=>{
   open();await screen.findByAltText('Retouched photograph');
   fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'dodge'}});

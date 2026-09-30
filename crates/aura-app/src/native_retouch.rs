@@ -52,7 +52,10 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
             if input.edits.len() != 1 {
                 return Err(invalid("Choose one operation to update").into());
             }
-            let change = &input.edits[0];
+            let change = input
+                .edits
+                .first()
+                .ok_or_else(|| invalid("Choose one operation to update"))?;
             let saved = edits
                 .iter_mut()
                 .find(|e| e.id == change.id)
@@ -77,7 +80,10 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
                 .ok_or_else(|| invalid("Retouch operation no longer exists"))?;
             match input.action.as_str() {
                 "duplicate" => {
-                    let mut copy = edits[index].clone();
+                    let mut copy = edits
+                        .get(index)
+                        .ok_or_else(|| invalid("Retouch operation no longer exists"))?
+                        .clone();
                     copy.id = uuid::Uuid::new_v4().to_string();
                     edits.insert(index + 1, copy);
                 }

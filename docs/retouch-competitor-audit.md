@@ -7,17 +7,22 @@ quality ranking has been established. There is no basis for calling AURA best.
 
 | Capability | Documented reference behavior | AURA behavior after this change |
 | --- | --- | --- |
-| Skin targeting | Retouch4me Heal and SkinFiner describe automatic skin selection | A photographer samples a skin patch; a color range intersects a painted/ellipse selection. No learned skin/face segmentation in the native workspace |
+| Skin targeting | Retouch4me Heal and SkinFiner describe automatic skin selection | Bundled YuNet detects face boxes and five landmarks. Auto portrait chooses a cheek/forehead sample and an editable mask; color similarity refines the selection. This is geometric skin targeting, not trained semantic skin segmentation |
 | Natural smoothing | SkinFiner describes smoothing with texture preservation | New sample-guided smoothing separates fine detail from middle-scale variation and protects edges. Detail defaults to 100% |
 | Uneven skin color | SkinFiner describes redness/yellow correction; Retouch4me Skin Tone describes skin-tone evening | New uniformity tool moves low-frequency chroma toward the chosen sample while preserving luminance. No automatic redness/yellowness classifier |
-| Dodge and burn | Retouch4me documents automated portrait correction and optional Soft Light output | New sampled skin dodge/burn uses bounded exposure correction and preserves RGB proportions. No face-aware learned decision or Soft Light layer export |
+| Dodge and burn | Retouch4me documents automated portrait correction and optional Soft Light output | Sampled skin dodge/burn uses bounded exposure correction and preserves RGB proportions. Auto portrait targets detected faces with a restrained, editable correction; its strength policy is hand-authored, and Soft Light layer export is not implemented |
 | Blemishes | Retouch4me Heal documents automatic problem-area detection | Local-statistics dark-spot detection plus texture-aware patch matching and approximate harmonic tone blending; no semantic distinction between temporary blemishes and permanent marks |
-| Eye bags and facial features | SkinFiner describes eye-bag reduction on automatically detected faces | Existing under-eye tool needs manual selection; no automatic anatomical localization in this workspace |
+| Eye bags and facial features | SkinFiner describes eye-bag reduction on automatically detected faces | Automatic eye/nose/mouth landmarks guide protected areas. The under-eye correction tool still needs a manual selection |
 | Presets | SkinFiner documents built-in and custom presets | Existing local named presets now include skin tolerance/edge settings and omit photo-specific samples/masks |
 | Manual refinement | SkinFiner documents manual skin-mask refinement | AURA provides painted masks, erasure, pressure, feathering, numeric coordinates and sample picking |
 | Non-destructive work | Retouch4me Dodge & Burn documents layer output | AURA saves editable operations and undoable recipe history. This is not layered PSD output |
 | Precision/color | SkinFiner documents 16/32-bit processing and color management | Native processing uses f32 linear Rec.2020 and the existing color-managed export path; these additions were verified with 8-bit PNG delivery, not a new HDR/ICC certification |
-| Batch portrait automation | Both products document batch or group workflows | Native operations are authored per photograph. AURA's collection automation is not validated as equivalent face-aware retouching |
+| Batch portrait automation | Both products document batch or group workflows | Collection preparation now automatically detects suitable faces and saves editable texture, tone and light-balance steps. Repeat runs, manual protection, undo and PNG export were tested on five portraits; equivalent competitor quality has not been established |
+
+The automatic-portrait follow-up is documented in
+[ADR-0074](adr/ADR-0074-automatic-portrait-retouch.md) and the
+[current validation report](automatic-portrait-validation.md). The earlier
+sampled-skin verification below remains historical evidence for those processors.
 
 ## Sources
 
