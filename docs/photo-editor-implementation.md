@@ -4,7 +4,37 @@ This tracks implementation after the [100-feature comparison](photo-editor-featu
 The comparison describes baseline `a69b236`; it is not a claim that AURA implements all
 100 feature families or matches the ten products in quality.
 
-## Current batch
+## Native retouch batch
+
+**Photo Studio → Develop → Retouch** now provides 20 local workflows: sampled
+healing/cloning, selected-region spot detection, frequency tone/texture controls,
+micro dodge and burn, dodge/burn, skin color and sampled color matching, shine
+reduction, under-eye lifting, fine-line softening, teeth and eye adjustments,
+fabric/backdrop smoothing, glare attenuation and cosmetic tinting.
+
+Each operation has a feathered elliptical target and saved parameters. The stack
+supports update, disable, remove, clear, durable undo/redo, before/after and two
+three-operation skin presets. The CPU preview and export pipelines render the
+same recipe extension before crop/perspective. Collection editing blocks retouch
+writes; external recipe revisions refresh the workspace.
+
+These are original deterministic AURA algorithms, with shared primitives across
+several named workflows. They do not reproduce Retouch4me's proprietary models
+or establish commercial quality parity. Automatic face/skin targeting, painted
+masks, layered frequency editing and reconstruction of obscured detail remain
+unimplemented in this workspace. See the [tool guide](native-retouch.md) and
+[ADR-0068](adr/ADR-0068-native-retouch-workspace.md).
+
+Verification includes six focused native tests, the production UI/desktop build,
+529 UI tests across 54 files, and five real portrait history/export checks. Five PNG
+exports exactly matched the full renderer; original hashes were unchanged.
+After restarting the final desktop build, all five photographs retained the same
+operation IDs and rendered pixels. The native interface passed tool selection,
+before/after comparison and return-to-Develop checks.
+The repeatable workflow is `scripts/test-native-retouch.py`; this run's evidence
+is under `.work-checks/native-retouch-review/`.
+
+## Studio authoring batch
 
 | Roadmap feature | Implemented behavior | Remaining scope |
 | --- | --- | --- |
@@ -24,7 +54,7 @@ participate in the delivered render hash. Originals and saved recipes are unchan
 The exact watermark bitmap/settings are archived beside the output and referenced by name
 and verified BLAKE3 in the manifest, so they remain available after closing the editor.
 
-## Verification
+## Studio authoring verification
 
 - UI suite: 522 tests across 52 files passed.
 - Final focused UI run: 10 tests passed, including two additional watermark tests.

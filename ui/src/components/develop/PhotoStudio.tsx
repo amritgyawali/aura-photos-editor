@@ -7,6 +7,7 @@ import { Histogram } from './Histogram';
 import { clippingPreview, imagePoint, type ClippingMode } from './previewTools';
 import { SnapshotPanel } from './SnapshotPanel';
 import { SyncSettingsPanel } from './SyncSettingsPanel';
+import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 
 export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusyChange }: {
   projectId: string; photoId: string; disabled: boolean; revision?: number; onBusyChange: (busy: boolean) => void;
@@ -17,6 +18,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const [original, setOriginal] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [retouchOpen, setRetouchOpen] = useState(false);
   const writing = useRef(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'essentials' | 'advanced'>('essentials');
@@ -36,7 +38,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
       .catch(cause => { if (active) setNotice(`Presets unavailable: ${asIpcError(cause).message}`); });
     return () => { active = false; };
   }, []);
-  useEffect(() => { onBusyChange(busy || loading); }, [busy, loading, onBusyChange]);
+  useEffect(() => { if (!retouchOpen) onBusyChange(busy || loading); }, [busy, loading, onBusyChange, retouchOpen]);
   useEffect(() => () => onBusyChange(false), [onBusyChange]);
   const edited = useMemo(() => render ? rgbDataUrl(render) : null, [render]);
   const proof = useMemo(() => render && clipping !== 'off' ? clippingPreview(render, clipping) : edited, [render, edited, clipping]);
@@ -48,6 +50,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   }, [photoId, projectId]);
   useEffect(() => {
     let active = true;
+    if (retouchOpen) { setLoading(false); return; }
     setError(null); setLoading(true);
     if (!inTauri()) {
       setError('Open the AURA desktop app to edit this photograph.'); setLoading(false); return;
@@ -62,7 +65,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
     }).catch(cause => { if (active) setError(asIpcError(cause).message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [photoId, projectId, refresh, revision]);
+  }, [photoId, projectId, refresh, revision, retouchOpen]);
 
   const write = useCallback(async (action: () => Promise<unknown>) => {
     if (writing.current) return;
@@ -80,6 +83,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
       setPicking(false); setView('edited'); setNotice('White balance saved as one manual edit. Use Undo to compare.');
     });
   };
+
+  if (retouchOpen) return <NativeRetouchWorkspace key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId} disabled={disabled} revision={revision} onBusyChange={onBusyChange} onClose={() => setRetouchOpen(false)} />;
 
   return <section className="photo-studio" aria-label="Photo editor">
     <div className="studio-toolbar">
@@ -118,6 +123,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
       <fieldset className="studio-adjustments lr-adjustments" disabled={disabled || busy || loading || !recipe || Boolean(problem)}>
         <legend>Develop</legend>
         <div className="studio-edit-modes" aria-label="Editing controls">
+          <button type="button" onClick={() => { setRetouchOpen(true); setPicking(false); }}>Retouch</button>
           {(['essentials', 'advanced'] as const).map(value => <button type="button" key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'essentials' ? 'Essentials' : 'Advanced'}</button>)}
         </div>
         <p>Start with <strong>Auto enhance</strong>, then fine-tune. Automatic edits respect your manual adjustments.</p>

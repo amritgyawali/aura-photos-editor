@@ -3151,6 +3151,32 @@ async fn preview_edit_profile(
     .map_err(|_| background_request_failed())?
 }
 
+#[tauri::command]
+async fn native_retouch_edit(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::RetouchInput,
+) -> IpcResult<Vec<aura_app::native_retouch::Edit>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::native_retouch::edit(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_preview(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+    before: bool,
+) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::preview(&app, &project_id, &photo_id, before)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -3195,6 +3221,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             sync_settings,
             pick_white_balance,
+            native_retouch_edit,
+            native_retouch_preview,
             list_edit_profiles,
             apply_edit_profile,
             preview_edit_profile,

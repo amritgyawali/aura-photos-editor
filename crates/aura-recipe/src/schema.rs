@@ -345,6 +345,7 @@ impl Validation {
     /// it into helpers would scatter the list this function exists to be.
     #[allow(clippy::too_many_lines)]
     pub fn check(recipe: &Recipe) -> AuraResult<()> {
+        crate::retouch_tools::read(recipe)?;
         if recipe.schema == 0 {
             return Err(recipe_invalid("schema", "must be at least 1"));
         }

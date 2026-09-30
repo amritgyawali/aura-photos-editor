@@ -171,6 +171,7 @@ impl CpuEngine {
         output: &crate::contract::render::OutputSpec,
     ) -> AuraResult<RenderedImage> {
         let started = self.clock.monotonic_us();
+        let retouch = aura_recipe::retouch_tools::read(recipe)?;
         let clamped = recipe.clamped();
         let plan = graph::plan(&clamped, purpose, frame.kind, self.caps);
 
@@ -201,7 +202,27 @@ impl CpuEngine {
             render_hash: hash,
             backend: Backend::Cpu.as_str().to_string(),
             notes,
-            stages_run: plan.slugs(),
+            stages_run: {
+                let mut stages = plan.slugs();
+                if retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0) {
+                    let index = plan
+                        .stages
+                        .iter()
+                        .position(|stage| {
+                            matches!(
+                                stage,
+                                Stage::Sharpen
+                                    | Stage::Geometry
+                                    | Stage::PostCropVignette
+                                    | Stage::Grain
+                                    | Stage::OutputTransform
+                            )
+                        })
+                        .unwrap_or(stages.len());
+                    stages.insert(index, "studio_retouch".to_string());
+                }
+                stages
+            },
             ms: u32::try_from(elapsed / 1_000).unwrap_or(u32::MAX),
             cache_hit: false,
         })
@@ -448,6 +469,11 @@ impl CpuEngine {
         // ---- masks ---------------------------------------------------------------------
         if plan.stages.contains(&Stage::Masks) {
             apply_masks(&mut rgb, width, height, recipe, position);
+        }
+
+        // Explicit authoring runs in interactive previews and exports, before final geometry.
+        if let Ok(edits) = aura_recipe::retouch_tools::read(recipe) {
+            crate::retouch_tools::apply(&mut rgb, width as usize, height as usize, &edits);
         }
 
         // ---- sharpening ----------------------------------------------------------------

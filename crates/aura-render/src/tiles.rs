@@ -82,6 +82,7 @@ pub fn render_streamed(
     budget_bytes: u64,
 ) -> AuraResult<RenderedImage> {
     let clamped = recipe.clamped();
+    let retouch = aura_recipe::retouch_tools::read(&clamped)?;
     let plan = graph::plan(
         &clamped,
         purpose,
@@ -90,12 +91,15 @@ pub fn render_streamed(
     );
 
     // A rotation is not streamable. Say so and render whole.
-    if clamped.geometry.rotate.abs() > f32::EPSILON || clamped.geometry.perspective.is_some() {
+    if clamped.geometry.rotate.abs() > f32::EPSILON
+        || clamped.geometry.perspective.is_some()
+        || retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0)
+    {
         let mut whole = engine.render_frame(frame, &clamped, level, purpose, output)?;
         whole.notes.push(RenderNote {
             stage: Stage::Geometry.as_str().to_string(),
             reason: SkipReason::NotRequested,
-            detail: Some("a rotated frame is rendered whole rather than streamed".to_string()),
+            detail: Some("geometry or native retouch requires a whole-frame render".to_string()),
         });
         return Ok(whole);
     }

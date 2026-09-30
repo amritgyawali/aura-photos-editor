@@ -115,6 +115,7 @@ pub mod parity;
 pub mod profiles;
 pub mod restore;
 pub mod retouch;
+pub mod retouch_tools;
 pub mod shaders;
 pub mod spatial;
 pub mod tiles;

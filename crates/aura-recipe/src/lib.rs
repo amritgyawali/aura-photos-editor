@@ -85,6 +85,7 @@ pub mod fixtures;
 pub mod hash;
 pub mod history;
 pub mod migrate;
+pub mod retouch_tools;
 pub mod schema;
 pub mod sidecar;
 pub mod store;
