@@ -59,7 +59,7 @@ impl SceneKind {
         match self {
             Self::Portrait => "portrait",
             Self::Group => "group portrait",
-            Self::Landscape => "outdoor / landscape",
+            Self::Landscape => "outdoor (sky or greenery)",
             Self::LowLight => "low light",
             Self::General => "general scene",
         }
@@ -75,6 +75,8 @@ pub struct GlobalPlan {
     pub clarity: i16,
     pub dehaze: i16,
     pub extra_shadows: i16,
+    pub whites: i16,
+    pub blacks: i16,
     /// Amount, radius, detail, masking.
     pub sharpen: (i16, f32, i16, i16),
     /// Luminance and colour noise reduction, when the measured noise needs any.
@@ -90,9 +92,14 @@ struct Measure {
     sky: f32,
     horizon: f32,
     sky_luma: f32,
+    /// Sky-coloured share of the bottom 30 %: a blue backdrop, not a sky, when high.
+    sky_bottom: f32,
     foliage: f32,
     median: f32,
     high: f32,
+    /// 2nd and 98th percentiles of display lightness: the tonal range actually used.
+    p02: f32,
+    p98: f32,
     dark_floor: f32,
     noise: f32,
 }
@@ -124,6 +131,7 @@ fn measure(px: &Pixels<'_>, faces: &[PortraitFace]) -> Measure {
     let mut sky = 0_usize;
     let mut sky_luma = 0.0;
     let mut top = 0_usize;
+    let mut bottom = (0_usize, 0_usize);
     let mut foliage = 0_usize;
     let mut rows = vec![(0_usize, 0_usize); 20];
     let mut n = 0_usize;
@@ -142,8 +150,8 @@ fn measure(px: &Pixels<'_>, faces: &[PortraitFace]) -> Measure {
                 sat.push(s);
             }
             n += 1;
-            let is_sky = (p[2] > p[0] * 1.05 && p[2] >= p[1] * 0.95 && l > 0.4)
-                || (l > 0.82 && s < 0.1);
+            // Blue sky only: a bright white tabletop or wall is not evidence of sky.
+            let is_sky = p[2] > p[0] * 1.08 && p[2] >= p[1] * 0.95 && l > 0.4 && s > 0.12;
             if fy < 0.6 {
                 let band = ((fy / 0.03) as usize).min(19);
                 if let Some(row) = rows.get_mut(band) {
@@ -157,6 +165,10 @@ fn measure(px: &Pixels<'_>, faces: &[PortraitFace]) -> Measure {
                     sky += 1;
                     sky_luma += l;
                 }
+            }
+            if fy > 0.7 {
+                bottom.0 += 1;
+                bottom.1 += usize::from(is_sky);
             }
             if !is_sky && !face {
                 floor.push(min);
@@ -181,9 +193,12 @@ fn measure(px: &Pixels<'_>, faces: &[PortraitFace]) -> Measure {
         sky: if top == 0 { 0.0 } else { sky as f32 / top as f32 },
         horizon,
         sky_luma: if sky == 0 { 0.0 } else { sky_luma / sky as f32 },
+        sky_bottom: if bottom.0 == 0 { 0.0 } else { bottom.1 as f32 / bottom.0 as f32 },
         foliage: if n == 0 { 0.0 } else { foliage as f32 / n as f32 },
         median: percentile(&mut lum, 0.5),
         high: percentile(&mut lum, 0.95),
+        p02: percentile(&mut lum, 0.02),
+        p98: percentile(&mut lum, 0.98),
         dark_floor: percentile(&mut floor, 0.05),
         noise: 0.0,
     };
@@ -277,7 +292,7 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
                 continue;
             }
             let (lr, lb) = ((r / g).ln(), (b / g).ln());
-            if lr.abs() < 0.45 && lb.abs() < 0.45 {
+            if lr.abs() < 0.8 && lb.abs() < 0.8 {
                 samples.push((lr, lb, luma([r, g, b])));
             }
         }
@@ -289,9 +304,12 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
         (edges[0] / edges[1]).ln() as f32,
         (edges[2] / edges[1]).ln() as f32,
     );
-    let mut centre = (0.0_f32, 0.0_f32);
+    // Seed the gray-pixel search from the edge estimate: near-neutral pixels that agree with
+    // the edges are surfaces lit by the scene's light, while a large coloured backdrop sits
+    // far from it and is ignored.
+    let mut centre = edge;
     let mut used = 0;
-    for radius in [0.45_f32, 0.2, 0.12] {
+    for radius in [0.2_f32, 0.12, 0.08] {
         let mut sum = (0.0, 0.0);
         let mut weight = 0.0;
         used = 0;
@@ -313,7 +331,10 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
     if coverage < 0.015 {
         return Neutral::Unsure { reason: "not enough reliable neutral areas" };
     }
-    if (centre.0 - edge.0).hypot(centre.1 - edge.1) > 0.1 {
+    // With people in frame the edges include warm skin-adjacent detail, so allow a little
+    // more disagreement there; without people, stay strict.
+    let tolerance = if faces.is_empty() { 0.1 } else { 0.2 };
+    if (centre.0 - edge.0).hypot(centre.1 - edge.1) > tolerance {
         return Neutral::Unsure {
             reason: "the neutral areas and the edges disagree about the light (a coloured backdrop or mixed light)",
         };
@@ -322,6 +343,13 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
     let cast = estimate.0.hypot(estimate.1);
     if cast < 0.04 {
         return Neutral::Neutral { coverage };
+    }
+    // Without people, a strong colour is usually the light itself - a sunset, blue hour or
+    // stage lighting - and removing it removes the photograph's reason for being.
+    if faces.is_empty() && cast > 0.2 {
+        return Neutral::Unsure {
+            reason: "a strong colour with no people in frame reads as the light's mood (sunset, blue hour or stage light)",
+        };
     }
     // Keep part of the light's character: correct mild casts more than strong ones, so a
     // tungsten reception still reads as warm evening light rather than a studio.
@@ -348,6 +376,7 @@ pub fn analyse(
     px: &Pixels<'_>,
     frame: Option<&aura_render::Frame>,
     faces: &[PortraitFace],
+    exposure: f32,
 ) -> GlobalPlan {
     let m = measure(px, faces);
     let big_faces = faces
@@ -363,7 +392,7 @@ pub fn analyse(
         SceneKind::Portrait
     } else if m.median < 0.22 && m.high < 0.7 {
         SceneKind::LowLight
-    } else if m.sky > 0.25 || m.foliage > 0.3 {
+    } else if (m.sky > 0.25 && m.sky_bottom < 0.1) || m.foliage > 0.3 {
         SceneKind::Landscape
     } else {
         SceneKind::General
@@ -393,7 +422,7 @@ pub fn analyse(
     } else {
         1.0
     };
-    let vibrance = (base * colour).round().clamp(0.0, 25.0) as i16;
+    let vibrance = (base * colour).round().clamp(0.0, 20.0) as i16;
     decisions.push(if vibrance > 0 {
         format!(
             "Vibrance +{vibrance}: average saturation measured {:.0}%.",
@@ -414,7 +443,11 @@ pub fn analyse(
     if clarity > 0 {
         decisions.push(format!("Clarity +{clarity} for structure; no faces to protect."));
     }
-    let dehaze = if m.dark_floor > 0.13 && (m.high - m.dark_floor) < 0.75 {
+    // Haze is an outdoor property; a bright studio backdrop has a high floor too.
+    let dehaze = if matches!(kind, SceneKind::Landscape | SceneKind::General)
+        && m.dark_floor > 0.13
+        && (m.high - m.dark_floor) < 0.75
+    {
         let amount = ((m.dark_floor - 0.1) * 150.0).clamp(5.0, 25.0) as i16;
         decisions.push(format!(
             "Dehaze +{amount}: the darkest non-sky tones sit at {:.0}% (a veil of haze).",
@@ -424,6 +457,34 @@ pub fn analyse(
     } else {
         0
     };
+    // A flat frame that never reaches black or white: set the end points, like the
+    // Shift-double-click on Whites and Blacks. Low-light frames keep their dark floor.
+    // Judge the range after the exposure this pass applies, or a brightened frame would be
+    // stretched twice.
+    let after = |v: f32| {
+        aura_raw::colour::curve::srgb_encode(
+            (aura_raw::colour::curve::srgb_decode(v) * exposure.exp2()).min(1.0),
+        )
+    };
+    let (p02, p98) = (after(m.p02), after(m.p98));
+    let has_range = p98 - p02 > 0.1;
+    let blacks = if kind == SceneKind::LowLight || p02 <= 0.08 || !has_range {
+        0
+    } else {
+        -((p02 - 0.04) * 150.0).clamp(0.0, 35.0) as i16
+    };
+    let whites = if p98 >= 0.9 || !has_range {
+        0
+    } else {
+        ((0.95 - p98) * 150.0).clamp(0.0, 30.0) as i16
+    };
+    if blacks != 0 || whites != 0 {
+        decisions.push(format!(
+            "Tonal range stretched (whites {whites:+}, blacks {blacks:+}): the frame used only {:.0}%-{:.0}% of the range.",
+            p02 * 100.0,
+            p98 * 100.0
+        ));
+    }
     let extra_shadows = if kind == SceneKind::LowLight {
         decisions.push("Shadows lifted a further +10 for a low-light frame.".into());
         10
@@ -484,7 +545,11 @@ pub fn analyse(
         }
         None => None,
     };
-    let sky = (kind == SceneKind::Landscape && m.sky > 0.2 && m.sky_luma > 0.55 && m.horizon > 0.08)
+    let sky = (kind == SceneKind::Landscape
+        && m.sky > 0.2
+        && m.sky_bottom < 0.1
+        && m.sky_luma > 0.55
+        && m.horizon > 0.08)
         .then(|| {
             decisions.push(format!(
                 "Sky: balanced the bright sky above {:.0}% of the frame height with a feathered gradient.",
@@ -526,10 +591,97 @@ pub fn analyse(
         clarity,
         dehaze,
         extra_shadows,
+        whites,
+        blacks,
         sharpen,
         noise,
         sky,
         decisions,
+    }
+}
+
+/// Keep a brightening exposure from washing out the people in the frame.
+///
+/// Two relative checks, never a target brightness for skin: a subject that is already
+/// clearly brighter than the rest of the scene is a low-key portrait and keeps its mood, and
+/// no face may be pushed into clipping.
+fn face_exposure_cap(exposure: f32, px: &Pixels<'_>, faces: &[PortraitFace]) -> (f32, Option<String>) {
+    if faces.is_empty() {
+        return (exposure, None);
+    }
+    // The histogram correction keeps uniformly dark frames within 0.25 EV because it cannot
+    // tell a silhouette from underexposure. A detected face says it is not a silhouette.
+    let requested = exposure;
+    let (w, h) = (px.width, px.height);
+    let mut all: Vec<f32> = (0..h)
+        .flat_map(|y| (0..w).map(move |x| (x, y)))
+        .map(|(x, y)| luma(px.linear(x, y)))
+        .collect();
+    let median = percentile(&mut all, 0.5);
+    let high = aura_raw::colour::curve::srgb_encode(percentile(&mut all, 0.95));
+    let exposure = if high < 0.6 && exposure >= 0.0 {
+        exposure.max((0.18 / median.max(0.002)).log2().clamp(0.0, 1.5))
+    } else {
+        exposure
+    };
+    if exposure <= 0.0 {
+        return (exposure, None);
+    }
+    let (w, h) = (px.width, px.height);
+    let mut face = Vec::new();
+    let mut frame = Vec::new();
+    for y in 0..h {
+        for x in 0..w {
+            let q = px.encoded(x, y);
+            let l = q[0] * 0.2126 + q[1] * 0.7152 + q[2] * 0.0722;
+            let (fx, fy) = ((x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32);
+            frame.push(l);
+            if faces.iter().any(|f| {
+                let [l0, t0, r0, b0] = f.bounds;
+                let (mw, mh) = ((r0 - l0) * 0.2, (b0 - t0) * 0.2);
+                fx > l0 + mw && fx < r0 - mw && fy > t0 + mh && fy < b0 - mh
+            }) {
+                face.push(luma(px.linear(x, y)));
+            }
+        }
+    }
+    if face.len() < 16 {
+        return (exposure, None);
+    }
+    let frame_median = percentile(&mut frame, 0.5);
+    let frame_high = percentile(&mut frame, 0.95);
+    let face_high = percentile(&mut face, 0.98);
+    let face_median = aura_raw::colour::curve::srgb_encode(percentile(&mut face, 0.5));
+    let headroom = (0.9 / face_high.max(1e-3)).log2().max(0.0);
+    let mut capped = exposure.min(headroom);
+    // Low key: the frame already reaches bright tones and the people are its brightest part,
+    // so the darkness around them is a choice. An underexposed frame never reaches bright.
+    let low_key = frame_high > 0.75 && face_median > frame_median * 1.25;
+    if low_key {
+        capped = capped.min(0.15);
+    }
+    if capped > requested + 1e-3 {
+        return (
+            capped,
+            Some(format!(
+                "Exposure raised to {capped:+.2} EV: the frame is dark throughout, and the detected faces show it is underexposed rather than a silhouette."
+            )),
+        );
+    }
+    if capped + 1e-3 < exposure {
+        (
+            capped,
+            Some(format!(
+                "Exposure limited to {capped:+.2} EV (the histogram asked for {exposure:+.2}): {}.",
+                if low_key {
+                    "the people are already brighter than the scene around them, so the darker mood is kept"
+                } else {
+                    "brightening further would clip highlights on a face"
+                }
+            )),
+        )
+    } else {
+        (exposure, None)
     }
 }
 
@@ -544,6 +696,8 @@ fn apply_global(recipe: &mut Recipe, tone: (f32, i16, i16, i16), plan: &GlobalPl
         g.temperature = kelvin;
         g.tint = tint;
     }
+    g.whites = plan.whites;
+    g.blacks = plan.blacks;
     g.vibrance = plan.vibrance;
     g.clarity = plan.clarity;
     g.dehaze = plan.dehaze;
@@ -603,21 +757,38 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
     let detail = proxy
         .as_ref()
         .and_then(|p| p.as_srgb8().map(|data| (data, p.width, p.height)));
-    let tone = crate::photo_enhance::correction(rgb)?;
+    let mut tone = crate::photo_enhance::correction(rgb)?;
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
+    let disabled = std::env::var_os("AURA_DISABLE_AUTO_PORTRAIT").is_some_and(|v| v == "1");
+    let faces = if disabled {
+        Vec::new()
+    } else {
+        aura_vision::portrait::detect(rgb, thumb.width, thumb.height)?
+    };
+    let mut exposure_note = None;
+    if global {
+        if let Some(px) = Pixels::new(rgb, thumb.width, thumb.height) {
+            let (capped, note) = face_exposure_cap(tone.0, &px, &faces);
+            tone.0 = capped;
+            exposure_note = note;
+        }
+    }
     // Luminance selections are evaluated after the global exposure the same pass applies.
     let exposure = if global { tone.0 } else { base.global.exposure };
-    let portrait = portrait_auto::plan(&base, rgb, thumb.width, thumb.height, detail, exposure)?;
+    let portrait = portrait_auto::plan_with_faces(
+        &base,
+        rgb,
+        thumb.width,
+        thumb.height,
+        detail,
+        exposure,
+        Some(faces.clone()),
+    )?;
     let mut report = portrait.report.clone();
     let mut groups = portrait.groups.clone();
 
     let mut global_plan = None;
     if global {
-        let faces = if report.status == "protected" {
-            aura_vision::portrait::detect(rgb, thumb.width, thumb.height).unwrap_or_default()
-        } else {
-            report.faces.clone()
-        };
         let frame = crate::photo_frames::CatalogFrames::new(state.clone())
             .frame(&photo, RenderLevel::Proxy2048)
             .ok();
@@ -625,7 +796,10 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
             .and_then(|(d, w, h)| Pixels::new(d, w, h))
             .or_else(|| Pixels::new(rgb, thumb.width, thumb.height));
         if let Some(px) = px {
-            let plan = analyse(&px, frame.as_ref(), &faces);
+            let mut plan = analyse(&px, frame.as_ref(), &faces, tone.0);
+            if let Some(note) = exposure_note.take() {
+                plan.decisions.insert(1, note);
+            }
             groups.insert(Group::Scene, plan.sky.clone().into_iter().collect());
             report.scene = Some(SceneSummary {
                 kind: plan.kind.label().into(),
@@ -653,9 +827,11 @@ pub fn run(state: &AppState, input: &DevelopImageInput, global: bool) -> IpcResu
             group: None,
             title: "Light & colour".into(),
             detail: format!(
-                "{}: exposure {exposure:+.2} EV, highlights {highlights}, shadows {}, contrast {contrast:+}, vibrance {:+}{}",
+                "{}: exposure {exposure:+.2} EV, highlights {highlights}, shadows {}, whites {:+}, blacks {:+}, contrast {contrast:+}, vibrance {:+}{}",
                 plan.kind.label(),
                 (shadows + plan.extra_shadows).clamp(-100, 100),
+                plan.whites,
+                plan.blacks,
                 plan.vibrance,
                 plan.white_balance
                     .map_or(String::new(), |(k, t)| format!(", white balance {k} K / {t:+}")),
@@ -768,7 +944,7 @@ mod tests {
                 rgb.extend(if y < 60 { [120, 170, 235] } else { [70, 120, 50] });
             }
         }
-        let plan = analyse(&pixels(&rgb, w, h), None, &[]);
+        let plan = analyse(&pixels(&rgb, w, h), None, &[], 0.0);
         assert_eq!(plan.kind, SceneKind::Landscape);
         assert!(plan.vibrance > 0 && plan.clarity > 0);
         let sky = plan.sky.expect("a bright blue sky");
@@ -780,11 +956,11 @@ mod tests {
     #[test]
     fn grey_and_dark_frames_are_not_given_colour_or_structure() {
         let gray = vec![128_u8; 100 * 100 * 3];
-        let plan = analyse(&pixels(&gray, 100, 100), None, &[]);
+        let plan = analyse(&pixels(&gray, 100, 100), None, &[], 0.0);
         assert_eq!(plan.vibrance, 0);
         assert!(plan.sky.is_none());
         let dark = vec![25_u8; 100 * 100 * 3];
-        let plan = analyse(&pixels(&dark, 100, 100), None, &[]);
+        let plan = analyse(&pixels(&dark, 100, 100), None, &[], 0.0);
         assert_eq!(plan.kind, SceneKind::LowLight);
         assert_eq!(plan.clarity, 0);
         assert!(plan.extra_shadows > 0);
@@ -801,10 +977,10 @@ mod tests {
             let v = (128 + n).clamp(0, 255) as u8;
             noisy.extend([v, v, v]);
         }
-        let plan = analyse(&pixels(&noisy, w as u32, h as u32), None, &[]);
+        let plan = analyse(&pixels(&noisy, w as u32, h as u32), None, &[], 0.0);
         assert!(plan.noise.is_some(), "{:?}", plan.decisions);
         let clean = vec![128_u8; w * h * 3];
-        let calm = analyse(&pixels(&clean, w as u32, h as u32), None, &[]);
+        let calm = analyse(&pixels(&clean, w as u32, h as u32), None, &[], 0.0);
         assert!(calm.noise.is_none());
         assert!(plan.sharpen.0 < calm.sharpen.0);
     }

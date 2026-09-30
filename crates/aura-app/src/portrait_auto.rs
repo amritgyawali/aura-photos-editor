@@ -188,6 +188,21 @@ pub fn plan(
     detail: Option<(&[u8], u32, u32)>,
     exposure: f32,
 ) -> AuraResult<Plan> {
+    plan_with_faces(proposal, rgb, width, height, detail, exposure, None)
+}
+
+/// [`plan`], reusing faces the caller already detected on the same `rgb` thumbnail.
+/// # Errors
+/// Invalid pixels or a failed model run.
+pub fn plan_with_faces(
+    proposal: &Recipe,
+    rgb: &[u8],
+    width: u32,
+    height: u32,
+    detail: Option<(&[u8], u32, u32)>,
+    exposure: f32,
+    faces: Option<Vec<PortraitFace>>,
+) -> AuraResult<Plan> {
     let protected = proposal.provenance.user_edited_fields.iter().any(|path| {
         path == retouch_tools::KEY || path.starts_with(&format!("{}.", retouch_tools::KEY))
     });
@@ -212,7 +227,10 @@ pub fn plan(
         report.message = if disabled { "Automatic portrait retouch is disabled on this device." } else { "Your manual retouch steps are protected. Undo those steps to return to the automatic version." }.into();
         return Ok(Plan { report, groups });
     }
-    report.faces = portrait::detect(rgb, width, height)?;
+    report.faces = match faces {
+        Some(faces) => faces,
+        None => portrait::detect(rgb, width, height)?,
+    };
     report.detected_faces = report.faces.len();
     let manual = retouch_tools::read(proposal)?
         .into_iter()

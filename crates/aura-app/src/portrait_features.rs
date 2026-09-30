@@ -814,29 +814,40 @@ fn eyes(
             b: add(centre, g.u, 0.13 * d),
             r: 0.08 * d,
         };
-        // Sclera: low in chroma and not much darker than this person's own skin. Measured
-        // per side of the iris, so a correction can be placed on the white of the eye only.
+        // Sclera: clearly less saturated than this person's own cheek and not much darker,
+        // measured in display values (linear light exaggerates the chroma of a white).
+        // Measured per side of the iris, so a correction can be placed on the white only.
+        let (cheek_luma, cheek_sat) = {
+            let (mut l, mut sat, mut n) = (0.0_f32, Vec::new(), 0.0_f32);
+            Capsule::disk(add(eye, g.v, 0.55 * d), 0.08 * d).each(px, |x, y| {
+                let q = px.encoded(x, y);
+                let max = q[0].max(q[1]).max(q[2]).max(1e-4);
+                l += q[0] * 0.2126 + q[1] * 0.7152 + q[2] * 0.0722;
+                sat.push((max - q[0].min(q[1]).min(q[2])) / max);
+                n += 1.0;
+            });
+            sat.sort_by(f32::total_cmp);
+            (l / n.max(1.0), sat.get(sat.len() / 2).copied().unwrap_or(0.3))
+        };
+        let sat_limit = (cheek_sat * 0.85).min(0.4);
         let mut sides: [Vec<([f32; 2], [f32; 3])>; 2] = [Vec::new(), Vec::new()];
         let mut total = 0_usize;
         opening.each(px, |x, y| {
             total += 1;
-            let p = px.linear(x, y);
-            let max = p[0].max(p[1]).max(p[2]).max(1e-4);
-            let min = p[0].min(p[1]).min(p[2]);
+            let q = px.encoded(x, y);
+            let max = q[0].max(q[1]).max(q[2]).max(1e-4);
+            let min = q[0].min(q[1]).min(q[2]);
             let point = [x as f32 + 0.5, y as f32 + 0.5];
             let along = (point[0] - centre[0]) * g.u[0] + (point[1] - centre[1]) * g.u[1];
-            if luma(p) > skin.luma * 0.55
-                && (max - min) / max < 0.45
-                && p.iter().all(|v| *v < 0.97)
-                && along.abs() > 0.06 * d
-            {
+            let l = q[0] * 0.2126 + q[1] * 0.7152 + q[2] * 0.0722;
+            if l > cheek_luma * 0.6 && (max - min) / max < sat_limit && max < 0.99 && along.abs() > 0.06 * d {
                 if let Some(side) = sides.get_mut(usize::from(along > 0.0)) {
-                    side.push((point, p));
+                    side.push((point, q));
                 }
             }
         });
         let found: usize = sides.iter().map(Vec::len).sum();
-        let open = total > 0 && found as f32 / total as f32 > 0.04 && found >= 6;
+        let open = total > 0 && found as f32 / total as f32 > 0.02 && found >= 6;
         if !open {
             closed += 1;
             continue;
@@ -847,8 +858,9 @@ fn eyes(
             .map(|(_, p)| (p[0] - (p[1] + p[2]) * 0.5) / p[0].max(p[1]).max(p[2]).max(1e-4))
             .sum::<f32>()
             / found as f32;
-        if redness > 0.12 {
-            let amount = ((redness - 0.08) * 3.0).clamp(0.15, 0.6);
+        // A healthy white measures about 0.1-0.25 here; only a clearly red one is cleaned.
+        if redness > 0.3 {
+            let amount = ((redness - 0.25) * 2.0).clamp(0.15, 0.6);
             let patches: Vec<Capsule> = sides
                 .iter()
                 .filter(|side| side.len() >= 3)
@@ -1085,7 +1097,7 @@ fn shine(
             let p = px.linear(x, y);
             let max = p[0].max(p[1]).max(p[2]).max(1e-4);
             let min = p[0].min(p[1]).min(p[2]);
-            if luma(p) > (skin.luma * 1.7).min(0.85) && (max - min) / max < 0.3 {
+            if luma(p) > (skin.luma * 1.8).max(0.5) && (max - min) / max < 0.25 {
                 specular += 1;
             }
         });
@@ -1094,7 +1106,8 @@ fn shine(
         return;
     }
     let fraction = specular as f32 / total as f32;
-    if fraction < 0.015 {
+    // Under 1.5 % is normal skin sheen; over 15 % is the light itself, not oily shine.
+    if !(0.015..=0.15).contains(&fraction) {
         return;
     }
     let [l, t, r, b] = g.bounds;
@@ -1102,7 +1115,7 @@ fn shine(
         base_edit(
             format!("{prefix}{face}-shine"),
             Tool::Mattify,
-            (fraction * 6.0).clamp(0.15, 0.45),
+            (fraction * 5.0).clamp(0.15, 0.4),
             px,
             [g.nose[0], g.nose[1], (r - l) * 0.5, (b - t) * 0.5],
         ),
@@ -1188,7 +1201,7 @@ mod tests {
         let size = 400;
         let mut rgb = canvas(size, [170, 120, 95]);
         let d = 96.0;
-        for (x, sclera) in [(0.38 * 400.0, [235, 232, 228]), (0.62 * 400.0, [236, 200, 196])] {
+        for (x, sclera) in [(0.38 * 400.0, [235, 232, 228]), (0.62 * 400.0, [236, 165, 160])] {
             let c = [x, 160.0];
             for dx in [-0.1, -0.05, 0.05, 0.1] {
                 paint(&mut rgb, size, [c[0] + dx * d, c[1]], 0.05 * d, sclera);
