@@ -4,15 +4,52 @@ import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { nativeRetouch, freshRetouch } from '../../ipc/nativeRetouch';
 import { develop } from '../../ipc/client';
 
-vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn()}}));
+vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn()}}));
 vi.mock('../../ipc/client',()=>({asIpcError:(e:Error)=>({message:e.message}),develop:{imageHistory:vi.fn(),historyStep:vi.fn()}}));
 beforeEach(()=>{
   vi.resetAllMocks();vi.mocked(nativeRetouch.edit).mockResolvedValue([]);
   vi.mocked(nativeRetouch.preview).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(120,100,90)),notes:[]} as never);
+  vi.mocked(nativeRetouch.selectionPreview).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(255,255,255))});
   vi.mocked(develop.imageHistory).mockResolvedValue({canUndo:true,canRedo:false} as never);
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('previews and saves gradient inversion with a brightness range without saving during preview',async()=>{
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'dodge'}});
+  fireEvent.click(screen.getByText('Gradient (G)'));
+  fireEvent.click(screen.getByLabelText('Outside shape'));
+  fireEvent.click(screen.getByLabelText('Limit by brightness'));
+  fireEvent.click(screen.getByText('Highlights'));
+  const calls=vi.mocked(nativeRetouch.edit).mock.calls.length;
+  fireEvent.click(screen.getByText('Preview selection mask'));
+  await screen.findByAltText('Selection mask');
+  expect(nativeRetouch.edit).toHaveBeenCalledTimes(calls);
+  expect(nativeRetouch.selectionPreview).toHaveBeenCalledWith('project','photo',expect.objectContaining({
+    selection:{inverted:true,gradient:{start:[.2,.5],end:[.8,.5]},luminance:{low:1,high:16,softness:1}}
+  }),null);
+  fireEvent.click(screen.getByText('Preview selection mask'));
+  await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({selection:expect.objectContaining({inverted:true,luminance:{low:1,high:16,softness:1}})})
+  ]));
+});
+it('rejects crossed brightness limits and clears shape constraints when selecting the entire photo',async()=>{
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'dodge'}});
+  fireEvent.click(screen.getByText('Gradient (G)'));
+  fireEvent.click(screen.getByLabelText('Outside shape'));
+  fireEvent.click(screen.getByLabelText('Limit by brightness'));
+  fireEvent.change(screen.getByLabelText('Dark limit (EV)'),{target:{value:'3'}});
+  expect((screen.getByText('Apply retouch') as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByText('Midtones'));
+  fireEvent.click(screen.getByText('Select entire photo'));
+  expect(screen.queryByLabelText('Gradient start X (%)')).toBeNull();
+  expect((screen.getByLabelText('Outside shape') as HTMLInputElement).checked).toBe(false);
+  expect((screen.getByLabelText('Limit by brightness') as HTMLInputElement).checked).toBe(true);
+  expect((screen.getByText('Apply retouch') as HTMLButtonElement).disabled).toBe(false);
+});
 it('compares cached previews without editing the recipe or requesting another render',async()=>{
   open();await screen.findByAltText('Retouched photograph');
   const renders=vi.mocked(nativeRetouch.preview).mock.calls.length;

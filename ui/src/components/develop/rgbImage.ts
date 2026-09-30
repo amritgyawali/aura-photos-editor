@@ -1,7 +1,7 @@
 import type { RenderDto } from '../../ipc/types';
 
 /** Wrap the backend's interleaved RGB in a lossless browser-readable BMP container. */
-export function rgbDataUrl(render: RenderDto): string | null {
+export function rgbDataUrl(render: Pick<RenderDto, 'width'|'height'|'rgbBase64'>): string | null {
   const { width, height } = render;
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1) return null;
   let rgb: string;

@@ -2,6 +2,14 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Advanced retouch selections
+
+- Added linear gradients, outside-shape inversion and brightness ranges to all 24 native retouch tools, with shared preview/export coverage.
+- Added numeric gradient endpoints, reverse direction, shadows/midtones/highlights presets and adjustable range falloff.
+- Added a disposable grayscale selection preview evaluated at the operation's position in the saved stack, with read-only zoom/pan.
+- Broad healing selections require a chosen source. Invalid selections are rejected before saving; old recipes preserve their behavior.
+- Added native/UI regression coverage and `scripts/test-retouch-selection.py` for five-portrait desktop and export verification.
+
 ## Retouch comparison and draft protection
 
 - Added an aligned, draggable before/after split in Retouch, with shared zoom/pan, keyboard slider controls and comparison of unsaved previews.

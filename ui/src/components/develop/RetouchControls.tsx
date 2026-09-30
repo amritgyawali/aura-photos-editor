@@ -1,4 +1,5 @@
-import { DEFAULT_SKIN, isSampledSkinTool, needsRetouchSource, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool } from '../../ipc/nativeRetouch';
+import { DEFAULT_SKIN, isSampledSkinTool, needsRetouchSource, validRetouchSelection, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool } from '../../ipc/nativeRetouch';
+import { RetouchSelectionControls } from './RetouchSelectionControls';
 import { RetouchPresets } from './RetouchPresets';
 
 export function validRetouch(draft: NativeRetouchEdit): boolean {
@@ -8,6 +9,7 @@ export function validRetouch(draft: NativeRetouchEdit): boolean {
     && draft.radius >= .0005 && draft.radius <= .05 && draft.texture >= 0 && draft.texture <= 2 && draft.tone >= 0 && draft.tone <= 1
     && Math.abs(draft.warmth) <= 1 && Math.abs(draft.tint) <= 1 && (!draft.source || draft.source.every(v => v >= 0 && v <= 1))
     && (!needsRetouchSource(draft) || Boolean(draft.source))
+    && validRetouchSelection(draft)
     && (!draft.skin || (Number.isFinite(draft.skin.tolerance) && draft.skin.tolerance >= .015 && draft.skin.tolerance <= .3
       && Number.isFinite(draft.skin.edgeProtection) && draft.skin.edgeProtection >= 0 && draft.skin.edgeProtection <= 1));
 }
@@ -38,7 +40,7 @@ export function RetouchControls(props: Props) {
     </select></label>
     <p className="lr-hint">{info[3]}</p>
     <label>Strength ({Math.round(draft.amount * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.amount} onChange={event => onChange({ amount: Number(event.target.value) })}/></label>
-    <label>Feather ({Math.round(draft.feather * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.feather} onChange={event => onChange({ feather: Number(event.target.value) })}/></label>
+    {!draft.selection?.gradient && <label>Feather ({Math.round(draft.feather * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.feather} onChange={event => onChange({ feather: Number(event.target.value) })}/></label>}
     <div className="retouch-apply-bar">
       <label className="retouch-toggle"><input type="checkbox" checked={props.live} onChange={event => props.onLive(event.target.checked)}/>Preview unsaved changes</label>
       <button className="retouch-primary" type="button" disabled={!canApply} onClick={props.onApply}>{selected ? 'Update selected retouch' : 'Apply retouch'}</button>
@@ -55,7 +57,9 @@ export function RetouchControls(props: Props) {
       <label>{draft.tool === 'skin_uniformity' ? 'Color evening' : 'Tonal evening'} ({Math.round(draft.tone * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.tone} onChange={event => onChange({ tone: Number(event.target.value) })}/></label>
       {draft.tool === 'skin_smooth' && <label>Fine detail ({Math.round(draft.texture * 100)}%)<input type="range" min="0" max="2" step="0.01" value={draft.texture} onChange={event => onChange({ texture: Number(event.target.value) })}/><span className="lr-hint">100% retains the fine-detail band.</span></label>}
     </details>}
-    <details open><summary>{draft.mask ? 'Clone anchor / keyboard target' : 'Target region'}</summary>
+    <RetouchSelectionControls draft={draft} onChange={onChange}/>
+    <button type="button" onClick={props.onSelectAll}>Select entire photo</button>
+    <details open><summary>{draft.mask || draft.selection?.gradient ? 'Clone anchor / keyboard target' : 'Target region'}</summary>
       {['Center X (%)', 'Center Y (%)', 'Horizontal radius (%)', 'Vertical radius (%)'].map((label, index) => <label key={label}>{label}
         <input type="number" min={index > 1 ? .1 : 0} max="100" step="0.1" value={Number(((draft.region[index] ?? 0) * 100).toFixed(2))}
           onChange={event => { const region = [...draft.region] as NativeRetouchEdit['region']; region[index] = Number(event.target.value) / 100; onChange({ region }); }}/>
@@ -68,7 +72,7 @@ export function RetouchControls(props: Props) {
           onChange={event => { const source: [number, number] = draft.source ? [...draft.source] : [.5, .5]; source[index] = Number(event.target.value) / 100; onChange({ source }); }}/>
       </label>)}
       <button type="button" onClick={() => onChange({ source: null })}>Clear source</button>
-      {needsRetouchSource(draft) && !draft.source && <p>{sampled ? 'Choose a clean skin sample before applying this tool.' : draft.tool === 'patch_heal' ? 'Pick a source for painted repairs or ellipse radii above 10%.' : 'Choose a source before applying this tool.'}</p>}
+      {needsRetouchSource(draft) && !draft.source && <p>{sampled ? 'Choose a clean skin sample before applying this tool.' : draft.tool === 'patch_heal' ? 'Pick a source for painted, gradient, inverted or large patch repairs.' : 'Choose a source before applying this tool.'}</p>}
     </details>}
     {(sampled || bands || ['micro_dodge_burn', 'eye_detail', 'under_eye', 'backdrop'].includes(draft.tool)) && <label>Frequency radius (% of short edge)
       <input type="number" min="0.05" max="5" step="0.05" value={Number((draft.radius * 100).toFixed(2))} onChange={event => onChange({ radius: Number(event.target.value) / 100 })}/>

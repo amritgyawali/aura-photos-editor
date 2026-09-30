@@ -8,7 +8,7 @@ use aura_core::{PhotoId, ProjectId};
 pub use aura_recipe::retouch_tools::Edit;
 use aura_recipe::{retouch_tools, schema, EditSource};
 use aura_render::RenderService;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -124,6 +124,34 @@ pub struct DraftInput {
     pub photo_id: String,
     pub edit: Edit,
     pub replace_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectionPreview {
+    pub width: u32,
+    pub height: u32,
+    pub rgb_base64: String,
+}
+
+/// Preview selection coverage without changing the recipe or history.
+/// # Errors
+/// Invalid collection membership, draft, replacement ID, or failed rendering.
+pub fn selection_preview(state: &AppState, input: &DraftInput) -> IpcResult<SelectionPreview> {
+    crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
+    let photo = PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo"))?;
+    let recipe = crate::develop_commands::load_or_neutral(state, photo)?;
+    let (rgb, width, height) = state.render()?.retouch_selection(
+        &photo,
+        &recipe,
+        &input.edit,
+        input.replace_id.as_deref(),
+    )?;
+    Ok(SelectionPreview {
+        width,
+        height,
+        rgb_base64: crate::develop_commands::base64(&rgb),
+    })
 }
 
 /// Render a proposed edit without storing a recipe or history entry.

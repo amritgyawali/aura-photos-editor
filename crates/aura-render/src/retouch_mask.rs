@@ -34,6 +34,69 @@ fn stroke_bounds(stroke: &BrushStroke, w: usize, h: usize) -> [usize; 4] {
 }
 
 impl Coverage {
+    pub(crate) fn for_edit(edit: &Edit, w: usize, h: usize, rgb: &[f32]) -> Self {
+        let base = Self::new(edit, w, h);
+        let Some(selection) = &edit.selection else {
+            return base;
+        };
+        if !selection.inverted && selection.gradient.is_none() && selection.luminance.is_none() {
+            return base;
+        }
+        let bounds = if selection.inverted || selection.gradient.is_some() {
+            [0, 0, w, h]
+        } else {
+            base.bounds
+        };
+        let [x0, y0, x1, y1] = bounds;
+        let mut pixels = Vec::with_capacity((x1 - x0) * (y1 - y0));
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let mut weight = selection.gradient.as_ref().map_or_else(
+                    || base.at(x, y, w, h),
+                    |g| {
+                        let dx = (g.end[0] - g.start[0]) * w as f32;
+                        let dy = (g.end[1] - g.start[1]) * h as f32;
+                        let t = (((x as f32 + 0.5 - g.start[0] * w as f32) * dx
+                            + (y as f32 + 0.5 - g.start[1] * h as f32) * dy)
+                            / (dx * dx + dy * dy).max(1e-12))
+                        .clamp(0.0, 1.0);
+                        t * t * (3.0 - 2.0 * t)
+                    },
+                );
+                if selection.inverted {
+                    weight = 1.0 - weight;
+                }
+                if let Some(range) = &selection.luminance {
+                    let i = (y * w + x) * 3;
+                    // The caller checks RGB length; x/y are bounded by image dimensions.
+                    #[allow(clippy::indexing_slicing)]
+                    let luma = rgb[i] * 0.2627 + rgb[i + 1] * 0.678 + rgb[i + 2] * 0.0593;
+                    // Clamp black to the lower endpoint, and HDR values to the upper endpoint.
+                    let ev = (luma.max(0.18 * 2.0_f32.powi(-16)) / 0.18)
+                        .log2()
+                        .clamp(-16.0, 16.0);
+                    let distance = (range.low - ev).max(ev - range.high).max(0.0);
+                    let t = if range.softness <= 0.0 {
+                        if distance <= 0.0 {
+                            1.0
+                        } else {
+                            0.0
+                        }
+                    } else {
+                        (1.0 - distance / range.softness).clamp(0.0, 1.0)
+                    };
+                    weight *= t * t * (3.0 - 2.0 * t);
+                }
+                pixels.push(weight);
+            }
+        }
+        Self {
+            bounds,
+            pixels: Some(pixels),
+            ..base
+        }
+    }
+
     pub(crate) fn new(edit: &Edit, w: usize, h: usize) -> Self {
         let [cx, cy, rx, ry] = edit.region;
         let mut result = Self {

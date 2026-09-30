@@ -18,6 +18,7 @@ fn operation(tool: Tool) -> Edit {
         tone: 1.0,
         warmth: 0.0,
         tint: 0.0,
+        selection: None,
         mask: None,
         skin: Some(SkinSettings {
             tolerance: 0.2,

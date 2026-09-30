@@ -100,6 +100,33 @@ unsaved refinement and Discard on the first portrait. This adds review controls
 and protects in-memory drafts; it does not change the retouch algorithms or
 establish competitor parity. See [ADR-0072](adr/ADR-0072-retouch-comparison-and-draft-protection.md).
 
+The advanced selection update adds gradients, shape inversion, brightness ranges
+and a disposable coverage preview across all 24 tools. The preview evaluates
+the range at the operation's position in the saved stack; later operations,
+sharpening and final geometry cannot alter its selection. It displays authored
+coverage, before tool-specific skin affinity or spot detection. These capabilities
+improve manual targeting; they do not close the automatic semantic-selection gap.
+See [ADR-0073](adr/ADR-0073-advanced-retouch-selections.md).
+
+Verification includes 551 UI tests across 57 files and 29 focused native tests.
+The last endpoint-guide correction also passed the 21 affected UI tests and
+TypeScript/Vite. Strict Clippy was rerun for the recipe and render libraries:
+the same 3 recipe and 67 renderer baseline errors remain. Error-category counts
+match the prior patch-heal run; no new categories or additional findings were
+introduced. The new bounded RGB indexing has a local, justified lint allowance;
+existing findings were not suppressed. Logs are in
+`.work-checks/selection-recipe-clippy.log` and `selection-render-clippy.log`.
+
+The final Windows desktop build and the five-portrait selection workflow passed.
+All five PNGs passed verification and matched the full renderer exactly; protected
+pixels and original download hashes were unchanged, undo/redo was exact, and
+actual gradient/range/mask controls passed on all five portraits. One desktop
+process exit interrupted the first run on the fifth portrait, with no cause in
+the checked logs. After restart, completed operation IDs and pixels were intact;
+the resumed run completed all remaining checks. The exit remains unexplained.
+Evidence: `.work-checks/selection-review/results.json`. The repeatable script is
+`scripts/test-retouch-selection.py`, including `--resume` for interrupted runs.
+
 To establish closer parity, a future evaluation needs paired originals and
 competitor outputs with versions/settings recorded, face/skin reference masks,
 diverse lighting and complexions, and blind review of pores, hair, eyes, lips,

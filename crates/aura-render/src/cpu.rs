@@ -122,6 +122,49 @@ pub struct CpuEngine {
 }
 
 impl CpuEngine {
+    /// Render the authored selection at the draft's actual position in the stack.
+    /// The RGB bytes encode coverage directly; they are not color-managed photo pixels.
+    /// # Errors
+    /// Invalid recipe/draft, missing replacement operation, or unavailable source pixels.
+    pub fn retouch_selection(
+        &self,
+        image: &PhotoId,
+        recipe: &Recipe,
+        draft: &aura_recipe::retouch_tools::Edit,
+        replace: Option<&str>,
+    ) -> AuraResult<(Vec<u8>, u32, u32)> {
+        aura_recipe::schema::Validation::check(recipe)?;
+        aura_recipe::retouch_tools::validate(std::slice::from_ref(draft))?;
+        let mut prior = aura_recipe::retouch_tools::read(recipe)?;
+        if let Some(id) = replace {
+            let index = prior.iter().position(|edit| edit.id == id).ok_or_else(|| {
+                aura_core::errors::render::recipe_invalid(
+                    "retouch selection",
+                    "operation no longer exists",
+                )
+            })?;
+            prior.truncate(index);
+        }
+        let mut prepared = recipe.clone();
+        aura_recipe::retouch_tools::write(&mut prepared, &prior)?;
+        prepared.geometry = aura_recipe::Geometry::default();
+        prepared.global.effects = aura_recipe::Effects::default();
+        // These stages follow retouching and must not influence the range decision.
+        prepared.global.sharpen.amount = 0;
+        let prepared = prepared.clamped();
+        let level = RenderLevel::Screen(1600, 1200);
+        let frame = self.source.frame(image, level)?;
+        let plan = graph::plan(&prepared, RenderPurpose::Interactive, frame.kind, self.caps);
+        let (rgb, width, height, _) = self.working_buffer(&frame, &prepared, &plan, level, None);
+        let mask =
+            crate::retouch_tools::selection_mask(&rgb, width as usize, height as usize, draft);
+        let bytes = mask
+            .into_iter()
+            .flat_map(|v| [(v * 255.0).round() as u8; 3])
+            .collect();
+        Ok((bytes, width, height))
+    }
+
     /// An engine over a frame source.
     #[must_use]
     pub fn new(source: Arc<dyn FrameSource>, clock: Arc<dyn Clock>) -> Self {

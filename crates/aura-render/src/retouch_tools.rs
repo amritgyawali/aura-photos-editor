@@ -33,7 +33,7 @@ pub fn apply(rgb: &mut [f32], width: usize, height: usize, edits: &[Edit]) {
         return;
     }
     for edit in edits.iter().filter(|e| e.enabled && e.amount > 0.0) {
-        let coverage = Coverage::new(edit, width, height);
+        let coverage = Coverage::for_edit(edit, width, height, rgb);
         if matches!(
             edit.tool,
             Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
@@ -47,6 +47,20 @@ pub fn apply(rgb: &mut [f32], width: usize, height: usize, edits: &[Edit]) {
             apply_one(rgb, width, height, edit, &coverage, None);
         }
     }
+}
+
+/// Authored selection coverage, independent of tool strength and detection.
+/// Invalid buffer dimensions return an empty mask. Parameters must be validated.
+#[must_use]
+pub fn selection_mask(rgb: &[f32], width: usize, height: usize, edit: &Edit) -> Vec<f32> {
+    if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
+        return Vec::new();
+    }
+    let coverage = Coverage::for_edit(edit, width, height, rgb);
+    (0..height)
+        .flat_map(|y| (0..width).map(move |x| (x, y)))
+        .map(|(x, y)| coverage.at(x, y, width, height))
+        .collect()
 }
 
 fn apply_one(

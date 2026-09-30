@@ -4,6 +4,26 @@ This tracks implementation after the [100-feature comparison](photo-editor-featu
 The comparison describes baseline `a69b236`; it is not a claim that AURA implements all
 100 feature families or matches the ten products in quality.
 
+## Advanced retouch selections
+
+All 24 native tools now accept linear gradients, inverted shapes and luminance
+ranges with adjustable falloff. A disposable grayscale preview evaluates the
+authored selection before the selected operation, preserving the saved recipe.
+The UI supplies numeric endpoints, reversal and tonal presets as well as drawing.
+Preview and export share the same coverage implementation. These are manual
+selection refinements, not automatic face segmentation. See [ADR-0073](adr/ADR-0073-advanced-retouch-selections.md)
+and the [user guide](native-retouch.md).
+
+Verification: 551 UI tests, 29 focused native tests, TypeScript/Vite and the final
+native desktop build passed. Five real portraits passed mask preview isolation,
+protected pixels, exact undo/redo and desktop controls; five verified PNGs matched
+the full renderer and original download hashes remained unchanged. Evidence is
+in `.work-checks/selection-review/`. One unexplained desktop exit interrupted the
+first run; restart verification preserved completed operation IDs and pixels,
+and the resumed workflow passed. The existing strict-Clippy baseline remains red
+(67 renderer and 3 recipe findings). This is a completed selection upgrade, not
+completion of the entire 100-feature roadmap.
+
 ## Sampled skin processing
 
 Three additional native tools provide sample-guided skin smoothing, color

@@ -3107,10 +3107,16 @@ async fn sync_settings(
 }
 
 #[tauri::command]
-async fn pick_white_balance(state: State<'_, AppState>, input: aura_app::studio_tools::WhiteBalancePickInput) -> IpcResult<RecipeDto> {
+async fn pick_white_balance(
+    state: State<'_, AppState>,
+    input: aura_app::studio_tools::WhiteBalancePickInput,
+) -> IpcResult<RecipeDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::studio_tools::pick_white_balance(&app, &input))
-        .await.map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::studio_tools::pick_white_balance(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -3119,10 +3125,17 @@ async fn list_edit_profiles() -> IpcResult<Vec<aura_app::edit_profiles::EditProf
 }
 
 #[tauri::command]
-async fn export_run_watermarked(state: State<'_, AppState>, input: ExportJobInput, watermark: aura_app::delivery_commands::Watermark) -> IpcResult<ExportStatusDto> {
+async fn export_run_watermarked(
+    state: State<'_, AppState>,
+    input: ExportJobInput,
+    watermark: aura_app::delivery_commands::Watermark,
+) -> IpcResult<ExportStatusDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::delivery_commands::export_run_with_watermark(&app, input, Some(watermark)))
-        .await.map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::delivery_commands::export_run_with_watermark(&app, input, Some(watermark))
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -3183,9 +3196,24 @@ async fn native_retouch_draft_preview(
     input: aura_app::native_retouch::DraftInput,
 ) -> IpcResult<RenderDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::native_retouch::draft_preview(&app, &input))
-        .await
-        .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::draft_preview(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_selection_preview(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::DraftInput,
+) -> IpcResult<aura_app::native_retouch::SelectionPreview> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::selection_preview(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 fn main() {
@@ -3233,6 +3261,7 @@ fn main() {
             sync_settings,
             pick_white_balance,
             native_retouch_edit,
+            native_retouch_selection_preview,
             native_retouch_preview,
             native_retouch_draft_preview,
             list_edit_profiles,

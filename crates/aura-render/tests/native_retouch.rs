@@ -18,6 +18,7 @@ fn edit(tool: Tool) -> Edit {
         tone: 0.5,
         warmth: 0.3,
         tint: -0.2,
+        selection: None,
         mask: None,
         skin: None,
     }
@@ -377,5 +378,263 @@ fn automatic_spot_cleanup_works_with_low_opacity_brushes() {
     assert!(
         pixels[center] < 0.3,
         "Opacity was not applied to the repair"
+    );
+}
+
+#[test]
+fn advanced_masks_protect_excluded_pixels_for_every_tool() {
+    use aura_recipe::retouch_tools::{Gradient, LuminanceRange, Selection};
+    let frame = fixtures::detail_frame(96, 80);
+    for tool in [
+        Tool::Heal,
+        Tool::Clone,
+        Tool::AutoBlemish,
+        Tool::Frequency,
+        Tool::MicroDodgeBurn,
+        Tool::Dodge,
+        Tool::Burn,
+        Tool::SkinColor,
+        Tool::ColorMatch,
+        Tool::Mattify,
+        Tool::UnderEye,
+        Tool::Wrinkle,
+        Tool::Teeth,
+        Tool::EyeClean,
+        Tool::EyeDetail,
+        Tool::RedEye,
+        Tool::Fabric,
+        Tool::Backdrop,
+        Tool::Glare,
+        Tool::Makeup,
+        Tool::SkinSmooth,
+        Tool::SkinUniformity,
+        Tool::PortraitDodgeBurn,
+        Tool::PatchHeal,
+    ] {
+        for inverted in [false, true] {
+            let mut op = edit(tool);
+            op.source = Some([0.1, 0.1]);
+            op.selection = Some(Selection {
+                inverted,
+                gradient: Some(Gradient {
+                    start: [0.3, 0.5],
+                    end: [0.7, 0.5],
+                }),
+                luminance: Some(LuminanceRange {
+                    low: -1.,
+                    high: 1.,
+                    softness: 0.3,
+                }),
+            });
+            retouch_tools::validate(&[op.clone()]).unwrap();
+            let mask = aura_render::retouch_tools::selection_mask(&frame.rgb, 96, 80, &op);
+            assert!(mask.iter().any(|v| *v == 0.));
+            assert!(mask.iter().any(|v| *v > 0.));
+            let mut out = frame.rgb.clone();
+            aura_render::retouch_tools::apply(&mut out, 96, 80, &[op]);
+            for (i, value) in mask.iter().enumerate() {
+                if *value == 0. {
+                    assert_eq!(
+                        &out[i * 3..i * 3 + 3],
+                        &frame.rgb[i * 3..i * 3 + 3],
+                        "{tool:?} {i}"
+                    );
+                }
+            }
+            assert!(out.iter().all(|v| v.is_finite()));
+        }
+    }
+}
+
+#[test]
+fn gradient_uses_pixel_aspect_and_inversion_is_complementary() {
+    use aura_recipe::retouch_tools::{Gradient, Selection};
+    let mut op = edit(Tool::Dodge);
+    op.selection = Some(Selection {
+        gradient: Some(Gradient {
+            start: [0., 0.],
+            end: [1., 1.],
+        }),
+        ..Selection::default()
+    });
+    let rgb = vec![0.18; 200 * 100 * 3];
+    let mask = aura_render::retouch_tools::selection_mask(&rgb, 200, 100, &op);
+    let t: f32 = (100.5 * 200. + 0.5 * 100.) / (200. * 200. + 100. * 100.);
+    assert!((mask[100] - t * t * (3. - 2. * t)).abs() < 1e-6);
+    op.selection.as_mut().unwrap().inverted = true;
+    let inverted = aura_render::retouch_tools::selection_mask(&rgb, 200, 100, &op);
+    for (a, b) in mask.iter().zip(inverted) {
+        assert!((a + b - 1.).abs() < 1e-6);
+    }
+    op.selection = Some(Selection {
+        inverted: true,
+        ..Selection::default()
+    });
+    let outside = aura_render::retouch_tools::selection_mask(&rgb, 200, 100, &op);
+    assert_eq!(outside[50 * 200 + 100], 0.);
+    assert_eq!(outside[0], 1.);
+}
+
+#[test]
+fn luminance_ranges_are_linear_stops_with_smooth_falloff_and_black_hdr_support() {
+    use aura_recipe::retouch_tools::{LuminanceRange, Selection};
+    let mut op = edit(Tool::Dodge);
+    op.region = [0.5, 0.5, 1., 1.];
+    op.feather = 0.;
+    op.selection = Some(Selection {
+        luminance: Some(LuminanceRange {
+            low: -1.,
+            high: 1.,
+            softness: 1.,
+        }),
+        ..Selection::default()
+    });
+    let rgb: Vec<f32> = [-3., -1.5, 0., 1.5, 3.]
+        .into_iter()
+        .flat_map(|ev| [0.18 * 2.0_f32.powf(ev); 3])
+        .collect();
+    let mask = aura_render::retouch_tools::selection_mask(&rgb, 5, 1, &op);
+    for (a, b) in mask.iter().zip([0., 0.5, 1., 0.5, 0.]) {
+        assert!((a - b).abs() < 1e-5);
+    }
+    op.selection.as_mut().unwrap().luminance = Some(LuminanceRange {
+        low: -16.,
+        high: 16.,
+        softness: 0.,
+    });
+    let extreme = [0., 0., 0., 100000., 100000., 100000.];
+    assert_eq!(
+        aura_render::retouch_tools::selection_mask(&extreme, 2, 1, &op),
+        vec![1., 1.]
+    );
+    let old = edit(Tool::Dodge);
+    assert!(serde_json::to_value(old)
+        .unwrap()
+        .get("selection")
+        .is_none());
+}
+
+#[test]
+fn inverted_painted_masks_include_erased_and_empty_areas() {
+    use aura_recipe::retouch_tools::Selection;
+    let mut op = edit(Tool::Dodge);
+    op.feather = 0.;
+    let mut paint = stroke(false, vec![[0.5, 0.5, 1.]]);
+    paint.opacity = 1.;
+    let mut erase = paint.clone();
+    erase.erase = true;
+    erase.radius = 0.025;
+    op.mask = Some(BrushMask {
+        strokes: vec![paint, erase],
+    });
+    op.selection = Some(Selection {
+        inverted: true,
+        ..Selection::default()
+    });
+    let rgb = vec![0.18; 100 * 100 * 3];
+    let mask = aura_render::retouch_tools::selection_mask(&rgb, 100, 100, &op);
+    assert_eq!(
+        mask[50 * 100 + 50],
+        1.,
+        "erased center is selected after inversion"
+    );
+    assert_eq!(
+        mask[50 * 100 + 55],
+        0.,
+        "painted ring is protected after inversion"
+    );
+    assert_eq!(mask[0], 1., "outside painted bounds is selected");
+    op.mask = Some(BrushMask { strokes: vec![] });
+    assert!(
+        aura_render::retouch_tools::selection_mask(&rgb, 100, 100, &op)
+            .iter()
+            .all(|v| *v == 1.)
+    );
+}
+
+#[test]
+fn invalid_selections_and_unsafe_automatic_sources_are_rejected() {
+    use aura_recipe::retouch_tools::{Gradient, LuminanceRange, Selection};
+    let mut op = edit(Tool::Dodge);
+    op.selection = Some(Selection {
+        gradient: Some(Gradient {
+            start: [0.5, 0.5],
+            end: [0.5, 0.5],
+        }),
+        ..Selection::default()
+    });
+    assert!(retouch_tools::validate(&[op.clone()]).is_err());
+    op.selection = Some(Selection {
+        luminance: Some(LuminanceRange {
+            low: 2.,
+            high: -2.,
+            softness: 0.,
+        }),
+        ..Selection::default()
+    });
+    assert!(retouch_tools::validate(&[op.clone()]).is_err());
+    for tool in [Tool::Heal, Tool::PatchHeal] {
+        op.tool = tool;
+        op.selection = Some(Selection {
+            inverted: true,
+            ..Selection::default()
+        });
+        assert!(retouch_tools::validate(&[op.clone()]).is_err());
+        op.source = Some([0.1, 0.1]);
+        assert!(retouch_tools::validate(&[op.clone()]).is_ok());
+        op.source = None;
+    }
+}
+
+#[test]
+fn selection_preview_uses_only_preceding_operations_and_never_changes_recipe() {
+    use aura_recipe::retouch_tools::{LuminanceRange, Selection};
+    let frame = fixtures::grey_frame(80, 80, 0.18);
+    let engine = CpuEngine::new(
+        Arc::new(fixtures::StaticSource::new(frame)),
+        FixedClock::at(time::OffsetDateTime::UNIX_EPOCH),
+    );
+    let image = aura_core::PhotoId::new();
+    let mut recipe =
+        aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "Bench-01");
+    let mut first = edit(Tool::Dodge);
+    first.id = "first".into();
+    first.region = [0.5, 0.5, 1., 1.];
+    first.feather = 0.;
+    first.amount = 1.;
+    let mut draft = first.clone();
+    draft.id = "second".into();
+    draft.selection = Some(Selection {
+        luminance: Some(LuminanceRange {
+            low: 0.1,
+            high: 16.,
+            softness: 0.,
+        }),
+        ..Selection::default()
+    });
+    let before = engine
+        .retouch_selection(&image, &recipe, &draft, None)
+        .unwrap();
+    retouch_tools::write(&mut recipe, &[first, draft.clone()]).unwrap();
+    let snapshot = recipe.clone();
+    let at_second = engine
+        .retouch_selection(&image, &recipe, &draft, Some("second"))
+        .unwrap();
+    let at_first = engine
+        .retouch_selection(&image, &recipe, &draft, Some("first"))
+        .unwrap();
+    assert_eq!(before, at_first);
+    assert_ne!(at_second.0, at_first.0);
+    assert_eq!(snapshot, recipe);
+    assert!(engine
+        .retouch_selection(&image, &recipe, &draft, Some("missing"))
+        .is_err());
+    recipe.geometry.crop = [0.25, 0.25, 0.75, 0.75];
+    recipe.global.sharpen.amount = 100;
+    assert_eq!(
+        at_second,
+        engine
+            .retouch_selection(&image, &recipe, &draft, Some("second"))
+            .unwrap()
     );
 }

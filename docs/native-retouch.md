@@ -143,9 +143,35 @@ against documented Retouch4me and SkinFiner behavior. Exact equivalence has not
 been established. [ADR-0070](adr/ADR-0070-sampled-skin-processing.md) describes
 the independent processing implementation.
 
+## Gradients, outside shapes and brightness ranges
+
+Choose **Gradient (G)** and drag from the protected end toward the selected end.
+Set endpoints numerically for precise placement, or use **Reverse gradient**.
+The distance between endpoints controls the transition. Gradient mode replaces
+the ellipse/painted selection. **Outside shape** reverses the selected area of
+an ellipse, painted mask or gradient; an inverted empty painted mask selects
+the whole photo.
+
+Enable **Limit by brightness** to intersect the shape with shadows, midtones or
+highlights. The limits are stops from middle gray, measured after earlier edits
+and before this operation. **Range falloff** softens the transition beyond each
+limit. Moving an operation in the stack can therefore change its brightness mask.
+**Select entire photo** removes shape restrictions but retains brightness limits.
+
+Use **Preview selection mask** to inspect actual authored coverage: white is
+selected, black protected, gray partially selected. You can zoom and pan in this
+view. Skin color matching and spot detection can restrict a tool's effect further;
+this mask is not a face detector or a prediction of the final retouch. Toggle it
+off to draw again. Mask previews do not save edits or history.
+
+Healing across gradients or inverted shapes needs a chosen source. Apply/Discard,
+undo/redo and export work as before. Tool presets omit selection settings so
+coordinates are not silently copied to another photograph.
+
 ## Current boundaries
 
-Targets are feathered ellipses or painted masks, with no automatic face/skin/eye
+Targets are feathered ellipses, painted masks or gradients, optionally inverted
+and restricted by brightness, with no automatic face/skin/eye
 segmentation. Auto blemish uses local image statistics, not a trained classifier.
 Several workflows share processing primitives. Backdrop smoothing is not object
 removal, and Makeup is not facial landmark-aware makeup synthesis. Effects render
@@ -181,3 +207,7 @@ draft history isolation, operation reordering/duplication, and real pointer
 interaction after zooming. It accepts the same command-line arguments.
 `scripts/test-sampled-skin.py` checks the three sampled-skin operations, their
 non-persistent previews, saved history, five portrait exports and sample controls.
+`scripts/test-retouch-selection.py` checks gradients and brightness masks, protected
+pixels, preview isolation, undo/redo, exact PNG exports and desktop mask controls.
+It supports `--resume` to verify completed operations and continue the same isolated
+test collection after an interruption.

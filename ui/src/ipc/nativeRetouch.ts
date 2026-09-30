@@ -32,6 +32,12 @@ export type BrushPoint = [number, number, number];
 export type BrushStroke = { erase: boolean; radius: number; opacity: number; points: BrushPoint[] };
 export type BrushMask = { strokes: BrushStroke[] };
 export type SkinSettings = { tolerance: number; edgeProtection: number };
+export type RetouchSelection = {
+  inverted?: boolean;
+  gradient?: { start: [number, number]; end: [number, number] } | null;
+  luminance?: { low: number; high: number; softness: number } | null;
+};
+export type SelectionPreview = Pick<RenderDto, 'width'|'height'|'rgbBase64'>;
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8 };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 export type NativeRetouchEdit = {
@@ -40,13 +46,24 @@ export type NativeRetouchEdit = {
   texture: number; tone: number; warmth: number; tint: number;
   mask?: BrushMask | null;
   skin?: SkinSettings | null;
+  selection?: RetouchSelection | null;
 };
+export const extendedRetouchShape = (edit: NativeRetouchEdit) => Boolean(edit.selection?.inverted || edit.selection?.gradient);
 export const needsRetouchSource = (edit: NativeRetouchEdit) => ['clone', 'color_match'].includes(edit.tool)
   || isSampledSkinTool(edit.tool)
-  || (edit.tool === 'patch_heal' && (Boolean(edit.mask) || edit.region[2] > .1 || edit.region[3] > .1));
+  || (edit.tool === 'heal' && extendedRetouchShape(edit))
+  || (edit.tool === 'patch_heal' && (Boolean(edit.mask) || edit.region[2] > .1 || edit.region[3] > .1 || extendedRetouchShape(edit)));
+export function validRetouchSelection(edit: NativeRetouchEdit): boolean {
+  const { gradient, luminance } = edit.selection ?? {};
+  if (gradient && (edit.mask || ![...gradient.start,...gradient.end].every(v => Number.isFinite(v) && v >= 0 && v <= 1)
+    || Math.hypot(gradient.start[0]-gradient.end[0],gradient.start[1]-gradient.end[1]) < .001)) return false;
+  return !luminance || ([luminance.low,luminance.high,luminance.softness].every(Number.isFinite)
+    && luminance.low >= -16 && luminance.high <= 16 && luminance.low <= luminance.high && luminance.softness >= 0 && luminance.softness <= 4);
+}
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
 export const nativeRetouch = {
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
   preview: (projectId: string, photoId: string, before = false) => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before}),
   draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId}}),
+  selectionPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<SelectionPreview>('native_retouch_selection_preview',{input:{projectId,photoId,edit,replaceId}}),
 };

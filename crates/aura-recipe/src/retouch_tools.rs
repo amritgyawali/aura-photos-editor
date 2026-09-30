@@ -33,6 +33,34 @@ pub struct SkinSettings {
     pub edge_protection: f32,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct Gradient {
+    pub start: [f32; 2],
+    pub end: [f32; 2],
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct LuminanceRange {
+    /// Stops relative to 18% linear working luminance, before this operation.
+    pub low: f32,
+    pub high: f32,
+    /// Smooth falloff outside each end of the selected interval, in stops.
+    pub softness: f32,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct Selection {
+    #[serde(default)]
+    pub inverted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gradient: Option<Gradient>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub luminance: Option<LuminanceRange>,
+}
+
 impl Default for SkinSettings {
     fn default() -> Self {
         Self {
@@ -95,6 +123,8 @@ pub struct Edit {
     pub mask: Option<BrushMask>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skin: Option<SkinSettings>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<Selection>,
 }
 
 /// Validate retouch parameters and aggregate authoring limits.
@@ -151,13 +181,20 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
         }
         if edit.tool == Tool::PatchHeal
             && edit.source.is_none()
-            && (edit.mask.is_some() || edit.region[2] > 0.1 || edit.region[3] > 0.1)
+            && (edit.mask.is_some()
+                || edit.region[2] > 0.1
+                || edit.region[3] > 0.1
+                || edit
+                    .selection
+                    .as_ref()
+                    .is_some_and(|s| s.inverted || s.gradient.is_some()))
         {
             return Err(recipe_invalid(
                 KEY,
                 "choose a source for painted or large patch repairs",
             ));
         }
+        validate_selection(edit)?;
         if let Some(mask) = &edit.mask {
             if mask.strokes.len() > MAX_STROKES {
                 return Err(recipe_invalid(KEY, "too many mask strokes"));
@@ -205,5 +242,43 @@ pub fn write(recipe: &mut Recipe, edits: &[Edit]) -> AuraResult<()> {
         serde_json::to_value(edits)
             .map_err(|_| recipe_invalid(KEY, "cannot serialize retouch operations"))?,
     );
+    Ok(())
+}
+
+fn validate_selection(edit: &Edit) -> AuraResult<()> {
+    let unit = |v: f32| v.is_finite() && (0.0..=1.0).contains(&v);
+    if let Some(selection) = &edit.selection {
+        if let Some(g) = &selection.gradient {
+            if edit.mask.is_some()
+                || !g.start.iter().chain(&g.end).all(|v| unit(*v))
+                || (g.start[0] - g.end[0]).hypot(g.start[1] - g.end[1]) < 0.001
+            {
+                return Err(recipe_invalid(
+                    KEY,
+                    "invalid gradient or conflicting painted mask",
+                ));
+            }
+        }
+        if selection.luminance.as_ref().is_some_and(|r| {
+            !r.low.is_finite()
+                || !r.high.is_finite()
+                || !r.softness.is_finite()
+                || !(-16.0..=16.0).contains(&r.low)
+                || !(-16.0..=16.0).contains(&r.high)
+                || r.low > r.high
+                || !(0.0..=4.0).contains(&r.softness)
+        }) {
+            return Err(recipe_invalid(KEY, "invalid luminance range"));
+        }
+        if edit.tool == Tool::Heal
+            && edit.source.is_none()
+            && (selection.inverted || selection.gradient.is_some())
+        {
+            return Err(recipe_invalid(
+                KEY,
+                "choose a source for gradient or inverted healing",
+            ));
+        }
+    }
     Ok(())
 }
