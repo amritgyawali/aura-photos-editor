@@ -1,0 +1,424 @@
+{
+  "steps": [
+    {
+      "area": "Collections",
+      "label": "Create a collection by typing its name",
+      "status": "passed",
+      "result": "Full test 11-30-17",
+      "seconds": 2.1,
+      "alerts": []
+    },
+    {
+      "area": "Navigation",
+      "label": "Open all six workspaces with the mouse",
+      "status": "passed",
+      "result": {
+        "Start": "COLLECTIONS",
+        "Photos": "COLLECTIONS",
+        "Auto edit": "COLLECTIONS",
+        "Instagram style": "COLLECTIONS",
+        "Export": "COLLECTIONS",
+        "Advanced": "COLLECTIONS"
+      },
+      "seconds": 9.8,
+      "alerts": []
+    },
+    {
+      "area": "Import",
+      "label": "Choose photos with the Windows file dialog (typed path, Enter)",
+      "status": "passed",
+      "result": {
+        "dialog": "Choose photos to edit"
+      },
+      "seconds": 18.2,
+      "alerts": []
+    },
+    {
+      "area": "Import",
+      "label": "All chosen photos arrive in the collection",
+      "status": "passed",
+      "result": [
+        "group-office.jpg",
+        "landscape.jpg",
+        "pet-dog-indoor.jpg",
+        "portrait-smile-teeth.jpg",
+        "portrait-yellow-backdrop.jpg"
+      ],
+      "seconds": 0.0,
+      "alerts": []
+    },
+    {
+      "area": "Photos",
+      "label": "Thumbnails appear in the library grid",
+      "status": "passed",
+      "result": {
+        "thumbnails": 5
+      },
+      "seconds": 3.3,
+      "alerts": []
+    },
+    {
+      "area": "Auto edit",
+      "label": "Auto edit all photos (one click) finishes and saves edits",
+      "status": "passed",
+      "result": {
+        "group-office.jpg": {
+          "faces": 3,
+          "ops": 12,
+          "exposure": 0.666721
+        },
+        "landscape.jpg": {
+          "faces": 0,
+          "ops": 0,
+          "exposure": 0.69915
+        },
+        "pet-dog-indoor.jpg": {
+          "faces": 0,
+          "ops": 0,
+          "exposure": 0.72966
+        },
+        "portrait-smile-teeth.jpg": {
+          "faces": 1,
+          "ops": 8,
+          "exposure": -0.05085
+        },
+        "portrait-yellow-backdrop.jpg": {
+          "faces": 1,
+          "ops": 8,
+          "exposure": -0.05085
+        }
+      },
+      "seconds": 10.1,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Select a photo in the filmstrip",
+      "status": "passed",
+      "result": "portrait-smile-teeth.jpg",
+      "seconds": 2.4,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Auto enhance photo: faces detected and steps listed",
+      "status": "passed",
+      "result": {
+        "faces": 1,
+        "steps": [
+          "Light & colour",
+          "Skin",
+          "Eyes"
+        ]
+      },
+      "seconds": 2.5,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Type exposure +0.30 EV with the keyboard",
+      "status": "passed",
+      "result": 0.30000001192092896,
+      "seconds": 2.6,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Type white balance 6200 K with the keyboard",
+      "status": "passed",
+      "result": 6200,
+      "seconds": 2.6,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Move a slider with arrow keys",
+      "status": "passed",
+      "result": "Preset strength",
+      "seconds": 3.2,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Add a tone-curve point with the mouse",
+      "status": "passed",
+      "result": "point added",
+      "seconds": 2.7,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Color mixer: orange saturation -10",
+      "status": "passed",
+      "result": -10,
+      "seconds": 4.5,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Crop to 4:5",
+      "status": "passed",
+      "result": [
+        0,
+        0.08330000191926956,
+        1,
+        0.916700005531311
+      ],
+      "seconds": 2.6,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Before/after compare divider with keyboard",
+      "status": "failed",
+      "error": "Locator.input_value: Timeout 120000ms exceeded.",
+      "seconds": 126.9,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Clipping warning overlay",
+      "status": "passed",
+      "result": "toggled",
+      "seconds": 1.7,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "White balance picker: click a neutral area",
+      "status": "passed",
+      "result": [
+        "White balance saved as one manual edit. Use Undo to compare."
+      ],
+      "seconds": 3.7,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Save a named snapshot with Enter",
+      "status": "passed",
+      "result": "saved",
+      "seconds": 3.3,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Undo and Redo buttons",
+      "status": "passed",
+      "result": "undo changed, redo restored",
+      "seconds": 3.9,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Go back to the first step and forward again",
+      "status": "passed",
+      "result": {
+        "steps": 12
+      },
+      "seconds": 3.6,
+      "alerts": []
+    },
+    {
+      "area": "Develop",
+      "label": "Presets list is available",
+      "status": "passed",
+      "result": [
+        "Off\nShadows\nHighlights\nBoth",
+        "Presets…\nTrue Natural\nLight & Airy\nDark & Moody\nCinematic Teal & Orange\nPortra Film\nVintage Fade\nGolden Hour Glow\nClassic Monochrome\nFilm Noir\nVivid Landscape\nSoft Portrait\nNeon Night\nEditorial Matte\nFresh & Crisp\nRomantic Wedding\nNordic Cool\nPro Retoucher C\nPro Retoucher A\nPro Retoucher B\nPro Retoucher D\nPro Retoucher E"
+      ],
+      "seconds": 0.0,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Open Retouch",
+      "status": "passed",
+      "result": "open",
+      "seconds": 2.8,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Face / Body skin / Face + body skin automatic retouch",
+      "status": "passed",
+      "result": {
+        "Body skin": {
+          "face": 0,
+          "body": 2,
+          "manual": 0
+        },
+        "Face": {
+          "face": 8,
+          "body": 0,
+          "manual": 0
+        },
+        "Face + body skin": {
+          "face": 8,
+          "body": 2,
+          "manual": 0
+        }
+      },
+      "seconds": 11.3,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Lower strength and switch off teeth, then re-run",
+      "status": "passed",
+      "result": {
+        "blemishes": true,
+        "eyes": true,
+        "intensity": 0.65,
+        "refine": true,
+        "scope": "face_and_body",
+        "teeth": false
+      },
+      "seconds": 6.0,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Select an automatic operation and weaken it with the keyboard",
+      "status": "passed",
+      "result": {
+        "before": 0.35,
+        "after": 0.45
+      },
+      "seconds": 6.3,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Paint a dodge stroke (B), erase (E), undo stroke (Ctrl+Z), apply (Enter)",
+      "status": "passed",
+      "result": {
+        "operations": 11
+      },
+      "seconds": 7.7,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Zoom (+), pan (arrows), hand (H), fit (0), split comparison",
+      "status": "passed",
+      "result": "zoom, pan, fit, split",
+      "seconds": 3.8,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Ctrl+Z / Ctrl+Shift+Z on saved operations",
+      "status": "passed",
+      "result": "ok",
+      "seconds": 7.6,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Remove one operation",
+      "status": "passed",
+      "result": {
+        "from": 11,
+        "to": 10
+      },
+      "seconds": 2.9,
+      "alerts": []
+    },
+    {
+      "area": "Retouch",
+      "label": "Leave Retouch",
+      "status": "passed",
+      "result": "closed",
+      "seconds": 2.0,
+      "alerts": []
+    },
+    {
+      "area": "Instagram style",
+      "label": "Type an Instagram handle and analyse",
+      "status": "passed",
+      "result": {
+        "outcome": "pped · Partial profile coverage. Instagram limited public access or requires a login. Try later, or add a folder of saved reference photos.\n\nPublic photos only. Instagram may limit access; saved JPEG or PNG references work offline. Matching estimates the visible style, including white balance and grading—it cannot recover exact editing settings, recreate lighting, or guarantee an identical result."
+      },
+      "seconds": 22.5,
+      "alerts": [
+        "AURA hit an unexpected problem and stopped safely."
+      ]
+    },
+    {
+      "area": "Export",
+      "label": "Export the collection as verified JPEGs",
+      "status": "passed",
+      "result": {
+        "written": "5",
+        "verified": "5",
+        "files": [
+          "full-test-11-30-17_0001.jpg",
+          "full-test-11-30-17_0002.jpg",
+          "full-test-11-30-17_0003.jpg",
+          "full-test-11-30-17_0004.jpg",
+          "full-test-11-30-17_0005.jpg"
+        ]
+      },
+      "seconds": 11.2,
+      "alerts": []
+    },
+    {
+      "area": "Advanced",
+      "label": "Open every advanced panel",
+      "status": "failed",
+      "error": "Locator.scroll_into_view_if_needed: Error: strict mode violation: get_by_text(\"Gallery consistency\", exact=True) resolved to 2 elements:",
+      "seconds": 3.3,
+      "alerts": []
+    },
+    {
+      "area": "Advanced",
+      "label": "Run the available advanced actions",
+      "status": "passed",
+      "result": {},
+      "seconds": 0.1,
+      "alerts": []
+    },
+    {
+      "area": "App",
+      "label": "Close and relaunch AURA",
+      "status": "passed",
+      "result": "relaunched",
+      "seconds": 5.2,
+      "alerts": []
+    },
+    {
+      "area": "App",
+      "label": "Edits survive a restart",
+      "status": "passed",
+      "result": "recipe identical after restart",
+      "seconds": 0.0,
+      "alerts": []
+    }
+  ],
+  "pageErrors": [],
+  "osInput": 386,
+  "originalsUnchanged": true,
+  "reverified": {
+    "date": "2026-10-01",
+    "note": "Steps 15 and 33 failed on test-harness locators, not on the app. After fixing the harness both were re-run with Windows input against the same running app.",
+    "Before/after compare divider with keyboard": {
+      "status": "passed",
+      "divider": "10 after Home + 10x Right"
+    },
+    "Open every advanced panel": {
+      "status": "passed",
+      "panels": [
+        "Quality review",
+        "Gallery consistency",
+        "Albums & curation",
+        "AI provider",
+        "Performance & storage"
+      ]
+    },
+    "Run the available advanced actions": {
+      "status": "passed with empty results",
+      "detail": "Check this gallery: 0 of 0 delivered (needs a cull); Match this wedding: 0 of 5 matched, no skin field; Curate this wedding: 0-image album from 0 delivered; Re-check hardware: Processor 2.2 ms, 4 GPU providers unavailable"
+    }
+  }
+}

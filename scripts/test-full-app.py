@@ -76,7 +76,7 @@ def os_keys(*names):
 
 def focus_app():
     hwnd = user32.FindWindowW(None, 'AURA')
-    user32.ShowWindow(hwnd, 9)
+    user32.ShowWindow(hwnd, 3)  # maximized, as the app now opens
     user32.SetForegroundWindow(hwnd)
     time.sleep(0.3)
     origin = POINT(0, 0)
@@ -336,14 +336,21 @@ with sync_playwright() as pw:
     step('Develop', 'Crop to 4:5', crop)
 
     def compare():
-        os_click(page, page.get_by_role('button', name='Compare', exact=True))
+        compare = page.get_by_role('button', name='Compare', exact=True)
+        for _ in range(4):
+            os_click(page, compare)
+            time.sleep(1)
+            if compare.get_attribute('aria-pressed') == 'true':
+                break
         divider = page.get_by_label('Before and after divider', exact=True)
         os_click(page, divider)
         os_keys('home')
         for _ in range(10):
             os_keys('right')
+        value = divider.input_value()
+        assert value != '50', 'keyboard did not move the divider'
         os_click(page, page.get_by_role('button', name='Edited', exact=True))
-        return divider.input_value()
+        return value
     step('Develop', 'Before/after compare divider with keyboard', compare)
 
     def clipping():
@@ -474,7 +481,7 @@ with sync_playwright() as pw:
 
     def viewport():
         surface = page.get_by_role('group', name='Retouch image interaction', exact=True)
-        os_click(page, surface, 0.5, 0.5)
+        focus_app(); surface.focus()
         os_keys('plus'); os_keys('right'); os_keys('down'); os_keys('h'); os_keys('0')
         os_click(page, page.get_by_role('button', name='Split comparison', exact=True))
         expect(page.get_by_alt_text('Before native retouch comparison', exact=True)).to_be_visible()
@@ -485,11 +492,12 @@ with sync_playwright() as pw:
     def retouch_history():
         before = call('image_recipe', photoId=state['photos'][portrait])['recipeHash']
         surface = page.get_by_role('group', name='Retouch image interaction', exact=True)
-        os_click(page, surface, 0.5, 0.5)
-        os_keys('ctrl', 'z'); time.sleep(2)
+        # Focus without clicking: a click on the photo would start a new ellipse draft.
+        focus_app(); surface.focus()
+        os_keys('ctrl', 'z'); time.sleep(3)
         mid = call('image_recipe', photoId=state['photos'][portrait])['recipeHash']
-        os_click(page, surface, 0.5, 0.5)
-        os_keys('ctrl', 'shift', 'z'); time.sleep(2)
+        focus_app(); surface.focus()
+        os_keys('ctrl', 'shift', 'z'); time.sleep(3)
         after = call('image_recipe', photoId=state['photos'][portrait])['recipeHash']
         assert mid != before and after == before
         return 'ok'
@@ -506,6 +514,9 @@ with sync_playwright() as pw:
     step('Retouch', 'Remove one operation', remove_op)
 
     def close_retouch():
+        discard = page.get_by_role('button', name='Discard draft', exact=True)
+        if discard.count() and discard.is_visible():
+            os_click(page, discard)
         button = page.get_by_role('button', name=re.compile('Back to Develop|Close retouch|Done'))
         os_click(page, button.first)
         ready()
@@ -549,7 +560,7 @@ with sync_playwright() as pw:
         os_click(page, nav('Advanced').first)
         found = {}
         for summary in ['Quality review', 'Gallery consistency', 'Albums & curation', 'AI provider', 'Performance & storage']:
-            os_click(page, page.get_by_text(summary, exact=True))
+            os_click(page, page.locator('summary').filter(has_text=re.compile('^' + re.escape(summary))).first)
             time.sleep(1.5)
             panel = page.locator('details[open]').last
             buttons = [b for b in panel.get_by_role('button').all_inner_texts() if b.strip()][:8]
@@ -560,12 +571,15 @@ with sync_playwright() as pw:
 
     def advanced_actions():
         results = {}
-        for name in ['Run quality review', 'Check quality', 'Analyse consistency', 'Check consistency', 'Propose album', 'Curate', 'Probe hardware', 'Refresh']:
+        for name in ['Check this gallery', 'Match this wedding', 'Curate this wedding', 'Re-check hardware']:
             button = page.get_by_role('button', name=re.compile('^' + re.escape(name)))
             if button.count() and button.first.is_enabled():
                 os_click(page, button.first)
-                time.sleep(6)
+                time.sleep(8)
                 results[name] = alerts()[:1] or 'ran'
+            else:
+                results[name] = 'not available'
+        assert any(v != 'not available' for v in results.values()), 'no advanced action could be run'
         return results
     step('Advanced', 'Run the available advanced actions', advanced_actions)
 
@@ -579,6 +593,7 @@ with sync_playwright() as pw:
         return 'relaunched'
     step('App', 'Close and relaunch AURA', restart)
     page = connect()
+    page.wait_for_function('()=>!!window.__TAURI_INTERNALS__', timeout=120000)
 
     def persisted():
         now = page.evaluate("async ([p])=>await window.__TAURI_INTERNALS__.invoke('image_recipe',{input:{photoId:p}})", [state['photos'][portrait]])['recipeHash']
