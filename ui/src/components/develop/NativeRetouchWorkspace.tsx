@@ -14,8 +14,9 @@ import './precision-retouch.css';
 export function automaticLabel(id: string): string {
   const scene = /^auto-scene-v\d+-/.exec(id);
   if (scene) return ' · Auto (scene)';
-  const face = /^auto-portrait-v\d+-(\d+)-/.exec(id);
-  return face ? ` · Auto (face ${Number(face[1]) + 1})` : '';
+  const face = /^auto-portrait-v\d+-(\d+)-(body-)?/.exec(id);
+  if (!face) return '';
+  return ` · Auto (${face[2] ? 'body' : 'face'} ${Number(face[1]) + 1})`;
 }
 
 export function NativeRetouchWorkspace({projectId, photoId, disabled = false, revision = 0, onClose, onBusyChange}: {
@@ -150,7 +151,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         </div>
         <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}</p>
         <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>
-        <AutoRetouchSettings disabled={stackBlocked||!preview} onRun={options=>void save(async()=>{
+        <AutoRetouchSettings disabled={stackBlocked||!preview} busy={analysing} onRun={options=>void save(async()=>{
           setAnalysing(true);
           try { await nativeRetouch.autoRetouch(projectId,photoId,options); }
           finally { if(mounted.current)setAnalysing(false); }

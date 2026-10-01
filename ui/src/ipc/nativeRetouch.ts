@@ -39,8 +39,10 @@ export type RetouchSelection = {
 };
 export type SelectionPreview = Pick<RenderDto, 'width'|'height'|'rgbBase64'>;
 /** Which automatic finishing runs and how strongly; remembered by the next Auto enhance. */
-export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean };
-export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true };
+/** Which skin the automatic retouch may change. */
+export type RetouchScope = 'face' | 'body' | 'face_and_body';
+export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope };
+export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true, scope: 'face' };
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8 };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 export type NativeRetouchEdit = {

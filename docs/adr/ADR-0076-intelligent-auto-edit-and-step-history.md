@@ -57,6 +57,14 @@ decision reversible and editable. A single history entry made it impossible to k
    and switches for blemishes, lines & redness, eyes and teeth. It is an explicit request, so
    it replaces automatic operations even in an edited stack (manual operations are kept) and is
    saved as a user edit. The choice is stored in the report and reused by later passes.
+6. **Retouch scope: face, body skin, or both.** `Options.scope` chooses what the automatic
+   retouch may change. Body skin is planned from the face's own geometry: a search area from
+   just below the chin to six face-heights down and 2.6 face-widths either side, a grid of
+   low-variation patches that must match the face's sampled skin chroma (within 0.06) and
+   lightness (0.4-2x), and two sampled-skin operations (texture at 0.8x, tone at 0.9x of the
+   measured strengths, tolerance 0.06, edge protection 0.9) on a brush mask with the face erased.
+   Fewer than four matching patches means the body is covered or out of frame and is skipped
+   with a reason. Body operation IDs carry `-body-` and belong to the Skin step.
 
 ## Consequences
 

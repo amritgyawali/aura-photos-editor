@@ -442,6 +442,32 @@ pub struct Options {
     pub teeth: bool,
     /// Fine lines, smile-line softening and local redness evening.
     pub refine: bool,
+    /// Which skin the automatic retouch works on.
+    pub scope: Scope,
+}
+
+/// The area the automatic retouch is allowed to change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Scope {
+    /// The face only: skin, blemishes, lines, eyes and teeth.
+    #[default]
+    Face,
+    /// Visible body skin (neck, shoulders, arms) only; the face is left as it is.
+    Body,
+    /// Both.
+    FaceAndBody,
+}
+
+impl Scope {
+    #[must_use]
+    pub const fn face(self) -> bool {
+        !matches!(self, Self::Body)
+    }
+    #[must_use]
+    pub const fn body(self) -> bool {
+        !matches!(self, Self::Face)
+    }
 }
 
 impl Default for Options {
@@ -452,6 +478,7 @@ impl Default for Options {
             eyes: true,
             teeth: true,
             refine: true,
+            scope: Scope::Face,
         }
     }
 }

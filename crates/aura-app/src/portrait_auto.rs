@@ -268,9 +268,31 @@ pub fn plan_with_faces(
         .and_then(|(data, w, h)| portrait_features::Pixels::new(data, w, h))
         .or_else(|| portrait_features::Pixels::new(rgb, width, height));
     let mut planned: [Vec<Edit>; 5] = Default::default();
+    let mut bodies = 0_usize;
     for (index, face) in report.faces.iter().enumerate() {
-        let mut plan = plan_face(face, index, rgb, width, height);
-        for edit in &mut plan.edits {
+        let face_plan = plan_face(face, index, rgb, width, height);
+        let mut body = if options.scope.body() {
+            match &face_plan.sample {
+                Some(sample) => plan_body(face, index, rgb, width, height, sample),
+                None => FacePlan::skip(
+                    "Body skin was not retouched: no reliable face skin sample to compare it with.",
+                ),
+            }
+        } else {
+            FacePlan::skip("")
+        };
+        let mut plan = if options.scope.face() {
+            face_plan
+        } else {
+            FacePlan {
+                edits: Vec::new(),
+                reason:
+                    "Face retouch is switched off for this pass; only body skin was considered."
+                        .into(),
+                sample: face_plan.sample,
+            }
+        };
+        for edit in plan.edits.iter_mut().chain(&mut body.edits) {
             edit.amount = (edit.amount * options.intensity).clamp(0.05, 0.5);
         }
         let mut features = portrait_features::FeatureEdits::default();
@@ -281,13 +303,19 @@ pub fn plan_with_faces(
         }
         let used: usize = planned.iter().map(Vec::len).sum();
         let wanted = plan.edits.len()
+            + body.edits.len()
             + features.blemishes.len()
             + features.refine.len()
             + features.eyes.len()
             + features.finishing.len();
         if manual + scene_ops + used + wanted > retouch_tools::MAX_EDITS {
             plan = FacePlan::skip("The saved retouch stack has reached its operation limit.");
+            body = FacePlan::skip("");
             features = portrait_features::FeatureEdits::default();
+        }
+        let mut findings = features.report.findings;
+        if options.scope.body() && !body.reason.is_empty() {
+            findings.insert(0, body.reason.clone());
         }
         let mut strengths = [0.0; 3];
         for (strength, edit) in strengths.iter_mut().zip(&plan.edits) {
@@ -295,7 +323,7 @@ pub fn plan_with_faces(
         }
         report.assessments.push(FaceAssessment {
             face: index + 1,
-            status: if plan.edits.is_empty() {
+            status: if plan.edits.is_empty() && body.edits.is_empty() {
                 "skipped"
             } else {
                 "retouched"
@@ -304,17 +332,19 @@ pub fn plan_with_faces(
             confidence: face.confidence,
             reason: plan.reason,
             strengths,
-            findings: features.report.findings,
+            findings,
             spots_healed: features.report.spots_healed,
             marks_kept: features.report.marks_kept,
         });
-        if plan.edits.is_empty() {
+        if plan.edits.is_empty() && body.edits.is_empty() {
             continue;
         }
         report.retouched_faces += 1;
         report.operations += wanted;
+        bodies += usize::from(!body.edits.is_empty());
         let [skin, spots, refine, eyes, finishing] = &mut planned;
         skin.extend(plan.edits);
+        skin.extend(body.edits);
         spots.extend(features.blemishes);
         refine.extend(features.refine);
         eyes.extend(features.eyes);
@@ -332,14 +362,20 @@ pub fn plan_with_faces(
         "No confident, sufficiently large face found. Portrait retouch was skipped.".into()
     } else if report.retouched_faces == 0 {
         "Faces detected, but no suitable skin sample was found or the operation limit was reached. Portrait retouch was skipped.".into()
+    } else if !options.scope.face() {
+        format!(
+            "Retouched body skin for {bodies} of {} people with {} editable steps; faces were left as they are. Undo walks back one automatic step at a time.",
+            report.detected_faces, report.operations,
+        )
     } else {
         format!(
-            "Retouched {} of {} detected faces with {} editable steps: skin texture, tone and light{}, eye and teeth finishing where measured.{} Undo walks back one automatic step at a time.",
+            "Retouched {} of {} detected faces with {} editable steps: skin texture, tone and light{}, eye and teeth finishing where measured.{}{} Undo walks back one automatic step at a time.",
             report.retouched_faces,
             report.detected_faces,
             report.operations,
             if spots > 0 { format!(", {spots} healed spot{}", if spots == 1 { "" } else { "s" }) } else { String::new() },
             if kept > 0 { format!(" {kept} possible permanent mark{} kept.", if kept == 1 { "" } else { "s" }) } else { String::new() },
+            if options.scope.body() { format!(" Body skin retouched for {bodies} {}.", if bodies == 1 { "person" } else { "people" }) } else { String::new() },
         )
     };
     Ok(Plan { report, groups })
@@ -348,6 +384,8 @@ pub fn plan_with_faces(
 struct FacePlan {
     edits: Vec<Edit>,
     reason: String,
+    /// The representative skin sample, when one was found.
+    sample: Option<Sample>,
 }
 
 impl FacePlan {
@@ -355,6 +393,7 @@ impl FacePlan {
         Self {
             edits: Vec::new(),
             reason: reason.into(),
+            sample: None,
         }
     }
 }
@@ -532,7 +571,154 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
     .collect();
     FacePlan {
         edits,
+        sample: Some(sample),
         reason: format!("Compared {} cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.{}", candidates.len(), if sample.mean < 0.15 { " Low skin signal reduces correction strength." } else { "" }),
+    }
+}
+
+/// Visible body skin below and beside a face: neck, shoulders, chest and arms.
+///
+/// There is no body segmentation model. The search area is drawn from the face's own size
+/// and position, and inside it only pixels close to a sample of *this person's* body skin
+/// are changed: the sample is taken below the face and must match the face's own skin
+/// colour, so it is never compared with an ideal tone. The face itself is erased from the
+/// mask so face and body are never smoothed twice.
+// Pixel-space geometry; every coordinate is clamped to the image before use.
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+fn plan_body(
+    face: &PortraitFace,
+    index: usize,
+    rgb: &[u8],
+    width: u32,
+    height: u32,
+    face_sample: &Sample,
+) -> FacePlan {
+    let (w, h) = (width as f32, height as f32);
+    let short = w.min(h);
+    let [l, t, r, b] = face.bounds;
+    let (fw, fh) = ((r - l) * w, (b - t) * h);
+    let cx = (l + r) * 0.5 * w;
+    let cy = (t + b) * 0.5 * h;
+    let x0 = (cx - fw * 2.6).max(0.0);
+    let x1 = (cx + fw * 2.6).min(w);
+    let y0 = (b * h - fh * 0.1).max(0.0);
+    let y1 = (b * h + fh * 6.0).min(h);
+    if y1 - y0 < fh * 0.5 || x1 - x0 < fw {
+        return FacePlan::skip(
+            "Body skin: the face reaches the bottom of the frame, so no body skin is visible.",
+        );
+    }
+    // Sample a grid over the area and keep patches that look like this person's skin.
+    let mut candidates = Vec::new();
+    let mut probes = 0_usize;
+    for gy in 0..14 {
+        for gx in 0..14 {
+            let point = [
+                x0 + (x1 - x0) * (gx as f32 + 0.5) / 14.0,
+                y0 + (y1 - y0) * (gy as f32 + 0.5) / 14.0,
+            ];
+            probes += 1;
+            if let Some(sample) = sample_quality(rgb, width, height, point) {
+                let near = color_distance(sample.chroma, face_sample.chroma) <= 0.06;
+                let lit =
+                    sample.mean > face_sample.mean * 0.4 && sample.mean < face_sample.mean * 2.0;
+                if near && lit {
+                    candidates.push(sample);
+                }
+            }
+        }
+    }
+    if candidates.len() < 4 {
+        return FacePlan::skip(
+            "Body skin: too little visible skin matching this person's face was found below it (covered by clothing or out of frame).",
+        );
+    }
+    let Some((sample, [texture, tone, _])) = representative_sample(&candidates) else {
+        return FacePlan::skip("Body skin: no representative skin patch was found.");
+    };
+    let coverage = candidates.len() as f32 / probes as f32;
+    // Cover the search area with feathered horizontal strokes, then erase the face.
+    let radius = ((y1 - y0).min(x1 - x0) / 4.0)
+        .min(short * 0.24)
+        .max(short * 0.02);
+    let mut strokes = Vec::new();
+    let mut y = y0 + radius * 0.8;
+    while y < y1 + radius * 0.2 && strokes.len() < 24 {
+        strokes.push(BrushStroke {
+            erase: false,
+            radius: (radius / short).clamp(0.0005, 0.25),
+            opacity: 1.0,
+            points: vec![
+                [
+                    ((x0 + radius * 0.8) / w).clamp(0.0, 1.0),
+                    (y / h).clamp(0.0, 1.0),
+                    1.0,
+                ],
+                [
+                    ((x1 - radius * 0.8) / w).clamp(0.0, 1.0),
+                    (y / h).clamp(0.0, 1.0),
+                    1.0,
+                ],
+            ],
+        });
+        y += radius * 1.4;
+    }
+    strokes.push(BrushStroke {
+        erase: true,
+        radius: ((fw.max(fh) * 0.55) / short).clamp(0.0005, 0.25),
+        opacity: 1.0,
+        points: vec![[(cx / w).clamp(0.0, 1.0), (cy / h).clamp(0.0, 1.0), 1.0]],
+    });
+    let mask = BrushMask { strokes };
+    let region = [
+        ((x0 + x1) * 0.5 / w).clamp(0.0, 1.0),
+        ((y0 + y1) * 0.5 / h).clamp(0.0, 1.0),
+        ((x1 - x0) * 0.5 / w).clamp(0.001, 1.0),
+        ((y1 - y0) * 0.5 / h).clamp(0.001, 1.0),
+    ];
+    // Body skin carries less retouch than a face: no make-up, and smoothing reads sooner.
+    let edits = [
+        (Tool::SkinSmooth, texture * 0.8, "body-texture"),
+        (Tool::SkinUniformity, tone * 0.9, "body-tone"),
+    ]
+    .into_iter()
+    .map(|(tool, amount, name)| Edit {
+        id: format!("{PREFIX}{index}-{name}"),
+        tool,
+        enabled: true,
+        region,
+        source: Some([sample.point[0] / w, sample.point[1] / h]),
+        amount,
+        feather: 0.8,
+        radius: (fw * 0.03 / short).clamp(0.001, 0.012),
+        texture: 1.0,
+        tone: 0.5,
+        warmth: 0.0,
+        tint: 0.0,
+        mask: Some(mask.clone()),
+        skin: Some(SkinSettings {
+            tolerance: 0.06,
+            edge_protection: 0.9,
+        }),
+        selection: None,
+    })
+    .collect();
+    FacePlan {
+        edits,
+        sample: Some(sample),
+        reason: format!(
+            "Body skin: found {} skin patches below the face that match this person's own face colour; smoothed and evened them only.{}",
+            candidates.len(),
+            if coverage > 0.8 {
+                " Much of the area matched skin colour, so a similar-coloured background may be softened slightly; check the result."
+            } else {
+                ""
+            }
+        ),
     }
 }
 
@@ -691,5 +877,110 @@ mod tests {
         assert!(plan_face(&face, 0, &vec![255; 100 * 100 * 3], 100, 100)
             .edits
             .is_empty());
+    }
+
+    fn person(clothing: Option<[u8; 3]>) -> (Vec<u8>, PortraitFace) {
+        let (w, h) = (200_usize, 300_usize);
+        let skin = [145_u8, 101, 74];
+        let mut rgb = Vec::with_capacity(w * h * 3);
+        for y in 0..h {
+            for _ in 0..w {
+                rgb.extend(if y > 100 {
+                    clothing.unwrap_or(skin)
+                } else {
+                    skin
+                });
+            }
+        }
+        let face = PortraitFace {
+            bounds: [0.3, 0.05, 0.7, 0.35],
+            landmarks: [
+                [0.4, 0.15],
+                [0.6, 0.15],
+                [0.5, 0.21],
+                [0.43, 0.27],
+                [0.57, 0.27],
+            ],
+            confidence: 0.95,
+        };
+        (rgb, face)
+    }
+
+    fn scoped(rgb: &[u8], face: &PortraitFace, scope: portrait_features::Scope) -> Plan {
+        let recipe = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
+        let options = portrait_features::Options {
+            scope,
+            ..portrait_features::Options::default()
+        };
+        plan_with_faces(
+            &recipe,
+            rgb,
+            200,
+            300,
+            None,
+            0.0,
+            Some(vec![face.clone()]),
+            &options,
+            false,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn face_body_and_both_scopes_change_only_the_chosen_skin() {
+        let (rgb, face) = person(None);
+        let ids = |plan: &Plan| -> Vec<String> {
+            plan.groups
+                .values()
+                .flatten()
+                .map(|e| e.id.clone())
+                .collect()
+        };
+        let face_only = ids(&scoped(&rgb, &face, portrait_features::Scope::Face));
+        assert!(face_only
+            .iter()
+            .any(|id| id.ends_with("-texture") && !id.contains("body")));
+        assert!(
+            !face_only.iter().any(|id| id.contains("-body-")),
+            "{face_only:?}"
+        );
+        let body_only = scoped(&rgb, &face, portrait_features::Scope::Body);
+        let body_ids = ids(&body_only);
+        assert_eq!(body_ids.len(), 2, "{body_ids:?}");
+        assert!(body_ids.iter().all(|id| id.contains("-body-")));
+        assert!(body_only
+            .report
+            .message
+            .contains("faces were left as they are"));
+        let both = ids(&scoped(&rgb, &face, portrait_features::Scope::FaceAndBody));
+        assert!(
+            both.iter().any(|id| id.contains("-body-"))
+                && both.iter().any(|id| id.ends_with("0-texture"))
+        );
+        let all: Vec<Edit> = scoped(&rgb, &face, portrait_features::Scope::FaceAndBody)
+            .groups
+            .into_values()
+            .flatten()
+            .collect();
+        retouch_tools::validate(&all).unwrap();
+        // The face is erased from the body mask so it is never smoothed twice.
+        let body = all
+            .iter()
+            .find(|e| e.id.ends_with("-body-texture"))
+            .unwrap();
+        assert!(body.mask.as_ref().unwrap().strokes.iter().any(|s| s.erase));
+        assert_eq!(group_of(&body.id), Some(Group::Skin));
+    }
+
+    #[test]
+    fn covered_body_is_skipped_with_a_reason() {
+        let (rgb, face) = person(Some([30, 60, 140]));
+        let plan = scoped(&rgb, &face, portrait_features::Scope::Body);
+        assert!(plan.groups.values().all(Vec::is_empty));
+        let findings = &plan.report.assessments[0].findings;
+        assert!(
+            findings.iter().any(|f| f.starts_with("Body skin:")),
+            "{findings:?}"
+        );
     }
 }

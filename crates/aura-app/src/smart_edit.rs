@@ -960,11 +960,25 @@ fn run_with(
     for (group, title, detail) in [
         (
             Group::Skin,
-            "Skin",
-            format!(
-                "Texture, tone evening and local light on {} face(s).",
-                report.retouched_faces
-            ),
+            match options.scope {
+                crate::portrait_features::Scope::Face => "Skin",
+                crate::portrait_features::Scope::Body => "Body skin",
+                crate::portrait_features::Scope::FaceAndBody => "Face & body skin",
+            },
+            match options.scope {
+                crate::portrait_features::Scope::Face => format!(
+                    "Texture, tone evening and local light on {} face(s).",
+                    report.retouched_faces
+                ),
+                crate::portrait_features::Scope::Body => format!(
+                    "Texture and tone evening on visible body skin for {} person(s); faces unchanged.",
+                    report.retouched_faces
+                ),
+                crate::portrait_features::Scope::FaceAndBody => format!(
+                    "Face texture, tone and light, plus body skin texture and tone, for {} person(s).",
+                    report.retouched_faces
+                ),
+            },
         ),
         (
             Group::Blemishes,

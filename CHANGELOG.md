@@ -19,6 +19,8 @@ All notable changes to AURA. One entry per phase, newest first.
 - Added measured fine-line, smile-line and nose-redness refinement, and a Retouch settings
   panel (strength and feature switches) backed by the new `auto_retouch` command.
 - `scripts/check-ipc-surface.sh` now reads every typed IPC module, not only `client.ts`.
+- Retouch now offers **Face**, **Body skin** and **Face + body skin** with one Auto retouch
+  button; body skin is sampled below each face and matched to the same person's face colour.
 
 ## Adaptive portrait retouch — 2026-09-30
 

@@ -19,13 +19,26 @@ back through. Nothing leaves your computer and your original file is never chang
 A step that finds nothing to do is not saved. Running Auto enhance again on an unchanged
 photo saves nothing new.
 
-### Choosing how much is done
+### Choosing what is retouched, and how much
 
-In **Retouch**, open **Automatic face and skin retouch settings**. Choose a strength
-(*Subtle* 25-75 %, *Natural* around 100 %, *Polished* up to 150 %) and switch blemish healing,
-lines and redness, eyes or teeth on or off, then press **Re-run automatic retouch**. Skin
-smoothing, tone and light always run. The automatic operations are replaced; operations you
-added yourself are kept, and the next **Auto enhance** remembers your choice.
+In **Retouch**, the **Automatic retouch** box offers three choices:
+
+- **Face**: skin, blemishes, lines, eyes and teeth on each detected face.
+- **Body skin**: neck, shoulders, chest and arms below each face; the face is left as it is.
+- **Face + body skin**: both.
+
+Pick one and press **Auto retouch**. Body skin is found by sampling skin below the face that
+matches the same person's face colour, and only pixels close to that sample are smoothed and
+evened; the face is masked out so it is never smoothed twice. Under **Strength and details**
+choose *Subtle* (25-75 %), *Natural* (about 100 %) or *Polished* (up to 150 %) and switch
+blemish healing, lines and redness, eyes or teeth on or off. Every result appears in the list
+below, tagged *Auto (face 1)* or *Auto (body 1)*, and you can change, disable or remove it.
+Running it again replaces the automatic operations; operations you added yourself are kept,
+and the next **Auto enhance** remembers your choice.
+
+There is no body segmentation model. A background close to the person's skin colour (beige
+walls, wood, sand) can be softened slightly; the report says so when much of the area matches,
+and each body operation has an ordinary brush mask you can erase.
 
 ## Going back and editing by hand
 
