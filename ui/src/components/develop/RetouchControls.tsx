@@ -48,7 +48,8 @@ export function RetouchControls(props: Props) {
       {selected && <button type="button" disabled={props.dirty} onClick={props.onNew}>Start another operation</button>}
     </div>
     {sampled && <details open><summary>Sampled skin range</summary>
-      <p className="lr-hint">Sample a clean skin patch. Matching colors are selected inside your ellipse or brush mask; this is not face detection. Similar-colored clothing or backgrounds may also match.</p>
+      <p className="lr-hint">Sample a clean skin patch. Matching colors are selected inside your ellipse or brush mask. Use Preview selection mask to see exactly which pixels change.</p>
+      <label className="retouch-toggle"><input type="checkbox" checked={skin.connected ?? false} onChange={event => onChange({ skin: { ...skin, connected: event.target.checked } })}/>Only skin connected to the sample (never a same-coloured background)</label>
       <button type="button" onClick={props.onSelectAll}>Use full photo selection</button>
       <label>Skin color tolerance ({Math.round(skin.tolerance * 1000) / 10}%)<input type="range" min="0.015" max="0.3" step="0.005" value={skin.tolerance}
         onChange={event => onChange({ skin: { ...skin, tolerance: Number(event.target.value) } })}/></label>

@@ -31,7 +31,8 @@ export type RetouchTool = typeof RETOUCH_TOOLS[number][0];
 export type BrushPoint = [number, number, number];
 export type BrushStroke = { erase: boolean; radius: number; opacity: number; points: BrushPoint[] };
 export type BrushMask = { strokes: BrushStroke[] };
-export type SkinSettings = { tolerance: number; edgeProtection: number };
+/** `connected` limits the change to skin touching the sample, never a same-coloured background. */
+export type SkinSettings = { tolerance: number; edgeProtection: number; connected?: boolean };
 export type RetouchSelection = {
   inverted?: boolean;
   gradient?: { start: [number, number]; end: [number, number] } | null;
@@ -43,7 +44,7 @@ export type SelectionPreview = Pick<RenderDto, 'width'|'height'|'rgbBase64'>;
 export type RetouchScope = 'face' | 'body' | 'face_and_body';
 export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope };
 export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true, scope: 'face' };
-export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8 };
+export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8, connected: true };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 export type NativeRetouchEdit = {
   id: string; tool: RetouchTool; enabled: boolean; region: [number, number, number, number];

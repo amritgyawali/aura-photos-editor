@@ -156,6 +156,186 @@ fn correction(
     }
 }
 
+/// Skin connected to the sample point, as a soft 0..1 weight over `coverage.bounds`.
+///
+/// A flood fill on a coarse grid of cell means: a cell joins when its colour is close to the
+/// sample and the step from its neighbour is not a strong edge in brightness or colour.
+/// That separates a person from a skin-coloured background, which almost always meets the
+/// skin at an edge, and from skin-coloured areas that do not touch the person at all.
+/// Returns `None` when the selection is not limited to connected skin.
+pub(crate) fn connected_weight(
+    rgb: &[f32],
+    w: usize,
+    h: usize,
+    edit: &Edit,
+    coverage: &Coverage,
+) -> Option<Vec<f32>> {
+    let settings = edit.skin?;
+    if !settings.connected {
+        return None;
+    }
+    let point = edit.source?;
+    let [x0, y0, x1, y1] = coverage.bounds;
+    let (bw, bh) = (x1.saturating_sub(x0), y1.saturating_sub(y0));
+    if bw == 0 || bh == 0 {
+        return Some(Vec::new());
+    }
+    let sample = reference(rgb, w, h, point);
+    let cell = (bw.max(bh) / 240).max(2);
+    let (gw, gh) = (bw.div_ceil(cell), bh.div_ceil(cell));
+    let mut means = vec![[0.0_f32; 3]; gw * gh];
+    let mut usable = vec![false; gw * gh];
+    for gy in 0..gh {
+        for gx in 0..gw {
+            let (cx0, cy0) = (x0 + gx * cell, y0 + gy * cell);
+            let (cx1, cy1) = ((cx0 + cell).min(x1), (cy0 + cell).min(y1));
+            let mut sum = [0.0_f32; 3];
+            let mut n = 0.0_f32;
+            for y in cy0..cy1 {
+                for x in cx0..cx1 {
+                    let i = (y * w + x) * 3;
+                    for c in 0..3 {
+                        sum[c] += rgb[i + c];
+                    }
+                    n += 1.0;
+                }
+            }
+            let mean = sum.map(|v| v / n.max(1.0));
+            let k = gy * gw + gx;
+            means[k] = mean;
+            let centre = coverage.at((cx0 + cx1) / 2, (cy0 + cy1) / 2, w, h);
+            usable[k] = centre > 0.0 && affinity(mean, sample, settings.tolerance) >= 0.3;
+        }
+    }
+    // Seed at the sample, or at the nearest usable cell within a few cells of it.
+    let sx = ((point[0] * w as f32) as usize).clamp(x0, x1 - 1);
+    let sy = ((point[1] * h as f32) as usize).clamp(y0, y1 - 1);
+    let (sgx, sgy) = ((sx - x0) / cell, (sy - y0) / cell);
+    let mut seed = None;
+    'search: for radius in 0..6_usize {
+        for gy in sgy.saturating_sub(radius)..=(sgy + radius).min(gh - 1) {
+            for gx in sgx.saturating_sub(radius)..=(sgx + radius).min(gw - 1) {
+                if usable[gy * gw + gx] {
+                    seed = Some(gy * gw + gx);
+                    break 'search;
+                }
+            }
+        }
+    }
+    let mut reached = vec![false; gw * gh];
+    if let Some(start) = seed {
+        let mut stack = vec![start];
+        reached[start] = true;
+        while let Some(k) = stack.pop() {
+            let (gx, gy) = (k % gw, k / gw);
+            let here = means[k];
+            let mut visit = |n: usize| {
+                if reached[n] || !usable[n] {
+                    return;
+                }
+                let there = means[n];
+                let (la, lb) = (luma(here), luma(there));
+                let step = (la - lb).abs() / la.max(lb).max(EPSILON);
+                let a = chroma(here);
+                let b = chroma(there);
+                let hue = a
+                    .iter()
+                    .zip(b)
+                    .map(|(p, q)| (p - q).powi(2))
+                    .sum::<f32>()
+                    .sqrt();
+                if step < 0.22 && hue < settings.tolerance * 0.6 {
+                    reached[n] = true;
+                    stack.push(n);
+                }
+            };
+            if gx > 0 {
+                visit(k - 1);
+            }
+            if gx + 1 < gw {
+                visit(k + 1);
+            }
+            if gy > 0 {
+                visit(k - gw);
+            }
+            if gy + 1 < gh {
+                visit(k + gw);
+            }
+        }
+    }
+    // Soften the cell edges: a 3x3 mean of the reached map, sampled bilinearly per pixel.
+    let mut soft = vec![0.0_f32; gw * gh];
+    for gy in 0..gh {
+        for gx in 0..gw {
+            let mut sum = 0.0;
+            let mut n = 0.0;
+            for ny in gy.saturating_sub(1)..=(gy + 1).min(gh - 1) {
+                for nx in gx.saturating_sub(1)..=(gx + 1).min(gw - 1) {
+                    sum += f32::from(u8::from(reached[ny * gw + nx]));
+                    n += 1.0;
+                }
+            }
+            soft[gy * gw + gx] = if reached[gy * gw + gx] {
+                (sum / n).max(0.5)
+            } else {
+                sum / n * 0.5
+            };
+        }
+    }
+    let mut out = Vec::with_capacity(bw * bh);
+    for y in y0..y1 {
+        let fy = ((y - y0) as f32 + 0.5) / cell as f32 - 0.5;
+        let gy0 = (fy.floor().max(0.0) as usize).min(gh - 1);
+        let gy1 = (gy0 + 1).min(gh - 1);
+        let ty = (fy - gy0 as f32).clamp(0.0, 1.0);
+        for x in x0..x1 {
+            let fx = ((x - x0) as f32 + 0.5) / cell as f32 - 0.5;
+            let gx0 = (fx.floor().max(0.0) as usize).min(gw - 1);
+            let gx1 = (gx0 + 1).min(gw - 1);
+            let tx = (fx - gx0 as f32).clamp(0.0, 1.0);
+            let top = soft[gy0 * gw + gx0] * (1.0 - tx) + soft[gy0 * gw + gx1] * tx;
+            let bottom = soft[gy1 * gw + gx0] * (1.0 - tx) + soft[gy1 * gw + gx1] * tx;
+            let v = top * (1.0 - ty) + bottom * ty;
+            out.push((v * 2.0 - 0.5).clamp(0.0, 1.0));
+        }
+    }
+    Some(out)
+}
+
+/// What a sampled skin operation will actually change, before strength: the authored
+/// coverage times this pixel's skin likeness times the connected-skin weight.
+pub(crate) fn selection(
+    rgb: &[f32],
+    w: usize,
+    h: usize,
+    edit: &Edit,
+    coverage: &Coverage,
+) -> Vec<f32> {
+    let settings = edit.skin.unwrap_or_default();
+    let connected = connected_weight(rgb, w, h, edit, coverage);
+    let sample = edit.source.map(|p| reference(rgb, w, h, p));
+    let [x0, y0, x1, y1] = coverage.bounds;
+    let mut out = vec![0.0; w * h];
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let i = (y * w + x) * 3;
+            let p = [rgb[i], rgb[i + 1], rgb[i + 2]];
+            let mut v = coverage.at(x, y, w, h);
+            if let Some(sample) = sample {
+                v *= affinity(p, sample, settings.tolerance);
+            }
+            if let Some(weights) = &connected {
+                v *= weights
+                    .get((y - y0) * (x1 - x0) + x - x0)
+                    .copied()
+                    .unwrap_or(0.0);
+            }
+            out[y * w + x] = v;
+        }
+    }
+    out
+}
+
 pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) {
     let Some(point) = edit.source else {
         return;
@@ -193,15 +373,23 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
         narrow.push(low);
         wide.push(broad);
     }
+    let connected = connected_weight(rgb, w, h, edit, coverage);
     for y in y0..y1 {
         for x in x0..x1 {
             let i = (y * w + x) * 3;
             let local = (y - by) * bw + x - bx;
             let old = [rgb[i], rgb[i + 1], rgb[i + 2]];
             let low = std::array::from_fn(|c| narrow[c][local]);
+            let reach = connected.as_ref().map_or(1.0, |weights| {
+                weights
+                    .get((y - y0) * (x1 - x0) + x - x0)
+                    .copied()
+                    .unwrap_or(0.0)
+            });
             // Selection checks the original pixel as well as its neighborhood, so
             // averaging across a lip/hair/background boundary cannot paint over it.
-            let alpha = coverage.at(x, y, w, h)
+            let alpha = reach
+                * coverage.at(x, y, w, h)
                 * edit.amount
                 * affinity(old, sample, settings.tolerance).min(affinity(
                     low,

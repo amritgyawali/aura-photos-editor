@@ -209,6 +209,6 @@ it('requires a skin sample and saves range, detail and edge controls with full-f
   fireEvent.click(screen.getByText('Use full photo selection'));
   fireEvent.click(screen.getByText('Apply retouch'));
   await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
-    expect.objectContaining({tool:'skin_smooth',source:[.45,.4],region:[.5,.5,1,1],mask:null,texture:1.1,skin:{tolerance:.12,edgeProtection:.9}})
+    expect.objectContaining({tool:'skin_smooth',source:[.45,.4],region:[.5,.5,1,1],mask:null,texture:1.1,skin:{tolerance:.12,edgeProtection:.9,connected:true}})
   ]));
 });

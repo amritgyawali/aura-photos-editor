@@ -23,6 +23,7 @@ fn operation(tool: Tool) -> Edit {
         skin: Some(SkinSettings {
             tolerance: 0.2,
             edge_protection: 0.8,
+            connected: false,
         }),
     }
 }
@@ -64,6 +65,7 @@ fn skin_parameters_require_a_sample_and_round_trip_without_changing_old_edits() 
     op.skin = Some(SkinSettings {
         tolerance: 0.08,
         edge_protection: 1.01,
+        connected: false,
     });
     assert!(retouch_tools::validate(&[op]).is_err());
 }
@@ -226,4 +228,48 @@ fn edge_protection_reduces_bleeding_across_a_brightness_boundary() {
         drift(&protected),
         drift(&weak)
     );
+}
+
+#[test]
+fn connected_skin_never_selects_a_skin_coloured_background_it_does_not_touch() {
+    // Skin on the left, a dark gap (hair, clothing or an outline), then a backdrop of the
+    // very same colour on the right: colour alone cannot tell them apart.
+    let skin = [0.55_f32, 0.36, 0.27];
+    let mut rgb = Vec::with_capacity(W * H * 3);
+    for _ in 0..H {
+        for x in 0..W {
+            rgb.extend(if (70..78).contains(&x) {
+                [0.02, 0.02, 0.02]
+            } else {
+                skin
+            });
+        }
+    }
+    let mut op = operation(Tool::SkinSmooth);
+    let colour_only = aura_render::retouch_tools::selection_mask(&rgb, W, H, &op);
+    op.skin = Some(SkinSettings {
+        tolerance: 0.2,
+        edge_protection: 0.8,
+        connected: true,
+    });
+    let connected = aura_render::retouch_tools::selection_mask(&rgb, W, H, &op);
+    let at = |mask: &[f32], x: usize| mask[(H / 2) * W + x];
+    assert!(
+        at(&colour_only, 120) > 0.9,
+        "colour alone selects the backdrop"
+    );
+    assert!(at(&connected, 20) > 0.9, "the person's skin is selected");
+    assert!(
+        at(&connected, 120) < 0.01,
+        "the backdrop is not: {}",
+        at(&connected, 120)
+    );
+    assert!(at(&connected, 74) < 0.01, "the dark gap is not");
+    // And rendering agrees with the preview.
+    let mut out = rgb.clone();
+    let mut smooth = op.clone();
+    smooth.texture = 0.0;
+    apply(&mut out, W, H, &[smooth]);
+    let i = ((H / 2) * W + 120) * 3;
+    assert_eq!(&out[i..i + 3], &rgb[i..i + 3]);
 }

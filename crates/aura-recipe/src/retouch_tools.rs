@@ -31,6 +31,11 @@ pub struct BrushStroke {
 pub struct SkinSettings {
     pub tolerance: f32,
     pub edge_protection: f32,
+    /// Only change skin connected to the sample without crossing a strong edge, so a
+    /// skin-coloured wall, table or backdrop that is not touching the person is never
+    /// selected. Absent (false) in recipes written before it existed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub connected: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -66,6 +71,7 @@ impl Default for SkinSettings {
         Self {
             tolerance: 0.08,
             edge_protection: 0.8,
+            connected: false,
         }
     }
 }

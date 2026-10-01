@@ -595,6 +595,7 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
             skin: Some(SkinSettings {
                 tolerance: 0.13,
                 edge_protection: 0.9,
+                connected: false,
             }),
             selection: None,
         }
@@ -643,61 +644,35 @@ fn plan_body(
             "Body skin: the face reaches the bottom of the frame, so no body skin is visible.",
         );
     }
-    // Sample a grid over the area and keep patches that look like this person's skin.
-    let mut candidates = Vec::new();
-    let mut probes = 0_usize;
-    for gy in 0..14 {
-        for gx in 0..14 {
-            let point = [
-                x0 + (x1 - x0) * (gx as f32 + 0.5) / 14.0,
-                y0 + (y1 - y0) * (gy as f32 + 0.5) / 14.0,
-            ];
-            probes += 1;
-            if let Some(sample) = sample_quality(rgb, width, height, point) {
-                let near = color_distance(sample.chroma, face_sample.chroma) <= 0.06;
-                let lit =
-                    sample.mean > face_sample.mean * 0.4 && sample.mean < face_sample.mean * 2.0;
-                if near && lit {
-                    candidates.push(sample);
-                }
-            }
-        }
-    }
-    if candidates.len() < 4 {
+    let Some(region) = body_skin_region(face, rgb, width, height, face_sample, [x0, y0, x1, y1])
+    else {
         return FacePlan::skip(
-            "Body skin: too little visible skin matching this person's face was found below it (covered by clothing or out of frame).",
+            "Body skin: no visible skin connected to the neck matches this person's face (covered by clothing, hair or out of frame).",
         );
-    }
+    };
+    // Measure the region's own texture and colour spread for the strengths.
+    let [gw, _] = region.grid;
+    let candidates: Vec<Sample> = region
+        .cells
+        .iter()
+        .enumerate()
+        .filter(|(_, selected)| **selected)
+        .step_by(3)
+        .filter_map(|(k, _)| {
+            let point = [
+                (region.origin[0] + (k % gw) * region.cell + region.cell / 2) as f32,
+                (region.origin[1] + (k / gw) * region.cell + region.cell / 2) as f32,
+            ];
+            sample_quality(rgb, width, height, point)
+        })
+        .take(400)
+        .collect();
     let Some((sample, [texture, tone, _])) = representative_sample(&candidates) else {
         return FacePlan::skip("Body skin: no representative skin patch was found.");
     };
-    let coverage = candidates.len() as f32 / probes as f32;
-    // Cover the search area with feathered horizontal strokes, then erase the face.
-    let radius = ((y1 - y0).min(x1 - x0) / 4.0)
-        .min(short * 0.24)
-        .max(short * 0.02);
-    let mut strokes = Vec::new();
-    let mut y = y0 + radius * 0.8;
-    while y < y1 + radius * 0.2 && strokes.len() < 24 {
-        strokes.push(BrushStroke {
-            erase: false,
-            radius: (radius / short).clamp(0.0005, 0.25),
-            opacity: 1.0,
-            points: vec![
-                [
-                    ((x0 + radius * 0.8) / w).clamp(0.0, 1.0),
-                    (y / h).clamp(0.0, 1.0),
-                    1.0,
-                ],
-                [
-                    ((x1 - radius * 0.8) / w).clamp(0.0, 1.0),
-                    (y / h).clamp(0.0, 1.0),
-                    1.0,
-                ],
-            ],
-        });
-        y += radius * 1.4;
-    }
+    let selected = region.cells.iter().filter(|c| **c).count();
+    let mut strokes = region.strokes(w, h);
+    // The face is retouched by its own operations; never smooth it twice.
     strokes.push(BrushStroke {
         erase: true,
         radius: ((fw.max(fh) * 0.55) / short).clamp(0.0005, 0.25),
@@ -738,6 +713,7 @@ fn plan_body(
         skin: Some(SkinSettings {
             tolerance: 0.12,
             edge_protection: 0.9,
+            connected: false,
         }),
         selection: None,
     })
@@ -746,14 +722,299 @@ fn plan_body(
         edits,
         sample: Some(sample),
         reason: format!(
-            "Body skin: found {} skin patches below the face that match this person's own face colour; smoothed and evened them only.{}",
-            candidates.len(),
-            if coverage > 0.8 {
-                " Much of the area matched skin colour, so a similar-coloured background may be softened slightly; check the result."
-            } else {
-                ""
-            }
+            "Body skin: selected {selected} skin cells connected to the neck and matching this person's own skin; clothing, hair and background are not part of the mask."
         ),
+    }
+}
+
+/// This person's visible body skin as a set of grid cells, found by growing from the neck.
+///
+/// Colour alone cannot separate skin from a pink wall, a beige dress or a wooden table, so
+/// a cell joins only when (1) its colour, brightness and saturation are close to the
+/// person's own neck skin (itself checked against their face), and (2) it is connected to
+/// the neck through neighbours without crossing an edge in brightness or colour. Holes inside
+/// the region (a necklace, a shadow) are filled; nothing outside it is ever selected.
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::too_many_lines
+)]
+fn body_skin_region(
+    face: &PortraitFace,
+    rgb: &[u8],
+    width: u32,
+    height: u32,
+    face_sample: &Sample,
+    area: [f32; 4],
+) -> Option<BodyRegion> {
+    const TOLERANCE: f32 = 0.055;
+    let (w, h) = (width as usize, height as usize);
+    let [x0, y0, x1, y1] = area.map(|v| v.max(0.0) as usize);
+    let (x1, y1) = (x1.min(w), y1.min(h));
+    if x1 <= x0 + 4 || y1 <= y0 + 4 {
+        return None;
+    }
+    let cell = ((x1 - x0).max(y1 - y0) / 160).max(2);
+    let (gw, gh) = ((x1 - x0) / cell, (y1 - y0) / cell);
+    if gw < 3 || gh < 3 {
+        return None;
+    }
+    let decode = |v: u8| aura_raw::colour::curve::srgb_decode(f32::from(v) / 255.0);
+    let luma = |p: [f32; 3]| p[0] * 0.2627 + p[1] * 0.678 + p[2] * 0.0593;
+    let chroma = |p: [f32; 3]| {
+        let s = (p[0] + p[1] + p[2]).max(1e-6);
+        [p[0] / s, p[1] / s, p[2] / s]
+    };
+    let sat = |p: [f32; 3]| {
+        let max = p[0].max(p[1]).max(p[2]).max(1e-6);
+        (max - p[0].min(p[1]).min(p[2])) / max
+    };
+    let dist = |a: [f32; 3], b: [f32; 3]| {
+        ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
+    };
+    let mut means = vec![[0.0_f32; 3]; gw * gh];
+    for gy in 0..gh {
+        for gx in 0..gw {
+            let mut sum = [0.0_f32; 3];
+            for y in y0 + gy * cell..y0 + (gy + 1) * cell {
+                for x in x0 + gx * cell..x0 + (gx + 1) * cell {
+                    let i = (y * w + x) * 3;
+                    if let Some(p) = rgb.get(i..i + 3) {
+                        for c in 0..3 {
+                            sum[c] += decode(p[c]);
+                        }
+                    }
+                }
+            }
+            if let Some(slot) = means.get_mut(gy * gw + gx) {
+                *slot = sum.map(|v| v / (cell * cell) as f32);
+            }
+        }
+    }
+    // The face's own skin, in linear light, around the representative cheek sample.
+    let face_rgb = {
+        let (fx, fy) = (face_sample.point[0] as usize, face_sample.point[1] as usize);
+        let mut sum = [0.0_f32; 3];
+        let mut n = 0.0;
+        for y in fy.saturating_sub(2)..(fy + 3).min(h) {
+            for x in fx.saturating_sub(2)..(fx + 3).min(w) {
+                if let Some(p) = rgb.get((y * w + x) * 3..(y * w + x) * 3 + 3) {
+                    for c in 0..3 {
+                        sum[c] += decode(p[c]);
+                    }
+                    n += 1.0;
+                }
+            }
+        }
+        sum.map(|v| v / f32::max(n, 1.0))
+    };
+    let (face_c, face_l, face_s) = (chroma(face_rgb), luma(face_rgb), sat(face_rgb));
+    let at = |k: usize| means.get(k).copied().unwrap_or([0.0; 3]);
+    let like = |p: [f32; 3], c: [f32; 3], l: f32, s: f32, tol: f32| {
+        dist(chroma(p), c) < tol
+            && luma(p) > l * 0.4
+            && luma(p) < l * 2.0
+            && (sat(p) - s).abs() < 0.2
+    };
+    // Seeds: skin-like cells in the neck zone, from the chin down one face height.
+    let [l, _, r, b] = face.bounds;
+    let fw = (r - l) * width as f32;
+    let fh = (face.bounds[3] - face.bounds[1]) * height as f32;
+    let cx = (l + r) * 0.5 * width as f32;
+    let to_gx = |x: f32| ((x - x0 as f32) / cell as f32).clamp(0.0, (gw - 1) as f32) as usize;
+    let to_gy = |y: f32| ((y - y0 as f32) / cell as f32).clamp(0.0, (gh - 1) as f32) as usize;
+    let (sy0, sy1) = (to_gy(b * height as f32), to_gy(b * height as f32 + fh));
+    let (sx0, sx1) = (to_gx(cx - fw * 0.6), to_gx(cx + fw * 0.6));
+    let mut seeds: Vec<usize> = (sy0..=sy1)
+        .flat_map(|gy| (sx0..=sx1).map(move |gx| gy * gw + gx))
+        .filter(|&k| like(at(k), face_c, face_l, face_s, TOLERANCE))
+        .collect();
+    if seeds.is_empty() {
+        return None;
+    }
+    // Body skin is judged against the neck's own colour (no make-up, different light).
+    let neck = {
+        let n = seeds.len() as f32;
+        let sum = seeds.iter().fold([0.0_f32; 3], |acc, &k| {
+            let p = at(k);
+            [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]]
+        });
+        sum.map(|v| v / n)
+    };
+    let (neck_c, neck_l, neck_s) = (chroma(neck), luma(neck), sat(neck));
+    let usable: Vec<bool> = (0..gw * gh)
+        .map(|k| {
+            let p = at(k);
+            like(p, neck_c, neck_l, neck_s, TOLERANCE) && dist(chroma(p), face_c) < TOLERANCE * 1.6
+        })
+        .collect();
+    seeds.retain(|&k| usable.get(k).copied().unwrap_or(false));
+    let mut reached = vec![false; gw * gh];
+    let mut stack = seeds.clone();
+    for &k in &seeds {
+        if let Some(slot) = reached.get_mut(k) {
+            *slot = true;
+        }
+    }
+    while let Some(k) = stack.pop() {
+        let (gx, gy) = (k % gw, k / gw);
+        let here = at(k);
+        let mut next = Vec::with_capacity(4);
+        if gx > 0 {
+            next.push(k - 1);
+        }
+        if gx + 1 < gw {
+            next.push(k + 1);
+        }
+        if gy > 0 {
+            next.push(k - gw);
+        }
+        if gy + 1 < gh {
+            next.push(k + gw);
+        }
+        for n in next {
+            if reached.get(n).copied().unwrap_or(true) || !usable.get(n).copied().unwrap_or(false) {
+                continue;
+            }
+            let there = at(n);
+            let step = (luma(here) - luma(there)).abs() / luma(here).max(luma(there)).max(1e-6);
+            if step < 0.15 && dist(chroma(here), chroma(there)) < 0.035 {
+                if let Some(slot) = reached.get_mut(n) {
+                    *slot = true;
+                }
+                stack.push(n);
+            }
+        }
+    }
+    // Fill holes: anything not reachable from the border through unselected cells.
+    let mut outside = vec![false; gw * gh];
+    let mut stack: Vec<usize> = (0..gw * gh)
+        .filter(|&k| {
+            let (gx, gy) = (k % gw, k / gw);
+            (gx == 0 || gy == 0 || gx + 1 == gw || gy + 1 == gh)
+                && !reached.get(k).copied().unwrap_or(false)
+        })
+        .collect();
+    for &k in &stack {
+        if let Some(slot) = outside.get_mut(k) {
+            *slot = true;
+        }
+    }
+    while let Some(k) = stack.pop() {
+        let (gx, gy) = (k % gw, k / gw);
+        let mut next = Vec::with_capacity(4);
+        if gx > 0 {
+            next.push(k - 1);
+        }
+        if gx + 1 < gw {
+            next.push(k + 1);
+        }
+        if gy > 0 {
+            next.push(k - gw);
+        }
+        if gy + 1 < gh {
+            next.push(k + gw);
+        }
+        for n in next {
+            if !outside.get(n).copied().unwrap_or(true) && !reached.get(n).copied().unwrap_or(false)
+            {
+                if let Some(slot) = outside.get_mut(n) {
+                    *slot = true;
+                }
+                stack.push(n);
+            }
+        }
+    }
+    let cells: Vec<bool> = outside.iter().map(|o| !o).collect();
+    let count = cells.iter().filter(|c| **c).count();
+    if count < 6 {
+        return None;
+    }
+    Some(BodyRegion {
+        cells,
+        grid: [gw, gh],
+        origin: [x0, y0],
+        cell,
+        seed: seeds.first().map(|&k| {
+            [
+                (x0 + (k % gw) * cell + cell / 2) as f32,
+                (y0 + (k / gw) * cell + cell / 2) as f32,
+            ]
+        }),
+    })
+}
+
+/// A body-skin region on a grid of square cells in planning pixels.
+struct BodyRegion {
+    cells: Vec<bool>,
+    grid: [usize; 2],
+    origin: [usize; 2],
+    cell: usize,
+    seed: Option<[f32; 2]>,
+}
+
+impl BodyRegion {
+    /// The region as editable horizontal brush strokes, one per run of selected cells. Rows
+    /// are merged in pairs, threes and so on until the run count fits the stroke limit.
+    #[allow(clippy::cast_precision_loss)]
+    fn strokes(&self, width: f32, height: f32) -> Vec<BrushStroke> {
+        let short = width.min(height);
+        let [gw, gh] = self.grid;
+        let runs_for = |group: usize| {
+            let mut runs = Vec::new();
+            for top in (0..gh).step_by(group) {
+                let filled = |gx: usize| {
+                    (top..(top + group).min(gh))
+                        .any(|gy| self.cells.get(gy * gw + gx).copied().unwrap_or(false))
+                };
+                let mut gx = 0;
+                while gx < gw {
+                    if filled(gx) {
+                        let start = gx;
+                        while gx < gw && filled(gx) {
+                            gx += 1;
+                        }
+                        runs.push((top, start, gx));
+                    } else {
+                        gx += 1;
+                    }
+                }
+            }
+            runs
+        };
+        let mut group = 1;
+        let mut runs = runs_for(group);
+        while runs.len() > retouch_tools::MAX_STROKES - 2 && group < gh {
+            group += 1;
+            runs = runs_for(group);
+        }
+        let cell = self.cell as f32;
+        let radius = cell * group as f32 * 0.5 + cell * 0.25;
+        runs.into_iter()
+            .map(|(top, a, b)| {
+                let y = self.origin[1] as f32 + top as f32 * cell + cell * group as f32 * 0.5;
+                let xa = self.origin[0] as f32 + a as f32 * cell + radius;
+                let xb = (self.origin[0] as f32 + b as f32 * cell - radius).max(xa);
+                BrushStroke {
+                    erase: false,
+                    radius: (radius / short).clamp(0.0005, 0.25),
+                    opacity: 1.0,
+                    points: vec![
+                        [
+                            (xa / width).clamp(0.0, 1.0),
+                            (y / height).clamp(0.0, 1.0),
+                            1.0,
+                        ],
+                        [
+                            (xb / width).clamp(0.0, 1.0),
+                            (y / height).clamp(0.0, 1.0),
+                            1.0,
+                        ],
+                    ],
+                }
+            })
+            .collect()
     }
 }
 
@@ -802,18 +1063,22 @@ fn face_skin_mask(f: FaceFrame, [width, height]: [f32; 2]) -> BrushMask {
         }
     };
     let [eye_a, eye_b] = f.eyes;
-    let strokes = vec![
-        // Forehead, cheeks at eye height, lower cheeks and jaw, chin, nose bridge.
-        stroke(at(f.mid, -0.5, -0.55), at(f.mid, 0.5, -0.55), 0.22, false),
-        stroke(at(eye_a, -0.2, 0.45), at(eye_b, 0.2, 0.45), 0.26, false),
-        stroke(at(f.mid, -0.5, 0.95), at(f.mid, 0.5, 0.95), 0.22, false),
-        stroke(
-            at(f.mouth_centre, 0.0, 0.35),
-            at(f.mouth_centre, 0.0, 0.35),
-            0.2,
-            false,
-        ),
-        stroke(at(f.mid, 0.0, 0.05), at(f.nose, 0.0, -0.05), 0.1, false),
+    // The face oval, filled with overlapping horizontal strokes from the upper forehead to the
+    // chin. Rows are 0.1 eye-distances apart with a 0.14 radius, so neighbouring rows overlap
+    // past their feathering and the coverage is even - no bands of stronger and weaker retouch.
+    let centre = at(f.mid, 0.0, 0.3);
+    let (half_width, half_height) = (0.82, 1.05);
+    let mut strokes: Vec<BrushStroke> = (0..=20)
+        .filter_map(|row| {
+            let dy = -half_height + row as f32 * 0.1;
+            let fraction = 1.0 - (dy / half_height).powi(2);
+            (fraction > 0.05).then(|| {
+                let span = (half_width * fraction.sqrt() - 0.14).max(0.0);
+                stroke(at(centre, -span, dy), at(centre, span, dy), 0.14, false)
+            })
+        })
+        .collect();
+    strokes.extend([
         // Eyes with lashes, brows, lips and nostrils stay exactly as they are.
         stroke(at(eye_a, -0.15, 0.0), at(eye_a, 0.15, 0.0), 0.11, true),
         stroke(at(eye_b, -0.15, 0.0), at(eye_b, 0.15, 0.0), 0.11, true),
@@ -822,7 +1087,7 @@ fn face_skin_mask(f: FaceFrame, [width, height]: [f32; 2]) -> BrushMask {
         stroke(f.mouth[0], f.mouth[1], 0.14, true),
         stroke(at(f.nose, -0.09, 0.04), at(f.nose, -0.09, 0.04), 0.05, true),
         stroke(at(f.nose, 0.09, 0.04), at(f.nose, 0.09, 0.04), 0.05, true),
-    ];
+    ]);
     BrushMask { strokes }
 }
 
@@ -1058,5 +1323,55 @@ mod tests {
             findings.iter().any(|f| f.starts_with("Body skin:")),
             "{findings:?}"
         );
+    }
+
+    #[test]
+    fn body_mask_never_reaches_a_skin_coloured_backdrop() {
+        // Skin-coloured backdrop on both sides, separated from the person by dark outlines.
+        let (w, h) = (200_usize, 300_usize);
+        let skin = [150_u8, 105, 80];
+        let mut rgb = Vec::with_capacity(w * h * 3);
+        for y in 0..h {
+            for x in 0..w {
+                let outline = (44..52).contains(&x) || (148..156).contains(&x);
+                rgb.extend(if outline { [20, 20, 25] } else { skin });
+            }
+        }
+        let face = PortraitFace {
+            bounds: [0.3, 0.05, 0.7, 0.35],
+            landmarks: [
+                [0.4, 0.15],
+                [0.6, 0.15],
+                [0.5, 0.21],
+                [0.43, 0.27],
+                [0.57, 0.27],
+            ],
+            confidence: 0.95,
+        };
+        let plan = scoped(&rgb, &face, portrait_features::Scope::Body);
+        let body: Vec<&Edit> = plan
+            .groups
+            .values()
+            .flatten()
+            .filter(|e| e.id.contains("-body-"))
+            .collect();
+        assert!(!body.is_empty(), "{:?}", plan.report.assessments);
+        for stroke in body[0]
+            .mask
+            .as_ref()
+            .unwrap()
+            .strokes
+            .iter()
+            .filter(|s| !s.erase)
+        {
+            for p in &stroke.points {
+                let reach = stroke.radius * 200.0 / 200.0;
+                assert!(
+                    p[0] - reach > 0.2 && p[0] + reach < 0.8,
+                    "stroke reaches the backdrop: {p:?} r={}",
+                    stroke.radius
+                );
+            }
+        }
     }
 }

@@ -1,0 +1,123 @@
+{
+  "group-office.jpg": [
+    {
+      "op": "auto-portrait-v1-0-texture",
+      "selectedPixels": 983,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-0-body-texture",
+      "selectedPixels": 42,
+      "outsideBodyArea": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-1-texture",
+      "selectedPixels": 646,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-2-texture",
+      "selectedPixels": 5201,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-2-body-texture",
+      "selectedPixels": 6628,
+      "outsideBodyArea": 0.0
+    }
+  ],
+  "portrait-1239291.jpg": [
+    {
+      "op": "auto-portrait-v1-0-texture",
+      "selectedPixels": 6667,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-0-body-texture",
+      "selectedPixels": 179,
+      "outsideBodyArea": 0.0
+    }
+  ],
+  "portrait-220453.jpg": [
+    {
+      "op": "auto-portrait-v1-0-texture",
+      "selectedPixels": 82467,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-0-body-texture",
+      "selectedPixels": 32072,
+      "outsideBodyArea": 0.0
+    }
+  ],
+  "portrait-glasses.jpg": [
+    {
+      "op": "auto-portrait-v1-0-texture",
+      "selectedPixels": 94850,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-0-body-texture",
+      "selectedPixels": 79529,
+      "outsideBodyArea": 0.0
+    }
+  ],
+  "portrait-pink-backdrop.jpg": [
+    {
+      "op": "auto-portrait-v1-0-texture",
+      "selectedPixels": 9487,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-0-body-texture",
+      "selectedPixels": 19827,
+      "outsideBodyArea": 0.0
+    }
+  ],
+  "portrait-smile-teeth.jpg": [
+    {
+      "op": "auto-portrait-v1-0-texture",
+      "selectedPixels": 43320,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-0-body-texture",
+      "selectedPixels": 1976,
+      "outsideBodyArea": 0.0
+    }
+  ],
+  "portrait-yellow-backdrop.jpg": [
+    {
+      "op": "auto-portrait-v1-0-texture",
+      "selectedPixels": 53919,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-0-body-texture",
+      "selectedPixels": 92614,
+      "outsideBodyArea": 0.0
+    }
+  ],
+  "two-people-meeting.jpg": [
+    {
+      "op": "auto-portrait-v1-0-texture",
+      "selectedPixels": 4860,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-0-body-texture",
+      "selectedPixels": 149,
+      "outsideBodyArea": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-1-texture",
+      "selectedPixels": 2716,
+      "outsideFace": 0.0
+    },
+    {
+      "op": "auto-portrait-v1-1-body-texture",
+      "selectedPixels": 49,
+      "outsideBodyArea": 0.0
+    }
+  ]
+}

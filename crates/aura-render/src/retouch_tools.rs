@@ -57,6 +57,15 @@ pub fn selection_mask(rgb: &[f32], width: usize, height: usize, edit: &Edit) -> 
         return Vec::new();
     }
     let coverage = Coverage::for_edit(edit, width, height, rgb);
+    // Sampled skin tools change only skin like the sample (and, when asked, connected to
+    // it); show exactly that, so the preview proves no background is selected.
+    if matches!(
+        edit.tool,
+        Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
+    ) && edit.source.is_some()
+    {
+        return crate::retouch_skin::selection(rgb, width, height, edit, &coverage);
+    }
     (0..height)
         .flat_map(|y| (0..width).map(move |x| (x, y)))
         .map(|(x, y)| coverage.at(x, y, width, height))
