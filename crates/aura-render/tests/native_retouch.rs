@@ -19,6 +19,7 @@ fn edit(tool: Tool) -> Edit {
         warmth: 0.3,
         tint: -0.2,
         selection: None,
+        matte: None,
         mask: None,
         skin: None,
     }

@@ -156,8 +156,14 @@ impl CpuEngine {
         let frame = self.source.frame(image, level)?;
         let plan = graph::plan(&prepared, RenderPurpose::Interactive, frame.kind, self.caps);
         let (rgb, width, height, _) = self.working_buffer(&frame, &prepared, &plan, level, None);
-        let mask =
-            crate::retouch_tools::selection_mask(&rgb, width as usize, height as usize, draft);
+        let mattes = aura_recipe::retouch_tools::read_mattes(recipe)?;
+        let mask = crate::retouch_tools::selection_mask_with_mattes(
+            &rgb,
+            width as usize,
+            height as usize,
+            draft,
+            &mattes,
+        );
         let bytes = mask
             .into_iter()
             .flat_map(|v| [(v * 255.0).round() as u8; 3])
@@ -516,7 +522,14 @@ impl CpuEngine {
 
         // Explicit authoring runs in interactive previews and exports, before final geometry.
         if let Ok(edits) = aura_recipe::retouch_tools::read(recipe) {
-            crate::retouch_tools::apply(&mut rgb, width as usize, height as usize, &edits);
+            let mattes = aura_recipe::retouch_tools::read_mattes(recipe).unwrap_or_default();
+            crate::retouch_tools::apply_with_mattes(
+                &mut rgb,
+                width as usize,
+                height as usize,
+                &edits,
+                &mattes,
+            );
         }
 
         // ---- sharpening ----------------------------------------------------------------

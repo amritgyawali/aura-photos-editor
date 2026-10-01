@@ -1,4 +1,6 @@
 //! Resolution-independent brush coverage shared by preview and delivery. ADR-0069.
+// Every index is inside a rectangle clipped to the frame on construction.
+#![allow(clippy::indexing_slicing)]
 use aura_recipe::retouch_tools::{BrushStroke, Edit};
 
 pub(crate) struct Coverage {
@@ -34,6 +36,36 @@ fn stroke_bounds(stroke: &BrushStroke, w: usize, h: usize) -> [usize; 4] {
 }
 
 impl Coverage {
+    /// This coverage multiplied by a segmentation matte, over the rectangle both cover.
+    pub(crate) fn with_matte(
+        self,
+        matte: &crate::retouch_matte::MattePlane,
+        w: usize,
+        h: usize,
+    ) -> Self {
+        let [ax0, ay0, ax1, ay1] = self.bounds;
+        let [bx0, by0, bx1, by1] = matte.bounds;
+        let bounds = [ax0.max(bx0), ay0.max(by0), ax1.min(bx1), ay1.min(by1)];
+        if bounds[2] <= bounds[0] || bounds[3] <= bounds[1] {
+            return Self {
+                bounds: [0; 4],
+                pixels: Some(Vec::new()),
+                ..self
+            };
+        }
+        let mut pixels = Vec::with_capacity((bounds[2] - bounds[0]) * (bounds[3] - bounds[1]));
+        for y in bounds[1]..bounds[3] {
+            for x in bounds[0]..bounds[2] {
+                pixels.push(self.at(x, y, w, h) * matte.at(x, y));
+            }
+        }
+        Self {
+            bounds,
+            pixels: Some(pixels),
+            ..self
+        }
+    }
+
     pub(crate) fn for_edit(edit: &Edit, w: usize, h: usize, rgb: &[f32]) -> Self {
         let base = Self::new(edit, w, h);
         let Some(selection) = &edit.selection else {

@@ -14,9 +14,11 @@ import './precision-retouch.css';
 export function automaticLabel(id: string): string {
   const scene = /^auto-scene-v\d+-/.exec(id);
   if (scene) return ' · Auto (scene)';
-  const face = /^auto-portrait-v\d+-(\d+)-(body-)?/.exec(id);
+  if (/^auto-portrait-v\d+-backdrop$/.test(id)) return ' · Auto (backdrop)';
+  const face = /^auto-portrait-v\d+-(\d+)-(body-|lines-neck|hair-|fabric)?/.exec(id);
   if (!face) return '';
-  return ` · Auto (${face[2] ? 'body' : 'face'} ${Number(face[1]) + 1})`;
+  const kind = face[2] === 'hair-' ? 'hair' : face[2] === 'fabric' ? 'clothes' : face[2] ? 'body' : 'face';
+  return ` · Auto (${kind} ${Number(face[1]) + 1})`;
 }
 
 export function NativeRetouchWorkspace({projectId, photoId, disabled = false, revision = 0, onClose, onBusyChange}: {

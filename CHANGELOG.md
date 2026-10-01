@@ -2,6 +2,28 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## AI face and body skin detection, 52 retouch settings — 2026-10-01
+
+- Face skin and body skin are now found by a bundled, offline, open-source person segmenter
+  (Google MediaPipe Selfie Multiclass, Apache-2.0, converted to ONNX and run on aura-infer),
+  with a crop pass for small people in group photos, edges refined from the photograph, and
+  each person's beard, brows, lips and eyes left out by measuring their own skin colour.
+- Body skin (neck, shoulders, arms, hands) is assigned per person; turned, tilted and partly
+  covered faces are retouched from the segmented skin instead of being skipped.
+- Segmentation mattes are stored with the recipe (`studio_retouch_mattes_v1`) and refined at
+  render resolution, so preview and export agree and rendering runs no model.
+- Automatic retouch gains 52 named settings in ten groups (skin detection, skin, blemishes,
+  lines, under eyes, eyes & brows, mouth, portrait volumes & make-up, body, hair/clothes/
+  backdrop) and nine presets. New operations: micro dodge & burn, pore refinement, glow,
+  skin brightness/warmth/tint, under-eye lines, eye bags, eye whitening, iris brilliance,
+  lash and brow definition, lip colour and definition, contour, highlight, blush, face fill
+  light, body tone match/shine/redness/blemishes, neck lines, hair detail and shine, fabric
+  creases and plain-backdrop cleanup.
+- Fixed a brown iris being read as flash red-eye and painted green; smoothing never lifts
+  lashes, brow hairs or beard inside the skin mask.
+- aura-infer: `ConvTranspose`, `ReduceSum`, half-pixel bilinear `Resize`; faster `Conv`,
+  broadcasting and `Transpose` with bit-identical results. ADR-0077.
+
 ## Intelligent one-click editing — 2026-09-30
 
 - Auto enhance now measures the scene (portrait, group, landscape, low light, general) and

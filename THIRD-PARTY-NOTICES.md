@@ -1,5 +1,17 @@
 # Third-party notices
 
+## MediaPipe Selfie Multiclass segmentation weights
+
+AURA bundles a conversion of Google's MediaPipe Selfie Multiclass image segmenter
+(`selfie_multiclass_256x256.tflite`), Copyright Google LLC, under the Apache License,
+Version 2.0. The converted file is `assets/models/selfie_multiclass/selfie_multiclass_256x256.onnx`;
+the weights are unchanged and only the tensor layout was converted, by
+`ml/models/skin/convert_selfie_multiclass.py`. The license text is in
+`assets/models/selfie_multiclass/LICENSE`; provenance and pinned hashes are in
+`assets/models/selfie_multiclass/MODEL-CARD.md`. You may obtain a copy of the license at
+http://www.apache.org/licenses/LICENSE-2.0. Distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND.
+
 ## YuNet portrait detection weights
 
 AURA bundles OpenCV Zoo's `face_detection_yunet_2023mar.onnx`, copyright

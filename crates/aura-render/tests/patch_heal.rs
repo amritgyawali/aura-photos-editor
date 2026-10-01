@@ -18,6 +18,7 @@ fn operation() -> Edit {
         warmth: 0.0,
         tint: 0.0,
         selection: None,
+        matte: None,
         mask: None,
         skin: None,
     }

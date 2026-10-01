@@ -1,6 +1,14 @@
-//! Deterministic, explicitly targeted native retouching. No learned segmentation. ADR-0068.
+//! Deterministic, explicitly targeted native retouching. ADR-0068.
+//!
+//! An operation may also carry a segmentation matte (ADR-0077): a person's face skin, body
+//! skin, hair or clothes as measured by the bundled segmenter at analysis time and stored in
+//! the recipe, so rendering stays deterministic and runs no model.
+// Dimensions are validated on entry and every coordinate is clamped to the frame.
+#![allow(clippy::indexing_slicing)]
 use crate::retouch_mask::Coverage;
-use aura_recipe::retouch_tools::{Edit, Tool};
+use crate::retouch_matte::MattePlane;
+use aura_recipe::retouch_tools::{Edit, Matte, Tool};
+use std::collections::BTreeMap;
 
 fn luma(v: [f32; 3]) -> f32 {
     v[0] * 0.2627 + v[1] * 0.6780 + v[2] * 0.0593
@@ -29,11 +37,55 @@ fn sample(rgb: &[f32], w: usize, h: usize, point: [f32; 2]) -> [f32; 3] {
 
 /// Apply normalized operations before crop. Buffers contain linear Rec.2020 RGB.
 pub fn apply(rgb: &mut [f32], width: usize, height: usize, edits: &[Edit]) {
+    apply_with_mattes(rgb, width, height, edits, &BTreeMap::new());
+}
+
+/// Every matte the enabled operations refer to, rendered once from the frame as it was before
+/// any of them ran - so every operation that shares a matte selects exactly the same pixels.
+fn matte_planes(
+    rgb: &[f32],
+    width: usize,
+    height: usize,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
+) -> BTreeMap<String, Option<MattePlane>> {
+    let mut planes = BTreeMap::new();
+    for id in edits
+        .iter()
+        .filter(|e| e.enabled && e.amount > 0.0)
+        .filter_map(|e| e.matte.as_ref())
+    {
+        if !planes.contains_key(id) {
+            let plane = mattes
+                .get(id)
+                .and_then(|m| MattePlane::render(m, rgb, width, height));
+            planes.insert(id.clone(), plane);
+        }
+    }
+    planes
+}
+
+/// [`apply`], with the segmentation mattes operations refer to. An operation whose matte is
+/// missing or selects nothing is skipped rather than applied to its whole region.
+pub fn apply_with_mattes(
+    rgb: &mut [f32],
+    width: usize,
+    height: usize,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
+) {
     if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
         return;
     }
+    let planes = matte_planes(rgb, width, height, edits, mattes);
     for edit in edits.iter().filter(|e| e.enabled && e.amount > 0.0) {
-        let coverage = Coverage::for_edit(edit, width, height, rgb);
+        let mut coverage = Coverage::for_edit(edit, width, height, rgb);
+        if let Some(id) = &edit.matte {
+            match planes.get(id) {
+                Some(Some(plane)) => coverage = coverage.with_matte(plane, width, height),
+                _ => continue,
+            }
+        }
         if matches!(
             edit.tool,
             Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
@@ -53,10 +105,31 @@ pub fn apply(rgb: &mut [f32], width: usize, height: usize, edits: &[Edit]) {
 /// Invalid buffer dimensions return an empty mask. Parameters must be validated.
 #[must_use]
 pub fn selection_mask(rgb: &[f32], width: usize, height: usize, edit: &Edit) -> Vec<f32> {
+    selection_mask_with_mattes(rgb, width, height, edit, &BTreeMap::new())
+}
+
+/// [`selection_mask`], with the segmentation mattes the operation may refer to.
+#[must_use]
+pub fn selection_mask_with_mattes(
+    rgb: &[f32],
+    width: usize,
+    height: usize,
+    edit: &Edit,
+    mattes: &BTreeMap<String, Matte>,
+) -> Vec<f32> {
     if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
         return Vec::new();
     }
-    let coverage = Coverage::for_edit(edit, width, height, rgb);
+    let mut coverage = Coverage::for_edit(edit, width, height, rgb);
+    if let Some(id) = &edit.matte {
+        match mattes
+            .get(id)
+            .and_then(|m| MattePlane::render(m, rgb, width, height))
+        {
+            Some(plane) => coverage = coverage.with_matte(&plane, width, height),
+            None => return vec![0.0; width * height],
+        }
+    }
     // Sampled skin tools change only skin like the sample (and, when asked, connected to
     // it); show exactly that, so the preview proves no background is selected.
     if matches!(
@@ -144,6 +217,14 @@ fn apply_one(
         return;
     }
     let donor_mean = source.map(|p| sample(rgb, w, h, p)).unwrap_or(center);
+    // Segmented operations on skin and hair skip much darker structures inside the matte.
+    // Clothes and backdrops keep their own shadows and are not guarded.
+    let guard_reference = (edit.matte.is_some()
+        && !matches!(
+            edit.tool,
+            Tool::Fabric | Tool::Backdrop | Tool::Heal | Tool::Clone
+        ))
+    .then_some(donor_mean);
     // Match donor tone to a ring outside the target, not to the blemish itself.
     let mut ring = [0.0; 3];
     let mut ring_n = 0.0;
@@ -159,9 +240,19 @@ fn apply_one(
     let mut patches = Vec::with_capacity((x1 - x0) * (y1 - y0));
     for y in y0..y1 {
         for x in x0..x1 {
-            let a = coverage.at(x, y, w, h)
+            let mut a = coverage.at(x, y, w, h)
                 * clip.map_or(1.0, |mask| mask.at(x, y, w, h))
                 * edit.amount;
+            if a <= 0.0 {
+                continue;
+            }
+            if let Some(reference) = guard_reference {
+                // A matte is coarser than a lash or a beard hair; never work on pixels far
+                // darker than the region's own reference.
+                let ratio = luma(pixel(rgb, w, x, y)) / luma(reference).max(1e-6);
+                let t = ((ratio - 0.3) / 0.2).clamp(0.0, 1.0);
+                a *= t * t * (3.0 - 2.0 * t);
+            }
             if a <= 0.0 {
                 continue;
             }
@@ -264,7 +355,9 @@ fn apply_one(
                     }
                 }
                 Tool::RedEye => {
-                    if old[0] > old[1].max(old[2]) * 1.5 {
+                    // Red-eye red has green and blue about equal. Brown irises, skin and lips
+                    // have much less blue than green and are left alone.
+                    if old[0] > old[1].max(old[2]) * 1.5 && old[2] >= old[1] * 0.5 {
                         value[0] = (old[1] + old[2]) * 0.5;
                     }
                 }
@@ -286,7 +379,10 @@ fn apply_one(
 fn auto_spots(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) {
     // Measured spot proposals within an explicit region; not a trained blemish classifier.
     // Painted opacity controls repair strength, not whether a spot can be detected.
-    let min_coverage = if edit.mask.is_some() {
+    let min_coverage = if edit.matte.is_some() {
+        // Well inside the segmented skin, so a repair never reaches across its edge.
+        0.5
+    } else if edit.mask.is_some() {
         f32::EPSILON
     } else {
         0.9

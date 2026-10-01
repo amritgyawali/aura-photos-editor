@@ -42,7 +42,38 @@ export type SelectionPreview = Pick<RenderDto, 'width'|'height'|'rgbBase64'>;
 /** Which automatic finishing runs and how strongly; remembered by the next Auto enhance. */
 /** Which skin the automatic retouch may change. */
 export type RetouchScope = 'face' | 'body' | 'face_and_body';
-export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope };
+/**
+ * The automatic retouch's fine controls (ADR-0077), mirroring `retouch_settings::Settings`.
+ * Strengths are 0..1 and 0 switches an operation off; for measured corrections 0.5 is the
+ * measured strength. Signed values are -1..1. Missing keys take the Rust defaults.
+ */
+export type RetouchSettings = {
+  aiSkinDetection: boolean; mainSubjectOnly: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean;
+  smoothing: number; texture: number; smoothingSize: number; toneEvenness: number; lightEvenness: number; microDodgeBurn: number;
+  poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
+  blemishSensitivity: number; maxSpots: number; keepFreckles: boolean;
+  foreheadLines: number; crowsFeet: number; smileLines: number; underEyeLines: number; neckLines: number;
+  darkCircles: number; eyeBags: number;
+  eyeWhitening: number; eyeVessels: number; irisDetail: number; irisBrightness: number; redEye: boolean; lashDefinition: number; browDefinition: number;
+  teethWhitening: number; lipColour: number; lipDefinition: number;
+  contour: number; highlight: number; blush: number; faceLight: number;
+  bodySmoothing: number; bodyTone: number; matchBodyToFace: number; bodyShine: number; bodyRedness: number; bodyBlemishes: number;
+  hairDetail: number; hairShine: number; fabric: number; backdrop: number;
+};
+export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
+  aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true,
+  smoothing: .5, texture: .5, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
+  poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
+  blemishSensitivity: .5, maxSpots: 12, keepFreckles: true,
+  foreheadLines: .5, crowsFeet: .5, smileLines: .5, underEyeLines: .25, neckLines: 0,
+  darkCircles: .5, eyeBags: .25,
+  eyeWhitening: .2, eyeVessels: .5, irisDetail: .5, irisBrightness: 0, redEye: true, lashDefinition: 0, browDefinition: 0,
+  teethWhitening: .5, lipColour: 0, lipDefinition: 0,
+  contour: 0, highlight: 0, blush: 0, faceLight: 0,
+  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: .25, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
+  hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0,
+};
+export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope; settings?: RetouchSettings };
 export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true, scope: 'face' };
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8, connected: true };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
@@ -53,6 +84,8 @@ export type NativeRetouchEdit = {
   mask?: BrushMask | null;
   skin?: SkinSettings | null;
   selection?: RetouchSelection | null;
+  /** A segmentation matte stored with the recipe (face skin, body skin, hair, clothes). */
+  matte?: string | null;
 };
 export const extendedRetouchShape = (edit: NativeRetouchEdit) => Boolean(edit.selection?.inverted || edit.selection?.gradient);
 export const needsRetouchSource = (edit: NativeRetouchEdit) => ['clone', 'color_match'].includes(edit.tool)

@@ -60,11 +60,11 @@ pub mod cull_commands;
 pub mod curate_commands;
 pub mod delivery_commands;
 pub mod develop_commands;
-pub mod studio_tools;
-pub mod native_retouch;
 pub mod edit_profiles;
 pub mod gallery_commands;
 pub mod learn_commands;
+pub mod native_retouch;
+pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.
@@ -85,15 +85,16 @@ pub mod micro_commands;
 pub mod moment_commands;
 pub mod people_commands;
 pub mod photo_enhance;
+mod photo_frames;
 pub mod portrait_auto;
 pub mod portrait_features;
-pub mod smart_edit;
-mod photo_frames;
 pub mod preview_commands;
 pub mod qc_commands;
 pub mod reference_style;
 pub mod restore_commands;
 pub mod retouch_commands;
+pub mod retouch_settings;
+pub mod smart_edit;
 pub mod state;
 pub mod story_commands;
 pub mod style_commands;

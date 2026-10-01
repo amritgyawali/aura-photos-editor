@@ -12,6 +12,7 @@
 // Every index below is produced from bounds-checked window coordinates; out-of-range reads
 // fall back to `get`. Pixel geometry is intentionally computed in f32 and truncated.
 #![allow(
+    clippy::indexing_slicing,
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
@@ -20,12 +21,13 @@
     clippy::too_many_lines
 )]
 
+use crate::retouch_settings::{gain, threshold, Settings};
 use aura_recipe::retouch_tools::{BrushMask, BrushStroke, Edit, LuminanceRange, Selection, Tool};
 use aura_vision::portrait::PortraitFace;
 use serde::{Deserialize, Serialize};
 
 /// The planner version recorded in the report; bump on any behavioural change.
-pub const VERSION: &str = "measured-features-v1";
+pub const VERSION: &str = "measured-features-v2";
 /// At most this many healed spots per face. A face with more is left for a person to judge.
 pub const MAX_SPOTS: usize = 12;
 /// More compact red marks than this on one face is a pattern (freckles), not blemishes.
@@ -351,6 +353,7 @@ fn base_edit(id: String, tool: Tool, amount: f32, px: &Pixels<'_>, region_px: [f
         mask: None,
         skin: None,
         selection: None,
+        matte: None,
     }
 }
 
@@ -383,8 +386,10 @@ pub fn plan(
     exposure: f32,
     prefix: &str,
     options: &Options,
+    face_matte: Option<&str>,
 ) -> FeatureEdits {
     let options = options.sanitised();
+    let settings = &options.settings;
     let mut out = FeatureEdits::default();
     let Some(g) = Geometry::new(face, px) else {
         return out;
@@ -403,18 +408,21 @@ pub fn plan(
         return out;
     };
     if options.blemishes {
-        blemishes(&g, &skin, px, index, prefix, &mut out);
+        blemishes(&g, &skin, px, index, prefix, settings, &mut out);
     }
     if options.refine {
-        refine(&g, &skin, px, index, prefix, &mut out);
+        refine(&g, &skin, px, index, prefix, settings, &mut out);
     }
     if options.eyes {
-        eyes(&g, &skin, px, index, prefix, exposure, &mut out);
+        eyes(&g, &skin, px, index, prefix, exposure, settings, &mut out);
     }
     if options.teeth {
-        mouth(&g, &skin, px, index, prefix, exposure, &mut out);
+        mouth(&g, &skin, px, index, prefix, exposure, settings, &mut out);
     }
-    shine(&g, &skin, px, index, prefix, &mut out);
+    if settings.shine > 0.0 {
+        shine(&g, &skin, px, index, prefix, settings, &mut out);
+    }
+    sculpt(&g, px, index, prefix, settings, face_matte, &mut out);
     // A heal either repairs a spot or it does not; every other strength follows the chosen
     // intensity, within each tool's own bounds.
     for edit in out
@@ -444,6 +452,8 @@ pub struct Options {
     pub refine: bool,
     /// Which skin the automatic retouch works on.
     pub scope: Scope,
+    /// The fine controls. ADR-0077.
+    pub settings: crate::retouch_settings::Settings,
 }
 
 /// The area the automatic retouch is allowed to change.
@@ -479,6 +489,7 @@ impl Default for Options {
             teeth: true,
             refine: true,
             scope: Scope::Face,
+            settings: crate::retouch_settings::Settings::default(),
         }
     }
 }
@@ -493,6 +504,7 @@ impl Options {
             } else {
                 1.0
             },
+            settings: self.settings.sanitised(),
             ..self
         }
     }
@@ -549,6 +561,7 @@ fn refine(
     px: &Pixels<'_>,
     face: usize,
     prefix: &str,
+    settings: &Settings,
     out: &mut FeatureEdits,
 ) {
     if g.d < 50.0 {
@@ -588,11 +601,20 @@ fn refine(
     ];
     let mut softened = 0;
     for (name, zone) in zones {
+        let strength = gain(if name == "lines-forehead" {
+            settings.forehead_lines
+        } else {
+            settings.crows_feet
+        });
+        if strength <= 0.0 {
+            continue;
+        }
         let Some(energy) = line_energy(zone, g, skin, px) else {
             continue;
         };
         let ratio = energy / cheek.max(1e-4);
-        if ratio < 1.35 {
+        // A stronger setting also softens slightly fainter lines.
+        if ratio < 1.35 - 0.15 * (strength - 1.0) {
             continue;
         }
         let [cx, cy] = zone.a;
@@ -600,7 +622,7 @@ fn refine(
             base_edit(
                 format!("{prefix}{face}-{name}"),
                 Tool::Wrinkle,
-                ((ratio - 1.2) * 0.5).clamp(0.15, 0.45),
+                ((ratio - 1.2) * 0.5).clamp(0.15, 0.45) * strength,
                 px,
                 [
                     cx,
@@ -619,6 +641,45 @@ fn refine(
         out.refine.push(edit);
         softened += 1;
     }
+    // 1b. Fine lines under each eye, measured the same way.
+    let under_strength = gain(settings.under_eye_lines);
+    if under_strength > 0.0 {
+        for (eye, name) in g
+            .eyes
+            .into_iter()
+            .zip(["lines-undereye-a", "lines-undereye-b"])
+        {
+            let zone = Capsule {
+                a: add(add(eye, g.v, 0.2 * d), g.u, -0.13 * d),
+                b: add(add(eye, g.v, 0.2 * d), g.u, 0.13 * d),
+                r: 0.055 * d,
+            };
+            let Some(energy) = line_energy(zone, g, skin, px) else {
+                continue;
+            };
+            let ratio = energy / cheek.max(1e-4);
+            if ratio < 1.3 - 0.15 * (under_strength - 1.0) {
+                continue;
+            }
+            let [cx, cy] = [(zone.a[0] + zone.b[0]) * 0.5, (zone.a[1] + zone.b[1]) * 0.5];
+            let mut edit = masked(
+                base_edit(
+                    format!("{prefix}{face}-{name}"),
+                    Tool::Wrinkle,
+                    ((ratio - 1.1) * 0.5).clamp(0.12, 0.4) * under_strength,
+                    px,
+                    [cx, cy, 0.25 * d, 0.15 * d],
+                ),
+                px,
+                &[zone],
+            );
+            edit.feather = 0.9;
+            edit.tone = 0.7;
+            edit.radius = (0.01 * d / short).clamp(0.0005, 0.05);
+            out.refine.push(edit);
+            softened += 1;
+        }
+    }
     if softened > 0 {
         parts.push(format!(
             "softened fine lines in {softened} area{} where line texture measured stronger than the cheek (fine skin texture kept)",
@@ -626,8 +687,12 @@ fn refine(
         ));
     }
     // 2. Smile lines: lift the fold only where it is darker than the cheek beside it.
+    let fold_strength = gain(settings.smile_lines);
     let mut folds = 0;
     for (corner, side, name) in [(g.mouth[0], -1.0, "fold-a"), (g.mouth[1], 1.0, "fold-b")] {
+        if fold_strength <= 0.0 {
+            break;
+        }
         let fold = Capsule {
             a: add(g.nose, g.u, side * 0.28 * d),
             b: add(corner, g.u, side * 0.08 * d),
@@ -651,13 +716,13 @@ fn refine(
         };
         if let (Some(f), Some(b)) = (mean(fold), mean(beside)) {
             let drop = 1.0 - f / b.max(1e-4);
-            if drop > 0.08 {
+            if drop > 0.08 - 0.03 * (fold_strength - 1.0) {
                 let [cx, cy] = [(fold.a[0] + fold.b[0]) * 0.5, (fold.a[1] + fold.b[1]) * 0.5];
                 let mut edit = masked(
                     base_edit(
                         format!("{prefix}{face}-{name}"),
                         Tool::MicroDodgeBurn,
-                        ((drop - 0.05) * 2.5).clamp(0.15, 0.4),
+                        ((drop - 0.05) * 2.5).clamp(0.15, 0.4) * fold_strength,
                         px,
                         [cx, cy, 0.3 * d, 0.3 * d],
                     ),
@@ -682,17 +747,21 @@ fn refine(
     let reference = add(g.eyes[0], g.v, 0.6 * d);
     let cheek_red = mean_encoded_redness(Capsule::disk(reference, 0.1 * d), skin, px);
     let mut evened = 0;
+    let red_strength = gain(settings.redness);
     for (side, name) in [(-1.0, "redness-a"), (1.0, "redness-b")] {
+        if red_strength <= 0.0 {
+            break;
+        }
         let zone = Capsule::disk(add(add(g.nose, g.u, side * 0.2 * d), g.v, 0.0), 0.08 * d);
         if let (Some(zone_red), Some(base)) = (mean_encoded_redness(zone, skin, px), cheek_red) {
             let excess = zone_red - base;
-            if excess > 0.05 {
+            if excess > 0.05 - 0.02 * (red_strength - 1.0) {
                 let (w, h) = (px.width as f32, px.height as f32);
                 let mut edit = masked(
                     base_edit(
                         format!("{prefix}{face}-{name}"),
                         Tool::ColorMatch,
-                        (excess * 5.0).clamp(0.2, 0.6),
+                        (excess * 5.0).clamp(0.2, 0.6) * red_strength,
                         px,
                         [zone.a[0], zone.a[1], 0.12 * d, 0.12 * d],
                     ),
@@ -798,6 +867,7 @@ fn blemishes(
     px: &Pixels<'_>,
     face: usize,
     prefix: &str,
+    settings: &Settings,
     out: &mut FeatureEdits,
 ) {
     let [bl, bt, br, bb] = g.bounds;
@@ -878,10 +948,15 @@ fn blemishes(
     }
     // Thresholds follow this face's own texture: a grainy or strongly lit face needs a
     // larger departure before a pixel counts as a mark. Bounded both ways.
-    let te = (robust_spread(skin_excess) * 4.0).clamp(0.035, 0.1);
+    // The photographer's sensitivity scales all three thresholds together.
+    let sensitivity = settings.blemish_sensitivity;
+    let te = threshold(
+        (robust_spread(skin_excess) * 4.0).clamp(0.035, 0.1),
+        sensitivity,
+    );
     let spread_dark = robust_spread(skin_dark);
-    let td = (spread_dark * 2.5).clamp(0.04, 0.2);
-    let tm = (spread_dark * 3.5).max(0.3);
+    let td = threshold((spread_dark * 2.5).clamp(0.04, 0.2), sensitivity);
+    let tm = threshold((spread_dark * 3.5).max(0.3), sensitivity);
     let mut score = vec![0.0_f32; w * h];
     for (i, slot) in score.iter_mut().enumerate() {
         let (e, dk) = (
@@ -1029,11 +1104,16 @@ fn blemishes(
     }
     // Many small red marks together read as freckles or a skin condition, not blemishes:
     // that is somebody's face, so none of them is removed automatically.
-    let freckles = chosen.len() > FRECKLE_FIELD;
+    let field = if settings.keep_freckles {
+        FRECKLE_FIELD
+    } else {
+        FRECKLE_FIELD * 3
+    };
+    let freckles = chosen.len() > field;
     if freckles {
         chosen.clear();
     }
-    chosen.truncate(MAX_SPOTS);
+    chosen.truncate(usize::from(settings.max_spots).min(MAX_SPOTS * 2));
     for (n, (centre, r)) in chosen.iter().enumerate() {
         let repair = (r * 1.8).max(2.5);
         let mut edit = base_edit(
@@ -1051,7 +1131,7 @@ fn blemishes(
     out.report.marks_kept = kept_marks.len();
     if freckles {
         out.report.findings.push(format!(
-            "Blemishes: found more than {FRECKLE_FIELD} small marks, which reads as freckles or a skin pattern; none were removed. Heal individual spots by hand if you want to."
+            "Blemishes: found more than {field} small marks, which reads as freckles or a skin pattern; none were removed. Heal individual spots by hand if you want to."
         ));
     } else if out.blemishes.is_empty() {
         out.report.findings.push(
@@ -1125,6 +1205,7 @@ fn donor(
     best.map(|(_, [x, y])| [(x / w).clamp(0.0, 1.0), (y / h).clamp(0.0, 1.0)])
 }
 
+#[allow(clippy::too_many_arguments)]
 fn eyes(
     g: &Geometry,
     skin: &SkinReference,
@@ -1132,6 +1213,7 @@ fn eyes(
     face: usize,
     prefix: &str,
     exposure: f32,
+    settings: &Settings,
     out: &mut FeatureEdits,
 ) {
     if g.d < 40.0 {
@@ -1207,9 +1289,40 @@ fn eyes(
             .map(|(_, p)| (p[0] - (p[1] + p[2]) * 0.5) / p[0].max(p[1]).max(p[2]).max(1e-4))
             .sum::<f32>()
             / found as f32;
+        let patches: Vec<Capsule> = sides
+            .iter()
+            .filter(|side| side.len() >= 3)
+            .map(|side| {
+                let n = side.len() as f32;
+                let c = [
+                    side.iter().map(|(q, _)| q[0]).sum::<f32>() / n,
+                    side.iter().map(|(q, _)| q[1]).sum::<f32>() / n,
+                ];
+                Capsule::disk(c, 0.05 * d)
+            })
+            .collect();
+        // Whites of the eyes: a small lift of the sclera only, bounded so they never go paper
+        // white. Measured patches beside the iris, never the iris or the lids.
+        if settings.eye_whitening > 0.0 && !patches.is_empty() {
+            let mut edit = masked(
+                base_edit(
+                    format!("{prefix}{face}-eye-{name}-white"),
+                    Tool::Dodge,
+                    settings.eye_whitening * 0.3,
+                    px,
+                    [centre[0], centre[1], 0.22 * d, 0.22 * d],
+                ),
+                px,
+                &patches,
+            );
+            edit.feather = 0.6;
+            edit.selection = Some(brighter_than(skin.stops(exposure) - 0.9, 0.5));
+            out.eyes.push(edit);
+        }
         // A healthy white measures about 0.1-0.25 here; only a clearly red one is cleaned.
-        if redness > 0.3 {
-            let amount = ((redness - 0.25) * 2.0).clamp(0.15, 0.6);
+        let vessels = gain(settings.eye_vessels);
+        if vessels > 0.0 && redness > 0.3 - 0.06 * (vessels - 1.0) {
+            let amount = ((redness - 0.25) * 2.0).clamp(0.15, 0.6) * vessels;
             let patches: Vec<Capsule> = sides
                 .iter()
                 .filter(|side| side.len() >= 3)
@@ -1241,32 +1354,114 @@ fn eyes(
             }
         }
         // Iris and lash detail: a small fine-band contrast lift inside the opening only.
-        let mut detail = masked(
-            base_edit(
-                format!("{prefix}{face}-eye-{name}-detail"),
-                Tool::EyeDetail,
-                if d >= 70.0 { 0.35 } else { 0.25 },
+        let iris = gain(settings.iris_detail);
+        if iris > 0.0 {
+            let mut detail = masked(
+                base_edit(
+                    format!("{prefix}{face}-eye-{name}-detail"),
+                    Tool::EyeDetail,
+                    if d >= 70.0 { 0.35 } else { 0.25 } * iris,
+                    px,
+                    [eye[0], eye[1], 0.2 * d, 0.2 * d],
+                ),
                 px,
-                [eye[0], eye[1], 0.2 * d, 0.2 * d],
-            ),
-            px,
-            &[Capsule::disk(centre, 0.11 * d)],
-        );
-        detail.feather = 0.6;
-        detail.radius = (0.012 * d / short).clamp(0.0005, 0.05);
-        out.eyes.push(detail);
-        detailed += 1;
+                &[Capsule::disk(centre, 0.11 * d)],
+            );
+            detail.feather = 0.6;
+            detail.radius = (0.012 * d / short).clamp(0.0005, 0.05);
+            out.eyes.push(detail);
+            detailed += 1;
+        }
+        // Iris brilliance: a soft lift of the iris itself.
+        if settings.iris_brightness > 0.0 {
+            let mut edit = masked(
+                base_edit(
+                    format!("{prefix}{face}-eye-{name}-iris"),
+                    Tool::Dodge,
+                    settings.iris_brightness * 0.35,
+                    px,
+                    [centre[0], centre[1], 0.12 * d, 0.12 * d],
+                ),
+                px,
+                &[Capsule::disk(centre, 0.065 * d)],
+            );
+            edit.feather = 0.8;
+            out.eyes.push(edit);
+        }
+        // Lash line: fine detail and a whisper of depth along the upper lid.
+        if settings.lash_definition > 0.0 {
+            let lid = Capsule {
+                a: add(add(centre, g.u, -0.15 * d), g.v, -0.06 * d),
+                b: add(add(centre, g.u, 0.15 * d), g.v, -0.06 * d),
+                r: 0.035 * d,
+            };
+            let mut detail = masked(
+                base_edit(
+                    format!("{prefix}{face}-eye-{name}-lash"),
+                    Tool::Frequency,
+                    0.85,
+                    px,
+                    [centre[0], centre[1], 0.22 * d, 0.12 * d],
+                ),
+                px,
+                &[lid],
+            );
+            detail.tone = 0.0;
+            detail.texture = 1.0 + settings.lash_definition * 0.8;
+            detail.feather = 0.7;
+            detail.radius = (0.01 * d / short).clamp(0.0005, 0.05);
+            out.eyes.push(detail);
+            let mut depth = masked(
+                base_edit(
+                    format!("{prefix}{face}-eye-{name}-lash-depth"),
+                    Tool::Burn,
+                    settings.lash_definition * 0.12,
+                    px,
+                    [centre[0], centre[1], 0.22 * d, 0.12 * d],
+                ),
+                px,
+                &[lid],
+            );
+            depth.feather = 0.8;
+            out.eyes.push(depth);
+        }
+        // Brow definition: fine detail in the brow, never a change of its shape.
+        if settings.brow_definition > 0.0 {
+            let brow = Capsule {
+                a: add(add(eye, g.v, -0.33 * d), g.u, -0.2 * d),
+                b: add(add(eye, g.v, -0.36 * d), g.u, 0.2 * d),
+                r: 0.07 * d,
+            };
+            let mut edit = masked(
+                base_edit(
+                    format!("{prefix}{face}-eye-brow-{name}"),
+                    Tool::Frequency,
+                    0.85,
+                    px,
+                    [eye[0], eye[1] - 0.35 * d, 0.3 * d, 0.15 * d],
+                ),
+                px,
+                &[brow],
+            );
+            edit.tone = 0.0;
+            edit.texture = 1.0 + settings.brow_definition * 0.7;
+            edit.feather = 0.8;
+            edit.radius = (0.012 * d / short).clamp(0.0005, 0.05);
+            out.eyes.push(edit);
+        }
         // Flash red-eye: the pupil itself is strongly and dominantly red.
         let mut red_px = 0_usize;
         let mut pupil = 0_usize;
         Capsule::disk(centre, 0.06 * d).each(px, |x, y| {
             pupil += 1;
             let p = px.encoded(x, y);
-            if p[0] > 0.3 && p[0] > p[1].max(p[2]) * 1.8 {
+            // Flash red-eye is a red with green and blue about equal; a brown iris has far
+            // less blue than green and must never be read as red-eye.
+            if p[0] > 0.3 && p[0] > p[1].max(p[2]) * 1.8 && p[2] >= p[1] * 0.6 {
                 red_px += 1;
             }
         });
-        if pupil > 0 && red_px as f32 / pupil as f32 > 0.3 {
+        if settings.red_eye && pupil > 0 && red_px as f32 / pupil as f32 > 0.3 {
             out.eyes.push(masked(
                 base_edit(
                     format!("{prefix}{face}-eye-{name}-redeye"),
@@ -1299,14 +1494,15 @@ fn eyes(
             });
             (n >= 6.0).then(|| sum / n)
         };
-        if let (Some(u_l), Some(c_l)) = (mean_luma(under), mean_luma(cheek)) {
+        let circles = gain(settings.dark_circles);
+        if let (Some(u_l), Some(c_l), true) = (mean_luma(under), mean_luma(cheek), circles > 0.0) {
             let drop = 1.0 - u_l / c_l.max(1e-4);
-            if drop > 0.08 {
+            if drop > 0.08 - 0.03 * (circles - 1.0) {
                 let mut edit = masked(
                     base_edit(
                         format!("{prefix}{face}-undereye-{name}"),
                         Tool::UnderEye,
-                        ((drop - 0.05) * 2.5).clamp(0.15, 0.55),
+                        ((drop - 0.05) * 2.5).clamp(0.15, 0.55) * circles,
                         px,
                         [eye[0], eye[1], 0.3 * d, 0.3 * d],
                     ),
@@ -1318,6 +1514,28 @@ fn eyes(
                 out.eyes.push(edit);
                 lifted += 1;
             }
+        }
+        // Eye bags: the puffy band below the shadow, evened rather than removed.
+        if settings.eye_bags > 0.0 {
+            let bag = Capsule {
+                a: add(add(eye, g.v, 0.36 * d), g.u, -0.12 * d),
+                b: add(add(eye, g.v, 0.36 * d), g.u, 0.12 * d),
+                r: 0.07 * d,
+            };
+            let mut edit = masked(
+                base_edit(
+                    format!("{prefix}{face}-undereye-bag-{name}"),
+                    Tool::MicroDodgeBurn,
+                    settings.eye_bags * 0.5,
+                    px,
+                    [eye[0], eye[1] + 0.36 * d, 0.25 * d, 0.15 * d],
+                ),
+                px,
+                &[bag],
+            );
+            edit.feather = 0.9;
+            edit.radius = (0.035 * d / short).clamp(0.0005, 0.05);
+            out.eyes.push(edit);
         }
     }
     let mut parts = Vec::new();
@@ -1366,6 +1584,7 @@ fn plural(n: usize) -> &'static str {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn mouth(
     g: &Geometry,
     skin: &SkinReference,
@@ -1373,12 +1592,69 @@ fn mouth(
     face: usize,
     prefix: &str,
     exposure: f32,
+    settings: &Settings,
     out: &mut FeatureEdits,
 ) {
     if g.mouth_width < 20.0 {
         return;
     }
     let mw = g.mouth_width;
+    // Lips: colour and definition, never on the teeth (which are brighter than the skin).
+    let lips = Capsule {
+        a: g.mouth[0],
+        b: g.mouth[1],
+        r: 0.2 * mw,
+    };
+    let not_teeth = Selection {
+        inverted: false,
+        gradient: None,
+        luminance: Some(LuminanceRange {
+            low: -16.0,
+            high: (skin.stops(exposure) + 0.15).clamp(-16.0, 16.0),
+            softness: 0.5,
+        }),
+    };
+    if settings.lip_colour > 0.0 {
+        let mut edit = masked(
+            base_edit(
+                format!("{prefix}{face}-lips-colour"),
+                Tool::Makeup,
+                settings.lip_colour * 0.5,
+                px,
+                [g.mouth_centre[0], g.mouth_centre[1], 0.6 * mw, 0.4 * mw],
+            ),
+            px,
+            &[lips],
+        );
+        edit.warmth = 0.25;
+        edit.tint = 0.45;
+        edit.feather = 0.8;
+        edit.selection = Some(not_teeth.clone());
+        out.finishing.push(edit);
+    }
+    if settings.lip_definition > 0.0 {
+        let mut edit = masked(
+            base_edit(
+                format!("{prefix}{face}-lips-detail"),
+                Tool::Frequency,
+                0.8,
+                px,
+                [g.mouth_centre[0], g.mouth_centre[1], 0.6 * mw, 0.4 * mw],
+            ),
+            px,
+            &[lips],
+        );
+        edit.tone = 0.0;
+        edit.texture = 1.0 + settings.lip_definition * 0.6;
+        edit.feather = 0.8;
+        edit.radius = (0.02 * mw / px.width.min(px.height) as f32).clamp(0.0005, 0.05);
+        edit.selection = Some(not_teeth);
+        out.finishing.push(edit);
+    }
+    let whitening = gain(settings.teeth_whitening);
+    if whitening <= 0.0 {
+        return;
+    }
     let teeth_area = Capsule {
         a: add(g.mouth_centre, g.u, -0.28 * mw),
         b: add(g.mouth_centre, g.u, 0.28 * mw),
@@ -1407,7 +1683,7 @@ fn mouth(
         .map(|p| ((p[0] + p[1]) * 0.5 - p[2]) / p[0].max(p[1]).max(p[2]).max(1e-4))
         .sum::<f32>()
         / teeth.len() as f32;
-    if yellow <= 0.18 {
+    if yellow <= 0.18 - 0.05 * (whitening - 1.0) {
         out.report
             .findings
             .push("Teeth: visible and already neutral, so they were left alone.".into());
@@ -1417,7 +1693,7 @@ fn mouth(
         base_edit(
             format!("{prefix}{face}-teeth"),
             Tool::Teeth,
-            ((yellow - 0.08) * 2.0).clamp(0.15, 0.45),
+            ((yellow - 0.08) * 2.0).clamp(0.15, 0.45) * whitening,
             px,
             [g.mouth_centre[0], g.mouth_centre[1], 0.5 * mw, 0.5 * mw],
         ),
@@ -1439,6 +1715,7 @@ fn shine(
     px: &Pixels<'_>,
     face: usize,
     prefix: &str,
+    settings: &Settings,
     out: &mut FeatureEdits,
 ) {
     let d = g.d;
@@ -1475,7 +1752,7 @@ fn shine(
         base_edit(
             format!("{prefix}{face}-shine"),
             Tool::Mattify,
-            (fraction * 5.0).clamp(0.15, 0.4),
+            (fraction * 5.0).clamp(0.15, 0.4) * gain(settings.shine),
             px,
             [g.nose[0], g.nose[1], (r - l) * 0.5, (b - t) * 0.5],
         ),
@@ -1488,6 +1765,121 @@ fn shine(
         "Shine: softened specular highlights covering {:.1}% of the skin.",
         fraction * 100.0
     ));
+}
+
+/// Portrait volumes and make-up: soft contour, highlight and blush on landmark zones, limited
+/// to the person's segmented face skin when a matte is available. Each is off unless chosen.
+fn sculpt(
+    g: &Geometry,
+    px: &Pixels<'_>,
+    face: usize,
+    prefix: &str,
+    settings: &Settings,
+    face_matte: Option<&str>,
+    out: &mut FeatureEdits,
+) {
+    if g.d < 40.0
+        || [settings.contour, settings.highlight, settings.blush]
+            .iter()
+            .all(|v| *v <= 0.0)
+    {
+        return;
+    }
+    // Without a segmented face, a soft shadow along the jaw would also darken the background.
+    if face_matte.is_none() {
+        out.report.findings.push(
+            "Portrait volumes need AI skin detection, which was not available for this face; contour, highlight and blush were skipped."
+                .into(),
+        );
+        return;
+    }
+    let d = g.d;
+    let [l, t, r, b] = g.bounds;
+    let region = [(l + r) * 0.5, (t + b) * 0.5, (r - l) * 0.6, (b - t) * 0.6];
+    let mut push =
+        |name: &str, tool: Tool, amount: f32, zones: Vec<Capsule>, warmth: f32, tint: f32| {
+            if amount <= 0.0 {
+                return;
+            }
+            let mut edit = masked(
+                base_edit(format!("{prefix}{face}-{name}"), tool, amount, px, region),
+                px,
+                &zones,
+            );
+            edit.feather = 1.0;
+            edit.warmth = warmth;
+            edit.tint = tint;
+            edit.matte = face_matte.map(str::to_owned);
+            out.finishing.push(edit);
+        };
+    let sides = [(-1.0_f32, 0_usize), (1.0, 1)];
+    let mut contour = Vec::new();
+    let mut highlight = vec![
+        Capsule {
+            a: add(g.mid, g.v, 0.12 * d),
+            b: add(g.nose, g.v, -0.12 * d),
+            r: 0.06 * d,
+        },
+        Capsule::disk(add(g.mid, g.v, -0.62 * d), 0.17 * d),
+        Capsule::disk(add(g.mouth_centre, g.v, 0.45 * d), 0.1 * d),
+    ];
+    let mut blush = Vec::new();
+    for (side, k) in sides {
+        let eye = g.eyes[k];
+        let corner = g.mouth[k];
+        contour.push(Capsule {
+            a: add(add(g.mid, g.u, side * 0.78 * d), g.v, 0.72 * d),
+            b: add(add(corner, g.u, side * 0.28 * d), g.v, -0.05 * d),
+            r: 0.11 * d,
+        });
+        contour.push(Capsule {
+            a: add(add(corner, g.u, side * 0.55 * d), g.v, 0.25 * d),
+            b: add(add(g.mouth_centre, g.u, side * 0.35 * d), g.v, 0.72 * d),
+            r: 0.09 * d,
+        });
+        highlight.push(Capsule::disk(
+            add(add(eye, g.v, 0.42 * d), g.u, side * 0.16 * d),
+            0.12 * d,
+        ));
+        blush.push(Capsule::disk(
+            add(add(eye, g.v, 0.72 * d), g.u, side * 0.1 * d),
+            0.19 * d,
+        ));
+    }
+    push(
+        "sculpt-contour",
+        Tool::Burn,
+        settings.contour * 0.3,
+        contour,
+        0.0,
+        0.0,
+    );
+    push(
+        "sculpt-highlight",
+        Tool::Dodge,
+        settings.highlight * 0.25,
+        highlight,
+        0.0,
+        0.0,
+    );
+    push(
+        "makeup-blush",
+        Tool::Makeup,
+        settings.blush * 0.4,
+        blush,
+        0.5,
+        0.55,
+    );
+    let made = [settings.contour, settings.highlight, settings.blush]
+        .iter()
+        .filter(|v| **v > 0.0)
+        .count();
+    if made > 0 {
+        out.report.findings.push(format!(
+            "Portrait volumes: added {made} soft sculpting or blush layer{} you asked for, inside the face skin only.",
+            plural(made)
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -1549,7 +1941,7 @@ mod tests {
                 mole,
             );
             let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
-            let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
+            let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default(), None);
             assert_eq!(plan.report.spots_healed, 1, "{skin:?}: {:?}", plan.report);
             assert!(plan.report.marks_kept >= 1, "{skin:?}: {:?}", plan.report);
             let spot_edit = &plan.blemishes[0];
@@ -1568,12 +1960,12 @@ mod tests {
     fn a_clean_face_gets_no_blemish_or_teeth_edits_and_is_deterministic() {
         let rgb = canvas(300, [180, 130, 105]);
         let px = Pixels::new(&rgb, 300, 300).unwrap();
-        let a = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
+        let a = plan(&face(), 0, &px, 0.0, "p-", &Options::default(), None);
         assert!(a.blemishes.is_empty());
         assert!(a.finishing.is_empty());
         // A uniform canvas has no open eye (no sclera brighter than skin).
         assert!(a.eyes.is_empty(), "{:?}", a.report);
-        let b = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
+        let b = plan(&face(), 0, &px, 0.0, "p-", &Options::default(), None);
         assert_eq!(a.report, b.report);
     }
 
@@ -1593,7 +1985,7 @@ mod tests {
             paint(&mut rgb, size, c, 0.035 * d, [40, 30, 25]);
         }
         let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
-        let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
+        let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default(), None);
         let tools: Vec<_> = plan.eyes.iter().map(|e| (e.id.clone(), e.tool)).collect();
         assert_eq!(
             tools.iter().filter(|(_, t)| *t == Tool::EyeDetail).count(),
@@ -1615,7 +2007,7 @@ mod tests {
                 paint(&mut rgb, size, [200.0 + dx as f32 * 3.0, 280.0], 4.5, teeth);
             }
             let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
-            let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
+            let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default(), None);
             let whitened = plan.finishing.iter().any(|e| e.tool == Tool::Teeth);
             assert_eq!(whitened, expect, "{:?}", plan.report);
         }
@@ -1659,7 +2051,7 @@ mod tests {
             [185, 110, 95],
         );
         let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
-        let all = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
+        let all = plan(&face(), 0, &px, 0.0, "p-", &Options::default(), None);
         let ids: Vec<_> = all.refine.iter().map(|e| (e.id.clone(), e.tool)).collect();
         assert!(
             ids.iter()
@@ -1688,6 +2080,7 @@ mod tests {
                 refine: false,
                 ..Options::default()
             },
+            None,
         );
         assert!(off.refine.is_empty());
         let gentle = plan(
@@ -1700,6 +2093,7 @@ mod tests {
                 intensity: 0.5,
                 ..Options::default()
             },
+            None,
         );
         for (a, b) in all.refine.iter().zip(&gentle.refine) {
             assert!(b.amount < a.amount, "{} {} {}", a.id, a.amount, b.amount);
@@ -1710,7 +2104,7 @@ mod tests {
     fn tiny_faces_are_skipped_with_a_reason() {
         let rgb = canvas(60, [180, 130, 105]);
         let px = Pixels::new(&rgb, 60, 60).unwrap();
-        let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default());
+        let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default(), None);
         assert!(plan.blemishes.is_empty() && plan.eyes.is_empty() && plan.finishing.is_empty());
         assert!(!plan.report.findings.is_empty());
     }
