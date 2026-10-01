@@ -243,7 +243,7 @@ impl Geometry {
             out.push(Capsule {
                 a: add(self.nose, self.u, side * 0.28 * d),
                 b: add(corner, self.u, side * 0.08 * d),
-                r: 0.09 * d,
+                r: 0.05 * d,
             });
         }
         out

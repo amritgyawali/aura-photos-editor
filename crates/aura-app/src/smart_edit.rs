@@ -862,7 +862,14 @@ fn run_with(
     let faces = if disabled {
         Vec::new()
     } else {
-        aura_vision::portrait::detect(rgb, thumb.width, thumb.height)?
+        let found = aura_vision::portrait::detect(rgb, thumb.width, thumb.height)?;
+        // Group photos and full-length portraits: look again, tile by tile, on the proxy.
+        match detail {
+            Some((data, w, h)) => {
+                aura_vision::portrait::detect_small_faces(data, w, h, &found).unwrap_or(found)
+            }
+            None => found,
+        }
     };
     let mut exposure_note = None;
     if global {
@@ -883,8 +890,14 @@ fn run_with(
         exposure,
         Some(faces.clone()),
         &options,
-        chosen.is_some(),
+        // Every caller is a person pressing a button; automatic operations are replaced and
+        // operations they added themselves are always kept.
+        true,
     )?;
+    let retouch_owned = chosen.is_some()
+        || base.provenance.user_edited_fields.iter().any(|path| {
+            path == retouch_tools::KEY || path.starts_with(&format!("{}.", retouch_tools::KEY))
+        });
     let mut report = portrait.report.clone();
     let mut groups = portrait.groups.clone();
 
@@ -1035,23 +1048,33 @@ fn run_with(
         } else {
             step.group.unwrap_or(Group::Scene)
         };
+        // Light and colour always merge as an automatic proposal, so a slider a person moved
+        // is never overwritten. The retouch stack merges as the photographer's own edit when
+        // they asked for it or have already edited it: pressing Auto again on a hand-edited
+        // stack replaces only the automatic operations and keeps theirs.
+        proposal.provenance.source = EditSource::Ai;
+        proposal.provenance.confidence = 0.35;
+        let (mut merged, mut changes) = schema::merge(&current, &proposal, EditSource::Ai)?;
         if !groups.is_empty() {
             let now = retouch_tools::read(&current)?;
             let stack = portrait_auto::staged(&now, &groups, upto);
             retouch_tools::validate(&stack)?;
-            if !stack.is_empty() || proposal.extra.contains_key(retouch_tools::KEY) {
-                retouch_tools::write(&mut proposal, &stack)?;
+            if !stack.is_empty() || merged.extra.contains_key(retouch_tools::KEY) {
+                let mut with_stack = merged.clone();
+                retouch_tools::write(&mut with_stack, &stack)?;
+                let source = if retouch_owned {
+                    EditSource::User
+                } else {
+                    EditSource::Ai
+                };
+                with_stack.provenance.source = source;
+                let (stacked, more) = schema::merge(&merged, &with_stack, source)?;
+                merged = stacked;
+                changes.changed.extend(more.changed);
+                changes.changed.sort_unstable();
+                changes.changed.dedup();
             }
         }
-        // A re-run the photographer asked for with their own settings is their edit.
-        let source = if chosen.is_some() {
-            EditSource::User
-        } else {
-            EditSource::Ai
-        };
-        proposal.provenance.source = source;
-        proposal.provenance.confidence = 0.35;
-        let (merged, changes) = schema::merge(&current, &proposal, source)?;
         schema::Validation::check(&merged)?;
         if changes.changed.is_empty() || !saved_changed(&current, &merged)? {
             continue;

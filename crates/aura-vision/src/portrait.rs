@@ -261,6 +261,101 @@ fn detect_view(
     Ok(kept)
 }
 
+/// Add faces too small for the whole-frame pass by running the detector on overlapping tiles.
+///
+/// The model sees a fixed 320-pixel square, so in a group photo or a full-length portrait a
+/// face can shrink below its 20-pixel minimum. Tiles of a larger rendition (for example the
+/// 2048-pixel proxy) give each face several times more pixels. Tiles are only run when the
+/// frame does not already hold a large face, which keeps close-up portraits as fast as before.
+/// `known` faces are kept; a tile face that overlaps one of them is dropped.
+/// # Errors
+/// Invalid pixels or a failed model run.
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
+pub fn detect_small_faces(
+    rgb: &[u8],
+    width: u32,
+    height: u32,
+    known: &[PortraitFace],
+) -> AuraResult<Vec<PortraitFace>> {
+    let (w, h) = (width as usize, height as usize);
+    if w == 0 || h == 0 || w.checked_mul(h).and_then(|n| n.checked_mul(3)) != Some(rgb.len()) {
+        return Err(invalid("Invalid portrait analysis pixels"));
+    }
+    let mut faces = known.to_vec();
+    let largest = known
+        .iter()
+        .map(|f| (f.bounds[2] - f.bounds[0]) * (f.bounds[3] - f.bounds[1]))
+        .fold(0.0_f32, f32::max);
+    if largest > 0.06 || w.max(h) < 2 * SIDE {
+        return Ok(faces);
+    }
+    let grid = if w.max(h) >= 1600 { 3 } else { 2 };
+    let tile_w = ((w as f32 / grid as f32) * 1.35).ceil().min(w as f32) as usize;
+    let tile_h = ((h as f32 / grid as f32) * 1.35).ceil().min(h as f32) as usize;
+    for gy in 0..grid {
+        for gx in 0..grid {
+            let x0 = if grid == 1 {
+                0
+            } else {
+                (w - tile_w) * gx / (grid - 1)
+            };
+            let y0 = if grid == 1 {
+                0
+            } else {
+                (h - tile_h) * gy / (grid - 1)
+            };
+            let mut tile = Vec::with_capacity(tile_w * tile_h * 3);
+            for y in y0..y0 + tile_h {
+                let start = (y * w + x0) * 3;
+                tile.extend_from_slice(rgb.get(start..start + tile_w * 3).unwrap_or(&[]));
+            }
+            if tile.len() != tile_w * tile_h * 3 {
+                continue;
+            }
+            for mut face in detect_view(&tile, tile_w, tile_h, 0)? {
+                let map = |[x, y]: [f32; 2]| {
+                    [
+                        (x0 as f32 + x * tile_w as f32) / w as f32,
+                        (y0 as f32 + y * tile_h as f32) / h as f32,
+                    ]
+                };
+                let [l, t, r, b] = face.bounds;
+                let [l, t] = map([l, t]);
+                let [r, b] = map([r, b]);
+                face.bounds = [l, t, r, b];
+                face.landmarks = face.landmarks.map(map);
+                // A face cut by the tile edge is found whole by a neighbouring tile.
+                let touches_edge = (face.bounds[0] * w as f32 - x0 as f32) < 2.0 && x0 > 0
+                    || (face.bounds[1] * h as f32 - y0 as f32) < 2.0 && y0 > 0
+                    || ((x0 + tile_w) as f32 - face.bounds[2] * w as f32) < 2.0 && x0 + tile_w < w
+                    || ((y0 + tile_h) as f32 - face.bounds[3] * h as f32) < 2.0 && y0 + tile_h < h;
+                if touches_edge {
+                    continue;
+                }
+                if faces
+                    .iter()
+                    .any(|other| overlap(face.bounds, other.bounds) > 0.3)
+                {
+                    continue;
+                }
+                if faces.len() < 16 {
+                    faces.push(face);
+                }
+            }
+        }
+    }
+    faces.sort_by(|a, b| {
+        let [ax, ay, _, _] = a.bounds;
+        let [bx, by, _, _] = b.bounds;
+        ax.total_cmp(&bx).then(ay.total_cmp(&by))
+    });
+    Ok(faces)
+}
+
 fn overlap([ax, ay, ar, ab]: [f32; 4], [bx, by, br, bb]: [f32; 4]) -> f32 {
     let intersection = (ar.min(br) - ax.max(bx)).max(0.0) * (ab.min(bb) - ay.max(by)).max(0.0);
     intersection / ((ar - ax) * (ab - ay) + (br - bx) * (bb - by) - intersection).max(1e-6)
@@ -299,6 +394,23 @@ mod tests {
                 .unwrap()
                 .is_empty());
         }
+    }
+    #[test]
+    fn tiled_search_keeps_known_faces_and_skips_close_ups() {
+        let known = PortraitFace {
+            bounds: [0.1, 0.1, 0.5, 0.6],
+            landmarks: [[0.2, 0.3], [0.4, 0.3], [0.3, 0.4], [0.22, 0.5], [0.38, 0.5]],
+            confidence: 0.9,
+        };
+        // A large known face: no tiles, nothing changes.
+        let blank = vec![120_u8; 700 * 700 * 3];
+        let faces = detect_small_faces(&blank, 700, 700, &[known.clone()]).unwrap();
+        assert_eq!(faces.len(), 1);
+        // No faces at all on a plain frame: tiles run and still find none.
+        assert!(detect_small_faces(&blank, 700, 700, &[])
+            .unwrap()
+            .is_empty());
+        assert!(detect_small_faces(&[0; 3], 2, 2, &[]).is_err());
     }
     #[test]
     fn nms_intersection_is_geometric() {

@@ -270,10 +270,20 @@ pub fn plan_with_faces(
     let mut planned: [Vec<Edit>; 5] = Default::default();
     let mut bodies = 0_usize;
     for (index, face) in report.faces.iter().enumerate() {
-        let face_plan = plan_face(face, index, rgb, width, height);
+        // A face found only on the larger rendition is too small in the thumbnail to sample;
+        // plan it on the larger pixels instead.
+        let eye_px = {
+            let [[ax, ay], [bx, by], ..] = face.landmarks;
+            ((bx - ax) * width as f32).hypot((by - ay) * height as f32)
+        };
+        let (prgb, pw, ph) = match detail {
+            Some(d) if eye_px < 24.0 => d,
+            _ => (rgb, width, height),
+        };
+        let face_plan = plan_face(face, index, prgb, pw, ph);
         let mut body = if options.scope.body() {
             match &face_plan.sample {
-                Some(sample) => plan_body(face, index, rgb, width, height, sample),
+                Some(sample) => plan_body(face, index, prgb, pw, ph, sample),
                 None => FacePlan::skip(
                     "Body skin was not retouched: no reliable face skin sample to compare it with.",
                 ),
@@ -293,7 +303,7 @@ pub fn plan_with_faces(
             }
         };
         for edit in plan.edits.iter_mut().chain(&mut body.edits) {
-            edit.amount = (edit.amount * options.intensity).clamp(0.05, 0.5);
+            edit.amount = (edit.amount * options.intensity).clamp(0.05, 0.95);
         }
         let mut features = portrait_features::FeatureEdits::default();
         if !plan.edits.is_empty() {
@@ -451,9 +461,9 @@ fn representative_sample(samples: &[Sample]) -> Option<(Sample, [f32; 3])> {
     Some((
         sample,
         [
-            (0.10 + texture / luminance.max(0.08) * 0.18).clamp(0.10, 0.28) * signal,
-            (0.08 + color_spread * 1.2).clamp(0.08, 0.20) * signal,
-            (0.08 + light_spread / luminance.max(0.08) * 0.4).clamp(0.08, 0.22) * signal,
+            (0.5 + texture / luminance.max(0.08) * 0.4).clamp(0.5, 0.8) * signal,
+            (0.25 + color_spread * 1.5).clamp(0.25, 0.5) * signal,
+            (0.2 + light_spread / luminance.max(0.08) * 0.5).clamp(0.2, 0.4) * signal,
         ],
     ))
 }
@@ -530,10 +540,18 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
     let Some((sample, [texture, tone, light])) = representative_sample(&candidates) else {
         return FacePlan::skip("No representative skin patch was available inside the face; patches may be clipped, too dark or highly textured.");
     };
-    let mask = skin_mask(
-        centers,
-        [eye_a, eye_b, nose, mouth_a, mouth_b],
-        distance,
+    let _ = centers;
+    let mask = face_skin_mask(
+        FaceFrame {
+            eyes: [eye_a, eye_b],
+            nose,
+            mouth: [mouth_a, mouth_b],
+            mid,
+            mouth_centre: mouth,
+            u,
+            v,
+            d: distance,
+        },
         [w, h],
     );
     let region = [
@@ -548,25 +566,38 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
         (Tool::PortraitDodgeBurn, light, "light"),
     ]
     .into_iter()
-    .map(|(tool, amount, name)| Edit {
-        id: format!("{PREFIX}{index}-{name}"),
-        tool,
-        enabled: true,
-        region,
-        source: Some([sample.point[0] / w, sample.point[1] / h]),
-        amount,
-        feather: 0.7,
-        radius: (distance * 0.045 / short).clamp(0.001, 0.012),
-        texture: 1.0,
-        tone: 0.5,
-        warmth: 0.0,
-        tint: 0.0,
-        mask: Some(mask.clone()),
-        skin: Some(SkinSettings {
-            tolerance: 0.07,
-            edge_protection: 0.9,
-        }),
-        selection: None,
+    .map(|(tool, amount, name)| {
+        // Smoothing works on the band between pores and facial form: a small radius keeps
+        // the form, 0.9 replaces most uneven mid-scale texture, and 70 % of the finest
+        // detail (pores) is kept so skin never turns plastic. Colour evening and local light
+        // look at broader blotches, so they keep the wider radius.
+        let smooth = tool == Tool::SkinSmooth;
+        Edit {
+            id: format!("{PREFIX}{index}-{name}"),
+            tool,
+            enabled: true,
+            region,
+            source: Some([sample.point[0] / w, sample.point[1] / h]),
+            amount,
+            feather: 0.6,
+            radius: if smooth {
+                (distance * 0.015 / short).clamp(0.0005, 0.012)
+            } else {
+                (distance * 0.045 / short).clamp(0.001, 0.012)
+            },
+            texture: if smooth { 0.7 } else { 1.0 },
+            tone: if smooth { 0.9 } else { 0.5 },
+            warmth: 0.0,
+            tint: 0.0,
+            mask: Some(mask.clone()),
+            // JPEG chroma varies across one cheek by more than 0.07; 0.13 still rejects lips,
+            // brows, hair and background, and the mask already erases eyes and mouth.
+            skin: Some(SkinSettings {
+                tolerance: 0.13,
+                edge_protection: 0.9,
+            }),
+            selection: None,
+        }
     })
     .collect();
     FacePlan {
@@ -694,14 +725,18 @@ fn plan_body(
         source: Some([sample.point[0] / w, sample.point[1] / h]),
         amount,
         feather: 0.8,
-        radius: (fw * 0.03 / short).clamp(0.001, 0.012),
-        texture: 1.0,
-        tone: 0.5,
+        radius: if tool == Tool::SkinSmooth {
+            (fw * 0.012 / short).clamp(0.0005, 0.012)
+        } else {
+            (fw * 0.03 / short).clamp(0.001, 0.012)
+        },
+        texture: if tool == Tool::SkinSmooth { 0.75 } else { 1.0 },
+        tone: if tool == Tool::SkinSmooth { 0.9 } else { 0.5 },
         warmth: 0.0,
         tint: 0.0,
         mask: Some(mask.clone()),
         skin: Some(SkinSettings {
-            tolerance: 0.06,
+            tolerance: 0.12,
             edge_protection: 0.9,
         }),
         selection: None,
@@ -722,31 +757,72 @@ fn plan_body(
     }
 }
 
-fn skin_mask(
-    centers: Vec<[f32; 2]>,
-    landmarks: [[f32; 2]; 5],
-    distance: f32,
-    [width, height]: [f32; 2],
-) -> BrushMask {
+/// The face in planning-pixel space: eye axis `u`, downward axis `v`, eye distance `d`.
+#[derive(Clone, Copy)]
+struct FaceFrame {
+    eyes: [[f32; 2]; 2],
+    nose: [f32; 2],
+    mouth: [[f32; 2]; 2],
+    mid: [f32; 2],
+    mouth_centre: [f32; 2],
+    u: [f32; 2],
+    v: [f32; 2],
+    d: f32,
+}
+
+/// Skin of the whole face - forehead, cheeks, nose, jaw and chin - as editable brush strokes,
+/// with eyes, brows, lips and nostrils erased. Hair, beard and background are left to the
+/// sampled-skin selection, which only changes pixels close to this person's own skin.
+#[allow(clippy::many_single_char_names)]
+fn face_skin_mask(f: FaceFrame, [width, height]: [f32; 2]) -> BrushMask {
     let short = width.min(height);
-    let mut strokes: Vec<_> = centers
-        .into_iter()
-        .map(|[x, y]| BrushStroke {
-            erase: false,
-            radius: (distance * 0.29 / short).clamp(0.0005, 0.25),
+    let at = |p: [f32; 2], du: f32, dv: f32| {
+        [
+            p[0] + f.u[0] * du * f.d + f.v[0] * dv * f.d,
+            p[1] + f.u[1] * du * f.d + f.v[1] * dv * f.d,
+        ]
+    };
+    let stroke = |a: [f32; 2], b: [f32; 2], r: f32, erase: bool| {
+        let point = |[x, y]: [f32; 2]| {
+            [
+                (x / width).clamp(0.0, 1.0),
+                (y / height).clamp(0.0, 1.0),
+                1.0,
+            ]
+        };
+        let mut points = vec![point(a)];
+        if (a[0] - b[0]).hypot(a[1] - b[1]) > 0.5 {
+            points.push(point(b));
+        }
+        BrushStroke {
+            erase,
+            radius: (r * f.d / short).clamp(0.0005, 0.25),
             opacity: 1.0,
-            points: vec![[x / width, y / height, 1.0]],
-        })
-        .collect();
-    // Explicit exclusions remain editable and protect landmarks if masks overlap.
-    for [x, y] in landmarks {
-        strokes.push(BrushStroke {
-            erase: true,
-            radius: (distance * 0.20 / short).clamp(0.0005, 0.25),
-            opacity: 1.0,
-            points: vec![[x / width, y / height, 1.0]],
-        });
-    }
+            points,
+        }
+    };
+    let [eye_a, eye_b] = f.eyes;
+    let strokes = vec![
+        // Forehead, cheeks at eye height, lower cheeks and jaw, chin, nose bridge.
+        stroke(at(f.mid, -0.5, -0.55), at(f.mid, 0.5, -0.55), 0.22, false),
+        stroke(at(eye_a, -0.2, 0.45), at(eye_b, 0.2, 0.45), 0.26, false),
+        stroke(at(f.mid, -0.5, 0.95), at(f.mid, 0.5, 0.95), 0.22, false),
+        stroke(
+            at(f.mouth_centre, 0.0, 0.35),
+            at(f.mouth_centre, 0.0, 0.35),
+            0.2,
+            false,
+        ),
+        stroke(at(f.mid, 0.0, 0.05), at(f.nose, 0.0, -0.05), 0.1, false),
+        // Eyes with lashes, brows, lips and nostrils stay exactly as they are.
+        stroke(at(eye_a, -0.15, 0.0), at(eye_a, 0.15, 0.0), 0.11, true),
+        stroke(at(eye_b, -0.15, 0.0), at(eye_b, 0.15, 0.0), 0.11, true),
+        stroke(at(eye_a, -0.18, -0.3), at(eye_a, 0.18, -0.3), 0.08, true),
+        stroke(at(eye_b, -0.18, -0.3), at(eye_b, 0.18, -0.3), 0.08, true),
+        stroke(f.mouth[0], f.mouth[1], 0.14, true),
+        stroke(at(f.nose, -0.09, 0.04), at(f.nose, -0.09, 0.04), 0.05, true),
+        stroke(at(f.nose, 0.09, 0.04), at(f.nose, 0.09, 0.04), 0.05, true),
+    ];
     BrushMask { strokes }
 }
 
@@ -870,7 +946,7 @@ mod tests {
                     .iter()
                     .filter(|s| s.erase)
                     .count(),
-                5
+                7
             );
             assert_eq!(edits, plan_face(&face, 0, &rgb, 100, 100).edits);
         }
