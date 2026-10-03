@@ -25,6 +25,12 @@
     clippy::cast_sign_loss,
     clippy::too_many_lines
 )]
+// Pixel statistics use the conventional short names (r, g, b, n, s, e, w).
+#![allow(
+    clippy::many_single_char_names,
+    clippy::items_after_statements,
+    clippy::enum_variant_names
+)]
 
 use crate::{
     commands::IpcResult,
@@ -236,7 +242,7 @@ fn noise_sigma(px: &Pixels<'_>) -> f32 {
             let (n, s, e, west) = (l(x, y - 1), l(x, y + 1), l(x + 1, y), l(x - 1, y));
             let gradient = (e - west).abs() + (s - n).abs();
             // Edges and texture are signal, not noise.
-            if gradient > 0.04 || c < 0.03 || c > 0.97 {
+            if gradient > 0.04 || !(0.03..=0.97).contains(&c) {
                 continue;
             }
             let laplacian = l(x - 1, y - 1) - 2.0 * n + l(x + 1, y - 1) - 2.0 * west + 4.0 * c
@@ -311,8 +317,8 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
             {
                 continue;
             }
-            for c in 0..3 {
-                edges[c] += f64::from((p[c] - right[c]).abs() + (p[c] - down[c]).abs());
+            for (edge, ((a, r), d)) in edges.iter_mut().zip(p.iter().zip(&right).zip(&down)) {
+                *edge += f64::from((a - r).abs() + (a - d).abs());
             }
             let (r, g, b) = (p[0], p[1], p[2]);
             if r < 0.01 || g < 0.01 || b < 0.01 {
@@ -848,7 +854,7 @@ fn run_with(
         .ok();
     let detail = proxy
         .as_ref()
-        .and_then(|p| p.as_srgb8().map(|data| (data, p.width, p.height)));
+        .and_then(|p| p.as_srgb8().map(|pixels| (pixels, p.width, p.height)));
     let mut tone = crate::photo_enhance::correction(rgb)?;
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
     // A later Auto enhance repeats whatever finishing the photographer last chose.
@@ -866,8 +872,8 @@ fn run_with(
         let found = aura_vision::portrait::detect(rgb, thumb.width, thumb.height)?;
         // Group photos and full-length portraits: look again, tile by tile, on the proxy.
         match detail {
-            Some((data, w, h)) => {
-                aura_vision::portrait::detect_small_faces(data, w, h, &found).unwrap_or(found)
+            Some((pixels, w, h)) => {
+                aura_vision::portrait::detect_small_faces(pixels, w, h, &found).unwrap_or(found)
             }
             None => found,
         }
@@ -1135,7 +1141,7 @@ mod tests {
         assert_eq!(plan.kind, SceneKind::Landscape);
         assert!(plan.vibrance > 0 && plan.clarity > 0);
         let sky = plan.sky.expect("a bright blue sky");
-        retouch_tools::validate(&[sky.clone()]).unwrap();
+        retouch_tools::validate(std::slice::from_ref(&sky)).unwrap();
         let g = sky.selection.unwrap().gradient.unwrap();
         assert!(g.start[1] > 0.3 && g.start[1] < 0.5, "{g:?}");
     }
@@ -1160,7 +1166,7 @@ mod tests {
         let mut noisy = Vec::with_capacity(w * h * 3);
         for _ in 0..w * h {
             state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-            let n = ((state >> 24) as i32 - 128) / 20;
+            let n = ((state >> 24).cast_signed() - 128) / 20;
             let v = (128 + n).clamp(0, 255) as u8;
             noisy.extend([v, v, v]);
         }

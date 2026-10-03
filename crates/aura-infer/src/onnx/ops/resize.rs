@@ -68,7 +68,7 @@ pub(super) fn resize(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<V
         .and_then(|v| v.checked_mul(ow))
         .filter(|v| *v <= 16_777_216)
         .ok_or_else(|| invalid_graph("Resize output exceeds tensor limit"))?;
-    let mut data = Vec::with_capacity(count);
+    let mut samples = Vec::with_capacity(count);
     if linear {
         let ys: Vec<(usize, usize, f32)> = (0..oh).map(|y| linear_tap(y, *sy, h)).collect();
         let xs: Vec<(usize, usize, f32)> = (0..ow).map(|x| linear_tap(x, *sx, w)).collect();
@@ -84,7 +84,7 @@ pub(super) fn resize(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<V
                 for &(x0, x1, tx) in &xs {
                     let top = at(plane, y0, x0)? * (1.0 - tx) + at(plane, y0, x1)? * tx;
                     let bottom = at(plane, y1, x0)? * (1.0 - tx) + at(plane, y1, x1)? * tx;
-                    data.push(top * (1.0 - ty) + bottom * ty);
+                    samples.push(top * (1.0 - ty) + bottom * ty);
                 }
             }
         }
@@ -94,7 +94,7 @@ pub(super) fn resize(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<V
                 let iy = source_index(y, *sy, h);
                 for x in 0..ow {
                     let ix = source_index(x, *sx, w);
-                    data.push(
+                    samples.push(
                         *input
                             .data
                             .get((plane * h + iy) * w + ix)
@@ -106,7 +106,7 @@ pub(super) fn resize(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<V
     }
     Ok(vec![Value::Float(Tensor {
         shape: vec![n, c, oh, ow],
-        data,
+        data: samples,
     })])
 }
 

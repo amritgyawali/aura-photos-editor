@@ -511,6 +511,7 @@ impl Recipe {
     ///
     /// Never fails and never refuses: this is the *value* half of the two kinds of wrong.
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn clamped(&self) -> Self {
         let mut out = self.clone();
         let g = &mut out.global;
@@ -645,7 +646,7 @@ mod tests {
             .contains(&"global.exposure".into()));
         proposal.global.exposure = 1.0;
         let (protected, _) = merge(&merged, &proposal, EditSource::Ai).unwrap();
-        assert_eq!(protected.global.exposure, 0.5);
+        assert!((protected.global.exposure - 0.5).abs() < f32::EPSILON);
     }
 
     #[test]

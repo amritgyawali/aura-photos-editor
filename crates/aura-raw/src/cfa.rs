@@ -126,20 +126,20 @@ fn crop_to_picture(plane: Mosaic, mosaic: &MosaicRef) -> Mosaic {
         return plane;
     }
     let stride = plane.width as usize;
-    let mut data = Vec::with_capacity(w as usize * h as usize);
+    let mut pixels = Vec::with_capacity(w as usize * h as usize);
     for row in y as usize..(y + h) as usize {
         let start = row * stride + x as usize;
         if let Some(line) = plane.data.get(start..start + w as usize) {
-            data.extend_from_slice(line);
+            pixels.extend_from_slice(line);
         }
     }
-    if data.len() != w as usize * h as usize {
+    if pixels.len() != w as usize * h as usize {
         return plane;
     }
     Mosaic {
         width: w,
         height: h,
-        data,
+        data: pixels,
     }
 }
 
@@ -405,7 +405,11 @@ fn decode_lossless(bytes: &[u8], mosaic: &MosaicRef) -> AuraResult<Mosaic> {
 
 #[cfg(test)]
 // The panic family is how a test asserts; none of this is compiled into the library.
-#[allow(clippy::unwrap_used, clippy::disallowed_methods, clippy::indexing_slicing)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::disallowed_methods,
+    clippy::indexing_slicing
+)]
 mod tile_tests {
     use super::*;
 
@@ -459,7 +463,11 @@ mod tile_tests {
 
 #[cfg(test)]
 // The panic family is how a test asserts; none of this is compiled into the library.
-#[allow(clippy::unwrap_used, clippy::disallowed_methods, clippy::indexing_slicing)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::disallowed_methods,
+    clippy::indexing_slicing
+)]
 mod crop_tests {
     use super::*;
 
@@ -493,7 +501,11 @@ mod crop_tests {
 
 #[cfg(test)]
 // The panic family is how a test asserts; none of this is compiled into the library.
-#[allow(clippy::unwrap_used, clippy::disallowed_methods, clippy::indexing_slicing)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::disallowed_methods,
+    clippy::indexing_slicing
+)]
 mod linearization_tests {
     use super::*;
 

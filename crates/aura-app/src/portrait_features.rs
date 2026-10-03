@@ -44,10 +44,10 @@ pub struct Pixels<'a> {
 impl<'a> Pixels<'a> {
     /// `None` when the buffer does not match the dimensions.
     #[must_use]
-    pub fn new(data: &'a [u8], width: u32, height: u32) -> Option<Self> {
+    pub fn new(bytes: &'a [u8], width: u32, height: u32) -> Option<Self> {
         let (w, h) = (width as usize, height as usize);
-        (w > 2 && h > 2 && w.checked_mul(h)?.checked_mul(3)? == data.len()).then_some(Self {
-            data,
+        (w > 2 && h > 2 && w.checked_mul(h)?.checked_mul(3)? == bytes.len()).then_some(Self {
+            data: bytes,
             width: w,
             height: h,
         })
@@ -255,7 +255,6 @@ impl Geometry {
 /// The same person's skin, measured from their own cheeks and forehead.
 #[derive(Debug, Clone, Copy)]
 struct SkinReference {
-    rgb: [f32; 3],
     luma: f32,
     chroma: [f32; 3],
 }
@@ -285,7 +284,6 @@ impl SkinReference {
         means.sort_by(|a, b| luma(*a).total_cmp(&luma(*b)));
         let rgb = *means.get(means.len() / 2)?;
         Some(Self {
-            rgb,
             luma: luma(rgb),
             chroma: chroma(rgb),
         })
@@ -442,6 +440,7 @@ pub fn plan(
 /// remembered in the recipe's report, so a later Auto enhance repeats the same choice.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Options {
     /// Multiplies every measured strength. `0.5` is subtle, `1.0` natural, `1.5` polished.
     pub intensity: f32,

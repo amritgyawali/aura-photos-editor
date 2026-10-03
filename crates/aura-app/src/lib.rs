@@ -13,21 +13,6 @@
     unreachable_pub,
     rust_2018_idioms
 )]
-// The panic family is banned in library code and is how a test asserts. An inline
-// `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
-// reach a photographer; the lints stay denied everywhere else in the crate. PHASE-14.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
-        clippy::indexing_slicing,
-        clippy::float_cmp,
-        clippy::disallowed_methods,
-        clippy::uninlined_format_args
-    )
-)]
 #![warn(clippy::pedantic)]
 #![allow(
     clippy::module_name_repetitions,
@@ -40,6 +25,22 @@
     // clippy names, but `set_framing`, `plan_geometry` and a dozen others have the same shape and
     // are only silent because their DTOs happen to be moved into a call.
     clippy::needless_pass_by_value
+)]
+// The panic family is banned in library code and is how a test asserts. An inline
+// `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
+// reach a photographer; the lints stay denied everywhere else in the crate. PHASE-14.
+// It follows `warn(clippy::pedantic)`, which would otherwise re-enable `float_cmp` in tests.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+        clippy::disallowed_methods,
+        clippy::uninlined_format_args
+    )
 )]
 
 //! The application layer: one typed command surface, used by the Tauri shell and

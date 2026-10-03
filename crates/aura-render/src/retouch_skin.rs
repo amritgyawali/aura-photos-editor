@@ -176,6 +176,7 @@ fn uses_colour(edit: &Edit) -> bool {
 /// That separates a person from a skin-coloured background, which almost always meets the
 /// skin at an edge, and from skin-coloured areas that do not touch the person at all.
 /// Returns `None` when the selection is not limited to connected skin.
+#[allow(clippy::too_many_lines)]
 pub(crate) fn connected_weight(
     rgb: &[f32],
     w: usize,
@@ -216,7 +217,7 @@ pub(crate) fn connected_weight(
             let mean = sum.map(|v| v / n.max(1.0));
             let k = gy * gw + gx;
             means[k] = mean;
-            let centre = coverage.at((cx0 + cx1) / 2, (cy0 + cy1) / 2, w, h);
+            let centre = coverage.at(usize::midpoint(cx0, cx1), usize::midpoint(cy0, cy1), w, h);
             usable[k] = centre > 0.0 && affinity(mean, sample, settings.tolerance) >= 0.3;
         }
     }

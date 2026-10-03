@@ -99,7 +99,7 @@ pub fn render_streamed(
         whole.notes.push(RenderNote {
             stage: Stage::Geometry.as_str().to_string(),
             reason: SkipReason::NotRequested,
-            detail: Some("geometry or native retouch requires a whole-frame render".to_string()),
+            detail: Some("geometry or native retouch needs the frame rendered whole".to_string()),
         });
         return Ok(whole);
     }

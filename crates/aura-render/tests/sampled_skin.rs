@@ -1,3 +1,6 @@
+// Tests assert by unwrapping; a panic here is a failed test, never a photographer's crash.
+#![allow(clippy::unwrap_used, clippy::disallowed_methods)]
+
 use aura_recipe::retouch_tools::{self, Edit, SkinSettings, Tool};
 use aura_render::retouch_tools::apply;
 

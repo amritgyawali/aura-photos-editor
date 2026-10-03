@@ -1,3 +1,6 @@
+// Tests assert by unwrapping and stamp a real file time; neither reaches a photographer.
+#![allow(clippy::unwrap_used, clippy::disallowed_methods)]
+
 use aura_core::contract::delivery::DeliveryColour;
 use aura_export::{
     read::{Rendered, Samples},

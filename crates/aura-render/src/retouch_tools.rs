@@ -145,6 +145,7 @@ pub fn selection_mask_with_mattes(
         .collect()
 }
 
+#[allow(clippy::too_many_lines)]
 fn apply_one(
     rgb: &mut [f32],
     w: usize,
@@ -216,7 +217,7 @@ fn apply_one(
     if matches!(edit.tool, Tool::Heal | Tool::Clone) && source.is_none() {
         return;
     }
-    let donor_mean = source.map(|p| sample(rgb, w, h, p)).unwrap_or(center);
+    let donor_mean = source.map_or(center, |p| sample(rgb, w, h, p));
     // Segmented operations on skin and hair skip much darker structures inside the matte.
     // Clothes and backdrops keep their own shadows and are not guarded.
     let guard_reference = (edit.matte.is_some()
@@ -309,7 +310,7 @@ fn apply_one(
                     value = old.map(|v| v * 2.0_f32.powf(-0.75));
                 }
                 Tool::UnderEye => {
-                    let lift = (luma(broad) - lum).max(0.0).min(0.12);
+                    let lift = (luma(broad) - lum).clamp(0.0, 0.12);
                     value = old.map(|v| v * (lum + lift) / lum);
                 }
                 Tool::SkinColor | Tool::Makeup => {

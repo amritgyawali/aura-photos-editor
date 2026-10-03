@@ -184,13 +184,13 @@ impl Watermark {
                         from_linear(colour, to_linear(colour, value) * (1.0 - alpha) + overlay)
                     };
                     match &mut output.data {
-                        Samples::Eight(data) => {
-                            if let Some(value) = data.get_mut(offset + channel) {
+                        Samples::Eight(samples) => {
+                            if let Some(value) = samples.get_mut(offset + channel) {
                                 *value = (blend(f32::from(*value) / 255.0) * 255.0).round() as u8;
                             }
                         }
-                        Samples::Sixteen(data) => {
-                            if let Some(value) = data.get_mut(offset + channel) {
+                        Samples::Sixteen(samples) => {
+                            if let Some(value) = samples.get_mut(offset + channel) {
                                 *value =
                                     (blend(f32::from(*value) / 65535.0) * 65535.0).round() as u16;
                             }

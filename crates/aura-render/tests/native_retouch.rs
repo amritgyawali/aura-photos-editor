@@ -1,3 +1,6 @@
+// Tests assert by unwrapping; a panic here is a failed test, never a photographer's crash.
+#![allow(clippy::unwrap_used, clippy::disallowed_methods)]
+
 use aura_core::clock::FixedClock;
 use aura_recipe::retouch_tools::{self, Edit, Tool};
 use aura_recipe::retouch_tools::{BrushMask, BrushStroke};
@@ -429,7 +432,7 @@ fn advanced_masks_protect_excluded_pixels_for_every_tool() {
             });
             retouch_tools::validate(&[op.clone()]).unwrap();
             let mask = aura_render::retouch_tools::selection_mask(&frame.rgb, 96, 80, &op);
-            assert!(mask.iter().any(|v| *v == 0.));
+            assert!(mask.contains(&0.));
             assert!(mask.iter().any(|v| *v > 0.));
             let mut out = frame.rgb.clone();
             aura_render::retouch_tools::apply(&mut out, 96, 80, &[op]);

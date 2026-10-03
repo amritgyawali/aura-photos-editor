@@ -1,4 +1,6 @@
 //! The bundled portrait planner must respect manual work and stable history.
+// Tests assert by unwrapping; a panic here is a failed test, never a photographer's crash.
+#![allow(clippy::unwrap_used, clippy::disallowed_methods)]
 use aura_app::portrait_auto::{self, KEY};
 use aura_recipe::{fixtures, retouch_tools, schema, EditSource};
 

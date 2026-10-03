@@ -113,7 +113,6 @@
 //! two answers.
 
 pub mod api;
-pub mod watermark;
 pub mod errors;
 pub mod fixtures;
 pub mod icc;
@@ -128,6 +127,7 @@ pub mod sets;
 pub mod store;
 pub mod tiff;
 pub mod verify;
+pub mod watermark;
 
 /// Which build wrote a row, and what invalidates every stored export record.
 ///

@@ -31,6 +31,15 @@
 //! a highlight-priority post-crop vignette (ADR-0065) - with a skin ceiling on the grading wheels
 //! that colour faces.
 
+// Colour arithmetic uses the conventional short names (r, g, b, a, s) and float conversions.
+#![allow(
+    clippy::many_single_char_names,
+    clippy::similar_names,
+    clippy::cast_precision_loss,
+    clippy::too_many_lines,
+    clippy::doc_markdown
+)]
+
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
@@ -900,8 +909,8 @@ pub fn apply_edit_profile(
     })
 }
 
-fn data_url(width: u32, height: u32, data: &RenderedData) -> AuraResult<String> {
-    let bytes = match data {
+fn data_url(width: u32, height: u32, rendered: &RenderedData) -> AuraResult<String> {
+    let bytes = match rendered {
         RenderedData::Eight(bytes) => bytes.clone(),
         RenderedData::Sixteen(words) => words
             .iter()

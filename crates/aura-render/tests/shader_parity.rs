@@ -180,10 +180,9 @@ fn each_stage_entry_point_is_in_the_file_its_subject_belongs_to() {
             // ADR-0065. Lightroom's calibration, colour grading and effects panels live together:
             // the two post-crop effects read a crop-relative position no other point-wise stage
             // needs, and the four share the curve-domain helpers.
-            Stage::Calibration
-            | Stage::ColourGrade
-            | Stage::PostCropVignette
-            | Stage::Grain => "creative.wgsl",
+            Stage::Calibration | Stage::ColourGrade | Stage::PostCropVignette | Stage::Grain => {
+                "creative.wgsl"
+            }
             _ => "spatial.wgsl",
         };
         assert_eq!(file, expected, "{} is in the wrong file", stage.as_str());

@@ -23,6 +23,8 @@
 //! AURA_FIVEK_DIR=D:/aura-data/fivek AURA_FIVEK_EXPERT=c \
 //!   cargo test -p aura-app --test profile_fit -- --ignored --nocapture
 //! ```
+// Tests assert by unwrapping; a panic here is a failed test, never a photographer's crash.
+#![allow(clippy::unwrap_used, clippy::disallowed_methods)]
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

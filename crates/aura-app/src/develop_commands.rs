@@ -650,7 +650,7 @@ fn sync_proposal(
                 }
             }
             "detail" => {
-                dst.sharpen = src.sharpen.clone();
+                dst.sharpen = src.sharpen;
                 dst.noise = src.noise.clone();
             }
             "effects" => {
@@ -744,7 +744,7 @@ fn history_cursor(history: &History) -> usize {
     history
         .entries()
         .iter()
-        .position(|entry| std::ptr::eq(&entry.recipe, current))
+        .position(|entry| std::ptr::eq(std::ptr::from_ref(&entry.recipe), current))
         .map_or(0, |index| index + 1)
 }
 

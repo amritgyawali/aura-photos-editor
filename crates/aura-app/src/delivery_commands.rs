@@ -463,7 +463,11 @@ pub use aura_export::watermark::Watermark;
 /// Export with an optional delivery graphic. The source recipe and original stay unchanged.
 /// # Errors
 /// Invalid job/graphic, unavailable pixels, or export I/O failure.
-pub fn export_run_with_watermark(state: &AppState, input: ExportJobInput, watermark: Option<Watermark>) -> IpcResult<ExportStatusDto> {
+pub fn export_run_with_watermark(
+    state: &AppState,
+    input: ExportJobInput,
+    watermark: Option<Watermark>,
+) -> IpcResult<ExportStatusDto> {
     let project = parse_project(&input.project_id)?;
     let job = build_job(&input)?;
     let field = ExportField::new(state, project)?;
