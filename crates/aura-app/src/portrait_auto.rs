@@ -190,6 +190,23 @@ pub fn staged(current: &[Edit], planned: &BTreeMap<Group, Vec<Edit>>, upto: Grou
     out
 }
 
+fn group_operations(edits: impl IntoIterator<Item = Edit>) -> BTreeMap<Group, Vec<Edit>> {
+    let mut groups: BTreeMap<Group, Vec<Edit>> = Group::ALL
+        .into_iter()
+        .filter(|group| *group != Group::Scene)
+        .map(|group| (group, Vec::new()))
+        .collect();
+    for edit in edits {
+        // Saving and reading an automatic operation must agree on its history group.
+        // In particular, body shine is finishing even though the body planner emits it.
+        groups
+            .entry(group_of(&edit.id).unwrap_or(Group::Skin))
+            .or_default()
+            .push(edit);
+    }
+    groups
+}
+
 /// A full portrait plan, not yet written into a recipe.
 #[derive(Debug, Clone)]
 pub struct Plan {
@@ -571,11 +588,7 @@ pub fn plan_with_faces(
             }
         }
     }
-    groups.insert(Group::Skin, skin);
-    groups.insert(Group::Blemishes, spots);
-    groups.insert(Group::Refine, refine);
-    groups.insert(Group::Eyes, eyes);
-    groups.insert(Group::Finishing, finishing);
+    groups = group_operations([skin, spots, refine, eyes, finishing].into_iter().flatten());
     let spots: usize = report.assessments.iter().map(|a| a.spots_healed).sum();
     let kept: usize = report.assessments.iter().map(|a| a.marks_kept).sum();
     report.message = if report.detected_faces == 0 {
@@ -2161,6 +2174,24 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn body_shine_is_not_duplicated_during_a_repeat_pass() {
+        let (rgb, face) = person(None);
+        let mut shine = plan_face(&face, 0, &rgb, 200, 300).edits.remove(0);
+        shine.id = format!("{PREFIX}0-body-shine");
+        shine.tool = Tool::Mattify;
+        let groups = group_operations([shine.clone()]);
+        assert_eq!(groups.get(&Group::Finishing), Some(&vec![shine.clone()]));
+        let mut current = vec![shine.clone()];
+        for _ in 0..2 {
+            for group in Group::ALL {
+                current = staged(&current, &groups, group);
+                retouch_tools::validate(&current).unwrap();
+                assert_eq!(current, vec![shine.clone()]);
+            }
+        }
+    }
+
     #[test]
     fn consensus_rejects_color_outliers_and_adapts_to_each_faces_signal() {
         let calm = Sample {

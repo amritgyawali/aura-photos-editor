@@ -132,6 +132,14 @@ fn retouches_real_photographs() {
             let planning = started.elapsed();
             let mut stack =
                 portrait_auto::staged(&[], &plan.groups, portrait_auto::Group::Finishing);
+            // Exercise every intermediate history step on a repeat pass, not only the
+            // final stack: a misgrouped operation can otherwise be duplicated mid-pass.
+            let mut repeated = stack.clone();
+            for group in portrait_auto::Group::ALL {
+                repeated = portrait_auto::staged(&repeated, &plan.groups, group);
+                retouch_tools::validate(&repeated).unwrap();
+                assert_eq!(repeated, stack, "Repeat pass changed {stem} at {group:?}");
+            }
             // `AURA_RETOUCH_ONLY=texture,tone` keeps only operations whose id contains one of
             // the words, to see what each one does.
             if let Ok(only) = std::env::var("AURA_RETOUCH_ONLY") {

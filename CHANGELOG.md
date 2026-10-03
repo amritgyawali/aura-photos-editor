@@ -12,6 +12,8 @@ All notable changes to AURA. One entry per phase, newest first.
   allow removing it, and clear it when selecting the entire photo.
 - Preserve manually adjusted automatic steps and snapshot their masks across later passes.
   Reject missing/corrupt masks instead of silently applying a skin edit outside its selection.
+- Use consistent history groups for body shine and other automatic corrections, preventing
+  duplicate-operation errors during intermediate steps of repeated retouching.
 - Make real-photo checks reject empty input sets and render in the correct working primaries.
   Keep the desktop shell build independent in nested checkouts.
 
