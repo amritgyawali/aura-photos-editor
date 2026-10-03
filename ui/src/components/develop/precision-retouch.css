@@ -31,3 +31,7 @@
 .retouch-primary { background: var(--accent) !important; color: #19151e !important; font-weight: 600; }
 .retouch-operation-actions button { padding: 8px 12px; }
 .retouch-shortcuts { margin-top: 20px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+/* ADR-0077: presets wrap as whole words rather than splitting "Studio clean" over two lines. */
+.auto-retouch-settings .retouch-presets { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.auto-retouch-settings .retouch-presets .retouch-toggle { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.auto-retouch-settings .retouch-setting-group label { display: block; }

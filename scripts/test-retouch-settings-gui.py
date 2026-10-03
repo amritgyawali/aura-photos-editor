@@ -71,8 +71,16 @@ def launch():
 proc = launch()
 try:
     with sync_playwright() as pw:
-        page = pw.chromium.connect_over_cdp('http://127.0.0.1:9223').contexts[0].pages[0]
+        browser = pw.chromium.connect_over_cdp('http://127.0.0.1:9223')
+        page = None
+        for _ in range(120):
+            pages = [p for c in browser.contexts for p in c.pages]
+            page = next((p for p in pages if 'localhost' in p.url or 'tauri' in p.url), None)
+            if page:
+                break
+            time.sleep(1)
         page.set_default_timeout(240000)
+        page.wait_for_function('() => !!window.__TAURI_INTERNALS__')
         expect.set_options(timeout=240000)
         page.on('pageerror', lambda e: report['pageErrors'].append(str(e)[:300]))
         page.wait_for_load_state()
@@ -94,10 +102,24 @@ try:
             photo = row['id']
             record = {'file': row['fileName'], 'runs': []}
             report['photos'].append(record)
-            os_click(page, page.get_by_role('option', name=row['fileName'], exact=True))
+            option = page.get_by_role('option', name=row['fileName'], exact=True)
+            # The filmstrip is locked while the current photo renders; wait for it.
+            page.wait_for_function("()=>{const f=document.querySelector('fieldset.filmstrip-lock');return !f||!f.disabled}")
+            for _ in range(5):
+                os_click(page, option)
+                time.sleep(1.5)
+                if option.get_attribute('aria-selected') == 'true':
+                    break
             expect(page.get_by_role('button', name='Retouch', exact=True)).to_be_enabled()
-            os_click(page, page.get_by_role('button', name='Retouch', exact=True))
-            expect(page.get_by_alt_text('Retouched photograph', exact=True)).to_be_visible()
+            workspace = page.get_by_alt_text('Retouched photograph', exact=True)
+            for _ in range(4):
+                os_click(page, page.get_by_role('button', name='Retouch', exact=True))
+                try:
+                    expect(workspace).to_be_visible(timeout=30000)
+                    break
+                except AssertionError:
+                    time.sleep(2)
+            expect(workspace).to_be_visible()
             for scope_name, preset in RUNS:
                 os_click(page, page.get_by_role('radio', name=scope_name, exact=True))
                 os_click(page, page.get_by_role('radio', name=preset, exact=True))
