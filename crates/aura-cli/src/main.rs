@@ -16,6 +16,7 @@ use aura_core::{ImportId, ProjectId};
 use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 use aura_ingest::fixtures;
 
+mod ipc_sources;
 mod phase03;
 mod phase04;
 mod phase05;

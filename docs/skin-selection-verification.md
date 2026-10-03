@@ -26,14 +26,24 @@ On 2026-10-04: 80 application unit tests, six detector tests, two recipe-matte t
 renderer-matte tests passed. The full UI suite passed 566 tests; the additional full-photo
 selection regression then passed with all 19 tests in the two affected component suites.
 The production UI build, banned-code check and IPC consistency check (285 commands) passed.
-Clippy remains blocked by five existing `indexing_slicing` errors on the unchanged expression
-at `crates/aura-app/src/smart_edit.rs:315`; no new errors were reported in this change.
+The initial Clippy run found five existing `indexing_slicing` errors on the unchanged
+expression at `crates/aura-app/src/smart_edit.rs:315`.
 
 GitHub Actions run `37148122335` passed the UI type-check, all 567 unit tests, production build and
 dependency-policy job. Its Rust gate stopped at existing formatting differences in
 `delivery_commands.rs`, export `api.rs`/`lib.rs`, `cfa.rs`, recipe `fixtures.rs` and
 `shader_parity.rs`, all unchanged by this follow-up. The dependent cross-platform test jobs
-were skipped; this PR does not claim a green full-workspace CI run.
+were skipped. Concurrent commit `488ee67` subsequently fixed those format/lint issues and
+the inherited whole-frame render-note test; this follow-up was rebased onto that commit.
+The earlier run remains a historical result, not the final combined CI status.
+
+Run `37149417992` then passed format, Clippy, model/contracts, UI, dependency and benchmark
+jobs, plus `cargo test --workspace --all-targets` on Windows, macOS and Linux. Its phase-27
+verification failed because its IPC scanner only read `client.ts`, omitting the working
+retouch wrappers in `nativeRetouch.ts`. The phase-27 through phase-30 scanners now share a
+reader for every non-test TypeScript module in `ui/src/ipc`, matching the standalone IPC check.
+The combined branch passes `cargo fmt --all -- --check` and
+`cargo clippy -p aura-app -p aura-cli --lib --bins --tests -- -D warnings` locally.
 
 ## Real photographs
 
@@ -65,7 +75,8 @@ pixels. Review the generated `*.selection.png` and `*.natural.after.png` beside 
 
 ## Native command workflow
 
-The Windows desktop executable built successfully with:
+The Windows desktop executable built successfully before incorporating the concurrent
+CI cleanup, with:
 
 ```powershell
 cargo build --manifest-path ui/src-tauri/Cargo.toml --features custom-protocol -j 2
@@ -73,8 +84,8 @@ $env:AURA_SKIN_PORTRAIT = 'absolute/path/to/portrait-with-face-and-body-skin.png
 cargo test -p aura-app --test native_skin_workflow -- --ignored --nocapture
 ```
 
-The native integration test passed on portrait 220453 in 14.42 seconds, using a temporary
-catalog, isolated cache and in-memory credentials. It imports the photograph, runs automatic
+The native integration test passed on portrait 220453 in 15.64 seconds after the rebase, using
+a temporary catalog, isolated cache and in-memory credentials. It imports the photograph, runs automatic
 retouch, renders before/after, manually adjusts and disables a skin operation, and repeats
 automatic retouch twice. It checks the exact manual operation and matte, rendered selection
 coverage, absence of the replaced automatic operation, atomic rejection of a missing matte

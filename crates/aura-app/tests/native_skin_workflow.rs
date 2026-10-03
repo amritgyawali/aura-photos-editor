@@ -1,6 +1,7 @@
 //! Real portrait import, selection, rendering and repeat retouch through the native commands.
 //! Set AURA_SKIN_PORTRAIT to a photograph with a visible face and body skin, then run ignored.
 //! The catalog, caches and credentials are isolated from the running desktop application.
+#![allow(clippy::expect_used, clippy::too_many_lines)]
 use aura_app::contract::ipc::{CreateProjectInput, DevelopImageInput, ListImagesInput};
 use aura_app::native_retouch::{self, DraftInput, RetouchInput};
 use aura_app::portrait_features::{Options, Scope};
