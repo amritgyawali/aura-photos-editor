@@ -64,6 +64,12 @@ pub const SUBSET: &[&str] = &[
     "geometry.crop",
     "geometry.rotate",
     "bw",
+    // ADR-0065. Lightroom's remaining creative panels, in its own attribute names.
+    "global.parametric",
+    "global.channel_curves",
+    "global.colour_grade",
+    "global.calibration",
+    "global.effects",
 ];
 
 /// Adobe's capitalised band names, in the same order as [`HSL_BANDS`].
@@ -147,6 +153,8 @@ pub fn write(recipe: &Recipe) -> String {
         );
     }
 
+    write_creative(recipe, &mut out);
+
     let cropped = !recipe.geometry.is_identity();
     attr("HasCrop", if cropped { "True" } else { "False" }, &mut out);
     let crop = recipe.geometry.crop;
@@ -177,10 +185,173 @@ pub fn write(recipe: &Recipe) -> String {
         let _ = writeln!(out, "     <rdf:li>{}, {}</rdf:li>", point[0], point[1]);
     }
     out.push_str("    </rdf:Seq>\n   </crs:ToneCurvePV2012>\n");
+    let channels = &g.channel_curves;
+    if !channels.is_identity() {
+        for (tag, curve) in [
+            ("ToneCurvePV2012Red", &channels.red),
+            ("ToneCurvePV2012Green", &channels.green),
+            ("ToneCurvePV2012Blue", &channels.blue),
+        ] {
+            let _ = writeln!(out, "   <crs:{tag}>\n    <rdf:Seq>");
+            for point in &curve.points {
+                let _ = writeln!(out, "     <rdf:li>{}, {}</rdf:li>", point[0], point[1]);
+            }
+            let _ = writeln!(out, "    </rdf:Seq>\n   </crs:{tag}>");
+        }
+    }
 
     out.push_str("  </rdf:Description>\n </rdf:RDF>\n</x:xmpmeta>\n");
     out.push_str("<?xpacket end=\"w\"?>\n");
     out
+}
+
+/// The attributes of ADR-0065's blocks, each written only when its block is not neutral.
+#[allow(clippy::many_single_char_names)]
+fn write_creative(recipe: &Recipe, out: &mut String) {
+    let g = &recipe.global;
+    let mut attr = |name: &str, value: i16| {
+        let _ = writeln!(out, "    crs:{name}=\"{value}\"");
+    };
+    let p = &g.parametric;
+    if !p.is_neutral() {
+        attr("ParametricShadows", p.shadows);
+        attr("ParametricDarks", p.darks);
+        attr("ParametricLights", p.lights);
+        attr("ParametricHighlights", p.highlights);
+        attr("ParametricShadowSplit", p.shadow_split);
+        attr("ParametricMidtoneSplit", p.midtone_split);
+        attr("ParametricHighlightSplit", p.highlight_split);
+    }
+    let c = &g.colour_grade;
+    if !c.is_neutral() {
+        // Lightroom keeps the shadow and highlight hue and saturation under their
+        // split-toning names for compatibility, and everything else under ColorGrade.
+        attr("SplitToningShadowHue", c.shadows.hue);
+        attr("SplitToningShadowSaturation", c.shadows.saturation);
+        attr("SplitToningHighlightHue", c.highlights.hue);
+        attr("SplitToningHighlightSaturation", c.highlights.saturation);
+        attr("SplitToningBalance", c.balance);
+        attr("ColorGradeShadowLum", c.shadows.luminance);
+        attr("ColorGradeHighlightLum", c.highlights.luminance);
+        attr("ColorGradeMidtoneHue", c.midtones.hue);
+        attr("ColorGradeMidtoneSat", c.midtones.saturation);
+        attr("ColorGradeMidtoneLum", c.midtones.luminance);
+        attr("ColorGradeGlobalHue", c.global.hue);
+        attr("ColorGradeGlobalSat", c.global.saturation);
+        attr("ColorGradeGlobalLum", c.global.luminance);
+        attr("ColorGradeBlending", c.blending);
+    }
+    let k = &g.calibration;
+    if !k.is_neutral() {
+        attr("ShadowTint", k.shadows_tint);
+        attr("RedHue", k.red_hue);
+        attr("RedSaturation", k.red_saturation);
+        attr("GreenHue", k.green_hue);
+        attr("GreenSaturation", k.green_saturation);
+        attr("BlueHue", k.blue_hue);
+        attr("BlueSaturation", k.blue_saturation);
+    }
+    let v = &g.effects.vignette;
+    let grain = &g.effects.grain;
+    if !g.effects.is_neutral() {
+        attr("PostCropVignetteAmount", v.amount);
+        attr("PostCropVignetteMidpoint", v.midpoint);
+        attr("PostCropVignetteRoundness", v.roundness);
+        attr("PostCropVignetteFeather", v.feather);
+        attr("PostCropVignetteHighlightContrast", v.highlights);
+        attr("GrainAmount", grain.amount);
+        attr("GrainSize", grain.size);
+        attr("GrainFrequency", grain.roughness);
+    }
+    if let Some(bw) = &recipe.bw {
+        for (band, crs) in HSL_BANDS.iter().zip(CRS_BANDS.iter()) {
+            attr(
+                &format!("GrayMixer{crs}"),
+                bw.mix.get(*band).copied().unwrap_or(0),
+            );
+        }
+    }
+}
+
+/// Read ADR-0065's attributes onto `out`. An absent attribute leaves the field as it was.
+#[allow(clippy::many_single_char_names)]
+fn read_creative(attrs: &BTreeMap<String, String>, xml: &str, out: &mut Recipe) {
+    let get = |name: &str| attrs.get(name).and_then(|s| parse_i16(s));
+    let set = |name: &str, field: &mut i16| {
+        if let Some(v) = get(name) {
+            *field = v;
+        }
+    };
+    let g = &mut out.global;
+    let p = &mut g.parametric;
+    set("ParametricShadows", &mut p.shadows);
+    set("ParametricDarks", &mut p.darks);
+    set("ParametricLights", &mut p.lights);
+    set("ParametricHighlights", &mut p.highlights);
+    set("ParametricShadowSplit", &mut p.shadow_split);
+    set("ParametricMidtoneSplit", &mut p.midtone_split);
+    set("ParametricHighlightSplit", &mut p.highlight_split);
+
+    let c = &mut g.colour_grade;
+    set("SplitToningShadowHue", &mut c.shadows.hue);
+    set("SplitToningShadowSaturation", &mut c.shadows.saturation);
+    set("SplitToningHighlightHue", &mut c.highlights.hue);
+    set(
+        "SplitToningHighlightSaturation",
+        &mut c.highlights.saturation,
+    );
+    set("SplitToningBalance", &mut c.balance);
+    set("ColorGradeShadowLum", &mut c.shadows.luminance);
+    set("ColorGradeHighlightLum", &mut c.highlights.luminance);
+    set("ColorGradeMidtoneHue", &mut c.midtones.hue);
+    set("ColorGradeMidtoneSat", &mut c.midtones.saturation);
+    set("ColorGradeMidtoneLum", &mut c.midtones.luminance);
+    set("ColorGradeGlobalHue", &mut c.global.hue);
+    set("ColorGradeGlobalSat", &mut c.global.saturation);
+    set("ColorGradeGlobalLum", &mut c.global.luminance);
+    set("ColorGradeBlending", &mut c.blending);
+
+    let k = &mut g.calibration;
+    set("ShadowTint", &mut k.shadows_tint);
+    set("RedHue", &mut k.red_hue);
+    set("RedSaturation", &mut k.red_saturation);
+    set("GreenHue", &mut k.green_hue);
+    set("GreenSaturation", &mut k.green_saturation);
+    set("BlueHue", &mut k.blue_hue);
+    set("BlueSaturation", &mut k.blue_saturation);
+
+    let v = &mut g.effects.vignette;
+    set("PostCropVignetteAmount", &mut v.amount);
+    set("PostCropVignetteMidpoint", &mut v.midpoint);
+    set("PostCropVignetteRoundness", &mut v.roundness);
+    set("PostCropVignetteFeather", &mut v.feather);
+    set("PostCropVignetteHighlightContrast", &mut v.highlights);
+    let grain = &mut g.effects.grain;
+    set("GrainAmount", &mut grain.amount);
+    set("GrainSize", &mut grain.size);
+    set("GrainFrequency", &mut grain.roughness);
+
+    for (tag, curve) in [
+        ("ToneCurvePV2012Red", &mut g.channel_curves.red),
+        ("ToneCurvePV2012Green", &mut g.channel_curves.green),
+        ("ToneCurvePV2012Blue", &mut g.channel_curves.blue),
+    ] {
+        if let Some(points) = scan_curve(xml, tag) {
+            *curve = Curve { points };
+        }
+    }
+
+    if let Some(bw) = &mut out.bw {
+        for (band, crs) in HSL_BANDS.iter().zip(CRS_BANDS.iter()) {
+            if let Some(v) = get(&format!("GrayMixer{crs}")) {
+                if v == 0 {
+                    bw.mix.remove(*band);
+                } else {
+                    bw.mix.insert((*band).to_string(), v);
+                }
+            }
+        }
+    }
 }
 
 /// Apply an XMP packet's `crs:` subset onto `base`, returning the updated recipe.
@@ -325,6 +496,8 @@ pub fn read(xml: &str, base: &Recipe) -> AuraResult<Recipe> {
         _ => {}
     }
 
+    read_creative(&attrs, xml, &mut out);
+
     Ok(out)
 }
 
@@ -411,8 +584,16 @@ fn scan_attributes(xml: &str) -> BTreeMap<String, String> {
 }
 
 fn scan_tone_curve(xml: &str) -> Option<Vec<[u16; 2]>> {
-    let start = xml.find("<crs:ToneCurvePV2012>")?;
-    let end = xml[start..].find("</crs:ToneCurvePV2012>")? + start;
+    scan_curve(xml, "ToneCurvePV2012")
+}
+
+/// The points of one `crs:` curve sequence. `ToneCurvePV2012` does not match its channel
+/// variants, because the search is for the complete opening tag.
+fn scan_curve(xml: &str, tag: &str) -> Option<Vec<[u16; 2]>> {
+    let open = format!("<crs:{tag}>");
+    let close = format!("</crs:{tag}>");
+    let start = xml.find(&open)?;
+    let end = xml[start..].find(&close)? + start;
     let block = &xml[start..end];
     let mut points = Vec::new();
     let mut rest = block;
@@ -496,6 +677,45 @@ mod tests {
         );
         let back = read(&packet, &recipe).expect("read");
         assert!((back.geometry.rotate - 2.5).abs() < 1e-4);
+    }
+
+    #[test]
+    fn lightroom_s_remaining_panels_round_trip_through_the_packet() {
+        let mut recipe = fixtures::reference();
+        let g = &mut recipe.global;
+        g.parametric.darks = -25;
+        g.parametric.highlight_split = 80;
+        g.colour_grade.shadows.hue = 210;
+        g.colour_grade.shadows.saturation = 30;
+        g.colour_grade.highlights.hue = 40;
+        g.colour_grade.highlights.saturation = 22;
+        g.colour_grade.midtones.luminance = -10;
+        g.colour_grade.balance = 15;
+        g.calibration.blue_saturation = 30;
+        g.calibration.shadows_tint = -8;
+        g.effects.vignette.amount = -35;
+        g.effects.grain.amount = 25;
+        g.channel_curves.blue = Curve {
+            points: vec![[0, 18], [128, 130], [255, 245]],
+        };
+        let packet = write(&recipe);
+        assert!(packet.contains("crs:SplitToningShadowHue=\"210\""));
+        assert!(packet.contains("crs:PostCropVignetteAmount=\"-35\""));
+        assert!(packet.contains("<crs:ToneCurvePV2012Blue>"));
+        let back = read(
+            &packet,
+            &fixtures::neutral(&recipe.image.content_hash, "ILCE-7M4"),
+        )
+        .expect("read");
+        assert_eq!(back.global.parametric, recipe.global.parametric);
+        assert_eq!(back.global.colour_grade, recipe.global.colour_grade);
+        assert_eq!(back.global.calibration, recipe.global.calibration);
+        assert_eq!(back.global.effects, recipe.global.effects);
+        assert_eq!(back.global.channel_curves, recipe.global.channel_curves);
+        assert_eq!(
+            back.global.curve, recipe.global.curve,
+            "the luminance curve is not a channel"
+        );
     }
 
     #[test]

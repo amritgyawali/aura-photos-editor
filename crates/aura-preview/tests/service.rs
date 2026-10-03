@@ -194,6 +194,10 @@ fn the_second_request_is_served_from_memory_and_the_third_from_disk() {
     let disk_elapsed = started.elapsed();
 
     assert_eq!((third.width, third.height), (first.width, first.height));
+    assert_eq!(
+        third.data, first.data,
+        "memory and disk must feed identical analysis pixels"
+    );
     assert!(
         reopened.cache_stats().hits > 0,
         "the disk cache must have been consulted"
@@ -205,6 +209,39 @@ fn the_second_request_is_served_from_memory_and_the_third_from_disk() {
 }
 
 // -------------------------------------------------------------- quarantine
+
+#[test]
+fn thumbnail_and_proxy_pixels_survive_a_service_restart_exactly() {
+    for level in [PixelLevel::Thumb(512), PixelLevel::Proxy2048] {
+        let harness = harness(PreviewConfig::default());
+        let id = add_fixture(&harness, 2);
+        let initial = harness
+            .service
+            .get(id, level, Priority::Interactive)
+            .expect("initial decode");
+        let reopened = Previews::open(
+            &harness.cache_root,
+            CacheBudget::default(),
+            Arc::clone(&harness.source) as Arc<dyn PreviewSource>,
+            PreviewConfig::default(),
+        )
+        .expect("reopen cache");
+        let durable = reopened
+            .get(id, level, Priority::Interactive)
+            .expect("disk decode");
+        assert_eq!(initial.width, durable.width);
+        assert_eq!(initial.height, durable.height);
+        assert_eq!(
+            initial.data, durable.data,
+            "preview cache changed pixels for {level:?}"
+        );
+        assert_eq!(
+            harness.source.previews.lock().len(),
+            1,
+            "restart must read the existing artifact"
+        );
+    }
+}
 
 #[test]
 fn a_file_that_cannot_be_decoded_becomes_a_problem_row_not_an_exception() {

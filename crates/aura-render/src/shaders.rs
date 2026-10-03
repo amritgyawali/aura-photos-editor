@@ -111,8 +111,11 @@ pub const DECONV: &str = include_str!("../shaders/deconv.wgsl");
 /// gather rather than map.
 const GEOMETRY: &str = include_str!("../shaders/geometry.wgsl");
 
+/// ADR-0065. Calibration, colour grading, the post-crop vignette and grain.
+pub const CREATIVE: &str = include_str!("../shaders/creative.wgsl");
+
 /// Every source, with the file name it came from.
-pub const SOURCES: [(&str, &str); 18] = [
+pub const SOURCES: [(&str, &str); 19] = [
     ("colour.wgsl", COLOUR),
     ("tone.wgsl", TONE),
     ("spatial.wgsl", SPATIAL),
@@ -131,6 +134,7 @@ pub const SOURCES: [(&str, &str); 18] = [
     ("denoise_tile.wgsl", DENOISE_TILE),
     ("deconv.wgsl", DECONV),
     ("geometry.wgsl", GEOMETRY),
+    ("creative.wgsl", CREATIVE),
 ];
 
 /// The entry point name for a stage. `exposure` becomes `stage_exposure`.
@@ -163,6 +167,20 @@ pub fn source_for(stage: Stage) -> Option<(&'static str, &'static str)> {
 pub fn shared_constants() -> Vec<(&'static str, String)> {
     vec![
         ("MID_GREY", format!("{:.2}", crate::tonemap::MID_GREY)),
+        // ADR-0065. The four strengths the creative panels share with `creative.wgsl`.
+        ("GRADE_TINT", format!("{:.2}", crate::creative::GRADE_TINT)),
+        (
+            "GRADE_LUMA_STOPS",
+            format!("{:.2}", crate::creative::GRADE_LUMA_STOPS),
+        ),
+        (
+            "VIGNETTE_STOPS",
+            format!("{:.2}", crate::creative::VIGNETTE_STOPS),
+        ),
+        (
+            "GRAIN_STRENGTH",
+            format!("{:.2}", crate::creative::GRAIN_STRENGTH),
+        ),
         ("CURVE_GAMMA", format!("{:.1}", crate::tonemap::CURVE_GAMMA)),
         ("KNEE", format!("{:.1}", aura_raw::colour::curve::KNEE)),
         ("luma.r", "0.262700".to_string()),

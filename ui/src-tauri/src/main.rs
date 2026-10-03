@@ -186,8 +186,21 @@ fn list_projects(state: State<'_, AppState>) -> IpcResult<Vec<ProjectSummary>> {
 }
 
 #[tauri::command]
-fn start_ingest(state: State<'_, AppState>, input: StartIngestInput) -> IpcResult<JobHandle> {
-    aura_app::start_ingest(&state, &input)
+fn start_ingest(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    input: StartIngestInput,
+) -> IpcResult<JobHandle> {
+    use tauri::Emitter;
+    aura_app::commands::start_ingest_with_events(
+        &state,
+        &input,
+        std::sync::Arc::new(move |event| {
+            if let Err(error) = app.emit("ingest", event) {
+                tracing::error!(target: "ingest", %error, "could not deliver import event");
+            }
+        }),
+    )
 }
 
 #[tauri::command]
@@ -3031,6 +3044,30 @@ async fn diagnostics_report(state: State<'_, AppState>) -> IpcResult<Diagnostics
 }
 
 #[tauri::command]
+async fn enhance_portrait(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::DevelopImageInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::photo_enhance::enhance_portrait(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn auto_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::smart_edit::AutoRetouchInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::smart_edit::auto_retouch(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn enhance_photo(
     state: State<'_, AppState>,
     input: aura_app::contract::ipc::DevelopImageInput,
@@ -3082,6 +3119,127 @@ async fn apply_reference_style(
     .map_err(|_| background_request_failed())?
 }
 
+#[tauri::command]
+async fn sync_settings(
+    state: State<'_, AppState>,
+    input: aura_app::develop_commands::SyncSettingsInput,
+) -> IpcResult<aura_app::develop_commands::SyncSettingsReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::sync_settings(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn pick_white_balance(
+    state: State<'_, AppState>,
+    input: aura_app::studio_tools::WhiteBalancePickInput,
+) -> IpcResult<RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::studio_tools::pick_white_balance(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_edit_profiles() -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
+    aura_app::edit_profiles::list_edit_profiles()
+}
+
+#[tauri::command]
+async fn export_run_watermarked(
+    state: State<'_, AppState>,
+    input: ExportJobInput,
+    watermark: aura_app::delivery_commands::Watermark,
+) -> IpcResult<ExportStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::delivery_commands::export_run_with_watermark(&app, input, Some(watermark))
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn apply_edit_profile(
+    state: State<'_, AppState>,
+    input: aura_app::edit_profiles::ApplyProfileInput,
+) -> IpcResult<aura_app::edit_profiles::ApplyProfileReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::edit_profiles::apply_edit_profile(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn preview_edit_profile(
+    state: State<'_, AppState>,
+    input: aura_app::edit_profiles::PreviewProfileInput,
+) -> IpcResult<aura_app::edit_profiles::ProfilePreview> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::edit_profiles::preview_edit_profile(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_edit(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::RetouchInput,
+) -> IpcResult<Vec<aura_app::native_retouch::Edit>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::native_retouch::edit(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_preview(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+    before: bool,
+) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::preview(&app, &project_id, &photo_id, before)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_draft_preview(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::DraftInput,
+) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::draft_preview(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_selection_preview(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::DraftInput,
+) -> IpcResult<aura_app::native_retouch::SelectionPreview> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::selection_preview(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -3124,10 +3282,21 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            sync_settings,
+            pick_white_balance,
+            native_retouch_edit,
+            native_retouch_selection_preview,
+            native_retouch_preview,
+            native_retouch_draft_preview,
+            list_edit_profiles,
+            apply_edit_profile,
+            preview_edit_profile,
             fetch_instagram_references,
             analyse_reference_style,
             apply_reference_style,
             enhance_photo,
+            enhance_portrait,
+            auto_retouch,
             create_project,
             list_projects,
             start_ingest,
@@ -3389,6 +3558,7 @@ fn main() {
             export_presets,
             export_preview_names,
             export_run,
+            export_run_watermarked,
             export_files,
             export_manifest,
             delivery_status,

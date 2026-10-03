@@ -13,21 +13,6 @@
     unreachable_pub,
     rust_2018_idioms
 )]
-// The panic family is banned in library code and is how a test asserts. An inline
-// `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
-// reach a photographer; the lints stay denied everywhere else in the crate. PHASE-14.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
-        clippy::indexing_slicing,
-        clippy::float_cmp,
-        clippy::disallowed_methods,
-        clippy::uninlined_format_args
-    )
-)]
 #![warn(clippy::pedantic)]
 #![allow(
     clippy::module_name_repetitions,
@@ -40,6 +25,22 @@
     // clippy names, but `set_framing`, `plan_geometry` and a dozen others have the same shape and
     // are only silent because their DTOs happen to be moved into a call.
     clippy::needless_pass_by_value
+)]
+// The panic family is banned in library code and is how a test asserts. An inline
+// `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
+// reach a photographer; the lints stay denied everywhere else in the crate. PHASE-14.
+// It follows `warn(clippy::pedantic)`, which would otherwise re-enable `float_cmp` in tests.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+        clippy::disallowed_methods,
+        clippy::uninlined_format_args
+    )
 )]
 
 //! The application layer: one typed command surface, used by the Tauri shell and
@@ -60,8 +61,11 @@ pub mod cull_commands;
 pub mod curate_commands;
 pub mod delivery_commands;
 pub mod develop_commands;
+pub mod edit_profiles;
 pub mod gallery_commands;
 pub mod learn_commands;
+pub mod native_retouch;
+pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.
@@ -83,11 +87,15 @@ pub mod moment_commands;
 pub mod people_commands;
 pub mod photo_enhance;
 mod photo_frames;
+pub mod portrait_auto;
+pub mod portrait_features;
 pub mod preview_commands;
 pub mod qc_commands;
 pub mod reference_style;
 pub mod restore_commands;
 pub mod retouch_commands;
+pub mod retouch_settings;
+pub mod smart_edit;
 pub mod state;
 pub mod story_commands;
 pub mod style_commands;
@@ -136,7 +144,7 @@ pub use delivery_commands::{
 };
 pub use develop_commands::{
     develop_status, history_step, image_history, image_recipe, render_caps, render_image,
-    set_param, snapshot,
+    set_param, snapshot, sync_settings,
 };
 pub use emotion_commands::{
     emotion_status, image_emotion, moment_peak, prefer_frame, ranked_by_emotion, reactions_of,

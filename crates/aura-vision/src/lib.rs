@@ -72,7 +72,7 @@
 //!
 //! **Preprocessing is a version, not a parameter.** Section 6.1 asks for a fused
 //! export so preprocessing cannot drift between training and inference. The
-//! interpreter in `aura-infer` has no resize operator, so the fusion is achieved
+//! embedding pack predates native resize support, so the fusion is achieved
 //! the other way round: the steps are constants of this crate, every stored row
 //! carries [`embed::model::PREPROCESS_VER`], and changing any of them is a version
 //! bump that triggers a re-embed. See
@@ -86,6 +86,8 @@ pub mod contract {
 pub mod embed;
 pub mod face;
 pub mod mask;
+pub mod portrait;
+pub mod skin;
 
 pub use embed::batch::{EmbedProgress, EmbedReport, EmbeddingRunner};
 pub use embed::model::{EmbeddingModel, EMBED_INPUT_SIDE, MODEL_VER, PREPROCESS_VER};

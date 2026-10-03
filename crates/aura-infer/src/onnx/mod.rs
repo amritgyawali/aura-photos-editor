@@ -5,7 +5,7 @@
 //! * [`wire`] - the protobuf encoding, reader and writer.
 //! * [`model`] - the nine messages we care about, parsed and serialised.
 //! * [`graph`] - validation, ordering and execution.
-//! * [`ops`] - the nineteen operators, each with a fixed accumulation order.
+//! * [`ops`] - the twenty operators, each with a fixed accumulation order.
 //!
 //! [`fixtures`] builds small models in memory so the runtime, the registry, the
 //! benchmarks and the phase gate all have something real to run without a

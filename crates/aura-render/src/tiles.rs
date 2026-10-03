@@ -82,6 +82,7 @@ pub fn render_streamed(
     budget_bytes: u64,
 ) -> AuraResult<RenderedImage> {
     let clamped = recipe.clamped();
+    let retouch = aura_recipe::retouch_tools::read(&clamped)?;
     let plan = graph::plan(
         &clamped,
         purpose,
@@ -90,12 +91,15 @@ pub fn render_streamed(
     );
 
     // A rotation is not streamable. Say so and render whole.
-    if clamped.geometry.rotate.abs() > f32::EPSILON || clamped.geometry.perspective.is_some() {
+    if clamped.geometry.rotate.abs() > f32::EPSILON
+        || clamped.geometry.perspective.is_some()
+        || retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0)
+    {
         let mut whole = engine.render_frame(frame, &clamped, level, purpose, output)?;
         whole.notes.push(RenderNote {
             stage: Stage::Geometry.as_str().to_string(),
             reason: SkipReason::NotRequested,
-            detail: Some("a rotated frame is rendered whole rather than streamed".to_string()),
+            detail: Some("geometry or native retouch needs the frame rendered whole".to_string()),
         });
         return Ok(whole);
     }
@@ -105,6 +109,9 @@ pub fn render_streamed(
     // The geometry stage must not run inside a tile: the crop *is* the tile grid.
     let mut tile_recipe = clamped.clone();
     tile_recipe.geometry = aura_recipe::Geometry::default();
+    // ADR-0065. The post-crop effects are drawn in *output raster* coordinates below, not in
+    // the tile's source coordinates, so they are stripped here and applied after the commit.
+    tile_recipe.global.effects = aura_recipe::Effects::default();
     let tile_plan = graph::plan(
         &tile_recipe,
         purpose,
@@ -166,7 +173,20 @@ pub fn render_streamed(
             );
 
             // Commit the middle of the tile, which is the part the halo protected.
-            let committed = crop_out(&rendered, rw, ox, oy, tile_w, tile_h);
+            let mut committed = crop_out(&rendered, rw, ox, oy, tile_w, tile_h);
+            crate::cpu::apply_post_crop(
+                &mut committed,
+                tile_w,
+                tile_h,
+                &clamped,
+                &plan,
+                spatial::Position {
+                    x: x - left,
+                    y: y - top,
+                    full_width: out_width,
+                    full_height: out_height,
+                },
+            );
             let quantised = crate::output::transform(
                 &committed,
                 tile_w,
@@ -422,6 +442,84 @@ mod tests {
             (streamed.width, streamed.height)
         );
         assert_eq!(whole.data, streamed.data);
+    }
+
+    #[test]
+    fn a_streamed_render_with_every_lightroom_panel_equals_a_whole_one() {
+        // ADR-0065. The post-crop vignette is drawn relative to the crop and the grain in frame
+        // coordinates; both must come out bit-identical when the frame is streamed in tiles.
+        let frame = fixtures::detail_frame(256, 256);
+        let engine = CpuEngine::new(
+            Arc::new(fixtures::StaticSource::new(frame.clone())),
+            FixedClock::at(time::OffsetDateTime::UNIX_EPOCH),
+        );
+        let mut recipe = recipes::neutral(recipes::FIXTURE_HASH, "Bench-01");
+        // Edges on whole pixels: a fractional crop is resampled on the whole-frame path and
+        // boxed on the streamed one, which is a separate, older difference.
+        recipe.geometry.crop = [0.125, 0.25, 0.875, 0.75];
+        let g = &mut recipe.global;
+        g.effects.vignette.amount = -60;
+        g.effects.vignette.roundness = 40;
+        g.effects.grain.amount = 45;
+        g.colour_grade.shadows.hue = 200;
+        g.colour_grade.shadows.saturation = 30;
+        g.colour_grade.highlights.hue = 35;
+        g.colour_grade.highlights.saturation = 25;
+        g.calibration.red_hue = 20;
+        g.calibration.blue_saturation = 15;
+        g.parametric.shadows = 30;
+        g.channel_curves.blue = aura_recipe::Curve {
+            points: vec![[0, 20], [255, 240]],
+        };
+
+        let whole = engine
+            .render_frame(
+                &frame,
+                &recipe,
+                RenderLevel::Full,
+                RenderPurpose::Export,
+                &OutputSpec::default(),
+            )
+            .expect("whole");
+        for stage in [
+            "calibration",
+            "curve",
+            "colour_grade",
+            "post_crop_vignette",
+            "grain",
+        ] {
+            assert!(
+                whole.stages_run.iter().any(|s| s == stage),
+                "{stage} did not run"
+            );
+        }
+        let streamed = render_streamed(
+            &engine,
+            &frame,
+            &recipe,
+            RenderLevel::Full,
+            RenderPurpose::Export,
+            &OutputSpec::default(),
+            1024,
+        )
+        .expect("streamed");
+        assert_eq!(
+            (whole.width, whole.height),
+            (streamed.width, streamed.height)
+        );
+        assert_eq!(whole.data, streamed.data);
+
+        let neutral = recipes::neutral(recipes::FIXTURE_HASH, "Bench-01");
+        let plain = engine
+            .render_frame(
+                &frame,
+                &neutral,
+                RenderLevel::Full,
+                RenderPurpose::Export,
+                &OutputSpec::default(),
+            )
+            .expect("neutral");
+        assert_ne!(plain.render_hash, whole.render_hash);
     }
 
     #[test]

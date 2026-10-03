@@ -34,7 +34,7 @@ use crate::contract::render::{
 use crate::geometry;
 use crate::graph::{self, Capabilities, InputKind, Plan, Stage};
 use crate::spatial;
-use crate::tonemap::{self, CurveLut, Tone};
+use crate::tonemap::{self, Tone};
 
 /// The working buffer's bytes per pixel: three `f32`.
 pub const BYTES_PER_PIXEL: u64 = 12;
@@ -122,6 +122,55 @@ pub struct CpuEngine {
 }
 
 impl CpuEngine {
+    /// Render the authored selection at the draft's actual position in the stack.
+    /// The RGB bytes encode coverage directly; they are not color-managed photo pixels.
+    /// # Errors
+    /// Invalid recipe/draft, missing replacement operation, or unavailable source pixels.
+    pub fn retouch_selection(
+        &self,
+        image: &PhotoId,
+        recipe: &Recipe,
+        draft: &aura_recipe::retouch_tools::Edit,
+        replace: Option<&str>,
+    ) -> AuraResult<(Vec<u8>, u32, u32)> {
+        aura_recipe::schema::Validation::check(recipe)?;
+        aura_recipe::retouch_tools::validate(std::slice::from_ref(draft))?;
+        let mut prior = aura_recipe::retouch_tools::read(recipe)?;
+        if let Some(id) = replace {
+            let index = prior.iter().position(|edit| edit.id == id).ok_or_else(|| {
+                aura_core::errors::render::recipe_invalid(
+                    "retouch selection",
+                    "operation no longer exists",
+                )
+            })?;
+            prior.truncate(index);
+        }
+        let mut prepared = recipe.clone();
+        aura_recipe::retouch_tools::write(&mut prepared, &prior)?;
+        prepared.geometry = aura_recipe::Geometry::default();
+        prepared.global.effects = aura_recipe::Effects::default();
+        // These stages follow retouching and must not influence the range decision.
+        prepared.global.sharpen.amount = 0;
+        let prepared = prepared.clamped();
+        let level = RenderLevel::Screen(1600, 1200);
+        let frame = self.source.frame(image, level)?;
+        let plan = graph::plan(&prepared, RenderPurpose::Interactive, frame.kind, self.caps);
+        let (rgb, width, height, _) = self.working_buffer(&frame, &prepared, &plan, level, None);
+        let mattes = aura_recipe::retouch_tools::read_mattes(recipe)?;
+        let mask = crate::retouch_tools::selection_mask_with_mattes(
+            &rgb,
+            width as usize,
+            height as usize,
+            draft,
+            &mattes,
+        );
+        let bytes = mask
+            .into_iter()
+            .flat_map(|v| [(v * 255.0).round() as u8; 3])
+            .collect();
+        Ok((bytes, width, height))
+    }
+
     /// An engine over a frame source.
     #[must_use]
     pub fn new(source: Arc<dyn FrameSource>, clock: Arc<dyn Clock>) -> Self {
@@ -171,6 +220,7 @@ impl CpuEngine {
         output: &crate::contract::render::OutputSpec,
     ) -> AuraResult<RenderedImage> {
         let started = self.clock.monotonic_us();
+        let retouch = aura_recipe::retouch_tools::read(recipe)?;
         let clamped = recipe.clamped();
         let plan = graph::plan(&clamped, purpose, frame.kind, self.caps);
 
@@ -201,7 +251,27 @@ impl CpuEngine {
             render_hash: hash,
             backend: Backend::Cpu.as_str().to_string(),
             notes,
-            stages_run: plan.slugs(),
+            stages_run: {
+                let mut stages = plan.slugs();
+                if retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0) {
+                    let index = plan
+                        .stages
+                        .iter()
+                        .position(|stage| {
+                            matches!(
+                                stage,
+                                Stage::Sharpen
+                                    | Stage::Geometry
+                                    | Stage::PostCropVignette
+                                    | Stage::Grain
+                                    | Stage::OutputTransform
+                            )
+                        })
+                        .unwrap_or(stages.len());
+                    stages.insert(index, "studio_retouch".to_string());
+                }
+                stages
+            },
             ms: u32::try_from(elapsed / 1_000).unwrap_or(u32::MAX),
             cache_hit: false,
         })
@@ -250,7 +320,10 @@ impl CpuEngine {
         }
 
         let multipliers = white_balance(g.temperature as f32, f32::from(g.tint));
-        let curve = CurveLut::build(&g.curve);
+        let curve = crate::creative::luminance_lut(&g.curve, &g.parametric);
+        let channels = crate::creative::ChannelLuts::build(&g.channel_curves);
+        let grade = crate::creative::GradePlan::new(&g.colour_grade);
+        let calibration = crate::creative::CalibrationPlan::new(&g.calibration);
         let tone = Tone {
             highlights: f32::from(g.highlights) / 100.0,
             shadows: f32::from(g.shadows) / 100.0,
@@ -283,6 +356,20 @@ impl CpuEngine {
                 if wants_matrix {
                     value = apply_f32(matrix, value);
                 }
+                for (slot, out) in pixel.iter_mut().zip(value.iter()) {
+                    *slot = *out;
+                }
+            });
+        }
+
+        // ---- calibration: the primaries every later colour control works on -----------
+        if plan.stages.contains(&Stage::Calibration) {
+            rgb.par_chunks_mut(3).for_each(|pixel| {
+                let value = calibration.apply([
+                    pixel.first().copied().unwrap_or(0.0),
+                    pixel.get(1).copied().unwrap_or(0.0),
+                    pixel.get(2).copied().unwrap_or(0.0),
+                ]);
                 for (slot, out) in pixel.iter_mut().zip(value.iter()) {
                     *slot = *out;
                 }
@@ -346,6 +433,7 @@ impl CpuEngine {
         let wants_hsl = plan.stages.contains(&Stage::Hsl);
         let wants_vibrance = plan.stages.contains(&Stage::Vibrance);
         let wants_bw = plan.stages.contains(&Stage::Monochrome);
+        let wants_grade = plan.stages.contains(&Stage::ColourGrade);
 
         if wants_exposure
             || wants_tone
@@ -354,6 +442,7 @@ impl CpuEngine {
             || wants_hsl
             || wants_vibrance
             || wants_bw
+            || wants_grade
         {
             let vibrance = f32::from(g.vibrance) / 100.0;
             let saturation = f32::from(g.saturation) / 100.0;
@@ -375,6 +464,7 @@ impl CpuEngine {
                 }
                 if wants_curve {
                     value = tonemap::apply_curve(value, &curve);
+                    value = channels.apply(value);
                 }
                 if wants_hsl {
                     value = tonemap::hsl(value, &g.hsl);
@@ -386,6 +476,9 @@ impl CpuEngine {
                     if let Some(bw) = &recipe.bw {
                         value = tonemap::monochrome(value, bw);
                     }
+                }
+                if wants_grade {
+                    value = grade.apply(value);
                 }
                 for (slot, out) in pixel.iter_mut().zip(value.iter()) {
                     *slot = *out;
@@ -427,6 +520,18 @@ impl CpuEngine {
             apply_masks(&mut rgb, width, height, recipe, position);
         }
 
+        // Explicit authoring runs in interactive previews and exports, before final geometry.
+        if let Ok(edits) = aura_recipe::retouch_tools::read(recipe) {
+            let mattes = aura_recipe::retouch_tools::read_mattes(recipe).unwrap_or_default();
+            crate::retouch_tools::apply_with_mattes(
+                &mut rgb,
+                width as usize,
+                height as usize,
+                &edits,
+                &mattes,
+            );
+        }
+
         // ---- sharpening ----------------------------------------------------------------
         if plan.stages.contains(&Stage::Sharpen) {
             spatial::unsharp(
@@ -462,6 +567,20 @@ impl CpuEngine {
             height = h as u32;
         }
 
+        // ---- the post-crop effects ----------------------------------------------------
+        //
+        // On the buffer the crop just produced, which *is* the delivered frame. The tiler strips
+        // these from its per-tile recipe and applies them to each committed tile in output
+        // raster coordinates instead, so a streamed export draws the same vignette and grain.
+        apply_post_crop(
+            &mut rgb,
+            width,
+            height,
+            recipe,
+            plan,
+            spatial::Position::whole(width, height),
+        );
+
         (rgb, width, height, notes)
     }
 
@@ -474,6 +593,24 @@ impl CpuEngine {
         } else {
             None
         }
+    }
+}
+
+/// The post-crop vignette and grain, on a buffer at `position` inside the delivered frame.
+pub fn apply_post_crop(
+    rgb: &mut [f32],
+    width: u32,
+    _height: u32,
+    recipe: &Recipe,
+    plan: &Plan,
+    position: spatial::Position,
+) {
+    let effects = &recipe.global.effects;
+    if plan.stages.contains(&Stage::PostCropVignette) {
+        crate::creative::vignette(rgb, width as usize, position, &effects.vignette);
+    }
+    if plan.stages.contains(&Stage::Grain) {
+        crate::creative::grain(rgb, width as usize, position, &effects.grain);
     }
 }
 

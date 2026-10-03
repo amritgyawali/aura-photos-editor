@@ -458,10 +458,12 @@ fn tier_three_refuses_to_render_from_an_embedded_preview() {
     .expect("encode a jpeg");
     std::fs::write(&path, &jpeg).expect("write");
 
+    // A JPEG is already a developed photograph rather than a RAW with a preview in it, so tier 3
+    // decodes its own pixels at full size - it never substitutes a smaller preview.
     let parsed = meta::read(&jpeg, &path).expect("a jpeg is readable");
-    let error = full::tier3(&jpeg, &parsed, DecodeLimits::tier3(), clock().as_ref())
-        .expect_err("tier 3 has no fallback");
-    assert_eq!(error.code.0, "AURA-RAW-2007");
+    let buffer = full::tier3(&jpeg, &parsed, DecodeLimits::tier3(), clock().as_ref())
+        .expect("a developed JPEG decodes at full resolution");
+    assert_eq!((buffer.width, buffer.height), (16, 16));
 }
 
 // ------------------------------------------------------------ failure paths

@@ -10,3 +10,5 @@
 *.NEF binary
 *.RAF binary
 *.DNG binary
+*.onnx binary
+*.tflite binary

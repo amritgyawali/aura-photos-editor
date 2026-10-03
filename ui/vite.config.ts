@@ -5,7 +5,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
-  server: { port: 5173, strictPort: true },
+  // The Rust build output under src-tauri is not UI source; watching it crashes the dev server
+  // when cargo rewrites (or the disk garbles) an incremental directory mid-scan.
+  server: { port: 5173, strictPort: true, watch: { ignored: ['**/src-tauri/**', '**/dist/**'] } },
   build: { outDir: 'dist', target: 'es2022', sourcemap: true },
   test: {
     environment: 'jsdom',

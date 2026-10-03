@@ -1,4 +1,6 @@
 //! An actual JPEG import, local correction and render round trip.
+// Tests assert by unwrapping; a panic here is a failed test, never a photographer's crash.
+#![allow(clippy::unwrap_used, clippy::disallowed_methods)]
 use aura_app::contract::ipc::*;
 use aura_app::AppState;
 use aura_core::progress::{CancelToken, NullProgress};
@@ -179,8 +181,10 @@ fn photo_roundtrip(is_png: bool) {
     assert!(!style.colors.is_empty());
     let apply = aura_app::reference_style::ApplyReferenceInput {
         photo_id: photo.clone(),
-        reference_id: style.id,
+        reference_id: style.id.clone(),
         strength: 0.8,
+        profile_id: None,
+        profile_strength: None,
     };
     let report = aura_app::reference_style::apply_reference(&state, &apply)
         .expect("valid photo fixture and successful operation");
@@ -212,6 +216,132 @@ fn photo_roundtrip(is_png: bool) {
             .value,
         serde_json::Value::from(1.0)
     );
+    // An edit profile on the same imported photo: saved, never compounding, the manual exposure
+    // untouched, and gentler because a JPEG or PNG is already developed.
+    let profile = aura_app::edit_profiles::ApplyProfileInput {
+        photo_id: photo.clone(),
+        profile_id: "fivek-expert-c".into(),
+        strength: 1.0,
+    };
+    let applied = aura_app::edit_profiles::apply_edit_profile(&state, &profile)
+        .expect("profile applies to an imported photo");
+    assert!(
+        applied.changed > 0,
+        "a learned profile must change the edit"
+    );
+    assert!(applied
+        .protected_fields
+        .iter()
+        .any(|f| f == "global.exposure"));
+    assert!(
+        applied
+            .adaptations
+            .iter()
+            .any(|n| n.contains("learned from RAW")),
+        "a developed photo gets the RAW-learned look at reduced strength: {:?}",
+        applied.adaptations
+    );
+    let once = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    aura_app::edit_profiles::apply_edit_profile(&state, &profile).expect("profile again");
+    let twice = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    assert_eq!(
+        once.recipe_hash, twice.recipe_hash,
+        "a profile must not compound"
+    );
+    let preview = aura_app::edit_profiles::preview_edit_profile(
+        &state,
+        &aura_app::edit_profiles::PreviewProfileInput {
+            profile_id: "film-portra".into(),
+            photo_id: Some(photo.clone()),
+            strength: 1.0,
+            size: Some(128),
+        },
+    )
+    .expect("preview on the imported photo");
+    assert!(preview.before.starts_with("data:image/jpeg;base64,"));
+    assert_ne!(preview.before, preview.after);
+    let sample = aura_app::edit_profiles::preview_edit_profile(
+        &state,
+        &aura_app::edit_profiles::PreviewProfileInput {
+            profile_id: "bw-noir".into(),
+            photo_id: None,
+            strength: 1.0,
+            size: Some(96),
+        },
+    )
+    .expect("preview on the sample scene");
+    assert_ne!(sample.before, sample.after);
+    // The reference can be fitted on top of a profile, and still never compounds.
+    let layered = aura_app::reference_style::ApplyReferenceInput {
+        profile_id: Some("film-portra".into()),
+        profile_strength: Some(0.8),
+        ..apply
+    };
+    aura_app::reference_style::apply_reference(&state, &layered).expect("reference over profile");
+    let layered_once = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    aura_app::reference_style::apply_reference(&state, &layered).expect("again");
+    let layered_twice = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    assert_eq!(layered_once.recipe_hash, layered_twice.recipe_hash);
+
+    // Every Lightroom panel is reachable by path, including blocks a neutral recipe omits.
+    for (path, value) in [
+        ("global.effects.grain.amount", serde_json::json!(20)),
+        ("global.effects.vignette.amount", serde_json::json!(-30)),
+        (
+            "global.colour_grade.shadows.saturation",
+            serde_json::json!(25),
+        ),
+        ("global.colour_grade.shadows.hue", serde_json::json!(200)),
+        ("global.calibration.blue_saturation", serde_json::json!(15)),
+        ("global.parametric.darks", serde_json::json!(-10)),
+        (
+            "global.channel_curves.blue.points",
+            serde_json::json!([[0, 12], [255, 245]]),
+        ),
+        ("global.hsl.blue.s", serde_json::json!(-30)),
+        ("bw", serde_json::json!({"mix": {}, "grade": null})),
+        ("bw.mix.red", serde_json::json!(25)),
+    ] {
+        aura_app::set_param(
+            &state,
+            &SetParamInput {
+                project_id: project.id.clone(),
+                photo_id: photo.clone(),
+                path: path.into(),
+                value,
+                label: None,
+            },
+        )
+        .unwrap_or_else(|e| panic!("{path}: {}", e.message));
+    }
+    let lightroom = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
+    for path in [
+        "global.effects.grain.amount",
+        "global.colour_grade.shadows.saturation",
+        "global.hsl.blue.s",
+        "bw.mix.red",
+    ] {
+        assert!(
+            lightroom
+                .params
+                .iter()
+                .any(|p| p.path == path && p.protected),
+            "{path} is not stored as the photographer's setting"
+        );
+    }
+    let synced = aura_app::sync_settings(
+        &state,
+        &aura_app::develop_commands::SyncSettingsInput {
+            groups: None,
+            project_id: project.id.clone(),
+            source_photo_id: photo.clone(),
+            target_photo_ids: vec![],
+            include_geometry: false,
+        },
+    )
+    .expect("sync");
+    assert_eq!(synced.synced, 0, "the only photo is the source");
+
     let after = aura_app::render_image(&state, &request)
         .expect("valid photo fixture and successful operation");
     assert_ne!(before.rgb_base64, after.rgb_base64);

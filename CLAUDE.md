@@ -146,6 +146,17 @@ Never load two phase files into one session.
 | Reference-look decisions | `docs/adr/ADR-0063-reference-look-matching.md` |
 | What matching a look does, in the product's own words | `docs/match-a-look.md` |
 | Look evaluation gates | `tests/eval/look_eval.rs` |
+| Edit profiles (the start screen's looks, validated JSON) | `crates/aura-app/config/edit_profiles.json` |
+| How edit profiles adapt, and how learned ones are measured | `docs/edit-profiles.md` |
+| Lightroom panel parity decisions | `docs/adr/ADR-0065-lightroom-panel-parity.md` |
+| Every Lightroom feature and where it lives in AURA | `docs/lightroom-parity.md` |
+| Learning a profile from RAW before/after pairs | `ml/edit-profiles/fetch_fivek_pairs.py` + `crates/aura-app/tests/profile_fit.rs` |
+| One-click intelligent editing and step history | `docs/adr/ADR-0076-intelligent-auto-edit-and-step-history.md`, `crates/aura-app/src/smart_edit.rs`, `crates/aura-app/src/portrait_features.rs` |
+| What Auto enhance does, in the product's own words | `docs/automatic-editing.md` |
+| Auto-edit qualification on the real app | `scripts/prepare-auto-edit-fixtures.py`, `scripts/test-auto-edit-v3.py`, `scripts/test-auto-edit-gui.py` |
+| Segmented face/body skin and the 52 retouch settings | `docs/adr/ADR-0077-segmented-skin-and-retouch-settings.md` |
+| The skin segmenter (model, card, converter) | `assets/models/selfie_multiclass/`, `crates/aura-vision/src/skin.rs`, `ml/models/skin/` |
+| Automatic retouch settings, in the product's own words | `docs/automatic-retouch-settings.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 
 ## Non-negotiables enforced by the build

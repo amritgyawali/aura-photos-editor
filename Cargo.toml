@@ -130,3 +130,7 @@ debug           = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 2
+
+# Model inference (YuNet, the skin segmenter) is unusably slow unoptimised. ADR-0077.
+[profile.dev.package.aura-infer]
+opt-level = 3

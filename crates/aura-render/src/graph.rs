@@ -33,6 +33,11 @@ pub enum Stage {
     WhiteBalance,
     /// Camera native into linear Rec.2020 at D65. The end of the input half.
     CameraMatrix,
+    /// Camera calibration: the shadow tint and the three primaries. ADR-0065.
+    ///
+    /// Directly after the matrix, because calibration is an adjustment *to the camera
+    /// profile* in Lightroom: it moves the primaries every later colour control works on.
+    Calibration,
     /// Lens vignette correction.
     LensVignette,
     /// Lens distortion correction. Needs a lens profile.
@@ -61,6 +66,11 @@ pub enum Stage {
     Vibrance,
     /// Black-and-white conversion with a per-band mix.
     Monochrome,
+    /// Colour grading: shadows, midtones, highlights and global wheels. ADR-0065.
+    ///
+    /// **After the monochrome mix**, so a black-and-white photograph can be split-toned -
+    /// which is most of what photographers use colour grading on a monochrome for.
+    ColourGrade,
     /// Local masks and the parameters inside them.
     Masks,
     /// Distraction removal: real pixels put where an object was. Phase 24.
@@ -80,15 +90,21 @@ pub enum Stage {
     Sharpen,
     /// Crop, rotation and perspective.
     Geometry,
+    /// The post-crop vignette. ADR-0065. After the crop, by definition: it is drawn on the
+    /// frame the photographer delivers.
+    PostCropVignette,
+    /// Film grain. ADR-0065. Last before the output transform, so nothing smooths it away.
+    Grain,
     /// Tone map, gamut, transfer, quantise. **The only place tone is baked.**
     OutputTransform,
 }
 
 /// Every stage, in execution order. The array *is* the pipeline.
-pub const ORDER: [Stage; 24] = [
+pub const ORDER: [Stage; 28] = [
     Stage::HighlightRecovery,
     Stage::WhiteBalance,
     Stage::CameraMatrix,
+    Stage::Calibration,
     Stage::LensVignette,
     Stage::LensDistortion,
     Stage::LensCa,
@@ -103,12 +119,15 @@ pub const ORDER: [Stage; 24] = [
     Stage::Dehaze,
     Stage::Vibrance,
     Stage::Monochrome,
+    Stage::ColourGrade,
     Stage::Masks,
     Stage::Cleanup,
     Stage::Retouch,
     Stage::Restoration,
     Stage::Sharpen,
     Stage::Geometry,
+    Stage::PostCropVignette,
+    Stage::Grain,
     Stage::OutputTransform,
 ];
 
@@ -120,6 +139,7 @@ impl Stage {
             Self::HighlightRecovery => "highlight_recovery",
             Self::WhiteBalance => "white_balance",
             Self::CameraMatrix => "camera_matrix",
+            Self::Calibration => "calibration",
             Self::LensVignette => "lens_vignette",
             Self::LensDistortion => "lens_distortion",
             Self::LensCa => "lens_ca",
@@ -134,12 +154,15 @@ impl Stage {
             Self::Dehaze => "dehaze",
             Self::Vibrance => "vibrance",
             Self::Monochrome => "monochrome",
+            Self::ColourGrade => "colour_grade",
             Self::Masks => "masks",
             Self::Cleanup => "cleanup",
             Self::Retouch => "retouch",
             Self::Restoration => "restoration",
             Self::Sharpen => "sharpen",
             Self::Geometry => "geometry",
+            Self::PostCropVignette => "post_crop_vignette",
+            Self::Grain => "grain",
             Self::OutputTransform => "output_transform",
         }
     }
@@ -325,6 +348,12 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         None,
     );
     push!(Stage::CameraMatrix, native, upstream, None);
+    push!(
+        Stage::Calibration,
+        !g.calibration.is_neutral(),
+        SkipReason::NotRequested,
+        None,
+    );
 
     // --- lens ---------------------------------------------------------------------------
     push!(
@@ -382,7 +411,7 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
     );
     push!(
         Stage::Curve,
-        !g.curve.is_identity(),
+        !g.curve.is_identity() || !g.parametric.is_flat() || !g.channel_curves.is_identity(),
         SkipReason::NotRequested,
         None,
     );
@@ -425,6 +454,12 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
     push!(
         Stage::Monochrome,
         recipe.bw.is_some(),
+        SkipReason::NotRequested,
+        None,
+    );
+    push!(
+        Stage::ColourGrade,
+        !g.colour_grade.is_inert(),
         SkipReason::NotRequested,
         None,
     );
@@ -539,6 +574,18 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         SkipReason::NotRequested,
         None
     );
+    push!(
+        Stage::PostCropVignette,
+        g.effects.vignette.amount != 0,
+        SkipReason::NotRequested,
+        None,
+    );
+    push!(
+        Stage::Grain,
+        g.effects.grain.amount > 0,
+        SkipReason::NotRequested,
+        None,
+    );
     stages.push(Stage::OutputTransform);
 
     notes.sort_by(|a, b| a.stage.cmp(&b.stage).then(a.reason.cmp(&b.reason)));
@@ -604,6 +651,18 @@ pub fn stage_for(path: &str) -> Option<Stage> {
                 Some(Stage::Hsl)
             } else if path.starts_with("bw") {
                 Some(Stage::Monochrome)
+            } else if path.starts_with("global.calibration") {
+                Some(Stage::Calibration)
+            } else if path.starts_with("global.parametric")
+                || path.starts_with("global.channel_curves")
+            {
+                Some(Stage::Curve)
+            } else if path.starts_with("global.colour_grade") {
+                Some(Stage::ColourGrade)
+            } else if path.starts_with("global.effects.vignette") {
+                Some(Stage::PostCropVignette)
+            } else if path.starts_with("global.effects.grain") {
+                Some(Stage::Grain)
             } else if path == "restoration.denoise" {
                 // PHASE-22, ADR-0047 section 2. The tier decides `global.noise.*`, which
                 // `Stage::NoiseReduction` reads at index 6, so a cache told the change is valid

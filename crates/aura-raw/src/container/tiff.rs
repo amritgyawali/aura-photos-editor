@@ -86,8 +86,16 @@ pub mod tag {
     pub const DNG_VERSION: u16 = 0xC612;
     /// Per-plane black level.
     pub const BLACK_LEVEL: u16 = 0xC61A;
+    /// A lookup table from stored codes to linear sensor values.
+    pub const LINEARIZATION_TABLE: u16 = 0xC618;
+    /// Per-column black level offsets.
+    pub const BLACK_LEVEL_DELTA_H: u16 = 0xC61B;
+    /// Per-row black level offsets.
+    pub const BLACK_LEVEL_DELTA_V: u16 = 0xC61C;
     /// Per-plane white level.
     pub const WHITE_LEVEL: u16 = 0xC61D;
+    /// The sensor area that holds image data: top, left, bottom, right.
+    pub const ACTIVE_AREA: u16 = 0xC68D;
     /// Origin of the useful image area inside the sensor array.
     pub const DEFAULT_CROP_ORIGIN: u16 = 0xC61F;
     /// Size of the useful image area.
