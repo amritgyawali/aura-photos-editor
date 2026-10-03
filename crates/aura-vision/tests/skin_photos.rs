@@ -23,9 +23,15 @@ fn segments_real_photographs() {
         .filter_map(Result::ok)
         .map(|e| e.path())
         .filter(|p| {
-            p.extension().is_some_and(|e| e == "rgb") && !p.to_string_lossy().contains(".overlay")
+            p.extension().is_some_and(|e| e == "rgb")
+                && p.file_stem()
+                    .is_some_and(|s| !s.to_string_lossy().contains('.'))
         })
         .collect();
+    assert!(
+        !entries.is_empty(),
+        "No NAME_WxH.rgb inputs found in AURA_SKIN_PHOTOS"
+    );
     entries.sort();
     for path in entries {
         let stem = path.file_stem().unwrap().to_string_lossy().to_string();

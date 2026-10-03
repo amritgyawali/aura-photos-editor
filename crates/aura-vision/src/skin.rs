@@ -47,7 +47,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::portrait::PortraitFace;
 
-pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v1";
+pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v2";
 pub const MODEL_HASH: &str = "10eee962bb85d9f5d0b292376f595ce70d810becfcef17feeb4762e62d8a7754";
 const SIDE: usize = 256;
 const CLASSES: usize = 6;
@@ -248,20 +248,24 @@ fn working(rgb: &[u8], w: usize, h: usize, edge: usize) -> Image {
             rgb: rgb.to_vec(),
         };
     }
-    let (ow, oh) = (w / factor, h / factor);
+    // Cover the complete source extent, including the final partial block. Integer
+    // division used to crop the right/bottom edges and produce zero-height panoramas.
+    let (ow, oh) = (w.div_ceil(factor), h.div_ceil(factor));
     let mut out = Vec::with_capacity(ow * oh * 3);
     for y in 0..oh {
+        let (y0, y1) = (y * h / oh, (y + 1) * h / oh);
         for x in 0..ow {
-            let mut sum = [0_u32; 3];
-            for yy in y * factor..(y + 1) * factor {
-                for xx in x * factor..(x + 1) * factor {
+            let (x0, x1) = (x * w / ow, (x + 1) * w / ow);
+            let mut sum = [0_u64; 3];
+            for yy in y0..y1 {
+                for xx in x0..x1 {
                     let i = (yy * w + xx) * 3;
                     for c in 0..3 {
-                        sum[c] += u32::from(rgb[i + c]);
+                        sum[c] += u64::from(rgb[i + c]);
                     }
                 }
             }
-            let n = (factor * factor) as u32;
+            let n = ((x1 - x0) * (y1 - y0)) as u64;
             for s in sum {
                 out.push(((s + n / 2) / n) as u8);
             }
@@ -672,6 +676,63 @@ fn to_matte(plane: &[f32], w: usize, h: usize, floor: f32) -> Option<Matte> {
     })
 }
 
+// A component can contain touching people. Keep detached hands with the nearest
+// person, but partition a shared component between all faces it reaches. Choosing
+// one owner for the entire component retouched somebody else's arms in group photos.
+fn assign_regions(
+    plane: &[f32],
+    w: usize,
+    h: usize,
+    boxes: &[[f32; 4]],
+    reach: f32,
+) -> Vec<Vec<bool>> {
+    let mask: Vec<bool> = plane.iter().map(|p| *p > 0.5).collect();
+    let (labels, count) = components(&mask, w, h);
+    let distance = |i: usize, k: usize| {
+        let [l, t, r, b] = boxes[k];
+        let x = (i % w) as f32 + 0.5;
+        let y = (i / w) as f32 + 0.5;
+        (x - (l + r) * 0.5).hypot(y - (t + b) * 0.5) / (r - l).max(b - t).max(1.0)
+    };
+    let mut nearest = vec![vec![f32::INFINITY; boxes.len()]; count + 1];
+    for (i, &label) in labels.iter().enumerate().filter(|(_, label)| **label != 0) {
+        for k in 0..boxes.len() {
+            nearest[label as usize][k] = nearest[label as usize][k].min(distance(i, k));
+        }
+    }
+    let candidates: Vec<Vec<usize>> = nearest
+        .iter()
+        .map(|distances| {
+            let nearby: Vec<usize> = distances
+                .iter()
+                .enumerate()
+                .filter(|(_, d)| **d <= 1.5_f32.min(reach))
+                .map(|(k, _)| k)
+                .collect();
+            if !nearby.is_empty() {
+                return nearby;
+            }
+            distances
+                .iter()
+                .enumerate()
+                .filter(|(_, d)| **d <= reach)
+                .min_by(|a, b| a.1.total_cmp(b.1))
+                .map(|(k, _)| vec![k])
+                .unwrap_or_default()
+        })
+        .collect();
+    let mut out = vec![vec![false; w * h]; boxes.len()];
+    for (i, &label) in labels.iter().enumerate().filter(|(_, label)| **label != 0) {
+        if let Some(&k) = candidates[label as usize]
+            .iter()
+            .min_by(|&&a, &&b| distance(i, a).total_cmp(&distance(i, b)))
+        {
+            out[k][i] = true;
+        }
+    }
+    out
+}
+
 /// Segment the people in a photograph and return a face, body, hair and clothes matte for
 /// each detected face (in input order), plus the background.
 ///
@@ -755,38 +816,9 @@ pub fn analyse(
             .min_by(|a, b| a.1.total_cmp(&b.1))
     };
 
-    // Connected regions of each person class, assigned to their nearest face.
-    let assign = |class: Class, reach: f32| -> Vec<Vec<bool>> {
-        let mask: Vec<bool> = field.plane(class).iter().map(|p| *p > 0.5).collect();
-        let (labels, count) = components(&mask, w, h);
-        let mut nearest = vec![(usize::MAX, f32::INFINITY); count + 1];
-        for (i, &label) in labels.iter().enumerate() {
-            if label == 0 {
-                continue;
-            }
-            let (x, y) = ((i % w) as f32 + 0.5, (i / w) as f32 + 0.5);
-            if let Some((k, d)) = owner(x, y) {
-                let slot = &mut nearest[label as usize];
-                if d < slot.1 {
-                    *slot = (k, d);
-                }
-            }
-        }
-        let mut out = vec![vec![false; w * h]; boxes.len()];
-        for (i, &label) in labels.iter().enumerate() {
-            if label == 0 {
-                continue;
-            }
-            let (k, d) = nearest[label as usize];
-            if k < boxes.len() && d <= reach {
-                out[k][i] = true;
-            }
-        }
-        out
-    };
-    let body_regions = assign(Class::BodySkin, 7.0);
-    let hair_regions = assign(Class::Hair, 2.5);
-    let clothes_regions = assign(Class::Clothes, 6.0);
+    let body_regions = assign_regions(field.plane(Class::BodySkin), w, h, &boxes, 7.0);
+    let hair_regions = assign_regions(field.plane(Class::Hair), w, h, &boxes, 2.5);
+    let clothes_regions = assign_regions(field.plane(Class::Clothes), w, h, &boxes, 6.0);
 
     // Grow a hard region by a few pixels so the soft edge around it survives.
     let grow = |region: &[bool], by: usize| -> Vec<f32> {
@@ -914,6 +946,40 @@ pub fn analyse(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn touching_people_do_not_share_one_body_owner() {
+        let (w, h) = (100, 100);
+        let mut plane = vec![0.0; w * h];
+        for y in 30..90 {
+            for x in 15..85 {
+                plane[y * w + x] = 1.0;
+            }
+        }
+        let boxes = [[15.0, 10.0, 35.0, 35.0], [65.0, 10.0, 85.0, 35.0]];
+        let regions = assign_regions(&plane, w, h, &boxes, 7.0);
+        assert!(regions[0][60 * w + 25]);
+        assert!(!regions[0][60 * w + 75]);
+        assert!(regions[1][60 * w + 75]);
+        for i in 0..w * h {
+            assert!(!(regions[0][i] && regions[1][i]));
+            assert_eq!(regions[0][i] || regions[1][i], plane[i] > 0.5);
+        }
+    }
+
+    #[test]
+    fn downscaling_keeps_frame_edges_and_thin_panoramas() {
+        let mut rgb = vec![0; 2051 * 9 * 3];
+        for y in 0..9 {
+            rgb[(y * 2051 + 2050) * 3] = 255;
+        }
+        let image = working(&rgb, 2051, 9, WORKING_EDGE);
+        assert!(image.w > 0 && image.h > 0);
+        assert!(image.pixel(image.w - 1, image.h - 1)[0] > 0);
+        let panorama = working(&vec![120; 10000 * 8 * 3], 10000, 8, WORKING_EDGE);
+        assert_eq!(panorama.h, 1);
+        assert_eq!(panorama.rgb.len(), panorama.w * panorama.h * 3);
+    }
 
     #[test]
     fn interpreter_matches_onnxruntime_on_a_fixed_pattern() {

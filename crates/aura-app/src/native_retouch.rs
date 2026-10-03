@@ -37,6 +37,7 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
         ProjectId::from_db(&input.project_id).map_err(|_| invalid("Invalid collection"))?;
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
     let mut edits = retouch_tools::read(&base)?;
+    let mut mattes = retouch_tools::read_mattes(&base)?;
     match input.action.as_str() {
         "list" => return Ok(edits),
         "append" => {
@@ -45,6 +46,7 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
             }
             for mut e in input.edits.clone() {
                 e.id = uuid::Uuid::new_v4().to_string();
+                preserve_manual_matte(&mut e, &mut mattes)?;
                 edits.push(e);
             }
         }
@@ -61,6 +63,10 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
                 .find(|e| e.id == change.id)
                 .ok_or_else(|| invalid("Retouch operation no longer exists"))?;
             *saved = change.clone();
+            if crate::portrait_auto::group_of(&saved.id).is_some() {
+                saved.id = format!("manual-{}", saved.id);
+            }
+            preserve_manual_matte(saved, &mut mattes)?;
         }
         "remove" => {
             let id = input
@@ -85,6 +91,7 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
                         .ok_or_else(|| invalid("Retouch operation no longer exists"))?
                         .clone();
                     copy.id = uuid::Uuid::new_v4().to_string();
+                    preserve_manual_matte(&mut copy, &mut mattes)?;
                     edits.insert(index + 1, copy);
                 }
                 "earlier" if index > 0 => edits.swap(index, index - 1),
@@ -97,7 +104,7 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
     }
     retouch_tools::validate(&edits)?;
     let mut proposal = base.clone();
-    retouch_tools::write(&mut proposal, &edits)?;
+    retouch_tools::write_with_mattes(&mut proposal, &edits, &mattes)?;
     let (merged, changes) = schema::merge(&base, &proposal, EditSource::User)?;
     schema::Validation::check(&merged)?;
     state.recipe_store().save(
@@ -108,6 +115,31 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
         "Native retouch",
     )?;
     Ok(edits)
+}
+
+// An automatic pass reuses its mask IDs. Snapshot a manually chosen mask so a later
+// detection cannot silently move an existing manual edit to another person's skin.
+fn preserve_manual_matte(
+    edit: &mut Edit,
+    mattes: &mut std::collections::BTreeMap<String, retouch_tools::Matte>,
+) -> aura_core::AuraResult<()> {
+    let Some(id) = edit.matte.as_ref() else {
+        return Ok(());
+    };
+    let matte = mattes
+        .get(id)
+        .ok_or_else(|| invalid("The skin selection is missing. Detect skin again."))?;
+    if id.starts_with(crate::portrait_auto::PREFIX) {
+        let snapshot = matte.clone();
+        let bytes = serde_json::to_vec(&snapshot)
+            .map_err(|_| invalid("Could not preserve the skin selection."))?;
+        // Several manual tools can share one immutable snapshot without consuming the
+        // recipe's matte budget once per tool.
+        let id = format!("manual-{}", blake3::hash(&bytes).to_hex());
+        mattes.insert(id.clone(), snapshot);
+        edit.matte = Some(id);
+    }
+    Ok(())
 }
 
 /// Full-frame editing preview. Final crop/perspective is applied in Develop and export.
@@ -234,4 +266,35 @@ fn render_preview(
             .collect(),
         ms: result.ms,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manual_selection_survives_replacement_of_the_automatic_matte() {
+        let id = "auto-portrait-v1-0-face";
+        let original = retouch_tools::Matte::encode([0.1, 0.1, 0.8, 0.8], 2, 2, &[255; 4]);
+        let mut mattes = std::collections::BTreeMap::from([(id.into(), original.clone())]);
+        let mut edit: Edit = serde_json::from_value(serde_json::json!({
+            "id": "manual-edit", "tool": "dodge", "enabled": true,
+            "region": [0.5, 0.5, 1.0, 1.0], "source": null,
+            "amount": 0.5, "feather": 0.0, "radius": 0.01,
+            "texture": 1.0, "tone": 0.5, "warmth": 0.0, "tint": 0.0,
+            "matte": id
+        }))
+        .unwrap();
+        preserve_manual_matte(&mut edit, &mut mattes).unwrap();
+        let saved = edit.matte.clone().unwrap();
+        mattes.insert(
+            id.into(),
+            retouch_tools::Matte::encode([0.0, 0.0, 1.0, 1.0], 2, 2, &[0; 4]),
+        );
+        assert_eq!(mattes.get(&saved), Some(&original));
+        preserve_manual_matte(&mut edit, &mut mattes).unwrap();
+        assert_eq!(edit.matte.as_ref(), Some(&saved));
+        mattes.remove(&saved);
+        assert!(preserve_manual_matte(&mut edit, &mut mattes).is_err());
+    }
 }

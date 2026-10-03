@@ -10,7 +10,7 @@
   to NCHW where an operator needs it).
   - SHA256: `014bebaf0aedaf951655d4563216359d3da311c6997cfb1d0b40fb7ababf40c8`.
   - BLAKE3 (checked before compilation): `10eee962bb85d9f5d0b292376f595ce70d810becfcef17feeb4762e62d8a7754`.
-- AURA pipeline: `mediapipe-selfie-multiclass-256-aura-v1` (`aura_vision::skin`), CPU FP32 on
+- AURA pipeline: `mediapipe-selfie-multiclass-256-aura-v2` (`aura_vision::skin`), CPU FP32 on
   aura-infer's pure-Rust interpreter. No network access, no Python at run time.
 - Input: 1x3x256x256 RGB, `(v - 127.5) / 127.5`, area-sampled from a square region; outside
   the frame is black. The whole frame is letterboxed; each detected face whose head and torso
@@ -19,7 +19,11 @@
   face skin, clothes, other (accessories). AURA keeps body skin, face skin, hair, clothes and
   background, refines each with a guided filter against the photo's own luminance, gates face
   skin by the *same person's* measured skin colour and brightness (beard, brows, lips and eyes
-  drop out), and assigns connected regions to the nearest detected face.
+  drop out), and assigns connected regions to the nearest detected face. Shared components
+  that reach multiple faces are partitioned by distance to those faces, normalized by face
+  size. This is an ownership heuristic, not learned instance segmentation; overlapping limbs
+  or a person whose face is outside the frame can still be assigned incorrectly.
+  Downsampling covers the complete source extent, including partial edge blocks and panoramas.
 - Parity: the interpreter's output on a fixed synthetic input matches onnxruntime 1.28 on the
   same graph within 2e-3 on every sampled logit and 1e-3 on every class mean
   (`skin::tests::interpreter_matches_onnxruntime_on_a_fixed_pattern`).

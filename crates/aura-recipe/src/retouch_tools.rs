@@ -456,23 +456,9 @@ pub fn write_with_mattes(
 /// Returns a recipe error if validation or serialization fails.
 pub fn write(recipe: &mut Recipe, edits: &[Edit]) -> AuraResult<()> {
     validate(edits)?;
-    // Mattes already stored stay available to the operations that still use them; an
-    // operation whose matte is gone keeps its other coverage.
-    let mattes = read_mattes(recipe).unwrap_or_default();
-    let kept: Vec<Edit> = edits
-        .iter()
-        .cloned()
-        .map(|mut e| {
-            if e.matte
-                .as_deref()
-                .is_some_and(|id| !mattes.contains_key(id))
-            {
-                e.matte = None;
-            }
-            e
-        })
-        .collect();
-    write_with_mattes(recipe, &kept, &mattes)
+    // Losing a skin matte must never turn a skin-only operation into a broad brush edit.
+    let mattes = read_mattes(recipe)?;
+    write_with_mattes(recipe, edits, &mattes)
 }
 
 fn validate_selection(edit: &Edit) -> AuraResult<()> {
@@ -517,6 +503,26 @@ fn validate_selection(edit: &Edit) -> AuraResult<()> {
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod matte_tests {
     use super::*;
+
+    #[test]
+    fn writing_a_missing_or_corrupt_matte_never_expands_the_selection() {
+        let mut recipe = crate::fixtures::neutral(crate::fixtures::FIXTURE_HASH, "test");
+        let edit: Edit = serde_json::from_value(serde_json::json!({
+            "id": "skin", "tool": "dodge", "enabled": true,
+            "region": [0.5, 0.5, 1.0, 1.0], "source": null,
+            "amount": 0.5, "feather": 0.0, "radius": 0.01,
+            "texture": 1.0, "tone": 0.5, "warmth": 0.0, "tint": 0.0,
+            "matte": "missing-skin"
+        }))
+        .unwrap();
+        let before = recipe.clone();
+        assert!(write(&mut recipe, &[edit]).is_err());
+        assert_eq!(recipe.extra, before.extra);
+        recipe
+            .extra
+            .insert(MATTE_KEY.into(), serde_json::json!({"broken": 5}));
+        assert!(write(&mut recipe, &[]).is_err());
+    }
 
     #[test]
     fn mattes_round_trip_through_sixteen_levels_and_refuse_bad_data() {

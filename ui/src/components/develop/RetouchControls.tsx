@@ -1,6 +1,7 @@
 import { DEFAULT_SKIN, isSampledSkinTool, needsRetouchSource, validRetouchSelection, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool } from '../../ipc/nativeRetouch';
 import { RetouchSelectionControls } from './RetouchSelectionControls';
 import { RetouchPresets } from './RetouchPresets';
+import { RetouchSkinSelection } from './RetouchSkinSelection';
 
 export function validRetouch(draft: NativeRetouchEdit): boolean {
   return [...draft.region, draft.amount, draft.feather, draft.radius, draft.texture, draft.tone, draft.warmth, draft.tint, ...(draft.source ?? [])].every(Number.isFinite)
@@ -21,6 +22,7 @@ type Props = {
   onSourceMode: () => void; onLive: (live: boolean) => void; onApply: () => void;
   onNew: () => void; onDiscard: () => void; onPreset: (polished: boolean) => void;
   onSelectAll: () => void;
+  edits: NativeRetouchEdit[];
 };
 
 export function RetouchControls(props: Props) {
@@ -58,6 +60,7 @@ export function RetouchControls(props: Props) {
       <label>{draft.tool === 'skin_uniformity' ? 'Color evening' : 'Tonal evening'} ({Math.round(draft.tone * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.tone} onChange={event => onChange({ tone: Number(event.target.value) })}/></label>
       {draft.tool === 'skin_smooth' && <label>Fine detail ({Math.round(draft.texture * 100)}%)<input type="range" min="0" max="2" step="0.01" value={draft.texture} onChange={event => onChange({ texture: Number(event.target.value) })}/><span className="lr-hint">100% retains the fine-detail band.</span></label>}
     </details>}
+    <RetouchSkinSelection draft={draft} edits={props.edits} onChange={onChange}/>
     <RetouchSelectionControls draft={draft} onChange={onChange}/>
     <button type="button" onClick={props.onSelectAll}>Select entire photo</button>
     <details open><summary>{draft.mask || draft.selection?.gradient ? 'Clone anchor / keyboard target' : 'Target region'}</summary>

@@ -2,6 +2,19 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Skin selection and independent retouch corrections — 2026-10-04
+
+- Partition connected skin regions between nearby detected people; preserve the full image
+  extent when downsampling, including very thin panoramas.
+- Retouch detected body skin using its own sample when a face sample is unavailable. Keep
+  teeth, eye, blemish and finishing controls working when skin smoothing is switched off.
+- Reuse detected face/body masks with any retouch tool. Show the active AI restriction,
+  allow removing it, and clear it when selecting the entire photo.
+- Preserve manually adjusted automatic steps and snapshot their masks across later passes.
+  Reject missing/corrupt masks instead of silently applying a skin edit outside its selection.
+- Make real-photo checks reject empty input sets and render in the correct working primaries.
+  Keep the desktop shell build independent in nested checkouts.
+
 ## AI face and body skin detection, 52 retouch settings — 2026-10-01
 
 - Face skin and body skin are now found by a bundled, offline, open-source person segmenter

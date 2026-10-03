@@ -302,7 +302,7 @@ pub fn plan_with_faces(
         message: String::new(),
         faces: Vec::new(),
         assessments: Vec::new(),
-        planner_version: format!("sample-consensus-v2+{}", portrait_features::VERSION),
+        planner_version: format!("sample-consensus-v3+{}", portrait_features::VERSION),
         steps: Vec::new(),
         scene: None,
         options: Some(options),
@@ -320,6 +320,10 @@ pub fn plan_with_faces(
         });
     }
     let settings = options.settings;
+    let overridden: std::collections::BTreeSet<String> = retouch_tools::read(proposal)?
+        .iter()
+        .filter_map(|e| e.id.strip_prefix("manual-").map(str::to_owned))
+        .collect();
     report.faces = match faces {
         Some(faces) => faces,
         None => portrait::detect(rgb, width, height)?,
@@ -398,22 +402,22 @@ pub fn plan_with_faces(
                 use_matte(edit, matte, [pw as f32, ph as f32]);
             }
         }
+        let face_template = face_plan.edits.first().cloned();
         face_plan.edits = tune_face(face_plan.edits, &settings);
-        if let (Some(sample), Some(template)) = (face_plan.sample, face_plan.edits.first().cloned())
-        {
+        if let (Some(sample), Some(template)) = (face_plan.sample, face_template) {
             let extra = face_extras(&template, index, &sample, exposure, &settings);
             face_plan.edits.extend(extra);
         }
         let mut body = if options.scope.body() {
             match (&face_plan.sample, person) {
-                (Some(sample), Some(p)) if p.body.is_some() => {
+                (sample, Some(p)) if p.body.is_some() => {
                     let matte = store(&mut mattes, p.body.as_ref(), index, "body");
                     matte.map_or_else(
                         || FacePlan::skip(""),
-                        |m| plan_body_matte(face, index, prgb, pw, ph, sample, &m, &settings, exposure),
+                        |m| plan_body_matte(face, index, prgb, pw, ph, sample.as_ref(), &m, &settings, exposure),
                     )
                 }
-                (Some(_), Some(p)) if segmentation.summary.unavailable.is_none() && p.face.is_some() => {
+                (_, Some(_)) if segmentation.summary.unavailable.is_none() => {
                     FacePlan::skip(
                         "Body skin: the segmenter found no visible body skin for this person (covered by clothing, hair or out of frame).",
                     )
@@ -459,7 +463,7 @@ pub fn plan_with_faces(
             edit.amount = (edit.amount * options.intensity).clamp(0.05, 0.95);
         }
         let mut features = portrait_features::FeatureEdits::default();
-        if !plan.edits.is_empty() && landmarks_trusted {
+        if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
                 features = portrait_features::plan(
                     face,
@@ -473,8 +477,20 @@ pub fn plan_with_faces(
             }
         }
         features.finishing.extend(garments);
+        // A manually adjusted automatic step occupies its original slot. Do not add a
+        // second automatic correction on top, including when the user disabled that step.
+        for edits in [
+            &mut plan.edits,
+            &mut body.edits,
+            &mut features.blemishes,
+            &mut features.refine,
+            &mut features.eyes,
+            &mut features.finishing,
+        ] {
+            edits.retain(|e| !overridden.contains(&e.id));
+        }
         let used: usize = planned.iter().map(Vec::len).sum();
-        let wanted = plan.edits.len()
+        let mut wanted = plan.edits.len()
             + body.edits.len()
             + features.blemishes.len()
             + features.refine.len()
@@ -484,6 +500,7 @@ pub fn plan_with_faces(
             plan = FacePlan::skip("The saved retouch stack has reached its operation limit.");
             body = FacePlan::skip("");
             features = portrait_features::FeatureEdits::default();
+            wanted = 0;
         }
         let mut findings = features.report.findings;
         if options.scope.body() && !body.reason.is_empty() {
@@ -496,12 +513,7 @@ pub fn plan_with_faces(
         }
         report.assessments.push(FaceAssessment {
             face: index + 1,
-            status: if plan.edits.is_empty() && body.edits.is_empty() {
-                "skipped"
-            } else {
-                "retouched"
-            }
-            .into(),
+            status: if wanted == 0 { "skipped" } else { "retouched" }.into(),
             confidence: face.confidence,
             reason: plan.reason,
             strengths,
@@ -509,7 +521,7 @@ pub fn plan_with_faces(
             spots_healed: features.report.spots_healed,
             marks_kept: features.report.marks_kept,
         });
-        if plan.edits.is_empty() && body.edits.is_empty() {
+        if wanted == 0 {
             continue;
         }
         report.retouched_faces += 1;
@@ -533,7 +545,10 @@ pub fn plan_with_faces(
     }
     let [skin, spots, refine, eyes, mut finishing] = planned;
     // A plain backdrop, smoothed for the whole frame when asked for.
-    if settings.backdrop > 0.0 && !report.faces.is_empty() {
+    if settings.backdrop > 0.0
+        && !report.faces.is_empty()
+        && !overridden.contains(&format!("{PREFIX}backdrop"))
+    {
         // Kept clear of the subject by the blur's own reach, so no colour bleeds across.
         let away = segmentation
             .background
@@ -1860,7 +1875,7 @@ fn plan_body_matte(
     rgb: &[u8],
     width: u32,
     height: u32,
-    face_sample: &Sample,
+    face_sample: Option<&Sample>,
     matte: &MatteUse,
     settings: &Settings,
     exposure: f32,
@@ -1943,10 +1958,13 @@ fn plan_body_matte(
         Tool::SkinUniformity,
         tone * 0.9 * gain(settings.body_tone),
     ));
-    if let Some(mut e) = base(
-        "body-match",
-        Tool::SkinUniformity,
-        settings.match_body_to_face * 0.6,
+    if let (Some(face_sample), Some(mut e)) = (
+        face_sample,
+        base(
+            "body-match",
+            Tool::SkinUniformity,
+            settings.match_body_to_face * 0.6,
+        ),
     ) {
         // Toward the same person's face, never toward a reference complexion.
         e.source = Some([
@@ -2329,6 +2347,94 @@ mod tests {
     }
 
     #[test]
+    fn manually_adjusted_automatic_steps_are_not_planned_again() {
+        let (rgb, face) = person(None);
+        let mut initial = scoped(&rgb, &face, portrait_features::Scope::Face);
+        let mut edited = initial.groups.get_mut(&Group::Skin).unwrap().remove(0);
+        let original_id = edited.id.clone();
+        edited.id = format!("manual-{original_id}");
+        edited.enabled = false;
+        let mut recipe = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
+        retouch_tools::write(&mut recipe, &[edited.clone()]).unwrap();
+        let options = portrait_features::Options {
+            settings: Settings {
+                ai_skin_detection: false,
+                ..Settings::default()
+            },
+            ..portrait_features::Options::default()
+        };
+        let plan = plan_with_faces(
+            &recipe,
+            &rgb,
+            200,
+            300,
+            None,
+            0.0,
+            Some(vec![face]),
+            &options,
+            true,
+        )
+        .unwrap();
+        assert!(!plan.groups.values().flatten().any(|e| e.id == original_id));
+        assert_eq!(retouch_tools::read(&recipe).unwrap(), vec![edited]);
+    }
+
+    #[test]
+    fn teeth_finishing_does_not_require_skin_smoothing() {
+        let mut rgb = [160, 112, 90].repeat(400 * 400);
+        for y in 276..285 {
+            for x in 178..223 {
+                rgb[(y * 400 + x) * 3..(y * 400 + x) * 3 + 3].copy_from_slice(&[230, 205, 140]);
+            }
+        }
+        let face = PortraitFace {
+            bounds: [0.2, 0.1, 0.8, 0.9],
+            confidence: 0.95,
+            landmarks: [
+                [0.38, 0.4],
+                [0.62, 0.4],
+                [0.5, 0.55],
+                [0.41, 0.7],
+                [0.59, 0.7],
+            ],
+        };
+        let recipe = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
+        let options = portrait_features::Options {
+            settings: Settings {
+                ai_skin_detection: false,
+                smoothing: 0.0,
+                tone_evenness: 0.0,
+                light_evenness: 0.0,
+                ..Settings::default()
+            },
+            ..portrait_features::Options::default()
+        };
+        let plan = plan_with_faces(
+            &recipe,
+            &rgb,
+            400,
+            400,
+            None,
+            0.0,
+            Some(vec![face]),
+            &options,
+            true,
+        )
+        .unwrap();
+        assert!(plan.groups.get(&Group::Skin).unwrap().is_empty());
+        assert!(plan
+            .groups
+            .values()
+            .flatten()
+            .any(|e| e.tool == Tool::Teeth));
+        assert_eq!(plan.report.retouched_faces, 1);
+        assert_eq!(
+            plan.report.operations,
+            plan.groups.values().map(Vec::len).sum::<usize>()
+        );
+    }
+
+    #[test]
     fn covered_body_is_skipped_with_a_reason() {
         let (rgb, face) = person(Some([30, 60, 140]));
         let plan = scoped(&rgb, &face, portrait_features::Scope::Body);
@@ -2405,6 +2511,25 @@ mod tests {
         let mut mattes = BTreeMap::new();
         let body = square_matte([0.2, 0.45, 0.8, 0.95], 40);
         let used = store(&mut mattes, Some(&body), 0, "body").unwrap();
+        let body_only = plan_body_matte(
+            &face,
+            0,
+            &rgb,
+            200,
+            300,
+            None,
+            &used,
+            &Settings::default(),
+            0.0,
+        );
+        assert!(
+            !body_only.edits.is_empty(),
+            "Body skin must not require a face sample"
+        );
+        assert!(body_only
+            .edits
+            .iter()
+            .all(|e| !e.id.ends_with("body-match")));
         let sample = sample_quality(&rgb, 200, 300, [100.0, 60.0]).unwrap();
         let settings = Settings {
             body_redness: 0.5,
@@ -2412,7 +2537,17 @@ mod tests {
             neck_lines: 0.5,
             ..Settings::default()
         };
-        let plan = plan_body_matte(&face, 0, &rgb, 200, 300, &sample, &used, &settings, 0.0);
+        let plan = plan_body_matte(
+            &face,
+            0,
+            &rgb,
+            200,
+            300,
+            Some(&sample),
+            &used,
+            &settings,
+            0.0,
+        );
         let ids: Vec<&str> = plan.edits.iter().map(|e| e.id.as_str()).collect();
         for want in [
             "0-body-texture",

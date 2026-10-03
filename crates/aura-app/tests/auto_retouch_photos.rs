@@ -26,6 +26,17 @@ fn encode(v: f32) -> u8 {
     (aura_raw::colour::curve::srgb_encode(v.clamp(0.0, 1.0)) * 255.0).round() as u8
 }
 
+fn working_pixels(rgb: &[u8]) -> Vec<f32> {
+    use aura_raw::colour::matrix::{invert, mul, REC2020_TO_XYZ_D65, SRGB_TO_XYZ_D65};
+    let matrix =
+        aura_render::colour::narrow(mul(invert(REC2020_TO_XYZ_D65).unwrap(), SRGB_TO_XYZ_D65));
+    rgb.chunks_exact(3)
+        .flat_map(|p| {
+            aura_render::colour::apply_f32(matrix, [decode(p[0]), decode(p[1]), decode(p[2])])
+        })
+        .collect()
+}
+
 fn preset(name: &str) -> portrait_features::Options {
     let mut options = portrait_features::Options {
         scope: portrait_features::Scope::FaceAndBody,
@@ -84,10 +95,15 @@ fn retouches_real_photographs() {
         .filter_map(Result::ok)
         .map(|e| e.path())
         .filter(|p| {
-            let name = p.to_string_lossy();
-            p.extension().is_some_and(|e| e == "rgb") && name.matches('.').count() == 1
+            p.extension().is_some_and(|e| e == "rgb")
+                && p.file_stem()
+                    .is_some_and(|s| !s.to_string_lossy().contains('.'))
         })
         .collect();
+    assert!(
+        !entries.is_empty(),
+        "No NAME_WxH.rgb inputs found in AURA_SKIN_PHOTOS"
+    );
     entries.sort();
     for path in entries {
         let stem = path.file_stem().unwrap().to_string_lossy().to_string();
@@ -127,7 +143,17 @@ fn retouches_real_photographs() {
             retouch_tools::write_with_mattes(&mut with, &stack, &plan.mattes).unwrap();
             aura_recipe::schema::Validation::check(&with).unwrap();
             let mattes = retouch_tools::read_mattes(&with).unwrap();
-            let mut linear: Vec<f32> = rgb.iter().map(|v| decode(*v)).collect();
+            let mut linear: Vec<f32> = working_pixels(&rgb);
+            let source = linear.clone();
+            let mut selected = vec![false; (w * h) as usize];
+            for edit in &stack {
+                let mask = aura_render::retouch_tools::selection_mask_with_mattes(
+                    &source, w as usize, h as usize, edit, &mattes,
+                );
+                for (selected, alpha) in selected.iter_mut().zip(mask) {
+                    *selected |= alpha > 0.0;
+                }
+            }
             let started = std::time::Instant::now();
             aura_render::retouch_tools::apply_with_mattes(
                 &mut linear,
@@ -137,7 +163,23 @@ fn retouches_real_photographs() {
                 &mattes,
             );
             let rendering = started.elapsed();
-            let after: Vec<u8> = linear.iter().map(|v| encode(*v)).collect();
+            for (i, (before, after)) in source
+                .chunks_exact(3)
+                .zip(linear.chunks_exact(3))
+                .enumerate()
+            {
+                if !selected[i] {
+                    assert_eq!(before, after, "Changed unselected pixel {i} in {stem}");
+                }
+                assert!(after.iter().all(|v| v.is_finite()));
+            }
+            let matrix = aura_render::output::working_to_output(aura_render::OutputColour::Srgb);
+            let after: Vec<u8> = linear
+                .chunks_exact(3)
+                .flat_map(|p| {
+                    aura_render::colour::apply_f32(matrix, [p[0], p[1], p[2]]).map(encode)
+                })
+                .collect();
             std::fs::write(
                 path.with_file_name(format!("{stem}.{name}.after.rgb")),
                 &after,
@@ -145,7 +187,7 @@ fn retouches_real_photographs() {
             .unwrap();
             if name == presets.split(',').next().unwrap_or("natural") {
                 // What the face and body skin operations select, as magenta and cyan.
-                let source: Vec<f32> = rgb.iter().map(|v| decode(*v)).collect();
+                let source: Vec<f32> = working_pixels(&rgb);
                 let mut overlay = rgb.clone();
                 for edit in stack
                     .iter()

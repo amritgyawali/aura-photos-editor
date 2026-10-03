@@ -16,6 +16,35 @@ Natural · Subtle · Soft glow · Polished beauty · Bridal · Groom & men · Ed
 Body focus · Studio clean. A preset only sets the controls below; change any of them and it
 becomes *Custom*.
 
+## Reuse and refine detected skin
+
+Run **Automatic retouch** with **Face + body skin**, then choose **Use detected skin**
+in the retouch controls. Each available face/body selection is listed by person. The chosen
+mask and its sampled reference can be reused with any tool; changing the selection does not
+change that tool's strength. **Preview selection mask** shows actual coverage.
+
+An attached AI mask limits the brush, ellipse and brightness selections. **Remove AI mask
+restriction** removes that limit while keeping the authored shape; **Select entire photo**
+also removes it. Use the eraser to protect additional details inside a detected region.
+
+Changing or disabling an automatic step makes it a manual override. A later automatic pass
+keeps that override and does not create a second copy of the same automatic step. Its mask
+is snapshotted so a new detection cannot move the manual correction. Undo restores the prior
+step. Removing the override allows a later pass to plan that step again.
+
+Body skin can be smoothed and evened from its own samples when face sampling fails. Only
+**Match body to face** requires a usable face sample. Eyes, teeth and blemish finishing can
+run independently with skin smoothing, tone evening and light evening switched off.
+
+## Reference approaches
+
+The local detector uses the open-source [MediaPipe person segmenter](https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter),
+with separate face-skin and body-skin classes. The controls follow the useful separation of
+mask refinement and tone/texture controls in [SkinFiner](https://www.photo-toolbox.com/product/skinfiner/),
+targeted healing/light balancing in [Retouch4me](https://global.retouch4.me/retouchplugins),
+and restrained finishing styles in [Imagen](https://support.imagen-ai.com/hc/en-us/articles/36160335937949-Retouch-all-faces-in-your-gallery).
+Those products are workflow references; their proprietary code and models are not used.
+
 ## The controls (58)
 
 **Always visible:** what to retouch (face / body skin / both), overall strength, heal
