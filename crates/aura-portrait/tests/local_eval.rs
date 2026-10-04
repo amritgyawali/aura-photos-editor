@@ -469,3 +469,61 @@ fn readings_on_colour_frames() {
         );
     }
 }
+
+#[test]
+#[ignore = "writes overlay planes for a UI preview to AURA_PORTRAIT_EVAL_OUT"]
+fn dump_overlays_for_ui_preview() {
+    let (Some(dir), Some(out)) = (dir(), out_dir()) else {
+        return;
+    };
+    let Some((width, height, 3, rgb)) = read_pnm(&dir.join("obama2.ppm")) else {
+        return;
+    };
+    let Some(canvas) = aura_portrait::Canvas::from_srgb8(&rgb, width, height, 1024) else {
+        return;
+    };
+    let map = aura_portrait::analyse(&canvas, &[]);
+    let (ow, oh) = aura_portrait::canvas::fit(map.width, map.height, 320);
+    let mut index = String::new();
+    for stat in &map.stats {
+        if stat.coverage <= 1e-4 {
+            continue;
+        }
+        let plane = map.resolve(stat.region, ow, oh);
+        let bytes: Vec<u8> = plane
+            .values
+            .iter()
+            .map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8)
+            .collect();
+        let _ = std::fs::write(out.join(format!("ov_{}.bin", stat.region.as_str())), bytes);
+        index.push_str(&format!(
+            "{} {} {} {}\n",
+            stat.region.as_str(),
+            stat.region.label().replace(' ', "_"),
+            stat.coverage,
+            stat.confidence
+        ));
+    }
+    let w = map.width as f32;
+    let h = map.height as f32;
+    for f in &map.faces {
+        let b = f.bbox();
+        index.push_str(&format!(
+            "face {} {} {} {} {} {} {} {} {} {} {} {}\n",
+            b[0] / w,
+            b[1] / h,
+            b[2] / w,
+            b[3] / h,
+            f.left_eye[0] / w,
+            f.left_eye[1] / h,
+            f.right_eye[0] / w,
+            f.right_eye[1] / h,
+            f.nose[0] / w,
+            f.nose[1] / h,
+            f.mouth[0] / w,
+            f.mouth[1] / h
+        ));
+    }
+    index.push_str(&format!("size {ow} {oh}\n"));
+    let _ = std::fs::write(out.join("ov_index.txt"), index);
+}

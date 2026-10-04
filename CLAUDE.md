@@ -147,6 +147,12 @@ Never load two phase files into one session.
 | What matching a look does, in the product's own words | `docs/match-a-look.md` |
 | Look evaluation gates | `tests/eval/look_eval.rs` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
+| Portrait parsing and portrait retouch decisions | `docs/adr/ADR-0065-measured-portrait-parsing-and-portrait-retouch.md` |
+| Faces, landmarks and the nineteen portrait regions | `crates/aura-portrait/` |
+| The vendored Haar cascades, their converter and their card | `crates/aura-portrait/data/`, `docs/model-cards/haar_cascades.md` |
+| The fourteen portrait operators the renderer executes | `crates/aura-render/src/portrait.rs` |
+| Portrait evaluation instruments (your own photographs) | `crates/aura-portrait/tests/local_eval.rs`, `crates/aura-render/tests/portrait_local.rs` |
+| What portrait retouch finds and changes, in the product's own words | `docs/portrait-retouch.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -1970,6 +1976,45 @@ frame for a photograph whose proxy is not built yet, which is right for a develo
 open on the night of a wedding and catastrophic for a residual: every look would have been the
 difference between a page and a rectangle. `own_frames` reads the real proxy and **skips** what it
 cannot get. Fourth time this product has chosen a smaller honest answer over a larger silent one.
+
+**Portrait retouch** is implemented, after phase 31 and outside the phase plan (ADR-0065).
+`aura-portrait` is a new crate below the renderer: a pure-Rust Viola-Jones evaluator, faithful to
+OpenCV's, over OpenCV's own BSD-licensed Haar cascades (frontal, profile, eye) - **the first
+detector in this product that finds a face in a real photograph** - scanned six ways (upright,
+tilted twenty degrees each way, locally equalised, profile and mirrored profile) and accepted only
+with evidence. Every other region is *measured* relative to the face: skin is a distance from a
+model fitted to that person's own cheeks, lips are redder than that skin, teeth brighter and less
+saturated than those lips, brows darker than that forehead; hair, body and background are colour
+models seeded beside the person. Nineteen soft regions come out: skin, face, eyes, iris, sclera,
+eyebrows, under-eyes, nose, lips, teeth, mouth, facial hair, neck, hair, body skin, clothing, body,
+background and sky. `aura-render` re-derives them from the pixels at render time (cached by
+content, `PARSE_VER` folded into the engine string), so recipe masks of kind face, skin, subject,
+background and sky - and any mask whose `target` names a region - finally render, and
+`CpuEngine::new` declares `mask_generators` and `retouch_operators`. Fourteen portrait operators
+(`skin_smooth`, `skin_even`, `blemish_clear`, `under_eye_lift`, `shine_control`, `face_light`,
+`eye_brighten`, `iris_enhance`, `sclera_whiten`, `brow_define`, `teeth_whiten`, `lip_enhance`,
+`hair_define`, `background_blur`) change tone and colour in place; none reshapes anybody and none
+moves a skin tone. Four IPC commands (`analyse_portrait`, `portrait_retouch`,
+`set_portrait_retouch`, `auto_portrait_retouch`) feed a **Portrait retouch** workspace with region
+overlays, landmarks, a draw-a-missed-face tool, measured automatic retouch and per-region
+adjustments.
+
+Three rules this adds:
+
+- **A region is measured against the person it belongs to, never against a constant.** The broad
+  skin prior only chooses where to sample a *detected* face; every skin plane is a distance from
+  that person's own skin. Phase 15's rule, applied to segmentation.
+- **The renderer re-derives regions from pixels; it never reads them from the catalog.** A
+  photographer's drawn face travels in the recipe as `target: "hint:x,y,w,h"`, so the four values a
+  delivered file is re-created from still decide every pixel.
+- **An automatic retouch is sized from measurements and never overwrites a choice.** A closed mouth
+  gets no whitening; once a person sets the retouch, `schema::merge` refuses the automatic pass and
+  the response says so.
+
+**What it does not claim:** accuracy on a real wedding, or parity across real skin tones. The gates
+are painted faces at all ten Monk swatches and an informal look at 22 public photographs, where the
+evaluator matched OpenCV's boxes 80 of 80. `docs/portrait-retouch.md` says so in the product's
+voice.
 
 Five rules that phase 13 adds and every later phase inherits:
 

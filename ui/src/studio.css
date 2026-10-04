@@ -148,3 +148,38 @@ summary { cursor: pointer; padding: 12px 0; color: var(--muted); }
 @media (max-width: 1100px) { .aura-studio { grid-template-columns: 200px minmax(0,1fr); } .studio-content { padding: 24px; } .welcome-contact-sheet { opacity: .25; width: 28%; } .studio-layout { grid-template-columns: minmax(0,1fr); } .studio-adjustments { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 28px; } .studio-adjustments > p, .studio-history { grid-column: 1 / -1; } }
 @media (max-width: 700px) { .aura-studio { display: block; height: auto; } .studio-sidebar { padding: 16px; gap: 12px; overflow: visible; } .studio-brand { padding: 0; } .studio-nav { display: flex; overflow-x: auto; } .studio-nav button { white-space: nowrap; padding: 10px; } .studio-nav button span, .sidebar-note { display: none; } .project-picker .project-list { max-height: 100px; overflow-y: auto; } .studio-topbar { padding: 15px 20px; } .studio-content { padding: 22px 16px; } .studio-welcome { padding-top: 20px; } .studio-welcome h1 { font-size: 48px; } .welcome-contact-sheet { display: none; } .welcome-features { grid-template-columns: 1fr; margin-top: 40px; } .studio-toolbar { align-items: start; flex-direction: column; } .match-look-panel { padding: 20px 16px; } .studio-canvas { min-height: 280px; height: 50vh; } .studio-adjustments { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+
+/* Portrait retouch: the photograph, what AURA found laid over it, and the controls. */
+.portrait-retouch { margin-top: 8px; }
+.portrait-summary { color: var(--muted); font-size: 13px; }
+.portrait-retouch .studio-layout { grid-template-columns: minmax(0,1fr) 300px; }
+.portrait-stage { height: auto; min-height: 280px; display: flex; align-items: center; justify-content: center; }
+.portrait-frame { position: relative; display: inline-block; line-height: 0; }
+.studio-canvas .portrait-frame img { position: static; display: block; width: auto; height: auto; max-width: 100%; max-height: min(70vh, 760px); object-fit: initial; }
+.portrait-overlay, .portrait-faces { position: absolute; inset: 0; width: 100%; height: 100%; }
+.portrait-overlay { pointer-events: none; }
+.portrait-faces { pointer-events: none; overflow: visible; }
+.portrait-faces.is-drawing { pointer-events: auto; cursor: crosshair; }
+.portrait-face rect { fill: none; stroke: #c4adf5; stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.portrait-face circle { fill: #ffe066; }
+.portrait-face.source-hint rect { stroke: #fff; stroke-dasharray: 6 4; }
+.portrait-hint { fill: rgba(255,255,255,.08); stroke: #fff; stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-dasharray: 6 4; }
+.portrait-hint.is-pending { stroke: var(--accent); }
+.portrait-stage-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.portrait-stage-tools button[aria-pressed='true'] { border-color: var(--accent); background: #3a3447; }
+.portrait-regions { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 14px; display: flex; flex-wrap: wrap; gap: 7px; }
+.portrait-regions legend { color: var(--muted); font-size: 12px; padding: 0 6px; }
+.region-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; font-size: 12px; border-radius: 99px; }
+.region-chip i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; opacity: .5; }
+.region-chip[aria-pressed='true'] { border-color: var(--accent); background: #3a3447; }
+.region-chip[aria-pressed='true'] i { opacity: 1; }
+.portrait-controls { display: grid; gap: 12px; align-content: start; }
+.portrait-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.portrait-retouch .studio-adjustments { display: grid; grid-template-columns: 1fr; }
+.portrait-group { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 8px; }
+.portrait-group h3 { margin: 0; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.portrait-slider { display: grid; gap: 4px; }
+.portrait-slider span { display: flex; justify-content: space-between; font-size: 13px; }
+.portrait-slider small { color: var(--muted); font-size: 11px; }
+.portrait-slider input[type='range'] { width: 100%; }
+.portrait-explanation { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; display: grid; gap: 4px; }

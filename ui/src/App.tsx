@@ -15,6 +15,7 @@ import { MatchLookPanel } from './components/look/MatchLookPanel';
 import { CuratePanel } from './components/curate/CuratePanel';
 import { DeliveryPanel } from './components/delivery/DeliveryPanel';
 import { PhotoStudio } from './components/develop/PhotoStudio';
+import { PortraitRetouch } from './components/develop/PortraitRetouch';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
@@ -283,6 +284,7 @@ export function App(): JSX.Element {
   const tabs = [
     ['library', 'Photos', 'Browse your collection'],
     ['edit', 'Auto edit', 'One click, start to finish'],
+    ['retouch', 'Portrait retouch', 'Skin, eyes, teeth & hair'],
     ['look', 'Instagram style', 'Your reference, your photos'],
     ['export', 'Export', 'Ready to share'],
     ['advanced', 'Advanced', 'Quality, curation & settings'],
@@ -336,6 +338,12 @@ export function App(): JSX.Element {
                 <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
               </>}
             </div>
+            {workspace === 'retouch' && <>
+              {focusedPhoto ? <>
+                <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
+                <PortraitRetouch key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} disabled={editing} onBusyChange={setSaving} />
+              </> : <div className="studio-empty"><strong>Add a portrait to retouch.</strong><p>Choose photos in Photos, then come back here.</p></div>}
+            </>}
             {workspace === 'look' && <details className="advanced-tools"><summary>Advanced lighting-bucket look profiles</summary><MatchLookPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={setMatching} /></details>}
             {workspace === 'export' && <><header className="workspace-heading"><div><span className="eyebrow">THE FINISHING TOUCH</span><h1>Render your final output.</h1></div></header><DeliveryPanel key={activeProjectId} projectId={activeProjectId} profileId={null} onError={setError} onBusyChange={setExporting} /></>}
             {workspace === 'advanced' && <><header className="workspace-heading"><div><span className="eyebrow">MORE CONTROL</span><h1>The details make the difference.</h1></div></header>

@@ -2,6 +2,40 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Portrait retouch - finding a face, and what is in it, in a real photograph
+
+Every retouch phase from 18 to 22 was built against an input port nothing filled, because the face
+detector phase 06 ships finds no faces. On a real photograph the retouch stages were correct,
+tested and gated to zero. This change fills the port.
+
+**Faces.** `aura-portrait` evaluates OpenCV's published Haar cascades with its own pure-Rust
+Viola-Jones implementation - checked against OpenCV on 22 photographs, 80 of 80 boxes agreeing to
+within two pixels - over six scans (upright, tilted both ways, locally equalised, profile, mirrored
+profile) and accepts a candidate only with evidence: a skin-coloured centre and either many agreeing
+windows or a measured eye and mouth. Every false positive the extra scans produced on the
+evaluation set was removed without losing a face. Every one of the ten Monk Skin Tone swatches is
+found on a painted test face; the darkest only by the equalised scan, which is why it exists.
+
+**Regions.** Nineteen soft regions measured relative to each person: skin from a model of their own
+cheeks, lips redder than that skin, teeth brighter and less saturated than those lips, brows darker
+than that forehead, eyes, iris and sclera inside the measured eye openings, hair and body from
+colour models seeded beside the person and held against the ground beside them, and sky connected
+to the top of the frame.
+
+**Retouch.** Fourteen operators in the renderer: smooth skin (pores kept), even skin tone (toward
+the person's own tone), clear blemishes (moles and freckles kept), brighten under-eyes, reduce
+shine, face fill light, brighten eyes, iris detail, clear eye whites, define brows, whiten teeth,
+lip colour, define hair and blur background. Recipe masks of kind face, skin, subject, background
+and sky now render, and any region can be adjusted on its own. Nothing reshapes anybody and nothing
+changes a skin tone.
+
+**Workspace.** A Portrait retouch tab: what AURA found laid over the photograph, landmarks, a tool to
+draw a face AURA missed, a measured automatic retouch in three strengths with a sentence for every
+decision, the fourteen sliders and per-region adjustments.
+
+**What it does not claim:** accuracy on a real wedding, or equal accuracy across real skin tones.
+See `docs/portrait-retouch.md` and ADR-0065.
+
 ## Phase 31 - Matching a look somebody else published
 
 The thing photographers actually ask for: point at an account whose photographs you want yours to

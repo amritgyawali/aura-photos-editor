@@ -146,9 +146,9 @@ pub fn wants_parse(recipe: &Recipe) -> bool {
 
 /// The parses this process has already made, newest last.
 ///
-/// Keyed by the content of the analysis canvas and the hints, so the cache cannot serve one
-/// photograph's faces for another and does not care which preview tier asked. Six entries:
-/// a photographer moving between a handful of frames in a session.
+/// Keyed by the frame's own pixels, its size and the hints, so the cache cannot serve one
+/// photograph's faces for another, and a proxy and a full-resolution original are parsed
+/// separately. Six entries: a photographer moving between a handful of frames in a session.
 static CACHE: Mutex<Vec<(blake3::Hash, Arc<PortraitMap>)>> = Mutex::new(Vec::new());
 
 /// How many parses are kept.
@@ -163,21 +163,20 @@ pub fn parse(frame: &Frame, hints: &[FaceHint]) -> Option<Arc<PortraitMap>> {
     if frame.origin != (0, 0) || frame.full != (frame.width, frame.height) {
         return None;
     }
-    let canvas = Canvas::from_linear(
-        &frame.rgb,
-        frame.width,
-        frame.height,
-        Primaries::Rec2020,
-        ANALYSIS_EDGE,
-    )?;
+    // Keyed by the frame's own pixels, so a cache hit costs one hash and never the downsample
+    // and colour conversion a parse starts with. The bytes go to the hasher in large blocks:
+    // a call per float is most of the cost of hashing a proxy.
     let mut hasher = blake3::Hasher::new();
     hasher.update(&PARSE_VER.to_le_bytes());
-    hasher.update(&canvas.width.to_le_bytes());
-    hasher.update(&canvas.height.to_le_bytes());
-    for pixel in &canvas.srgb {
-        for channel in pixel {
-            hasher.update(&channel.to_le_bytes());
+    hasher.update(&frame.width.to_le_bytes());
+    hasher.update(&frame.height.to_le_bytes());
+    let mut block = Vec::with_capacity(16_384 * 4);
+    for chunk in frame.rgb.chunks(16_384) {
+        block.clear();
+        for value in chunk {
+            block.extend_from_slice(&value.to_le_bytes());
         }
+        hasher.update(&block);
     }
     for hint in hints {
         hasher.update(hint.to_target().as_bytes());
@@ -189,6 +188,13 @@ pub fn parse(frame: &Frame, hints: &[FaceHint]) -> Option<Arc<PortraitMap>> {
             return Some(Arc::clone(map));
         }
     }
+    let canvas = Canvas::from_linear(
+        &frame.rgb,
+        frame.width,
+        frame.height,
+        Primaries::Rec2020,
+        ANALYSIS_EDGE,
+    )?;
     let map = Arc::new(aura_portrait::analyse(&canvas, hints));
     let mut cache = CACHE.lock().unwrap_or_else(PoisonError::into_inner);
     if !cache.iter().any(|(k, _)| *k == key) {
