@@ -1,4 +1,4 @@
-"""Drive one-click automatic editing through the real desktop window (ADR-0076).
+"""Drive one-click automatic editing through the real desktop window (ADR-0081).
 
 Uses genuine Windows mouse and keyboard input (SetCursorPos / mouse_event / keybd_event)
 for the main actions, plus Playwright over WebView2 CDP (port 9223) to locate controls
@@ -221,7 +221,7 @@ with sync_playwright() as pw:
         return {'options': opts, 'manualKept': all(any(e['id'] == i for e in after) for i in own),
                 'teethOps': sum(e['tool'] == 'teeth' for e in after), 'autoOps': sum(e['id'].startswith('auto-') for e in after),
                 'lastHistory': call('image_history', photoId=photo)['entries'][-1]['label']}
-    # Needs a desktop build that includes the auto_retouch command (ADR-0076 section 5).
+    # Needs a desktop build that includes the auto_retouch command (ADR-0081 section 5).
     if not __import__('os').environ.get('AURA_SKIP_SETTINGS'):
         step('OS mouse/keyboard: automatic retouch settings, re-run', settings)
 

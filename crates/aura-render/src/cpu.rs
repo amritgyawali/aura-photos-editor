@@ -180,8 +180,13 @@ impl CpuEngine {
             // PHASE-23. The reference path can correct a lens and square up a wall, so the
             // three geometry stages are schedulable rather than skipped. The other three
             // capabilities stay false: phases 20, 21 and 22 have not shipped.
+            // The portrait parse makes face, skin, subject, background and sky masks, and the
+            // fourteen portrait operators, executable from the pixels alone - so the two
+            // capabilities phase 14 left false for phases 18 and 20 are true on this path.
             caps: Capabilities {
                 geometry_models: true,
+                mask_generators: true,
+                retouch_operators: true,
                 ..Capabilities::default()
             },
             working_bytes: DEFAULT_WORKING_BYTES,
@@ -515,9 +520,44 @@ impl CpuEngine {
             );
         }
 
+        // ---- the portrait parse ----------------------------------------------------------
+        //
+        // Measured on the frame as it arrived - before any slider moved - so an exposure or a
+        // temperature change does not move a mask, and cached by content so it is made once.
+        let wants_portrait = (plan.stages.contains(&Stage::Masks)
+            || plan.stages.contains(&Stage::Retouch))
+            && crate::portrait::wants_parse(recipe);
+        let portrait = if wants_portrait {
+            let found = crate::portrait::parse(frame, &crate::portrait::hints(recipe));
+            if found.is_none() {
+                notes.push(RenderNote {
+                    stage: Stage::Masks.as_str().to_string(),
+                    reason: SkipReason::MaskGeneratorAbsent,
+                    detail: Some("portrait regions need the whole frame".to_string()),
+                });
+            }
+            found
+        } else {
+            None
+        };
+
         // ---- masks ---------------------------------------------------------------------
         if plan.stages.contains(&Stage::Masks) {
             apply_masks(&mut rgb, width, height, recipe, position);
+            if let Some(map) = &portrait {
+                notes.extend(crate::portrait::apply_masks(
+                    &mut rgb, width, height, recipe, map,
+                ));
+            }
+        }
+
+        // ---- retouch -------------------------------------------------------------------
+        if plan.stages.contains(&Stage::Retouch) {
+            if let Some(map) = &portrait {
+                notes.extend(crate::portrait::apply_retouch(
+                    &mut rgb, width, height, recipe, map,
+                ));
+            }
         }
 
         // Explicit authoring runs in interactive previews and exports, before final geometry.
@@ -708,7 +748,11 @@ fn smoothstep(x: f32, edge0: f32, edge1: f32) -> f32 {
 /// being blended. Blending the whole stage would make two overlapping masks interact
 /// non-linearly with each other's tone curves; scaling the parameters makes them add, which
 /// is what a photographer expects and what makes an inverted pair cover the frame exactly.
-fn apply_mask_params(rgb: [f32; 3], params: &aura_recipe::MaskParams, weight: f32) -> [f32; 3] {
+pub(crate) fn apply_mask_params(
+    rgb: [f32; 3],
+    params: &aura_recipe::MaskParams,
+    weight: f32,
+) -> [f32; 3] {
     let mut value = rgb;
     if let Some(exposure) = params.exposure {
         value = tonemap::exposure(value, exposure * weight);

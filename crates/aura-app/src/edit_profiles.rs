@@ -28,7 +28,7 @@
 //!   Each learned profile carries its held-out measurement in `evidence`.
 //!
 //! Looks use Lightroom's own panels - colour grading, grain, calibration, the parametric curve and
-//! a highlight-priority post-crop vignette (ADR-0065) - with a skin ceiling on the grading wheels
+//! a highlight-priority post-crop vignette (ADR-0070) - with a skin ceiling on the grading wheels
 //! that colour faces.
 
 // Colour arithmetic uses the conventional short names (r, g, b, a, s) and float conversions.
@@ -135,15 +135,15 @@ pub struct ProfileAdjust {
     pub noise: i16,
     /// Edge darkening, `0..=1`, drawn as Lightroom's post-crop vignette (`1` is amount -100).
     pub vignette: f32,
-    /// Lightroom's parametric tone curve, scaled by strength. ADR-0065.
+    /// Lightroom's parametric tone curve, scaled by strength. ADR-0070.
     pub parametric: Option<ParametricCurve>,
-    /// Red, green and blue curves, blended toward identity by strength. ADR-0065.
+    /// Red, green and blue curves, blended toward identity by strength. ADR-0070.
     pub channel_curves: Option<ChannelCurves>,
-    /// Colour grading wheels; saturation and luminance scale with strength. ADR-0065.
+    /// Colour grading wheels; saturation and luminance scale with strength. ADR-0070.
     pub colour_grade: Option<ColourGrade>,
-    /// Camera calibration, scaled by strength. ADR-0065.
+    /// Camera calibration, scaled by strength. ADR-0070.
     pub calibration: Option<Calibration>,
-    /// Film grain; the amount scales with strength. ADR-0065.
+    /// Film grain; the amount scales with strength. ADR-0070.
     pub grain: Option<Grain>,
     /// A black-and-white mix, keys from the eight bands. `None` keeps colour.
     pub bw: Option<BTreeMap<String, i16>>,

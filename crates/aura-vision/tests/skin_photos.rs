@@ -1,4 +1,4 @@
-//! Real-photograph check of the skin segmenter, run by hand. ADR-0077.
+//! Real-photograph check of the skin segmenter, run by hand. ADR-0082.
 //!
 //! `AURA_SKIN_PHOTOS` names a folder of `NAME_WxH.rgb` files (packed sRGB, made from JPEGs by
 //! `ml/models/skin/to_raw.py`); for each one this writes `NAME.overlay.rgb` beside it: the photo

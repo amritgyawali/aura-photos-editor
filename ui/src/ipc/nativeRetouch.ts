@@ -43,7 +43,7 @@ export type SelectionPreview = Pick<RenderDto, 'width'|'height'|'rgbBase64'>;
 /** Which skin the automatic retouch may change. */
 export type RetouchScope = 'face' | 'body' | 'face_and_body';
 /**
- * The automatic retouch's fine controls (ADR-0077), mirroring `retouch_settings::Settings`.
+ * The automatic retouch's fine controls (ADR-0082), mirroring `retouch_settings::Settings`.
  * Strengths are 0..1 and 0 switches an operation off; for measured corrections 0.5 is the
  * measured strength. Signed values are -1..1. Missing keys take the Rust defaults.
  */

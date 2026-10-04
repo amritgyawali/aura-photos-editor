@@ -1,4 +1,4 @@
-//! Explicit, local authoring tools. See ADR-0067.
+//! Explicit, local authoring tools. See ADR-0072.
 use crate::{commands::IpcResult, contract::ipc::RecipeDto, AppState};
 use aura_core::{AuraError, AuraResult, PhotoId, ProjectId};
 use aura_recipe::{schema, EditSource};

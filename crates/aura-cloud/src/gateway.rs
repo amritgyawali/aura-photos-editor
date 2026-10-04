@@ -306,10 +306,17 @@ impl CloudAiGateway {
 
         // The key is read as late as possible, so a run that was going to be
         // refused, cached or over budget never touches the credential store.
+        // A provider whose row says no key is required gets an empty secret: the
+        // builders already suppress the credential header for one, and a local
+        // server with no key at all would otherwise read as "no key stored" and
+        // degrade to the fallback for ever.
         let account = config.kind.account();
-        let secret = match self.keys.load(&account) {
-            Ok(Some(secret)) => secret,
-            Ok(None) => {
+        let requires_key = crate::catalog::spec(config.kind).requires_key;
+        let stored = self.keys.load(&account);
+        let secret = match (requires_key, stored) {
+            (_, Ok(Some(secret))) => secret,
+            (false, Ok(None)) => SecretKey::new(String::new()),
+            (true, Ok(None)) => {
                 return self.fall_back(
                     task,
                     input,
@@ -319,7 +326,7 @@ impl CloudAiGateway {
                     started_ms,
                 );
             }
-            Err(err) => {
+            (_, Err(err)) => {
                 return self.fall_back(task, input, &project, context, &err, started_ms);
             }
         };

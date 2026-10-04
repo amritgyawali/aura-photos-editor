@@ -59,6 +59,15 @@ impl ProgressCounter {
         self.done.fetch_add(n, Ordering::Relaxed) + n
     }
 
+    /// Set the finished count outright.
+    ///
+    /// For a reader that is folding somebody else's [`ProgressUpdate`], whose `done` is
+    /// already a running total. Adding one of those with [`ProgressCounter::advance`] counts
+    /// every batch again on top of the ones before it, which is a bar that runs off the end.
+    pub fn set_done(&self, done: u64) {
+        self.done.store(done, Ordering::Relaxed);
+    }
+
     /// Units finished so far.
     #[must_use]
     pub fn done(&self) -> u64 {

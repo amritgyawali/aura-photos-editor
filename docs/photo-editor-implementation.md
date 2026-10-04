@@ -11,7 +11,7 @@ ranges with adjustable falloff. A disposable grayscale preview evaluates the
 authored selection before the selected operation, preserving the saved recipe.
 The UI supplies numeric endpoints, reversal and tonal presets as well as drawing.
 Preview and export share the same coverage implementation. These are manual
-selection refinements, not automatic face segmentation. See [ADR-0073](adr/ADR-0073-advanced-retouch-selections.md)
+selection refinements, not automatic face segmentation. See [ADR-0078](adr/ADR-0078-advanced-retouch-selections.md)
 and the [user guide](native-retouch.md).
 
 Verification: 551 UI tests, 29 focused native tests, TypeScript/Vite and the final
@@ -35,7 +35,7 @@ include tolerance and edge protection without copying source coordinates.
 
 This is not automatic face segmentation or exact Retouch4me/SkinFiner parity.
 See the [behavior audit](retouch-competitor-audit.md), [user guide](native-retouch.md)
-and [ADR-0070](adr/ADR-0070-sampled-skin-processing.md).
+and [ADR-0075](adr/ADR-0075-sampled-skin-processing.md).
 
 Verification: 540 UI tests across 57 files, 18 native tests, TypeScript and the
 production UI build passed. The native desktop build passed with the local
@@ -73,7 +73,7 @@ resume an interrupted run. Operation duplication/reordering and actual pointer
 drawing at zoom with an unsaved preview also passed.
 
 Evidence is in `.work-checks/precision-retouch-review/results.json` and its
-adjacent screenshot and before/after images. See [ADR-0069](adr/ADR-0069-precision-retouch-authoring.md), the
+adjacent screenshot and before/after images. See [ADR-0074](adr/ADR-0074-precision-retouch-authoring.md), the
 [tool guide](native-retouch.md) and `scripts/test-precision-retouch.py`.
 
 ## Native retouch foundation
@@ -95,7 +95,7 @@ several named workflows. They do not reproduce Retouch4me's proprietary models
 or establish commercial quality parity. Automatic face/skin targeting, layered frequency editing and reconstruction
 of obscured detail remain
 unimplemented in this workspace. See the [tool guide](native-retouch.md) and
-[ADR-0068](adr/ADR-0068-native-retouch-workspace.md).
+[ADR-0073](adr/ADR-0073-native-retouch-workspace.md).
 
 Verification includes six focused native tests, the production UI/desktop build,
 529 UI tests across 54 files, and five real portrait history/export checks. Five PNG
@@ -160,7 +160,7 @@ blending matches surrounding light while transferring donor detail. Old Heal
 operations retain their rendering behavior.
 
 The [native retouch guide](native-retouch.md) describes the controls and limits;
-[ADR-0071](adr/ADR-0071-texture-aware-patch-heal.md) records the independent
+[ADR-0076](adr/ADR-0076-texture-aware-patch-heal.md) records the independent
 algorithm. The five-portrait verification script accepts `--workflow patch-heal`.
 This feature does not provide semantic blemish detection or demonstrate exact
 Retouch4me/SkinFiner quality parity.
@@ -181,5 +181,5 @@ separate substantial implementations:
   GPU coverage, HDR display/export, LUT import, macros and plug-in APIs.
 
 Feature-by-feature baseline evidence and implementation techniques remain in the linked
-100-row comparison. See [ADR-0067](adr/ADR-0067-studio-authoring-and-export-watermarks.md)
+100-row comparison. See [ADR-0072](adr/ADR-0072-studio-authoring-and-export-watermarks.md)
 for this batch's persistence, color and compatibility decisions.

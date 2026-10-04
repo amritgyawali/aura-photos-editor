@@ -11,6 +11,7 @@ members = [
   "crates/aura-models",
   "crates/aura-cloud",
   "crates/aura-index",
+  "crates/aura-portrait",
   "crates/aura-vision",
   "crates/aura-people",
   "crates/aura-brain-gallery",
@@ -102,6 +103,12 @@ rayon             = "1"
 crossbeam-channel = "0.5"
 parking_lot       = "0.12"
 
+# TLS for the cloud gateway (phase 04's waiver, discharged in ADR-0066). No
+# default features: rustls defaults to `aws-lc-rs`, which needs a C compiler.
+rustls            = { version = "0.23", default-features = false, features = ["std", "tls12", "logging"] }
+rustls-rustcrypto = "0.0.2-alpha"
+webpki-roots      = "0.26"
+
 # Testing
 proptest    = "1"
 tempfile    = "3"
@@ -131,6 +138,12 @@ debug           = "line-tables-only"
 [profile.dev.package."*"]
 opt-level = 2
 
-# Model inference (YuNet, the skin segmenter) is unusably slow unoptimised. ADR-0077.
+# Model inference (YuNet, the skin segmenter) is unusably slow unoptimised. ADR-0082.
 [profile.dev.package.aura-infer]
 opt-level = 3
+
+# The portrait parse scans a frame six ways with a boosted cascade; unoptimised, one painted
+# portrait takes seconds rather than milliseconds, which would turn every renderer test that
+# resolves a face mask into a wait. Overflow checks stay on, as everywhere in dev.
+[profile.dev.package.aura-portrait]
+opt-level = 2

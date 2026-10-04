@@ -29,6 +29,8 @@ Never load two phase files into one session.
 | Hardware troubleshooting | `docs/runbooks/hardware.md` |
 | Adding a model | `docs/runbooks/adding-a-model.md` |
 | Cloud AI policy | `docs/adr/ADR-0009-cloud-ai-policy.md` |
+| Provider catalogue, first-run setup and TLS | `docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` |
+| The nineteen AI providers, as data | `crates/aura-cloud/src/catalog.rs` |
 | Using your own AI key | `docs/using-your-own-ai-key.md` |
 | Recorded provider responses | `tests/cloud/cassettes/` |
 | Embedding and index decisions | `docs/adr/ADR-0011-embeddings-and-similarity-index.md` |
@@ -148,16 +150,22 @@ Never load two phase files into one session.
 | Look evaluation gates | `tests/eval/look_eval.rs` |
 | Edit profiles (the start screen's looks, validated JSON) | `crates/aura-app/config/edit_profiles.json` |
 | How edit profiles adapt, and how learned ones are measured | `docs/edit-profiles.md` |
-| Lightroom panel parity decisions | `docs/adr/ADR-0065-lightroom-panel-parity.md` |
+| Lightroom panel parity decisions | `docs/adr/ADR-0070-lightroom-panel-parity.md` |
 | Every Lightroom feature and where it lives in AURA | `docs/lightroom-parity.md` |
 | Learning a profile from RAW before/after pairs | `ml/edit-profiles/fetch_fivek_pairs.py` + `crates/aura-app/tests/profile_fit.rs` |
-| One-click intelligent editing and step history | `docs/adr/ADR-0076-intelligent-auto-edit-and-step-history.md`, `crates/aura-app/src/smart_edit.rs`, `crates/aura-app/src/portrait_features.rs` |
+| One-click intelligent editing and step history | `docs/adr/ADR-0081-intelligent-auto-edit-and-step-history.md`, `crates/aura-app/src/smart_edit.rs`, `crates/aura-app/src/portrait_features.rs` |
 | What Auto enhance does, in the product's own words | `docs/automatic-editing.md` |
 | Auto-edit qualification on the real app | `scripts/prepare-auto-edit-fixtures.py`, `scripts/test-auto-edit-v3.py`, `scripts/test-auto-edit-gui.py` |
-| Segmented face/body skin and the 52 retouch settings | `docs/adr/ADR-0077-segmented-skin-and-retouch-settings.md` |
+| Segmented face/body skin and the 52 retouch settings | `docs/adr/ADR-0082-segmented-skin-and-retouch-settings.md` |
 | The skin segmenter (model, card, converter) | `assets/models/selfie_multiclass/`, `crates/aura-vision/src/skin.rs`, `ml/models/skin/` |
 | Automatic retouch settings, in the product's own words | `docs/automatic-retouch-settings.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
+| Portrait parsing and portrait retouch decisions | `docs/adr/ADR-0065-measured-portrait-parsing-and-portrait-retouch.md` |
+| Faces, landmarks and the nineteen portrait regions | `crates/aura-portrait/` |
+| The vendored Haar cascades, their converter and their card | `crates/aura-portrait/data/`, `docs/model-cards/haar_cascades.md` |
+| The fourteen portrait operators the renderer executes | `crates/aura-render/src/portrait.rs` |
+| Portrait evaluation instruments (your own photographs) | `crates/aura-portrait/tests/local_eval.rs`, `crates/aura-render/tests/portrait_local.rs` |
+| What portrait retouch finds and changes, in the product's own words | `docs/portrait-retouch.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -197,7 +205,72 @@ RUSTUP_TOOLCHAIN=1.97.1-x86_64-pc-windows-gnu cargo test --workspace --all-targe
 `windows-sys` needs `dlltool` for a release import library and MinGW is not
 installed. Run xtask in debug (`cargo xtask ...`, which is what the alias does).
 
+**This machine needs `AURA_PERF_HOST_SCALE=6`**, for `cargo test -p aura-perf` and
+for `scripts/check-phase-gates.sh` alike. Every wall-clock budget in the product is
+stated against a reference machine and multiplied by that variable; without it
+phase 04's call-overhead budget and phase 14's proxy guardrail both fail on timing
+alone, which reads as a regression and is a measurement of this laptop.
+
+```bash
+AURA_PERF_HOST_SCALE=6 scripts/check-phase-gates.sh
+```
+
 ## Current state
+
+**Bring your own AI (post-30).** The cloud gateway reaches nineteen providers rather than four,
+and it reaches them over TLS. `crates/aura-cloud/src/catalog.rs` is the whole vendor list as data -
+wire format, address, whether the address is the photographer's to set, whether a key is required,
+what a key looks like, whether the models can see a photograph, three models and three prices -
+and `catalog::build` is the only place that turns a choice into a provider, so `aura-app` does no
+matching of its own. `crates/aura-cloud/src/tls.rs` discharges phase 04's TLS waiver through the
+`Connector` port ADR-0009 said it would arrive in; the crypto is `rustls-rustcrypto` because this
+machine has no C toolchain and both of rustls's own providers compile C, and
+`docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` says plainly what that trades. Three things a
+later agent needs from it:
+
+- **The provider choice is persisted and the key still is not.** `crates/aura-app/src/ai_settings.rs`
+  writes the provider, address and model names to the `setting` table from migration 0001, which
+  nothing had ever written to - so no migration was added. The key stays in the credential store,
+  filed per provider. A catalog copied to a second machine carries the choice and not the secret.
+- **A first-run screen that can always be declined.** `ui/src/components/AiSetup.tsx`, mounted from
+  `App.tsx` when `ai_setup_status` says the question is outstanding. `skip_ai_setup` is a separate
+  command from `save_ai_setup` and records **no provider**, because declining is an answer and a
+  panel that later showed a configured-looking Anthropic with no key behind it would be reporting a
+  decision nobody made.
+- **`Transport::schemes` is on the wire.** A build without the `tls` feature reports `["http"]` and
+  the setup screen warns on every HTTPS provider that a key saved there would not be used. Phase
+  24's rule - an absent input is ignorance, not permission - applied to a capability.
+
+**Nothing in it is evidence that a provider works.** No call in this repository has ever reached a
+public vendor, every test uses the cassette transport, and the prices in the catalogue are the
+vendors' published list prices rather than measurements - which is why they are only ever used to
+*refuse* a call before it is made, and why the spend meter reads the tokens the provider said it
+billed. The first successful round trip reopens ADR-0066's criteria.
+
+
+**All thirty phases are implemented, and the eight process gaps the independent review found are
+closed.** `docs/progress/PHASE-01-30-REVIEW.md` is the review; its section 10 is what was done
+about it. Three things a later agent needs from that page rather than from this one:
+
+- **Every UI source file is reachable from `main.tsx`, and a test keeps it that way.** Forty-two
+  of eighty-two were not, for nineteen phases - the whole develop stack, people, story, style,
+  cull, cleanup and camera matching. `App.tsx` now mounts nine workspaces;
+  `ui/src/reachability.test.ts` fails on one orphan. **A component with passing tests is not a
+  mounted component**, and nothing in this repository checked the difference until it did.
+- **All thirty phase gates run.** `scripts/check-phase-gates.sh` runs them and refuses to run at
+  all unless it finds thirty gate modules in `aura-cli`, so a phase whose gate is not wired in is
+  a red build. It is CI lane `phase-gates` and the `phases` release gate. Sixteen of them had run
+  nowhere.
+- **`ui/src-tauri` is compiled by CI lane `shell` and by nothing on this machine.** The reference
+  Windows machine has no linker for it - no `gcc` under the GNU toolchain, no MSVC linker - so
+  `just shell-check` will not run here. That lane is the only thing that type-checks the IPC
+  boundary; `scripts/check-ipc-surface.sh` proves the names and not the types, and says so.
+
+**Nothing in section 7 of the review is closed and nothing in it can be closed by writing code.**
+Every model-capability flag is still false, no camera file has ever been decoded, nothing is
+calibrated, no lens or brand baseline is measured, there is no GPU backend, no network transport
+and nothing has been signed. The product is architecturally complete and evidentially empty, and
+every quality number anywhere in it was measured against a fixture this repository authored.
 
 Phase 01 is implemented: workspace, error taxonomy, catalog schema v1 with the
 six-step refusal chain, idempotent ingest with clock alignment, the job graph with
@@ -1982,6 +2055,45 @@ open on the night of a wedding and catastrophic for a residual: every look would
 difference between a page and a rectangle. `own_frames` reads the real proxy and **skips** what it
 cannot get. Fourth time this product has chosen a smaller honest answer over a larger silent one.
 
+**Portrait retouch** is implemented, after phase 31 and outside the phase plan (ADR-0065).
+`aura-portrait` is a new crate below the renderer: a pure-Rust Viola-Jones evaluator, faithful to
+OpenCV's, over OpenCV's own BSD-licensed Haar cascades (frontal, profile, eye) - **the first
+detector in this product that finds a face in a real photograph** - scanned six ways (upright,
+tilted twenty degrees each way, locally equalised, profile and mirrored profile) and accepted only
+with evidence. Every other region is *measured* relative to the face: skin is a distance from a
+model fitted to that person's own cheeks, lips are redder than that skin, teeth brighter and less
+saturated than those lips, brows darker than that forehead; hair, body and background are colour
+models seeded beside the person. Nineteen soft regions come out: skin, face, eyes, iris, sclera,
+eyebrows, under-eyes, nose, lips, teeth, mouth, facial hair, neck, hair, body skin, clothing, body,
+background and sky. `aura-render` re-derives them from the pixels at render time (cached by
+content, `PARSE_VER` folded into the engine string), so recipe masks of kind face, skin, subject,
+background and sky - and any mask whose `target` names a region - finally render, and
+`CpuEngine::new` declares `mask_generators` and `retouch_operators`. Fourteen portrait operators
+(`skin_smooth`, `skin_even`, `blemish_clear`, `under_eye_lift`, `shine_control`, `face_light`,
+`eye_brighten`, `iris_enhance`, `sclera_whiten`, `brow_define`, `teeth_whiten`, `lip_enhance`,
+`hair_define`, `background_blur`) change tone and colour in place; none reshapes anybody and none
+moves a skin tone. Four IPC commands (`analyse_portrait`, `portrait_retouch`,
+`set_portrait_retouch`, `auto_portrait_retouch`) feed a **Portrait retouch** workspace with region
+overlays, landmarks, a draw-a-missed-face tool, measured automatic retouch and per-region
+adjustments.
+
+Three rules this adds:
+
+- **A region is measured against the person it belongs to, never against a constant.** The broad
+  skin prior only chooses where to sample a *detected* face; every skin plane is a distance from
+  that person's own skin. Phase 15's rule, applied to segmentation.
+- **The renderer re-derives regions from pixels; it never reads them from the catalog.** A
+  photographer's drawn face travels in the recipe as `target: "hint:x,y,w,h"`, so the four values a
+  delivered file is re-created from still decide every pixel.
+- **An automatic retouch is sized from measurements and never overwrites a choice.** A closed mouth
+  gets no whitening; once a person sets the retouch, `schema::merge` refuses the automatic pass and
+  the response says so.
+
+**What it does not claim:** accuracy on a real wedding, or parity across real skin tones. The gates
+are painted faces at all ten Monk swatches and an informal look at 22 public photographs, where the
+evaluator matched OpenCV's boxes 80 of 80. `docs/portrait-retouch.md` says so in the product's
+voice.
+
 Five rules that phase 13 adds and every later phase inherits:
 
 - **`ExplainService` is the only way to record what happened.** Phase 27 writes QC decisions
@@ -2241,3 +2353,22 @@ Two rules that phase 02 added and every later phase inherits:
 - **Pixels carry their provenance.** `PixelSource` says whether a buffer came
   from the camera's own JPEG or from AURA's documented render. Never mix the two
   in a score without recording which one it was.
+
+Three rules the post-review work adds, and they are the repository's rather than any phase's:
+
+- **A component with passing tests is not a mounted component.** The review counted forty-two
+  finished, tested, command-backed UI files that no import path reached from the entry point.
+  Every one of them looked done from inside its own test file. `ui/src/reachability.test.ts` is
+  the guard, and the general form of the rule is that *proving a part works is not proving the
+  product has it* - which applies to a gate nothing runs and a crate nothing compiles just as
+  much as to a panel nothing mounts.
+- **A guard written in a doc comment is not a guard.** `Calibrator::fit_isotonic` had documented
+  since phase 13 that it returns the identity map when there is nothing to fit; it checked the
+  *outcome count* and not the *fitted map*, so a degenerate fit produced one constant confidence
+  for every decision in the product. It was found by writing a test that asserted what the
+  comment said. The two lessons compound: the crate had no unit tests, which is why a doc comment
+  was the only place the rule lived.
+- **A check that only runs inside one phase's gate is a check that stops running.** Phase 30
+  lifted the IPC parity check out of phase 27's gate for this reason and the review found sixteen
+  gates that had gone the other way. Anything that has to hold across the product belongs in
+  `scripts/`, in CI and in `ops/release/release.toml` - all three.

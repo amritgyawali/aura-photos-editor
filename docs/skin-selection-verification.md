@@ -1,6 +1,6 @@
 # Skin selection regression checks
 
-This follow-up to ADR-0077 fixes selection ownership, manual mask preservation and independent
+This follow-up to ADR-0082 fixes selection ownership, manual mask preservation and independent
 finishing controls. It uses the existing bundled MediaPipe Selfie Multiclass weights; only
 the preprocessing/ownership policy changes to `mediapipe-selfie-multiclass-256-aura-v2`.
 

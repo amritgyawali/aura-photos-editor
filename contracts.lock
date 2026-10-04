@@ -1,4 +1,4 @@
-05e5f5c894c39eec9d14abe7664d0565ae3cf55d7d373da311c9562d32af66b0  crates/aura-app/src/contract/ipc.rs
+dd9825c62e1a8a3bc70fb74d1cf2387737c0d2a713c7d2350bb5b4f9a13fffa6  crates/aura-app/src/contract/ipc.rs
 e73c77d6ac620fb3e62a91f2342dd22061769977dc6db49abdd60d669464ab7f  crates/aura-catalog/migrations/0001_init.sql
 1026d7b8166dc998476f1f009fb660e8a9a7ee7ac6866096eaf2a57fbdfda063  crates/aura-catalog/migrations/0004_cloud_audit.sql
 c0db688ee7efb4acf16b82555ffebff15eb28d241268080e81e0d66ec31cb0b5  crates/aura-catalog/migrations/0005_embeddings.sql
@@ -66,7 +66,7 @@ e28b32471be867bda8803fa582271858b88068184fb35c761a60d9b665330f05  crates/aura-jo
 0a364991ca2f5718daed822a7c8ba2099c7dd0bc833c91b6b8119573af7b9ed3  crates/aura-preview/src/contract/service.rs
 0b1716c1e5cf780b5535a5761d67676a5d96a7ea5f563a4b43a496187f8f0890  crates/aura-raw/src/contract/pixels.rs
 d70190129547cfcc548915e34dd7e8539bf74ed1fcaad042eb4cf9b47a1a73c5  crates/aura-raw/src/contract/sidecar.rs
-2ac702f5db4c66041963c2e582ca50acccb39a4479144528f331112543dbd37c  crates/aura-recipe/src/contract/recipe.rs
+3d4a313da1c5140af68ae2beb190cf6fa80b9e6a91dbfbed067c7d0a626b2d20  crates/aura-recipe/src/contract/recipe.rs
 ee23e8e79af92c6f9e69f6eb51d0ec6e4fc0bc106fb25c2050c85a4a5931475a  crates/aura-render/shaders/cleanup_paste.wgsl
 f1136b8d143ffc522bcc6f91ec53a964e452f7b2217c0394edd9f61010d1dde3  crates/aura-render/shaders/deconv.wgsl
 1af3a5d1cb4b63f1d525786ebbc7118cd33f72f4bb72dd234b92069b3d53cdef  crates/aura-render/shaders/denoise_tile.wgsl
@@ -80,4 +80,4 @@ c324a390153e56daf204b1161571f377a5aa6b5f75442f3f686438ff24feab87  crates/aura-re
 3f175b59ea13758a1521f23c39a7fec06242e0f1f5bb44f2c9f4245d0842b578  crates/aura-render/shaders/retouch_apply.wgsl
 b692e1d08f7642d370532b5e947980f8d86ae2cbadc212b125b5ba96072d17d5  crates/aura-render/src/contract/render.rs
 d707ca15002555f46b7b9208b6a7a0792b2d8dd2a4e9b08a6f3858ae621218ee  crates/aura-vision/src/contract/mask.rs
-05bf6fec45359bed81f3227afa49c0cf282fddfacdcc2d4b6c383a8bf37fca8d  ui/src/ipc/types.ts
+cd6223488a07c29c29ea8d6afe17b93e858a07fa3db4599f30c7f29bc05ab9be  ui/src/ipc/types.ts

@@ -112,6 +112,7 @@ pub mod local;
 pub mod micro;
 pub mod output;
 pub mod parity;
+pub mod portrait;
 pub mod profiles;
 pub mod restore;
 pub mod retouch;

@@ -1,4 +1,4 @@
-//! Real-photograph check of the automatic retouch, run by hand. ADR-0077.
+//! Real-photograph check of the automatic retouch, run by hand. ADR-0082.
 //!
 //! `AURA_SKIN_PHOTOS` names a folder of `NAME_WxH.rgb` files (packed sRGB, made from JPEGs by
 //! `ml/models/skin/to_raw.py`). For every photograph and every preset named in

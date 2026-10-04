@@ -1,5 +1,5 @@
-//! Resolution-independent brush coverage shared by preview and delivery. ADR-0069.
-// Every index is inside a rectangle clipped to the frame on construction.
+//! Resolution-independent brush coverage shared by preview and delivery. ADR-0074.
+// Buffers come from dimension-checked input; all coordinates are bounded before indexing.
 #![allow(clippy::indexing_slicing)]
 use aura_recipe::retouch_tools::{BrushStroke, Edit};
 

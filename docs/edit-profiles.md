@@ -87,7 +87,7 @@ cannot do is know that this particular frame needed another stop. The profile cl
 gap on unseen photographs, which is the retoucher's consistent taste; the rest is per-photo
 judgement. The held-out sets are small (5 to 9 photographs), so treat the numbers as indicative.
 
-Profiles use Lightroom's own panels (ADR-0065): colour grading for split-toned looks (teal and
+Profiles use Lightroom's own panels (ADR-0070): colour grading for split-toned looks (teal and
 orange, film, moody, monochrome toning), film grain, camera calibration (the landscape "blue
 primary" trick), the parametric curve, and a highlight-priority post-crop vignette. Colour grading
 in a profile is capped on the midtones (20) and highlights (30) wheels, because those wheels colour

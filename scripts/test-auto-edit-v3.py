@@ -1,4 +1,4 @@
-"""Qualify one-click automatic editing on the real desktop app (ADR-0076).
+"""Qualify one-click automatic editing on the real desktop app (ADR-0081).
 
 Requires the rebuilt desktop running with WebView2 CDP on port 9223, Pillow and
 Playwright, and the photo set from scripts/prepare-auto-edit-fixtures.py.

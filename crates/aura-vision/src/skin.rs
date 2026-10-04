@@ -1,4 +1,4 @@
-//! Bundled, offline person segmentation: face skin, body skin, hair and clothes. ADR-0077.
+//! Bundled, offline person segmentation: face skin, body skin, hair and clothes. ADR-0082.
 //!
 //! The model is Google MediaPipe's *Selfie Multiclass* segmenter (Apache-2.0), converted to
 //! ONNX by `ml/models/skin/convert_selfie_multiclass.py` and run on aura-infer. It labels each

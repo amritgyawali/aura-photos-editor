@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../ipc/client';
 import type {
+  AiProviderDto,
+  AiSetupStatusDto,
   CloudCallDto,
   CloudSpendDto,
   CloudStatusDto,
@@ -10,13 +12,27 @@ import type {
 export type AiKeysPanelProps = {
   projectId: string | null;
   onError?: (error: { code: string; message: string }) => void;
+  /** Reopen the full setup screen, which is where the catalogue lives. */
+  onOpenSetup?: () => void;
 };
 
-/** The providers a user may choose. */
+/**
+ * The providers this panel offers before the catalogue has answered.
+ *
+ * The real list comes from `api.listAiProviders()` and is nineteen rows long.
+ * These four are what the dropdown holds for the fraction of a second before
+ * that call returns, and they are the four whose wire formats this product
+ * implements natively - so a panel that never got an answer is still usable
+ * rather than empty.
+ */
 export const PROVIDER_CHOICES = ['anthropic', 'openai', 'google', 'compat'] as const;
 
 /** The label a photographer reads, rather than the identifier we store. */
-export function providerLabel(provider: string): string {
+export function providerLabel(provider: string, catalogue: AiProviderDto[] = []): string {
+  const found = catalogue.find((entry) => entry.id === provider);
+  if (found) {
+    return found.label;
+  }
   switch (provider) {
     case 'anthropic':
       return 'Anthropic (Claude)';
@@ -29,6 +45,27 @@ export function providerLabel(provider: string): string {
     default:
       return provider;
   }
+}
+
+/**
+ * One line per provider for the dropdown, marking the ones already set up.
+ *
+ * A photographer who has three keys stored should be able to see which three
+ * without opening three vendor dashboards, and switching to one of them should
+ * not ask them to paste anything.
+ */
+export function providerOptions(
+  catalogue: AiProviderDto[],
+  keyed: string[],
+): { id: string; label: string }[] {
+  const rows =
+    catalogue.length > 0
+      ? catalogue.map((entry) => ({ id: entry.id, label: entry.label }))
+      : PROVIDER_CHOICES.map((id) => ({ id, label: providerLabel(id) }));
+  return rows.map((row) => ({
+    id: row.id,
+    label: keyed.includes(row.id) ? `${row.label} - key saved` : row.label,
+  }));
 }
 
 /** Money, the way a spend meter should show it. */
@@ -104,8 +141,10 @@ export function callSummary(call: CloudCallDto): string {
  * the moment it is saved, the panel shows a fingerprint rather than the secret,
  * and there is no command that could return it.
  */
-export function AiKeysPanel({ projectId, onError }: AiKeysPanelProps): JSX.Element {
+export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProps): JSX.Element {
   const [status, setStatus] = useState<CloudStatusDto | null>(null);
+  const [catalogue, setCatalogue] = useState<AiProviderDto[]>([]);
+  const [setup, setSetup] = useState<AiSetupStatusDto | null>(null);
   const [spend, setSpend] = useState<CloudSpendDto | null>(null);
   const [calls, setCalls] = useState<CloudCallDto[]>([]);
   const [provider, setProvider] = useState<string>('anthropic');
@@ -131,6 +170,15 @@ export function AiKeysPanel({ projectId, onError }: AiKeysPanelProps): JSX.Eleme
       const next = await api.cloudStatus();
       setStatus(next);
       setProvider(next.provider);
+    } catch (error) {
+      report(error);
+    }
+    // The catalogue and the key inventory are a separate call from the status for
+    // the same reason spending is: a credential store that will not answer must
+    // not be able to blank the panel that would tell somebody about it.
+    try {
+      setCatalogue(await api.listAiProviders());
+      setSetup(await api.aiSetupStatus());
     } catch (error) {
       report(error);
     }
@@ -256,6 +304,7 @@ export function AiKeysPanel({ projectId, onError }: AiKeysPanelProps): JSX.Eleme
   );
 
   const reasons = disabledReasons(status);
+  const selected = catalogue.find((entry) => entry.id === provider) ?? null;
 
   return (
     <section className="ai-keys-panel" aria-label="AI keys">
@@ -266,6 +315,12 @@ export function AiKeysPanel({ projectId, onError }: AiKeysPanelProps): JSX.Eleme
         ship with the app, and you pay your provider directly for what it uses.
       </p>
 
+      {onOpenSetup ? (
+        <button type="button" className="ai-keys-open-setup" onClick={onOpenSetup}>
+          Browse all providers
+        </button>
+      ) : null}
+
       <label className="ai-keys-provider">
         Provider
         <select
@@ -273,20 +328,20 @@ export function AiKeysPanel({ projectId, onError }: AiKeysPanelProps): JSX.Eleme
           value={provider}
           onChange={(event) => setProvider(event.currentTarget.value)}
         >
-          {PROVIDER_CHOICES.map((choice) => (
-            <option key={choice} value={choice}>
-              {providerLabel(choice)}
+          {providerOptions(catalogue, setup?.keyedProviders ?? []).map((choice) => (
+            <option key={choice.id} value={choice.id}>
+              {choice.label}
             </option>
           ))}
         </select>
       </label>
 
-      {provider === 'compat' ? (
+      {selected?.endpointEditable ?? provider === 'compat' ? (
         <label className="ai-keys-endpoint">
           Server address
           <input
             type="text"
-            placeholder="http://127.0.0.1:11434"
+            placeholder={selected?.endpoint ?? 'http://127.0.0.1:11434'}
             value={endpoint}
             disabled={busy}
             onChange={(event) => setEndpoint(event.currentTarget.value)}

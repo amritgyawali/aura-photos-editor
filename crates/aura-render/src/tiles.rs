@@ -90,16 +90,30 @@ pub fn render_streamed(
         graph::Capabilities::default(),
     );
 
-    // A rotation is not streamable. Say so and render whole.
+    // A rotation is not streamable, and neither is a portrait or a native retouch: a face cut in
+    // half by a tile boundary is not a face, and the parse or the edit that finds it must see the
+    // whole frame. Say so and render whole.
+    let native_retouch = retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0);
+    let portrait = crate::portrait::wants_parse(&clamped);
     if clamped.geometry.rotate.abs() > f32::EPSILON
         || clamped.geometry.perspective.is_some()
-        || retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0)
+        || native_retouch
+        || portrait
     {
         let mut whole = engine.render_frame(frame, &clamped, level, purpose, output)?;
         whole.notes.push(RenderNote {
             stage: Stage::Geometry.as_str().to_string(),
             reason: SkipReason::NotRequested,
-            detail: Some("geometry or native retouch needs the frame rendered whole".to_string()),
+            detail: Some(
+                if portrait {
+                    "a portrait retouch is rendered whole rather than streamed"
+                } else if native_retouch {
+                    "a native retouch is rendered whole rather than streamed"
+                } else {
+                    "a rotated frame is rendered whole rather than streamed"
+                }
+                .to_string(),
+            ),
         });
         return Ok(whole);
     }
@@ -109,7 +123,7 @@ pub fn render_streamed(
     // The geometry stage must not run inside a tile: the crop *is* the tile grid.
     let mut tile_recipe = clamped.clone();
     tile_recipe.geometry = aura_recipe::Geometry::default();
-    // ADR-0065. The post-crop effects are drawn in *output raster* coordinates below, not in
+    // ADR-0070. The post-crop effects are drawn in *output raster* coordinates below, not in
     // the tile's source coordinates, so they are stripped here and applied after the commit.
     tile_recipe.global.effects = aura_recipe::Effects::default();
     let tile_plan = graph::plan(
@@ -446,7 +460,7 @@ mod tests {
 
     #[test]
     fn a_streamed_render_with_every_lightroom_panel_equals_a_whole_one() {
-        // ADR-0065. The post-crop vignette is drawn relative to the crop and the grain in frame
+        // ADR-0070. The post-crop vignette is drawn relative to the crop and the grain in frame
         // coordinates; both must come out bit-identical when the frame is streamed in tiles.
         let frame = fixtures::detail_frame(256, 256);
         let engine = CpuEngine::new(

@@ -1,15 +1,104 @@
-/* Functional, accessible, deliberately plain. The design system lands later;
-   this phase only has to stay at 60 fps and be keyboard-first. */
+/* AURA's design system: a dark working surface for people who judge photographs.
+ *
+ * The rule that kept the phases 01 to 30 review's reachability test green is kept here
+ * too: every selector the components use stays exactly as it was, and only declarations
+ * change. A class rename would silently unstyle a panel the same way an unmounted one
+ * went unnoticed, so the names are frozen and the paint moves underneath them.
+ *
+ * Tokens come first. Colors, space and shape are named once so the light theme below is
+ * a token swap rather than a second stylesheet, and a component can never invent a
+ * near-miss of a border color on its own. */
 
 :root {
   color-scheme: dark;
-  --bg: #14161a;
-  --panel: #1c1f25;
-  --line: #2c313a;
+
+  --bg: #0f1114;
+  --bg-deep: #0a0c0e;
+  --panel: #171a1f;
+  --raised: #1e2229;
+  --line: #2a2f38;
+  --line-strong: #3a414d;
   --text: #e8eaee;
+  --text-dim: #c3c9d2;
   --muted: #9aa3b0;
   --accent: #6ea8fe;
+  --accent-deep: #3d7dd8;
+  --accent-soft: rgba(110, 168, 254, 0.16);
+  --success: #66c08b;
   --warn: #f0a35e;
+  --warn-soft: rgba(240, 163, 94, 0.14);
+  --danger: #e2685f;
+  --danger-soft: rgba(226, 104, 95, 0.14);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-1: 4px;
+  --radius-2: 8px;
+  --radius-3: 12px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 18px rgba(0, 0, 0, 0.45);
+  --font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* The explicit light choice wins over the media query; the media query covers
+   "follow the system", which is the default state of the app. */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f2f3f5;
+    --bg-deep: #ffffff;
+    --panel: #ffffff;
+    --raised: #eef0f3;
+    --line: #d8dce2;
+    --line-strong: #b9c0ca;
+    --text: #1c2026;
+    --text-dim: #3b424d;
+    --muted: #626b78;
+    --accent: #2f6fd0;
+    --accent-deep: #245aaf;
+    --accent-soft: rgba(47, 111, 208, 0.12);
+    --success: #2e8a57;
+    --warn: #b46a1c;
+    --warn-soft: rgba(180, 106, 28, 0.12);
+    --danger: #b23a32;
+    --danger-soft: rgba(178, 58, 50, 0.1);
+    --shadow-1: 0 1px 2px rgba(20, 24, 31, 0.12);
+    --shadow-2: 0 4px 18px rgba(20, 24, 31, 0.18);
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f2f3f5;
+  --bg-deep: #ffffff;
+  --panel: #ffffff;
+  --raised: #eef0f3;
+  --line: #d8dce2;
+  --line-strong: #b9c0ca;
+  --text: #1c2026;
+  --text-dim: #3b424d;
+  --muted: #626b78;
+  --accent: #2f6fd0;
+  --accent-deep: #245aaf;
+  --accent-soft: rgba(47, 111, 208, 0.12);
+  --success: #2e8a57;
+  --warn: #b46a1c;
+  --warn-soft: rgba(180, 106, 28, 0.12);
+  --danger: #b23a32;
+  --danger-soft: rgba(178, 58, 50, 0.1);
+  --shadow-1: 0 1px 2px rgba(20, 24, 31, 0.12);
+  --shadow-2: 0 4px 18px rgba(20, 24, 31, 0.18);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 * {
@@ -20,19 +109,232 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif;
+  font: var(--font);
+  -webkit-font-smoothing: antialiased;
 }
 
+/* Slim, themed scrollbars: a photo application scrolls constantly and the
+   default track steals a dozen pixels of attention per column. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ---------------------------------------------------------------------------
+   Buttons, inputs, focus. The hierarchy exists so "the one thing to press"
+   is a visual fact rather than a scavenger hunt through thirteen panels.
+   --------------------------------------------------------------------------- */
+
+button {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 12px;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: color-mix(in srgb, var(--raised) 82%, var(--text));
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+button:focus-visible,
+.grid-viewport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn {
+  /* Already the default button; the modifier exists so a row can mark itself. */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.btn-primary {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+input,
+select {
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2);
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+}
+
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* Range sliders are the develop surface's most-used control; the native thumb
+   is a 12px circle nobody can hit reliably on a calibrated display. */
+input[type='range'] {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  height: 24px;
+  padding: 0;
+  cursor: ew-resize;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  background: var(--line);
+  border-radius: 2px;
+  height: 4px;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  background: var(--text);
+  border: 2px solid var(--bg-deep);
+  border-radius: 50%;
+  box-shadow: var(--shadow-1);
+  height: 16px;
+  margin-top: -6px;
+  width: 16px;
+}
+
+input[type='range']:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input[type='range']::-moz-range-track {
+  background: var(--line);
+  border-radius: 2px;
+  height: 4px;
+}
+
+input[type='range']::-moz-range-thumb {
+  background: var(--text);
+  border: 2px solid var(--bg-deep);
+  border-radius: 50%;
+  box-shadow: var(--shadow-1);
+  height: 16px;
+  width: 16px;
+}
+
+/* ---------------------------------------------------------------------------
+   The shell. One column: a slim top bar, the step bar, the step's tools,
+   the open tool. There is no sidebar and the middle of the application is
+   the whole width - the step decides which tools exist and the tabs inside
+   the step decide which one is on screen.
+   --------------------------------------------------------------------------- */
+
 .app {
-  display: grid;
-  grid-template-columns: 320px 1fr;
+  display: flex;
+  flex-direction: column;
   height: 100vh;
+  overflow: hidden;
+}
+
+.topbar {
+  align-items: center;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+
+.topbar-project {
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar .theme-toggle {
+  margin-left: auto;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
 }
 
 .sidebar {
   border-right: 1px solid var(--line);
   overflow-y: auto;
-  padding: 12px;
+  padding: var(--space-3);
+  background: var(--bg-deep);
+}
+
+.sidebar-top {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.sidebar-brand {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.theme-toggle {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.theme-toggle:hover {
+  color: var(--text);
 }
 
 .main {
@@ -55,87 +357,468 @@ body {
   min-width: 0;
 }
 
-.explain-panel {
-  background: var(--panel);
-  border-left: 1px solid var(--line);
-  overflow-y: auto;
-  padding: 12px;
+/* A step pointing at a sidebar panel lands there with one highlight. The flash
+   is the answer to "where did it take me" in a thirteen-panel column. */
+.is-flash {
+  animation: flash 1.6s ease-out;
 }
 
-.composition-card__figure {
+@keyframes flash {
+  0% {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-flash {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The stage: the step's tools, and the one that is open.
+
+   Each step of the workflow offers only the tools that make sense at that point
+   (components/workflow/stages.ts is the policy); the tabs below draw that list,
+   a hairline separates them from the always-available system group, and the
+   stage body holds exactly one mounted tool. The old shell mounted thirteen
+   panels at once and let each poll on its own cadence while the photographer
+   was reading another; one mounted tool is the same discipline the data layer
+   has always had - one answer per question, in the view too.
+   --------------------------------------------------------------------------- */
+
+.stage-nav {
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+  padding: 0 var(--space-4);
+}
+
+.stage-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.stage-tab-wrap {
+  align-items: center;
+  display: flex;
+}
+
+.stage-tab-divider {
+  background: var(--line);
+  height: 18px;
+  margin: 0 var(--space-2);
+  width: 1px;
+}
+
+.stage-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  font-size: 13px;
+  padding: var(--space-2) var(--space-3) 10px;
+}
+
+.stage-tabs button:hover {
+  color: var(--text);
+}
+
+.stage-tabs button[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.stage-purpose {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  gap: var(--space-2);
   margin: 0;
+  padding: 6px 0 var(--space-2);
 }
 
-.composition-card__canvas {
-  background: #101217;
-  min-height: 14rem;
-  overflow: hidden;
-  position: relative;
+.stage-step-number {
+  background: var(--accent-soft);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  width: 18px;
+}
+
+.stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+/* Full width at ordinary windows, capped so a 4K display reads a centered
+   workbench rather than a form stretched across two metres of margin. */
+.stage > * {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin-inline: auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 1280px;
+}
+
+/* Panels were written for a 320px sidebar column; at stage width they want
+   the panel chrome to breathe and the grid inside to use it. */
+.stage .panel {
+  max-width: none;
+}
+
+/* ---------------------------------------------------------------------------
+   The step bar: the five steps, their state, and where the photographer is.
+   --------------------------------------------------------------------------- */
+
+.step-bar {
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3);
+}
+
+.step-bar ol {
+  display: flex;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.step-bar-item {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.step-bar-go {
+  align-items: flex-start;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2);
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) 10px;
+  text-align: left;
   width: 100%;
 }
 
-.composition-card__preview,
-.composition-card__preview-placeholder,
-.composition-card__overlay {
-  height: 100%;
-  inset: 0;
-  position: absolute;
-  width: 100%;
+.step-bar-go:hover:not(:disabled) {
+  border-color: var(--accent);
 }
 
-.composition-card__preview {
-  display: block;
+.step-bar-item.is-here .step-bar-go {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
-.composition-card__preview-placeholder {
-  background: linear-gradient(135deg, #22262e, #2b303a);
+.step-bar-number {
+  background: var(--raised);
+  border-radius: 50%;
+  color: var(--muted);
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  height: 20px;
+  line-height: 20px;
+  margin-top: 1px;
+  text-align: center;
+  width: 20px;
 }
 
-.composition-card__overlay {
-  color: #f7d774;
+.step-bar-item.is-done .step-bar-number {
+  background: var(--success);
+  color: #0c120e;
+  font-weight: 700;
 }
 
-.composition-card__legend {
+.step-bar-item.is-warn .step-bar-number {
+  background: var(--warn);
+  color: #17130c;
+  font-weight: 700;
+}
+
+.step-bar-item.is-running .step-bar-number {
+  background: var(--accent);
+  color: #0c1017;
+  font-weight: 700;
+}
+
+.step-bar-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.step-bar-title {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.step-bar-hint {
   color: var(--muted);
   font-size: 11px;
-  margin: 6px 0 12px;
-  padding-left: 18px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.composition-card__measures {
-  display: grid;
-  gap: 4px 10px;
-  grid-template-columns: max-content minmax(0, 1fr);
+.step-bar-status {
+  align-self: flex-start;
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 10px;
+  gap: 4px;
+  letter-spacing: 0.04em;
+  margin-left: auto;
+  text-transform: uppercase;
 }
 
-.composition-card__measures dd {
+.step-bar-dot {
+  border-radius: 50%;
+  height: 7px;
+  width: 7px;
+}
+
+.step-bar-status.is-todo .step-bar-dot {
+  background: var(--line-strong);
+}
+
+.step-bar-status.is-running .step-bar-dot {
+  animation: pulse 1.1s ease-in-out infinite;
+  background: var(--accent);
+}
+
+.step-bar-status.is-done {
+  color: var(--success);
+}
+
+.step-bar-status.is-done .step-bar-dot {
+  background: var(--success);
+}
+
+.step-bar-status.is-warn {
+  color: var(--warn);
+}
+
+.step-bar-status.is-warn .step-bar-dot {
+  background: var(--warn);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-bar-status.is-running .step-bar-dot {
+    animation: none;
+  }
+}
+
+@media (max-width: 1240px) {
+  .step-bar ol {
+    flex-wrap: wrap;
+  }
+
+  .step-bar-item {
+    flex: 0 1 calc(33.33% - 8px);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   The welcome screen and the tour: what the app looks like before a wedding.
+   --------------------------------------------------------------------------- */
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: auto;
+  max-width: 560px;
+  padding: var(--space-6) var(--space-4);
+}
+
+.welcome h1 {
+  font-size: 26px;
+  letter-spacing: -0.01em;
   margin: 0;
 }
 
-@media (max-width: 980px) {
-  .workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .explain-panel {
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    max-height: 45vh;
-  }
+.welcome-lead {
+  color: var(--text-dim);
+  margin: 0;
 }
+
+.welcome-steps {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-3);
+  background: var(--panel);
+  display: grid;
+  gap: 1px;
+  list-style: none;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.welcome-steps li {
+  align-items: center;
+  background: var(--panel);
+  display: flex;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+}
+
+.welcome-steps li + li {
+  border-top: 1px solid var(--line);
+}
+
+.welcome-step-number {
+  background: var(--raised);
+  border-radius: 50%;
+  color: var(--muted);
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  height: 26px;
+  line-height: 26px;
+  text-align: center;
+  width: 26px;
+}
+
+.welcome-step-body {
+  display: grid;
+  gap: 1px;
+}
+
+.welcome-step-body span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.welcome-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tour-scrim {
+  align-items: center;
+  background: rgba(6, 8, 11, 0.78);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: var(--space-4);
+  position: fixed;
+  z-index: 60;
+}
+
+.tour-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-2);
+  display: grid;
+  gap: var(--space-3);
+  max-width: 460px;
+  padding: var(--space-5);
+  width: 100%;
+}
+
+.tour-kicker {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.tour-card h2 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.tour-body {
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.tour-dots span {
+  background: var(--line-strong);
+  border-radius: 50%;
+  height: 6px;
+  width: 6px;
+}
+
+.tour-dots span.is-on {
+  background: var(--accent);
+}
+
+.tour-actions {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tour-skip {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.tour-nav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* ---------------------------------------------------------------------------
+   Panels, progress, problems.
+   --------------------------------------------------------------------------- */
 
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-bottom: 12px;
-  padding: 12px;
+  border-radius: var(--radius-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-1);
 }
 
 .panel h2 {
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  margin: 0 0 var(--space-2);
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -143,44 +826,102 @@ body {
 .row {
   align-items: center;
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
-input {
-  background: #12141a;
+.progress {
+  background: var(--bg-deep);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-2);
+  height: 20px;
+  margin-top: var(--space-2);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  height: 100%;
+  transition: width 120ms linear;
+}
+
+.progress-label {
   color: var(--text);
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
+  font-size: 11px;
+  left: var(--space-2);
+  line-height: 20px;
+  position: absolute;
+  top: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-button {
-  background: #262b34;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--text);
-  cursor: pointer;
-  padding: 6px 10px;
+.banner {
+  align-items: center;
+  background: var(--warn-soft);
+  border-bottom: 1px solid var(--warn);
+  border-left: 3px solid var(--warn);
+  color: var(--text-dim);
+  display: flex;
+  gap: var(--space-2);
+  padding: 10px var(--space-3);
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+.banner strong {
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
-button:focus-visible,
-.grid-viewport:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.banner button {
+  margin-left: auto;
 }
+
+.empty {
+  color: var(--muted);
+}
+
+.project-list,
+.problem-list,
+.root-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.project {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+  width: 100%;
+}
+
+.project.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.problem-list li {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+}
+
+.problem-code {
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------------------
+   The grid: the most pixels on screen, and the thing at 60 fps.
+   --------------------------------------------------------------------------- */
 
 .grid-viewport {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: var(--space-2);
   position: relative;
 }
 
@@ -190,8 +931,9 @@ button:focus-visible,
 }
 
 .cell {
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-2);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -199,11 +941,18 @@ button:focus-visible,
   overflow: hidden;
   position: absolute;
   top: 0;
+  transition:
+    border-color 100ms ease,
+    transform 100ms ease;
   will-change: transform;
 }
 
+.cell:hover {
+  border-color: var(--line-strong);
+}
+
 .cell-thumb {
-  background: linear-gradient(135deg, #22262e, #2b303a);
+  background: linear-gradient(135deg, var(--raised), var(--line));
   flex: 1;
 }
 
@@ -231,7 +980,7 @@ button:focus-visible,
 .filmstrip {
   border-top: 1px solid var(--line);
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   overflow-x: auto;
   padding: 6px;
 }
@@ -245,71 +994,587 @@ button:focus-visible,
   border-color: var(--accent);
 }
 
-.project-list,
-.problem-list,
-.root-list {
+/* ---------------------------------------------------------------------------
+   The workspace shell and the per-photograph rails.
+   --------------------------------------------------------------------------- */
+
+.workspace-nav {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  flex: 0 0 auto;
+}
+
+.workspace-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 6px var(--space-2);
+}
+
+.workspace-nav button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-1);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 12px;
+}
+
+.workspace-nav button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.workspace-nav button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.workspace-nav button.is-active {
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.inspector {
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.explain-panel {
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.inspector__tabs,
+.develop-workspace__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.inspector__tabs button,
+.develop-workspace__tabs button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-1);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.inspector__tabs button.is-open,
+.develop-workspace__tabs button.is-open {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Everything but the library is a single scrolling column. */
+.people-panel,
+.story-panel,
+.moments,
+.cull-view,
+.cleanup-panel,
+.style-panel,
+.camera-match,
+.develop-workspace,
+.tone-review {
+  overflow-y: auto;
+  padding: var(--space-3);
+}
+
+.develop-workspace {
+  min-width: 0;
+}
+
+.develop-workspace__caveats {
+  color: var(--warn);
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.develop-workspace__source,
+.story-panel__summary,
+.style-panel__bucket,
+.filter-note {
+  color: var(--muted);
+  margin: 4px 0;
+}
+
+.story-panel__editor {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+.story-panel__editor label,
+.style-panel__pick {
+  display: block;
+  margin: var(--space-2) 0;
+}
+
+.story-panel__editor input[type='range'] {
+  display: block;
+  width: 100%;
+}
+
+.filter-note button {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   The composition card's figure and its overlays.
+   --------------------------------------------------------------------------- */
+
+.composition-card__figure {
+  margin: 0;
+}
+
+.composition-card__canvas {
+  background: var(--bg-deep);
+  min-height: 14rem;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.composition-card__preview,
+.composition-card__preview-placeholder,
+.composition-card__overlay {
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.composition-card__preview {
+  display: block;
+}
+
+.composition-card__preview-placeholder {
+  background: linear-gradient(135deg, var(--raised), var(--line));
+}
+
+.composition-card__overlay {
+  color: #f7d774;
+}
+
+.composition-card__legend {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 6px 0 var(--space-3);
+  padding-left: 18px;
+}
+
+.composition-card__measures {
+  display: grid;
+  gap: var(--space-1) 10px;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.composition-card__measures dd {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   The photo editor: the step-4 workbench.
+   --------------------------------------------------------------------------- */
+
+.photo-editor {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-1);
+  margin-bottom: var(--space-6);
+  padding: var(--space-5);
+}
+
+.photo-editor__viewer {
+  background: var(--bg-deep);
+  border-radius: var(--radius-2);
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  margin: var(--space-4) 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.photo-editor__viewer img {
+  display: block;
+  max-width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+}
+
+.photo-editor__viewer > span {
+  background: rgba(10, 12, 14, 0.86);
+  border-radius: var(--radius-1);
+  bottom: var(--space-3);
+  color: #fff;
+  left: var(--space-3);
+  padding: 4px 10px;
+  position: absolute;
+}
+
+.photo-editor__controls {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.photo-editor__controls label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.photo-editor__controls input[type='range'] {
+  width: 150px;
+}
+
+/* ---------------------------------------------------------------------------
+   The first-run AI setup screen.
+   --------------------------------------------------------------------------- */
+
+.ai-setup {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-4);
+  background: rgba(6, 8, 11, 0.88);
+}
+
+.ai-setup-sheet {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-2);
+  max-width: 880px;
+  padding: var(--space-5);
+  width: 100%;
+}
+
+.ai-setup-header h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+
+.ai-setup-headline,
+.ai-setup-blurb,
+.ai-setup-storage,
+.ai-setup-keys-url,
+.ai-setup-endpoint-fixed,
+.ai-setup-empty {
+  color: var(--muted);
+  margin: 6px 0;
+}
+
+.ai-setup-offline {
+  border-left: 3px solid var(--warn);
+  color: var(--warn);
+  margin: var(--space-3) 0;
+  padding-left: var(--space-2);
+}
+
+.ai-setup-search {
+  display: block;
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.ai-setup-search input {
+  display: block;
+  margin-top: var(--space-1);
+  width: 100%;
+}
+
+.ai-setup-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.project {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 4px;
+.ai-setup-card {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2);
+  color: inherit;
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  height: 100%;
+  padding: 10px;
+  text-align: left;
   width: 100%;
 }
 
-.project.active {
+.ai-setup-card:hover,
+.ai-setup-card:focus-visible {
   border-color: var(--accent);
 }
 
-.problem-list li {
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 2px;
-  padding: 6px 0;
+.ai-setup-card-label {
+  display: block;
+  font-weight: 600;
 }
 
-.problem-code {
+.ai-setup-card-keyed {
+  color: var(--accent);
+  display: block;
+  font-size: 12px;
+}
+
+.ai-setup-card-blurb,
+.ai-setup-card-price {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: var(--space-1);
+}
+
+.ai-setup-card-price {
+  overflow-wrap: anywhere;
+}
+
+.ai-setup-connect h2 {
+  font-size: 17px;
+  margin: var(--space-4) 0 0;
+}
+
+.ai-setup-tiers,
+.ai-setup-notes {
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding: 0;
+}
+
+.ai-setup-tiers li {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ai-setup-notes li {
+  border-left: 3px solid var(--warn);
   color: var(--warn);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  margin: 6px 0;
+  padding-left: var(--space-2);
 }
 
-.empty {
+.ai-setup-key,
+.ai-setup-endpoint,
+.ai-setup-advanced label {
+  display: block;
+  margin: var(--space-3) 0 0;
+}
+
+.ai-setup-key input,
+.ai-setup-endpoint input,
+.ai-setup-advanced input {
+  display: block;
+  margin-top: var(--space-1);
+  width: 100%;
+}
+
+.ai-setup-advanced-toggle,
+.ai-keys-open-setup {
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.ai-setup-advanced p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ai-setup-check {
+  border-left: 3px solid var(--accent);
+  margin: var(--space-3) 0;
+  padding-left: var(--space-2);
+}
+
+.ai-setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.ai-setup-footer {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: var(--space-3);
+}
+
+.ai-setup-skip {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   The application log panel: a live tail, so filters stay compact and the
+   line list dominates the height it is given.
+   --------------------------------------------------------------------------- */
+
+.log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: var(--space-2);
+}
+
+.log-filters button {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-1);
+  color: var(--muted);
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.log-filters button.is-open {
+  background: var(--bg);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.log-count {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 6px 0;
+}
+
+.log-lines {
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  list-style: none;
+  margin: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-2);
+}
+
+.log-line {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 62px 56px minmax(0, 1fr);
+  padding: 2px 0;
+}
+
+.log-line + .log-line {
+  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.log-time {
   color: var(--muted);
 }
 
-.banner {
-  align-items: center;
-  background: #3a2a1a;
-  border-bottom: 1px solid var(--warn);
+.log-kind {
+  text-transform: uppercase;
+}
+
+.log-line.is-click .log-kind {
+  color: var(--text-dim);
+}
+
+.log-line.is-ipc .log-kind {
+  color: var(--accent);
+}
+
+.log-line.is-ipc-error .log-kind,
+.log-line.is-error .log-kind {
+  color: var(--danger);
+}
+
+.log-line.is-warning .log-kind {
+  color: var(--warn);
+}
+
+.log-line.is-session .log-kind {
+  color: var(--success);
+}
+
+.log-text {
+  overflow-wrap: anywhere;
+}
+
+.log-detail {
+  color: var(--muted);
+  margin-left: var(--space-2);
+}
+
+.log-empty {
+  color: var(--muted);
+  padding: var(--space-2);
+  text-align: center;
+}
+
+.log-actions {
   display: flex;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
-.progress {
-  background: #12141a;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  height: 18px;
-  margin-top: 8px;
-  overflow: hidden;
-  position: relative;
+.log-clear {
+  border-color: var(--danger);
+  color: var(--danger);
+  margin-left: auto;
 }
 
-.progress-bar {
-  background: var(--accent);
-  height: 100%;
-  transition: width 120ms linear;
-}
+/* ---------------------------------------------------------------------------
+   Narrow windows: the grid gives up the sidebar last, so the columns shrink
+   before they disappear.
+   --------------------------------------------------------------------------- */
 
-.progress-label {
-  font-size: 11px;
-  left: 8px;
-  line-height: 18px;
-  position: absolute;
-  top: 0;
+@media (max-width: 980px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .explain-panel,
+  .inspector {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    max-height: 45vh;
+  }
 }

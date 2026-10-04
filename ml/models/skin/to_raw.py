@@ -1,4 +1,4 @@
-"""Turn JPEGs into the packed-RGB files the by-hand skin and retouch checks read. ADR-0077.
+"""Turn JPEGs into the packed-RGB files the by-hand skin and retouch checks read. ADR-0082.
 
 Writes NAME_WxH.rgb (packed 8-bit sRGB, long edge at most 1024) for every .jpg/.png in IN_DIR,
 then, after the Rust checks have written their *.rgb outputs, `--png` converts every output in

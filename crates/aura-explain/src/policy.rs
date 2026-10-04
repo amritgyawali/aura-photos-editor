@@ -389,3 +389,238 @@ impl Default for RiskRow {
 const fn yes() -> bool {
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use aura_core::contract::ledger::{Autonomy, DecisionKind};
+
+    use super::{AutonomyPolicy, Bands, Risk};
+
+    fn policy() -> AutonomyPolicy {
+        AutonomyPolicy::embedded().expect("the shipped band table has to load")
+    }
+
+    #[test]
+    fn the_shipped_table_loads_and_covers_every_decision_kind() {
+        // "A build that silently fell back to defaults would be a build whose autonomy came
+        // from a bug."
+        let policy = policy();
+        assert!(policy.version() > 0);
+        for kind in DecisionKind::ALL {
+            let bands = policy.bands(kind);
+            assert!(bands.is_ordered(), "{kind:?} thresholds do not descend");
+        }
+    }
+
+    #[test]
+    fn nothing_in_this_build_acts_unattended_because_nothing_is_calibrated() {
+        // Condition C2 of the phase 13 exit report, as an assertion rather than a sentence.
+        // `uncalibrated_raises` moves every decision one band toward review, so the most
+        // autonomous thing a perfectly confident uncalibrated decision can be is one step
+        // below `Auto` - and for an irreversible kind, two.
+        let policy = policy();
+        for kind in DecisionKind::ALL {
+            let banded =
+                policy.decide(kind, 1.0, Risk::NONE.for_kind(kind).with_uncalibrated(true));
+            assert_ne!(
+                banded,
+                Autonomy::Auto,
+                "{kind:?} would act unattended on an uncalibrated confidence"
+            );
+        }
+    }
+
+    #[test]
+    fn a_calibrated_and_certain_decision_can_reach_the_top_band() {
+        // The other half of the previous test: the raise is the *uncalibrated* flag doing its
+        // job rather than a table nothing can ever pass, which would make the whole feature
+        // unreachable and the test above pass for the wrong reason.
+        let policy = policy();
+        let reversible = DecisionKind::ALL
+            .into_iter()
+            .find(|kind| !kind.is_irreversible())
+            .expect("at least one kind is reversible");
+        assert_eq!(
+            policy.decide(reversible, 1.0, Risk::NONE.for_kind(reversible)),
+            Autonomy::Auto
+        );
+    }
+
+    #[test]
+    fn each_risk_raises_the_band_by_exactly_one_step() {
+        let policy = policy();
+        let kind = DecisionKind::ALL
+            .into_iter()
+            .find(|kind| !kind.is_irreversible())
+            .expect("at least one kind is reversible");
+        let plain = policy.decide(kind, 1.0, Risk::NONE);
+        let one = policy.decide(kind, 1.0, Risk::must_have());
+        let two = policy.decide(kind, 1.0, Risk::must_have().with_uncalibrated(true));
+        assert_eq!(one, plain.stricter());
+        assert_eq!(two, plain.stricter().stricter());
+    }
+
+    #[test]
+    fn a_low_confidence_decision_is_never_raised_above_review_by_arithmetic() {
+        // `stricter` saturates: there is nothing beyond `RequireReview`, and three raises on a
+        // decision already there must not wrap around to anything more permissive.
+        let policy = policy();
+        for kind in DecisionKind::ALL {
+            let banded = policy.decide(
+                kind,
+                0.0,
+                Risk {
+                    irreversible: true,
+                    must_have: true,
+                    uncalibrated: true,
+                },
+            );
+            assert_eq!(banded, Autonomy::RequireReview, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn the_band_is_monotone_in_the_confidence() {
+        // A decision the product is more sure of may never be *less* autonomous than one it is
+        // less sure of. The bands are a step function and this is what stops a mis-ordered
+        // table shipping.
+        let policy = policy();
+        for kind in DecisionKind::ALL {
+            let mut previous = Autonomy::RequireReview;
+            for step in 0..=100 {
+                let banded = policy.decide(kind, step as f32 / 100.0, Risk::NONE);
+                let allowed = matches!(
+                    (previous, banded),
+                    (Autonomy::RequireReview, _)
+                        | (
+                            Autonomy::Suggest,
+                            Autonomy::Suggest | Autonomy::AutoZeroTouch | Autonomy::Auto
+                        )
+                        | (
+                            Autonomy::AutoZeroTouch,
+                            Autonomy::AutoZeroTouch | Autonomy::Auto
+                        )
+                        | (Autonomy::Auto, Autonomy::Auto)
+                );
+                assert!(
+                    allowed,
+                    "{kind:?} went backwards at {step}: {previous:?} then {banded:?}"
+                );
+                previous = banded;
+            }
+        }
+    }
+
+    #[test]
+    fn a_confidence_outside_its_range_is_clamped_rather_than_banded_on() {
+        let policy = policy();
+        let kind = DecisionKind::ALL[0];
+        assert_eq!(
+            policy.decide(kind, 2.0, Risk::NONE),
+            policy.decide(kind, 1.0, Risk::NONE)
+        );
+        assert_eq!(
+            policy.decide(kind, -1.0, Risk::NONE),
+            policy.decide(kind, 0.0, Risk::NONE)
+        );
+    }
+
+    #[test]
+    fn a_table_whose_thresholds_do_not_descend_is_refused() {
+        // The one invariant a band table has. An `auto_at` below `suggest_at` would make the
+        // most confident decisions the ones that ask.
+        let bad = r#"
+version = 2
+[defaults]
+auto_at = 0.50
+zero_touch_at = 0.70
+suggest_at = 0.90
+reason = "backwards on purpose"
+"#;
+        assert!(AutonomyPolicy::parse(bad).is_err());
+    }
+
+    #[test]
+    fn a_row_with_no_written_reason_is_refused() {
+        // "A threshold nobody can explain is a threshold nobody can defend." Section 6.4's
+        // rule that a band table is a product decision.
+        let bad = r#"
+version = 2
+[defaults]
+auto_at = 0.95
+zero_touch_at = 0.85
+suggest_at = 0.60
+reason = "the default"
+
+[[kind]]
+id = "cull"
+auto_at = 0.97
+zero_touch_at = 0.90
+suggest_at = 0.70
+reason = ""
+"#;
+        assert!(AutonomyPolicy::parse(bad).is_err());
+    }
+
+    #[test]
+    fn an_unknown_decision_kind_is_refused_rather_than_ignored() {
+        // A row nobody reads is a threshold somebody believes is in force.
+        let bad = r#"
+version = 2
+[defaults]
+auto_at = 0.95
+zero_touch_at = 0.85
+suggest_at = 0.60
+reason = "the default"
+
+[[kind]]
+id = "telepathy"
+auto_at = 0.97
+zero_touch_at = 0.90
+suggest_at = 0.70
+reason = "not a kind"
+"#;
+        assert!(AutonomyPolicy::parse(bad).is_err());
+    }
+
+    #[test]
+    fn a_kind_with_no_row_of_its_own_uses_the_defaults_rather_than_the_top_band() {
+        let policy = policy();
+        let defaults = policy.bands(DecisionKind::ALL[0]);
+        assert!(defaults.is_ordered());
+    }
+
+    #[test]
+    fn a_raised_band_says_why_it_was_raised() {
+        // "A photographer who sees 0.99 and a review request reads the reason rather than
+        // guessing at one."
+        let policy = policy();
+        let multipliers = policy.multipliers();
+        let codes = Risk {
+            irreversible: true,
+            must_have: true,
+            uncalibrated: true,
+        }
+        .reason_codes(&multipliers);
+        assert!(codes.contains(&"uncalibrated_confidence"));
+        assert!(Risk::NONE.reason_codes(&multipliers).is_empty());
+    }
+
+    #[test]
+    fn an_irreversible_kind_carries_its_risk_from_the_type_rather_than_from_configuration() {
+        // "Set from `DecisionKind::is_irreversible`, never from configuration." A band table a
+        // studio can edit must not be able to declare a deletion reversible.
+        for kind in DecisionKind::ALL {
+            assert_eq!(
+                Risk::NONE.for_kind(kind).irreversible,
+                kind.is_irreversible(),
+                "{kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_default_bands_are_ordered() {
+        assert!(Bands::default().is_ordered());
+    }
+}

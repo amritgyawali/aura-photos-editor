@@ -1,4 +1,4 @@
-"""Check AI skin detection and the automatic retouch settings in the real desktop app. ADR-0077.
+"""Check AI skin detection and the automatic retouch settings in the real desktop app. ADR-0082.
 
 Starts the desktop app with WebView2 CDP on port 9223 (AURA_EXE, default the dev build),
 imports the photographs given on the command line, and for each one clicks Retouch, a scope,

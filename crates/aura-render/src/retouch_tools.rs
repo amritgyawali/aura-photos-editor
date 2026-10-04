@@ -1,6 +1,6 @@
-//! Deterministic, explicitly targeted native retouching. ADR-0068.
+//! Deterministic, explicitly targeted native retouching. ADR-0073.
 //!
-//! An operation may also carry a segmentation matte (ADR-0077): a person's face skin, body
+//! An operation may also carry a segmentation matte (ADR-0082): a person's face skin, body
 //! skin, hair or clothes as measured by the bundled segmenter at analysis time and stored in
 //! the recipe, so rendering stays deterministic and runs no model.
 // Dimensions are validated on entry and every coordinate is clamped to the frame.

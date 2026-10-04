@@ -20,7 +20,7 @@ quality ranking has been established. There is no basis for calling AURA best.
 | Batch portrait automation | Both products document batch or group workflows | Collection preparation now automatically detects suitable faces and saves editable texture, tone and light-balance steps. Repeat runs, manual protection, undo and PNG export were tested on five portraits; equivalent competitor quality has not been established |
 
 The automatic-portrait follow-up is documented in
-[ADR-0074](adr/ADR-0074-automatic-portrait-retouch.md) and the
+[ADR-0079](adr/ADR-0079-automatic-portrait-retouch.md) and the
 [current validation report](automatic-portrait-validation.md). The earlier
 sampled-skin verification below remains historical evidence for those processors.
 
@@ -103,7 +103,7 @@ zoom and pan. `scripts/test-retouch-comparison.py` passed on all five portraits,
 including unchanged recipes, history and original hashes. It also checked an
 unsaved refinement and Discard on the first portrait. This adds review controls
 and protects in-memory drafts; it does not change the retouch algorithms or
-establish competitor parity. See [ADR-0072](adr/ADR-0072-retouch-comparison-and-draft-protection.md).
+establish competitor parity. See [ADR-0077](adr/ADR-0077-retouch-comparison-and-draft-protection.md).
 
 The advanced selection update adds gradients, shape inversion, brightness ranges
 and a disposable coverage preview across all 24 tools. The preview evaluates
@@ -111,7 +111,7 @@ the range at the operation's position in the saved stack; later operations,
 sharpening and final geometry cannot alter its selection. It displays authored
 coverage, before tool-specific skin affinity or spot detection. These capabilities
 improve manual targeting; they do not close the automatic semantic-selection gap.
-See [ADR-0073](adr/ADR-0073-advanced-retouch-selections.md).
+See [ADR-0078](adr/ADR-0078-advanced-retouch-selections.md).
 
 Verification includes 551 UI tests across 57 files and 29 focused native tests.
 The last endpoint-guide correction also passed the 21 affected UI tests and

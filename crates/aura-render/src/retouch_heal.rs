@@ -1,5 +1,5 @@
 //! Texture transfer with bounded donor search and a coarse harmonic tone correction.
-//! This is an independent local algorithm, not learned blemish classification. ADR-0071.
+//! This is an independent local algorithm, not learned blemish classification. ADR-0076.
 // Buffers come from dimension-checked input; all coordinates are bounded before indexing.
 #![allow(clippy::indexing_slicing)]
 use crate::retouch_mask::Coverage;

@@ -5,7 +5,7 @@
 //! around it; a tooth is whitened only when it is yellower than the frame's own neutral; an
 //! under-eye is lifted only when it is darker than the same person's cheek. Dark spots that
 //! are not redder than their surroundings (moles, freckles, beauty marks) are always kept and
-//! counted, because a permanent mark is part of somebody's face. ADR-0076.
+//! counted, because a permanent mark is part of somebody's face. ADR-0081.
 //!
 //! Each finding becomes an ordinary, editable native retouch operation with a stable ID, so
 //! the photographer can inspect, weaken, disable or remove any single one of them.
@@ -451,7 +451,7 @@ pub struct Options {
     pub refine: bool,
     /// Which skin the automatic retouch works on.
     pub scope: Scope,
-    /// The fine controls. ADR-0077.
+    /// The fine controls. ADR-0082.
     pub settings: crate::retouch_settings::Settings,
 }
 

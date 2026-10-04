@@ -1,6 +1,6 @@
 # Automatic portrait editing validation — 2026-09-30
 
-Implementation: ADR-0074. This is an offline face-guided retouch workflow, not a
+Implementation: ADR-0079. This is an offline face-guided retouch workflow, not a
 commercial-retoucher parity claim or a semantic skin segmentation benchmark.
 
 ## Automated checks

@@ -153,3 +153,57 @@ pub fn encode_jpeg(image: &Rgb8, quality: u8) -> AuraResult<Vec<u8>> {
         .map_err(|e| corrupt(format!("jpeg encode failed: {e}")))?;
     Ok(out)
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+mod png_tests {
+    use super::*;
+    use crate::PixelData;
+
+    #[test]
+    fn transparent_png_decodes_and_reaches_all_preview_tiers() {
+        let mut encoded = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut encoded, 2, 1);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().expect("PNG header");
+            writer
+                .write_image_data(&[255, 0, 0, 255, 0, 0, 255, 0])
+                .expect("PNG pixels");
+        }
+        let image = decode_png(&encoded, DecodeLimits::tier1()).expect("decode PNG");
+        assert_eq!(image.data, [255, 0, 0, 255, 255, 255]);
+        let path = std::path::Path::new("photo.png");
+        let meta = crate::read_meta(&encoded, path).expect("PNG metadata");
+        assert_eq!(meta.format, crate::RawFormat::Png);
+        let clock = aura_core::clock::SystemClock::default();
+        let thumb = crate::thumb::tier1(&encoded, &meta, 512, DecodeLimits::tier1(), &clock, path)
+            .expect("thumbnail");
+        assert_eq!((thumb.buffer.width, thumb.buffer.height), (2, 1));
+        // Exercise the path used by Develop and AI analysis, including a cold
+        // proxy request with no previously decoded thumbnail to reuse.
+        let proxy = crate::proxy::tier2(&encoded, &meta, DecodeLimits::tier2(), &clock, None, path)
+            .expect("PNG proxy without a cached thumbnail");
+        assert_eq!((proxy.pair.srgb.width, proxy.pair.srgb.height), (2, 1));
+        assert_eq!((proxy.pair.linear.width, proxy.pair.linear.height), (2, 1));
+        let PixelData::Srgb8(proxy_pixels) = &proxy.pair.srgb.data else {
+            panic!("proxy must contain sRGB pixels");
+        };
+        assert_eq!(proxy_pixels.len(), 6);
+        assert!(proxy_pixels[0] > 240 && proxy_pixels[1] < 15 && proxy_pixels[2] < 15);
+        assert!(proxy_pixels[3..].iter().all(|channel| *channel > 240));
+        decode_jpeg(&proxy.jpeg, DecodeLimits::tier2()).expect("cacheable JPEG proxy");
+        let full = crate::full::tier3(&encoded, &meta, DecodeLimits::tier3(), &clock)
+            .expect("full resolution PNG");
+        assert_eq!((full.width, full.height), (2, 1));
+        assert!(decode_png(
+            &encoded,
+            DecodeLimits {
+                max_pixels: 1,
+                ..DecodeLimits::tier1()
+            }
+        )
+        .is_err());
+    }
+}

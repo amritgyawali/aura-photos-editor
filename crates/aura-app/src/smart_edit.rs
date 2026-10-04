@@ -4,7 +4,7 @@
 //! The pass never owns a result. Every decision is written into the same recipe fields and
 //! native retouch operations a person would use, each automatic stage is its own undoable
 //! history step, and anything a person has already set is protected by
-//! [`aura_recipe::schema::merge`]. ADR-0076.
+//! [`aura_recipe::schema::merge`]. ADR-0081.
 //!
 //! What is measured, in order:
 //!

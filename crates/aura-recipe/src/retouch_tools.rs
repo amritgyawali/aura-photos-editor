@@ -1,11 +1,11 @@
-//! Versioned local retouch authoring, carried by the recipe extension map. ADR-0068.
+//! Versioned local retouch authoring, carried by the recipe extension map. ADR-0073.
 use crate::{errors::recipe_invalid, Recipe};
 use aura_core::AuraResult;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub const KEY: &str = "studio_retouch_v1";
-/// Segmentation mattes that retouch operations refer to by id. ADR-0077.
+/// Segmentation mattes that retouch operations refer to by id. ADR-0082.
 pub const MATTE_KEY: &str = "studio_retouch_mattes_v1";
 pub const MAX_EDITS: usize = 256;
 pub const MAX_MATTES: usize = 64;
@@ -143,7 +143,7 @@ pub struct Edit {
     pub matte: Option<String>,
 }
 
-/// A soft selection measured by the skin segmenter, stored compactly. ADR-0077.
+/// A soft selection measured by the skin segmenter, stored compactly. ADR-0082.
 ///
 /// `data` is base64 of a run-length code: each byte is `(level << 4) | (run - 1)`, where
 /// `level` is coverage in fifteenths (0..15, decoded as `level * 17`) and `run` is 1..16 cells

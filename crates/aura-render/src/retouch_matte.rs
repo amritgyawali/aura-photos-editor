@@ -1,4 +1,4 @@
-//! Segmentation mattes at render resolution, with edges re-derived from the photograph. ADR-0077.
+//! Segmentation mattes at render resolution, with edges re-derived from the photograph. ADR-0082.
 //!
 //! A stored matte is at most 256 cells on its long side, so on a 24-megapixel export one cell
 //! covers twenty pixels. Upsampling it bilinearly would put a twenty-pixel ramp across every jaw

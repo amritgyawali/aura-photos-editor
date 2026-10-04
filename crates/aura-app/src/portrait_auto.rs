@@ -39,7 +39,7 @@ pub struct FaceAssessment {
     pub confidence: f32,
     pub reason: String,
     pub strengths: [f32; 3],
-    /// Measured finishing decisions for this face: spots, eyes, teeth and shine. ADR-0076.
+    /// Measured finishing decisions for this face: spots, eyes, teeth and shine. ADR-0081.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub findings: Vec<String>,
     #[serde(default)]
@@ -89,7 +89,7 @@ pub struct Report {
     /// The finishing choices this pass used; a later pass repeats them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<portrait_features::Options>,
-    /// How skin was found: by the bundled segmenter or by landmark geometry. ADR-0077.
+    /// How skin was found: by the bundled segmenter or by landmark geometry. ADR-0082.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub segmentation: Option<SegmentationSummary>,
 }
@@ -213,7 +213,7 @@ pub struct Plan {
     pub report: Report,
     /// Planned operations per group. A present-but-empty group removes older automatic work.
     pub groups: BTreeMap<Group, Vec<Edit>>,
-    /// Segmentation mattes the planned operations refer to, by id. ADR-0077.
+    /// Segmentation mattes the planned operations refer to, by id. ADR-0082.
     pub mattes: BTreeMap<String, Matte>,
 }
 
@@ -1366,7 +1366,7 @@ fn sample_quality(rgb: &[u8], width: u32, height: u32, [x, y]: [f32; 2]) -> Opti
     })
 }
 
-// ---- Segmented skin (ADR-0077) -----------------------------------------------------------
+// ---- Segmented skin (ADR-0082) -----------------------------------------------------------
 
 /// The segmenter's answer for this pass, or why there is none.
 struct Segmentation {

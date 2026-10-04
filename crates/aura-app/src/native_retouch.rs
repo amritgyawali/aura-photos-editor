@@ -1,4 +1,4 @@
-//! Native retouch commands; typed recipe extension, original-preserving history. ADR-0068.
+//! Native retouch commands; typed recipe extension, original-preserving history. ADR-0073.
 use crate::{
     commands::IpcResult,
     contract::ipc::{RenderDto, RenderNoteDto},

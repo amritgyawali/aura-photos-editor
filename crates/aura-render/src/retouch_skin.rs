@@ -1,4 +1,4 @@
-//! Sample-guided portrait processing in linear Rec.2020. ADR-0070.
+//! Sample-guided portrait processing in linear Rec.2020. ADR-0075.
 // Dimensions and coordinates are bounded by the caller and Coverage before indexing.
 #![allow(clippy::indexing_slicing)]
 use crate::retouch_mask::Coverage;

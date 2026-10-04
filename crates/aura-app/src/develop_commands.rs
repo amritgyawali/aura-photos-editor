@@ -443,7 +443,7 @@ fn apply_path(base: &Recipe, path: &str, value: &serde_json::Value) -> Result<Re
     let parts: Vec<&str> = path.split('.').collect();
     let mut cursor = &mut document;
     for (index, part) in parts.iter().enumerate() {
-        // ADR-0065. A neutral optional block, an untouched HSL band and a colour photograph's
+        // ADR-0070. A neutral optional block, an untouched HSL band and a colour photograph's
         // black-and-white block are *absent* from the document rather than present and zero,
         // so the first time a person sets one of their fields the block is filled in with its
         // defaults here. Only blocks the schema defines can be created; anything else is still

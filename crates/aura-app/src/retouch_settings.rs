@@ -1,4 +1,4 @@
-//! The automatic retouch's fine controls: fifty-two named settings in ten groups. ADR-0077.
+//! The automatic retouch's fine controls: fifty-two named settings in ten groups. ADR-0082.
 //!
 //! Modelled on what professional portrait retouching tools expose (frequency-separated skin
 //! smoothing that keeps pores, tone and light evening, measured blemish healing, dodge and

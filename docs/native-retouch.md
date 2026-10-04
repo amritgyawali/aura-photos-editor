@@ -140,7 +140,7 @@ outside the photograph leave those target pixels unchanged.
 The tool blends surrounding tone using an approximate correction field. Large
 areas and sharp lighting boundaries may need smaller repairs or a different source.
 It does not decide which marks should be removed. Existing Heal operations keep
-their previous behavior. [ADR-0071](adr/ADR-0071-texture-aware-patch-heal.md) records
+their previous behavior. [ADR-0076](adr/ADR-0076-texture-aware-patch-heal.md) records
 the algorithm and its limits.
 
 ## Sampled skin tools
@@ -166,7 +166,7 @@ ideal complexion or automatically distinguish skin from permanent marks.
 
 The [competitor audit](retouch-competitor-audit.md) records the remaining gaps
 against documented Retouch4me and SkinFiner behavior. Exact equivalence has not
-been established. [ADR-0070](adr/ADR-0070-sampled-skin-processing.md) describes
+been established. [ADR-0075](adr/ADR-0075-sampled-skin-processing.md) describes
 the independent processing implementation.
 
 ## Gradients, outside shapes and brightness ranges
@@ -212,7 +212,7 @@ across skin tones, lighting conditions or camera formats.
 
 Retouch currently requires a whole-frame CPU render, including when export would
 otherwise stream tiles. Large photographs therefore need more memory. Recipes
-support up to 256 native operations. See [ADR-0068](adr/ADR-0068-native-retouch-workspace.md)
+support up to 256 native operations. See [ADR-0073](adr/ADR-0073-native-retouch-workspace.md)
 for persistence, coordinate and rendering decisions.
 
 ## Repeatable verification

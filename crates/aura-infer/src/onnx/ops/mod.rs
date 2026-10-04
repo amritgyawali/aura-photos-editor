@@ -2,7 +2,7 @@
 //!
 //! Twenty-two operators. That number is a decision, not an accident: it is what the
 //! backbones planned for phases 05 to 11 need, plus `ConvTranspose` and `ReduceSum`
-//! for the bundled skin segmenter (ADR-0077), and every one of them is
+//! for the bundled skin segmenter (ADR-0082), and every one of them is
 //! implemented here with a fixed accumulation order so that two machines agree
 //! bit for bit. Adding an operator is a normal change with tests; running one we
 //! have not implemented is not possible, because [`is_supported`] is checked at

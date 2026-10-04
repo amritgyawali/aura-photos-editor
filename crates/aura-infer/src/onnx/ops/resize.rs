@@ -1,6 +1,6 @@
 //! Two spatial subsets of ONNX Resize (opset 11+): `nearest`/`asymmetric`/`floor`, and
 //! `linear`/`half_pixel` (TensorFlow's `half_pixel_centers` bilinear, used by the skin
-//! segmenter's decoder - ADR-0077).
+//! segmenter's decoder - ADR-0082).
 use aura_core::AuraResult;
 
 use super::{float_operand, nchw, optional_float};

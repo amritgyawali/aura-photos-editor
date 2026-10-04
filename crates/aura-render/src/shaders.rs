@@ -111,7 +111,7 @@ pub const DECONV: &str = include_str!("../shaders/deconv.wgsl");
 /// gather rather than map.
 const GEOMETRY: &str = include_str!("../shaders/geometry.wgsl");
 
-/// ADR-0065. Calibration, colour grading, the post-crop vignette and grain.
+/// ADR-0070. Calibration, colour grading, the post-crop vignette and grain.
 pub const CREATIVE: &str = include_str!("../shaders/creative.wgsl");
 
 /// Every source, with the file name it came from.
@@ -167,7 +167,7 @@ pub fn source_for(stage: Stage) -> Option<(&'static str, &'static str)> {
 pub fn shared_constants() -> Vec<(&'static str, String)> {
     vec![
         ("MID_GREY", format!("{:.2}", crate::tonemap::MID_GREY)),
-        // ADR-0065. The four strengths the creative panels share with `creative.wgsl`.
+        // ADR-0070. The four strengths the creative panels share with `creative.wgsl`.
         ("GRADE_TINT", format!("{:.2}", crate::creative::GRADE_TINT)),
         (
             "GRADE_LUMA_STOPS",
