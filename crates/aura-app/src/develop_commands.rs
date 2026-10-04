@@ -120,6 +120,37 @@ pub fn history_step(state: &AppState, input: &HistoryStepInput) -> IpcResult<Set
             history.reset(ResetTo::AiSuggestion, clock.as_ref())?;
             "Reset to AI suggestion"
         }
+        other if other.starts_with("goto:") => {
+            // Jump to the state right after a listed step (`goto:0` is before every step).
+            // Recorded as one navigation row, so redo keeps working and nothing is discarded.
+            let seq: u64 = other
+                .trim_start_matches("goto:")
+                .parse()
+                .map_err(|_| aura_core::errors::render::recipe_invalid("action", other))?;
+            let target = if seq == 0 {
+                0
+            } else {
+                history
+                    .entries()
+                    .iter()
+                    .position(|entry| entry.seq == seq)
+                    .map(|index| index + 1)
+                    .ok_or_else(|| {
+                        aura_core::errors::render::recipe_invalid(
+                            "history",
+                            "that step no longer exists",
+                        )
+                    })?
+            };
+            let mut cursor = history_cursor(&history);
+            while cursor > target && history.undo().is_some() {
+                cursor -= 1;
+            }
+            while cursor < target && history.redo().is_some() {
+                cursor += 1;
+            }
+            "Go to step"
+        }
         other => {
             return Err(IpcError::from(aura_core::errors::render::recipe_invalid(
                 "action", other,
@@ -129,9 +160,28 @@ pub fn history_step(state: &AppState, input: &HistoryStepInput) -> IpcResult<Set
 
     let current = history.current().clone();
     let changed = aura_recipe::history::changed_paths(&before, &current);
+    // Navigation is an append-only journal event, not a new edit branch. These
+    // reserved paths cannot be authored by set_param or an automated recipe merge.
+    let mut recorded = changed.clone();
+    match input.action.as_str() {
+        "undo" => recorded.push("$history.undo".into()),
+        "redo" => recorded.push("$history.redo".into()),
+        goto if goto.starts_with("goto:") => {
+            if changed.is_empty() {
+                // Already there: nothing to record.
+                return Ok(SetParamDto {
+                    recipe: recipe_dto(&input.photo_id, &current),
+                    changed: Vec::new(),
+                    invalidated_from: None,
+                });
+            }
+            recorded.push(format!("$history.{goto}"));
+        }
+        _ => {}
+    }
     state
         .recipe_store()
-        .save(&project, &photo, &current, &changed, label)?;
+        .save(&project, &photo, &current, &recorded, label)?;
 
     Ok(SetParamDto {
         recipe: recipe_dto(&input.photo_id, &current),
@@ -149,6 +199,7 @@ pub fn history_step(state: &AppState, input: &HistoryStepInput) -> IpcResult<Set
 pub fn snapshot(state: &AppState, input: &SnapshotInput) -> IpcResult<HistoryDto> {
     let project = parse_project(&input.project_id)?;
     let photo = parse_photo(&input.photo_id)?;
+    crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
     let mut history = load_history(state, photo)?;
     let clock = state.clock();
 
@@ -392,6 +443,21 @@ fn apply_path(base: &Recipe, path: &str, value: &serde_json::Value) -> Result<Re
     let parts: Vec<&str> = path.split('.').collect();
     let mut cursor = &mut document;
     for (index, part) in parts.iter().enumerate() {
+        // ADR-0070. A neutral optional block, an untouched HSL band and a colour photograph's
+        // black-and-white block are *absent* from the document rather than present and zero,
+        // so the first time a person sets one of their fields the block is filled in with its
+        // defaults here. Only blocks the schema defines can be created; anything else is still
+        // "no such field".
+        let prefix = parts.get(..index).map(|p| p.join(".")).unwrap_or_default();
+        if let serde_json::Value::Object(map) = cursor {
+            let missing =
+                !map.contains_key(*part) || map.get(*part).is_some_and(serde_json::Value::is_null);
+            if missing && index + 1 < parts.len() {
+                if let Some(block) = default_block(&prefix, part) {
+                    map.insert((*part).to_string(), block);
+                }
+            }
+        }
         if index + 1 == parts.len() {
             let serde_json::Value::Object(map) = cursor else {
                 return Err(aura_core::errors::render::recipe_invalid(
@@ -399,7 +465,9 @@ fn apply_path(base: &Recipe, path: &str, value: &serde_json::Value) -> Result<Re
                     "no such field",
                 ));
             };
-            if !map.contains_key(*part) {
+            // The black-and-white mix is a map keyed by band, and a band nobody moved is absent.
+            let mix_band = prefix == "bw.mix" && aura_recipe::HSL_BANDS.contains(part);
+            if !map.contains_key(*part) && !mix_band {
                 return Err(aura_core::errors::render::recipe_invalid(
                     path,
                     "no such field",
@@ -421,6 +489,209 @@ fn apply_path(base: &Recipe, path: &str, value: &serde_json::Value) -> Result<Re
 
     serde_json::from_value(document)
         .map_err(|e| aura_core::errors::render::recipe_invalid(path, &e.to_string()))
+}
+
+/// Input to [`sync_settings`]: Lightroom's Sync Settings.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncSettingsInput {
+    /// The collection.
+    pub project_id: String,
+    /// The photograph whose develop settings are copied.
+    pub source_photo_id: String,
+    /// The photographs to copy onto; empty means every other photograph in the collection.
+    #[serde(default)]
+    pub target_photo_ids: Vec<String>,
+    /// Also copy the crop and straighten. Off by default, as in Lightroom: a crop belongs to
+    /// the composition of one frame.
+    #[serde(default)]
+    pub include_geometry: bool,
+    /// Explicit groups; absent preserves the original sync command's behaviour.
+    #[serde(default)]
+    pub groups: Option<Vec<String>>,
+}
+
+/// What [`sync_settings`] did.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncSettingsReport {
+    /// Photographs whose settings now match the source.
+    pub synced: usize,
+    /// Photographs that could not be written, with the reason.
+    pub failed: Vec<String>,
+}
+
+/// Copy one photograph's develop settings onto others, as a person's edit.
+///
+/// Recorded as [`EditSource::User`], because choosing to sync is a person's decision about those
+/// photographs: every copied field is protected from later automatic passes, exactly as if it had
+/// been set by hand on each frame. Identity, masks, retouching and cleanup are never copied - they
+/// describe one frame's pixels.
+///
+/// # Errors
+///
+/// `AURA-RENDER-8002` for an invalid identifier, `AURA-DB-3006` when the catalog cannot be read.
+pub fn sync_settings(state: &AppState, input: &SyncSettingsInput) -> IpcResult<SyncSettingsReport> {
+    let project = parse_project(&input.project_id)?;
+    let source_id = parse_photo(&input.source_photo_id)?;
+    crate::studio_tools::require_member(state, &input.project_id, &input.source_photo_id)?;
+    let source = load_or_neutral(state, source_id)?;
+    // Validate before touching any target, including an empty collection.
+    let _ = sync_proposal(&source, &source, input)?;
+    let targets: Vec<String> = if input.target_photo_ids.is_empty() {
+        let key = input.project_id.clone();
+        state.catalog().read(move |conn| {
+            let mut stmt = conn
+                .prepare("SELECT photo_id FROM photo WHERE project_id = ?1 ORDER BY photo_id")
+                .map_err(|e| aura_core::errors::db::statement_failed("sync targets", &e))?;
+            let rows = stmt
+                .query_map([key], |row| row.get::<_, String>(0))
+                .map_err(|e| aura_core::errors::db::statement_failed("sync targets", &e))?;
+            rows.collect::<Result<Vec<String>, _>>()
+                .map_err(|e| aura_core::errors::db::statement_failed("sync targets", &e))
+        })?
+    } else {
+        input.target_photo_ids.clone()
+    };
+    let mut report = SyncSettingsReport {
+        synced: 0,
+        failed: Vec::new(),
+    };
+    let unique: std::collections::BTreeSet<_> = targets.iter().collect();
+    for target in unique
+        .into_iter()
+        .filter(|id| **id != input.source_photo_id)
+    {
+        let result = (|| -> Result<(), AuraError> {
+            crate::studio_tools::require_member(state, &input.project_id, target)?;
+            let photo = PhotoId::from_db(target).map_err(|_| {
+                aura_core::errors::render::recipe_invalid("photo", "invalid photo identifier")
+            })?;
+            let base = load_or_neutral(state, photo)?;
+            let proposal = sync_proposal(&base, &source, input)?;
+            let (merged, change) = schema::merge(&base, &proposal, EditSource::User)?;
+            let merged = merged.clamped();
+            schema::Validation::check(&merged)?;
+            state.recipe_store().save(
+                &project,
+                &photo,
+                &merged,
+                &change.changed,
+                "Synced settings",
+            )?;
+            Ok(())
+        })();
+        match result {
+            Ok(()) => report.synced += 1,
+            Err(error) => report
+                .failed
+                .push(format!("{target}: {}", error.user_message)),
+        }
+    }
+    Ok(report)
+}
+
+fn sync_proposal(
+    base: &Recipe,
+    source: &Recipe,
+    input: &SyncSettingsInput,
+) -> Result<Recipe, AuraError> {
+    let mut proposal = base.clone();
+    let Some(groups) = &input.groups else {
+        proposal.global = source.global.clone();
+        proposal.bw.clone_from(&source.bw);
+        proposal.lens.vignette = source.lens.vignette;
+        if input.include_geometry {
+            proposal.geometry = source.geometry.clone();
+        }
+        for band in aura_recipe::HSL_BANDS {
+            proposal.global.hsl.entry(band.to_string()).or_default();
+        }
+        return Ok(proposal);
+    };
+    if groups.is_empty() {
+        return Err(aura_core::errors::render::recipe_invalid(
+            "groups",
+            "Select at least one settings group",
+        ));
+    }
+    let src = &source.global;
+    let dst = &mut proposal.global;
+    for group in groups {
+        match group.as_str() {
+            "tone" => {
+                dst.exposure = src.exposure;
+                dst.contrast = src.contrast;
+                dst.highlights = src.highlights;
+                dst.shadows = src.shadows;
+                dst.whites = src.whites;
+                dst.blacks = src.blacks;
+                dst.clarity = src.clarity;
+                dst.texture = src.texture;
+                dst.dehaze = src.dehaze;
+            }
+            "white_balance" => {
+                dst.temperature = src.temperature;
+                dst.tint = src.tint;
+            }
+            "curves" => {
+                dst.curve.clone_from(&src.curve);
+                dst.parametric = src.parametric;
+                dst.channel_curves.clone_from(&src.channel_curves);
+            }
+            "color" => {
+                dst.vibrance = src.vibrance;
+                dst.saturation = src.saturation;
+                dst.hsl.clone_from(&src.hsl);
+                dst.colour_grade = src.colour_grade;
+                proposal.bw.clone_from(&source.bw);
+                for band in aura_recipe::HSL_BANDS {
+                    dst.hsl.entry(band.to_string()).or_default();
+                }
+            }
+            "detail" => {
+                dst.sharpen = src.sharpen;
+                dst.noise = src.noise.clone();
+            }
+            "effects" => {
+                dst.effects = src.effects;
+                proposal.lens.vignette = source.lens.vignette;
+            }
+            "calibration" => {
+                dst.calibration = src.calibration;
+            }
+            "lens" => {
+                // Optical profiles belong to the target camera/lens, not the source frame.
+                proposal.lens.distortion = source.lens.distortion;
+                proposal.lens.ca = source.lens.ca;
+            }
+            "geometry" => proposal.geometry = source.geometry.clone(),
+            _ => {
+                return Err(aura_core::errors::render::recipe_invalid(
+                    "groups",
+                    "Unknown settings group",
+                ))
+            }
+        }
+    }
+    Ok(proposal)
+}
+
+/// The defaults of a block that may be absent from a recipe's document.
+fn default_block(parent: &str, key: &str) -> Option<serde_json::Value> {
+    let value = match (parent, key) {
+        ("global", "parametric") => serde_json::to_value(aura_recipe::ParametricCurve::default()),
+        ("global", "channel_curves") => serde_json::to_value(aura_recipe::ChannelCurves::default()),
+        ("global", "colour_grade") => serde_json::to_value(aura_recipe::ColourGrade::default()),
+        ("global", "calibration") => serde_json::to_value(aura_recipe::Calibration::default()),
+        ("global", "effects") => serde_json::to_value(aura_recipe::Effects::default()),
+        ("global.hsl", band) if aura_recipe::HSL_BANDS.contains(&band) => {
+            serde_json::to_value(aura_recipe::HslShift::default())
+        }
+        ("", "bw") => serde_json::to_value(aura_recipe::Bw::default()),
+        _ => return None,
+    };
+    value.ok()
 }
 
 /// The label the history panel shows for a control the caller did not name.
@@ -461,14 +732,72 @@ fn load_history(state: &AppState, photo: PhotoId) -> Result<History, AuraError> 
             .unwrap_or_else(|| "0".repeat(64)),
         &state.photo_camera(photo).unwrap_or_default(),
     );
-    state.recipe_store().history(&photo, original)
+    state
+        .recipe_store()
+        .history(&photo, original)
+        .map(replay_history)
+}
+
+/// The number of steps currently applied: 0 at the original, `entries().len()` at the head.
+fn history_cursor(history: &History) -> usize {
+    let current = history.current();
+    history
+        .entries()
+        .iter()
+        .position(|entry| std::ptr::eq(std::ptr::from_ref(&entry.recipe), current))
+        .map_or(0, |index| index + 1)
+}
+
+/// Reconstruct the active edit branch and its cursor from the saved journal.
+/// Navigation rows remain in `SQLite`, so redo also survives reopening the app.
+fn replay_history(stored: History) -> History {
+    let mut entries = Vec::new();
+    let mut cursor = 0;
+    for entry in stored.entries() {
+        let goto = entry
+            .changed
+            .iter()
+            .find_map(|path| path.strip_prefix("$history.goto:"))
+            .and_then(|seq| seq.parse::<u64>().ok());
+        if let Some(seq) = goto {
+            if seq == 0 {
+                cursor = 0;
+            } else if let Some(index) = entries
+                .iter()
+                .position(|e: &aura_recipe::history::HistoryEntry| e.seq == seq)
+            {
+                cursor = index + 1;
+            }
+        } else if entry.changed.iter().any(|path| path == "$history.undo") && cursor > 0 {
+            cursor -= 1;
+        } else if entry.changed.iter().any(|path| path == "$history.redo") && cursor < entries.len()
+        {
+            cursor += 1;
+        } else {
+            // A new edit discards the redo branch. If the bounded journal no
+            // longer has a navigation target, its saved recipe is a checkpoint.
+            entries.truncate(cursor);
+            entries.push(entry.clone());
+            cursor = entries.len();
+        }
+    }
+    let head = entries.len();
+    let mut history = History::rehydrate(
+        stored.original().clone(),
+        entries,
+        stored.snapshots().to_vec(),
+    );
+    for _ in cursor..head {
+        history.undo();
+    }
+    history
 }
 
 /// Base64, written out rather than pulled in.
 ///
 /// One dependency avoided for twenty lines. The alphabet is standard and there is no line
 /// wrapping, because the only consumer is a data URL.
-fn base64(bytes: &[u8]) -> String {
+pub(crate) fn base64(bytes: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
@@ -517,6 +846,48 @@ fn parse_photo(id: &str) -> Result<PhotoId, IpcError> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn selective_sync_preserves_unselected_controls_and_camera_specific_profiles() {
+        use super::*;
+        let mut base = recipe_fixtures::reference();
+        base.global.exposure = 1.25;
+        base.lens.profile = Some("target lens".into());
+        let mut source = base.clone();
+        source.global.temperature = 7200;
+        source.global.exposure = -1.0;
+        source.geometry.rotate = 2.0;
+        source.lens.profile = Some("different lens".into());
+        let input = SyncSettingsInput {
+            project_id: String::new(),
+            source_photo_id: String::new(),
+            target_photo_ids: vec![],
+            include_geometry: true,
+            groups: Some(vec!["white_balance".into(), "lens".into()]),
+        };
+        let copied = sync_proposal(&base, &source, &input).unwrap();
+        assert_eq!(copied.global.temperature, 7200);
+        assert_eq!(copied.global.exposure, base.global.exposure);
+        assert_eq!(copied.geometry, base.geometry);
+        assert_eq!(copied.lens.profile, base.lens.profile);
+        assert!(sync_proposal(
+            &base,
+            &source,
+            &SyncSettingsInput {
+                groups: Some(vec![]),
+                ..input.clone()
+            }
+        )
+        .is_err());
+        assert!(sync_proposal(
+            &base,
+            &source,
+            &SyncSettingsInput {
+                groups: Some(vec!["everything".into()]),
+                ..input
+            }
+        )
+        .is_err());
+    }
     use super::*;
 
     #[test]

@@ -85,6 +85,21 @@ impl<'a> ExportPass<'a> {
     /// cannot take the files, `AURA-RENDER-8022` when a written file did not read back - which
     /// **stops the job**.
     pub fn run(&self, project: ProjectId, job: &ExportJob) -> AuraResult<PassResult> {
+        self.run_with_watermark(project, job, None)
+    }
+
+    /// Run a job with an optional graphic baked into every output after resizing/sharpening.
+    /// # Errors
+    /// The same job and I/O failures as `run`, plus an invalid watermark.
+    pub fn run_with_watermark(
+        &self,
+        project: ProjectId,
+        job: &ExportJob,
+        watermark: Option<&crate::watermark::Watermark>,
+    ) -> AuraResult<PassResult> {
+        if let Some(mark) = watermark {
+            mark.validate()?;
+        }
         // 1. The job, before a frame is rendered.
         job.validate()?;
 
@@ -101,7 +116,13 @@ impl<'a> ExportPass<'a> {
         // 3. Every name, before anything is written.
         let plan = naming::plan(job, self.field)?;
 
-        let versions = self.field.engine_versions();
+        let mut versions = self.field.engine_versions();
+        if let Some(mark) = watermark {
+            let (asset, hash) = mark.archive(&root)?;
+            versions.push(("watermark".to_owned(), "1".to_owned()));
+            versions.push(("watermark_asset".to_owned(), asset));
+            versions.push(("watermark_asset_blake3".to_owned(), hash));
+        }
         let job_id = self
             .store
             .open_job(project, job, &self.app_version, &versions)?;
@@ -178,6 +199,12 @@ impl<'a> ExportPass<'a> {
                     format!("{}x{}", sharpened.width, sharpened.height),
                 ));
             }
+
+            let sharpened = if let Some(mark) = watermark {
+                mark.apply(&sharpened)?
+            } else {
+                sharpened
+            };
 
             // 4d. Encode.
             let (bytes, mut encode_reasons) = match set.format {

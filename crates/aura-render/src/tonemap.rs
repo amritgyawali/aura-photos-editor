@@ -223,6 +223,18 @@ impl CurveLut {
         Self { table, identity }
     }
 
+    /// A table sampled from a function of the curve-domain value, in increasing order of x.
+    ///
+    /// ADR-0070: the parametric curve composes with the point curve into one table, so the
+    /// inner loop still does exactly one lookup per pixel.
+    #[must_use]
+    pub fn from_fn(identity: bool, mut f: impl FnMut(f32) -> f32) -> Self {
+        let table = (0..Self::ENTRIES)
+            .map(|i| f(i as f32 / (Self::ENTRIES - 1) as f32))
+            .collect();
+        Self { table, identity }
+    }
+
     /// True when this curve changes nothing.
     #[must_use]
     pub const fn is_identity(&self) -> bool {

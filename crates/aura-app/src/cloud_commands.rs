@@ -86,7 +86,7 @@ pub fn set_ai_key(state: &AppState, input: &SetAiKeyInput) -> IpcResult<CloudSta
     // pointed at Anthropic with no key - which reads as the key having been lost.
     let mut setup = state.ai_setup()?;
     setup.provider = kind.as_str().to_string();
-    setup.endpoint = input.endpoint.clone();
+    setup.endpoint.clone_from(&input.endpoint);
     setup.completed = true;
     setup.skipped = false;
     state.save_ai_setup(&setup)?;

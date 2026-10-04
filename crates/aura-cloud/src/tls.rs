@@ -9,7 +9,7 @@
 //! [`crate::catalog`], every one of which is HTTPS-only: a setup screen that
 //! collects a key it cannot use is worse than no setup screen.
 //!
-//! `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` discharges the waiver
+//! `docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` discharges the waiver
 //! and records what was traded. Three things are worth having in front of you
 //! before reading the code.
 //!
@@ -20,7 +20,7 @@
 //! dependency is pure Rust - so linking either of them would make the cloud half
 //! of the product unbuildable on the machine it is developed on. What is used
 //! instead is `rustls-rustcrypto`, which assembles a rustls `CryptoProvider` out
-//! of the RustCrypto primitives. Its own authors describe it as not yet
+//! of the `RustCrypto` primitives. Its own authors describe it as not yet
 //! production-grade, and the ADR says so in those words.
 //!
 //! **Verification is on, and there is no switch that turns it off.** No
@@ -63,7 +63,7 @@ impl fmt::Debug for TlsStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TlsStream")
             .field("host", &self.host)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -129,7 +129,7 @@ impl Connector for TlsConnector {
         let config = client_config().ok_or_else(|| {
             unreachable(
                 host,
-                "this build could not assemble a TLS configuration; see ADR-0063",
+                "this build could not assemble a TLS configuration; see ADR-0066",
             )
         })?;
 

@@ -440,7 +440,9 @@ impl OsKeyStore {
                         format!(
                             "$ErrorActionPreference='Stop'; \
                              if(-not (Test-Path '{path}')){{exit 44}}; \
-                             $sec=(Get-Content -Path '{path}' -Raw).Trim() | ConvertTo-SecureString; \
+                             $raw=(Get-Content -Path '{path}' -Raw).Trim(); \
+                             if(-not $raw){{exit 44}}; \
+                             $sec=$raw | ConvertTo-SecureString; \
                              $b=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec); \
                              [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b)",
                             path = path.display()

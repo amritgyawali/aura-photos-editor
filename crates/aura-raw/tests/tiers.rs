@@ -443,10 +443,39 @@ fn tiled_full_decode_matches_a_whole_image_decode_on_xtrans() {
 
 #[test]
 fn tier_three_refuses_to_render_from_an_embedded_preview() {
+    // A RAW whose mosaic compression this build cannot decode, with a perfectly good JPEG
+    // preview inside it. Tier 3 must refuse rather than hand back the preview as though it were
+    // the sensor data.
     let directory = tempfile::tempdir().expect("temporary directory");
-    let path = directory.path().join("preview-only.jpg");
-    // A plain JPEG has no mosaic at all, which is the same situation as a RAW
-    // whose compression we cannot decode.
+    let mut loaded = load(
+        directory.path(),
+        FixtureOptions {
+            with_preview: true,
+            ..FixtureOptions::default()
+        },
+    );
+    let mosaic = loaded
+        .meta
+        .mosaic
+        .as_mut()
+        .expect("the fixture has a mosaic");
+    mosaic.scheme = meta::MosaicScheme::Unsupported(34_713);
+    let error = full::tier3(
+        &loaded.bytes,
+        &loaded.meta,
+        DecodeLimits::tier3(),
+        clock().as_ref(),
+    )
+    .expect_err("tier 3 has no fallback");
+    assert_eq!(error.code.0, "AURA-RAW-2007");
+}
+
+#[test]
+fn a_plain_jpeg_is_its_own_full_resolution_image() {
+    // A JPEG or PNG photograph has no mosaic because it *is* the developed image, so tier 3
+    // decodes its own pixels - which is what lets a phone or camera JPEG be exported at full size.
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join("photo.jpg");
     let jpeg = aura_raw::codec::encode_jpeg(
         &aura_raw::codec::Rgb8 {
             width: 16,
@@ -457,11 +486,10 @@ fn tier_three_refuses_to_render_from_an_embedded_preview() {
     )
     .expect("encode a jpeg");
     std::fs::write(&path, &jpeg).expect("write");
-
     let parsed = meta::read(&jpeg, &path).expect("a jpeg is readable");
-    let error = full::tier3(&jpeg, &parsed, DecodeLimits::tier3(), clock().as_ref())
-        .expect_err("tier 3 has no fallback");
-    assert_eq!(error.code.0, "AURA-RAW-2007");
+    let buffer = full::tier3(&jpeg, &parsed, DecodeLimits::tier3(), clock().as_ref())
+        .expect("a jpeg decodes at full resolution");
+    assert_eq!((buffer.width, buffer.height), (16, 16));
 }
 
 // ------------------------------------------------------------ failure paths

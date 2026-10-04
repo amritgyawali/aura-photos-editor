@@ -90,8 +90,8 @@ export function Autopilot(props: AutopilotProps) {
       <header className="autopilot-header">
         <h2>Edit complete wedding</h2>
         <p>
-          Import the RAWs, click once, come back to a delivered gallery. Everything below is
-          saved as it goes, so stopping loses nothing.
+          One click runs the available analysis and editing stages. Review the results before export.
+          Completed work is saved as you go.
         </p>
       </header>
 
@@ -130,12 +130,14 @@ export function Autopilot(props: AutopilotProps) {
         </div>
       )}
 
+      <details className="advanced-tools"><summary>Review every step & customize stages</summary>
       <StageList
         stages={stages}
         disabled={disabled}
         current={progress?.stage ?? null}
         onToggle={running ? undefined : onToggleStage}
       />
+      </details>
 
       {!running ? <RunSummary summary={summary} events={events} /> : null}
 

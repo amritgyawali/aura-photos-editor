@@ -869,7 +869,12 @@ fn category(difference: i32) -> u32 {
     32 - magnitude.leading_zeros()
 }
 
-fn encode_lossless_jpeg(mosaic: &[u16], width: u32, height: u32, precision: u8) -> Vec<u8> {
+pub(crate) fn encode_lossless_jpeg(
+    mosaic: &[u16],
+    width: u32,
+    height: u32,
+    precision: u8,
+) -> Vec<u8> {
     let codes = canonical_codes();
     let mut writer = BitWriter::new();
     let seed = 1i32 << (precision - 1);

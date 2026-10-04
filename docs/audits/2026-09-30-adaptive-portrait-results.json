@@ -1,0 +1,641 @@
+{
+  "date": "2026-09-30",
+  "baseRevision": "80e22e53ac8369ab30af5ae769f99d5371f2eb23",
+  "detectorVersion": "yunet-2023mar-aura320-rotation-v2",
+  "plannerVersion": "sample-consensus-v2",
+  "uiTests": {
+    "passed": 556,
+    "files": 58
+  },
+  "focusedNativeTests": {
+    "recipe": 64,
+    "portraitDetectorExposure": 12
+  },
+  "builds": {
+    "ui": "passed",
+    "desktop": "passed",
+    "note": "Affected internal packages rebuilt with debug information disabled after local native archive/linker failures."
+  },
+  "rotationDesktopChecks": {
+    "status": "passed",
+    "photos": [
+      {
+        "file": "portrait-1239291.jpg",
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.935988,
+              "face": 1,
+              "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.132094,
+                0.113477,
+                0.113602
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.394374,
+                0.394712,
+                0.548069,
+                0.676523
+              ],
+              "confidence": 0.935988,
+              "landmarks": [
+                [
+                  0.428115,
+                  0.51337
+                ],
+                [
+                  0.494625,
+                  0.510107
+                ],
+                [
+                  0.460886,
+                  0.564333
+                ],
+                [
+                  0.438321,
+                  0.601396
+                ],
+                [
+                  0.498328,
+                  0.60346
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "resetUndoRedo": true,
+        "snapshotRestore": true,
+        "manualProvenance": true,
+        "manualProtected": true
+      },
+      {
+        "file": "rotation-180.png",
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.935587,
+              "face": 1,
+              "reason": "Compared 22 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.149006,
+                0.124183,
+                0.149869
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.454695,
+                0.318165,
+                0.600737,
+                0.604666
+              ],
+              "confidence": 0.935587,
+              "landmarks": [
+                [
+                  0.574144,
+                  0.482678
+                ],
+                [
+                  0.499586,
+                  0.48168
+                ],
+                [
+                  0.542418,
+                  0.425668
+                ],
+                [
+                  0.564584,
+                  0.39452
+                ],
+                [
+                  0.502742,
+                  0.39013
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "resetUndoRedo": true,
+        "snapshotRestore": true,
+        "manualProvenance": true,
+        "manualProtected": true
+      },
+      {
+        "file": "rotation-270.png",
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.935301,
+              "face": 1,
+              "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.134547,
+                0.115387,
+                0.11477
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.323597,
+                0.394319,
+                0.605272,
+                0.547776
+              ],
+              "confidence": 0.935301,
+              "landmarks": [
+                [
+                  0.486602,
+                  0.428137
+                ],
+                [
+                  0.489837,
+                  0.494432
+                ],
+                [
+                  0.435446,
+                  0.460683
+                ],
+                [
+                  0.398643,
+                  0.438087
+                ],
+                [
+                  0.396477,
+                  0.497938
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "resetUndoRedo": true,
+        "snapshotRestore": true,
+        "manualProvenance": true,
+        "manualProtected": true
+      },
+      {
+        "file": "rotation-90.png",
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.935515,
+              "face": 1,
+              "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.131721,
+                0.112677,
+                0.113685
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.394865,
+                0.452086,
+                0.67655,
+                0.605699
+              ],
+              "confidence": 0.935515,
+              "landmarks": [
+                [
+                  0.513321,
+                  0.571901
+                ],
+                [
+                  0.510052,
+                  0.505403
+                ],
+                [
+                  0.564279,
+                  0.539136
+                ],
+                [
+                  0.601623,
+                  0.561742
+                ],
+                [
+                  0.603494,
+                  0.501772
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "resetUndoRedo": true,
+        "snapshotRestore": true,
+        "manualProvenance": true,
+        "manualProtected": true
+      }
+    ],
+    "guiDetailsAndReset": true,
+    "originalUnchanged": true
+  },
+  "fivePortraitDesktopChecks": {
+    "status": "passed",
+    "originalHashes": {
+      "portrait-1239291.jpg": "0ecc1caab14a8075840c686c8b6b35b83d8502f367e01e3f8b8eb7daedcf9a64",
+      "portrait-220453.jpg": "57b9d6f990b791df16e05c5001adf1c349fb8bb0f3783587ca4a3123352e2bbb",
+      "portrait-2379004.jpg": "15ea2219d330fe85a637fda0bf54c5680bd90726caac0aa519638010ff921418",
+      "portrait-774909.jpg": "b7fbf5f2375897cbcb3e053c6ea8e3781c68391e775cbcf0c10095c82dac777b",
+      "portrait-8386841.jpg": "bee918ed3b603a4ddc41e8f56d3866f09405b74b25d50e9d4c0483652f708d98"
+    },
+    "exactFullRendererMatch": true,
+    "manualRefinementAndUndo": true,
+    "desktopControls": true,
+    "originalsUnchanged": true,
+    "photos": [
+      {
+        "file": "portrait-1239291.jpg",
+        "command": "enhance_photo",
+        "analysisSeconds": 2.794344900001306,
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.935988,
+              "face": 1,
+              "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.132094,
+                0.113477,
+                0.113602
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.394374,
+                0.394712,
+                0.548069,
+                0.676523
+              ],
+              "confidence": 0.935988,
+              "landmarks": [
+                [
+                  0.428115,
+                  0.51337
+                ],
+                [
+                  0.494625,
+                  0.510107
+                ],
+                [
+                  0.460886,
+                  0.564333
+                ],
+                [
+                  0.438321,
+                  0.601396
+                ],
+                [
+                  0.498328,
+                  0.60346
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "idempotent": true,
+        "undoRedo": true,
+        "manualProtected": true,
+        "recipeHash": "a6314c5a55832ec743c9b699c880aadb6f9340635d964c3e200f7feb217e9ec1",
+        "afterSha256": "3ed90caedf6e05fe0c7d2dc7a16c2a6b1fc76b728135e589d4b5a06d69baea75",
+        "fullAfterSha256": "603be509ef17facccd08e4e72cb70e74976ab0b1d1281f70b22c4fcdae793d46"
+      },
+      {
+        "file": "portrait-220453.jpg",
+        "command": "enhance_portrait",
+        "analysisSeconds": 3.2281770999979926,
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.930814,
+              "face": 1,
+              "reason": "Compared 18 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.121769,
+                0.096841,
+                0.116584
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.289818,
+                0.233424,
+                0.691306,
+                0.600668
+              ],
+              "confidence": 0.930814,
+              "landmarks": [
+                [
+                  0.392415,
+                  0.379985
+                ],
+                [
+                  0.588096,
+                  0.383882
+                ],
+                [
+                  0.484459,
+                  0.455327
+                ],
+                [
+                  0.399601,
+                  0.493168
+                ],
+                [
+                  0.566784,
+                  0.504924
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "idempotent": true,
+        "undoRedo": true,
+        "manualProtected": true,
+        "recipeHash": "3e7a1561e502f5d334caabe3118f11f04a5d75b6dfd35ed1a9a3b8a21ea2b294",
+        "afterSha256": "1eb32be392432c5bb32593027d6d99e1971d80459625382530f3b9a0fae7a8b6",
+        "fullAfterSha256": "9a5b72684860df33b79337b829e17c14d6dc615fbf70a0656dbf806f48c9d49b"
+      },
+      {
+        "file": "portrait-2379004.jpg",
+        "command": "enhance_photo",
+        "analysisSeconds": 3.463399500004016,
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.930731,
+              "face": 1,
+              "reason": "Compared 12 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.109055,
+                0.092554,
+                0.088221
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.351461,
+                0.229305,
+                0.628518,
+                0.471302
+              ],
+              "confidence": 0.930731,
+              "landmarks": [
+                [
+                  0.45844,
+                  0.322405
+                ],
+                [
+                  0.582237,
+                  0.320272
+                ],
+                [
+                  0.542417,
+                  0.369407
+                ],
+                [
+                  0.47102,
+                  0.411411
+                ],
+                [
+                  0.577093,
+                  0.406963
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "idempotent": true,
+        "undoRedo": true,
+        "manualProtected": true,
+        "recipeHash": "221500023ad41eaebd745c4a1b06c42a479676e625f987342d9193bb72402b23",
+        "afterSha256": "8e294230403835b1f4cfc5b002e611264fb40a13b452d60d820767615d440da7",
+        "fullAfterSha256": "71aa1e1230d8062cd85693a06d84102dd9a9d10cad9ff0da27d6fffed0cd9222"
+      },
+      {
+        "file": "portrait-774909.jpg",
+        "command": "enhance_portrait",
+        "analysisSeconds": 3.236907500002417,
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.946196,
+              "face": 1,
+              "reason": "Compared 20 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.118612,
+                0.110876,
+                0.098997
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.288138,
+                0.277144,
+                0.630168,
+                0.563251
+              ],
+              "confidence": 0.946196,
+              "landmarks": [
+                [
+                  0.353381,
+                  0.390408
+                ],
+                [
+                  0.516702,
+                  0.388623
+                ],
+                [
+                  0.425021,
+                  0.444591
+                ],
+                [
+                  0.374703,
+                  0.496062
+                ],
+                [
+                  0.518725,
+                  0.486202
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "idempotent": true,
+        "undoRedo": true,
+        "manualProtected": true,
+        "recipeHash": "0e908267d0874106172e2015ee691558b4e2d98d04307ee266b009ecb865fa6d",
+        "afterSha256": "98761b146cae191e0436455ec9b2dba6ec0ed4f53a161c3fe3f398908af28f02",
+        "fullAfterSha256": "298f73b9d2f0011edc93769a6bc5e28dab6ef5fa81c0f99c355a9fcf18a76c54"
+      },
+      {
+        "file": "portrait-8386841.jpg",
+        "command": "enhance_photo",
+        "analysisSeconds": 3.1894356999982847,
+        "analysis": {
+          "assessments": [
+            {
+              "confidence": 0.907847,
+              "face": 1,
+              "reason": "Compared 27 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+              "status": "retouched",
+              "strengths": [
+                0.131166,
+                0.129021,
+                0.134112
+              ]
+            }
+          ],
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.345828,
+                0.353571,
+                0.578718,
+                0.558122
+              ],
+              "confidence": 0.907847,
+              "landmarks": [
+                [
+                  0.377424,
+                  0.419528
+                ],
+                [
+                  0.475654,
+                  0.41887
+                ],
+                [
+                  0.40022,
+                  0.458897
+                ],
+                [
+                  0.390476,
+                  0.499579
+                ],
+                [
+                  0.470108,
+                  0.499233
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-rotation-v2",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "plannerVersion": "sample-consensus-v2",
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "idempotent": true,
+        "undoRedo": true,
+        "manualProtected": true,
+        "recipeHash": "a1f106d8f8216253f018f069439c6650147a77d2e571e061d6964a639d898297",
+        "afterSha256": "0765d5eef8940b25a395eff5f61066ae60d234e4bca1dbdaf011f5f5fa845976",
+        "fullAfterSha256": "bb2ede4120c1e1549fd142d98b8fc75cf1d133a5bf45a02ebf0ca998ea45729c"
+      }
+    ],
+    "export": {
+      "written": 5,
+      "verified": 5,
+      "corrupt": 0,
+      "renderFailed": 0
+    }
+  },
+  "limits": [
+    "This is a bounded fixture regression, not proof of arbitrary-photo support or competitor quality parity.",
+    "Skin targeting uses landmarks and sampled color, not semantic segmentation.",
+    "Orientation fallback stops at the first view with faces; mixed orientations, small and obscured faces remain limited.",
+    "This work does not resolve the earlier audit findings on formats, sidecars, export naming, layers or missing features."
+  ]
+}

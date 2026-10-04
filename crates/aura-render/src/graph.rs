@@ -33,6 +33,11 @@ pub enum Stage {
     WhiteBalance,
     /// Camera native into linear Rec.2020 at D65. The end of the input half.
     CameraMatrix,
+    /// Camera calibration: the shadow tint and the three primaries. ADR-0070.
+    ///
+    /// Directly after the matrix, because calibration is an adjustment *to the camera
+    /// profile* in Lightroom: it moves the primaries every later colour control works on.
+    Calibration,
     /// Lens vignette correction.
     LensVignette,
     /// Lens distortion correction. Needs a lens profile.
@@ -61,6 +66,11 @@ pub enum Stage {
     Vibrance,
     /// Black-and-white conversion with a per-band mix.
     Monochrome,
+    /// Colour grading: shadows, midtones, highlights and global wheels. ADR-0070.
+    ///
+    /// **After the monochrome mix**, so a black-and-white photograph can be split-toned -
+    /// which is most of what photographers use colour grading on a monochrome for.
+    ColourGrade,
     /// Local masks and the parameters inside them.
     Masks,
     /// Distraction removal: real pixels put where an object was. Phase 24.
@@ -80,15 +90,21 @@ pub enum Stage {
     Sharpen,
     /// Crop, rotation and perspective.
     Geometry,
+    /// The post-crop vignette. ADR-0070. After the crop, by definition: it is drawn on the
+    /// frame the photographer delivers.
+    PostCropVignette,
+    /// Film grain. ADR-0070. Last before the output transform, so nothing smooths it away.
+    Grain,
     /// Tone map, gamut, transfer, quantise. **The only place tone is baked.**
     OutputTransform,
 }
 
 /// Every stage, in execution order. The array *is* the pipeline.
-pub const ORDER: [Stage; 24] = [
+pub const ORDER: [Stage; 28] = [
     Stage::HighlightRecovery,
     Stage::WhiteBalance,
     Stage::CameraMatrix,
+    Stage::Calibration,
     Stage::LensVignette,
     Stage::LensDistortion,
     Stage::LensCa,
@@ -103,12 +119,15 @@ pub const ORDER: [Stage; 24] = [
     Stage::Dehaze,
     Stage::Vibrance,
     Stage::Monochrome,
+    Stage::ColourGrade,
     Stage::Masks,
     Stage::Cleanup,
     Stage::Retouch,
     Stage::Restoration,
     Stage::Sharpen,
     Stage::Geometry,
+    Stage::PostCropVignette,
+    Stage::Grain,
     Stage::OutputTransform,
 ];
 
@@ -120,6 +139,7 @@ impl Stage {
             Self::HighlightRecovery => "highlight_recovery",
             Self::WhiteBalance => "white_balance",
             Self::CameraMatrix => "camera_matrix",
+            Self::Calibration => "calibration",
             Self::LensVignette => "lens_vignette",
             Self::LensDistortion => "lens_distortion",
             Self::LensCa => "lens_ca",
@@ -134,12 +154,15 @@ impl Stage {
             Self::Dehaze => "dehaze",
             Self::Vibrance => "vibrance",
             Self::Monochrome => "monochrome",
+            Self::ColourGrade => "colour_grade",
             Self::Masks => "masks",
             Self::Cleanup => "cleanup",
             Self::Retouch => "retouch",
             Self::Restoration => "restoration",
             Self::Sharpen => "sharpen",
             Self::Geometry => "geometry",
+            Self::PostCropVignette => "post_crop_vignette",
+            Self::Grain => "grain",
             Self::OutputTransform => "output_transform",
         }
     }
@@ -325,6 +348,12 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         None,
     );
     push!(Stage::CameraMatrix, native, upstream, None);
+    push!(
+        Stage::Calibration,
+        !g.calibration.is_neutral(),
+        SkipReason::NotRequested,
+        None,
+    );
 
     // --- lens ---------------------------------------------------------------------------
     push!(
@@ -382,7 +411,7 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
     );
     push!(
         Stage::Curve,
-        !g.curve.is_identity(),
+        !g.curve.is_identity() || !g.parametric.is_flat() || !g.channel_curves.is_identity(),
         SkipReason::NotRequested,
         None,
     );
@@ -428,6 +457,12 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         SkipReason::NotRequested,
         None,
     );
+    push!(
+        Stage::ColourGrade,
+        !g.colour_grade.is_inert(),
+        SkipReason::NotRequested,
+        None,
+    );
 
     // --- local, retouch, restoration ----------------------------------------------------
     let geometric_masks = recipe
@@ -440,26 +475,39 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
             )
         })
         .count();
-    let generated_masks: Vec<String> = recipe
+    // Hints carry a face box and adjust nothing, so they neither run the stage nor need a
+    // generator note of their own.
+    let generated_masks: Vec<&aura_recipe::Mask> = recipe
         .masks
         .iter()
         .filter(|m| {
             !matches!(
                 m.kind,
                 aura_recipe::MaskKind::Linear | aura_recipe::MaskKind::Radial
-            )
+            ) && !crate::portrait::is_hint(m)
         })
+        .collect();
+    // Portrait masks resolve through `aura_portrait` when the build can parse a photograph.
+    // A brush stroke cannot be re-derived from pixels - it is somebody's hand - so it stays a
+    // generator this renderer does not have.
+    let resolvable = generated_masks
+        .iter()
+        .filter(|m| caps.mask_generators && crate::portrait::mask_region(m).is_some())
+        .count();
+    let unresolved: Vec<String> = generated_masks
+        .iter()
+        .filter(|m| !caps.mask_generators || crate::portrait::mask_region(m).is_none())
         .map(|m| m.id.clone())
         .collect();
 
-    if geometric_masks > 0 {
+    if geometric_masks > 0 || resolvable > 0 {
         stages.push(Stage::Masks);
     }
-    if !generated_masks.is_empty() && !caps.mask_generators {
+    if !unresolved.is_empty() {
         notes.push(RenderNote {
             stage: Stage::Masks.as_str().to_string(),
             reason: SkipReason::MaskGeneratorAbsent,
-            detail: Some(generated_masks.join(",")),
+            detail: Some(unresolved.join(",")),
         });
     } else if geometric_masks == 0 && generated_masks.is_empty() {
         notes.push(RenderNote {
@@ -484,18 +532,49 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         recipe.cleanup.first().map(|op| op.method.clone()),
     );
 
-    push!(
-        Stage::Retouch,
-        !recipe.retouch.is_empty() && caps.retouch_operators && !skip_heavy,
-        if recipe.retouch.is_empty() {
-            SkipReason::NotRequested
-        } else if !caps.retouch_operators {
-            SkipReason::OperatorAbsent
-        } else {
-            SkipReason::InteractivePath
-        },
-        recipe.retouch.first().map(|op| op.op.clone()),
-    );
+    // Portrait operators are light enough for the interactive path - a handful of running-sum
+    // blurs at a radius set by the face - so a photographer sees the retouch while moving the
+    // slider rather than only on export. Every other operator keeps phase 14's rule: it is
+    // heavy, and an operator this renderer does not execute is named rather than dropped.
+    let portrait_ops = recipe
+        .retouch
+        .iter()
+        .filter(|op| crate::portrait::is_operator(&op.op))
+        .count();
+    let foreign: Vec<String> = recipe
+        .retouch
+        .iter()
+        .filter(|op| !crate::portrait::is_operator(&op.op))
+        .map(|op| op.op.clone())
+        .collect();
+    if recipe.retouch.is_empty() {
+        notes.push(RenderNote {
+            stage: Stage::Retouch.as_str().to_string(),
+            reason: SkipReason::NotRequested,
+            detail: None,
+        });
+    } else if !caps.retouch_operators {
+        notes.push(RenderNote {
+            stage: Stage::Retouch.as_str().to_string(),
+            reason: SkipReason::OperatorAbsent,
+            detail: recipe.retouch.first().map(|op| op.op.clone()),
+        });
+    } else {
+        if portrait_ops > 0 {
+            stages.push(Stage::Retouch);
+        }
+        if !foreign.is_empty() {
+            notes.push(RenderNote {
+                stage: Stage::Retouch.as_str().to_string(),
+                reason: if skip_heavy {
+                    SkipReason::InteractivePath
+                } else {
+                    SkipReason::OperatorAbsent
+                },
+                detail: Some(foreign.join(",")),
+            });
+        }
+    }
 
     // PHASE-22, ADR-0047 section 2. `restoration.denoise` deliberately does **not** appear here.
     // Denoising is a sensor-domain operation and runs at `Stage::NoiseReduction`, index 6, thirteen
@@ -538,6 +617,18 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         wants_geometry,
         SkipReason::NotRequested,
         None
+    );
+    push!(
+        Stage::PostCropVignette,
+        g.effects.vignette.amount != 0,
+        SkipReason::NotRequested,
+        None,
+    );
+    push!(
+        Stage::Grain,
+        g.effects.grain.amount > 0,
+        SkipReason::NotRequested,
+        None,
     );
     stages.push(Stage::OutputTransform);
 
@@ -604,6 +695,18 @@ pub fn stage_for(path: &str) -> Option<Stage> {
                 Some(Stage::Hsl)
             } else if path.starts_with("bw") {
                 Some(Stage::Monochrome)
+            } else if path.starts_with("global.calibration") {
+                Some(Stage::Calibration)
+            } else if path.starts_with("global.parametric")
+                || path.starts_with("global.channel_curves")
+            {
+                Some(Stage::Curve)
+            } else if path.starts_with("global.colour_grade") {
+                Some(Stage::ColourGrade)
+            } else if path.starts_with("global.effects.vignette") {
+                Some(Stage::PostCropVignette)
+            } else if path.starts_with("global.effects.grain") {
+                Some(Stage::Grain)
             } else if path == "restoration.denoise" {
                 // PHASE-22, ADR-0047 section 2. The tier decides `global.noise.*`, which
                 // `Stage::NoiseReduction` reads at index 6, so a cache told the change is valid
@@ -660,7 +763,12 @@ pub fn render_hash(
 /// different renderer.
 #[must_use]
 pub fn engine_string() -> String {
-    format!("{}+profiles.{}", ENGINE, crate::profiles::PROFILES_VER)
+    format!(
+        "{}+profiles.{}+portrait.{}",
+        ENGINE,
+        crate::profiles::PROFILES_VER,
+        aura_portrait::PARSE_VER
+    )
 }
 
 #[cfg(test)]
@@ -892,7 +1000,11 @@ mod tests {
 
     #[test]
     fn the_engine_string_carries_the_profile_version() {
-        assert!(engine_string().ends_with(&format!("+profiles.{}", crate::profiles::PROFILES_VER)));
+        let engine = engine_string();
+        assert!(engine.contains(&format!("+profiles.{}+", crate::profiles::PROFILES_VER)));
+        // The portrait parse decides the pixels of every masked or retouched render, so its
+        // version is part of the engine as the profile table's is.
+        assert!(engine.ends_with(&format!("+portrait.{}", aura_portrait::PARSE_VER)));
     }
 
     #[test]

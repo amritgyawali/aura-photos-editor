@@ -16,7 +16,7 @@
 //! [`crate::cassette::CassetteTransport`] replays recorded responses,
 //! [`OfflineTransport`] refuses everything, and [`crate::http::HttpTransport`]
 //! is a real HTTP/1.1 client that speaks TLS through [`crate::tls`]. See
-//! `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` for what the pure-Rust
+//! `docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` for what the pure-Rust
 //! crypto provider under it trades.
 //!
 //! ## Retries, and why they are bounded so tightly
@@ -62,13 +62,13 @@ pub enum ProviderKind {
     Google,
     /// OpenAI's models inside a customer's own Azure tenancy.
     AzureOpenAi,
-    /// OpenRouter, which fronts most of the others behind one key.
+    /// `OpenRouter`, which fronts most of the others behind one key.
     OpenRouter,
     /// Groq's inference service.
     Groq,
     /// Mistral's hosted endpoint.
     Mistral,
-    /// DeepSeek's hosted endpoint.
+    /// `DeepSeek`'s hosted endpoint.
     DeepSeek,
     /// xAI's Grok endpoint.
     XAi,
@@ -76,7 +76,7 @@ pub enum ProviderKind {
     Together,
     /// Fireworks AI.
     Fireworks,
-    /// DeepInfra.
+    /// `DeepInfra`.
     DeepInfra,
     /// Cerebras.
     Cerebras,

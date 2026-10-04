@@ -158,8 +158,10 @@ dependencies = [
  "aura-ingest",
  "aura-jobs",
  "aura-learn",
+ "aura-look",
  "aura-models",
  "aura-people",
+ "aura-portrait",
  "aura-preview",
  "aura-qc",
  "aura-raw",
@@ -170,6 +172,7 @@ dependencies = [
  "aura-style",
  "aura-vision",
  "blake3",
+ "dirs 5.0.1",
  "fs4",
  "parking_lot",
  "rusqlite",
@@ -360,6 +363,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tracing",
+ "tracing-appender",
  "tracing-subscriber",
 ]
 
@@ -514,6 +518,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-look"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-raw",
+ "aura-recipe",
+ "aura-render",
+ "aura-style",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "time",
+ "tracing",
+ "uuid",
+ "walkdir",
+]
+
+[[package]]
 name = "aura-models"
 version = "0.1.0"
 dependencies = [
@@ -546,6 +570,15 @@ dependencies = [
  "time",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aura-portrait"
+version = "0.1.0"
+dependencies = [
+ "aura-raw",
+ "rayon",
+ "serde",
 ]
 
 [[package]]
@@ -610,6 +643,7 @@ name = "aura-render"
 version = "0.1.0"
 dependencies = [
  "aura-core",
+ "aura-portrait",
  "aura-raw",
  "aura-recipe",
  "blake3",
@@ -3879,9 +3913,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.44"
+version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6725596c3f2c3a0aef021139e145d4eafe314a6623e4680ca83852b2c67ab2ba"
+checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
 dependencies = [
  "log",
  "once_cell",
@@ -4412,6 +4446,12 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "symlink"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7973cce6668464ea31f176d85b13c7ab3bba2cb3b77a2ed26abd7801688010a"
 
 [[package]]
 name = "syn"
@@ -5120,6 +5160,19 @@ dependencies = [
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-appender"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "050686193eb999b4bb3bc2acfa891a13da00f79734704c4b8b4ef1a10b368a3c"
+dependencies = [
+ "crossbeam-channel",
+ "symlink",
+ "thiserror 2.0.20",
+ "time",
+ "tracing-subscriber",
 ]
 
 [[package]]

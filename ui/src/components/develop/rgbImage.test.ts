@@ -15,5 +15,6 @@ describe('rendered RGB display', () => {
   });
   it('does not display truncated pixel data as a valid image', () => {
     expect(rgbDataUrl({ width: 2, height: 2, rgbBase64: 'AAAA' } as RenderDto)).toBeNull();
+    expect(rgbDataUrl({ width: 2, height: 2, rgbBase64: 'not base64!' } as RenderDto)).toBeNull();
   });
 });

@@ -269,8 +269,10 @@ impl History {
             ));
         };
         let changed = changed_paths(self.current(), &snapshot.recipe);
+        let mut restored = snapshot.recipe;
+        restored.provenance.source = EditSource::User;
         self.push(
-            snapshot.recipe,
+            restored,
             EditSource::User,
             changed,
             format!("Restore snapshot: {name}"),
@@ -325,7 +327,10 @@ impl History {
 #[must_use]
 pub fn changed_paths(before: &Recipe, after: &Recipe) -> Vec<String> {
     let mut out = Vec::new();
-    for path in crate::schema::paths(after) {
+    for path in crate::schema::paths(before)
+        .into_iter()
+        .chain(crate::schema::paths(after))
+    {
         if path.starts_with("provenance") {
             continue;
         }
@@ -345,6 +350,39 @@ mod tests {
     use aura_core::clock::FixedClock;
     use std::sync::Arc;
     use time::OffsetDateTime;
+
+    #[test]
+    fn reset_and_snapshot_restore_record_removed_extension_fields() {
+        let clock = clock();
+        let original = fixtures::neutral(fixtures::FIXTURE_HASH, "test");
+        let mut edited = original.clone();
+        edited.extra.insert(
+            "studio_retouch_v1".into(),
+            serde_json::json!([{"tool":"dodge"}]),
+        );
+        let changed = changed_paths(&original, &edited);
+        let removed = changed_paths(&edited, &original);
+        assert_eq!(changed, removed);
+        assert!(removed.iter().any(|path| path == "studio_retouch_v1"));
+        let mut history = History::new(original.clone());
+        history.snapshot("before", clock.as_ref()).unwrap();
+        history.push(
+            edited.clone(),
+            EditSource::User,
+            changed.clone(),
+            "Dodge",
+            clock.as_ref(),
+        );
+        history.reset(ResetTo::Original, clock.as_ref()).unwrap();
+        assert!(history.current().extra.is_empty());
+        history.undo().unwrap();
+        assert_eq!(history.current().extra, edited.extra);
+        history.redo().unwrap();
+        assert!(history.current().extra.is_empty());
+        history.push(edited, EditSource::User, changed, "Dodge", clock.as_ref());
+        history.restore("before", clock.as_ref()).unwrap();
+        assert!(history.current().extra.is_empty());
+    }
 
     fn clock() -> Arc<FixedClock> {
         FixedClock::at(OffsetDateTime::UNIX_EPOCH)

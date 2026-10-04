@@ -84,7 +84,7 @@ Four rules the compiler enforces and one it cannot:
 the `tls` feature is on, which it is by default. Both `http://` - a local or
 studio-network OpenAI-compatible server - and the public HTTPS endpoints of the
 nineteen providers in `catalog` are therefore reachable.
-`docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` discharges the waiver
+`docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` discharges the waiver
 ADR-0009 recorded, and says plainly what the pure-Rust crypto provider trades.
 
 **No call in this repository has ever reached a public vendor.** Every test uses

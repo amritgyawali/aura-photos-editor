@@ -40,7 +40,7 @@ pub enum Dialect {
     /// A compatible server: `max_tokens`, no JSON mode, no organisation header.
     Compatible,
     /// A hosted vendor that copied the shape and implements JSON mode:
-    /// OpenRouter, Groq, Mistral, DeepSeek, xAI, Together, Fireworks and the
+    /// `OpenRouter`, Groq, Mistral, `DeepSeek`, xAI, Together, Fireworks and the
     /// rest. `max_tokens`, because none of them took the newer field name.
     CompatibleJson,
     /// Azure OpenAI: the deployment name is in the path, the key travels in

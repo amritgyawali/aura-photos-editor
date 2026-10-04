@@ -1,0 +1,5479 @@
+{
+  "date": "2026-09-30",
+  "commit": "3a546d1127ed01ee094601eab084df6ccfcc65d2",
+  "executableSha256": "6b230674c7fee706db1e153c6d39aa73be8c876b6dd2344c9298ca70b2075e10",
+  "verdict": "Useful JPEG/PNG photo editor and portrait retoucher; not an all-purpose professional editor for every photograph.",
+  "platform": "Windows 11 Home 10.0.26200, about 7.8 GiB RAM, CPU debug build; unrelated background workloads left running",
+  "unitChecks": {
+    "uiPassed": 553,
+    "uiFiles": 57,
+    "focusedNativePassed": 110,
+    "fullNativeGate": "blocked by compiler crash"
+  },
+  "inputs": [
+    {
+      "file": "portrait-1239291.jpg",
+      "kind": "real portrait",
+      "source": "https://www.pexels.com/photo/1239291/",
+      "sha256": "0ecc1caab14a8075840c686c8b6b35b83d8502f367e01e3f8b8eb7daedcf9a64"
+    },
+    {
+      "file": "portrait-220453.jpg",
+      "kind": "real portrait",
+      "source": "https://www.pexels.com/photo/220453/",
+      "sha256": "57b9d6f990b791df16e05c5001adf1c349fb8bb0f3783587ca4a3123352e2bbb"
+    },
+    {
+      "file": "portrait-2379004.jpg",
+      "kind": "real portrait",
+      "source": "https://www.pexels.com/photo/2379004/",
+      "sha256": "15ea2219d330fe85a637fda0bf54c5680bd90726caac0aa519638010ff921418"
+    },
+    {
+      "file": "portrait-774909.jpg",
+      "kind": "real portrait",
+      "source": "https://www.pexels.com/photo/774909/",
+      "sha256": "b7fbf5f2375897cbcb3e053c6ea8e3781c68391e775cbcf0c10095c82dac777b"
+    },
+    {
+      "file": "portrait-8386841.jpg",
+      "kind": "real portrait",
+      "source": "https://www.pexels.com/photo/8386841/",
+      "sha256": "bee918ed3b603a4ddc41e8f56d3866f09405b74b25d50e9d4c0483652f708d98"
+    },
+    {
+      "file": "landscape.jpg",
+      "kind": "real photograph",
+      "source": "https://www.pexels.com/photo/23531520/",
+      "sha256": "67763207e3544560287dfe153fdaaf67e1f7c199ae219a767695d8fb729b201b"
+    },
+    {
+      "file": "cat-veterinary.jpg",
+      "kind": "real photograph",
+      "source": "https://www.pexels.com/photo/6816859/",
+      "sha256": "9150d19cc121c5f93bad0c4d5826f3e17806e2611b23c56aeb921759d261a461"
+    },
+    {
+      "file": "product-sneaker.jpg",
+      "kind": "real photograph",
+      "source": "https://www.pexels.com/photo/1161538/",
+      "sha256": "81122bf4272b3e1bf4e93b7e25c2f0cdf12aa9a94060b05e6f210d0d1f12a4ef"
+    },
+    {
+      "file": "test-rgb.png",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "52acddd35ebdd5fc4388bc73360d1fe48190ed2ffeadc09f4e45ca3317e5d9a2"
+    },
+    {
+      "file": "test-rgb.tif",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "35ad892a7d7b8eebab5268d93d1b5eac893a4d4ddadbab51576fac38b3a6958b"
+    },
+    {
+      "file": "test-gray.jpg",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "b395dd649f24a1d857f7a22d42c23e66d6e06e0bc25d293dd28c1ce2833b6559"
+    },
+    {
+      "file": "test-cmyk.jpg",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "b2c3715857e15a17af05dbd8757e21c5738900c89b7248ce4e6a8a47eaba3de1"
+    },
+    {
+      "file": "test-webp.webp",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "319d32ba41fb4740994fc0d746790819ab31fda22462c1257bfa237e8c568180"
+    },
+    {
+      "file": "test-bmp.bmp",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "dc4beb3ecdec3c08cd82d7564cbca52e339026938540c04f0cc114a8c57ff846"
+    },
+    {
+      "file": "test-gif.gif",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "ba9fd4b57068db1e9b369bad0593346f6145a6c584865cce3f43cd106638b477"
+    },
+    {
+      "file": "test-dark.jpg",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "9a72d8d568567080a0a4873f0823850297cb687cfd1426091da644a7a0bb6a0f"
+    },
+    {
+      "file": "test-bright.jpg",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "dd71fe983e5356ef037339b13ba6845496e270ce3fbe17213016e094a7f6fa89"
+    },
+    {
+      "file": "test-alpha.png",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "c25139faf937d8068669665f21648d9a19b040dd9fa4256c77aec76a9fdead12"
+    },
+    {
+      "file": "test-gray16.tif",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "342f626f16ddb9946ceb1eac9f51ddca2014f01ac215369ca335dcd1653b69c4"
+    },
+    {
+      "file": "test-black.png",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "cb8115fc6593ffbb81552897009adb14c01814cd4b9246a54be1fb18d3d58b41"
+    },
+    {
+      "file": "test-one-pixel.png",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "e878950f8091ec010cf5cc723bdea027a8539cf7147cfea199c2f666232dcd4e"
+    },
+    {
+      "file": "test-exif6.jpg",
+      "kind": "EXIF orientation fixture",
+      "source": "Portrait pixels plus orientation=6",
+      "sha256": "a0025f87047c638ee59cc0b24cb81e2d7b55540ff443dae89177e2e2369a46e2"
+    },
+    {
+      "file": "test-corrupt.jpg",
+      "kind": "deliberately corrupt fixture",
+      "source": "Generated invalid JPEG",
+      "sha256": "ea9b04782349e91484e2ae3d60fec53a75100715665b96ef75674bb3fbed595b"
+    },
+    {
+      "file": "test-two-portraits.jpg",
+      "kind": "composed multi-face fixture, not a real group photo",
+      "source": "Two supplied Pexels portrait photographs",
+      "sha256": "4308891d091a6b1882d85ad1280f6e8cb6d6e4793072f61a418663e4c7bcb680"
+    },
+    {
+      "file": "test-opaque.png",
+      "kind": "synthetic format/stress fixture",
+      "source": "Derived from portrait-1239291.jpg or generated flat field",
+      "sha256": "52acddd35ebdd5fc4388bc73360d1fe48190ed2ffeadc09f4e45ca3317e5d9a2"
+    }
+  ],
+  "features": [
+    {
+      "id": 1,
+      "name": "File and folder import",
+      "category": "Library and capture",
+      "status": "Tested with limits",
+      "evidence": "crates/aura-ingest/src/import.rs",
+      "note": "File/folder IPC import and desktop collection selection tested. Windows file picker was not automated. Same-directory stems are grouped as one photo."
+    },
+    {
+      "id": 2,
+      "name": "RAW decoding and demosaicing",
+      "category": "Library and capture",
+      "status": "Partial / limited",
+      "evidence": "docs/camera-support.md",
+      "note": "81 RAW/export integration tests include synthetic RAW fixtures. No real camera RAW file was qualified; proprietary compression support varies."
+    },
+    {
+      "id": 3,
+      "name": "EXIF and camera/lens metadata",
+      "category": "Library and capture",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-ingest/src/import.rs",
+      "note": "EXIF orientation 6 swapped dimensions correctly. Real MakerNotes and all orientation values were not tested."
+    },
+    {
+      "id": 4,
+      "name": "Ratings, flags and color labels",
+      "category": "Library and capture",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-catalog/migrations/0001_init.sql",
+      "note": "Catalog and UI foundations; not exercised through a complete tagging workflow in this audit."
+    },
+    {
+      "id": 5,
+      "name": "Keywords and searchable metadata",
+      "category": "Library and capture",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-catalog/migrations/0001_init.sql",
+      "note": "Metadata storage exists; comprehensive search and keyword editing not established here."
+    },
+    {
+      "id": 6,
+      "name": "Collections and rule-based albums",
+      "category": "Library and capture",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-catalog/migrations/0001_init.sql",
+      "note": "New collections and navigation tested; smart/rule-based albums not established."
+    },
+    {
+      "id": 7,
+      "name": "Duplicate detection and skip-on-import",
+      "category": "Library and capture",
+      "status": "Tested with limits",
+      "evidence": "crates/aura-ingest/src/import.rs",
+      "note": "Repeated import reported skipped existing files. Same-stem derivative grouping can hide an individually editable PNG behind a TIFF."
+    },
+    {
+      "id": 8,
+      "name": "Face recognition and people albums",
+      "category": "Library and capture",
+      "status": "Partial / limited",
+      "evidence": "docs/retouch.md",
+      "note": "Real YuNet face detection in auto retouch; this is not identity recognition. Older people-pipeline detector is a placeholder."
+    },
+    {
+      "id": 9,
+      "name": "Tethered capture and live view",
+      "category": "Library and capture",
+      "status": "Unavailable / not established",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 10,
+      "name": "Offline editable proxy previews",
+      "category": "Library and capture",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-preview/src/lib.rs",
+      "note": "Cached previews exist; editing with an original disconnected was not tested."
+    },
+    {
+      "id": 11,
+      "name": "Exposure compensation",
+      "category": "Exposure and tone",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 12,
+      "name": "White balance temperature and tint",
+      "category": "Exposure and tone",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 13,
+      "name": "Global contrast",
+      "category": "Exposure and tone",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 14,
+      "name": "Highlight recovery",
+      "category": "Exposure and tone",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-render/src/cpu.rs",
+      "note": "Highlight slider changes pixels. It cannot recover detail already clipped out of a JPEG."
+    },
+    {
+      "id": 15,
+      "name": "Shadow recovery",
+      "category": "Exposure and tone",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 16,
+      "name": "White and black point controls",
+      "category": "Exposure and tone",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 17,
+      "name": "Levels and midpoint gamma",
+      "category": "Exposure and tone",
+      "status": "Unavailable / not established",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 18,
+      "name": "RGB and luminance histogram",
+      "category": "Exposure and tone",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/Histogram.tsx",
+      "note": "Histogram visible in the live desktop; unit test passed. No instrumented colorimetry validation."
+    },
+    {
+      "id": 19,
+      "name": "Highlight and shadow clipping overlay",
+      "category": "Exposure and tone",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/Histogram.tsx",
+      "note": "Live clipping overlay toggled. Preview clipping is not sensor-level RAW clipping."
+    },
+    {
+      "id": 20,
+      "name": "One-click automatic tone enhancement",
+      "category": "Exposure and tone",
+      "status": "Tested with limits",
+      "evidence": "crates/aura-app/src/photo_enhance.rs",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 21,
+      "name": "Point and individual RGB tone curves",
+      "category": "Color and creative control",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 22,
+      "name": "Parametric tone curves",
+      "category": "Color and creative control",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 23,
+      "name": "HSL color mixer",
+      "category": "Color and creative control",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 24,
+      "name": "Targeted point-color editing",
+      "category": "Color and creative control",
+      "status": "Unavailable / not established",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 25,
+      "name": "Shadow/midtone/highlight color grading",
+      "category": "Color and creative control",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 26,
+      "name": "Black-and-white channel mixing",
+      "category": "Color and creative control",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 27,
+      "name": "Vibrance and saturation",
+      "category": "Color and creative control",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 28,
+      "name": "Camera calibration and matching profiles",
+      "category": "Color and creative control",
+      "status": "Partial / limited",
+      "evidence": "docs/colour-management.md",
+      "note": "Calibration sliders work; measured camera matching profiles remain incomplete."
+    },
+    {
+      "id": 29,
+      "name": "ICC input/display/output color management",
+      "category": "Color and creative control",
+      "status": "Partial / limited",
+      "evidence": "docs/colour-management.md",
+      "note": "Output/profile infrastructure exists. No calibrated monitor, wide-gamut roundtrip or print proof certification."
+    },
+    {
+      "id": 30,
+      "name": "Importable 3D LUT looks",
+      "category": "Color and creative control",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-render/src/creative.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 31,
+      "name": "Crop and aspect-ratio presets",
+      "category": "Geometry and optics",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 32,
+      "name": "Straighten and horizon correction",
+      "category": "Geometry and optics",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 33,
+      "name": "Rotate and mirror",
+      "category": "Geometry and optics",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Small-angle rotation tested; full rotate/mirror workflow not fully exercised."
+    },
+    {
+      "id": 34,
+      "name": "Perspective and keystone correction",
+      "category": "Geometry and optics",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-render/src/cpu.rs",
+      "note": "Perspective implementation exists; not exercised through the desktop in this audit."
+    },
+    {
+      "id": 35,
+      "name": "Lens distortion correction",
+      "category": "Geometry and optics",
+      "status": "Partial / limited",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Switch saved but changed no pixels on the sample without a calibrated lens profile."
+    },
+    {
+      "id": 36,
+      "name": "Chromatic aberration and defringing",
+      "category": "Geometry and optics",
+      "status": "Partial / limited",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Switch saved but changed no pixels on the sample; no measured chromatic-aberration chart tested."
+    },
+    {
+      "id": 37,
+      "name": "Lens vignetting compensation",
+      "category": "Geometry and optics",
+      "status": "Tested with limits",
+      "evidence": "crates/aura-render/src/cpu.rs",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 38,
+      "name": "High-quality image resampling",
+      "category": "Geometry and optics",
+      "status": "Unavailable / not established",
+      "evidence": "docs/delivery.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 39,
+      "name": "Content-aware scaling",
+      "category": "Geometry and optics",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 40,
+      "name": "Liquify and mesh warping",
+      "category": "Geometry and optics",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 41,
+      "name": "Local adjustment brush",
+      "category": "Selections and local adjustments",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/MaskPanel.tsx",
+      "note": "Actual mouse brush, erase, stroke undo and Enter-to-apply tested in native retouch."
+    },
+    {
+      "id": 42,
+      "name": "Linear gradient masks",
+      "category": "Selections and local adjustments",
+      "status": "Tested with limits",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Native retouch gradient implementation and focused tests; not general adjustment-layer gradients."
+    },
+    {
+      "id": 43,
+      "name": "Radial gradient masks",
+      "category": "Selections and local adjustments",
+      "status": "Tested with limits",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Feathered retouch ellipse; not a full layer-based radial-adjustment system."
+    },
+    {
+      "id": 44,
+      "name": "Luminance-range masks",
+      "category": "Selections and local adjustments",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/MaskPanel.tsx",
+      "note": "Native retouch luminance gate; covered by renderer/UI tests, not a new real-photo GUI range-mask session."
+    },
+    {
+      "id": 45,
+      "name": "Color-range masks",
+      "category": "Selections and local adjustments",
+      "status": "Partial / limited",
+      "evidence": "docs/masks.md",
+      "note": "Sampled skin/color-affinity selection; not unrestricted semantic/color selection."
+    },
+    {
+      "id": 46,
+      "name": "Automatic subject/background selection",
+      "category": "Selections and local adjustments",
+      "status": "Partial / limited",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Semantic segmentation model is untrained. No reliable automatic subject/background masking claim."
+    },
+    {
+      "id": 47,
+      "name": "Automatic sky selection",
+      "category": "Selections and local adjustments",
+      "status": "Partial / limited",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Semantic segmentation model is untrained. No reliable automatic sky mask claim."
+    },
+    {
+      "id": 48,
+      "name": "Face, skin, hair and eye masks",
+      "category": "Selections and local adjustments",
+      "status": "Partial / limited",
+      "evidence": "docs/retouch.md",
+      "note": "Automatic face boxes/landmarks and cheek/forehead sampled-color masks work. No learned skin/hair/eye segmentation."
+    },
+    {
+      "id": 49,
+      "name": "Mask feathering and edge refinement",
+      "category": "Selections and local adjustments",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/MaskPanel.tsx",
+      "note": "Feather/edge-protection processors have focused checks; no perfect hair-edge guarantee."
+    },
+    {
+      "id": 50,
+      "name": "Mask add, subtract, intersect and invert",
+      "category": "Selections and local adjustments",
+      "status": "Partial / limited",
+      "evidence": "ui/src/components/develop/MaskPanel.tsx",
+      "note": "Brush add/erase, inversion and range intersections exist. Arbitrary layer-mask Boolean workflows are incomplete."
+    },
+    {
+      "id": 51,
+      "name": "Spot healing and blemish repair",
+      "category": "Portraits and repair",
+      "status": "Tested with limits",
+      "evidence": "docs/retouch.md",
+      "note": "Heal, patch heal and local spot cleanup change pixels. Spot heuristics cannot decide whether a mark is permanent."
+    },
+    {
+      "id": 52,
+      "name": "Clone stamp",
+      "category": "Portraits and repair",
+      "status": "Tested with limits",
+      "evidence": "docs/retouch.md",
+      "note": "Sampled clone renders and passes exact isolated Undo/Redo."
+    },
+    {
+      "id": 53,
+      "name": "Content-aware object removal",
+      "category": "Portraits and repair",
+      "status": "Partial / limited",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Small-area heal/patch tools work; general semantic/generative object removal is not production-ready."
+    },
+    {
+      "id": 54,
+      "name": "Red-eye correction",
+      "category": "Portraits and repair",
+      "status": "Tested with limits",
+      "evidence": "docs/retouch.md",
+      "note": "Manual red-eye tool renders; no diverse flash-red-eye perceptual benchmark."
+    },
+    {
+      "id": 55,
+      "name": "Texture-preserving skin smoothing",
+      "category": "Portraits and repair",
+      "status": "Tested with limits",
+      "evidence": "docs/retouch.md",
+      "note": "Sampled smoothing and auto face-guided texture pass work. Not commercial quality parity."
+    },
+    {
+      "id": 56,
+      "name": "Frequency separation",
+      "category": "Portraits and repair",
+      "status": "Partial / limited",
+      "evidence": "docs/retouch.md",
+      "note": "Frequency-based tone/detail processor works; separate editable high/low pixel layers are unavailable."
+    },
+    {
+      "id": 57,
+      "name": "Dodge and burn / local relighting",
+      "category": "Portraits and repair",
+      "status": "Tested with limits",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Manual dodge/burn and automatic sampled-skin light balancing work."
+    },
+    {
+      "id": 58,
+      "name": "Eye and teeth enhancement",
+      "category": "Portraits and repair",
+      "status": "Tested with limits",
+      "evidence": "docs/retouch.md",
+      "note": "Manual eye/teeth processors work; no automatic semantic sclera/teeth targeting."
+    },
+    {
+      "id": 59,
+      "name": "Skin-tone uniformity",
+      "category": "Portraits and repair",
+      "status": "Tested with limits",
+      "evidence": "docs/retouch.md",
+      "note": "Sampled skin tone uniformity works; similar-colored non-skin pixels can match."
+    },
+    {
+      "id": 60,
+      "name": "Depth-aware background blur",
+      "category": "Portraits and repair",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "No production depth map/background blur workflow established."
+    },
+    {
+      "id": 61,
+      "name": "Pixel layers and layer groups",
+      "category": "Layers and composition",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 62,
+      "name": "Adjustment layers",
+      "category": "Layers and composition",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 63,
+      "name": "Per-layer masks",
+      "category": "Layers and composition",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Retouch selections are per operation; general pixel-layer masks unavailable."
+    },
+    {
+      "id": 64,
+      "name": "Layer blend modes and opacity",
+      "category": "Layers and composition",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Retouch strength exists; general layer blend modes unavailable."
+    },
+    {
+      "id": 65,
+      "name": "Smart Objects / linked image objects",
+      "category": "Layers and composition",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 66,
+      "name": "Reorderable nondestructive filter stack",
+      "category": "Layers and composition",
+      "status": "Tested with limits",
+      "evidence": "crates/aura-render/src/cpu.rs",
+      "note": "Native retouch operation stack exists; not a universal smart-filter/layer stack."
+    },
+    {
+      "id": 67,
+      "name": "Editable text layers",
+      "category": "Layers and composition",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 68,
+      "name": "Vector shapes and editable paths",
+      "category": "Layers and composition",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 69,
+      "name": "Automatic layer alignment and blending",
+      "category": "Layers and composition",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 70,
+      "name": "Editable layered document interchange",
+      "category": "Layers and composition",
+      "status": "Unavailable / not established",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 71,
+      "name": "Bracketed HDR merge",
+      "category": "Computational photography",
+      "status": "Unavailable / not established",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 72,
+      "name": "Panorama stitching",
+      "category": "Computational photography",
+      "status": "Unavailable / not established",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 73,
+      "name": "Focus stacking",
+      "category": "Computational photography",
+      "status": "Unavailable / not established",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 74,
+      "name": "Multi-frame noise reduction",
+      "category": "Computational photography",
+      "status": "Partial / limited",
+      "evidence": "docs/restoration.md",
+      "note": "No multi-frame noise-reduction workflow established."
+    },
+    {
+      "id": 75,
+      "name": "AI denoising",
+      "category": "Computational photography",
+      "status": "Partial / limited",
+      "evidence": "docs/restoration.md",
+      "note": "Classical noise sliders work. Learned denoise and face-recovery heads remain untrained."
+    },
+    {
+      "id": 76,
+      "name": "Sharpening, texture, clarity and dehaze",
+      "category": "Computational photography",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Sharpening, texture, clarity and dehaze changed sample pixels; quality is not benchmarked against competitors."
+    },
+    {
+      "id": 77,
+      "name": "AI enlargement / super-resolution",
+      "category": "Computational photography",
+      "status": "Unavailable / not established",
+      "evidence": "docs/restoration.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 78,
+      "name": "Sky replacement",
+      "category": "Computational photography",
+      "status": "Unavailable / not established",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 79,
+      "name": "Generative fill",
+      "category": "Computational photography",
+      "status": "Unavailable / not established",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 80,
+      "name": "Generative canvas expansion",
+      "category": "Computational photography",
+      "status": "Unavailable / not established",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 81,
+      "name": "Presets and adjustable preset strength",
+      "category": "Workflow and automation",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "21 profiles listed; first profile at 65% applied repeatably. Not all 21 profiles visually graded."
+    },
+    {
+      "id": 82,
+      "name": "Copy, paste and synchronize edits",
+      "category": "Workflow and automation",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "note": "Selected tone settings synced to one target with manual protection; full collection stress sync not tested."
+    },
+    {
+      "id": 83,
+      "name": "Reference-image look matching",
+      "category": "Workflow and automation",
+      "status": "Partial / limited",
+      "evidence": "ui/src/components/look/MatchLookPanel.tsx",
+      "note": "Reference-style analysis/matching implementation and UI tests exist; no new end-to-end reference set audit."
+    },
+    {
+      "id": 84,
+      "name": "Nondestructive history and Undo/Redo",
+      "category": "Workflow and automation",
+      "status": "Known failure",
+      "evidence": "crates/aura-app/src/develop_commands.rs",
+      "note": "Normal isolated Undo/Redo passed for all 24 tools and keyboard workflow. Reset photo fails on retouch-only edits."
+    },
+    {
+      "id": 85,
+      "name": "Virtual copies and named snapshots",
+      "category": "Workflow and automation",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-app/src/develop_commands.rs",
+      "note": "Named snapshot saved through keyboard. Restore and virtual-copy workflows not fully exercised."
+    },
+    {
+      "id": 86,
+      "name": "Before/after comparison and zoom",
+      "category": "Workflow and automation",
+      "status": "Tested with limits",
+      "evidence": "ui/src/components/develop/PhotoStudio.tsx",
+      "note": "Live compare divider, zoom, pan, fit and before/after tested."
+    },
+    {
+      "id": 87,
+      "name": "Macros, actions and plug-in scripting",
+      "category": "Workflow and automation",
+      "status": "Unavailable / not established",
+      "evidence": "ui/src/components/autopilot/prepareCollection.ts",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 88,
+      "name": "Batch editing and export queues",
+      "category": "Workflow and automation",
+      "status": "Partial / limited",
+      "evidence": "ui/src/components/autopilot/prepareCollection.ts",
+      "note": "Multi-photo IPC processing and export tested. Thousands-of-images queue/cancel/resume not qualified."
+    },
+    {
+      "id": 89,
+      "name": "Film grain and analog looks",
+      "category": "Workflow and automation",
+      "status": "Tested with limits",
+      "evidence": "crates/aura-render/src/creative.rs",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 90,
+      "name": "Creative post-crop vignette",
+      "category": "Workflow and automation",
+      "status": "Tested with limits",
+      "evidence": "crates/aura-render/src/creative.rs",
+      "note": "Sample execution or focused checks passed; not universal format or visual-quality proof."
+    },
+    {
+      "id": 91,
+      "name": "JPEG/PNG/TIFF export and bit-depth options",
+      "category": "Output and performance",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-export/src/api.rs",
+      "note": "JPEG/PNG and true 16-bit TIFF export verified. Ordinary RGB/gray TIFF input fails; PNG alpha/16-bit precision not retained."
+    },
+    {
+      "id": 92,
+      "name": "Export resizing and output sharpening",
+      "category": "Output and performance",
+      "status": "Tested with limits",
+      "evidence": "docs/delivery.md",
+      "note": "256-pixel long-edge resize verified; output sharpening exercised by export integration tests."
+    },
+    {
+      "id": 93,
+      "name": "Batch naming and metadata/privacy controls",
+      "category": "Output and performance",
+      "status": "Known failure",
+      "evidence": "docs/delivery.md",
+      "note": "Original-name template produced image/image_2/image_3. Privacy policy checks are structural, not forensic real-camera metadata qualification."
+    },
+    {
+      "id": 94,
+      "name": "Text and image watermarks",
+      "category": "Output and performance",
+      "status": "Tested with limits",
+      "evidence": "docs/delivery.md",
+      "note": "Text/logo watermark UI and native compositing exist; synthetic RGBA watermark plus 256-pixel export verified."
+    },
+    {
+      "id": 95,
+      "name": "Soft proofing and gamut warnings",
+      "category": "Output and performance",
+      "status": "Unavailable / not established",
+      "evidence": "docs/lightroom-parity.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 96,
+      "name": "Print layouts and contact sheets",
+      "category": "Output and performance",
+      "status": "Unavailable / not established",
+      "evidence": "docs/delivery.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    },
+    {
+      "id": 97,
+      "name": "XMP sidecars and edit interchange",
+      "category": "Output and performance",
+      "status": "Known failure",
+      "evidence": "crates/aura-recipe/src/xmp.rs",
+      "note": "Requested export sidecars were absent. Export field supplies recipe_json=None; XMP serialization elsewhere does not prove working interchange."
+    },
+    {
+      "id": 98,
+      "name": "GPU-accelerated rendering",
+      "category": "Output and performance",
+      "status": "Partial / limited",
+      "evidence": "crates/aura-render/src/lib.rs",
+      "note": "CPU renderer used. GPU shaders/ports do not constitute an active GPU rendering backend."
+    },
+    {
+      "id": 99,
+      "name": "Tiled rendering and multiresolution caching",
+      "category": "Output and performance",
+      "status": "Tested with limits",
+      "evidence": "crates/aura-preview/src/lib.rs",
+      "note": "Preview/cache implementation and earlier cache tests; final edited recipe/pixels persisted through forced restart."
+    },
+    {
+      "id": 100,
+      "name": "HDR display editing and HDR export",
+      "category": "Output and performance",
+      "status": "Unavailable / not established",
+      "evidence": "docs/colour-management.md",
+      "note": "Current source/documentation does not establish this complete desktop workflow."
+    }
+  ],
+  "findings": [
+    {
+      "severity": "High",
+      "title": "Reset photo leaves native retouch",
+      "detail": "Fresh isolated photo: add Dodge, Reset photo, render. Reset pixels equal Dodge pixels, not original. Removing the extra recipe key is missed because changed_paths iterates only paths in the target recipe. Fix deleted-path detection and add an application-level regression.",
+      "evidence": "crates/aura-recipe/src/history.rs:326"
+    },
+    {
+      "severity": "High",
+      "title": "Valid TIFF input rejected as damaged",
+      "detail": "Fresh single-file collections reject Pillow-valid RGB8 and grayscale16 TIFF with AURA-RAW-2002. TIFF export works. Add ordinary TIFF decoding and accurate unsupported-format reporting.",
+      "evidence": "crates/aura-raw/src/meta.rs"
+    },
+    {
+      "severity": "High",
+      "title": "Requested sidecars not written",
+      "detail": "All three-format exports requested sidecar=true; each reported sidecars=0. ExportField initializes recipe_json and original_path to None. Connect persisted recipes/originals and verify sidecar contents.",
+      "evidence": "crates/aura-app/src/delivery_commands.rs:172"
+    },
+    {
+      "severity": "Medium",
+      "title": "Original filenames lost on export",
+      "detail": "{original} produced image, image_2, image_3. ExportField queries original_name/camera_model while actual file names live in photo_file; errors/fallbacks lose naming data. Use the catalog primary-file relationship.",
+      "evidence": "crates/aura-app/src/delivery_commands.rs:178"
+    },
+    {
+      "severity": "Medium",
+      "title": "Manual edits labelled automatic",
+      "detail": "The saved GUI Exposure, Orange, Crop and Native retouch history entries carry source=ai after an automatic pass. Manual protection still works. Fix provenance when committing user edits.",
+      "evidence": "crates/aura-app/src/native_retouch.rs"
+    },
+    {
+      "severity": "Medium",
+      "title": "Portrait decode timeout under load",
+      "detail": "One 1200\u00d71800 JPEG initially failed AURA-RAW-2004 during concurrent tests. Fresh isolated retry and face retouch passed. The error says retryable=false while asking the user to retry. Root cause not established.",
+      "evidence": "crates/aura-raw/src/timeout.rs"
+    },
+    {
+      "severity": "Medium",
+      "title": "Window close did not exit promptly",
+      "detail": "CloseMainWindow returned true, but the audited process was still alive after 20 seconds. Only that process was stopped for restart. Saved recipe and pixels recovered exactly. Shutdown cause not established.",
+      "evidence": "restart-results.json"
+    },
+    {
+      "severity": "Build",
+      "title": "Clean native test run blocked",
+      "detail": "cargo test -p aura-raw -p aura-export --lib crashed rustc compiling aura-catalog (0xc0000409), including a retry with incremental disabled. Focused integrations compiled against the existing desktop dependency graph and passed. This is not a green full-workspace gate.",
+      "evidence": "full-audit-native-tests-noincremental.log"
+    },
+    {
+      "severity": "Build",
+      "title": "Local dependency corruption and advisories",
+      "detail": "Initial UI suite could not load mime-db/db.json. Preserved the error, restored with npm ci, then all 553 tests and production build passed. npm audit reports 5 development-tool findings: 3 moderate, 1 high, 1 critical. No exploitability assessment or dependency upgrade was made.",
+      "evidence": "full-audit-npm-security.json"
+    }
+  ],
+  "runtime": {
+    "cases": [
+      {
+        "name": "image:cat-veterinary.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            1200,
+            800
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 0,
+            "faces": [],
+            "message": "No confident, sufficiently large face found. Portrait retouch was skipped.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 0,
+            "retouchedFaces": 0,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 13.913
+      },
+      {
+        "name": "image:landscape.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            1200,
+            899
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 0,
+            "faces": [],
+            "message": "No confident, sufficiently large face found. Portrait retouch was skipped.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 0,
+            "retouchedFaces": 0,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 17.534
+      },
+      {
+        "name": "image:portrait-1239291.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            1200,
+            800
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.394374,
+                  0.394712,
+                  0.548069,
+                  0.676523
+                ],
+                "confidence": 0.935988,
+                "landmarks": [
+                  [
+                    0.428115,
+                    0.51337
+                  ],
+                  [
+                    0.494625,
+                    0.510107
+                  ],
+                  [
+                    0.460886,
+                    0.564333
+                  ],
+                  [
+                    0.438321,
+                    0.601396
+                  ],
+                  [
+                    0.498328,
+                    0.60346
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 12.728
+      },
+      {
+        "name": "image:portrait-220453.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            1200,
+            1800
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.289818,
+                  0.233424,
+                  0.691306,
+                  0.600668
+                ],
+                "confidence": 0.930814,
+                "landmarks": [
+                  [
+                    0.392415,
+                    0.379985
+                  ],
+                  [
+                    0.588096,
+                    0.383882
+                  ],
+                  [
+                    0.484459,
+                    0.455327
+                  ],
+                  [
+                    0.399601,
+                    0.493168
+                  ],
+                  [
+                    0.566784,
+                    0.504924
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 28.226
+      },
+      {
+        "name": "image:portrait-2379004.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            1200,
+            1812
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.351461,
+                  0.229305,
+                  0.628518,
+                  0.471302
+                ],
+                "confidence": 0.930731,
+                "landmarks": [
+                  [
+                    0.45844,
+                    0.322405
+                  ],
+                  [
+                    0.582237,
+                    0.320272
+                  ],
+                  [
+                    0.542417,
+                    0.369407
+                  ],
+                  [
+                    0.47102,
+                    0.411411
+                  ],
+                  [
+                    0.577093,
+                    0.406963
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 27.289
+      },
+      {
+        "name": "image:portrait-774909.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            1200,
+            1800
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.288138,
+                  0.277144,
+                  0.630168,
+                  0.563251
+                ],
+                "confidence": 0.946196,
+                "landmarks": [
+                  [
+                    0.353381,
+                    0.390408
+                  ],
+                  [
+                    0.516702,
+                    0.388623
+                  ],
+                  [
+                    0.425021,
+                    0.444591
+                  ],
+                  [
+                    0.374703,
+                    0.496062
+                  ],
+                  [
+                    0.518725,
+                    0.486202
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 26.468
+      },
+      {
+        "name": "image:portrait-8386841.jpg",
+        "status": "error",
+        "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2004\",\"message\":\"One photo took too long to open and was set aside so the rest could finish. You can retry it from the Problems list.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-RAW-2004\"}\n    at eval (eval at evaluate (:302:30), <anonymous>:2:28)\n    at async <anonymous>:328:30",
+        "seconds": 42.183
+      },
+      {
+        "name": "image:product-sneaker.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            1200,
+            800
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 0,
+            "faces": [],
+            "message": "No confident, sufficiently large face found. Portrait retouch was skipped.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 0,
+            "retouchedFaces": 0,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 20.44
+      },
+      {
+        "name": "image:test-alpha.png",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            500,
+            333
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.391861,
+                  0.38788,
+                  0.545663,
+                  0.685167
+                ],
+                "confidence": 0.921792,
+                "landmarks": [
+                  [
+                    0.428043,
+                    0.502356
+                  ],
+                  [
+                    0.50467,
+                    0.505201
+                  ],
+                  [
+                    0.462756,
+                    0.564304
+                  ],
+                  [
+                    0.432352,
+                    0.604506
+                  ],
+                  [
+                    0.49443,
+                    0.610888
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 7.184
+      },
+      {
+        "name": "image:test-black.png",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            320,
+            240
+          ],
+          "changed": false,
+          "auto": {
+            "detectedFaces": 0,
+            "faces": [],
+            "message": "No confident, sufficiently large face found. Portrait retouch was skipped.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 0,
+            "retouchedFaces": 0,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 6.335
+      },
+      {
+        "name": "image:test-bright.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            500,
+            333
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.395541,
+                  0.405736,
+                  0.535946,
+                  0.665723
+                ],
+                "confidence": 0.901778,
+                "landmarks": [
+                  [
+                    0.431092,
+                    0.503218
+                  ],
+                  [
+                    0.501643,
+                    0.501545
+                  ],
+                  [
+                    0.466921,
+                    0.555008
+                  ],
+                  [
+                    0.440485,
+                    0.591111
+                  ],
+                  [
+                    0.500362,
+                    0.594557
+                  ]
+                ]
+              }
+            ],
+            "message": "Faces detected, but no suitable skin sample was found or the operation limit was reached. Portrait retouch was skipped.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 0,
+            "retouchedFaces": 0,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 6.783
+      },
+      {
+        "name": "image:test-cmyk.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            500,
+            333
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.393267,
+                  0.392389,
+                  0.548007,
+                  0.676851
+                ],
+                "confidence": 0.935529,
+                "landmarks": [
+                  [
+                    0.42818,
+                    0.512937
+                  ],
+                  [
+                    0.494643,
+                    0.509598
+                  ],
+                  [
+                    0.46177,
+                    0.564347
+                  ],
+                  [
+                    0.438893,
+                    0.600684
+                  ],
+                  [
+                    0.498814,
+                    0.603345
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 9.59
+      },
+      {
+        "name": "image:test-corrupt.jpg",
+        "status": "error",
+        "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2001\",\"message\":\"AURA does not recognise this file as a photo it can develop. It has been set aside; the rest of the import continues.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-RAW-2001\"}\n    at eval (eval at evaluate (:302:30), <anonymous>:2:28)\n    at async <anonymous>:328:30",
+        "seconds": 0.95
+      },
+      {
+        "name": "image:test-dark.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            500,
+            333
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.391912,
+                  0.385391,
+                  0.55037,
+                  0.677169
+                ],
+                "confidence": 0.932882,
+                "landmarks": [
+                  [
+                    0.426575,
+                    0.511642
+                  ],
+                  [
+                    0.495268,
+                    0.508275
+                  ],
+                  [
+                    0.460591,
+                    0.56468
+                  ],
+                  [
+                    0.437615,
+                    0.600765
+                  ],
+                  [
+                    0.497021,
+                    0.602882
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 6.597
+      },
+      {
+        "name": "image:test-exif6.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            333,
+            500
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 0,
+            "faces": [],
+            "message": "No confident, sufficiently large face found. Portrait retouch was skipped.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 0,
+            "retouchedFaces": 0,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 6.135
+      },
+      {
+        "name": "image:test-gray.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            500,
+            333
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.393972,
+                  0.391326,
+                  0.543789,
+                  0.677445
+                ],
+                "confidence": 0.928056,
+                "landmarks": [
+                  [
+                    0.42288,
+                    0.506584
+                  ],
+                  [
+                    0.498878,
+                    0.507048
+                  ],
+                  [
+                    0.456558,
+                    0.562442
+                  ],
+                  [
+                    0.431725,
+                    0.604837
+                  ],
+                  [
+                    0.493542,
+                    0.602759
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 5.893
+      },
+      {
+        "name": "image:test-gray16.tif",
+        "status": "error",
+        "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2002\",\"message\":\"This photo file is damaged and could not be opened. Copy it from the card again, then re-run the import.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-RAW-2002\"}\n    at eval (eval at evaluate (:302:30), <anonymous>:2:28)\n    at async <anonymous>:328:30",
+        "seconds": 1.007
+      },
+      {
+        "name": "image:test-one-pixel.png",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            1,
+            1
+          ],
+          "changed": false,
+          "auto": {
+            "detectedFaces": 0,
+            "faces": [],
+            "message": "No confident, sufficiently large face found. Portrait retouch was skipped.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 0,
+            "retouchedFaces": 0,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 2.881
+      },
+      {
+        "name": "image:test-rgb.tif",
+        "status": "error",
+        "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2002\",\"message\":\"This photo file is damaged and could not be opened. Copy it from the card again, then re-run the import.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-RAW-2002\"}\n    at eval (eval at evaluate (:302:30), <anonymous>:2:28)\n    at async <anonymous>:328:30",
+        "seconds": 0.066
+      },
+      {
+        "name": "image:test-two-portraits.jpg",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            833,
+            500
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 2,
+            "faces": [
+              {
+                "bounds": [
+                  0.233662,
+                  0.25395,
+                  0.332737,
+                  0.451435
+                ],
+                "confidence": 0.929439,
+                "landmarks": [
+                  [
+                    0.25638,
+                    0.329603
+                  ],
+                  [
+                    0.299431,
+                    0.330291
+                  ],
+                  [
+                    0.274361,
+                    0.364561
+                  ],
+                  [
+                    0.259144,
+                    0.397491
+                  ],
+                  [
+                    0.295539,
+                    0.396027
+                  ]
+                ]
+              },
+              {
+                "bounds": [
+                  0.71535,
+                  0.258541,
+                  0.878739,
+                  0.593393
+                ],
+                "confidence": 0.939046,
+                "landmarks": [
+                  [
+                    0.757313,
+                    0.379126
+                  ],
+                  [
+                    0.835207,
+                    0.38119
+                  ],
+                  [
+                    0.79407,
+                    0.448036
+                  ],
+                  [
+                    0.763327,
+                    0.506488
+                  ],
+                  [
+                    0.827008,
+                    0.501167
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 2 of 2 detected faces with 6 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 6,
+            "retouchedFaces": 2,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 7.614
+      },
+      {
+        "name": "image:test-opaque.png",
+        "status": "executed",
+        "result": {
+          "dimensions": [
+            500,
+            333
+          ],
+          "changed": true,
+          "auto": {
+            "detectedFaces": 1,
+            "faces": [
+              {
+                "bounds": [
+                  0.393939,
+                  0.392813,
+                  0.54811,
+                  0.676434
+                ],
+                "confidence": 0.935202,
+                "landmarks": [
+                  [
+                    0.428012,
+                    0.513373
+                  ],
+                  [
+                    0.494533,
+                    0.510098
+                  ],
+                  [
+                    0.461258,
+                    0.564847
+                  ],
+                  [
+                    0.438615,
+                    0.600825
+                  ],
+                  [
+                    0.498582,
+                    0.60352
+                  ]
+                ]
+              }
+            ],
+            "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+            "model": "yunet-2023mar-aura320-v1",
+            "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+            "operations": 3,
+            "retouchedFaces": 1,
+            "status": "complete"
+          },
+          "notes": "Appearance is reviewed separately; detection count is not ground truth."
+        },
+        "seconds": 4.742
+      },
+      {
+        "name": "tool:heal",
+        "status": "executed",
+        "result": {
+          "saved": 1,
+          "changedPixels": true,
+          "bounds": [
+            196,
+            151,
+            265,
+            203
+          ],
+          "exactUndoRedo": true
+        },
+        "seconds": 2.848
+      },
+      {
+        "name": "tool:patch_heal",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.69
+      },
+      {
+        "name": "tool:clone",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.731
+      },
+      {
+        "name": "tool:auto_blemish",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.673
+      },
+      {
+        "name": "tool:frequency",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 2.086
+      },
+      {
+        "name": "tool:skin_smooth",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.638
+      },
+      {
+        "name": "tool:skin_uniformity",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.795
+      },
+      {
+        "name": "tool:portrait_dodge_burn",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.641
+      },
+      {
+        "name": "tool:micro_dodge_burn",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.964
+      },
+      {
+        "name": "tool:dodge",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.682
+      },
+      {
+        "name": "tool:burn",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.642
+      },
+      {
+        "name": "tool:skin_color",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.601
+      },
+      {
+        "name": "tool:color_match",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.786
+      },
+      {
+        "name": "tool:mattify",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.821
+      },
+      {
+        "name": "tool:under_eye",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.754
+      },
+      {
+        "name": "tool:wrinkle",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.862
+      },
+      {
+        "name": "tool:teeth",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.586
+      },
+      {
+        "name": "tool:eye_clean",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.534
+      },
+      {
+        "name": "tool:eye_detail",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.89
+      },
+      {
+        "name": "tool:red_eye",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.737
+      },
+      {
+        "name": "tool:fabric",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 2.139
+      },
+      {
+        "name": "tool:backdrop",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.757
+      },
+      {
+        "name": "tool:glare",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.55
+      },
+      {
+        "name": "tool:makeup",
+        "status": "error",
+        "error": "Undo did not restore pixels",
+        "seconds": 1.519
+      },
+      {
+        "name": "parameter:global.exposure",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "31045d564b908bf8e6117503df9762d3a1ccd9b6620b136906af2be937c842b8"
+        },
+        "seconds": 2.171
+      },
+      {
+        "name": "parameter:global.temperature",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "0bb1dac63f49925ba7151018c8a7eeb379228aaa2c4f3924d79625c8ef8d3e4e"
+        },
+        "seconds": 0.802
+      },
+      {
+        "name": "parameter:global.tint",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "2c0ac302d67d4c3f691842c72fec46d7fd65b24bc722a2b9a60f61fe336990ce"
+        },
+        "seconds": 0.792
+      },
+      {
+        "name": "parameter:global.contrast",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "6cd6dbc8492f591515589835e92abde76979e8a8d1e296c08d98d47c99539b32"
+        },
+        "seconds": 0.762
+      },
+      {
+        "name": "parameter:global.highlights",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "f10ff33fafc7fba2dec994c4ae708eec0a6257ef6d95b01b6de0ff1d15b88c95"
+        },
+        "seconds": 0.768
+      },
+      {
+        "name": "parameter:global.shadows",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "b342d28b45b102952553a1062c27ff8ccfb0abacea8a2b7e466f071b71e2d03e"
+        },
+        "seconds": 0.775
+      },
+      {
+        "name": "parameter:global.whites",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "f11d2ba12a4a1cd8698a59282dac1ed754b267fd909c3ede221804d0ff18d459"
+        },
+        "seconds": 0.744
+      },
+      {
+        "name": "parameter:global.blacks",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "fd420e0021a195a7dc43e904992b5f80c7cd57ca3d23f7e5ed43ec5de971287c"
+        },
+        "seconds": 0.807
+      },
+      {
+        "name": "parameter:global.texture",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "f3502b7aaffcab10b5501546d161a8571f3ccefb3d319b4b7c545ded7c439abd"
+        },
+        "seconds": 0.825
+      },
+      {
+        "name": "parameter:global.clarity",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "ca6af20a74717c4712fe47856cc7f5de4b5434fccc325d841dff185d64038dfe"
+        },
+        "seconds": 1.02
+      },
+      {
+        "name": "parameter:global.dehaze",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "fce601fffdfb4907b07b57053c8ed5eadfc24d6154867cd60fbd32132246832a"
+        },
+        "seconds": 0.831
+      },
+      {
+        "name": "parameter:global.vibrance",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "da297d9df70af7788d9742239b69e315e2b337aa811a43e6a69935d63c4679c1"
+        },
+        "seconds": 0.751
+      },
+      {
+        "name": "parameter:global.saturation",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "ef57de5abd2fcf4ca9919f7cdab7bda870d1318fa0e6489dc72ec7b34bcd1fb2"
+        },
+        "seconds": 0.754
+      },
+      {
+        "name": "parameter:global.hsl.red.h",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "4a237e2e69e608645e25ea5ecc06e01c5390ab8278793a8299f9df63e3344951"
+        },
+        "seconds": 1.254
+      },
+      {
+        "name": "parameter:global.hsl.orange.s",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "707bbdb97f26fa39fa73f084218eee9514505a1043a83e0dec5ab98ffb95409c"
+        },
+        "seconds": 0.809
+      },
+      {
+        "name": "parameter:global.hsl.blue.l",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "1fe0d8b17f5d4725dcd3ff9caa37cfef91abd111d8b1b5311e3dd635efc6f1ec"
+        },
+        "seconds": 0.767
+      },
+      {
+        "name": "parameter:global.curve.points",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "77121ccfb826a5b716f00b6cee5b8af7c92b71223a4ccc95e7907c07cd359928"
+        },
+        "seconds": 1.156
+      },
+      {
+        "name": "parameter:global.channel_curves.red.points",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "b3cdddc5e0cfcdf62618331c212c292de890cf99f94337461abb951df424d24b"
+        },
+        "seconds": 1.074
+      },
+      {
+        "name": "parameter:global.parametric.lights",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "535c3cbd8282e867920a356c4ba84c32dfda78da27cd46a7093acf3c2cb2dc21"
+        },
+        "seconds": 0.945
+      },
+      {
+        "name": "parameter:global.sharpen.amount",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "dca029d672edcd03558efbf2600ba7e38cd93ffd8b6f12c5c7cd57880a669102"
+        },
+        "seconds": 0.852
+      },
+      {
+        "name": "parameter:global.noise.luminance",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "d355b9befe76dd5281c0107da96abe1ba53615ebab76949b363088b8def415e0"
+        },
+        "seconds": 0.796
+      },
+      {
+        "name": "parameter:global.noise.colour",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "9305ef067c07996445e892e65eea052d538dbaa99cc3490a8888b500fa74bd4e"
+        },
+        "seconds": 0.9
+      },
+      {
+        "name": "parameter:global.effects.vignette.amount",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "bba21f6eda22d65a94d8a9fb51bca2b5af982ad2f30985a00d158c651bf8f665"
+        },
+        "seconds": 1.005
+      },
+      {
+        "name": "parameter:global.effects.grain.amount",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "332387481af9e4cd93915d70655feb70fca58e41ee54c74498de0562599d4a5a"
+        },
+        "seconds": 0.824
+      },
+      {
+        "name": "parameter:global.calibration.red_hue",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "036b3058fee6402e6a5bae8aec605f40f2a7a4841656cc1727f405912aff7568"
+        },
+        "seconds": 0.783
+      },
+      {
+        "name": "parameter:global.colour_grade.shadows.saturation",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "b175a43eda63097efd1cf09ce797122bb992e0b2afe23ea9bfa7b7741b410b31"
+        },
+        "seconds": 0.929
+      },
+      {
+        "name": "parameter:bw",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "69c35d6419bd612495eca2be292db552515c62fcc6b5393bd6fa37c8f0761b8a"
+        },
+        "seconds": 0.924
+      },
+      {
+        "name": "parameter:geometry.rotate",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "49722c8755db29a8703848c2a22282f26f4d1c49651915c7abb505e3ea3365d9"
+        },
+        "seconds": 0.923
+      },
+      {
+        "name": "parameter:geometry.crop",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            350,
+            233
+          ],
+          "hash": "f8938d493a15e4aea76a72fed77bd4167ce7a5ffe88eb0a43e823857961f99a2"
+        },
+        "seconds": 0.578
+      },
+      {
+        "name": "parameter:lens.distortion",
+        "status": "executed",
+        "result": {
+          "changedPixels": false,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "faa1a80b463b8ee061311c63890406050e45581e1d1f8bb59677682288c6476c"
+        },
+        "seconds": 0.71
+      },
+      {
+        "name": "parameter:lens.ca",
+        "status": "executed",
+        "result": {
+          "changedPixels": false,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "00b6bb63279348c25b374f98fccd2c32449fc9d6183e985ed94f400c3807d5fb"
+        },
+        "seconds": 0.826
+      },
+      {
+        "name": "parameter:lens.vignette",
+        "status": "executed",
+        "result": {
+          "changedPixels": true,
+          "dimensions": [
+            500,
+            333
+          ],
+          "hash": "19fe2e34f70ef73022e5f6c622b67693442bf23149c166019f3bbd05e216a1cc"
+        },
+        "seconds": 0.753
+      },
+      {
+        "name": "export:jpeg",
+        "status": "executed",
+        "result": {
+          "export": {
+            "photos": 20,
+            "selected": 0,
+            "requested": 3,
+            "written": 3,
+            "verified": 3,
+            "unverified": 0,
+            "corrupt": 0,
+            "renderFailed": 0,
+            "renamed": 2,
+            "sidecars": 0,
+            "bytes": 641289,
+            "manifestSealed": true,
+            "ms": 5792
+          },
+          "files": [
+            {
+              "file": "audit/image.jpg",
+              "format": "JPEG",
+              "size": [
+                1200,
+                899
+              ],
+              "mode": "RGB",
+              "bits": 8
+            },
+            {
+              "file": "audit/image_2.jpg",
+              "format": "JPEG",
+              "size": [
+                1200,
+                800
+              ],
+              "mode": "RGB",
+              "bits": 8
+            },
+            {
+              "file": "audit/image_3.jpg",
+              "format": "JPEG",
+              "size": [
+                500,
+                333
+              ],
+              "mode": "RGB",
+              "bits": 8
+            }
+          ]
+        },
+        "seconds": 6.712
+      },
+      {
+        "name": "export:png",
+        "status": "executed",
+        "result": {
+          "export": {
+            "photos": 20,
+            "selected": 0,
+            "requested": 3,
+            "written": 3,
+            "verified": 3,
+            "unverified": 0,
+            "corrupt": 0,
+            "renderFailed": 0,
+            "renamed": 2,
+            "sidecars": 0,
+            "bytes": 2804100,
+            "manifestSealed": true,
+            "ms": 9762
+          },
+          "files": [
+            {
+              "file": "audit/image.png",
+              "format": "PNG",
+              "size": [
+                1200,
+                899
+              ],
+              "mode": "RGB",
+              "bits": 8,
+              "exactRendererMatch": true
+            },
+            {
+              "file": "audit/image_2.png",
+              "format": "PNG",
+              "size": [
+                1200,
+                800
+              ],
+              "mode": "RGB",
+              "bits": 8,
+              "exactRendererMatch": true
+            },
+            {
+              "file": "audit/image_3.png",
+              "format": "PNG",
+              "size": [
+                500,
+                333
+              ],
+              "mode": "RGB",
+              "bits": 8,
+              "exactRendererMatch": true
+            }
+          ]
+        },
+        "seconds": 17.499
+      },
+      {
+        "name": "export:tiff",
+        "status": "executed",
+        "result": {
+          "export": {
+            "photos": 20,
+            "selected": 0,
+            "requested": 3,
+            "written": 3,
+            "verified": 3,
+            "unverified": 0,
+            "corrupt": 0,
+            "renderFailed": 0,
+            "renamed": 2,
+            "sidecars": 0,
+            "bytes": 13253394,
+            "manifestSealed": true,
+            "ms": 5514
+          },
+          "files": [
+            {
+              "file": "audit/image.tif",
+              "format": "TIFF",
+              "size": [
+                1200,
+                899
+              ],
+              "mode": "RGB",
+              "bits": [
+                16,
+                16,
+                16
+              ]
+            },
+            {
+              "file": "audit/image_2.tif",
+              "format": "TIFF",
+              "size": [
+                1200,
+                800
+              ],
+              "mode": "RGB",
+              "bits": [
+                16,
+                16,
+                16
+              ]
+            },
+            {
+              "file": "audit/image_3.tif",
+              "format": "TIFF",
+              "size": [
+                500,
+                333
+              ],
+              "mode": "RGB",
+              "bits": [
+                16,
+                16,
+                16
+              ]
+            }
+          ]
+        },
+        "seconds": 5.593
+      },
+      {
+        "name": "invalid-parameter",
+        "status": "executed",
+        "result": {
+          "rejected": false,
+          "unchanged": false
+        },
+        "seconds": 0.028
+      }
+    ],
+    "photos": [
+      {
+        "id": "pht_01a0f258-12b3-7870-a435-e4848a6abfbe",
+        "fileName": "cat-veterinary.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 1200,
+        "height": 800,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b4-7ec0-8ae6-a4b1c101a3e1",
+        "fileName": "landscape.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 1200,
+        "height": 899,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b5-7ac2-9e8d-85bb67c6c91f",
+        "fileName": "portrait-1239291.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 1200,
+        "height": 800,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b5-7ac2-9e8d-85d0d09d5505",
+        "fileName": "portrait-220453.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 1200,
+        "height": 1800,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b6-7e71-80ba-6fd551876e69",
+        "fileName": "portrait-2379004.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 1200,
+        "height": 1812,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b6-7e71-80ba-6ffcd0e8fa18",
+        "fileName": "portrait-774909.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 1200,
+        "height": 1800,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b7-7341-85db-013bba4dd1cc",
+        "fileName": "portrait-8386841.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 1200,
+        "height": 1800,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b7-7341-85db-015176e5d0da",
+        "fileName": "product-sneaker.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 1200,
+        "height": 800,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b8-7ed2-aaa7-d5d5ebcbb2df",
+        "fileName": "test-alpha.png",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b8-7ed2-aaa7-d5f73df8dab4",
+        "fileName": "test-black.png",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b8-7ed2-aaa7-d6188796f637",
+        "fileName": "test-bright.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b9-7732-a221-8e4edcf25511",
+        "fileName": "test-cmyk.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12b9-7732-a221-8e6e4600d908",
+        "fileName": "test-corrupt.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12ba-7902-8cce-6250258f536f",
+        "fileName": "test-dark.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12ba-7902-8cce-6279f1b899e6",
+        "fileName": "test-exif6.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12ba-7902-8cce-6298dc9dc537",
+        "fileName": "test-gray.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12bb-77c3-bda3-94f95774490c",
+        "fileName": "test-gray16.tif",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12bb-77c3-bda3-9519ab72b51e",
+        "fileName": "test-one-pixel.png",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12bb-77c3-bda3-9537cb16df8d",
+        "fileName": "test-opaque.png",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12bb-77c3-bda3-9537cb16df8d",
+        "fileName": "test-rgb.tif",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a0f258-12bc-7e00-b94c-d26f4913248b",
+        "fileName": "test-two-portraits.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      }
+    ],
+    "mode": "actual desktop IPC, not mouse/keyboard",
+    "projectId": "prj_01a0f258-1278-7611-9917-efbf7fdc699e",
+    "collectionName": "Full capability audit 2026-09-30 18-29-13",
+    "ingestEvents": [
+      {
+        "kind": "finished",
+        "inserted": 21,
+        "skipped": 0,
+        "failed": 0,
+        "elapsed_ms": 46
+      },
+      {
+        "kind": "finished",
+        "inserted": 21,
+        "skipped": 0,
+        "failed": 0,
+        "elapsed_ms": 46
+      }
+    ],
+    "notCatalogued": [
+      "test-bmp.bmp",
+      "test-gif.gif",
+      "test-rgb.png",
+      "test-webp.webp"
+    ],
+    "ingestRuns": [
+      [
+        {
+          "kind": "finished",
+          "inserted": 0,
+          "skipped": 21,
+          "failed": 0,
+          "elapsed_ms": 172
+        },
+        {
+          "kind": "finished",
+          "inserted": 0,
+          "skipped": 21,
+          "failed": 0,
+          "elapsed_ms": 172
+        },
+        {
+          "kind": "finished",
+          "inserted": 0,
+          "skipped": 21,
+          "failed": 0,
+          "elapsed_ms": 172
+        }
+      ],
+      [
+        {
+          "kind": "finished",
+          "inserted": 1,
+          "skipped": 22,
+          "failed": 0,
+          "elapsed_ms": 386
+        },
+        {
+          "kind": "finished",
+          "inserted": 1,
+          "skipped": 22,
+          "failed": 0,
+          "elapsed_ms": 386
+        },
+        {
+          "kind": "finished",
+          "inserted": 1,
+          "skipped": 22,
+          "failed": 0,
+          "elapsed_ms": 386
+        },
+        {
+          "kind": "finished",
+          "inserted": 1,
+          "skipped": 22,
+          "failed": 0,
+          "elapsed_ms": 386
+        }
+      ]
+    ],
+    "originalsUnchanged": true,
+    "completed": true
+  },
+  "followup": {
+    "cases": [
+      {
+        "name": "extreme-exposure-is-clamped",
+        "status": "executed",
+        "result": {
+          "path": "global.exposure",
+          "value": 5,
+          "protected": true,
+          "stage": "exposure"
+        },
+        "seconds": 0.032
+      },
+      {
+        "name": "isolated-tool:heal",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.872
+      },
+      {
+        "name": "isolated-tool:patch_heal",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.978
+      },
+      {
+        "name": "isolated-tool:clone",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.935
+      },
+      {
+        "name": "isolated-tool:auto_blemish",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.161
+      },
+      {
+        "name": "isolated-tool:frequency",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.195
+      },
+      {
+        "name": "isolated-tool:skin_smooth",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.019
+      },
+      {
+        "name": "isolated-tool:skin_uniformity",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.928
+      },
+      {
+        "name": "isolated-tool:portrait_dodge_burn",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.084
+      },
+      {
+        "name": "isolated-tool:micro_dodge_burn",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.223
+      },
+      {
+        "name": "isolated-tool:dodge",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.827
+      },
+      {
+        "name": "isolated-tool:burn",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.825
+      },
+      {
+        "name": "isolated-tool:skin_color",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.972
+      },
+      {
+        "name": "isolated-tool:color_match",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.901
+      },
+      {
+        "name": "isolated-tool:mattify",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.176
+      },
+      {
+        "name": "isolated-tool:under_eye",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.566
+      },
+      {
+        "name": "isolated-tool:wrinkle",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.752
+      },
+      {
+        "name": "isolated-tool:teeth",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.094
+      },
+      {
+        "name": "isolated-tool:eye_clean",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.047
+      },
+      {
+        "name": "isolated-tool:eye_detail",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.103
+      },
+      {
+        "name": "isolated-tool:red_eye",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.879
+      },
+      {
+        "name": "isolated-tool:fabric",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 4.485
+      },
+      {
+        "name": "isolated-tool:backdrop",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 3.305
+      },
+      {
+        "name": "isolated-tool:glare",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 4.117
+      },
+      {
+        "name": "isolated-tool:makeup",
+        "status": "executed",
+        "result": {
+          "changed": true,
+          "exactUndo": true,
+          "exactRedo": true
+        },
+        "seconds": 2.877
+      },
+      {
+        "name": "reset-retouch-history-reproduction",
+        "status": "executed",
+        "result": {
+          "resetLooksOriginal": false,
+          "undoAfterNewEditRestoresReset": true,
+          "historyBefore": {
+            "photoId": "pht_01a0f258-12bb-77c3-bda3-9537cb16df8d",
+            "entries": [
+              {
+                "seq": 107,
+                "atMs": 1790772725403,
+                "source": "user",
+                "changed": [
+                  "global.exposure"
+                ],
+                "label": "Invalid"
+              },
+              {
+                "seq": 108,
+                "atMs": 1790772953392,
+                "source": "user",
+                "changed": [
+                  "global.exposure"
+                ],
+                "label": "Reset to original"
+              },
+              {
+                "seq": 109,
+                "atMs": 1790772953406,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 110,
+                "atMs": 1790772954142,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 113,
+                "atMs": 1790772956511,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 114,
+                "atMs": 1790772957250,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 117,
+                "atMs": 1790772959488,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 118,
+                "atMs": 1790772960203,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 121,
+                "atMs": 1790772962425,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 122,
+                "atMs": 1790772963243,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 125,
+                "atMs": 1790772965586,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 126,
+                "atMs": 1790772966267,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 129,
+                "atMs": 1790772968782,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 130,
+                "atMs": 1790772969479,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 133,
+                "atMs": 1790772971802,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 134,
+                "atMs": 1790772972590,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 137,
+                "atMs": 1790772974729,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 138,
+                "atMs": 1790772975438,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 141,
+                "atMs": 1790772977813,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 142,
+                "atMs": 1790772978523,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 145,
+                "atMs": 1790772981036,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 146,
+                "atMs": 1790772981743,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 149,
+                "atMs": 1790772983865,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 150,
+                "atMs": 1790772984572,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 153,
+                "atMs": 1790772986690,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 154,
+                "atMs": 1790772987398,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 157,
+                "atMs": 1790772989663,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 158,
+                "atMs": 1790772990364,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 161,
+                "atMs": 1790772992566,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 162,
+                "atMs": 1790772993433,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 165,
+                "atMs": 1790772995743,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 166,
+                "atMs": 1790772996487,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 169,
+                "atMs": 1790772999308,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 170,
+                "atMs": 1790773000105,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 173,
+                "atMs": 1790773003062,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 174,
+                "atMs": 1790773003832,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 177,
+                "atMs": 1790773006156,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 178,
+                "atMs": 1790773006926,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 181,
+                "atMs": 1790773009204,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 182,
+                "atMs": 1790773009916,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 185,
+                "atMs": 1790773012307,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 186,
+                "atMs": 1790773013260,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 189,
+                "atMs": 1790773016190,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 190,
+                "atMs": 1790773017182,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 193,
+                "atMs": 1790773020674,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 194,
+                "atMs": 1790773021436,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 197,
+                "atMs": 1790773023978,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 198,
+                "atMs": 1790773024851,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 201,
+                "atMs": 1790773028097,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 202,
+                "atMs": 1790773028856,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 205,
+                "atMs": 1790773030975,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 206,
+                "atMs": 1790773031661,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              }
+            ],
+            "snapshots": [],
+            "canUndo": true,
+            "canRedo": false,
+            "hasAiSuggestion": false
+          },
+          "historyAfterReset": {
+            "photoId": "pht_01a0f258-12bb-77c3-bda3-9537cb16df8d",
+            "entries": [
+              {
+                "seq": 107,
+                "atMs": 1790772725403,
+                "source": "user",
+                "changed": [
+                  "global.exposure"
+                ],
+                "label": "Invalid"
+              },
+              {
+                "seq": 108,
+                "atMs": 1790772953392,
+                "source": "user",
+                "changed": [
+                  "global.exposure"
+                ],
+                "label": "Reset to original"
+              },
+              {
+                "seq": 109,
+                "atMs": 1790772953406,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 110,
+                "atMs": 1790772954142,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 113,
+                "atMs": 1790772956511,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 114,
+                "atMs": 1790772957250,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 117,
+                "atMs": 1790772959488,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 118,
+                "atMs": 1790772960203,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 121,
+                "atMs": 1790772962425,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 122,
+                "atMs": 1790772963243,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 125,
+                "atMs": 1790772965586,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 126,
+                "atMs": 1790772966267,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 129,
+                "atMs": 1790772968782,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 130,
+                "atMs": 1790772969479,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 133,
+                "atMs": 1790772971802,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 134,
+                "atMs": 1790772972590,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 137,
+                "atMs": 1790772974729,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 138,
+                "atMs": 1790772975438,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 141,
+                "atMs": 1790772977813,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 142,
+                "atMs": 1790772978523,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 145,
+                "atMs": 1790772981036,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 146,
+                "atMs": 1790772981743,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 149,
+                "atMs": 1790772983865,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 150,
+                "atMs": 1790772984572,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 153,
+                "atMs": 1790772986690,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 154,
+                "atMs": 1790772987398,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 157,
+                "atMs": 1790772989663,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 158,
+                "atMs": 1790772990364,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 161,
+                "atMs": 1790772992566,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 162,
+                "atMs": 1790772993433,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 165,
+                "atMs": 1790772995743,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 166,
+                "atMs": 1790772996487,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 169,
+                "atMs": 1790772999308,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 170,
+                "atMs": 1790773000105,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 173,
+                "atMs": 1790773003062,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 174,
+                "atMs": 1790773003832,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 177,
+                "atMs": 1790773006156,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 178,
+                "atMs": 1790773006926,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 181,
+                "atMs": 1790773009204,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 182,
+                "atMs": 1790773009916,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 185,
+                "atMs": 1790773012307,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 186,
+                "atMs": 1790773013260,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 189,
+                "atMs": 1790773016190,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 190,
+                "atMs": 1790773017182,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 193,
+                "atMs": 1790773020674,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 194,
+                "atMs": 1790773021436,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 197,
+                "atMs": 1790773023978,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 198,
+                "atMs": 1790773024851,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 201,
+                "atMs": 1790773028097,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 202,
+                "atMs": 1790773028856,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 205,
+                "atMs": 1790773030975,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              },
+              {
+                "seq": 206,
+                "atMs": 1790773031661,
+                "source": "user",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              }
+            ],
+            "snapshots": [],
+            "canUndo": true,
+            "canRedo": false,
+            "hasAiSuggestion": false
+          }
+        },
+        "seconds": 2.178
+      },
+      {
+        "name": "retry:portrait-8386841.jpg",
+        "status": "executed",
+        "result": {
+          "pixelHash": "793343172c7ec29d64cd31b5985f85c18a76edee1e8c512ed996bdacd672eb74"
+        },
+        "seconds": 5.958
+      },
+      {
+        "name": "retry:test-rgb.tif",
+        "status": "executed",
+        "result": {
+          "pixelHash": "ed6d11640d013cdb914a3686706510d20859c52fa42777b1a2e76b12937b10c9"
+        },
+        "seconds": 0.659
+      },
+      {
+        "name": "retry:test-gray16.tif",
+        "status": "error",
+        "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2002\",\"message\":\"This photo file is damaged and could not be opened. Copy it from the card again, then re-run the import.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-RAW-2002\"}\n    at eval (eval at evaluate (:302:30), <anonymous>:1:88)\n    at async <anonymous>:328:30",
+        "seconds": 0.44
+      },
+      {
+        "name": "adaptive-profile",
+        "status": "executed",
+        "result": {
+          "count": 21,
+          "firstProfile": "true-natural",
+          "report": {
+            "profileId": "true-natural",
+            "changed": 32,
+            "protectedFields": [],
+            "adaptations": []
+          },
+          "idempotent": true
+        },
+        "seconds": 0.587
+      },
+      {
+        "name": "selective-sync",
+        "status": "executed",
+        "result": {
+          "report": {
+            "synced": 1,
+            "failed": []
+          },
+          "targetExposure": {
+            "path": "global.exposure",
+            "value": 0.25,
+            "protected": true,
+            "stage": "exposure"
+          }
+        },
+        "seconds": 0.238
+      },
+      {
+        "name": "resized-watermarked-export",
+        "status": "executed",
+        "result": {
+          "export": {
+            "photos": 20,
+            "selected": 0,
+            "requested": 1,
+            "written": 1,
+            "verified": 1,
+            "unverified": 0,
+            "corrupt": 0,
+            "renderFailed": 0,
+            "renamed": 0,
+            "sidecars": 0,
+            "bytes": 79536,
+            "manifestSealed": true,
+            "ms": 1283
+          },
+          "files": [
+            {
+              "file": "watermarked\\image.png",
+              "size": [
+                256,
+                170
+              ],
+              "sample": [
+                237,
+                80,
+                84
+              ]
+            }
+          ]
+        },
+        "seconds": 1.803
+      }
+    ],
+    "completed": true
+  },
+  "isolated": {
+    "cases": [
+      {
+        "name": "single-file:test-rgb.tif",
+        "status": "error",
+        "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2002\",\"message\":\"This photo file is damaged and could not be opened. Copy it from the card again, then re-run the import.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-RAW-2002\"}\n    at eval (eval at evaluate (:302:30), <anonymous>:1:96)\n    at async <anonymous>:328:30"
+      },
+      {
+        "name": "single-file:test-gray16.tif",
+        "status": "error",
+        "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2002\",\"message\":\"This photo file is damaged and could not be opened. Copy it from the card again, then re-run the import.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-RAW-2002\"}\n    at eval (eval at evaluate (:302:30), <anonymous>:1:96)\n    at async <anonymous>:328:30"
+      },
+      {
+        "name": "single-file:portrait-8386841.jpg",
+        "status": "executed",
+        "result": {
+          "projectId": "prj_01a0f265-6898-79d2-bb8b-032cc469dac0",
+          "photoId": "pht_01a0f265-68fb-7353-a55d-1588817f901f",
+          "render": {
+            "size": [
+              1200,
+              1800
+            ],
+            "hash": "793343172c7ec29d64cd31b5985f85c18a76edee1e8c512ed996bdacd672eb74"
+          }
+        }
+      },
+      {
+        "name": "fresh-retouch-reset-undo",
+        "status": "executed",
+        "result": {
+          "projectId": "prj_01a0f265-865f-7ca0-9ec1-f03231cfb517",
+          "photoId": "pht_01a0f265-86e1-7531-aa1a-67a3692d96dc",
+          "original": {
+            "size": [
+              500,
+              333
+            ],
+            "hash": "dd6e5f06b0cd5afbc44f5eb228c70177f5488df80f033d9e9779cc8f50a9b61d"
+          },
+          "dodge": {
+            "size": [
+              500,
+              333
+            ],
+            "hash": "a12b3a0fa1b780975ca630c3ff58ddd852020f90871f31dcc65fb21dc8c546e5"
+          },
+          "reset": {
+            "size": [
+              500,
+              333
+            ],
+            "hash": "a12b3a0fa1b780975ca630c3ff58ddd852020f90871f31dcc65fb21dc8c546e5"
+          },
+          "undo": {
+            "size": [
+              500,
+              333
+            ],
+            "hash": "a12b3a0fa1b780975ca630c3ff58ddd852020f90871f31dcc65fb21dc8c546e5"
+          },
+          "resetEqualsOriginal": false,
+          "undoEqualsReset": true,
+          "undoEqualsEarlierDodge": true,
+          "historyBefore": {
+            "photoId": "pht_01a0f265-86e1-7531-aa1a-67a3692d96dc",
+            "entries": [
+              {
+                "seq": 1,
+                "atMs": 1790773136184,
+                "source": "default",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              }
+            ],
+            "snapshots": [],
+            "canUndo": true,
+            "canRedo": false,
+            "hasAiSuggestion": false
+          },
+          "historyAfterReset": {
+            "photoId": "pht_01a0f265-86e1-7531-aa1a-67a3692d96dc",
+            "entries": [
+              {
+                "seq": 1,
+                "atMs": 1790773136184,
+                "source": "default",
+                "changed": [
+                  "studio_retouch_v1"
+                ],
+                "label": "Native retouch"
+              }
+            ],
+            "snapshots": [],
+            "canUndo": true,
+            "canRedo": false,
+            "hasAiSuggestion": false
+          }
+        }
+      },
+      {
+        "name": "GUI exposure repeat with correct numeric tolerance",
+        "status": "executed",
+        "result": {
+          "storedValue": 0.3499999940395355,
+          "tolerance": 1e-05
+        }
+      }
+    ]
+  },
+  "gui": {
+    "steps": [
+      {
+        "label": "GUI: auto enhance portrait",
+        "status": "passed",
+        "result": {
+          "detectedFaces": 1,
+          "faces": [
+            {
+              "bounds": [
+                0.394374,
+                0.394712,
+                0.548069,
+                0.676523
+              ],
+              "confidence": 0.935988,
+              "landmarks": [
+                [
+                  0.428115,
+                  0.51337
+                ],
+                [
+                  0.494625,
+                  0.510107
+                ],
+                [
+                  0.460886,
+                  0.564333
+                ],
+                [
+                  0.438321,
+                  0.601396
+                ],
+                [
+                  0.498328,
+                  0.60346
+                ]
+              ]
+            }
+          ],
+          "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "model": "yunet-2023mar-aura320-v1",
+          "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "operations": 3,
+          "retouchedFaces": 1,
+          "status": "complete"
+        },
+        "seconds": 5.82
+      },
+      {
+        "label": "GUI: keyboard exposure +0.35 EV",
+        "status": "failed",
+        "error": "global.exposure: 0.3499999940395355 != 0.35",
+        "seconds": 90.54
+      },
+      {
+        "label": "GUI: keyboard white balance 6000 K",
+        "status": "passed",
+        "result": null,
+        "seconds": 4.07
+      },
+      {
+        "label": "GUI: add tone-curve point with mouse",
+        "status": "passed",
+        "result": [
+          [
+            0,
+            0
+          ],
+          [
+            128,
+            153
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        "seconds": 0.3
+      },
+      {
+        "label": "GUI: selective orange saturation",
+        "status": "passed",
+        "result": null,
+        "seconds": 7.56
+      },
+      {
+        "label": "GUI: crop to 4:5",
+        "status": "passed",
+        "result": [
+          0.23330000042915344,
+          0,
+          0.766700029373169,
+          1
+        ],
+        "seconds": 3.11
+      },
+      {
+        "label": "GUI: save named snapshot with Enter",
+        "status": "passed",
+        "result": null,
+        "seconds": 3.31
+      },
+      {
+        "label": "GUI: before/after divider and clipping overlay",
+        "status": "passed",
+        "result": null,
+        "seconds": 1.46
+      },
+      {
+        "label": "GUI: paint, erase, undo stroke, apply with Enter",
+        "status": "passed",
+        "result": 4,
+        "seconds": 5.53
+      },
+      {
+        "label": "GUI: zoom, pan, fit and retouch split",
+        "status": "passed",
+        "result": null,
+        "seconds": 0.59
+      },
+      {
+        "label": "GUI: keyboard Undo and Redo saved edit",
+        "status": "passed",
+        "result": null,
+        "seconds": 9.25
+      }
+    ],
+    "pageErrors": [],
+    "projectId": "prj_01a0f25f-9e11-73d1-a3a5-32130a48c3cd",
+    "photoId": "pht_01a0f25f-9f53-7c13-9285-fdbd93b5ef01",
+    "collectionName": "Mouse and keyboard audit 18-37-26",
+    "sourceHash": "0ecc1caab14a8075840c686c8b6b35b83d8502f367e01e3f8b8eb7daedcf9a64",
+    "beforeHash": "36fbfad11aebf0bd3e66a4cfea444b7b3a79c56b575f3efe0bcfb35f3559147e",
+    "afterHash": "3ec73e30e189c0d004e432cfc94ee5d3489bce3e66808ef2432ea19ec21ecae2",
+    "recipe": {
+      "photoId": "pht_01a0f25f-9f53-7c13-9285-fdbd93b5ef01",
+      "body": "{\"bw\":null,\"engine\":\"aura-render/1.0.0\",\"geometry\":{\"crop\":[0.233300,0,0.766700,1],\"perspective\":null,\"rotate\":0},\"global\":{\"blacks\":0,\"clarity\":0,\"contrast\":0,\"curve\":{\"points\":[[0,0],[128,153],[255,255]]},\"dehaze\":0,\"exposure\":0.350000,\"highlights\":-18,\"hsl\":{\"orange\":{\"h\":0,\"l\":0,\"s\":-12}},\"noise\":{\"colour\":0,\"detail\":50,\"luminance\":0,\"model\":\"reference_v1\"},\"saturation\":0,\"shadows\":2,\"sharpen\":{\"amount\":0,\"detail\":25,\"masking\":0,\"radius\":1},\"temperature\":6000,\"texture\":0,\"tint\":0,\"vibrance\":0,\"whites\":0},\"image\":{\"camera\":\"\",\"content_hash\":\"78b652aab764eb5f11d138d3f9679ed63b9caf45774297e570359478921f92dd\",\"profile\":\"reference\"},\"lens\":{\"ca\":false,\"coefficients\":null,\"distortion\":false,\"profile\":null,\"vignette\":0},\"masks\":[],\"provenance\":{\"confidence\":0.350000,\"decision_id\":null,\"scene\":null,\"source\":\"ai\",\"style_profile\":null,\"user_edited_fields\":[\"geometry.crop\",\"global.curve.points\",\"global.exposure\",\"global.hsl.orange.h\",\"global.hsl.orange.l\",\"global.hsl.orange.s\",\"global.temperature\",\"studio_retouch_v1\"]},\"restoration\":{\"deblur\":0,\"denoise\":\"off\",\"face_recovery\":0},\"retouch\":[],\"schema\":1,\"studio_portrait_auto_v1\":{\"detectedFaces\":1,\"faces\":[{\"bounds\":[0.394374,0.394712,0.548069,0.676523],\"confidence\":0.935988,\"landmarks\":[[0.428115,0.513370],[0.494625,0.510107],[0.460886,0.564333],[0.438321,0.601396],[0.498328,0.603460]]}],\"message\":\"Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.\",\"model\":\"yunet-2023mar-aura320-v1\",\"modelHash\":\"3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431\",\"operations\":3,\"retouchedFaces\":1,\"status\":\"complete\"},\"studio_retouch_v1\":[{\"amount\":0.200186,\"enabled\":true,\"feather\":0.700000,\"id\":\"auto-portrait-v1-0-texture\",\"mask\":{\"strokes\":[{\"erase\":false,\"opacity\":1,\"points\":[[0.429201,0.563302,1]],\"radius\":0.028976},{\"erase\":false,\"opacity\":1,\"points\":[[0.495712,0.560039,1]],\"radius\":0.028976},{\"erase\":false,\"opacity\":1,\"points\":[[0.460327,0.463804,1]],\"radius\":0.028976},{\"erase\":true,\"opacity\":1,\"points\":[[0.428115,0.513370,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.494625,0.510107,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.460886,0.564333,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.438321,0.601396,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.498328,0.603460,1]],\"radius\":0.019983}]},\"radius\":0.004496,\"region\":[0.471221,0.535618,0.076847,0.140906],\"skin\":{\"edgeProtection\":0.900000,\"tolerance\":0.070000},\"source\":[0.455003,0.455811],\"texture\":1,\"tint\":0,\"tone\":0.500000,\"tool\":\"skin_smooth\",\"warmth\":0},{\"amount\":0.160000,\"enabled\":true,\"feather\":0.700000,\"id\":\"auto-portrait-v1-0-tone\",\"mask\":{\"strokes\":[{\"erase\":false,\"opacity\":1,\"points\":[[0.429201,0.563302,1]],\"radius\":0.028976},{\"erase\":false,\"opacity\":1,\"points\":[[0.495712,0.560039,1]],\"radius\":0.028976},{\"erase\":false,\"opacity\":1,\"points\":[[0.460327,0.463804,1]],\"radius\":0.028976},{\"erase\":true,\"opacity\":1,\"points\":[[0.428115,0.513370,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.494625,0.510107,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.460886,0.564333,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.438321,0.601396,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.498328,0.603460,1]],\"radius\":0.019983}]},\"radius\":0.004496,\"region\":[0.471221,0.535618,0.076847,0.140906],\"skin\":{\"edgeProtection\":0.900000,\"tolerance\":0.070000},\"source\":[0.455003,0.455811],\"texture\":1,\"tint\":0,\"tone\":0.500000,\"tool\":\"skin_uniformity\",\"warmth\":0},{\"amount\":0.200000,\"enabled\":true,\"feather\":0.700000,\"id\":\"auto-portrait-v1-0-light\",\"mask\":{\"strokes\":[{\"erase\":false,\"opacity\":1,\"points\":[[0.429201,0.563302,1]],\"radius\":0.028976},{\"erase\":false,\"opacity\":1,\"points\":[[0.495712,0.560039,1]],\"radius\":0.028976},{\"erase\":false,\"opacity\":1,\"points\":[[0.460327,0.463804,1]],\"radius\":0.028976},{\"erase\":true,\"opacity\":1,\"points\":[[0.428115,0.513370,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.494625,0.510107,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.460886,0.564333,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.438321,0.601396,1]],\"radius\":0.019983},{\"erase\":true,\"opacity\":1,\"points\":[[0.498328,0.603460,1]],\"radius\":0.019983}]},\"radius\":0.004496,\"region\":[0.471221,0.535618,0.076847,0.140906],\"skin\":{\"edgeProtection\":0.900000,\"tolerance\":0.070000},\"source\":[0.455003,0.455811],\"texture\":1,\"tint\":0,\"tone\":0.500000,\"tool\":\"portrait_dodge_burn\",\"warmth\":0},{\"amount\":0.650000,\"enabled\":true,\"feather\":0.650000,\"id\":\"e8b0d51c-8044-4e55-ad0b-6e04b450f4f5\",\"mask\":{\"strokes\":[{\"erase\":false,\"opacity\":1,\"points\":[[0.430000,0.560000,1],[0.434286,0.561429,1],[0.438571,0.562857,1],[0.442857,0.564286,1],[0.447143,0.565714,1],[0.451429,0.567143,1],[0.455714,0.568571,1],[0.460000,0.570000,1],[0.464286,0.571429,1],[0.468571,0.572857,1],[0.472857,0.574286,1],[0.477143,0.575714,1],[0.481429,0.577143,1],[0.485714,0.578571,1],[0.490000,0.580000,1]],\"radius\":0.030000}]},\"radius\":0.003000,\"region\":[0.430000,0.560000,0.035000,0.035000],\"source\":null,\"texture\":1,\"tint\":0,\"tone\":0.500000,\"tool\":\"dodge\",\"warmth\":0}]}",
+      "recipeHash": "fef4a7bf378f914b5efe451076fccd38794f78c75710f33d0a3f6a094995044a",
+      "schema": 1,
+      "engine": "aura-render/1.0.0",
+      "source": "ai",
+      "confidence": 0.35,
+      "decisionId": null,
+      "userEditedFields": [
+        "geometry.crop",
+        "global.curve.points",
+        "global.exposure",
+        "global.hsl.orange.h",
+        "global.hsl.orange.l",
+        "global.hsl.orange.s",
+        "global.temperature",
+        "studio_retouch_v1"
+      ],
+      "params": [
+        {
+          "path": "bw",
+          "value": null,
+          "protected": false,
+          "stage": "monochrome"
+        },
+        {
+          "path": "engine",
+          "value": "aura-render/1.0.0",
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "geometry.crop",
+          "value": [
+            0.23330000042915344,
+            0,
+            0.766700029373169,
+            1
+          ],
+          "protected": true,
+          "stage": "geometry"
+        },
+        {
+          "path": "geometry.perspective",
+          "value": null,
+          "protected": false,
+          "stage": "geometry"
+        },
+        {
+          "path": "geometry.rotate",
+          "value": 0,
+          "protected": false,
+          "stage": "geometry"
+        },
+        {
+          "path": "global.blacks",
+          "value": 0,
+          "protected": false,
+          "stage": "tone"
+        },
+        {
+          "path": "global.clarity",
+          "value": 0,
+          "protected": false,
+          "stage": "clarity"
+        },
+        {
+          "path": "global.contrast",
+          "value": 0,
+          "protected": false,
+          "stage": "contrast"
+        },
+        {
+          "path": "global.curve.points",
+          "value": [
+            [
+              0,
+              0
+            ],
+            [
+              128,
+              153
+            ],
+            [
+              255,
+              255
+            ]
+          ],
+          "protected": true,
+          "stage": "curve"
+        },
+        {
+          "path": "global.dehaze",
+          "value": 0,
+          "protected": false,
+          "stage": "dehaze"
+        },
+        {
+          "path": "global.exposure",
+          "value": 0.3499999940395355,
+          "protected": true,
+          "stage": "exposure"
+        },
+        {
+          "path": "global.highlights",
+          "value": -18,
+          "protected": false,
+          "stage": "highlight_recovery"
+        },
+        {
+          "path": "global.hsl.orange.h",
+          "value": 0,
+          "protected": true,
+          "stage": "hsl"
+        },
+        {
+          "path": "global.hsl.orange.l",
+          "value": 0,
+          "protected": true,
+          "stage": "hsl"
+        },
+        {
+          "path": "global.hsl.orange.s",
+          "value": -12,
+          "protected": true,
+          "stage": "hsl"
+        },
+        {
+          "path": "global.noise.colour",
+          "value": 0,
+          "protected": false,
+          "stage": "noise_reduction"
+        },
+        {
+          "path": "global.noise.detail",
+          "value": 50,
+          "protected": false,
+          "stage": "noise_reduction"
+        },
+        {
+          "path": "global.noise.luminance",
+          "value": 0,
+          "protected": false,
+          "stage": "noise_reduction"
+        },
+        {
+          "path": "global.noise.model",
+          "value": "reference_v1",
+          "protected": false,
+          "stage": "noise_reduction"
+        },
+        {
+          "path": "global.saturation",
+          "value": 0,
+          "protected": false,
+          "stage": "vibrance"
+        },
+        {
+          "path": "global.shadows",
+          "value": 2,
+          "protected": false,
+          "stage": "tone"
+        },
+        {
+          "path": "global.sharpen.amount",
+          "value": 0,
+          "protected": false,
+          "stage": "sharpen"
+        },
+        {
+          "path": "global.sharpen.detail",
+          "value": 25,
+          "protected": false,
+          "stage": "sharpen"
+        },
+        {
+          "path": "global.sharpen.masking",
+          "value": 0,
+          "protected": false,
+          "stage": "sharpen"
+        },
+        {
+          "path": "global.sharpen.radius",
+          "value": 1,
+          "protected": false,
+          "stage": "sharpen"
+        },
+        {
+          "path": "global.temperature",
+          "value": 6000,
+          "protected": true,
+          "stage": "white_balance"
+        },
+        {
+          "path": "global.texture",
+          "value": 0,
+          "protected": false,
+          "stage": "texture"
+        },
+        {
+          "path": "global.tint",
+          "value": 0,
+          "protected": false,
+          "stage": "white_balance"
+        },
+        {
+          "path": "global.vibrance",
+          "value": 0,
+          "protected": false,
+          "stage": "vibrance"
+        },
+        {
+          "path": "global.whites",
+          "value": 0,
+          "protected": false,
+          "stage": "tone"
+        },
+        {
+          "path": "lens.ca",
+          "value": false,
+          "protected": false,
+          "stage": "lens_ca"
+        },
+        {
+          "path": "lens.coefficients",
+          "value": null,
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "lens.distortion",
+          "value": false,
+          "protected": false,
+          "stage": "lens_distortion"
+        },
+        {
+          "path": "lens.profile",
+          "value": null,
+          "protected": false,
+          "stage": "lens_distortion"
+        },
+        {
+          "path": "lens.vignette",
+          "value": 0,
+          "protected": false,
+          "stage": "lens_vignette"
+        },
+        {
+          "path": "masks",
+          "value": [],
+          "protected": false,
+          "stage": "masks"
+        },
+        {
+          "path": "restoration.deblur",
+          "value": 0,
+          "protected": false,
+          "stage": "restoration"
+        },
+        {
+          "path": "restoration.denoise",
+          "value": "off",
+          "protected": false,
+          "stage": "noise_reduction"
+        },
+        {
+          "path": "restoration.face_recovery",
+          "value": 0,
+          "protected": false,
+          "stage": "restoration"
+        },
+        {
+          "path": "retouch",
+          "value": [],
+          "protected": false,
+          "stage": "retouch"
+        },
+        {
+          "path": "schema",
+          "value": 1,
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_portrait_auto_v1.detectedFaces",
+          "value": 1,
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_portrait_auto_v1.faces",
+          "value": [
+            {
+              "bounds": [
+                0.394374,
+                0.394712,
+                0.548069,
+                0.676523
+              ],
+              "confidence": 0.935988,
+              "landmarks": [
+                [
+                  0.428115,
+                  0.51337
+                ],
+                [
+                  0.494625,
+                  0.510107
+                ],
+                [
+                  0.460886,
+                  0.564333
+                ],
+                [
+                  0.438321,
+                  0.601396
+                ],
+                [
+                  0.498328,
+                  0.60346
+                ]
+              ]
+            }
+          ],
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_portrait_auto_v1.message",
+          "value": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_portrait_auto_v1.model",
+          "value": "yunet-2023mar-aura320-v1",
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_portrait_auto_v1.modelHash",
+          "value": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_portrait_auto_v1.operations",
+          "value": 3,
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_portrait_auto_v1.retouchedFaces",
+          "value": 1,
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_portrait_auto_v1.status",
+          "value": "complete",
+          "protected": false,
+          "stage": null
+        },
+        {
+          "path": "studio_retouch_v1",
+          "value": [
+            {
+              "amount": 0.200186,
+              "enabled": true,
+              "feather": 0.7,
+              "id": "auto-portrait-v1-0-texture",
+              "mask": {
+                "strokes": [
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.429201,
+                        0.563302,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.495712,
+                        0.560039,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.460327,
+                        0.463804,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.428115,
+                        0.51337,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.494625,
+                        0.510107,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.460886,
+                        0.564333,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.438321,
+                        0.601396,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.498328,
+                        0.60346,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  }
+                ]
+              },
+              "radius": 0.004496,
+              "region": [
+                0.471221,
+                0.535618,
+                0.076847,
+                0.140906
+              ],
+              "skin": {
+                "edgeProtection": 0.9,
+                "tolerance": 0.07
+              },
+              "source": [
+                0.455003,
+                0.455811
+              ],
+              "texture": 1,
+              "tint": 0,
+              "tone": 0.5,
+              "tool": "skin_smooth",
+              "warmth": 0
+            },
+            {
+              "amount": 0.16,
+              "enabled": true,
+              "feather": 0.7,
+              "id": "auto-portrait-v1-0-tone",
+              "mask": {
+                "strokes": [
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.429201,
+                        0.563302,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.495712,
+                        0.560039,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.460327,
+                        0.463804,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.428115,
+                        0.51337,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.494625,
+                        0.510107,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.460886,
+                        0.564333,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.438321,
+                        0.601396,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.498328,
+                        0.60346,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  }
+                ]
+              },
+              "radius": 0.004496,
+              "region": [
+                0.471221,
+                0.535618,
+                0.076847,
+                0.140906
+              ],
+              "skin": {
+                "edgeProtection": 0.9,
+                "tolerance": 0.07
+              },
+              "source": [
+                0.455003,
+                0.455811
+              ],
+              "texture": 1,
+              "tint": 0,
+              "tone": 0.5,
+              "tool": "skin_uniformity",
+              "warmth": 0
+            },
+            {
+              "amount": 0.2,
+              "enabled": true,
+              "feather": 0.7,
+              "id": "auto-portrait-v1-0-light",
+              "mask": {
+                "strokes": [
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.429201,
+                        0.563302,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.495712,
+                        0.560039,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.460327,
+                        0.463804,
+                        1
+                      ]
+                    ],
+                    "radius": 0.028976
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.428115,
+                        0.51337,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.494625,
+                        0.510107,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.460886,
+                        0.564333,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.438321,
+                        0.601396,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  },
+                  {
+                    "erase": true,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.498328,
+                        0.60346,
+                        1
+                      ]
+                    ],
+                    "radius": 0.019983
+                  }
+                ]
+              },
+              "radius": 0.004496,
+              "region": [
+                0.471221,
+                0.535618,
+                0.076847,
+                0.140906
+              ],
+              "skin": {
+                "edgeProtection": 0.9,
+                "tolerance": 0.07
+              },
+              "source": [
+                0.455003,
+                0.455811
+              ],
+              "texture": 1,
+              "tint": 0,
+              "tone": 0.5,
+              "tool": "portrait_dodge_burn",
+              "warmth": 0
+            },
+            {
+              "amount": 0.65,
+              "enabled": true,
+              "feather": 0.65,
+              "id": "e8b0d51c-8044-4e55-ad0b-6e04b450f4f5",
+              "mask": {
+                "strokes": [
+                  {
+                    "erase": false,
+                    "opacity": 1,
+                    "points": [
+                      [
+                        0.43,
+                        0.56,
+                        1
+                      ],
+                      [
+                        0.434286,
+                        0.561429,
+                        1
+                      ],
+                      [
+                        0.438571,
+                        0.562857,
+                        1
+                      ],
+                      [
+                        0.442857,
+                        0.564286,
+                        1
+                      ],
+                      [
+                        0.447143,
+                        0.565714,
+                        1
+                      ],
+                      [
+                        0.451429,
+                        0.567143,
+                        1
+                      ],
+                      [
+                        0.455714,
+                        0.568571,
+                        1
+                      ],
+                      [
+                        0.46,
+                        0.57,
+                        1
+                      ],
+                      [
+                        0.464286,
+                        0.571429,
+                        1
+                      ],
+                      [
+                        0.468571,
+                        0.572857,
+                        1
+                      ],
+                      [
+                        0.472857,
+                        0.574286,
+                        1
+                      ],
+                      [
+                        0.477143,
+                        0.575714,
+                        1
+                      ],
+                      [
+                        0.481429,
+                        0.577143,
+                        1
+                      ],
+                      [
+                        0.485714,
+                        0.578571,
+                        1
+                      ],
+                      [
+                        0.49,
+                        0.58,
+                        1
+                      ]
+                    ],
+                    "radius": 0.03
+                  }
+                ]
+              },
+              "radius": 0.003,
+              "region": [
+                0.43,
+                0.56,
+                0.035,
+                0.035
+              ],
+              "source": null,
+              "texture": 1,
+              "tint": 0,
+              "tone": 0.5,
+              "tool": "dodge",
+              "warmth": 0
+            }
+          ],
+          "protected": true,
+          "stage": null
+        }
+      ]
+    },
+    "history": {
+      "photoId": "pht_01a0f25f-9f53-7c13-9285-fdbd93b5ef01",
+      "entries": [
+        {
+          "seq": 1,
+          "atMs": 1790772762485,
+          "source": "ai",
+          "changed": [
+            "global.highlights",
+            "global.shadows",
+            "studio_portrait_auto_v1.detectedFaces",
+            "studio_portrait_auto_v1.faces",
+            "studio_portrait_auto_v1.message",
+            "studio_portrait_auto_v1.model",
+            "studio_portrait_auto_v1.modelHash",
+            "studio_portrait_auto_v1.operations",
+            "studio_portrait_auto_v1.retouchedFaces",
+            "studio_portrait_auto_v1.status",
+            "studio_retouch_v1"
+          ],
+          "label": "Auto enhance: Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version."
+        },
+        {
+          "seq": 2,
+          "atMs": 1790772766979,
+          "source": "ai",
+          "changed": [
+            "global.exposure"
+          ],
+          "label": "Exposure"
+        },
+        {
+          "seq": 3,
+          "atMs": 1790772857834,
+          "source": "ai",
+          "changed": [
+            "global.temperature"
+          ],
+          "label": "Temp"
+        },
+        {
+          "seq": 4,
+          "atMs": 1790772862182,
+          "source": "ai",
+          "changed": [
+            "global.curve.points"
+          ],
+          "label": "Luminance curve"
+        },
+        {
+          "seq": 5,
+          "atMs": 1790772866358,
+          "source": "ai",
+          "changed": [
+            "global.hsl.orange.h",
+            "global.hsl.orange.l",
+            "global.hsl.orange.s"
+          ],
+          "label": "Orange"
+        },
+        {
+          "seq": 6,
+          "atMs": 1790772870679,
+          "source": "ai",
+          "changed": [
+            "geometry.crop"
+          ],
+          "label": "Crop 0.80"
+        },
+        {
+          "seq": 7,
+          "atMs": 1790772884705,
+          "source": "ai",
+          "changed": [
+            "studio_retouch_v1"
+          ],
+          "label": "Native retouch"
+        }
+      ],
+      "snapshots": [
+        "Audit natural portrait"
+      ],
+      "canUndo": true,
+      "canRedo": false,
+      "hasAiSuggestion": true
+    },
+    "sourceUnchanged": true
+  },
+  "export": {
+    "guiExportVerified": true,
+    "files": [
+      {
+        "file": "gui\\export\\gallery\\mouse-and-keyboard-audit-18-37-26_0001.jpg",
+        "size": [
+          640,
+          800
+        ],
+        "format": "JPEG"
+      }
+    ],
+    "recipeHash": "fef4a7bf378f914b5efe451076fccd38794f78c75710f33d0a3f6a094995044a",
+    "pixelHash": "3ec73e30e189c0d004e432cfc94ee5d3489bce3e66808ef2432ea19ec21ecae2",
+    "retriedPortraitAuto": {
+      "detectedFaces": 1,
+      "faces": [
+        {
+          "bounds": [
+            0.345828,
+            0.353571,
+            0.578718,
+            0.558122
+          ],
+          "confidence": 0.907847,
+          "landmarks": [
+            [
+              0.377424,
+              0.419528
+            ],
+            [
+              0.475654,
+              0.41887
+            ],
+            [
+              0.40022,
+              0.458897
+            ],
+            [
+              0.390476,
+              0.499579
+            ],
+            [
+              0.470108,
+              0.499233
+            ]
+          ]
+        }
+      ],
+      "message": "Retouched 1 of 1 detected faces with 3 editable steps: skin texture, tone uniformity and local light balance. Eye and mouth areas are excluded. Undo restores the previous version.",
+      "model": "yunet-2023mar-aura320-v1",
+      "modelHash": "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431",
+      "operations": 3,
+      "retouchedFaces": 1,
+      "status": "complete"
+    }
+  },
+  "restart": {
+    "closeWindowExitedWithin20Seconds": false,
+    "forcedRestartOfAuditedProcess": true,
+    "recipeUnchanged": true,
+    "pixelsUnchanged": true,
+    "recipeHash": "fef4a7bf378f914b5efe451076fccd38794f78c75710f33d0a3f6a094995044a",
+    "pixelHash": "3ec73e30e189c0d004e432cfc94ee5d3489bce3e66808ef2432ea19ec21ecae2",
+    "all25InputsUnchanged": true
+  },
+  "native": [
+    {
+      "suite": "aura-raw/colour_maths",
+      "compiled": true,
+      "exitCode": 0,
+      "summary": [
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "suite": "aura-raw/containers",
+      "compiled": true,
+      "exitCode": 0,
+      "summary": [
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s"
+      ]
+    },
+    {
+      "suite": "aura-raw/png_photos",
+      "compiled": true,
+      "exitCode": 0,
+      "summary": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "suite": "aura-export/export_pass",
+      "compiled": true,
+      "exitCode": 0,
+      "summary": [
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.18s"
+      ]
+    },
+    {
+      "suite": "aura-export/watermark",
+      "compiled": true,
+      "exitCode": 0,
+      "summary": [
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+      ]
+    },
+    {
+      "suite": "aura-raw/codecs",
+      "compiled": true,
+      "exitCode": 0,
+      "summary": [
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s"
+      ]
+    },
+    {
+      "suite": "aura-raw/tiers",
+      "compiled": true,
+      "exitCode": 0,
+      "summary": [
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.08s"
+      ]
+    }
+  ]
+}

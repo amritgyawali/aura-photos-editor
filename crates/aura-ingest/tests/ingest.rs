@@ -143,6 +143,68 @@ fn scan_files(root: &Path) -> Vec<aura_ingest::scan::ScannedFile> {
 // ------------------------------------------------------------------ idempotence
 
 #[test]
+fn file_picker_imports_all_five_roots_in_one_run() {
+    let harness = harness_with_files(&[
+        ("one.jpg", b"first portrait"),
+        ("two.jpg", b"second portrait"),
+        ("three.jpg", b"third portrait"),
+        ("four.jpg", b"fourth portrait"),
+        ("five.jpg", b"fifth portrait"),
+    ]);
+    let mut plan = plan_for(&harness);
+    plan.roots = ["one.jpg", "two.jpg", "three.jpg", "four.jpg", "five.jpg"]
+        .iter()
+        .map(|name| harness.root.join(name))
+        .collect();
+    let report = aura_ingest::run(&harness.catalog, &plan, &CancelToken::new(), &NullProgress)
+        .expect("all five file-picker roots import");
+    assert_eq!(report.files_imported, 5);
+    assert_eq!(report.photos_created, 5);
+    let (count, state, imported): (u64, String, u64) = harness
+        .catalog
+        .read(|conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT COUNT(*), state, files_imported FROM import_run WHERE import_id=?1",
+                    [plan.import_id.to_db()],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .expect("journal row"))
+        })
+        .expect("catalog read");
+    assert_eq!((count, state.as_str(), imported), (1, "completed", 5));
+}
+
+#[test]
+fn the_same_source_can_be_imported_into_a_second_collection() {
+    let mut harness = harness_with_files(&[("portrait.jpg", b"shared source photo")]);
+    assert_eq!(run(&harness).photos_created, 1);
+    harness.project_id = ProjectId::new();
+    let now = rfc3339(harness.catalog.clock().now_utc());
+    let project = ProjectRow {
+        project_id: harness.project_id.to_db(),
+        name: "Second collection".into(),
+        couple_label: None,
+        event_date: None,
+        timezone: "UTC".into(),
+        status: "active".into(),
+        created_at: now.clone(),
+        updated_at: now,
+    };
+    harness
+        .catalog
+        .writer()
+        .transact(move |tx| repo::create_project(tx, &project))
+        .expect("second project");
+    assert_eq!(run(&harness).photos_created, 1);
+    assert_eq!(
+        run(&harness).files_imported,
+        0,
+        "the second project remains idempotent"
+    );
+}
+
+#[test]
 fn second_import_of_identical_folder_inserts_nothing() {
     let harness = harness_with_generated_wedding();
 
@@ -162,6 +224,87 @@ fn second_import_of_identical_folder_inserts_nothing() {
         digest_a, digest_b,
         "catalog must be identical after re-import"
     );
+}
+
+#[test]
+fn same_folder_and_camera_can_be_imported_into_another_project() {
+    let mut harness = harness_with_generated_wedding();
+    let first = run(&harness);
+    let original_project = harness.project_id;
+    let original_digest = digest(&harness);
+    let cameras = harness.catalog.count("camera").expect("camera count");
+    assert!(cameras > 0, "fixture must exercise camera registration");
+
+    let project_id = ProjectId::new();
+    let now = rfc3339(harness.catalog.clock().now_utc());
+    let row = ProjectRow {
+        project_id: project_id.to_db(),
+        name: "Another project using the same card".into(),
+        couple_label: None,
+        event_date: None,
+        timezone: "UTC".into(),
+        status: "active".into(),
+        created_at: now.clone(),
+        updated_at: now,
+    };
+    harness
+        .catalog
+        .writer()
+        .transact(move |tx| repo::create_project(tx, &row))
+        .expect("create second project");
+    harness.project_id = project_id;
+    let second = run(&harness);
+    assert_eq!(second.photos_created, first.photos_created);
+    assert_eq!(second.files_imported, first.files_imported);
+    assert_eq!(
+        harness.catalog.count("camera").expect("camera count"),
+        cameras * 2
+    );
+    assert_eq!(run(&harness).files_imported, 0);
+    harness.project_id = original_project;
+    assert_eq!(
+        digest(&harness),
+        original_digest,
+        "first project stays intact"
+    );
+    assert_eq!(run(&harness).files_imported, 0);
+}
+
+#[test]
+fn existing_source_root_ids_are_preserved_on_reimport() {
+    let harness = harness_with_files(&[("photo.jpg", b"fixture photograph")]);
+    let legacy_id = format!(
+        "src_{}",
+        blake3::hash(harness.root.to_string_lossy().as_bytes()).to_hex()
+    );
+    let row = aura_catalog::model::SourceRootRow {
+        root_id: legacy_id.clone(),
+        project_id: harness.project_id.to_db(),
+        abs_path: harness.root.to_string_lossy().into_owned(),
+        volume_label: None,
+        volume_serial: None,
+        is_removable: false,
+    };
+    let now = rfc3339(harness.catalog.clock().now_utc());
+    harness
+        .catalog
+        .writer()
+        .transact(move |tx| repo::upsert_source_root(tx, &row, &now))
+        .expect("legacy source root");
+    assert_eq!(run(&harness).files_imported, 1);
+    assert_eq!(run(&harness).files_imported, 0);
+    assert_eq!(harness.catalog.count("source_root").expect("root count"), 1);
+    let recorded: String = harness
+        .catalog
+        .read(|conn| {
+            Ok(conn
+                .query_row("SELECT root_id FROM photo_file LIMIT 1", [], |row| {
+                    row.get(0)
+                })
+                .expect("file root"))
+        })
+        .expect("read root");
+    assert_eq!(recorded, legacy_id);
 }
 
 #[test]
@@ -262,6 +405,24 @@ fn unknown_extensions_are_ignored_not_guessed() {
     let files = scan_files(dir.path());
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].kind, FileKind::Raw);
+}
+
+#[test]
+fn default_scan_accepts_png_in_folders_and_as_an_individual_selection() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let png = dir.path().join("portrait.PNG");
+    std::fs::write(&png, b"png scan fixture").expect("png");
+    std::fs::write(dir.path().join("landscape.jpg"), b"jpeg scan fixture").expect("jpeg");
+    let folder = scan_files(dir.path());
+    assert_eq!(
+        folder.len(),
+        2,
+        "default import must not silently omit PNGs"
+    );
+    assert!(folder.iter().any(|file| file.kind == FileKind::Png));
+    let individual = scan_files(&png);
+    assert_eq!(individual.len(), 1);
+    assert_eq!(individual[0].kind, FileKind::Png);
 }
 
 // -------------------------------------------------------------------- quarantine

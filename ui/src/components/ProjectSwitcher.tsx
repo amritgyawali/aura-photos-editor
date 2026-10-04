@@ -18,8 +18,8 @@ export function ProjectSwitcher({
   const [name, setName] = useState('');
 
   return (
-    <section className="panel" aria-label="Weddings">
-      <h2>Weddings</h2>
+    <section className="panel" aria-label="Photo collections">
+      <h2>Collections</h2>
 
       <ul className="project-list">
         {projects.map((project) => (
@@ -34,15 +34,15 @@ export function ProjectSwitcher({
             </button>
           </li>
         ))}
-        {projects.length === 0 && <li className="empty">No weddings yet.</li>}
+        {projects.length === 0 && <li className="empty">No collections yet.</li>}
       </ul>
 
       <div className="row">
-        <label htmlFor="project-name">New wedding</label>
+        <label htmlFor="project-name">New collection</label>
         <input
           id="project-name"
           value={name}
-          placeholder="Sarah and Tom"
+          placeholder="Weekend portraits"
           onChange={(event) => setName(event.target.value)}
         />
         <button

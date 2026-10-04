@@ -2552,7 +2552,7 @@ impl AppState {
     ///
     /// **No editorial judge is attached either.** Wiring one is a later change than this pass;
     /// the pass behaves exactly as it does with an unreachable provider, which is that every
-    /// proposal in the judgement band waits for a person. ADR-0063 made a public provider
+    /// proposal in the judgement band waits for a person. ADR-0066 made a public provider
     /// reachable - the reason nothing is attached here is that nothing attaches it, and phase
     /// 24's rule is that the absence produces a refusal rather than a silent approval.
     ///
@@ -2796,6 +2796,30 @@ impl AppState {
         Arc::new(Style::new(self.style_store()))
     }
 
+    // -----------------------------------------------------------------
+    // PHASE-31 - matching a look somebody else published
+    // -----------------------------------------------------------------
+
+    /// Migration 31's tables.
+    #[must_use]
+    pub fn look_store(&self) -> Arc<aura_look::store::LookStore> {
+        Arc::new(aura_look::store::LookStore::new(
+            Arc::clone(&self.catalog),
+            Arc::clone(&self.clock),
+        ))
+    }
+
+    /// The frozen `LookService` for this catalog. PHASE-31.
+    ///
+    /// Separate from [`AppState::style`] and deliberately so: phase 17's profile is fitted from
+    /// a photographer's own delivered pairs and this one is measured off somebody else's
+    /// finished JPEGs, and a caller that could not tell them apart would report the second with
+    /// the confidence of the first.
+    #[must_use]
+    pub fn look(&self) -> Arc<aura_look::Look> {
+        Arc::new(aura_look::Look::new(self.look_store()))
+    }
+
     /// The signing identity this installation exports profiles with.
     ///
     /// Derived from the catalog's own path rather than stored, which is a **deliberate
@@ -2937,9 +2961,8 @@ impl AppState {
     /// Never today. The signature is fallible because a backend probe can fail and changing
     /// a public signature later is worse than carrying an unused `Result` now.
     pub fn render(&self) -> AuraResult<Arc<aura_render::CpuEngine>> {
-        let source: Arc<dyn aura_render::FrameSource> = Arc::new(CatalogFrames {
-            state: self.clone(),
-        });
+        let source: Arc<dyn aura_render::FrameSource> =
+            Arc::new(crate::photo_frames::CatalogFrames::new(self.clone()));
         Ok(Arc::new(aura_render::CpuEngine::new(
             source,
             Arc::clone(&self.clock),
@@ -3166,254 +3189,6 @@ mod tests {
         assert!(!composition_enabled_value(Some(OsStr::new(" FALSE "))));
         assert!(!composition_enabled_value(Some(OsStr::new("off"))));
         assert!(!composition_enabled_value(Some(OsStr::new("No"))));
-    }
-}
-
-/// The frame source the develop engine reads. PHASE-14.
-///
-/// A port implementation, not a contract: `aura_render::FrameSource` is deliberately not
-/// frozen, so the day the proxy pipeline changes shape this is the only file that moves.
-///
-/// **It opens no RAW itself.** Phase 02's `PreviewService` is the only thing in the product
-/// that turns a file into pixels, and this asks it for the rung the requested render level
-/// needs. A photograph whose proxy cannot be produced still renders - as a neutral grey frame
-/// with a warning on the log - because a develop panel that refuses to open until the whole
-/// wedding is decoded is a develop panel nobody can use on the night of a wedding.
-///
-/// That fallback used to be the *only* path: this type returned 18 % grey for every
-/// photograph, so every develop render, every panel preview and every exported JPEG was a
-/// flat grey rectangle of the right size with the right metadata. The grey is now what it was
-/// always documented to be - what you get when the pixels are genuinely not available.
-struct CatalogFrames {
-    state: AppState,
-}
-
-impl std::fmt::Debug for CatalogFrames {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("CatalogFrames")
-    }
-}
-
-impl CatalogFrames {
-    /// Which cached rung serves a render level.
-    ///
-    /// `Screen` asks for a thumbnail only when it wants less than a thumbnail is; anything
-    /// larger comes off the proxy, because upscaling a 512 px thumbnail into a 1920 px panel
-    /// is a soft photograph that looks like a focus failure.
-    fn rung(level: aura_render::RenderLevel) -> aura_raw::PixelLevel {
-        match level {
-            aura_render::RenderLevel::Full => aura_raw::PixelLevel::Full,
-            aura_render::RenderLevel::Proxy2048 => aura_raw::PixelLevel::Proxy2048,
-            aura_render::RenderLevel::Screen(w, h) => {
-                let edge = w.max(h).max(1);
-                if edge <= 512 {
-                    aura_raw::PixelLevel::Thumb(edge)
-                } else {
-                    aura_raw::PixelLevel::Proxy2048
-                }
-            }
-        }
-    }
-
-    /// Turn a cached buffer into working-space samples.
-    ///
-    /// Two encodings arrive here and they need different treatment. `Linear16` is already the
-    /// working space - the proxy pipeline put it there through the camera matrix - and only
-    /// needs the scene curve undone. `Srgb8` is what a cached proxy JPEG decodes to, and it is
-    /// display-encoded **in sRGB primaries**: the transfer function comes off first and then
-    /// the primaries are rotated, because doing only the first leaves every saturated colour
-    /// rotated toward grey.
-    fn working_samples(buffer: &aura_raw::contract::pixels::PixelBuffer) -> Option<Vec<f32>> {
-        use aura_raw::colour::{curve, working_space};
-        use aura_raw::contract::pixels::PixelData;
-
-        let want = (buffer.width as usize)
-            .saturating_mul(buffer.height as usize)
-            .saturating_mul(3);
-        if want == 0 {
-            return None;
-        }
-
-        match &buffer.data {
-            PixelData::Srgb8(bytes) => {
-                if bytes.len() < want {
-                    return None;
-                }
-                let mut out: Vec<f32> = Vec::with_capacity(want);
-                for pixel in bytes.chunks_exact(3).take(want / 3) {
-                    let linear = [
-                        f64::from(curve::srgb_decode(f32::from(pixel[0]) / 255.0)),
-                        f64::from(curve::srgb_decode(f32::from(pixel[1]) / 255.0)),
-                        f64::from(curve::srgb_decode(f32::from(pixel[2]) / 255.0)),
-                    ];
-                    let working = working_space::linear_srgb_to_working(linear);
-                    out.extend_from_slice(&[
-                        working[0] as f32,
-                        working[1] as f32,
-                        working[2] as f32,
-                    ]);
-                }
-                Some(out)
-            }
-            PixelData::Linear16(codes) => {
-                if codes.len() < want {
-                    return None;
-                }
-                Some(
-                    codes
-                        .iter()
-                        .take(want)
-                        .map(|c| curve::linear_u16_to_scene(*c))
-                        .collect(),
-                )
-            }
-            // A tiled full decode is the exporter's business and it does not come through
-            // this port; treating it as unavailable is honest rather than clever.
-            PixelData::Tiled(tiles) => Some(
-                aura_raw::full::assemble(tiles, buffer.width, buffer.height)
-                    .iter()
-                    .map(|sample| curve::linear_u16_to_scene(*sample))
-                    .collect(),
-            ),
-        }
-    }
-}
-
-impl aura_render::FrameSource for CatalogFrames {
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        clippy::cast_precision_loss
-    )]
-    fn frame(
-        &self,
-        image: &aura_core::PhotoId,
-        level: aura_render::RenderLevel,
-    ) -> AuraResult<aura_render::Frame> {
-        let key = image.to_db();
-        let row: Option<(Option<i64>, Option<i64>, Option<String>, String)> = self
-            .state
-            .catalog
-            .read(move |conn| {
-                conn.query_row(
-                    "SELECT width_px, height_px, camera_model, project_id
-                       FROM photo WHERE photo_id = ?1",
-                    rusqlite::params![key],
-                    |row| {
-                        Ok((
-                            row.get::<_, Option<i64>>(0)?,
-                            row.get::<_, Option<i64>>(1)?,
-                            row.get::<_, Option<String>>(2)?,
-                            row.get::<_, String>(3)?,
-                        ))
-                    },
-                )
-                .optional()
-                .map_err(|e| aura_core::errors::db::statement_failed("photo row", &e))
-            })
-            .unwrap_or(None);
-
-        let (declared, camera, project) = match row {
-            Some((w, h, camera, project)) => (w.zip(h), camera.unwrap_or_default(), Some(project)),
-            None => (None, String::new(), None),
-        };
-
-        // The declared size is EXIF's, and a photograph whose file carries none has NULL here.
-        // It is only ever used to size the grey fallback and to bound the output; the real
-        // dimensions come from the buffer the preview service returns.
-        let (width, height) =
-            declared.map_or((2048, 1365), |(w, h)| (w.max(1) as u32, h.max(1) as u32));
-        let edge = level.long_edge().unwrap_or(width.max(height));
-        let scale = f64::from(edge) / f64::from(width.max(height).max(1));
-        let out_w = ((f64::from(width) * scale).round() as u32).clamp(1, width.max(1));
-        let out_h = ((f64::from(height) * scale).round() as u32).clamp(1, height.max(1));
-
-        let pixels = project.and_then(|project| {
-            use aura_preview::contract::service::{PreviewService, Priority};
-
-            let service = match self.state.previews(&project) {
-                Ok(service) => service,
-                Err(error) => {
-                    tracing::warn!(
-                        target: "render",
-                        image = %image.to_db(),
-                        code = error.code.0,
-                        detail = %error.detail,
-                        "no preview cache for this project, rendering grey"
-                    );
-                    return None;
-                }
-            };
-
-            // The requested rung first, then the proxy. The second attempt is what a
-            // full-resolution export of a camera file this build cannot demosaic falls back
-            // on: `AURA-RAW-2007` on a Canon CR2 is a *smaller* photograph, and delivering one
-            // is a far better answer than delivering a grey rectangle at the right size. It is
-            // skipped when the request was already the proxy, so an ordinary failure stays one
-            // attempt rather than two.
-            let mut rungs = vec![Self::rung(level)];
-            if rungs[0] != aura_raw::PixelLevel::Proxy2048 {
-                rungs.push(aura_raw::PixelLevel::Proxy2048);
-            }
-
-            for rung in rungs {
-                match service.get(*image, rung, Priority::Interactive) {
-                    Ok(buffer) => match Self::working_samples(&buffer) {
-                        Some(data) => {
-                            return Some(aura_raw::demosaic::RgbF32 {
-                                width: buffer.width,
-                                height: buffer.height,
-                                data,
-                            })
-                        }
-                        None => tracing::warn!(
-                            target: "render",
-                            image = %image.to_db(),
-                            "the cached buffer was tiled or truncated"
-                        ),
-                    },
-                    Err(error) => tracing::warn!(
-                        target: "render",
-                        image = %image.to_db(),
-                        code = error.code.0,
-                        detail = %error.detail,
-                        "this rung could not be produced"
-                    ),
-                }
-            }
-            tracing::warn!(
-                target: "render",
-                image = %image.to_db(),
-                "no pixels for this photograph at any rung, rendering grey"
-            );
-            None
-        });
-
-        let Some(image_rgb) = pixels else {
-            return Err(aura_core::errors::raw::corrupt(
-                "The photograph could not be decoded. Check that its original file is available and its format is supported.",
-            ));
-        };
-
-        // A cached rung is whatever size the proxy pipeline produced. `Proxy2048` and `Full`
-        // take it as it is; a `Screen` request is a panel asking for a specific box and is
-        // resampled to it, downscaling only - enlarging a proxy to fill a 4K window would
-        // manufacture detail the photograph does not have.
-        let resampled = match level {
-            aura_render::RenderLevel::Screen(_, _)
-                if image_rgb.width > out_w || image_rgb.height > out_h =>
-            {
-                aura_raw::demosaic::resize(&image_rgb, out_w.max(1), out_h.max(1))
-            }
-            _ => image_rgb,
-        };
-
-        Ok(aura_render::Frame::working(
-            resampled.data,
-            resampled.width,
-            resampled.height,
-            &camera,
-        ))
     }
 }
 

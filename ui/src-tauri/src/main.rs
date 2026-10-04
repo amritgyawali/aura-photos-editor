@@ -3,7 +3,11 @@
 // lives here: the shell must stay thin enough to replace.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use aura_app::contract::ipc::{PhotoAutoEditDto, PhotoAutoEditInput};
+use aura_app::contract::ipc::{
+    AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditDto, PhotoAutoEditInput,
+};
+// ADR-0068.
+use aura_app::contract::ipc::{OneClickFinishDto, OneClickFinishInput, OneClickStatusDto};
 use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
@@ -84,9 +88,11 @@ use aura_app::contract::ipc::{
 };
 use aura_app::contract::ipc::{
     AdoptProfileInput, CompareProfilesInput, ExportProfileDto, ExportProfileInput,
-    ImportProfileDto, ImportProfileInput, ProfileReportDto, ScanArchiveDto, ScanArchiveInput,
-    SetProjectProfileInput, StyleComparisonDto, StylePairDto, StyleProfileDto, StyleStatusDto,
-    TrainProfileDto, TrainProfileInput,
+    ImportProfileDto, ImportProfileInput, LookBucketDto, LookBucketsInput, LookMatchDto,
+    LookProfileDto, LookProfileInput, LookStatusDto, MeasureLookDto, MeasureLookInput,
+    ProfileReportDto, ReferenceOriginDto, ScanArchiveDto, ScanArchiveInput, SelectLookInput,
+    SetLookStrengthInput, SetProjectProfileInput, StyleComparisonDto, StylePairDto,
+    StyleProfileDto, StyleStatusDto, TrainProfileDto, TrainProfileInput,
 };
 // PHASE-25. The gallery consistency surface: nine commands whose subject is a wedding
 // rather than a photograph. `GalleryStatusDto` carries two denominators and a panel has to
@@ -187,8 +193,21 @@ fn list_projects(state: State<'_, AppState>) -> IpcResult<Vec<ProjectSummary>> {
 }
 
 #[tauri::command]
-fn start_ingest(state: State<'_, AppState>, input: StartIngestInput) -> IpcResult<JobHandle> {
-    aura_app::start_ingest(&state, &input)
+fn start_ingest(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    input: StartIngestInput,
+) -> IpcResult<JobHandle> {
+    use tauri::Emitter;
+    aura_app::commands::start_ingest_with_events(
+        &state,
+        &input,
+        std::sync::Arc::new(move |event| {
+            if let Err(error) = app.emit("ingest", event) {
+                tracing::error!(target: "ingest", %error, "could not deliver import event");
+            }
+        }),
+    )
 }
 
 #[tauri::command]
@@ -522,6 +541,111 @@ async fn estimate_tone(
 // yet, so the shell has nothing to hand it. The command exists, its shape is frozen and its
 // error is the honest one - `AURA-ML-5073`, "not enough usable pairs" - rather than a silent
 // success. See condition C3 in `docs/progress/PHASE-17-EXIT.md`.
+// ---------------------------------------------------------------------------
+// PHASE-31 - matching a look somebody else published
+// ---------------------------------------------------------------------------
+//
+// Ten commands. `measure_look` is the only one that does work; the rest read.
+//
+// **`parse_reference` is deliberately synchronous and deliberately infallible.** The panel calls
+// it on every keystroke so the address box can show the handle it understood, and a command that
+// went to a thread pool to parse a string would be a spinner on the third character of
+// `instagram.com/`. It resolves nothing and contacts nothing - see `aura_look::source`'s header
+// for the two separate reasons this build does not go and fetch the page.
+
+#[tauri::command]
+async fn look_status(state: State<'_, AppState>, project_id: String) -> IpcResult<LookStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::look_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_looks(state: State<'_, AppState>) -> IpcResult<Vec<LookProfileDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::list_looks(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+fn parse_reference(address: String) -> IpcResult<ReferenceOriginDto> {
+    Ok(aura_app::parse_reference(&address))
+}
+
+#[tauri::command]
+async fn look_buckets(
+    state: State<'_, AppState>,
+    input: LookBucketsInput,
+) -> IpcResult<Vec<LookBucketDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::look_buckets(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn look_match_report(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<LookMatchDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::look_match_report(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// The long one: it walks a folder, decodes every reference photograph, renders a sample of the
+// photographer's own frames twice and then refines against them. Minutes rather than seconds on
+// a real reference, which is why it is on the blocking pool and why the panel shows what it is
+// doing rather than a bare spinner.
+#[tauri::command]
+async fn measure_look(
+    state: State<'_, AppState>,
+    input: MeasureLookInput,
+) -> IpcResult<MeasureLookDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::measure_look(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn select_look(state: State<'_, AppState>, input: SelectLookInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::select_look(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_look_strength(
+    state: State<'_, AppState>,
+    input: SetLookStrengthInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_look_strength(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn rename_look(state: State<'_, AppState>, input: LookProfileInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::rename_look(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn forget_look(state: State<'_, AppState>, input: LookProfileInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::forget_look(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn style_status(state: State<'_, AppState>, project_id: String) -> IpcResult<StyleStatusDto> {
     let app = state.inner().clone();
@@ -735,6 +859,85 @@ fn background_request_failed() -> IpcError {
 fn catalog_path() -> Result<PathBuf, IpcError> {
     let paths = AppPaths::resolve().map_err(IpcError::from)?;
     Ok(paths.data_dir.join("catalogs").join("default.sqlite"))
+}
+
+// UI AUDIT. The front end's audit log - every click, command and error the
+// photographer made - arrives here in batches and goes to one rolling JSONL file
+// under the same data directory as the catalog. The shell is the right place to
+// own it: it owns the window's life, the paths, and the panic hook, and the webview
+// is the one component that can lose its log on refresh, crash or close.
+//
+// Nothing in the engine reads this file; it exists so "what did they actually do"
+// has an answer after the window is gone. `logs/` beside `catalogs/`, rotated at
+// 32 MiB to two generations, because an infinite append is a full disk on a
+// machine that already carries RAW files.
+#[tauri::command]
+async fn ui_audit(batch: Vec<serde_json::Value>) -> IpcResult<()> {
+    tauri::async_runtime::spawn_blocking(move || write_audit_batch(&batch))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+/// The byte ceiling past which the file becomes `ui-audit.log.1` and `.1` becomes `.2`.
+const AUDIT_ROTATE_BYTES: u64 = 32 * 1024 * 1024;
+
+fn write_audit_batch(batch: &[serde_json::Value]) -> IpcResult<()> {
+    use std::io::Write;
+
+    let paths = AppPaths::resolve().map_err(IpcError::from)?;
+    let dir = paths.data_dir.join("logs");
+    let file_path = dir.join("ui-audit.log");
+
+    if std::fs::create_dir_all(&dir).is_err() {
+        return Err(IpcError::from(aura_core::errors::db::statement_failed(
+            "the audit log directory could not be created",
+            &std::io::Error::other("create_dir_all failed"),
+        )));
+    }
+    rotate_if_over_ceiling(&file_path);
+
+    let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_path)
+    else {
+        return Err(IpcError::from(aura_core::errors::db::statement_failed(
+            "the audit log file could not be opened",
+            &std::io::Error::other("append open failed"),
+        )));
+    };
+    for entry in batch {
+        // One JSON value per line, exactly the format the panel offers for download,
+        // so the two halves of a support case - the live copy and the file - are the
+        // same shape and can be concatenated by hand if anyone ever needs that.
+        let Ok(line) = serde_json::to_string(entry) else {
+            continue;
+        };
+        if writeln!(file, "{line}").is_err() {
+            return Err(IpcError::from(aura_core::errors::db::statement_failed(
+                "the audit log file stopped taking lines",
+                &std::io::Error::other("write failed"),
+            )));
+        }
+    }
+    let _ = file.flush();
+    Ok(())
+}
+
+fn rotate_if_over_ceiling(path: &std::path::Path) {
+    let over_ceiling = std::fs::metadata(path).is_ok_and(|meta| meta.len() > AUDIT_ROTATE_BYTES);
+    if !over_ceiling {
+        return;
+    }
+    let second = path.with_file_name("ui-audit.log.2");
+    let first = path.with_file_name("ui-audit.log.1");
+    // `.2` dies first so the renames below cannot collide; each failure is acceptable
+    // - a missing rotation delays the next one, it does not lose lines that are
+    // already written.
+    let _ = std::fs::remove_file(&second);
+    if std::fs::rename(&first, &second).is_ok() || !first.exists() {
+        let _ = std::fs::rename(path, &first);
+    }
 }
 
 // PHASE-19. Every local light command can touch SQLite, and `sculpt_local` decodes proxies
@@ -2968,6 +3171,28 @@ async fn diagnostics_report(state: State<'_, AppState>) -> IpcResult<Diagnostics
 }
 
 #[tauri::command]
+async fn automatic_start(
+    state: State<'_, AppState>,
+    input: AutomaticStartInput,
+) -> IpcResult<AutomaticStartDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::automatic_start(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_analysis(
+    state: State<'_, AppState>,
+    input: PhotoAutoEditInput,
+) -> IpcResult<PhotoAnalysisDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_analysis(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn photo_auto_edit(
     state: State<'_, AppState>,
     input: PhotoAutoEditInput,
@@ -2978,13 +3203,310 @@ async fn photo_auto_edit(
         .map_err(|_| background_request_failed())?
 }
 
+// ADR-0068. The one-click finish. These three are the thin end of the wedge: the
+// pipeline itself runs on a thread inside `aura-app` and reports through the status
+// row, so these commands only start it, read it, and stop it.
+#[tauri::command]
+async fn one_click_finish(
+    state: State<'_, AppState>,
+    input: OneClickFinishInput,
+) -> IpcResult<OneClickFinishDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::one_click_finish(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn one_click_status(job_id: String) -> IpcResult<OneClickStatusDto> {
+    tauri::async_runtime::spawn_blocking(move || aura_app::one_click_status(&job_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn one_click_cancel(job_id: String) -> IpcResult<bool> {
+    let found = tauri::async_runtime::spawn_blocking(move || {
+        let known = aura_app::one_click_status(&job_id).is_ok();
+        (known, aura_app::one_click_cancel(&job_id))
+    })
+    .await
+    .map_err(|_| background_request_failed())?;
+    Ok(found.1 && found.0)
+}
+
+#[tauri::command]
+async fn enhance_photo(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::DevelopImageInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::photo_enhance::enhance_photo(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn fetch_instagram_references(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::FetchInstagramInput,
+) -> IpcResult<aura_app::reference_style::FetchReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::fetch_instagram(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn analyse_reference_style(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::AnalyseReferenceInput,
+) -> IpcResult<aura_app::reference_style::ReferenceAnalysis> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::analyse_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn apply_reference_style(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::ApplyReferenceInput,
+) -> IpcResult<aura_app::reference_style::ApplyReferenceReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::apply_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn analyse_portrait(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::PortraitInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitAnalysisDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::analyse_portrait(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::PortraitInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::SetPortraitRetouchInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::set_portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn auto_portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::AutoPortraitRetouchInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::auto_portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn enhance_portrait(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::DevelopImageInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::photo_enhance::enhance_portrait(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn auto_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::smart_edit::AutoRetouchInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::smart_edit::auto_retouch(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn sync_settings(
+    state: State<'_, AppState>,
+    input: aura_app::develop_commands::SyncSettingsInput,
+) -> IpcResult<aura_app::develop_commands::SyncSettingsReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::sync_settings(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn pick_white_balance(
+    state: State<'_, AppState>,
+    input: aura_app::studio_tools::WhiteBalancePickInput,
+) -> IpcResult<RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::studio_tools::pick_white_balance(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_edit_profiles() -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
+    aura_app::edit_profiles::list_edit_profiles()
+}
+
+#[tauri::command]
+async fn export_run_watermarked(
+    state: State<'_, AppState>,
+    input: ExportJobInput,
+    watermark: aura_app::delivery_commands::Watermark,
+) -> IpcResult<ExportStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::delivery_commands::export_run_with_watermark(&app, input, Some(watermark))
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn apply_edit_profile(
+    state: State<'_, AppState>,
+    input: aura_app::edit_profiles::ApplyProfileInput,
+) -> IpcResult<aura_app::edit_profiles::ApplyProfileReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::edit_profiles::apply_edit_profile(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn preview_edit_profile(
+    state: State<'_, AppState>,
+    input: aura_app::edit_profiles::PreviewProfileInput,
+) -> IpcResult<aura_app::edit_profiles::ProfilePreview> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::edit_profiles::preview_edit_profile(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_edit(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::RetouchInput,
+) -> IpcResult<Vec<aura_app::native_retouch::Edit>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::native_retouch::edit(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_preview(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+    before: bool,
+) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::preview(&app, &project_id, &photo_id, before)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_draft_preview(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::DraftInput,
+) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::draft_preview(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_selection_preview(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::DraftInput,
+) -> IpcResult<aura_app::native_retouch::SelectionPreview> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::selection_preview(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+// `tauri::generate_context!` expands to an `unwrap` and a `HashMap` inside Tauri's own
+// generated code, which this workspace's disallowed lists cannot see past. Allowed here and
+// nowhere else: every other line of the shell is held to both rules.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    // The engine log: rolling daily files under the data directory, because a
+    // windows-subsystem build has no console and the only copy of a startup failure
+    // worth reading is the one that survived the crash. `Appender` opens the file per
+    // rollover rather than holding a handle, so it is moved into the subscriber and
+    // there is no guard to keep alive.
+    let appender = AppPaths::resolve().ok().map(|paths| {
+        let dir = paths.data_dir.join("logs");
+        let _ = std::fs::create_dir_all(&dir);
+        tracing_appender::rolling::daily(&dir, "aura-engine.log")
+    });
+    let subscriber = tracing_subscriber::fmt().with_env_filter(
+        tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+    );
+    match appender {
+        Some(file) => subscriber.with_writer(file).with_ansi(false).init(),
+        None => subscriber.init(),
+    }
 
     // A panic in the shell must produce a report, not a silent disappearance.
     std::panic::set_hook(Box::new(|info| {
@@ -3020,7 +3542,32 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            ui_audit,
+            automatic_start,
+            photo_analysis,
             photo_auto_edit,
+            one_click_finish,
+            one_click_status,
+            one_click_cancel,
+            analyse_portrait,
+            portrait_retouch,
+            set_portrait_retouch,
+            auto_portrait_retouch,
+            sync_settings,
+            pick_white_balance,
+            native_retouch_edit,
+            native_retouch_selection_preview,
+            native_retouch_preview,
+            native_retouch_draft_preview,
+            list_edit_profiles,
+            apply_edit_profile,
+            preview_edit_profile,
+            fetch_instagram_references,
+            analyse_reference_style,
+            apply_reference_style,
+            enhance_photo,
+            enhance_portrait,
+            auto_retouch,
             create_project,
             list_projects,
             start_ingest,
@@ -3063,6 +3610,16 @@ fn main() {
             set_colour_override,
             select_colour_variant,
             estimate_colour,
+            look_status,
+            list_looks,
+            parse_reference,
+            look_buckets,
+            look_match_report,
+            measure_look,
+            select_look,
+            set_look_strength,
+            rename_look,
+            forget_look,
             style_status,
             list_profiles,
             profile_report,
@@ -3277,6 +3834,7 @@ fn main() {
             export_presets,
             export_preview_names,
             export_run,
+            export_run_watermarked,
             export_files,
             export_manifest,
             delivery_status,

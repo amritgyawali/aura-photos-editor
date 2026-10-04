@@ -1,4 +1,5 @@
 //! An actual JPEG import -> auto-edit -> render -> export round trip.
+#![allow(clippy::disallowed_methods)] // test code: `serde_json::json!` expands to an unwrap
 use aura_app::contract::ipc::*;
 use aura_app::{photo_auto_edit, AppState};
 use aura_core::progress::{CancelToken, NullProgress};

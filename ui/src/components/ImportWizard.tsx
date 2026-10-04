@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { asIpcError, inTauri, pickImportPaths } from '../ipc/client';
+import { asIpcError, inTauri, pickPhotoFolder, pickPhotos } from '../ipc/client';
 
 export type ImportWizardProps = {
+  automatic?: boolean;
   disabled: boolean;
   onStart: (roots: string[]) => void;
   onCancel: () => void;
@@ -16,6 +17,7 @@ export type ImportWizardProps = {
  * real dialog when it is present.
  */
 export function ImportWizard({
+  automatic = false,
   disabled,
   onStart,
   onCancel,
@@ -25,20 +27,16 @@ export function ImportWizard({
 }: ImportWizardProps): JSX.Element {
   const [draft, setDraft] = useState('');
   const [roots, setRoots] = useState<string[]>([]);
-  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
 
-  const browse = async (directory: boolean): Promise<void> => {
-    setPicking(true);
-    setPickerError(null);
+  const choose = async (individual = false) => {
+    setPicking(true); setError(null);
     try {
-      const paths = await pickImportPaths(directory);
-      setRoots((current) => [...new Set([...current, ...paths])]);
-    } catch (error) {
-      setPickerError(asIpcError(error).message);
-    } finally {
-      setPicking(false);
-    }
+      const paths = individual ? await pickPhotos() : [await pickPhotoFolder()].filter((path): path is string => path !== null);
+      if (paths.length) onStart(paths);
+    } catch (cause) { setError(asIpcError(cause).message); }
+    finally { setPicking(false); }
   };
 
   const addRoot = (): void => {
@@ -53,13 +51,17 @@ export function ImportWizard({
 
   return (
     <section className="panel" aria-label="Import">
-      <h2>Import</h2>
-      {inTauri() && <div className="row">
-        <button type="button" disabled={disabled || running || picking} onClick={() => void browse(false)}>Choose photos</button>
-        <button type="button" disabled={disabled || running || picking} onClick={() => void browse(true)}>Choose folders</button>
-      </div>}
-      <p>JPEG, PNG and supported camera RAW files. Originals stay in their current location.</p>
-      {pickerError && <p role="alert">{pickerError}</p>}
+      <h2>Add your photos</h2>
+      <p>Choose one photo or a whole collection. AURA adjusts each photo’s light and contrast automatically. Your originals stay untouched.</p>
+      {automatic && <p>AURA then analyzes, edits and exports them to Pictures / AURA Exports without further steps.</p>}
+      <div className="import-actions">
+        <button className="is-primary" type="button" disabled={disabled || running || picking || !inTauri()} onClick={() => void choose(true)}>{picking ? 'Choosing…' : 'Choose photos'}</button>
+        <button type="button" disabled={disabled || running || picking || !inTauri()} onClick={() => void choose()}>Choose photo folder</button>
+      </div>
+      <p className="studio-footnote">JPEG, PNG and supported camera RAWs · Local editing · Undo anytime</p>
+      {error && <p role="alert">{error}</p>}
+      <details className="import-manual"><summary>Enter folders manually</summary>
+      <fieldset className="import-paths" disabled={disabled || running || picking}>
 
       <div className="row">
         <label htmlFor="root-input">Card or folder</label>
@@ -103,19 +105,24 @@ export function ImportWizard({
           disabled={disabled || running || roots.length === 0}
           onClick={() => onStart(roots)}
         >
-          Start import
+          {automatic ? 'Process these paths automatically' : 'Start import'}
         </button>
         <button type="button" disabled={!running} onClick={onCancel}>
           Stop
         </button>
       </div>
 
+      </fieldset></details>
+
       {running && (
+        <div>
+        <button type="button" onClick={onCancel}>Stop import</button>
         <div className="progress" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
           <div className="progress-bar" style={{ width: `${percent}%` }} />
           <span className="progress-label">
             {done} of {total || '?'} files
           </span>
+        </div>
         </div>
       )}
     </section>

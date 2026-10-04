@@ -29,7 +29,7 @@ Never load two phase files into one session.
 | Hardware troubleshooting | `docs/runbooks/hardware.md` |
 | Adding a model | `docs/runbooks/adding-a-model.md` |
 | Cloud AI policy | `docs/adr/ADR-0009-cloud-ai-policy.md` |
-| Provider catalogue, first-run setup and TLS | `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` |
+| Provider catalogue, first-run setup and TLS | `docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` |
 | The nineteen AI providers, as data | `crates/aura-cloud/src/catalog.rs` |
 | Using your own AI key | `docs/using-your-own-ai-key.md` |
 | Recorded provider responses | `tests/cloud/cassettes/` |
@@ -145,7 +145,24 @@ Never load two phase files into one session.
 | Release checklist, signing, rollout and flags | `ops/release/`, `ops/sign/`, `ops/notarise/`, `ops/update/`, `ops/flags/` |
 | How a release ships | `docs/release-process.md` |
 | What leaves the machine, and what does not | `docs/privacy.md` |
+| Reference-look decisions | `docs/adr/ADR-0063-reference-look-matching.md` |
+| What matching a look does, in the product's own words | `docs/match-a-look.md` |
+| Look evaluation gates | `tests/eval/look_eval.rs` |
+| Edit profiles (the start screen's looks, validated JSON) | `crates/aura-app/config/edit_profiles.json` |
+| How edit profiles adapt, and how learned ones are measured | `docs/edit-profiles.md` |
+| Lightroom panel parity decisions | `docs/adr/ADR-0070-lightroom-panel-parity.md` |
+| Every Lightroom feature and where it lives in AURA | `docs/lightroom-parity.md` |
+| Learning a profile from RAW before/after pairs | `ml/edit-profiles/fetch_fivek_pairs.py` + `crates/aura-app/tests/profile_fit.rs` |
+| One-click intelligent editing and step history | `docs/adr/ADR-0081-intelligent-auto-edit-and-step-history.md`, `crates/aura-app/src/smart_edit.rs`, `crates/aura-app/src/portrait_features.rs` |
+| What Auto enhance does, in the product's own words | `docs/automatic-editing.md` |
+| Auto-edit qualification on the real app | `scripts/prepare-auto-edit-fixtures.py`, `scripts/test-auto-edit-v3.py`, `scripts/test-auto-edit-gui.py` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
+| Portrait parsing and portrait retouch decisions | `docs/adr/ADR-0065-measured-portrait-parsing-and-portrait-retouch.md` |
+| Faces, landmarks and the nineteen portrait regions | `crates/aura-portrait/` |
+| The vendored Haar cascades, their converter and their card | `crates/aura-portrait/data/`, `docs/model-cards/haar_cascades.md` |
+| The fourteen portrait operators the renderer executes | `crates/aura-render/src/portrait.rs` |
+| Portrait evaluation instruments (your own photographs) | `crates/aura-portrait/tests/local_eval.rs`, `crates/aura-render/tests/portrait_local.rs` |
+| What portrait retouch finds and changes, in the product's own words | `docs/portrait-retouch.md` |
 
 ## Non-negotiables enforced by the build
 
@@ -205,7 +222,7 @@ and `catalog::build` is the only place that turns a choice into a provider, so `
 matching of its own. `crates/aura-cloud/src/tls.rs` discharges phase 04's TLS waiver through the
 `Connector` port ADR-0009 said it would arrive in; the crypto is `rustls-rustcrypto` because this
 machine has no C toolchain and both of rustls's own providers compile C, and
-`docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` says plainly what that trades. Three things a
+`docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` says plainly what that trades. Three things a
 later agent needs from it:
 
 - **The provider choice is persisted and the key still is not.** `crates/aura-app/src/ai_settings.rs`
@@ -225,7 +242,7 @@ later agent needs from it:
 public vendor, every test uses the cassette transport, and the prices in the catalogue are the
 vendors' published list prices rather than measurements - which is why they are only ever used to
 *refuse* a call before it is made, and why the spend meter reads the tokens the provider said it
-billed. The first successful round trip reopens ADR-0063's criteria.
+billed. The first successful round trip reopens ADR-0066's criteria.
 
 
 **All thirty phases are implemented, and the eight process gaps the independent review found are
@@ -1958,6 +1975,121 @@ first fixture proposed 45 changes and `LearningUpdate::validate` refuses anythin
 be recorded - `AURA-ML-5054` refuses a code that is not in the shipped registry, and every unit test
 passed because each exercised the kind that worked. The registry now covers `ToneCode`, `ColourCode`,
 `CurateCode` and `QcCode`, and `docs/reason-codes.md` is regenerated at 227 codes.
+
+Phase 31 is implemented conditionally, and it is the first phase past the end of the plan.
+`aura-core::contract::look` freezes the three media sources, the reference origin, the seven tone
+landmarks, the zone tint, the band reading, the reference reading, the aggregate, the bucket, the
+diagnostics, the profile, twenty-two reason codes, the bucket residual, the match report, the
+outline, the override and `LookService`; `aura-look` measures somebody else's finished work.
+`source.rs` turns an address into provenance and a folder into files, understands an Instagram data
+export's own layout, and **refuses the one route a photographer actually wants**; `measure.rs`
+decodes once and takes eleven readings in two colour spaces on purpose; `light.rs` sorts a frame
+into one of ten lights from its pixels alone and never returns `Flash`; `aggregate.rs` folds with
+medians and a MAD; `solve.rs` subtracts, shrinks, bounds, and then walks every parameter **through
+the real renderer** until the distance stops falling; `verify.rs` renders both sides and measures
+what moved; `materialise.rs` writes the answer into phase 17's frozen `StyleProfile`; `store.rs`
+owns migration 31 and `api.rs` is the frozen service and the pass. Migration 31 stores six tables,
+two views and three triggers; three error codes ship with runbooks; ten IPC commands (ADR-0064) feed
+a panel mounted **first** in the sidebar; and `aura-cli verify --phase 31` is the executable gate.
+Its exit report is `docs/progress/PHASE-31-EXIT.md`.
+
+**This phase ships no model** - the eleventh since phase 08 - and the reason is phase 27's rather
+than phase 24's: a model would be worse than a measurement. What a reference photograph says about
+a look is a set of distribution statistics, whose failure mode is describing a page imprecisely; a
+head trained to "recognise a look" on data that does not exist would describe it confidently and
+wrongly. Every gate is measured against synthetic pages whose look was authored, applied by an
+analytic transform, and read back through the real measurer. That is condition C1 and a Sev 2
+trigger. **C2 is the headline and it is the one to close first: nobody has shown a photographer a
+matched gallery beside the page it was matched to**, so the claim the whole feature exists to make
+is unmeasured. C3 is that nothing can be fetched.
+
+Five rules that phase 31 adds and every later phase inherits:
+
+- **`LookService` is the only way to ask what somebody else's look is.** Twenty-eighth service of
+  its kind and the first whose subject is **another person's work**. Deliberately not
+  `StyleService`: a profile fitted from three hundred of a photographer's own matched pairs and a
+  look measured off twenty-four of somebody else's JPEGs carry different evidence, and a caller that
+  could not tell them apart would report the second with the confidence of the first.
+- **A reference is measured, never reverse-engineered.** There is no fitter here and there could not
+  be one, because the input has no original. Phase 17 asks "what did they do"; this asks "what does
+  it look like", and the second question is the only one a finished JPEG can answer. Any later phase
+  recovering an edit from a file it did not make has misunderstood what it has to work with.
+- **A capability the build does not have is a sentence, not an omission.** `MediaSource::PublicUrl`
+  is offered, disabled, and explained with what to do instead in the same breath. Omitting it is
+  tidier and leaves a photographer hunting for the setting they think they missed. Phase 03 put the
+  hardware on the wire and phase 30 put `NETWORK_TRANSPORT_AVAILABLE` there; this is the first time
+  the missing capability is the thing somebody came for.
+- **A look is applied before the guards, and every guard re-runs after it.** Phase 17's rule
+  inherited unchanged and load-bearing here rather than merely true: it is the *whole* of this
+  phase's skin defence, because there is no skin term in a look to bound. There is no skin field on
+  the profile, no skin column in migration 31, and a zero written into every band's hue - a rotation
+  solved from a whole-frame statistic moves every pixel in that band, and most of a face at every
+  skin tone is in the orange one.
+- **A result that cannot be measured is not produced.** `materialise::into_style` takes the measured
+  report as an argument rather than an `Option`, because `ProfileDiagnostics::overall_de00` is an
+  `f32` and a look materialised before `verify::measure` ran would put a zero exactly where every
+  panel in this product renders a perfect match.
+
+Three things phase 31 got wrong first, all worth generalising:
+
+**A handle parser that read the most ordinary input as something else.** The first rule was "no dot
+and no slash means a handle", and Instagram handles legitimately contain dots - so `@some.photographer`
+went down the web-address branch. The fix made the rule about *structure* rather than about
+punctuation, and closed a worse half of the same defect: `../../etc/passwd` has a dot and a slash and
+was being recorded as a web reference. It is only ever a label and nothing dereferences it, which is
+exactly why it would have survived review.
+
+**A refinement whose cost grew with the size of the wedding.** The probe rendered every frame it was
+given and the search calls it a hundred and thirty-two times, so a thousand-frame project would have
+spent a hundred and thirty thousand renders pinning down a median that eight frames already pin
+down. The bound is on the *refinement* and not on the measurement, because the measured figure is
+about a photographer's gallery rather than about a sample of it - and conflating the two is how a
+report starts flattering itself.
+
+**A baseline that would have been a measurement of mid grey.** `CatalogFrames` returns a neutral
+frame for a photograph whose proxy is not built yet, which is right for a develop panel that must
+open on the night of a wedding and catastrophic for a residual: every look would have been the
+difference between a page and a rectangle. `own_frames` reads the real proxy and **skips** what it
+cannot get. Fourth time this product has chosen a smaller honest answer over a larger silent one.
+
+**Portrait retouch** is implemented, after phase 31 and outside the phase plan (ADR-0065).
+`aura-portrait` is a new crate below the renderer: a pure-Rust Viola-Jones evaluator, faithful to
+OpenCV's, over OpenCV's own BSD-licensed Haar cascades (frontal, profile, eye) - **the first
+detector in this product that finds a face in a real photograph** - scanned six ways (upright,
+tilted twenty degrees each way, locally equalised, profile and mirrored profile) and accepted only
+with evidence. Every other region is *measured* relative to the face: skin is a distance from a
+model fitted to that person's own cheeks, lips are redder than that skin, teeth brighter and less
+saturated than those lips, brows darker than that forehead; hair, body and background are colour
+models seeded beside the person. Nineteen soft regions come out: skin, face, eyes, iris, sclera,
+eyebrows, under-eyes, nose, lips, teeth, mouth, facial hair, neck, hair, body skin, clothing, body,
+background and sky. `aura-render` re-derives them from the pixels at render time (cached by
+content, `PARSE_VER` folded into the engine string), so recipe masks of kind face, skin, subject,
+background and sky - and any mask whose `target` names a region - finally render, and
+`CpuEngine::new` declares `mask_generators` and `retouch_operators`. Fourteen portrait operators
+(`skin_smooth`, `skin_even`, `blemish_clear`, `under_eye_lift`, `shine_control`, `face_light`,
+`eye_brighten`, `iris_enhance`, `sclera_whiten`, `brow_define`, `teeth_whiten`, `lip_enhance`,
+`hair_define`, `background_blur`) change tone and colour in place; none reshapes anybody and none
+moves a skin tone. Four IPC commands (`analyse_portrait`, `portrait_retouch`,
+`set_portrait_retouch`, `auto_portrait_retouch`) feed a **Portrait retouch** workspace with region
+overlays, landmarks, a draw-a-missed-face tool, measured automatic retouch and per-region
+adjustments.
+
+Three rules this adds:
+
+- **A region is measured against the person it belongs to, never against a constant.** The broad
+  skin prior only chooses where to sample a *detected* face; every skin plane is a distance from
+  that person's own skin. Phase 15's rule, applied to segmentation.
+- **The renderer re-derives regions from pixels; it never reads them from the catalog.** A
+  photographer's drawn face travels in the recipe as `target: "hint:x,y,w,h"`, so the four values a
+  delivered file is re-created from still decide every pixel.
+- **An automatic retouch is sized from measurements and never overwrites a choice.** A closed mouth
+  gets no whitening; once a person sets the retouch, `schema::merge` refuses the automatic pass and
+  the response says so.
+
+**What it does not claim:** accuracy on a real wedding, or parity across real skin tones. The gates
+are painted faces at all ten Monk swatches and an informal look at 22 public photographs, where the
+evaluator matched OpenCV's boxes 80 of 80. `docs/portrait-retouch.md` says so in the product's
+voice.
 
 Five rules that phase 13 adds and every later phase inherits:
 

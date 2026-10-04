@@ -35,7 +35,7 @@ pub enum RawFormat {
     Tiff,
     /// A JPEG, which a photographer may well have shot alongside the RAWs.
     Jpeg,
-    /// A PNG photograph or lossless raster image.
+    /// A developed PNG image, decoded as sRGB with transparency on white.
     Png,
     /// HEIF or HEIC.
     Heif,

@@ -8,6 +8,7 @@
 //!   * `bench <stage>`       - run the budget benchmarks and write `perf/results` (T18).
 //!   * `models [--generate]` - generate and sign the pinned model set, or check it (phase 03).
 
+mod ai_provision;
 mod models;
 
 use std::collections::BTreeMap;
@@ -152,6 +153,10 @@ const EXTRA_CONTRACTS: &[&str] = &[
     // PHASE-30. The last migration. Every migration has been a frozen contract since phase 01;
     // phase 16 found 15 missing and phase 28 found 28 missing, both the same way.
     "crates/aura-catalog/migrations/0030_delivery.sql",
+    // PHASE-31. The migration. `docs/plan/CLAUDE.md` has listed every migration as a frozen
+    // contract since phase 01, and phases 16 and 28 each found one missing from this list after
+    // it had shipped - so it goes in with the phase rather than after it.
+    "crates/aura-catalog/migrations/0031_look.sql",
     "ui/src/ipc/types.ts",
     "schemas/recipe.v1.json",
 ];
@@ -163,10 +168,11 @@ fn main() -> ExitCode {
         Some("fixtures") => fixtures(&args[1..]),
         Some("bench") => bench(&args[1..]),
         Some("models") => models::run(&args[1..]),
+        Some("ai-provision") => ai_provision::run(&args[1..]),
         _ => {
             eprintln!(
                 "usage: cargo xtask [contracts [--check] | fixtures [--out DIR] | \
-                 bench <stage> | models [--generate]]"
+                 bench <stage> | models [--generate] | ai-provision]"
             );
             ExitCode::FAILURE
         }

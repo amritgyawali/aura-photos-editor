@@ -2,6 +2,7 @@
 //! [`IpcError`] the UI can render without translation.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use aura_catalog::model::ProjectRow;
 use aura_catalog::repo::PhotoOrder;
@@ -11,8 +12,8 @@ use aura_core::{ImportId, ProjectId};
 use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 
 use crate::contract::ipc::{
-    CreateProjectInput, ImageRowLite, IngestProgressDto, JobHandle, ListImagesInput, ProblemRow,
-    ProjectHandle, ProjectSummary, SetCameraLabelInput, StartIngestInput,
+    CreateProjectInput, ImageRowLite, IngestEvent, IngestProgressDto, JobHandle, ListImagesInput,
+    ProblemRow, ProjectHandle, ProjectSummary, SetCameraLabelInput, StartIngestInput,
 };
 use crate::state::AppState;
 
@@ -79,6 +80,19 @@ pub fn list_projects(state: &AppState) -> IpcResult<Vec<ProjectSummary>> {
 ///
 /// Returns `AURA-IO-1001` when a root does not exist, or the catalog error.
 pub fn start_ingest(state: &AppState, input: &StartIngestInput) -> IpcResult<JobHandle> {
+    start_ingest_with_events(state, input, Arc::new(|_| {}))
+}
+
+/// Start an import and notify the shell when it finishes, including failures.
+/// Headless callers can use [`start_ingest`] without an event subscriber.
+///
+/// # Errors
+/// Returns validation or worker startup failures before a job is accepted.
+pub fn start_ingest_with_events(
+    state: &AppState,
+    input: &StartIngestInput,
+    events: Arc<dyn Fn(IngestEvent) + Send + Sync>,
+) -> IpcResult<JobHandle> {
     let project_id = ProjectId::from_db(&input.project_id).map_err(|_| {
         crate::contract::ipc::IpcError::from(aura_core::errors::db::statement_failed(
             "project id was not a valid AURA id",
@@ -116,24 +130,46 @@ pub fn start_ingest(state: &AppState, input: &StartIngestInput) -> IpcResult<Job
         .spawn(move || {
             let progress = crate::state::CountingProgress::new(counter);
             let outcome = aura_ingest::run(worker_state.catalog(), &plan, &cancel, &progress);
+            // Finished before the event goes out, so a panel that polls `ingest_progress` on
+            // hearing it sees a run that is over rather than one still marked running.
+            worker_state.finish_import(&worker_job_id);
+            worker_state.finish_job(&worker_job_id);
             match outcome {
-                Ok(report) => tracing::info!(
+                Ok(report) => {
+                    tracing::info!(
                     target: "ingest",
                     imported = report.files_imported,
                     duplicates = report.files_already_present,
                     quarantined = report.files_quarantined,
                     elapsed_ms = report.duration_ms,
                     "import finished"
-                ),
-                Err(err) => tracing::error!(
+                    );
+                    events(IngestEvent::Finished {
+                        inserted: report.files_imported,
+                        skipped: report.files_already_present,
+                        failed: report.files_quarantined,
+                        elapsed_ms: report.duration_ms,
+                    });
+                }
+                Err(err) => {
+                    tracing::error!(
                     target: "ingest",
                     code = err.code.0,
                     detail = err.detail,
                     "import failed"
-                ),
+                    );
+                    events(IngestEvent::Warning {
+                        code: err.code.0.to_string(),
+                        message: err.user_message,
+                    });
+                    events(IngestEvent::Finished {
+                        inserted: 0,
+                        skipped: 0,
+                        failed: 1,
+                        elapsed_ms: 0,
+                    });
+                }
             }
-            worker_state.finish_import(&worker_job_id);
-            worker_state.finish_job(&worker_job_id);
         })
         .map_err(|e| {
             crate::contract::ipc::IpcError::from(aura_core::errors::db::statement_failed(

@@ -1,0 +1,1934 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "true-natural",
+      "name": "True Natural",
+      "category": "Everyday",
+      "tagline": "Clean, honest colour. The photo, only better.",
+      "description": "Balances the light, opens the shadows a touch and adds a little crispness without changing what the scene looked like. The safest choice when you want an edit nobody notices.",
+      "bestFor": [
+        "Family",
+        "Travel",
+        "Events",
+        "Anything"
+      ],
+      "technique": [
+        "Measure exposure and set the midtones where the eye expects them",
+        "Recover a little highlight detail and open the deepest shadows",
+        "Vibrance rather than saturation, so muted colours come up and skin does not",
+        "A light touch of capture sharpening with edge masking"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Adobe Lightroom: apply clarity, dehaze and sharpening",
+          "url": "https://helpx.adobe.com/lightroom-cc/how-to/apply-clarity-dehaze-sharpen-lightroom-cc.html"
+        },
+        {
+          "title": "Amateur Photographer: Lightroom editing tips",
+          "url": "https://amateurphotographer.com/latest/landscape-photography-editing-tips/"
+        }
+      ],
+      "swatch": [
+        "#6f8fb8",
+        "#e3c3a4",
+        "#7d9a5c",
+        "#f2eee6",
+        "#3a3b40"
+      ],
+      "adjust": {
+        "highlights": -10,
+        "shadows": 8,
+        "whites": 4,
+        "blacks": -4,
+        "clarity": 5,
+        "vibrance": 10,
+        "sharpen": 30
+      }
+    },
+    {
+      "id": "light-airy",
+      "name": "Light & Airy",
+      "category": "Bright",
+      "tagline": "Bright, soft and luminous with pastel colour.",
+      "description": "The classic bright-and-airy wedding and lifestyle look: lifted exposure, open shadows, soft contrast and a gently desaturated, pastel palette. Highlights are pulled back so white dresses keep their detail.",
+      "bestFor": [
+        "Weddings",
+        "Newborn",
+        "Lifestyle",
+        "Outdoor portraits"
+      ],
+      "technique": [
+        "Raise exposure, then pull highlights back at least -25 so whites do not blow out",
+        "Open the shadows, but keep a real black so the image keeps depth",
+        "Lift the darks in the tone curve and soften the top for a matte glow",
+        "Mute and brighten greens and yellows in HSL; brighten skin slightly",
+        "A little warmth, a little lower clarity for softness",
+        "Parametric curve: shadows and darks lifted; a hint of warm highlight grading"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Brendan Williams Creative: light and airy in Lightroom",
+          "url": "https://www.bwillcreative.com/how-to-make-photos-look-light-and-airy-in-lightroom/"
+        },
+        {
+          "title": "The Editing Studio: bright and airy presets guide",
+          "url": "https://theeditingstudio.co/blog/bright-and-airy-lightroom-presets"
+        },
+        {
+          "title": "Imagen: the professional's guide to light and airy editing",
+          "url": "https://imagen-ai.com/valuable-tips/light-and-airy-lightroom-presets/"
+        }
+      ],
+      "swatch": [
+        "#f4efe8",
+        "#e9d8c9",
+        "#c9d6c3",
+        "#dfe6ee",
+        "#b7a89c"
+      ],
+      "adjust": {
+        "exposure": 0.35,
+        "contrast": -15,
+        "highlights": -30,
+        "shadows": 30,
+        "whites": 12,
+        "blacks": -4,
+        "temperature": 180,
+        "tint": 5,
+        "clarity": -6,
+        "vibrance": 6,
+        "saturation": -10,
+        "curve": [
+          [
+            0,
+            16
+          ],
+          [
+            64,
+            74
+          ],
+          [
+            192,
+            206
+          ],
+          [
+            255,
+            250
+          ]
+        ],
+        "hsl": {
+          "green": {
+            "h": 0,
+            "s": -30,
+            "l": 12
+          },
+          "yellow": {
+            "h": -6,
+            "s": -18,
+            "l": 15
+          },
+          "orange": {
+            "h": 0,
+            "s": -6,
+            "l": 8
+          },
+          "aqua": {
+            "h": 0,
+            "s": -15,
+            "l": 6
+          },
+          "blue": {
+            "h": 0,
+            "s": -15,
+            "l": 10
+          }
+        },
+        "colourGrade": {
+          "highlights": {
+            "hue": 40,
+            "saturation": 6,
+            "luminance": 0
+          }
+        },
+        "parametric": {
+          "shadows": 10,
+          "darks": 5
+        }
+      }
+    },
+    {
+      "id": "dark-moody",
+      "name": "Dark & Moody",
+      "category": "Moody",
+      "tagline": "Deep shadows, muted colour, matte blacks.",
+      "description": "A dramatic, low-key finish: exposure and whites come down, contrast goes up, greens and blues are desaturated and darkened, and the blacks are lifted into a soft matte. A gentle vignette keeps the eye on the subject.",
+      "bestFor": [
+        "Portraits",
+        "Autumn",
+        "Interiors",
+        "Storytelling"
+      ],
+      "technique": [
+        "Exposure -0.3 to -0.7, contrast +30, highlights down hard",
+        "Open the shadows a little so faces stay readable",
+        "Lift the black point in the tone curve for a matte fade",
+        "Desaturate and darken greens, blues and yellows; keep skin warm",
+        "Clarity up a touch, saturation down, then a vignette",
+        "Colour grading: cool blue-teal shadows at low saturation; a touch of grain"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "The Editing Studio: how to get the dark moody look",
+          "url": "https://theeditingstudio.co/blog/how-to-get-dark-moody-look-lightroom"
+        },
+        {
+          "title": "Lightroom Tutorials: dark and moody",
+          "url": "https://www.lightroomtutorials.com/dark-and-moody/"
+        },
+        {
+          "title": "Editing With Jazzie: dark moody photos in Lightroom",
+          "url": "https://www.editingwithjazzie.com/blog/how-to-edit-dark-moody-photos-in-lightroom"
+        }
+      ],
+      "swatch": [
+        "#2c2a28",
+        "#5a4a3e",
+        "#3e4a42",
+        "#8a6e58",
+        "#1c1f24"
+      ],
+      "adjust": {
+        "exposure": -0.4,
+        "contrast": 30,
+        "highlights": -55,
+        "shadows": 25,
+        "whites": -22,
+        "blacks": -18,
+        "temperature": 120,
+        "clarity": 16,
+        "vibrance": -10,
+        "saturation": -16,
+        "curve": [
+          [
+            0,
+            26
+          ],
+          [
+            70,
+            62
+          ],
+          [
+            190,
+            194
+          ],
+          [
+            255,
+            238
+          ]
+        ],
+        "hsl": {
+          "green": {
+            "h": 10,
+            "s": -38,
+            "l": -25
+          },
+          "aqua": {
+            "h": 0,
+            "s": -25,
+            "l": -15
+          },
+          "blue": {
+            "h": 0,
+            "s": -28,
+            "l": -22
+          },
+          "yellow": {
+            "h": -8,
+            "s": -22,
+            "l": -12
+          },
+          "orange": {
+            "h": 0,
+            "s": -4,
+            "l": -4
+          }
+        },
+        "vignette": 0.3,
+        "colourGrade": {
+          "shadows": {
+            "hue": 210,
+            "saturation": 15,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 40,
+            "saturation": 10,
+            "luminance": 0
+          }
+        },
+        "grain": {
+          "amount": 12,
+          "size": 25,
+          "roughness": 50
+        }
+      }
+    },
+    {
+      "id": "cinematic-teal-orange",
+      "name": "Cinematic Teal & Orange",
+      "category": "Cinematic",
+      "tagline": "Blockbuster colour: warm people, teal world.",
+      "description": "The film-grade complementary palette. Skin and warm light stay golden while greens, cyans and blues are pushed toward teal, then a gentle S-curve with lifted blacks gives it a projected-print feel.",
+      "bestFor": [
+        "Urban",
+        "Travel",
+        "Couples",
+        "Sunset"
+      ],
+      "technique": [
+        "S-curve with a lifted black point",
+        "Rotate greens and blues toward teal in HSL and darken them",
+        "Keep orange hue near zero, lift its luminance a little to protect skin",
+        "Slight warmth overall so highlights read amber",
+        "Keep the effect felt rather than seen - saturation stays moderate",
+        "Colour grading: teal shadows (hue 200, 28) and amber highlights (hue 38, 22), balance -10"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Fstoppers: quick and easy orange and teal in Lightroom",
+          "url": "https://fstoppers.com/education/quick-and-easy-orange-and-teal-look-lightroom-204459"
+        },
+        {
+          "title": "Shotkit: how to get the teal and orange look",
+          "url": "https://shotkit.com/teal-orange-look/"
+        },
+        {
+          "title": "iPhotography: cinematic look with colour grading",
+          "url": "https://www.iphotography.com/blog/cinematic-look-in-lightroom-with-colour-grading/"
+        }
+      ],
+      "swatch": [
+        "#1f4e5a",
+        "#2f7f86",
+        "#d9894a",
+        "#f2c28f",
+        "#15262c"
+      ],
+      "adjust": {
+        "contrast": 18,
+        "highlights": -35,
+        "shadows": 20,
+        "whites": 6,
+        "blacks": -10,
+        "temperature": 150,
+        "tint": -3,
+        "clarity": 8,
+        "dehaze": 5,
+        "vibrance": 10,
+        "saturation": -4,
+        "curve": [
+          [
+            0,
+            14
+          ],
+          [
+            64,
+            56
+          ],
+          [
+            192,
+            202
+          ],
+          [
+            255,
+            246
+          ]
+        ],
+        "hsl": {
+          "orange": {
+            "h": 3,
+            "s": 12,
+            "l": 6
+          },
+          "yellow": {
+            "h": -18,
+            "s": -20,
+            "l": 0
+          },
+          "green": {
+            "h": 45,
+            "s": -35,
+            "l": -15
+          },
+          "aqua": {
+            "h": -8,
+            "s": 18,
+            "l": -8
+          },
+          "blue": {
+            "h": -28,
+            "s": 10,
+            "l": -18
+          },
+          "red": {
+            "h": 0,
+            "s": -6,
+            "l": 0
+          }
+        },
+        "vignette": 0.22,
+        "colourGrade": {
+          "shadows": {
+            "hue": 200,
+            "saturation": 28,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 38,
+            "saturation": 22,
+            "luminance": 0
+          },
+          "balance": -10
+        }
+      }
+    },
+    {
+      "id": "film-portra",
+      "name": "Portra Film",
+      "category": "Film",
+      "tagline": "Warm skin, soft roll-off, gentle film fade.",
+      "description": "An emulation of the look Kodak Portra 400 scans are loved for: peachy skin, warm olive greens, soft pastel skies, lifted shadows and a highlight shoulder that never clips harshly. Saturation is harmonious rather than punchy.",
+      "bestFor": [
+        "Portraits",
+        "Weddings",
+        "Golden hour",
+        "Family"
+      ],
+      "technique": [
+        "Pull highlights down and compress the top of the curve for film roll-off",
+        "Lift the black point to a warm grey",
+        "Warm the white balance slightly and add a hint of magenta",
+        "Shift yellows and greens toward olive and mute them; soften blues",
+        "Lower texture a little; never reach for the saturation slider",
+        "Colour grading: warm shadows (hue 35, 12) and soft warm highlights; fine grain"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Medialoot: emulate the Portra 400 film look",
+          "url": "https://medialoot.com/blog/how-to-emulate-the-portra-400-film-look-in-lightroom/"
+        },
+        {
+          "title": "Mastin Labs: Portra 400 in Lightroom",
+          "url": "https://mastinlabs.com/blogs/photoism/blog-portra-400-lightroom-authentic-look"
+        },
+        {
+          "title": "The Editing Studio: Kodak Portra 400 film emulation guide",
+          "url": "https://theeditingstudio.co/blog/kodak-portra-400-lightroom-preset"
+        }
+      ],
+      "swatch": [
+        "#e8c9a8",
+        "#c9a27a",
+        "#8c9466",
+        "#b9c7cf",
+        "#5b4d44"
+      ],
+      "adjust": {
+        "exposure": 0.12,
+        "contrast": -10,
+        "highlights": -40,
+        "shadows": 18,
+        "whites": -10,
+        "temperature": 260,
+        "tint": 6,
+        "texture": -6,
+        "vibrance": -5,
+        "saturation": -8,
+        "curve": [
+          [
+            0,
+            24
+          ],
+          [
+            60,
+            66
+          ],
+          [
+            128,
+            132
+          ],
+          [
+            196,
+            202
+          ],
+          [
+            255,
+            244
+          ]
+        ],
+        "hsl": {
+          "red": {
+            "h": 0,
+            "s": -10,
+            "l": 0
+          },
+          "orange": {
+            "h": 4,
+            "s": -6,
+            "l": 8
+          },
+          "yellow": {
+            "h": -12,
+            "s": -18,
+            "l": 4
+          },
+          "green": {
+            "h": -15,
+            "s": -25,
+            "l": 5
+          },
+          "aqua": {
+            "h": 0,
+            "s": -20,
+            "l": 4
+          },
+          "blue": {
+            "h": -8,
+            "s": -20,
+            "l": 8
+          }
+        },
+        "colourGrade": {
+          "shadows": {
+            "hue": 35,
+            "saturation": 12,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 45,
+            "saturation": 8,
+            "luminance": 0
+          }
+        },
+        "grain": {
+          "amount": 18,
+          "size": 30,
+          "roughness": 50
+        }
+      }
+    },
+    {
+      "id": "vintage-fade",
+      "name": "Vintage Fade",
+      "category": "Film",
+      "tagline": "Sun-faded print from a family album.",
+      "description": "A nostalgic, low-contrast print: both ends of the curve are faded, colour is muted and warmed, blues drift toward cyan and a soft vignette darkens the corners like an old lens.",
+      "bestFor": [
+        "Street",
+        "Travel",
+        "Lifestyle",
+        "Throwback"
+      ],
+      "technique": [
+        "Fade the curve at both ends - lifted blacks, lowered whites",
+        "Lower contrast and saturation; warm the white balance",
+        "Push greens toward yellow and blues toward cyan, then mute both",
+        "Soften clarity and add a vignette",
+        "Colour grading: cool shadows, warm highlights; coarse grain and a faded vignette"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "presets.io: ultimate guide to film look emulation",
+          "url": "https://presets.io/a/blog/ultimate-guide-film-look-emulation-lightroom"
+        },
+        {
+          "title": "Imagen: recreating the classic film look",
+          "url": "https://imagen-ai.com/valuable-tips/kodak-portra-400-lightroom-preset/"
+        }
+      ],
+      "swatch": [
+        "#d8c7a6",
+        "#b59a78",
+        "#8f9a82",
+        "#9fb2b4",
+        "#6b5a4a"
+      ],
+      "adjust": {
+        "contrast": -18,
+        "highlights": -20,
+        "shadows": 15,
+        "whites": -8,
+        "temperature": 380,
+        "tint": 10,
+        "clarity": -6,
+        "vibrance": -10,
+        "saturation": -24,
+        "curve": [
+          [
+            0,
+            40
+          ],
+          [
+            64,
+            78
+          ],
+          [
+            192,
+            188
+          ],
+          [
+            255,
+            226
+          ]
+        ],
+        "hsl": {
+          "green": {
+            "h": -20,
+            "s": -30,
+            "l": 0
+          },
+          "blue": {
+            "h": -15,
+            "s": -30,
+            "l": 10
+          },
+          "aqua": {
+            "h": 0,
+            "s": -25,
+            "l": 5
+          },
+          "orange": {
+            "h": 0,
+            "s": -10,
+            "l": 4
+          },
+          "yellow": {
+            "h": -5,
+            "s": -15,
+            "l": 0
+          }
+        },
+        "vignette": 0.3,
+        "colourGrade": {
+          "shadows": {
+            "hue": 220,
+            "saturation": 12,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 45,
+            "saturation": 18,
+            "luminance": 0
+          }
+        },
+        "grain": {
+          "amount": 30,
+          "size": 40,
+          "roughness": 60
+        }
+      }
+    },
+    {
+      "id": "golden-hour",
+      "name": "Golden Hour Glow",
+      "category": "Warm",
+      "tagline": "That last hour of sun, every time.",
+      "description": "Wraps the frame in warm, low sun: a strong but guarded warm white balance, glowing yellows and oranges, softened greens toward autumn and a slightly lower clarity for a hazy glow. The warmth backs off automatically on frames that are already warm.",
+      "bestFor": [
+        "Sunset",
+        "Outdoor portraits",
+        "Couples",
+        "Beach"
+      ],
+      "technique": [
+        "Warm white balance and a touch of magenta",
+        "Recover highlights so the sun keeps its shape",
+        "Brighten and enrich yellows and oranges; move greens toward yellow",
+        "Lower clarity and dehaze slightly for glow; vibrance up",
+        "Colour grading: golden highlights and warm midtones"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "presets.io: bright and warm colour toning explained",
+          "url": "https://presets.io/a/blog/lightroom-color-toning-bright-and-airy-explained"
+        },
+        {
+          "title": "Amateur Photographer: Lightroom editing tips",
+          "url": "https://amateurphotographer.com/latest/landscape-photography-editing-tips/"
+        }
+      ],
+      "swatch": [
+        "#f7c46c",
+        "#ec9a4f",
+        "#c9723f",
+        "#9b8a4a",
+        "#5a3a2a"
+      ],
+      "adjust": {
+        "exposure": 0.1,
+        "contrast": 8,
+        "highlights": -28,
+        "shadows": 15,
+        "whites": 4,
+        "temperature": 650,
+        "tint": 8,
+        "clarity": -8,
+        "texture": -4,
+        "dehaze": -5,
+        "vibrance": 16,
+        "curve": [
+          [
+            0,
+            6
+          ],
+          [
+            64,
+            60
+          ],
+          [
+            192,
+            200
+          ],
+          [
+            255,
+            252
+          ]
+        ],
+        "hsl": {
+          "orange": {
+            "h": 0,
+            "s": 8,
+            "l": 6
+          },
+          "yellow": {
+            "h": -10,
+            "s": 12,
+            "l": 8
+          },
+          "red": {
+            "h": 0,
+            "s": 6,
+            "l": 0
+          },
+          "green": {
+            "h": -15,
+            "s": -15,
+            "l": 0
+          },
+          "blue": {
+            "h": 0,
+            "s": -20,
+            "l": 5
+          }
+        },
+        "colourGrade": {
+          "highlights": {
+            "hue": 42,
+            "saturation": 25,
+            "luminance": 0
+          },
+          "midtones": {
+            "hue": 35,
+            "saturation": 10,
+            "luminance": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "bw-classic",
+      "name": "Classic Monochrome",
+      "category": "Black & White",
+      "tagline": "Rich greys, bright skin, dramatic sky.",
+      "description": "A timeless black and white conversion: the mix brightens skin through red and orange and darkens blue skies like a yellow-orange filter on film, with a full tonal range from true black to clean white.",
+      "bestFor": [
+        "Portraits",
+        "Weddings",
+        "Street",
+        "Architecture"
+      ],
+      "technique": [
+        "Convert with a custom mix: reds and oranges up for skin, blues down for sky",
+        "Highlights down, shadows up, then set true whites and blacks",
+        "A gentle S-curve and clarity for tonal separation",
+        "A light vignette and sharpening",
+        "Split-tone the monochrome: cool shadows, warm highlights, very low saturation; fine grain"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Digital Photography School: better black and white in Lightroom",
+          "url": "https://digital-photography-school.com/3-tips-for-better-black-and-white-conversion-using-lightroom/"
+        },
+        {
+          "title": "Outdoor Photographer: converting to black and white",
+          "url": "https://www.outdoorphotographer.com/tips-techniques/photo-editing-tips/converting-to-black-white-in-lightroom-classic/"
+        },
+        {
+          "title": "PHLEARN: black and white in 4 easy steps",
+          "url": "https://phlearn.com/tutorial/30-days-lightroom-day-19/"
+        }
+      ],
+      "swatch": [
+        "#f2f2f2",
+        "#bdbdbd",
+        "#8a8a8a",
+        "#555555",
+        "#1a1a1a"
+      ],
+      "adjust": {
+        "contrast": 22,
+        "highlights": -30,
+        "shadows": 20,
+        "whites": 18,
+        "blacks": -22,
+        "clarity": 14,
+        "texture": 6,
+        "sharpen": 40,
+        "curve": [
+          [
+            0,
+            4
+          ],
+          [
+            64,
+            56
+          ],
+          [
+            192,
+            204
+          ],
+          [
+            255,
+            252
+          ]
+        ],
+        "vignette": 0.18,
+        "bw": {
+          "red": 15,
+          "orange": 20,
+          "yellow": 10,
+          "green": -10,
+          "aqua": -15,
+          "blue": -25,
+          "purple": -5,
+          "magenta": 5
+        },
+        "colourGrade": {
+          "shadows": {
+            "hue": 215,
+            "saturation": 6,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 45,
+            "saturation": 8,
+            "luminance": 0
+          }
+        },
+        "grain": {
+          "amount": 15,
+          "size": 25,
+          "roughness": 50
+        }
+      }
+    },
+    {
+      "id": "bw-noir",
+      "name": "Film Noir",
+      "category": "Black & White",
+      "tagline": "Hard light, inky blacks, red-filter skies.",
+      "description": "A high-contrast, graphic monochrome. The mix acts like a red filter - skies go nearly black, skin glows - and the curve is steep with deep blacks and a heavy vignette.",
+      "bestFor": [
+        "Street",
+        "Night",
+        "Dramatic portraits",
+        "Architecture"
+      ],
+      "technique": [
+        "Red-filter mix: reds, oranges and yellows up; blues and aqua far down",
+        "Strong contrast and a steep S-curve",
+        "Whites up, blacks crushed, clarity high",
+        "Heavy vignette to close the frame",
+        "Heavy, rough grain like pushed film"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "iPhotography: edit black and white photos in Lightroom",
+          "url": "https://www.iphotography.com/blog/edit-black-and-white-photos-lightroom/"
+        },
+        {
+          "title": "Imagen: mastering monochrome",
+          "url": "https://imagen-ai.com/valuable-tips/black-and-white-presets-lightroom/"
+        }
+      ],
+      "swatch": [
+        "#ffffff",
+        "#9e9e9e",
+        "#4a4a4a",
+        "#1e1e1e",
+        "#050505"
+      ],
+      "adjust": {
+        "contrast": 42,
+        "highlights": -20,
+        "shadows": -8,
+        "whites": 32,
+        "blacks": -38,
+        "clarity": 24,
+        "texture": 8,
+        "sharpen": 45,
+        "curve": [
+          [
+            0,
+            0
+          ],
+          [
+            60,
+            40
+          ],
+          [
+            196,
+            220
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        "vignette": 0.42,
+        "bw": {
+          "red": 30,
+          "orange": 25,
+          "yellow": 20,
+          "green": -20,
+          "aqua": -30,
+          "blue": -45,
+          "purple": -10,
+          "magenta": 0
+        },
+        "grain": {
+          "amount": 35,
+          "size": 35,
+          "roughness": 65
+        }
+      }
+    },
+    {
+      "id": "vivid-landscape",
+      "name": "Vivid Landscape",
+      "category": "Nature",
+      "tagline": "Deep skies, living greens, crisp detail.",
+      "description": "A punchy nature finish: highlights recovered for the sky, shadows opened for the foreground, dehaze and clarity for depth, and blues and greens enriched while the sky is darkened for drama.",
+      "bestFor": [
+        "Landscape",
+        "Mountains",
+        "Hiking",
+        "Seascape"
+      ],
+      "technique": [
+        "Highlights down, shadows up to fit a wide dynamic range",
+        "Clarity +15 to +25, a little dehaze and texture",
+        "Vibrance around +20",
+        "Darken and saturate blues; enrich greens and yellows",
+        "Output sharpening",
+        "Calibration: blue primary saturation up - the landscape photographer's sky trick"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Amateur Photographer: landscape photography editing tips",
+          "url": "https://amateurphotographer.com/latest/landscape-photography-editing-tips/"
+        },
+        {
+          "title": "Picfair Focus: 10 expert tips for landscapes in Lightroom",
+          "url": "https://focus.picfair.com/articles/10-tips-for-boosting-landscapes-in-lightroom"
+        },
+        {
+          "title": "PhotoshopCAFE: texture, clarity and dehaze explained",
+          "url": "https://photoshopcafe.com/texture-clarity-and-dehaze-in-lightroom-acr-explained-the-ultimate-comparision/"
+        }
+      ],
+      "swatch": [
+        "#1f5fa8",
+        "#3f8f5a",
+        "#d6b24a",
+        "#e9eef2",
+        "#28332a"
+      ],
+      "adjust": {
+        "contrast": 14,
+        "highlights": -45,
+        "shadows": 30,
+        "whites": 14,
+        "blacks": -14,
+        "clarity": 20,
+        "texture": 12,
+        "dehaze": 14,
+        "vibrance": 22,
+        "saturation": 3,
+        "hsl": {
+          "blue": {
+            "h": 0,
+            "s": 15,
+            "l": -15
+          },
+          "aqua": {
+            "h": 0,
+            "s": 10,
+            "l": -8
+          },
+          "green": {
+            "h": 5,
+            "s": 12,
+            "l": -5
+          },
+          "yellow": {
+            "h": -8,
+            "s": 8,
+            "l": 0
+          },
+          "orange": {
+            "h": 0,
+            "s": 5,
+            "l": 0
+          }
+        },
+        "sharpen": 45,
+        "calibration": {
+          "blue_saturation": 20,
+          "red_saturation": 5
+        }
+      }
+    },
+    {
+      "id": "soft-portrait",
+      "name": "Soft Portrait",
+      "category": "Portrait",
+      "tagline": "Flattering skin, gentle light, true colour.",
+      "description": "A portrait-first finish: texture and clarity are lowered to soften skin without smearing it, skin is lightened and calmed a touch, the light is warmed slightly and sharpening is masked to edges so eyes and lashes stay crisp.",
+      "bestFor": [
+        "Headshots",
+        "Portraits",
+        "Bridal",
+        "Beauty"
+      ],
+      "technique": [
+        "Negative texture for skin, a little negative clarity for glow",
+        "Lighten orange luminance and lower its saturation slightly",
+        "Recover highlights on the forehead and cheeks",
+        "Sharpen with a high masking value so only edges sharpen"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "PhotoshopCAFE: texture, clarity and dehaze explained",
+          "url": "https://photoshopcafe.com/texture-clarity-and-dehaze-in-lightroom-acr-explained-the-ultimate-comparision/"
+        },
+        {
+          "title": "Julieanne Kost: using the colour mixer for HSL",
+          "url": "https://jkost.com/blog/2024/08/using-color-mixer-to-adjust-hue-saturation-and-luminance-in-lightroom-classic.html"
+        }
+      ],
+      "swatch": [
+        "#f0d4c0",
+        "#dcb39a",
+        "#b58a74",
+        "#e8e2dc",
+        "#6a5c56"
+      ],
+      "adjust": {
+        "exposure": 0.1,
+        "contrast": 4,
+        "highlights": -25,
+        "shadows": 15,
+        "whites": 5,
+        "temperature": 100,
+        "tint": 3,
+        "clarity": -8,
+        "texture": -18,
+        "vibrance": 6,
+        "saturation": -3,
+        "hsl": {
+          "orange": {
+            "h": 0,
+            "s": -8,
+            "l": 10
+          },
+          "red": {
+            "h": 0,
+            "s": -6,
+            "l": 4
+          },
+          "yellow": {
+            "h": 0,
+            "s": -8,
+            "l": 0
+          }
+        },
+        "sharpen": 25,
+        "noise": 10
+      }
+    },
+    {
+      "id": "urban-night",
+      "name": "Neon Night",
+      "category": "Cinematic",
+      "tagline": "Cool city shadows, glowing lights.",
+      "description": "Built for city lights after dark: a cooler white balance, deep recovered highlights around street lamps, lifted shadows, enriched blues, magentas and ambers, and noise reduction tuned for high ISO.",
+      "bestFor": [
+        "Night",
+        "City",
+        "Concerts",
+        "Neon"
+      ],
+      "technique": [
+        "Cool the white balance and nudge tint toward magenta",
+        "Pull highlights hard so lamps keep their shape; open shadows",
+        "Enrich blue, purple, magenta and orange lights",
+        "Clarity and a little dehaze for crisp edges",
+        "Luminance and colour noise reduction for high ISO",
+        "Colour grading: blue shadows, warm highlights for street lamps"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "The Editing Studio: cinematic Lightroom preset guide",
+          "url": "https://theeditingstudio.co/blog/cinematic-lightroom-preset"
+        },
+        {
+          "title": "Impact Photography: colour grade photos to look cinematic",
+          "url": "https://www.impact-photography.com/how-to-color-grade-photos-to-look-cinematic-in-lightroom-a-complete-walkthrough/"
+        }
+      ],
+      "swatch": [
+        "#101b3a",
+        "#3a3fa8",
+        "#c23fa0",
+        "#f0a040",
+        "#0a0c14"
+      ],
+      "adjust": {
+        "contrast": 18,
+        "highlights": -50,
+        "shadows": 25,
+        "whites": 10,
+        "blacks": -14,
+        "temperature": -420,
+        "tint": 8,
+        "clarity": 14,
+        "dehaze": 10,
+        "vibrance": 16,
+        "hsl": {
+          "blue": {
+            "h": -10,
+            "s": 15,
+            "l": 0
+          },
+          "purple": {
+            "h": 0,
+            "s": 15,
+            "l": 0
+          },
+          "magenta": {
+            "h": -5,
+            "s": 12,
+            "l": 0
+          },
+          "orange": {
+            "h": 0,
+            "s": 10,
+            "l": 0
+          },
+          "aqua": {
+            "h": 0,
+            "s": 15,
+            "l": 0
+          }
+        },
+        "sharpen": 20,
+        "noise": 25,
+        "colourGrade": {
+          "shadows": {
+            "hue": 225,
+            "saturation": 20,
+            "luminance": 0
+          },
+          "highlights": {
+            "hue": 30,
+            "saturation": 12,
+            "luminance": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "editorial-matte",
+      "name": "Editorial Matte",
+      "category": "Editorial",
+      "tagline": "Magazine-clean with a quiet matte finish.",
+      "description": "Restrained and modern: a matte curve, calm muted colour, clean neutrals and a little crispness. Lets composition and wardrobe carry the frame, the way a fashion editorial does.",
+      "bestFor": [
+        "Fashion",
+        "Brand",
+        "Architecture",
+        "Product"
+      ],
+      "technique": [
+        "Matte curve: black point lifted, highlights slightly rolled off",
+        "Saturation down, vibrance up a touch so colour stays even",
+        "Mute greens and blues; keep neutrals neutral",
+        "Clarity up slightly for crisp edges",
+        "Parametric curve: darks lifted, lights eased for the matte finish"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Medialoot: create a modern airy look",
+          "url": "https://medialoot.com/blog/how-to-create-a-modern-airy-look-in-lightroom/"
+        },
+        {
+          "title": "Imagen: dark presets and adaptive editing",
+          "url": "https://imagen-ai.com/valuable-tips/dark-lightroom-presets/"
+        }
+      ],
+      "swatch": [
+        "#dcd6ce",
+        "#a9a39b",
+        "#7f8a86",
+        "#c7c1b8",
+        "#3b3a38"
+      ],
+      "adjust": {
+        "contrast": -5,
+        "highlights": -20,
+        "shadows": 10,
+        "clarity": 6,
+        "vibrance": 4,
+        "saturation": -14,
+        "curve": [
+          [
+            0,
+            30
+          ],
+          [
+            50,
+            58
+          ],
+          [
+            200,
+            204
+          ],
+          [
+            255,
+            242
+          ]
+        ],
+        "hsl": {
+          "green": {
+            "h": 0,
+            "s": -22,
+            "l": 0
+          },
+          "blue": {
+            "h": -5,
+            "s": -16,
+            "l": 0
+          },
+          "yellow": {
+            "h": 0,
+            "s": -12,
+            "l": 0
+          }
+        },
+        "colourGrade": {
+          "global": {
+            "hue": 30,
+            "saturation": 4,
+            "luminance": 0
+          }
+        },
+        "parametric": {
+          "darks": 8,
+          "lights": -4
+        }
+      }
+    },
+    {
+      "id": "fresh-crisp",
+      "name": "Fresh & Crisp",
+      "category": "Bright",
+      "tagline": "Appetising colour and texture for food and product.",
+      "description": "Bright, clean and saturated in the warm band: whites set clean, texture and clarity bring out surface detail, reds, oranges and yellows are enriched and greens stay fresh. Strong output sharpening.",
+      "bestFor": [
+        "Food",
+        "Product",
+        "Flat lay",
+        "Interiors"
+      ],
+      "technique": [
+        "Exposure up a little with whites set clean",
+        "Texture and clarity up for surface detail",
+        "Vibrance up; enrich red, orange, yellow and green",
+        "Slight warmth, strong sharpening",
+        "Calibration: red primary saturation up for appetising colour"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Adobe Lightroom: apply clarity, dehaze and sharpening",
+          "url": "https://helpx.adobe.com/lightroom-cc/how-to/apply-clarity-dehaze-sharpen-lightroom-cc.html"
+        },
+        {
+          "title": "Julieanne Kost: using the colour mixer for HSL",
+          "url": "https://jkost.com/blog/2024/08/using-color-mixer-to-adjust-hue-saturation-and-luminance-in-lightroom-classic.html"
+        }
+      ],
+      "swatch": [
+        "#f6f1e7",
+        "#e0463a",
+        "#f09a2a",
+        "#6aa84f",
+        "#2b2320"
+      ],
+      "adjust": {
+        "exposure": 0.2,
+        "contrast": 12,
+        "highlights": -20,
+        "shadows": 15,
+        "whites": 20,
+        "blacks": -10,
+        "temperature": 120,
+        "clarity": 8,
+        "texture": 12,
+        "vibrance": 18,
+        "saturation": 4,
+        "hsl": {
+          "red": {
+            "h": 0,
+            "s": 10,
+            "l": 0
+          },
+          "orange": {
+            "h": 0,
+            "s": 10,
+            "l": 4
+          },
+          "yellow": {
+            "h": 0,
+            "s": 8,
+            "l": 6
+          },
+          "green": {
+            "h": 0,
+            "s": 12,
+            "l": 0
+          }
+        },
+        "sharpen": 50,
+        "calibration": {
+          "red_saturation": 10
+        }
+      }
+    },
+    {
+      "id": "romantic-wedding",
+      "name": "Romantic Wedding",
+      "category": "Wedding",
+      "tagline": "Warm, soft and timeless for the big day.",
+      "description": "A wedding finish between airy and film: bright but not washed out, warm skin, a soft glow from lower clarity and texture, calm sage greens and pale skies, and highlights held so the dress keeps every detail.",
+      "bestFor": [
+        "Weddings",
+        "Engagements",
+        "Bridal",
+        "Ceremony"
+      ],
+      "technique": [
+        "Exposure up moderately; highlights held for the dress",
+        "Soft curve with lifted blacks",
+        "Warm white balance with a touch of magenta",
+        "Sage greens (muted, slightly lighter), pale blues, light skin",
+        "Lower clarity and texture for a soft glow",
+        "Colour grading: warm highlights, faint warm shadows"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "Flourish Presets: editing dark and moody vs bright",
+          "url": "https://flourishpresets.com/blogs/flourish-presets-lightroom-presets-luts/how-to-edit-dark-and-moody-photos-moody-presets"
+        },
+        {
+          "title": "Wedding Rebels: Kodak Portra 400 presets",
+          "url": "https://weddingrebels.co/blogs/blog/kodak-portra-400-lightroom-preset"
+        },
+        {
+          "title": "The Luxe Lens: light and airy presets",
+          "url": "https://help.luxelens.com/hc/en-us/articles/360047321574-Light-Airy-How-to-Use-Your-Presets"
+        }
+      ],
+      "swatch": [
+        "#f3e6dc",
+        "#e5c4ae",
+        "#a9b59a",
+        "#d9e0e6",
+        "#7a655a"
+      ],
+      "adjust": {
+        "exposure": 0.22,
+        "contrast": -8,
+        "highlights": -35,
+        "shadows": 22,
+        "whites": 8,
+        "temperature": 220,
+        "tint": 8,
+        "clarity": -10,
+        "texture": -8,
+        "vibrance": 4,
+        "saturation": -8,
+        "curve": [
+          [
+            0,
+            14
+          ],
+          [
+            64,
+            70
+          ],
+          [
+            192,
+            200
+          ],
+          [
+            255,
+            250
+          ]
+        ],
+        "hsl": {
+          "green": {
+            "h": -10,
+            "s": -30,
+            "l": 8
+          },
+          "orange": {
+            "h": 0,
+            "s": -5,
+            "l": 10
+          },
+          "yellow": {
+            "h": 0,
+            "s": -15,
+            "l": 5
+          },
+          "blue": {
+            "h": 0,
+            "s": -20,
+            "l": 10
+          },
+          "aqua": {
+            "h": 0,
+            "s": -20,
+            "l": 5
+          }
+        },
+        "colourGrade": {
+          "highlights": {
+            "hue": 35,
+            "saturation": 10,
+            "luminance": 0
+          },
+          "shadows": {
+            "hue": 20,
+            "saturation": 6,
+            "luminance": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "nordic-cool",
+      "name": "Nordic Cool",
+      "category": "Moody",
+      "tagline": "Clean, cool and quiet Scandinavian light.",
+      "description": "A cool, desaturated palette with crisp detail: white balance cooled, greens shifted toward teal and muted, yellows quieted and a slight fade in the blacks. Skin is kept out of the cooling by the skin guard.",
+      "bestFor": [
+        "Winter",
+        "Coast",
+        "Minimal",
+        "Architecture"
+      ],
+      "technique": [
+        "Cool the white balance",
+        "Mute saturation overall, especially yellows and greens",
+        "Push greens toward teal",
+        "Slight black fade and crisp clarity",
+        "Colour grading: cool shadows; calibration: bluer blues"
+      ],
+      "origin": "researched",
+      "sources": [
+        {
+          "title": "presets.io: ultimate guide to film look emulation",
+          "url": "https://presets.io/a/blog/ultimate-guide-film-look-emulation-lightroom"
+        },
+        {
+          "title": "Imagen: mastering the moody aesthetic",
+          "url": "https://imagen-ai.com/valuable-tips/dark-lightroom-presets/"
+        }
+      ],
+      "swatch": [
+        "#dfe7ec",
+        "#9fb5bf",
+        "#5f7f86",
+        "#c9c9c4",
+        "#2c353a"
+      ],
+      "adjust": {
+        "contrast": 8,
+        "highlights": -30,
+        "shadows": 20,
+        "temperature": -380,
+        "tint": -3,
+        "clarity": 8,
+        "vibrance": 5,
+        "saturation": -18,
+        "curve": [
+          [
+            0,
+            16
+          ],
+          [
+            64,
+            62
+          ],
+          [
+            192,
+            196
+          ],
+          [
+            255,
+            250
+          ]
+        ],
+        "hsl": {
+          "green": {
+            "h": 20,
+            "s": -35,
+            "l": 0
+          },
+          "yellow": {
+            "h": 0,
+            "s": -30,
+            "l": 0
+          },
+          "orange": {
+            "h": 0,
+            "s": -12,
+            "l": 4
+          },
+          "blue": {
+            "h": 0,
+            "s": -10,
+            "l": 5
+          },
+          "aqua": {
+            "h": 0,
+            "s": -10,
+            "l": 0
+          }
+        },
+        "colourGrade": {
+          "shadows": {
+            "hue": 200,
+            "saturation": 12,
+            "luminance": 0
+          }
+        },
+        "calibration": {
+          "blue_saturation": 10
+        }
+      }
+    },
+    {
+      "id": "fivek-expert-c",
+      "name": "Pro Retoucher C",
+      "category": "Learned",
+      "tagline": "Vivid and punchy with open shadows - the FiveK reference edit.",
+      "description": "Measured, not written: AURA decoded 25 camera RAW files, recovered the settings that reproduce professional retoucher C's finished photographs through its own renderer, and kept the median of what the retoucher did beyond AURA's automatic correction. On 9 RAW photos it never learned from, it brings AURA from 9.9 to 9.3 dE00 of the retoucher's final.",
+      "bestFor": [
+        "Everyday",
+        "Travel",
+        "Portraits",
+        "Landscape"
+      ],
+      "technique": [
+        "Exposure -0.09 EV beyond AURA's own correction",
+        "Contrast +18",
+        "Highlights +8",
+        "Shadows +24",
+        "Whites -24",
+        "Blacks -36",
+        "Vibrance +40",
+        "Saturation +40",
+        "A tone curve through (64, 80), (192, 208)"
+      ],
+      "origin": "learned",
+      "sources": [
+        {
+          "title": "MIT-Adobe FiveK dataset (Bychkovsky et al., CVPR 2011)",
+          "url": "https://data.csail.mit.edu/graphics/fivek/"
+        }
+      ],
+      "evidence": {
+        "autoDe00": 9.95,
+        "dataset": "MIT-Adobe FiveK, expert C, camera RAW (DNG) to retoucher final",
+        "heldOutPairs": 9,
+        "profileDe00": 9.33,
+        "trainingPairs": 25
+      },
+      "swatch": [
+        "#ece6de",
+        "#d1b39a",
+        "#789a6c",
+        "#86a4c8",
+        "#34312e"
+      ],
+      "adjust": {
+        "blacks": -36,
+        "contrast": 18,
+        "curve": [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            80
+          ],
+          [
+            192,
+            208
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        "exposure": -0.09,
+        "highlights": 8,
+        "saturation": 40,
+        "shadows": 24,
+        "vibrance": 40,
+        "whites": -24,
+        "developedStrength": 0.5
+      }
+    },
+    {
+      "id": "fivek-expert-a",
+      "name": "Pro Retoucher A",
+      "category": "Learned",
+      "tagline": "Rich colour, deeper blacks, clean neutral white balance.",
+      "description": "Measured, not written: AURA decoded 13 camera RAW files, recovered the settings that reproduce professional retoucher A's finished photographs through its own renderer, and kept the median of what the retoucher did beyond AURA's automatic correction. On 5 RAW photos it never learned from, it brings AURA from 14.0 to 13.2 dE00 of the retoucher's final.",
+      "bestFor": [
+        "Everyday",
+        "Travel",
+        "Portraits",
+        "Landscape"
+      ],
+      "technique": [
+        "Exposure -0.09 EV beyond AURA's own correction",
+        "Contrast +15",
+        "Shadows +13",
+        "Whites +12",
+        "Blacks -24",
+        "Vibrance +8",
+        "Saturation +48",
+        "A tone curve through (64, 64), (192, 208)"
+      ],
+      "origin": "learned",
+      "sources": [
+        {
+          "title": "MIT-Adobe FiveK dataset (Bychkovsky et al., CVPR 2011)",
+          "url": "https://data.csail.mit.edu/graphics/fivek/"
+        }
+      ],
+      "evidence": {
+        "autoDe00": 14.03,
+        "dataset": "MIT-Adobe FiveK, expert A, camera RAW (DNG) to retoucher final",
+        "heldOutPairs": 5,
+        "profileDe00": 13.16,
+        "trainingPairs": 13
+      },
+      "swatch": [
+        "#e9e4dc",
+        "#c9b6a2",
+        "#7f9a7a",
+        "#8fa8c4",
+        "#3c3a38"
+      ],
+      "adjust": {
+        "blacks": -24,
+        "contrast": 15,
+        "curve": [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            64
+          ],
+          [
+            192,
+            208
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        "exposure": -0.09,
+        "saturation": 48,
+        "shadows": 13,
+        "vibrance": 8,
+        "whites": 12,
+        "developedStrength": 0.5
+      }
+    },
+    {
+      "id": "fivek-expert-b",
+      "name": "Pro Retoucher B",
+      "category": "Learned",
+      "tagline": "Warm, gentle and light-handed.",
+      "description": "Measured, not written: AURA decoded 13 camera RAW files, recovered the settings that reproduce professional retoucher B's finished photographs through its own renderer, and kept the median of what the retoucher did beyond AURA's automatic correction. On 5 RAW photos it never learned from, it brings AURA from 13.2 to 11.6 dE00 of the retoucher's final.",
+      "bestFor": [
+        "Everyday",
+        "Travel",
+        "Portraits",
+        "Landscape"
+      ],
+      "technique": [
+        "Exposure -0.09 EV beyond AURA's own correction",
+        "Contrast +7",
+        "Highlights +8",
+        "Shadows +8",
+        "Whites +3",
+        "Blacks -18",
+        "Saturation +16",
+        "Tint +6",
+        "White balance +400 K (warmer)",
+        "A tone curve through (64, 80), (192, 208)"
+      ],
+      "origin": "learned",
+      "sources": [
+        {
+          "title": "MIT-Adobe FiveK dataset (Bychkovsky et al., CVPR 2011)",
+          "url": "https://data.csail.mit.edu/graphics/fivek/"
+        }
+      ],
+      "evidence": {
+        "autoDe00": 13.21,
+        "dataset": "MIT-Adobe FiveK, expert B, camera RAW (DNG) to retoucher final",
+        "heldOutPairs": 5,
+        "profileDe00": 11.55,
+        "trainingPairs": 13
+      },
+      "swatch": [
+        "#f1e9df",
+        "#d8b28f",
+        "#6fa06a",
+        "#7da2d0",
+        "#2f2c2a"
+      ],
+      "adjust": {
+        "blacks": -18,
+        "contrast": 7,
+        "curve": [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            80
+          ],
+          [
+            192,
+            208
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        "exposure": -0.09,
+        "highlights": 8,
+        "saturation": 16,
+        "shadows": 8,
+        "temperature": 400,
+        "tint": 6,
+        "whites": 3,
+        "developedStrength": 0.5
+      }
+    },
+    {
+      "id": "fivek-expert-d",
+      "name": "Pro Retoucher D",
+      "category": "Learned",
+      "tagline": "Warm light, open shadows and deep blacks.",
+      "description": "Measured, not written: AURA decoded 13 camera RAW files, recovered the settings that reproduce professional retoucher D's finished photographs through its own renderer, and kept the median of what the retoucher did beyond AURA's automatic correction. On 5 RAW photos it never learned from, it brings AURA from 16.7 to 13.9 dE00 of the retoucher's final.",
+      "bestFor": [
+        "Everyday",
+        "Travel",
+        "Portraits",
+        "Landscape"
+      ],
+      "technique": [
+        "Exposure -0.09 EV beyond AURA's own correction",
+        "Contrast +17",
+        "Highlights +8",
+        "Shadows +32",
+        "Blacks -30",
+        "Vibrance -8",
+        "Saturation +16",
+        "Tint +6",
+        "White balance +400 K (warmer)",
+        "A tone curve through (64, 80), (192, 208)"
+      ],
+      "origin": "learned",
+      "sources": [
+        {
+          "title": "MIT-Adobe FiveK dataset (Bychkovsky et al., CVPR 2011)",
+          "url": "https://data.csail.mit.edu/graphics/fivek/"
+        }
+      ],
+      "evidence": {
+        "autoDe00": 16.74,
+        "dataset": "MIT-Adobe FiveK, expert D, camera RAW (DNG) to retoucher final",
+        "heldOutPairs": 5,
+        "profileDe00": 13.91,
+        "trainingPairs": 13
+      },
+      "swatch": [
+        "#efe2d2",
+        "#d9a77c",
+        "#88985c",
+        "#8c9fb8",
+        "#2b2522"
+      ],
+      "adjust": {
+        "blacks": -30,
+        "contrast": 17,
+        "curve": [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            80
+          ],
+          [
+            192,
+            208
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        "exposure": -0.09,
+        "highlights": 8,
+        "saturation": 16,
+        "shadows": 32,
+        "temperature": 400,
+        "tint": 6,
+        "vibrance": -8,
+        "developedStrength": 0.5
+      }
+    },
+    {
+      "id": "fivek-expert-e",
+      "name": "Pro Retoucher E",
+      "category": "Learned",
+      "tagline": "Golden warmth, rich colour and open shadows.",
+      "description": "Measured, not written: AURA decoded 13 camera RAW files, recovered the settings that reproduce professional retoucher E's finished photographs through its own renderer, and kept the median of what the retoucher did beyond AURA's automatic correction. On 5 RAW photos it never learned from, it brings AURA from 16.0 to 14.0 dE00 of the retoucher's final.",
+      "bestFor": [
+        "Everyday",
+        "Travel",
+        "Portraits",
+        "Landscape"
+      ],
+      "technique": [
+        "Exposure -0.09 EV beyond AURA's own correction",
+        "Contrast +15",
+        "Highlights +16",
+        "Shadows +25",
+        "Whites -6",
+        "Blacks -36",
+        "Vibrance +8",
+        "Saturation +40",
+        "White balance +800 K (warmer)",
+        "A tone curve through (64, 80), (192, 208)"
+      ],
+      "origin": "learned",
+      "sources": [
+        {
+          "title": "MIT-Adobe FiveK dataset (Bychkovsky et al., CVPR 2011)",
+          "url": "https://data.csail.mit.edu/graphics/fivek/"
+        }
+      ],
+      "evidence": {
+        "autoDe00": 16.01,
+        "dataset": "MIT-Adobe FiveK, expert E, camera RAW (DNG) to retoucher final",
+        "heldOutPairs": 5,
+        "profileDe00": 13.96,
+        "trainingPairs": 13
+      },
+      "swatch": [
+        "#f4eee6",
+        "#e0b48c",
+        "#6aa65e",
+        "#6f9fd6",
+        "#2a2826"
+      ],
+      "adjust": {
+        "blacks": -36,
+        "contrast": 15,
+        "curve": [
+          [
+            0,
+            0
+          ],
+          [
+            64,
+            80
+          ],
+          [
+            192,
+            208
+          ],
+          [
+            255,
+            255
+          ]
+        ],
+        "exposure": -0.09,
+        "highlights": 16,
+        "saturation": 40,
+        "shadows": 25,
+        "temperature": 800,
+        "vibrance": 8,
+        "whites": -6,
+        "developedStrength": 0.5
+      }
+    }
+  ]
+}

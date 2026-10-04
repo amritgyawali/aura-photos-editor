@@ -85,15 +85,17 @@ pub mod fixtures;
 pub mod hash;
 pub mod history;
 pub mod migrate;
+pub mod retouch_tools;
 pub mod schema;
 pub mod sidecar;
 pub mod store;
 pub mod xmp;
 
 pub use contract::recipe::{
-    Bw, CleanupOp, Curve, EditSource, Geometry, Global, HslShift, ImageRef, Lens, LensCoefficients,
-    Mask, MaskKind, MaskParams, Noise, Perspective, Provenance, Recipe, Restoration, RetouchOp,
-    Sharpen, ENGINE, HSL_BANDS, SCHEMA_VERSION,
+    Bw, Calibration, ChannelCurves, CleanupOp, ColourGrade, Curve, EditSource, Effects, Geometry,
+    Global, GradeWheel, Grain, HslShift, ImageRef, Lens, LensCoefficients, Mask, MaskKind,
+    MaskParams, Noise, ParametricCurve, Perspective, PostCropVignette, Provenance, Recipe,
+    Restoration, RetouchOp, Sharpen, ENGINE, HSL_BANDS, SCHEMA_VERSION,
 };
 pub use hash::{canonical, recipe_hash};
 pub use history::{History, HistoryEntry, Snapshot};

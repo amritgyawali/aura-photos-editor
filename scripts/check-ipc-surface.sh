@@ -66,7 +66,11 @@ awk '
 # them, because `[^>]*` stops at the first `>`. It found 239 of 240 and reported the missing one as
 # dead surface, which is a check that is wrong in the direction of raising a false alarm - the only
 # direction that gets a check switched off.
-grep "invoke" "$client" \
+#
+# Every typed IPC module counts, not only client.ts: the native retouch wrappers live beside it in
+# nativeRetouch.ts, and reading one file reported five working commands as dead surface.
+find "$root/ui/src/ipc" -maxdepth 1 -name '*.ts' ! -name '*.test.ts' -print0 \
+  | xargs -0 grep -h "invoke" \
   | grep -oE "\('[a-z0-9_]+'" \
   | tr -d "('" \
   | sort -u > "$tmp/invoked"

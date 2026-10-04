@@ -413,6 +413,6 @@ fn the_status_says_which_schemes_this_build_can_reach() {
     // The default build carries `aura-cloud`'s `tls` feature, which is what makes
     // sixteen of the nineteen rows in the catalogue reachable at all. A build
     // without it reports only `http` and the setup screen warns on every HTTPS
-    // provider - see ADR-0063 section 5.
+    // provider - see ADR-0066 section 5.
     assert!(schemes.contains(&"https".to_string()), "{schemes:?}");
 }

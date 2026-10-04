@@ -50,8 +50,8 @@ pub struct AiSetup {
     pub completed: bool,
     /// True when it was answered by declining rather than by choosing.
     ///
-    /// Kept separately from `completed` so the panel can offer "you skipped this
-    /// - set it up now" rather than presenting a configured-looking Anthropic
+    /// Kept separately from `completed` so the panel can offer "you skipped this,
+    /// set it up now" rather than presenting a configured-looking Anthropic
     /// that has no key behind it.
     pub skipped: bool,
 }

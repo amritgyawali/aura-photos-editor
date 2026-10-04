@@ -15,7 +15,7 @@
 //!302s us somewhere is a provider we should not silently follow, and every
 //! vendor here returns identity-encoded JSON.
 //!
-//! TLS was on that list until `docs/adr/ADR-0063-tls-and-the-provider-catalogue.md`
+//! TLS was on that list until `docs/adr/ADR-0066-tls-and-the-provider-catalogue.md`
 //! discharged the waiver phase 04 recorded in ADR-0009. It arrives exactly where
 //! the original module said it would - through the [`Connector`] port, in
 //! [`crate::tls`] - and nothing else in this file knows about it. A build with

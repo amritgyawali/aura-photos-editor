@@ -141,7 +141,7 @@ pub trait EditorialJudge: Send + Sync {
 ///
 /// Not a stub. It is the shipped behaviour whenever cloud AI is off, no key is configured, or the
 /// studio declined - which is the default state of a fresh install, because cloud AI starts off
-/// per project and the first-run screen may always be declined. ADR-0063 made a public provider
+/// per project and the first-run screen may always be declined. ADR-0066 made a public provider
 /// reachable; nothing in this crate attaches one, and `Answer` has no `Approve` variant, so the
 /// worst a wired judge could do is make the product do less.
 #[derive(Debug, Clone, Copy, Default)]

@@ -1,0 +1,1811 @@
+{
+  "asOf": "2026-09-30",
+  "baselineCommit": "a69b236",
+  "scope": "100 prioritized feature families from 10 representative editors; not an exhaustive product matrix or ranking",
+  "products": [
+    {
+      "id": "PS",
+      "name": "Adobe Photoshop",
+      "focus": "Layer compositing, selection and retouching",
+      "source": "ps"
+    },
+    {
+      "id": "LR",
+      "name": "Adobe Lightroom Classic",
+      "focus": "Photo library and reversible RAW workflow",
+      "source": "lr"
+    },
+    {
+      "id": "C1",
+      "name": "Capture One Pro",
+      "focus": "Tethering and selective color control",
+      "source": "c1"
+    },
+    {
+      "id": "AF",
+      "name": "Affinity (photo editing / Pixel Studio)",
+      "focus": "Layers, live filters and image merging",
+      "source": "aff"
+    },
+    {
+      "id": "DX",
+      "name": "DxO PhotoLab",
+      "focus": "RAW denoising and measured optical correction",
+      "source": "dxo"
+    },
+    {
+      "id": "ON",
+      "name": "ON1 Photo RAW",
+      "focus": "Effects, masks and multi-image workflows",
+      "source": "on1"
+    },
+    {
+      "id": "LU",
+      "name": "Luminar Neo",
+      "focus": "Portrait tools and automatic scene enhancement",
+      "source": "lum"
+    },
+    {
+      "id": "AC",
+      "name": "ACDSee Photo Studio Ultimate",
+      "focus": "Asset management and layered editing",
+      "source": "acd"
+    },
+    {
+      "id": "GI",
+      "name": "GIMP",
+      "focus": "Pixel editing, paths and extensibility",
+      "source": "gimp"
+    },
+    {
+      "id": "DT",
+      "name": "darktable",
+      "focus": "Scene-referred RAW workflow and performance",
+      "source": "dt"
+    }
+  ],
+  "sources": {
+    "ps": {
+      "title": "Photoshop tools",
+      "url": "https://www.adobe.com/products/photoshop/features.html"
+    },
+    "psscale": {
+      "title": "Photoshop content-aware scaling",
+      "url": "https://helpx.adobe.com/ca/photoshop/desktop/crop-resize-transform/resize-adjust-resolution/preserve-visual-content-when-scaling-images.html"
+    },
+    "psstack": {
+      "title": "Photoshop image stacks and Smart Objects",
+      "url": "https://helpx.adobe.com/photoshop/desktop/create-manage-layers/create-layer-compositions/create-and-process-image-stacks.html"
+    },
+    "psobjects": {
+      "title": "Photoshop Smart Objects",
+      "url": "https://helpx.adobe.com/photoshop/desktop/create-manage-layers/smart-objects/smart-objects-overview-and-benefits.html"
+    },
+    "lr": {
+      "title": "Lightroom Classic Develop tools",
+      "url": "https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/develop-module-tools.html"
+    },
+    "lrtone": {
+      "title": "Lightroom Classic tone and clipping",
+      "url": "https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html"
+    },
+    "lrproxy": {
+      "title": "Lightroom Classic Smart Previews",
+      "url": "https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/lightroom-smart-previews.html"
+    },
+    "lrimport": {
+      "title": "Lightroom Classic import options",
+      "url": "https://helpx.adobe.com/lightroom-classic/desktop/import-photos/photo-video-import-options.html"
+    },
+    "lrmask": {
+      "title": "Lightroom Classic mask combinations",
+      "url": "https://helpx.adobe.com/dk/lightroom-classic/desktop/process-and-develop-photos/masking.html"
+    },
+    "lrcolor": {
+      "title": "Lightroom Classic color management",
+      "url": "https://helpx.adobe.com/lightroom-classic/desktop/workspace/color-management.html"
+    },
+    "lrout": {
+      "title": "Lightroom Classic export",
+      "url": "https://helpx.adobe.com/lightroom-classic/desktop/export-photos/export-files-disk-or-cd.html"
+    },
+    "lrsync": {
+      "title": "Lightroom Classic copy and synchronize",
+      "url": "https://helpx.adobe.com/in/lightroom-classic/desktop/help/applying-adjustments-develop-module-basic.html"
+    },
+    "c1": {
+      "title": "Capture One Pro",
+      "url": "https://www.captureone.com/en/products/capture-one-pro"
+    },
+    "c1color": {
+      "title": "Capture One Color Editor",
+      "url": "https://support.captureone.com/hc/en-us/articles/360002601358-The-Color-Editor-overview"
+    },
+    "c1new": {
+      "title": "Capture One new features",
+      "url": "https://www.captureone.com/en/explore-features/whats-new"
+    },
+    "aff": {
+      "title": "Affinity photo editing",
+      "url": "https://www.affinity.studio/photo-editing-software"
+    },
+    "afffreq": {
+      "title": "Affinity frequency separation",
+      "url": "https://www.affinity.studio/blog/frequency-separation-explained"
+    },
+    "dxo": {
+      "title": "DxO PhotoLab features",
+      "url": "https://www.dxo.com/dxo-photolab/features/"
+    },
+    "on1": {
+      "title": "ON1 Photo RAW established features",
+      "url": "https://www.on1.com/products/photo-raw/features/?v=1&v=13"
+    },
+    "lum": {
+      "title": "Luminar Neo tools",
+      "url": "https://skylum.com/luminar-for-intel"
+    },
+    "lumportrait": {
+      "title": "Luminar portrait tools",
+      "url": "https://support.skylum.com/editing-tools/portrait-tools"
+    },
+    "acd": {
+      "title": "ACDSee Photo Studio Ultimate features",
+      "url": "https://www.acdsee.com/en/products/photo-studio-ultimate/features/"
+    },
+    "gimp": {
+      "title": "GIMP 3 documentation index",
+      "url": "https://docs.gimp.org/3.0/en_GB/gimp-help-index.html"
+    },
+    "gimpfilters": {
+      "title": "GIMP nondestructive filters",
+      "url": "https://docs.gimp.org/3.2/en_GB/gimp-filters-common.html"
+    },
+    "gimpplugin": {
+      "title": "GIMP plug-ins and scripting",
+      "url": "https://developer.gimp.org/resource/about-plugins/"
+    },
+    "dt": {
+      "title": "darktable features",
+      "url": "https://www.darktable.org/about/features/"
+    }
+  },
+  "features": [
+    {
+      "id": 1,
+      "category": "Library and capture",
+      "name": "File and folder import",
+      "examples": [
+        "LR",
+        "DT"
+      ],
+      "sources": [
+        "dt"
+      ],
+      "status": "Verified",
+      "evidence": "crates/aura-ingest/src/import.rs",
+      "technique": "Journal each import; hash originals; resume interrupted jobs",
+      "note": "Five JPEG file roots passed native testing; other formats need their own fixtures"
+    },
+    {
+      "id": 2,
+      "category": "Library and capture",
+      "name": "RAW decoding and demosaicing",
+      "examples": [
+        "C1",
+        "DX"
+      ],
+      "sources": [
+        "c1",
+        "dxo"
+      ],
+      "status": "Partial",
+      "evidence": "docs/camera-support.md",
+      "technique": "Extend existing safe decoder with camera-specific fixtures and fallback provenance",
+      "note": "Coverage varies by compression; no claim of every camera"
+    },
+    {
+      "id": 3,
+      "category": "Library and capture",
+      "name": "EXIF and camera/lens metadata",
+      "examples": [
+        "DT",
+        "DX"
+      ],
+      "sources": [
+        "dt",
+        "dxo"
+      ],
+      "status": "Present",
+      "evidence": "crates/aura-ingest/src/import.rs",
+      "technique": "Normalize metadata once; preserve unknown fields and orientation",
+      "note": "Inspect real camera MakerNotes before expanding support"
+    },
+    {
+      "id": 4,
+      "category": "Library and capture",
+      "name": "Ratings, flags and color labels",
+      "examples": [
+        "DT",
+        "AC"
+      ],
+      "sources": [
+        "dt",
+        "acd"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-catalog/migrations/0001_init.sql",
+      "technique": "Persist user decisions separately from automatic culling suggestions",
+      "note": "Culling infrastructure is not proof of complete manual labeling UX"
+    },
+    {
+      "id": 5,
+      "category": "Library and capture",
+      "name": "Keywords and searchable metadata",
+      "examples": [
+        "DT",
+        "AC"
+      ],
+      "sources": [
+        "dt",
+        "acd"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-catalog/migrations/0001_init.sql",
+      "technique": "Index editable IPTC fields; add full-text search and bulk metadata updates",
+      "note": "Complete keyword editing and search UI not established"
+    },
+    {
+      "id": 6,
+      "category": "Library and capture",
+      "name": "Collections and rule-based albums",
+      "examples": [
+        "ON",
+        "AC"
+      ],
+      "sources": [
+        "on1",
+        "acd"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-catalog/migrations/0001_init.sql",
+      "technique": "Store collection membership and saved predicates independently",
+      "note": "Collections exist; general smart-album parity is unverified"
+    },
+    {
+      "id": 7,
+      "category": "Library and capture",
+      "name": "Duplicate detection and skip-on-import",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lrimport"
+      ],
+      "status": "Present",
+      "evidence": "crates/aura-ingest/src/import.rs",
+      "technique": "Use content hashes and idempotent catalog writes; report skipped copies",
+      "note": "Exact reimport tests passed; near-duplicate visual matching is a separate extension"
+    },
+    {
+      "id": 8,
+      "category": "Library and capture",
+      "name": "Face recognition and people albums",
+      "examples": [
+        "AC"
+      ],
+      "sources": [
+        "acd"
+      ],
+      "status": "Partial",
+      "evidence": "docs/retouch.md",
+      "technique": "Use a validated detector, embeddings and user-confirmed identity clusters",
+      "note": "Face detector is documented as untrained"
+    },
+    {
+      "id": 9,
+      "category": "Library and capture",
+      "name": "Tethered capture and live view",
+      "examples": [
+        "C1",
+        "DT"
+      ],
+      "sources": [
+        "c1",
+        "dt"
+      ],
+      "status": "Planned",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Add camera transport adapters, capture queue and reconnect handling",
+      "note": "No tethering path established in the inspected implementation"
+    },
+    {
+      "id": 10,
+      "category": "Library and capture",
+      "name": "Offline editable proxy previews",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lrproxy"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-preview/src/lib.rs",
+      "technique": "Persist proxy provenance and reconcile edits when originals return",
+      "note": "Cached previews alone do not prove offline editing"
+    },
+    {
+      "id": 11,
+      "category": "Exposure and tone",
+      "name": "Exposure compensation",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lrtone"
+      ],
+      "status": "Verified",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Apply gain in linear light and journal the user's value",
+      "note": "Manual exposure protection passed the five-photo native test"
+    },
+    {
+      "id": 12,
+      "category": "Exposure and tone",
+      "name": "White balance temperature and tint",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lr"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Use chromatic adaptation with an optional neutral-patch picker",
+      "note": "Controls exist; camera-specific accuracy still needs measured targets"
+    },
+    {
+      "id": 13,
+      "category": "Exposure and tone",
+      "name": "Global contrast",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lrtone",
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Use bounded tone shaping with stable neutral settings",
+      "note": "Control and renderer exist; no competitor-quality benchmark"
+    },
+    {
+      "id": 14,
+      "category": "Exposure and tone",
+      "name": "Highlight recovery",
+      "examples": [
+        "LR",
+        "DX"
+      ],
+      "sources": [
+        "lrtone",
+        "dxo"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-render/src/cpu.rs",
+      "technique": "Recover RAW channel detail before tone mapping; protect specular highlights",
+      "note": "JPEG highlight adjustment cannot recover clipped sensor data"
+    },
+    {
+      "id": 15,
+      "category": "Exposure and tone",
+      "name": "Shadow recovery",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lrtone"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Lift dark tonal ranges with noise-aware limits",
+      "note": "Needs high-ISO and backlit RAW validation"
+    },
+    {
+      "id": 16,
+      "category": "Exposure and tone",
+      "name": "White and black point controls",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lrtone"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Adjust endpoints with smooth shoulders and clipping feedback",
+      "note": "Dedicated sliders are present"
+    },
+    {
+      "id": 17,
+      "category": "Exposure and tone",
+      "name": "Levels and midpoint gamma",
+      "examples": [
+        "AC",
+        "GI"
+      ],
+      "sources": [
+        "acd",
+        "gimp"
+      ],
+      "status": "Planned",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Add input/output black-white points and midpoint gamma",
+      "note": "Separate Levels tool not established"
+    },
+    {
+      "id": 18,
+      "category": "Exposure and tone",
+      "name": "RGB and luminance histogram",
+      "examples": [
+        "LR",
+        "DX"
+      ],
+      "sources": [
+        "lr",
+        "dxo"
+      ],
+      "status": "Verified",
+      "evidence": "ui/src/components/develop/Histogram.tsx",
+      "technique": "Measure rendered pixels with bounded sampling and channel bins",
+      "note": "Current histogram is a preview sample, not RAW sensor data"
+    },
+    {
+      "id": 19,
+      "category": "Exposure and tone",
+      "name": "Highlight and shadow clipping overlay",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lrtone"
+      ],
+      "status": "Partial",
+      "evidence": "ui/src/components/develop/Histogram.tsx",
+      "technique": "Overlay per-pixel clipping masks with independent channel thresholds",
+      "note": "Near-clipping percentages exist; spatial overlay is missing"
+    },
+    {
+      "id": 20,
+      "category": "Exposure and tone",
+      "name": "One-click automatic tone enhancement",
+      "examples": [
+        "LU",
+        "LR"
+      ],
+      "sources": [
+        "lum",
+        "lrtone"
+      ],
+      "status": "Verified",
+      "evidence": "crates/aura-app/src/photo_enhance.rs",
+      "technique": "Use bounded luminance statistics; protect manual fields; keep a neutral option",
+      "note": "Local measured correction, not a trained subject-aware model"
+    },
+    {
+      "id": 21,
+      "category": "Color and creative control",
+      "name": "Point and individual RGB tone curves",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lr"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Use monotonic interpolation and cache transfer tables",
+      "note": "Controls and renderer exist"
+    },
+    {
+      "id": 22,
+      "category": "Color and creative control",
+      "name": "Parametric tone curves",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lr"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Blend smooth tonal bands with ordered split points",
+      "note": "Controls and renderer exist"
+    },
+    {
+      "id": 23,
+      "category": "Color and creative control",
+      "name": "HSL color mixer",
+      "examples": [
+        "LR",
+        "C1"
+      ],
+      "sources": [
+        "lr",
+        "c1color"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Apply soft hue-band weights with stable hue wrapping",
+      "note": "Skin protection needs varied real-portrait evaluation"
+    },
+    {
+      "id": 24,
+      "category": "Color and creative control",
+      "name": "Targeted point-color editing",
+      "examples": [
+        "C1"
+      ],
+      "sources": [
+        "c1color"
+      ],
+      "status": "Planned",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Sample a pixel; edit a feathered range in perceptual color space",
+      "note": "Fixed HSL bands are not a sampled point-color tool"
+    },
+    {
+      "id": 25,
+      "category": "Color and creative control",
+      "name": "Shadow/midtone/highlight color grading",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lr"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Blend tonal color wheels while controlling luminance changes",
+      "note": "UI and recipe fields are present"
+    },
+    {
+      "id": 26,
+      "category": "Color and creative control",
+      "name": "Black-and-white channel mixing",
+      "examples": [
+        "ON"
+      ],
+      "sources": [
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Mix source hue contributions into monochrome luminance",
+      "note": "Monochrome controls exist"
+    },
+    {
+      "id": 27,
+      "category": "Color and creative control",
+      "name": "Vibrance and saturation",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lr"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Separate global chroma scaling from bounded low-chroma enhancement",
+      "note": "Controls and renderer exist"
+    },
+    {
+      "id": 28,
+      "category": "Color and creative control",
+      "name": "Camera calibration and matching profiles",
+      "examples": [
+        "LR",
+        "C1"
+      ],
+      "sources": [
+        "lr",
+        "c1"
+      ],
+      "status": "Partial",
+      "evidence": "docs/colour-management.md",
+      "technique": "Fit profiles from measured targets under controlled illuminants",
+      "note": "Calibration controls exist; real camera profiles are missing"
+    },
+    {
+      "id": 29,
+      "category": "Color and creative control",
+      "name": "ICC input/display/output color management",
+      "examples": [
+        "DT",
+        "LR"
+      ],
+      "sources": [
+        "dt",
+        "lrcolor"
+      ],
+      "status": "Partial",
+      "evidence": "docs/colour-management.md",
+      "technique": "Keep scene-linear working pixels; transform through explicit ICC profiles",
+      "note": "Output spaces exist; arbitrary input ICC and display parity are incomplete"
+    },
+    {
+      "id": 30,
+      "category": "Color and creative control",
+      "name": "Importable 3D LUT looks",
+      "examples": [
+        "ON",
+        "AC"
+      ],
+      "sources": [
+        "on1",
+        "acd"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-render/src/creative.rs",
+      "technique": "Parse cube/3DL safely; interpolate a 3D lattice with amount control",
+      "note": "Internal curve LUTs are not user-importable 3D LUTs"
+    },
+    {
+      "id": 31,
+      "category": "Geometry and optics",
+      "name": "Crop and aspect-ratio presets",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lr",
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Store normalized crop coordinates with reversible aspect locks",
+      "note": "Existing presets and crop recipe need broader native coverage"
+    },
+    {
+      "id": 32,
+      "category": "Geometry and optics",
+      "name": "Straighten and horizon correction",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lr",
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Use reversible rotation and optional measured line suggestions",
+      "note": "Manual control exists; automatic quality requires validation"
+    },
+    {
+      "id": 33,
+      "category": "Geometry and optics",
+      "name": "Rotate and mirror",
+      "examples": [
+        "GI"
+      ],
+      "sources": [
+        "gimp"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Compose orientation transforms and update crop/mask coordinates",
+      "note": "Rotation exists; a complete mirror workflow is unverified"
+    },
+    {
+      "id": 34,
+      "category": "Geometry and optics",
+      "name": "Perspective and keystone correction",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lr",
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "crates/aura-render/src/cpu.rs",
+      "technique": "Apply a homography with bounded interpolation and crop preview",
+      "note": "Code exists; architectural real-image cases remain to be tested"
+    },
+    {
+      "id": 35,
+      "category": "Geometry and optics",
+      "name": "Lens distortion correction",
+      "examples": [
+        "DX",
+        "LR"
+      ],
+      "sources": [
+        "dxo",
+        "lr"
+      ],
+      "status": "Partial",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Apply calibrated radial/tangential lens models",
+      "note": "Measured camera/lens coverage is incomplete"
+    },
+    {
+      "id": 36,
+      "category": "Geometry and optics",
+      "name": "Chromatic aberration and defringing",
+      "examples": [
+        "DX",
+        "LR"
+      ],
+      "sources": [
+        "dxo",
+        "lr"
+      ],
+      "status": "Partial",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Align color channels and suppress selected edge fringes",
+      "note": "Correction controls exist; universal lens parity is unproven"
+    },
+    {
+      "id": 37,
+      "category": "Geometry and optics",
+      "name": "Lens vignetting compensation",
+      "examples": [
+        "DX",
+        "LR"
+      ],
+      "sources": [
+        "dxo",
+        "lr"
+      ],
+      "status": "Present",
+      "evidence": "crates/aura-render/src/cpu.rs",
+      "technique": "Apply calibrated radial gain before creative grading",
+      "note": "Calibration quality remains camera/lens dependent"
+    },
+    {
+      "id": 38,
+      "category": "Geometry and optics",
+      "name": "High-quality image resampling",
+      "examples": [
+        "GI",
+        "ON"
+      ],
+      "sources": [
+        "gimp",
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "docs/delivery.md",
+      "technique": "Resize in linear light with antialiasing and tile borders",
+      "note": "Code exists; compare downsampling and enlargement fixtures"
+    },
+    {
+      "id": 39,
+      "category": "Geometry and optics",
+      "name": "Content-aware scaling",
+      "examples": [
+        "PS"
+      ],
+      "sources": [
+        "psscale"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Evaluate seam carving with user-protected subject regions",
+      "note": "No implementation established; keep geometry changes reversible"
+    },
+    {
+      "id": 40,
+      "category": "Geometry and optics",
+      "name": "Liquify and mesh warping",
+      "examples": [
+        "AF",
+        "ON"
+      ],
+      "sources": [
+        "aff",
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Use editable displacement meshes with foldover limits",
+      "note": "Manual creative tool only; do not apply automatically to faces"
+    },
+    {
+      "id": 41,
+      "category": "Selections and local adjustments",
+      "name": "Local adjustment brush",
+      "examples": [
+        "LR",
+        "DX"
+      ],
+      "sources": [
+        "lr",
+        "dxo"
+      ],
+      "status": "Partial",
+      "evidence": "ui/src/components/develop/MaskPanel.tsx",
+      "technique": "Rasterize pressure-aware strokes into tiled alpha masks",
+      "note": "Mask-editing infrastructure exists; complete painting UX is unverified"
+    },
+    {
+      "id": 42,
+      "category": "Selections and local adjustments",
+      "name": "Linear gradient masks",
+      "examples": [
+        "LR",
+        "DX"
+      ],
+      "sources": [
+        "lr",
+        "dxo"
+      ],
+      "status": "Partial",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Evaluate a feathered signed-distance ramp in image coordinates",
+      "note": "Renderer support exists; direct on-image workflow needs validation"
+    },
+    {
+      "id": 43,
+      "category": "Selections and local adjustments",
+      "name": "Radial gradient masks",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lr"
+      ],
+      "status": "Partial",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Evaluate elliptical distance with feather, invert and rotate",
+      "note": "Renderer support exists; direct manipulation needs validation"
+    },
+    {
+      "id": 44,
+      "category": "Selections and local adjustments",
+      "name": "Luminance-range masks",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lr",
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "ui/src/components/develop/MaskPanel.tsx",
+      "technique": "Map luminance into a soft threshold band",
+      "note": "General user-authored range-mask tool not established"
+    },
+    {
+      "id": 45,
+      "category": "Selections and local adjustments",
+      "name": "Color-range masks",
+      "examples": [
+        "LR",
+        "DX"
+      ],
+      "sources": [
+        "lr",
+        "dxo"
+      ],
+      "status": "Partial",
+      "evidence": "docs/masks.md",
+      "technique": "Use perceptual color distance with tolerance and feather",
+      "note": "Color growth is present; full editable range workflow unverified"
+    },
+    {
+      "id": 46,
+      "category": "Selections and local adjustments",
+      "name": "Automatic subject/background selection",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lr",
+        "on1"
+      ],
+      "status": "Partial",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Run validated segmentation through the existing inference service",
+      "note": "Segmentation heads are untrained"
+    },
+    {
+      "id": 47,
+      "category": "Selections and local adjustments",
+      "name": "Automatic sky selection",
+      "examples": [
+        "LR",
+        "DX"
+      ],
+      "sources": [
+        "lr",
+        "dxo"
+      ],
+      "status": "Partial",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Segment sky and refine edges against foreground structures",
+      "note": "Real-photo automatic masks are blocked by model readiness"
+    },
+    {
+      "id": 48,
+      "category": "Selections and local adjustments",
+      "name": "Face, skin, hair and eye masks",
+      "examples": [
+        "LR",
+        "LU"
+      ],
+      "sources": [
+        "lr",
+        "lumportrait"
+      ],
+      "status": "Partial",
+      "evidence": "docs/retouch.md",
+      "technique": "Combine face landmarks with semantic parsing and matting",
+      "note": "Untrained face detection blocks real portrait masks"
+    },
+    {
+      "id": 49,
+      "category": "Selections and local adjustments",
+      "name": "Mask feathering and edge refinement",
+      "examples": [
+        "DX",
+        "AC"
+      ],
+      "sources": [
+        "dxo",
+        "acd"
+      ],
+      "status": "Partial",
+      "evidence": "ui/src/components/develop/MaskPanel.tsx",
+      "technique": "Use distance fields and edge-aware matting; expose mask preview",
+      "note": "Basic operations exist; hair/veil quality is unproven"
+    },
+    {
+      "id": 50,
+      "category": "Selections and local adjustments",
+      "name": "Mask add, subtract, intersect and invert",
+      "examples": [
+        "LR",
+        "DX"
+      ],
+      "sources": [
+        "lrmask",
+        "dxo"
+      ],
+      "status": "Partial",
+      "evidence": "ui/src/components/develop/MaskPanel.tsx",
+      "technique": "Represent combinations as a reversible alpha-expression graph",
+      "note": "Complete boolean authoring workflow needs verification"
+    },
+    {
+      "id": 51,
+      "category": "Portraits and repair",
+      "name": "Spot healing and blemish repair",
+      "examples": [
+        "PS",
+        "AC"
+      ],
+      "sources": [
+        "ps",
+        "acd"
+      ],
+      "status": "Partial",
+      "evidence": "docs/retouch.md",
+      "technique": "Provide explicit source sampling and edge-aware patch blending",
+      "note": "Automatic face/blemish models are not ready for real portraits"
+    },
+    {
+      "id": 52,
+      "category": "Portraits and repair",
+      "name": "Clone stamp",
+      "examples": [
+        "PS",
+        "ON"
+      ],
+      "sources": [
+        "ps",
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "docs/retouch.md",
+      "technique": "Paint from a chosen source offset with opacity and edge feather",
+      "note": "General manual clone-stamp workflow not established"
+    },
+    {
+      "id": 53,
+      "category": "Portraits and repair",
+      "name": "Content-aware object removal",
+      "examples": [
+        "PS"
+      ],
+      "sources": [
+        "ps"
+      ],
+      "status": "Partial",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Start with user-selected masks; evaluate patch search and inpainting",
+      "note": "Current automatic cleanup refuses unclassified real-image removals"
+    },
+    {
+      "id": 54,
+      "category": "Portraits and repair",
+      "name": "Red-eye correction",
+      "examples": [
+        "LR",
+        "AC"
+      ],
+      "sources": [
+        "lr",
+        "acd"
+      ],
+      "status": "Partial",
+      "evidence": "docs/retouch.md",
+      "technique": "Detect pupil/redness within a user-confirmed eye region",
+      "note": "Automatic path depends on unavailable face evidence"
+    },
+    {
+      "id": 55,
+      "category": "Portraits and repair",
+      "name": "Texture-preserving skin smoothing",
+      "examples": [
+        "LU"
+      ],
+      "sources": [
+        "lumportrait"
+      ],
+      "status": "Partial",
+      "evidence": "docs/retouch.md",
+      "technique": "Separate low-frequency variation from texture with strict strength limits",
+      "note": "Retouch safeguards exist; usable real-photo masks are missing"
+    },
+    {
+      "id": 56,
+      "category": "Portraits and repair",
+      "name": "Frequency separation",
+      "examples": [
+        "AF",
+        "AC"
+      ],
+      "sources": [
+        "afffreq",
+        "acd"
+      ],
+      "status": "Planned",
+      "evidence": "docs/retouch.md",
+      "technique": "Create reversible low/high-frequency components with neutral reconstruction",
+      "note": "A full editable frequency-separation workflow is not established"
+    },
+    {
+      "id": 57,
+      "category": "Portraits and repair",
+      "name": "Dodge and burn / local relighting",
+      "examples": [
+        "PS",
+        "LU"
+      ],
+      "sources": [
+        "ps",
+        "lum"
+      ],
+      "status": "Partial",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Apply masked exposure and edge-aware luminance changes",
+      "note": "Local-light infrastructure exists; depth-aware relighting is not proven"
+    },
+    {
+      "id": 58,
+      "category": "Portraits and repair",
+      "name": "Eye and teeth enhancement",
+      "examples": [
+        "LU",
+        "AC"
+      ],
+      "sources": [
+        "lumportrait",
+        "acd"
+      ],
+      "status": "Partial",
+      "evidence": "docs/retouch.md",
+      "technique": "Bound local luminance/chroma edits inside confirmed masks",
+      "note": "Real-photo face detection remains a dependency"
+    },
+    {
+      "id": 59,
+      "category": "Portraits and repair",
+      "name": "Skin-tone uniformity",
+      "examples": [
+        "C1"
+      ],
+      "sources": [
+        "c1color"
+      ],
+      "status": "Partial",
+      "evidence": "docs/retouch.md",
+      "technique": "Reduce unwanted hue/chroma variance within protected skin masks",
+      "note": "Measured retouch code exists; accuracy on people is unproven"
+    },
+    {
+      "id": 60,
+      "category": "Portraits and repair",
+      "name": "Depth-aware background blur",
+      "examples": [
+        "LR",
+        "LU"
+      ],
+      "sources": [
+        "lr",
+        "lumportrait"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Estimate depth and alpha; use occlusion-aware variable-radius blur",
+      "note": "No complete depth-bokeh workflow established"
+    },
+    {
+      "id": 61,
+      "category": "Layers and composition",
+      "name": "Pixel layers and layer groups",
+      "examples": [
+        "AF",
+        "GI"
+      ],
+      "sources": [
+        "aff",
+        "gimp"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Add a versioned document graph with ordered children and stable IDs",
+      "note": "Current edit recipe is not a general layered document"
+    },
+    {
+      "id": 62,
+      "category": "Layers and composition",
+      "name": "Adjustment layers",
+      "examples": [
+        "AC"
+      ],
+      "sources": [
+        "acd"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Represent adjustments as independently masked graph nodes",
+      "note": "Global recipe blocks are not user-managed adjustment layers"
+    },
+    {
+      "id": 63,
+      "category": "Layers and composition",
+      "name": "Per-layer masks",
+      "examples": [
+        "AC",
+        "GI"
+      ],
+      "sources": [
+        "acd",
+        "gimp"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Attach editable alpha planes to compositing nodes",
+      "note": "Requires a layered document model"
+    },
+    {
+      "id": 64,
+      "category": "Layers and composition",
+      "name": "Layer blend modes and opacity",
+      "examples": [
+        "AC",
+        "GI"
+      ],
+      "sources": [
+        "acd",
+        "gimp"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Implement premultiplied-alpha compositing with explicit blend space",
+      "note": "Local edit strength is not general layer blending"
+    },
+    {
+      "id": 65,
+      "category": "Layers and composition",
+      "name": "Smart Objects / linked image objects",
+      "examples": [
+        "PS"
+      ],
+      "sources": [
+        "psobjects"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Reference immutable source assets and retain transform/filter parameters",
+      "note": "Requires asset references, relinking and nested rendering"
+    },
+    {
+      "id": 66,
+      "category": "Layers and composition",
+      "name": "Reorderable nondestructive filter stack",
+      "examples": [
+        "GI",
+        "AF"
+      ],
+      "sources": [
+        "gimpfilters",
+        "aff"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-render/src/cpu.rs",
+      "technique": "Store versioned operation nodes with explicit dependencies",
+      "note": "Existing fixed renderer stages are not a reorderable user stack"
+    },
+    {
+      "id": 67,
+      "category": "Layers and composition",
+      "name": "Editable text layers",
+      "examples": [
+        "PS",
+        "AC"
+      ],
+      "sources": [
+        "ps",
+        "acd"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Add font shaping, text layout and resolution-independent rendering",
+      "note": "No layered typography workflow established"
+    },
+    {
+      "id": 68,
+      "category": "Layers and composition",
+      "name": "Vector shapes and editable paths",
+      "examples": [
+        "PS",
+        "GI"
+      ],
+      "sources": [
+        "ps",
+        "gimp"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Store Bezier paths and rasterize with antialiasing at output scale",
+      "note": "Needs document nodes and selection/path editing tools"
+    },
+    {
+      "id": 69,
+      "category": "Layers and composition",
+      "name": "Automatic layer alignment and blending",
+      "examples": [
+        "AC"
+      ],
+      "sources": [
+        "acd"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Estimate transforms, compensate exposure and blend overlapping regions",
+      "note": "No multi-source composition graph established"
+    },
+    {
+      "id": 70,
+      "category": "Layers and composition",
+      "name": "Editable layered document interchange",
+      "examples": [
+        "AF",
+        "ON"
+      ],
+      "sources": [
+        "aff",
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-recipe/src/contract/recipe.rs",
+      "technique": "Define native layered serialization; explicitly scope PSD/ORA interoperability",
+      "note": "Current XMP recipes do not preserve arbitrary layered documents"
+    },
+    {
+      "id": 71,
+      "category": "Computational photography",
+      "name": "Bracketed HDR merge",
+      "examples": [
+        "AF",
+        "ON"
+      ],
+      "sources": [
+        "aff",
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Align brackets, reject motion and merge scene radiance before tone mapping",
+      "note": "Explicitly listed as missing"
+    },
+    {
+      "id": 72,
+      "category": "Computational photography",
+      "name": "Panorama stitching",
+      "examples": [
+        "ON",
+        "AC"
+      ],
+      "sources": [
+        "on1",
+        "acd"
+      ],
+      "status": "Planned",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Match features, solve camera geometry, choose seams and multiband blend",
+      "note": "Explicitly listed as missing"
+    },
+    {
+      "id": 73,
+      "category": "Computational photography",
+      "name": "Focus stacking",
+      "examples": [
+        "AF",
+        "ON"
+      ],
+      "sources": [
+        "aff",
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Align scale/focus breathing; fuse sharp regions with seam refinement",
+      "note": "No implementation established"
+    },
+    {
+      "id": 74,
+      "category": "Computational photography",
+      "name": "Multi-frame noise reduction",
+      "examples": [
+        "PS"
+      ],
+      "sources": [
+        "psstack"
+      ],
+      "status": "Planned",
+      "evidence": "docs/restoration.md",
+      "technique": "Align bursts and robustly aggregate static regions with motion rejection",
+      "note": "Current restoration is not a proven multi-frame merge tool"
+    },
+    {
+      "id": 75,
+      "category": "Computational photography",
+      "name": "AI denoising",
+      "examples": [
+        "DX",
+        "ON"
+      ],
+      "sources": [
+        "dxo",
+        "on1"
+      ],
+      "status": "Partial",
+      "evidence": "docs/restoration.md",
+      "technique": "Evaluate trained denoisers against classical baselines and identity detail",
+      "note": "Classical restoration exists; trained model parity is unproven"
+    },
+    {
+      "id": 76,
+      "category": "Computational photography",
+      "name": "Sharpening, texture, clarity and dehaze",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lr"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Use scale-aware local contrast, edge masks and bounded restoration",
+      "note": "Controls exist; halo/noise behavior needs broader image tests"
+    },
+    {
+      "id": 77,
+      "category": "Computational photography",
+      "name": "AI enlargement / super-resolution",
+      "examples": [
+        "ON",
+        "PS"
+      ],
+      "sources": [
+        "on1",
+        "ps"
+      ],
+      "status": "Planned",
+      "evidence": "docs/restoration.md",
+      "technique": "Tile a validated super-resolution model with overlap and detail safeguards",
+      "note": "Do not confuse standard resizing with learned recovery"
+    },
+    {
+      "id": 78,
+      "category": "Computational photography",
+      "name": "Sky replacement",
+      "examples": [
+        "LU",
+        "ON"
+      ],
+      "sources": [
+        "lum",
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Combine sky matting, horizon alignment and editable scene relighting",
+      "note": "Requires reliable masks and multiple source assets"
+    },
+    {
+      "id": 79,
+      "category": "Computational photography",
+      "name": "Generative fill",
+      "examples": [
+        "PS"
+      ],
+      "sources": [
+        "ps"
+      ],
+      "status": "Planned",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Store a selected-mask request and versioned generated candidates",
+      "note": "Cleanup infrastructure is not a general prompt-fill product"
+    },
+    {
+      "id": 80,
+      "category": "Computational photography",
+      "name": "Generative canvas expansion",
+      "examples": [
+        "PS",
+        "LU"
+      ],
+      "sources": [
+        "ps",
+        "lum"
+      ],
+      "status": "Planned",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Extend document bounds and generate only the user-selected missing region",
+      "note": "Requires explicit user initiation and provider/local-model integration"
+    },
+    {
+      "id": 81,
+      "category": "Workflow and automation",
+      "name": "Presets and adjustable preset strength",
+      "examples": [
+        "PS",
+        "ON"
+      ],
+      "sources": [
+        "ps",
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Save versioned parameter subsets and interpolate supported values",
+      "note": "Existing presets; custom authoring/import/export still need review"
+    },
+    {
+      "id": 82,
+      "category": "Workflow and automation",
+      "name": "Copy, paste and synchronize edits",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lrsync"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/develop/LightroomPanel.tsx",
+      "technique": "Apply selected recipe fields in a transactional batch",
+      "note": "Current sync-all behavior needs selective sync expansion"
+    },
+    {
+      "id": 83,
+      "category": "Workflow and automation",
+      "name": "Reference-image look matching",
+      "examples": [
+        "C1"
+      ],
+      "sources": [
+        "c1new"
+      ],
+      "status": "Partial",
+      "evidence": "ui/src/components/look/MatchLookPanel.tsx",
+      "technique": "Match bounded color/tone statistics and validate through the renderer",
+      "note": "A statistical approximation, not recovery of another editor's settings"
+    },
+    {
+      "id": 84,
+      "category": "Workflow and automation",
+      "name": "Nondestructive history and Undo/Redo",
+      "examples": [
+        "DX",
+        "DT"
+      ],
+      "sources": [
+        "dxo",
+        "dt"
+      ],
+      "status": "Verified",
+      "evidence": "crates/aura-app/src/develop_commands.rs",
+      "technique": "Replay an append-only edit journal with explicit cursor movement",
+      "note": "Five-photo tests passed Undo/Redo and new-edit branch behavior"
+    },
+    {
+      "id": 85,
+      "category": "Workflow and automation",
+      "name": "Virtual copies and named snapshots",
+      "examples": [
+        "DX",
+        "LR"
+      ],
+      "sources": [
+        "dxo",
+        "lr"
+      ],
+      "status": "Planned",
+      "evidence": "crates/aura-app/src/develop_commands.rs",
+      "technique": "Fork recipe references without duplicating originals",
+      "note": "Persistent history is not a complete virtual-copy/snapshot UI"
+    },
+    {
+      "id": 86,
+      "category": "Workflow and automation",
+      "name": "Before/after comparison and zoom",
+      "examples": [
+        "LR",
+        "GI"
+      ],
+      "sources": [
+        "lr",
+        "gimpfilters"
+      ],
+      "status": "Verified",
+      "evidence": "ui/src/components/develop/PhotoStudio.tsx",
+      "technique": "Render matched views with a keyboard-accessible divider",
+      "note": "Native comparison passed; exhaustive synchronized zoom parity untested"
+    },
+    {
+      "id": 87,
+      "category": "Workflow and automation",
+      "name": "Macros, actions and plug-in scripting",
+      "examples": [
+        "AF",
+        "GI"
+      ],
+      "sources": [
+        "aff",
+        "gimpplugin"
+      ],
+      "status": "Planned",
+      "evidence": "ui/src/components/autopilot/prepareCollection.ts",
+      "technique": "Record typed commands; validate parameters; expose a bounded extension API",
+      "note": "Autopilot stages are not arbitrary user-authored macros"
+    },
+    {
+      "id": 88,
+      "category": "Workflow and automation",
+      "name": "Batch editing and export queues",
+      "examples": [
+        "ON",
+        "AF"
+      ],
+      "sources": [
+        "on1",
+        "aff"
+      ],
+      "status": "Present",
+      "evidence": "ui/src/components/autopilot/prepareCollection.ts",
+      "technique": "Use bounded workers, cancellation checkpoints and per-item results",
+      "note": "Five-image export passed; large-gallery capacity needs measurement"
+    },
+    {
+      "id": 89,
+      "category": "Workflow and automation",
+      "name": "Film grain and analog looks",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lr",
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "crates/aura-render/src/creative.rs",
+      "technique": "Use seeded spatial grain so preview and export agree",
+      "note": "Creative controls exist; visual calibration is not benchmarked"
+    },
+    {
+      "id": 90,
+      "category": "Workflow and automation",
+      "name": "Creative post-crop vignette",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lr",
+        "on1"
+      ],
+      "status": "Present",
+      "evidence": "crates/aura-render/src/creative.rs",
+      "technique": "Evaluate feathered geometry in final output coordinates",
+      "note": "Controls and renderer exist"
+    },
+    {
+      "id": 91,
+      "category": "Output and performance",
+      "name": "JPEG/PNG/TIFF export and bit-depth options",
+      "examples": [
+        "DT",
+        "LR"
+      ],
+      "sources": [
+        "dt",
+        "lrout"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-export/src/api.rs",
+      "technique": "Keep format capabilities explicit; verify decoded output after writing",
+      "note": "Five PNG exports verified; format/depth matrix is not fully tested"
+    },
+    {
+      "id": 92,
+      "category": "Output and performance",
+      "name": "Export resizing and output sharpening",
+      "examples": [
+        "ON",
+        "LR"
+      ],
+      "sources": [
+        "on1",
+        "lrout"
+      ],
+      "status": "Present",
+      "evidence": "docs/delivery.md",
+      "technique": "Resize once, then sharpen for the chosen output size and medium",
+      "note": "Do not promise identical print appearance without profiling"
+    },
+    {
+      "id": 93,
+      "category": "Output and performance",
+      "name": "Batch naming and metadata/privacy controls",
+      "examples": [
+        "DX",
+        "LR"
+      ],
+      "sources": [
+        "dxo",
+        "lrout"
+      ],
+      "status": "Present",
+      "evidence": "docs/delivery.md",
+      "technique": "Plan collision-safe names; whitelist metadata; strip location when chosen",
+      "note": "Export policy exists; broaden metadata round-trip tests"
+    },
+    {
+      "id": 94,
+      "category": "Output and performance",
+      "name": "Text and image watermarks",
+      "examples": [
+        "LR",
+        "ON"
+      ],
+      "sources": [
+        "lrout",
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "docs/delivery.md",
+      "technique": "Composite a positioned overlay after resize in output space",
+      "note": "A full watermark editor/export path is not established"
+    },
+    {
+      "id": 95,
+      "category": "Output and performance",
+      "name": "Soft proofing and gamut warnings",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lrcolor"
+      ],
+      "status": "Planned",
+      "evidence": "docs/lightroom-parity.md",
+      "technique": "Use display and printer profiles with selectable rendering intent",
+      "note": "Explicitly listed as missing"
+    },
+    {
+      "id": 96,
+      "category": "Output and performance",
+      "name": "Print layouts and contact sheets",
+      "examples": [
+        "ON"
+      ],
+      "sources": [
+        "on1"
+      ],
+      "status": "Planned",
+      "evidence": "docs/delivery.md",
+      "technique": "Lay out physical page units, margins and color-managed output",
+      "note": "Exporting an album set is not a desktop print-layout engine"
+    },
+    {
+      "id": 97,
+      "category": "Output and performance",
+      "name": "XMP sidecars and edit interchange",
+      "examples": [
+        "DT",
+        "LR"
+      ],
+      "sources": [
+        "dt",
+        "lrsync"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-recipe/src/xmp.rs",
+      "technique": "Map supported parameters; retain unmapped data; document lossy translation",
+      "note": "Writer exists; full cross-editor round-trip fidelity is not proven"
+    },
+    {
+      "id": 98,
+      "category": "Output and performance",
+      "name": "GPU-accelerated rendering",
+      "examples": [
+        "DT",
+        "AF"
+      ],
+      "sources": [
+        "dt",
+        "aff"
+      ],
+      "status": "Partial",
+      "evidence": "crates/aura-render/src/lib.rs",
+      "technique": "Connect a compute backend behind the renderer; keep tested CPU fallback",
+      "note": "Shaders exist but no GPU backend is linked"
+    },
+    {
+      "id": 99,
+      "category": "Output and performance",
+      "name": "Tiled rendering and multiresolution caching",
+      "examples": [
+        "DT"
+      ],
+      "sources": [
+        "dt"
+      ],
+      "status": "Present",
+      "evidence": "crates/aura-preview/src/lib.rs",
+      "technique": "Cache by source/recipe/version; bound memory; prioritize visible tiles",
+      "note": "Architecture exists; interactive latency targets need real measurement"
+    },
+    {
+      "id": 100,
+      "category": "Output and performance",
+      "name": "HDR display editing and HDR export",
+      "examples": [
+        "LR"
+      ],
+      "sources": [
+        "lr",
+        "lrout"
+      ],
+      "status": "Planned",
+      "evidence": "docs/colour-management.md",
+      "technique": "Add an HDR display/output path with SDR fallback and gain-map validation",
+      "note": "Wide-gamut floating-point internals alone are not HDR delivery"
+    }
+  ]
+}

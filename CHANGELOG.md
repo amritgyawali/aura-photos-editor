@@ -2,6 +2,145 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Intelligent one-click editing — 2026-09-30
+
+- Auto enhance now measures the scene (portrait, group, landscape, low light, general) and
+  sets white balance (partial gray-pixel correction, faces ignored), vibrance, clarity,
+  dehaze, noise reduction and sharpening in addition to exposure and tone.
+- Outdoor frames with a bright sky get a feathered, highlight-only sky gradient.
+- Per face, on the 2048-px proxy: temporary blemishes (redder than surrounding skin) are
+  healed individually while darker, non-red marks are kept and counted; iris detail,
+  sclera redness, flash red-eye and under-eye shadows are corrected only when measured;
+  yellow teeth are whitened and skin shine is softened only when measured.
+- The pass saves up to six separate history steps (light & colour, sky, skin, blemishes,
+  eyes, teeth & shine). `history_step` accepts `goto:<seq>`; Develop's history list has
+  "Go back to here" for every step. Retouch tags automatic operations with their face.
+- Report explains every step, the scene decisions and per-face findings. ADR-0081.
+- Added measured fine-line, smile-line and nose-redness refinement, and a Retouch settings
+  panel (strength and feature switches) backed by the new `auto_retouch` command.
+- `scripts/check-ipc-surface.sh` now reads every typed IPC module, not only `client.ts`.
+- Retouch now offers **Face**, **Body skin** and **Face + body skin** with one Auto retouch
+  button; body skin is sampled below each face and matched to the same person's face colour.
+
+## Adaptive portrait retouch — 2026-09-30
+
+- Added bounded orientation fallbacks for sideways/upside-down face detection.
+- Added representative patch sampling, measured per-face retouch strengths and
+  an expandable explanation of automatic decisions in Develop and Retouch.
+- Fixed retouch-only Reset and snapshot restoration by tracking removed recipe
+  fields; manual merges and restored snapshots now record user provenance.
+- Retained offline processing, original-file preservation and manual protection.
+
+## Automatic portrait editing
+
+- Bundled a hash-verified YuNet face detector for offline CPU analysis, including five facial landmarks and multiple-face suppression.
+- Auto enhance and collection preparation now detect suitable faces, sample skin and save restrained texture, tone and dodge/burn adjustments as editable steps.
+- Added Auto portrait in Retouch, analysis feedback, persisted explanations and explicit no-face/manual-protection outcomes.
+- Repeat analysis keeps stable operation IDs and creates no duplicate history. Undo/redo and manual retouch protection remain available.
+- Fixed fresh-versus-cached preview differences so face analysis and editing previews stay consistent after restarting the app.
+- Added the bounded nearest/asymmetric/floor ONNX Resize operator and portrait integration checks. Small, occluded or unsuitable faces are skipped; targeting is landmark-guided, not semantic skin segmentation.
+
+## Advanced retouch selections
+
+- Added linear gradients, outside-shape inversion and brightness ranges to all 24 native retouch tools, with shared preview/export coverage.
+- Added numeric gradient endpoints, reverse direction, shadows/midtones/highlights presets and adjustable range falloff.
+- Added a disposable grayscale selection preview evaluated at the operation's position in the saved stack, with read-only zoom/pan.
+- Broad healing selections require a chosen source. Invalid selections are rejected before saving; old recipes preserve their behavior.
+- Added native/UI regression coverage and `scripts/test-retouch-selection.py` for five-portrait desktop and export verification.
+
+## Retouch comparison and draft protection
+
+- Added an aligned, draggable before/after split in Retouch, with shared zoom/pan, keyboard slider controls and comparison of unsaved previews.
+- Comparison gestures cannot paint or move a source. Moving the divider uses cached previews and does not change saved edits or exports.
+- Unsaved drafts now block saved-operation selection, stack changes and saved history navigation until Apply or Discard. Dirty saved-operation refinements also block tool switching, starting another operation and quick skin presets.
+- Added UI regression tests and a repeatable five-portrait desktop workflow in `scripts/test-retouch-comparison.py`.
+
+## Texture-aware patch healing
+
+- Added a native patch repair tool with surrounding-texture donor matching and local tone blending; existing Heal operations retain their behavior.
+- Small ellipses support automatic donor search. Painted and larger repairs require a chosen source, with validation in both the interface and native recipe path.
+- Fractional and overlapping source patches use immutable source pixels. Undo/redo, disposable previews, editable operations and export use the shared renderer.
+- Added behavior tests and extended the five-portrait desktop verification script with `--workflow patch-heal`.
+
+## Sample-guided portrait retouching
+
+- Added skin smoothing with edge protection and adjustable fine detail, sampled skin-tone evening that preserves luminance, and bounded skin dodge/burn that preserves RGB proportions.
+- Skin color tolerance intersects the existing ellipse/painted mask. The photographer selects the reference patch; this is not automatic face detection.
+- Added sample controls, full-photo targeting and preset persistence for tolerance/edge settings. Existing retouch operations keep their previous algorithms and recipe serialization.
+- Added synthetic behavior tests and a five-portrait desktop verification workflow. The [competitor audit](docs/retouch-competitor-audit.md) distinguishes working native behavior from unverified Retouch4me/SkinFiner parity.
+
+## Portrait editing: simpler controls and reliable review
+
+- Local auto enhancement preserves normally exposed portraits instead of forcing their median brightness toward middle gray; global darkening is limited to a quarter stop while highlights remain independently adjustable.
+- Fixed multi-file imports stopping after the first source: one import plan now creates one journal record, with counters spanning every source.
+- Source IDs include their collection so the same original folder can be used in separate collections without primary-key collisions.
+- The desktop now emits import completion and failure events, allowing the UI to release its import lock and start automatic editing after success.
+- Undo/redo navigation is replayed from persisted journal events. Saving an undo no longer discards the redo position; making a new edit still abandons the redo branch.
+- Essentials mode puts auto enhancement and everyday adjustments first; Advanced retains all Develop panels.
+- Filmstrip thumbnails show the actual imported photos and support Left/Right and Home/End navigation.
+- An RGB histogram reports the edited preview's tones and near-clipped pixel percentages.
+- Keep the last preview visible during saves and rendering; lock adjustments until refreshed state arrives and release the parent lock when the editor unmounts.
+- Numeric edits handle empty input, clamping and Escape; Enter/blur no longer submit the same edit twice. Disabled reset labels cannot change a recipe.
+- Added a repeatable native test for five real JPEG portraits, including full-size PNG export, original-file hashes, history and manual-setting protection.
+
+## Lightroom parity: every Develop panel, and one click that uses them
+
+**Every Lightroom Develop panel is in the photo studio**: Basic, Tone Curve (point, red, green,
+blue and parametric), Color Mixer, Black & White, Color Grading, Detail, Lens Corrections,
+Transform & Crop, Effects (post-crop vignette and grain) and Calibration, plus Auto, Presets with a
+strength slider and Sync Settings. Each control writes one recipe path as the photographer's own
+setting, which no automatic pass changes again. `docs/lightroom-parity.md` maps every Lightroom
+feature to where it lives here and says plainly what is not built yet (HDR and panorama merge, soft
+proofing, AI masks and content-aware remove on real photos, a GPU backend).
+
+**Five recipe blocks and four render stages, without moving a stored hash** (ADR-0070). Parametric
+and RGB curves compose into the existing curve stage; calibration, colour grading, the post-crop
+vignette and grain are new stages; all five blocks are absent from the canonical form while
+neutral. Streamed and whole-frame renders agree to the byte, and the XMP sidecar carries all of it
+in Lightroom's own attribute names. The merge now returns an omitted block to neutral, can turn
+black-and-white on (it could not set a leaf inside a null block), and will not let automation turn
+a person's monochrome off.
+
+**The one-click profiles use the real panels**: split-toned teal and orange, graded and grained
+film, toned monochromes, calibrated landscapes, and a highlight-priority vignette.
+
+## Edit profiles, a three-step start screen, and a DNG decoder that reads converted files
+
+**The start screen is now three steps: choose a look, optionally match an Instagram reference, and
+upload a photo or a folder.** When the import finishes every photo is edited with the chosen look
+automatically; with a reference as well, the reference is fitted on top of the look.
+
+**Edit profiles are residuals on a measurement, not presets.** Sixteen researched looks - light and
+airy, dark and moody, teal and orange, Portra film, vintage fade, golden hour, two monochromes,
+vivid landscape, soft portrait, neon night, editorial matte, fresh and crisp, romantic wedding,
+Nordic cool and true natural - each built from published before-and-after walkthroughs whose
+sources ship with it. Every application starts again from AURA's own measured correction, adds the
+look scaled by strength, then runs six guards that can only make the look gentler: highlight
+headroom, low-key frames, the frame's own colour lean, already-vivid frames, a RAW-learned look on
+an already-developed JPEG, and skin (the orange
+band is bounded in every colour profile). Nothing compounds, and nothing a person set is touched.
+Every card and the before/after are rendered by the export renderer. `docs/edit-profiles.md`.
+
+**Learned profiles copy professional retouchers' settings from RAW before-and-afters.**
+`ml/edit-profiles/fetch_fivek_pairs.py` downloads MIT-Adobe FiveK pairs - the camera DNG and a
+retoucher's final - and `crates/aura-app/tests/profile_fit.rs` decodes the DNG with AURA's own
+decoder, recovers the recipe that reproduces the final through the real renderer, and keeps the
+median of what the retoucher did beyond AURA's correction. Five ship, one per FiveK retoucher,
+learned from 110 RAW before-and-afters across eleven camera bodies; on 29 held-out RAW photos they
+bring AURA 6-17 % closer to the retoucher's final than the automatic correction alone. Each carries
+its held-out measurement, and on a photo the camera already developed it applies at half strength.
+That makes 21 profiles.
+
+**Converted DNGs decode correctly.** Doing that exposed four decoder defects that affected DNGs
+from Adobe DNG Converter: lossless-JPEG tiles were refused, the masked sensor border and the
+default crop were rendered, the black level ignored `BlackLevelDeltaV` - which on a converted
+Canon is where the whole black level is - leaving a lifted magenta haze, and a converted NEF's
+`LinearizationTable` was ignored. All four are fixed and tested; the fitter's residual against a
+retoucher's final fell from 12-21 to about 3 dE00.
+
+Two stale tests from the PNG commit are corrected: a PNG signature now sniffs as PNG, and tier 3
+decodes a developed JPEG at full size.
+
 ## Bring your own AI - nineteen providers, a first-run setup screen, and TLS
 
 Not a phase. Phase 04 shipped a governed cloud gateway that could reach four vendors, and the
@@ -26,7 +165,7 @@ answer, and nobody is asked twice. Invariant 6 is unchanged: the product edits a
 with none of this.
 
 **TLS ships, which is what makes the other two mean anything.** ADR-0009 waived it in phase 04 and
-`docs/adr/ADR-0063-tls-and-the-provider-catalogue.md` discharges the waiver. Sixteen of those
+`docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` discharges the waiver. Sixteen of those
 nineteen rows are HTTPS-only, and *a setup screen that collects a key it cannot use is worse than
 no setup screen*. It arrives exactly where phase 04's own module comment said it would - through
 the `Connector` port - and `HttpTransport` now holds one connector per scheme, so a hosted key and
@@ -55,7 +194,7 @@ reports 263 = 263 = 263.
 machine cannot compile the desktop shell, every test uses the cassette transport, and the prices
 in the table are the vendors' published list prices rather than anything measured here - which is
 why they are only ever used to *refuse* a call, and why the spend meter reads the tokens the
-provider said it billed. The first successful round trip to any of the nineteen reopens ADR-0063's
+provider said it billed. The first successful round trip to any of the nineteen reopens ADR-0066's
 criteria the way the first real camera file reopens phase 02's.
 
 ## Post-review - the application becomes reachable, and every gate becomes enforced
@@ -120,6 +259,131 @@ repository.
 **None of this is evidence about a photograph.** Every model-capability flag is still false, no
 camera file has been decoded, nothing is calibrated and nothing has been signed. Section 7 of the
 review is the list, and it is unchanged.
+
+## Portrait retouch - finding a face, and what is in it, in a real photograph
+
+Every retouch phase from 18 to 22 was built against an input port nothing filled, because the face
+detector phase 06 ships finds no faces. On a real photograph the retouch stages were correct,
+tested and gated to zero. This change fills the port.
+
+**Faces.** `aura-portrait` evaluates OpenCV's published Haar cascades with its own pure-Rust
+Viola-Jones implementation - checked against OpenCV on 22 photographs, 80 of 80 boxes agreeing to
+within two pixels - over six scans (upright, tilted both ways, locally equalised, profile, mirrored
+profile) and accepts a candidate only with evidence: a skin-coloured centre and either many agreeing
+windows or a measured eye and mouth. Every false positive the extra scans produced on the
+evaluation set was removed without losing a face. Every one of the ten Monk Skin Tone swatches is
+found on a painted test face; the darkest only by the equalised scan, which is why it exists.
+
+**Regions.** Nineteen soft regions measured relative to each person: skin from a model of their own
+cheeks, lips redder than that skin, teeth brighter and less saturated than those lips, brows darker
+than that forehead, eyes, iris and sclera inside the measured eye openings, hair and body from
+colour models seeded beside the person and held against the ground beside them, and sky connected
+to the top of the frame.
+
+**Retouch.** Fourteen operators in the renderer: smooth skin (pores kept), even skin tone (toward
+the person's own tone), clear blemishes (moles and freckles kept), brighten under-eyes, reduce
+shine, face fill light, brighten eyes, iris detail, clear eye whites, define brows, whiten teeth,
+lip colour, define hair and blur background. Recipe masks of kind face, skin, subject, background
+and sky now render, and any region can be adjusted on its own. Nothing reshapes anybody and nothing
+changes a skin tone.
+
+**Workspace.** A Portrait retouch tab: what AURA found laid over the photograph, landmarks, a tool to
+draw a face AURA missed, a measured automatic retouch in three strengths with a sentence for every
+decision, the fourteen sliders and per-region adjustments.
+
+**What it does not claim:** accuracy on a real wedding, or equal accuracy across real skin tones.
+See `docs/portrait-retouch.md` and ADR-0065.
+
+## Phase 31 - Matching a look somebody else published
+
+The thing photographers actually ask for: point at an account whose photographs you want yours to
+look like, and get there.
+
+**A look is measured from appearance, never recovered as an edit.** Phase 17 is handed a RAW and the
+JPEG somebody made from it, so it can ask what they *did*. Here there is only the JPEG - nobody
+knows what the reference photographer started with, what camera made it, or how much of what is on
+the screen is the edit and how much is the light that afternoon. So AURA measures eleven
+distribution statistics over each reference photograph - seven tone landmarks, three zone tints,
+eight hue bands, two chroma quantiles, a rendered white point - takes their robust middle over the
+whole page, and compares that against the same measurements of **your own photographs as phases 15
+and 16 have already decided to render them**. The difference is the look. That makes it a residual
+by construction, so a reference your gallery already matches asks for nothing, and there is no state
+of this feature in which switching it on makes a photograph worse than leaving it off.
+
+**The scale constants are authored and the answer is measured.** The first guess comes from a table
+of mappings nobody fitted - there is no data in this repository to fit them on. What makes that
+acceptable is that the guess is then rendered through the *real* renderer, measured against the
+reference, and walked parameter by parameter until the distance stops falling. The constants decide
+where the search starts; what ships is a measurement. A project with no analysed frames gets the
+guess, labelled as one, and cannot apply it: the database refuses a selection for a look nobody has
+measured.
+
+**AURA does not download the photographs, and says so with the alternative in the same breath.** Two
+separate facts point the same way. This repository fails the build on an outbound socket anywhere
+outside the cloud gateway, and that transport has no TLS - so there is no route from this process to
+an `https://` host at all, which is what lets AURA claim your photographs never leave your machine.
+And reading a page's media in bulk is something Instagram grants to the account that owns the page;
+the unofficial routes are against its terms and can get an account restricted. The route is
+**offered, disabled, and explained** rather than omitted, because a photographer who came here to
+paste a link will otherwise hunt for a setting they think they missed. The link is still parsed,
+validated and stored, so every report says which page the look is from - and the panel never renders
+a tick, because nothing was resolved.
+
+**Nothing is learned about skin, and the schema cannot express it.** Fifth application of the rule
+phase 15 wrote, and the hardest version to see: finding skin in a stranger's photograph means
+declaring a hue window and calling what falls inside it skin, which is the fixed skin constant this
+product has refused four times wearing a measurement's clothes. There is no skin field on the
+profile, no skin column in migration 31, and zero written into every band's hue - because a rotation
+solved from a whole-frame statistic is applied to every pixel in that band, and most of a face at
+every skin tone is in the orange band. What protects skin instead is phase 16's guard, which grades
+your own frame's own skin through the renderer after the look is applied and withdraws the colour
+half if it moved.
+
+**A look is about light, not about subject, and the report says so on every look.** A reference
+photograph does not say whether it is a ceremony or a reception, so there is one axis - ten kinds of
+light - and no code path that could invent a second. `SceneAxisNotLearned`, `SkinNotLearned` and
+`HueRotationWithheld` are on every look that worked, because a note that only appeared when
+something went wrong would let a photographer assume the opposite every other time.
+
+**The bounds are tighter than phase 17's and the asymmetry is the point.** Half a stop against two
+thirds, 600 kelvin against 800. Teaching AURA from your own archive is telling it about decisions
+you made; pointing at a page is expressing a preference about photographs somebody else made
+somewhere you have never been, and a page that reads bright may be bright because that photographer
+shoots in Greece. The strength slider goes down and never up, in three places - the command, the
+override and a database CHECK.
+
+**The report leads with how much of the gap closed**, not with whether a threshold was met. Phase
+27's rule in the feature that would most easily have shipped the other one: a look that closed
+ninety per cent of a large difference worked, and one that landed inside the ceiling because there
+was nothing to close is not a result.
+
+**And it says how much of the gallery that figure describes.** The distance is a frame-weighted mean
+over the lighting buckets, and a bucket exists only where the reference *and* this wedding both had
+frames in that light - so a wedding shot mostly under a light the page never worked in produces a
+real number about a small slice of it. `measured_frames` sits beside `frames`, derived from the
+bucket rows rather than stored where it could drift, and a match that measured nothing reports that
+rather than reading `0.0 dE00` as a perfect score. Phase 18's rule where one number was the most
+flattering thing available.
+
+**Measuring is stoppable and stopping stores nothing.** It renders a sample of the wedding twice and
+refines over eleven axes, so it runs for minutes. The cancellation check sits between axes rather
+than between sweeps - a sweep is hundreds of renders, and a Stop button that takes one to respond is
+a Stop button nobody believes. A cancelled pass leaves the catalog exactly as it was.
+
+**The panel shows what a look does in each light**, as a table with the reference count behind each
+row, what it changes there, and how close that light's own photographs actually landed - a dash
+rather than a zero where nothing was measured.
+
+New crate `aura-look`; migration 31 with six tables, two views and three triggers; three error codes
+with runbooks; ten IPC commands; a panel mounted first in the sidebar; `aura-cli verify --phase 31`
+as the gate. ADR-0063 and ADR-0064 record the decisions, `docs/match-a-look.md` says it in the
+product's own words.
+
+**What is not proved:** nobody has shown a photographer a matched gallery beside the page it was
+matched to. Every number was measured against synthetic references this repository generated,
+carrying looks it applied itself. The arithmetic is real and tested; whether the result is what
+somebody meant when they pointed at an account is unmeasured, and it is the first condition that
+should close.
 
 ## Phase 30 - Delivery: getting it out, learning from it, and shipping the thing
 

@@ -9,9 +9,9 @@
 use std::collections::BTreeMap;
 
 use crate::contract::recipe::{
-    Bw, Curve, EditSource, Geometry, Global, HslShift, ImageRef, Lens, LensCoefficients, Mask,
-    MaskKind, MaskParams, Noise, Provenance, Recipe, Restoration, RetouchOp, Sharpen, ENGINE,
-    SCHEMA_VERSION,
+    Bw, Calibration, ChannelCurves, ColourGrade, Curve, EditSource, Effects, Geometry, Global,
+    HslShift, ImageRef, Lens, LensCoefficients, Mask, MaskKind, MaskParams, Noise, ParametricCurve,
+    Provenance, Recipe, Restoration, RetouchOp, Sharpen, ENGINE, SCHEMA_VERSION,
 };
 
 /// A content hash that is obviously synthetic and is still 64 hex characters.
@@ -68,6 +68,11 @@ pub fn reference() -> Recipe {
                 detail: 50,
                 model: "scene_aware_v1".to_string(),
             },
+            parametric: ParametricCurve::default(),
+            channel_curves: ChannelCurves::default(),
+            colour_grade: ColourGrade::default(),
+            calibration: Calibration::default(),
+            effects: Effects::default(),
         },
         lens: Lens {
             distortion: true,
@@ -176,6 +181,11 @@ pub fn neutral(content_hash: &str, camera: &str) -> Recipe {
             hsl: BTreeMap::new(),
             sharpen: Sharpen::default(),
             noise: Noise::default(),
+            parametric: ParametricCurve::default(),
+            channel_curves: ChannelCurves::default(),
+            colour_grade: ColourGrade::default(),
+            calibration: Calibration::default(),
+            effects: Effects::default(),
         },
         lens: Lens::default(),
         geometry: Geometry::default(),

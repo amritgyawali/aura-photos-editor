@@ -127,6 +127,7 @@ pub mod sets;
 pub mod store;
 pub mod tiff;
 pub mod verify;
+pub mod watermark;
 
 /// Which build wrote a row, and what invalidates every stored export record.
 ///

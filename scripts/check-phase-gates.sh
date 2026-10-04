@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run every phase gate, 01 to 30, and fail on the first one that does not.
+# Run every phase gate, 01 to 31, and fail on the first one that does not.
 #
 # ## Why this file exists
 #
@@ -12,12 +12,12 @@
 # The fix is deliberately a list of one thing rather than thirty CI steps: a workflow that names
 # each gate individually is a workflow somebody forgets to extend, which is exactly how the
 # omission happened. This script enumerates the gate modules that `aura-cli` actually compiles
-# and refuses to run if the count is not thirty, so adding a phase without wiring its gate in is
+# and refuses to run if the count is not thirty-one, so adding a phase without wiring its gate in is
 # a red build rather than a silent gap.
 #
 # ## Usage
 #
-#   bash scripts/check-phase-gates.sh              # all thirty, release
+#   bash scripts/check-phase-gates.sh              # all thirty-one, release
 #   bash scripts/check-phase-gates.sh 06 07 08     # a subset
 #   AURA_PHASE_GATE_PROFILE=debug bash scripts/check-phase-gates.sh 12
 #
@@ -52,8 +52,8 @@ mapfile -t declared < <(grep -oE '^mod phase[0-9]{2};' crates/aura-cli/src/main.
   | grep -oE '[0-9]{2}' | sort -u)
 all=(01 02 "${declared[@]}")
 
-if [ "${#all[@]}" -ne 30 ]; then
-  echo "check-phase-gates: found ${#all[@]} gate modules, expected 30" >&2
+if [ "${#all[@]}" -ne 31 ]; then
+  echo "check-phase-gates: found ${#all[@]} gate modules, expected 31" >&2
   printf 'check-phase-gates:   %s\n' "${all[@]}" >&2
   exit 1
 fi

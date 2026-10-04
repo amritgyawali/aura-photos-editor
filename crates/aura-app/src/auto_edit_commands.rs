@@ -14,6 +14,48 @@ use crate::contract::ipc::{PhotoAutoEditDto, PhotoAutoEditInput};
 use crate::develop_commands::{load_or_neutral, recipe_dto};
 use crate::AppState;
 
+/// Read actual pixels even when optional learned analysis models are unavailable.
+///
+/// # Errors
+/// Refuses a photograph outside the project, and one whose preview cannot be decoded.
+pub fn photo_analysis(
+    state: &AppState,
+    input: &PhotoAutoEditInput,
+) -> IpcResult<crate::contract::ipc::PhotoAnalysisDto> {
+    let photo = PhotoId::from_db(&input.photo_id)
+        .map_err(|_| aura_core::errors::render::recipe_invalid("photo", "invalid identifier"))?;
+    let belongs = state.catalog().read(|conn| {
+        conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM photo WHERE photo_id=?1 AND project_id=?2)",
+            rusqlite::params![input.photo_id, input.project_id],
+            |row| row.get::<_, bool>(0),
+        )
+        .map_err(|e| aura_core::errors::db::statement_failed("analyze photograph", &e))
+    })?;
+    if !belongs {
+        return Err(aura_core::errors::render::recipe_invalid(
+            "photo",
+            "photo does not belong to this project",
+        )
+        .into());
+    }
+    let buffer = state.previews(&input.project_id)?.get(
+        photo,
+        aura_raw::PixelLevel::Thumb(512),
+        Priority::Interactive,
+    )?;
+    let aura_raw::PixelData::Srgb8(rgb) = &buffer.data else {
+        return Err(aura_core::errors::raw::corrupt("analysis requires an sRGB preview").into());
+    };
+    let readings = PhotoReadings::measure(rgb, String::new())?;
+    let recommendation = aura_cloud::photo_adjustment::local_adjustment(&readings);
+    Ok(crate::contract::ipc::PhotoAnalysisDto {
+        photo_id: input.photo_id.clone(),
+        readings,
+        recommendation,
+    })
+}
+
 /// Analyse original pixels and save a reversible, manually protected edit.
 ///
 /// # Errors
@@ -24,7 +66,18 @@ pub fn photo_auto_edit(
 ) -> IpcResult<PhotoAutoEditDto> {
     let cancel = CancelToken::new();
     state.register_job(&input.job_id, cancel.clone());
-    let result = edit(state, input, &cancel);
+    let result = edit(state, input, &cancel, false);
+    state.finish_job(&input.job_id);
+    result
+}
+
+pub(crate) fn photo_auto_edit_local(
+    state: &AppState,
+    input: &PhotoAutoEditInput,
+) -> IpcResult<PhotoAutoEditDto> {
+    let cancel = CancelToken::new();
+    state.register_job(&input.job_id, cancel.clone());
+    let result = edit(state, input, &cancel, true);
     state.finish_job(&input.job_id);
     result
 }
@@ -33,6 +86,7 @@ fn edit(
     state: &AppState,
     input: &PhotoAutoEditInput,
     cancel: &CancelToken,
+    force_local: bool,
 ) -> IpcResult<PhotoAutoEditDto> {
     let invalid =
         |field: &str| aura_core::errors::render::recipe_invalid(field, "invalid identifier");
@@ -62,7 +116,7 @@ fn edit(
     let image = crop(&SourceImage::new(&buffer), PayloadPolicy::default())?;
     let readings = PhotoReadings::measure(rgb, image.content_hash.clone())?;
     let task = PhotoAutoEdit { image };
-    let answer = if policy.blur_faces {
+    let answer = if force_local || policy.blur_faces {
         use aura_cloud::contract::cloud::{CloudResult, CloudTask};
         let value = task.local_fallback(&readings)?;
         CloudResult::local(value, 0.35, uuid::Uuid::new_v4())
@@ -92,6 +146,9 @@ fn edit(
     proposal.global.highlights = answer.value.highlights;
     proposal.global.shadows = answer.value.shadows;
     proposal.global.vibrance = answer.value.vibrance;
+    proposal.global.temperature = answer.value.temperature;
+    proposal.global.tint = answer.value.tint;
+    proposal.global.saturation = answer.value.saturation;
     proposal.provenance.confidence = answer.confidence;
     proposal.provenance.source = EditSource::Ai;
     proposal.provenance.decision_id = Some(answer.call_id.to_string());
@@ -99,8 +156,9 @@ fn edit(
     schema::Validation::check(&merged)?;
     let source = answer.source.as_str().to_string();
     let label = format!(
-        "Auto edit ({source}, {}): {}",
+        "Auto edit ({source}, {}, {}): {}",
         answer.model,
+        answer.value.preset,
         answer.value.reasons.join(" ")
     );
     state

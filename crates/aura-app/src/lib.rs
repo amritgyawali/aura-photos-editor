@@ -13,21 +13,6 @@
     unreachable_pub,
     rust_2018_idioms
 )]
-// The panic family is banned in library code and is how a test asserts. An inline
-// `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
-// reach a photographer; the lints stay denied everywhere else in the crate. PHASE-14.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
-        clippy::indexing_slicing,
-        clippy::float_cmp,
-        clippy::disallowed_methods,
-        clippy::uninlined_format_args
-    )
-)]
 #![warn(clippy::pedantic)]
 #![allow(
     clippy::module_name_repetitions,
@@ -40,6 +25,22 @@
     // clippy names, but `set_framing`, `plan_geometry` and a dozen others have the same shape and
     // are only silent because their DTOs happen to be moved into a call.
     clippy::needless_pass_by_value
+)]
+// The panic family is banned in library code and is how a test asserts. An inline
+// `#[cfg(test)]` module is not compiled into the library at all, so nothing it does can
+// reach a photographer; the lints stay denied everywhere else in the crate. PHASE-14.
+// It follows `warn(clippy::pedantic)`, which would otherwise re-enable `float_cmp` in tests.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+        clippy::disallowed_methods,
+        clippy::uninlined_format_args
+    )
 )]
 
 //! The application layer: one typed command surface, used by the Tauri shell and
@@ -61,8 +62,11 @@ pub mod cull_commands;
 pub mod curate_commands;
 pub mod delivery_commands;
 pub mod develop_commands;
+pub mod edit_profiles;
 pub mod gallery_commands;
 pub mod learn_commands;
+pub mod native_retouch;
+pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.
@@ -77,14 +81,22 @@ pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
 pub mod local_commands;
+pub mod look_commands;
 pub mod mask_commands;
 pub mod micro_commands;
 pub mod moment_commands;
 pub mod people_commands;
+pub mod photo_enhance;
+mod photo_frames;
+pub mod portrait_auto;
+pub mod portrait_commands;
+pub mod portrait_features;
 pub mod preview_commands;
 pub mod qc_commands;
+pub mod reference_style;
 pub mod restore_commands;
 pub mod retouch_commands;
+pub mod smart_edit;
 pub mod state;
 pub mod story_commands;
 pub mod style_commands;
@@ -134,7 +146,7 @@ pub use delivery_commands::{
 };
 pub use develop_commands::{
     develop_status, history_step, image_history, image_recipe, render_caps, render_image,
-    set_param, snapshot,
+    set_param, snapshot, sync_settings,
 };
 pub use emotion_commands::{
     emotion_status, image_emotion, moment_peak, prefer_frame, ranked_by_emotion, reactions_of,
@@ -169,6 +181,10 @@ pub use learn_commands::{
 };
 pub use local_commands::{
     accept_local, image_local, local_review_queue, local_status, sculpt_local, set_local_strength,
+};
+pub use look_commands::{
+    forget_look, list_looks, look_buckets, look_match_report, look_status, measure_look,
+    parse_reference, rename_look, select_look, set_look_strength,
 };
 pub use mask_commands::{
     edit_mask, ensure_masks, image_masks, mask_allowance, mask_kinds, mask_overlay, mask_status,
@@ -206,7 +222,12 @@ pub use retouch_commands::{
 };
 pub use state::AppState;
 mod auto_edit_commands;
-pub use auto_edit_commands::photo_auto_edit;
+// ADR-0068. The one-click finish, and its three commands.
+pub mod one_click_commands;
+pub use auto_edit_commands::{photo_analysis, photo_auto_edit};
+pub use one_click_commands::{
+    automatic_start, one_click_cancel, one_click_finish, one_click_status,
+};
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,
     segment_story, set_chapter, split_chapter, story_outline, story_status,

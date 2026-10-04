@@ -114,6 +114,58 @@ impl<'a> StageTimer<'a> {
     }
 }
 
+/// How many samples [`best_of`] takes by default.
+///
+/// Three. The distribution of a compute-bound timing on a shared host is one true cost with a
+/// long tail of interruptions bolted on top, so the useful statistic is the *minimum* and the
+/// question is only how many draws it takes to get near it. Five consecutive runs of one
+/// unchanged binary on one CI-class container measured 3.93x, 4.09x, 4.58x, 4.64x and 5.48x
+/// the development figure for `render_full_cpu_per_megapixel`; the best of three draws from
+/// that distribution lands close to its floor, and a fourth buys little for a third more time.
+pub const BEST_OF_RUNS: usize = 3;
+
+/// Time `work` several times and keep the **fastest** run.
+///
+/// [`StageTimer`] reads the clock twice around one execution, which is the right instrument
+/// for a stage that runs once in a pass - an ingest, an index build - and the wrong one for a
+/// budget asserted in CI. A single sample inherits every scheduling hiccup on a shared runner,
+/// and the failure that produces is indistinguishable from a regression while being caused by
+/// which machine the job drew.
+///
+/// The minimum is the estimator to use, and it is not a way of flattering the number. Noise on
+/// a timing is strictly additive: a scheduler can take time away from the work and never give
+/// it, so the fastest of several runs is the closest estimate of what the code actually costs,
+/// and a genuine regression raises that floor along with everything else. Phase 22's rule, in
+/// the crate that exists to measure: a threshold on a measurement is a statement about the
+/// instrument as well as about the world.
+///
+/// `work` is run `runs` times and its result is discarded; a caller that needs the output
+/// should run it once more outside the timing, as the callers here do for their assertions.
+#[must_use]
+pub fn best_of<F>(
+    stage: impl Into<String>,
+    runs: usize,
+    units: u64,
+    clock: &dyn Clock,
+    mut work: F,
+) -> Measurement
+where
+    F: FnMut(),
+{
+    let stage = stage.into();
+    let mut fastest = u64::MAX;
+    for _ in 0..runs.max(1) {
+        let started = clock.monotonic_ms();
+        work();
+        fastest = fastest.min(clock.monotonic_ms().saturating_sub(started));
+    }
+    Measurement {
+        stage,
+        elapsed_ms: if fastest == u64::MAX { 0 } else { fastest },
+        units,
+    }
+}
+
 /// One budget line: the ceiling a stage must stay under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Budget {

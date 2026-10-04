@@ -1,9 +1,119 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { PhotoAutoEditInput, PhotoAutoEditDto } from './types';
+import type { AutomaticStartDto, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
+
+import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
+
+/**
+ * Every command in the product passes through here, and the audit log hangs off
+ * this one line: started, ok with latency, or refused with the error's code and
+ * message. That is why no call site logs anything - a per-site log is one forgotten
+ * site at a time, and this surface has 220 of them.
+ *
+ * The high-frequency reads are the exception and `isQuietIpc` names them: a grid
+ * scrolling a wedding fires `get_preview` faster than a log can hold it, and the
+ * lines would crowd out the clicks the log exists for. Their failures are still
+ * always recorded. `ui_audit` is exempt from logging too: it is the log's own pipe,
+ * and watching the watcher doubles the traffic it exists to reduce.
+ */
+function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const quiet = isQuietIpc(command);
+  const relay = command === 'ui_audit';
+  if (!quiet && !relay) {
+    audit('ipc', command, { phase: 'start' });
+  }
+  const startedAt = Date.now();
+  return rawInvoke<T>(command, args).then(
+    (value) => {
+      const ms = Date.now() - startedAt;
+      if (!quiet && !relay) {
+        audit('ipc', command, { phase: 'ok', ms });
+      } else if (!relay && ms > 5000) {
+        audit('warning', `slow ${command}`, { ms });
+      }
+      return value;
+    },
+    (error: unknown) => {
+      if (!relay) {
+        const code =
+          typeof error === 'object' && error !== null && 'code' in error
+            ? String((error as { code: unknown }).code)
+            : 'IPC-UNKNOWN';
+        // `message` is the field the shell serialises; `user_message` is the
+        // AuraError shape the panels read through `asIpcError`. Either is worth a
+        // line, and a refusal with no readable message is still a refusal.
+        const record =
+          typeof error === 'object' && error !== null
+            ? (error as Record<string, unknown>)
+            : {};
+        const message =
+          typeof record['message'] === 'string'
+            ? record['message']
+            : typeof record['user_message'] === 'string'
+              ? record['user_message']
+              : String(error).slice(0, 200);
+        audit('ipc-error', `${code} in ${command}`, {
+          ms: Date.now() - startedAt,
+          message: String(message).slice(0, 200),
+        });
+        // A failure is exactly the moment the file needs the lines around it, so the
+        // queue goes to disk now rather than on the next tick.
+        flushAuditToFile();
+      }
+      throw error;
+    },
+  );
+}
+
+/**
+ * Push the queued lines into the shell's file log.
+ *
+ * Batched on an interval and flushed on errors and at page hide, because a command
+ * per line would make the relay itself one of the loudest things in the log. The
+ * call is deliberately not awaited and never logs or retries: if the shell cannot
+ * take the lines, they still live in memory and localStorage for the panel.
+ */
+function flushAuditToFile(): void {
+  if (!inTauri()) {
+    return;
+  }
+  const batch = drainAuditBatch();
+  if (batch.length === 0) {
+    return;
+  }
+  // Through the wrapper rather than `rawInvoke` on purpose: the parity check reads
+  // command strings out of this file case-sensitively, and `ui_audit` has to appear
+  // as an invoked name or it reads as a command the client never calls. The wrapper
+  // recognises the relay by name and does not log it, so nothing recurses.
+  invoke<void>('ui_audit', { batch }).catch(() => undefined);
+}
+
+const relayTimer = setInterval(flushAuditToFile, 5000);
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushAuditToFile);
+}
+void relayTimer;
 
 export const photoAutoEdit = (input: PhotoAutoEditInput): Promise<PhotoAutoEditDto> =>
   invoke<PhotoAutoEditDto>('photo_auto_edit', { input });
+
+export const photoAnalysis = (input: PhotoAutoEditInput): Promise<PhotoAnalysisDto> =>
+  invoke<PhotoAnalysisDto>('photo_analysis', { input });
+
+export const automaticStart = (input: { roots: string[]; projectId: string | null }): Promise<AutomaticStartDto> =>
+  invoke<AutomaticStartDto>('automatic_start', { input });
+
+/** ADR-0068. Start the whole delivery pipeline. Returns immediately; poll `oneClickStatus`. */
+export const oneClickFinish = (input: OneClickFinishInput): Promise<OneClickFinishDto> =>
+  invoke<OneClickFinishDto>('one_click_finish', { input });
+
+/** The live row behind the button. Rejects with `AURA-IO-1001` once the run leaves memory. */
+export const oneClickStatus = (jobId: string): Promise<OneClickStatusDto> =>
+  invoke<OneClickStatusDto>('one_click_status', { jobId });
+
+/** Stop between photographs. True when the id was known. */
+export const oneClickCancel = (jobId: string): Promise<boolean> =>
+  invoke<boolean>('one_click_cancel', { jobId });
 
 export async function pickImportPaths(directory: boolean): Promise<string[]> {
   const result = await invoke<string | string[] | null>('plugin:dialog|open', {
@@ -11,6 +121,108 @@ export async function pickImportPaths(directory: boolean): Promise<string[]> {
       filters: directory ? [] : [{ name: 'Photographs', extensions: ['jpg', 'jpeg', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef', 'tif', 'tiff'] }] },
   });
   return result === null ? [] : typeof result === 'string' ? [result] : result;
+}
+
+export type ReferenceAnalysis = {
+  id: string; origin: string; measured: number; skipped: number; colors: string[];
+  brightness: number; contrast: number; warmth: number; saturation: number;
+};
+export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
+export type FetchReport = { folder: string; fetched: number; skipped: number; complete: boolean; message: string };
+export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
+
+export type HslShift = { h: number; s: number; l: number };
+export type ProfileAdjust = {
+  exposure?: number; contrast?: number; highlights?: number; shadows?: number; whites?: number; blacks?: number;
+  temperature?: number; tint?: number; clarity?: number; texture?: number; dehaze?: number; vibrance?: number;
+  saturation?: number; curve?: [number, number][]; hsl?: Record<string, HslShift>; sharpen?: number; noise?: number;
+  vignette?: number; bw?: Record<string, number> | null; developedStrength?: number | null;
+};
+export type EditProfile = {
+  id: string; name: string; category: string; tagline: string; description: string; bestFor: string[];
+  technique: string[]; origin: 'researched' | 'learned'; sources: { title: string; url: string }[];
+  evidence: { dataset: string; trainingPairs: number; heldOutPairs: number; autoDe00: number; profileDe00: number } | null;
+  swatch: string[]; adjust: ProfileAdjust;
+};
+export type ProfileSelection = { profileId: string; strength: number };
+export type ApplyProfileReport = { profileId: string; changed: number; protectedFields: string[]; adaptations: string[] };
+export type ProfilePreview = { profileId: string; before: string; after: string; adaptations: string[] };
+
+export type SyncSettingsReport = { synced: number; failed: string[] };
+export type ExportWatermark = { width: number; height: number; rgba: number[]; opacity: number; widthFraction: number; marginFraction: number; anchor: 'top_left' | 'top_right' | 'bottom_left' | 'bottom_right' | 'center' };
+export const exportWatermarked = (input: ExportJobInput, watermark: ExportWatermark) =>
+  invoke<ExportStatusDto>('export_run_watermarked', { input, watermark });
+/** Lightroom's Sync Settings: copy one photo's develop settings onto others, as your own edit. */
+export const syncSettings = (projectId: string, sourcePhotoId: string, targetPhotoIds: string[] = [], includeGeometry = false, groups?: string[]) =>
+  invoke<SyncSettingsReport>('sync_settings', { input: { projectId, sourcePhotoId, targetPhotoIds, includeGeometry, groups } });
+
+export const pickWhiteBalance = (projectId: string, photoId: string, x: number, y: number) =>
+  invoke<RecipeDto>('pick_white_balance', { input: { projectId, photoId, x, y } });
+
+/** Named, adaptive looks. Every application starts from the measured correction, never compounds. */
+export const editProfiles = {
+  list: () => invoke<EditProfile[]>('list_edit_profiles'),
+  apply: (photoId: string, profileId: string, strength: number) =>
+    invoke<ApplyProfileReport>('apply_edit_profile', { input: { photoId, profileId, strength } }),
+  preview: (profileId: string, strength: number, photoId?: string | null, size?: number) =>
+    invoke<ProfilePreview>('preview_edit_profile', { input: { profileId, strength, photoId: photoId ?? null, size: size ?? null } }),
+};
+
+export const referenceStyle = {
+  fetch: (address: string, limit: number, cancelId: string) => invoke<FetchReport>('fetch_instagram_references', { input: { address, limit, cancelId } }),
+  analyse: (address: string, folder: string, cancelId: string) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId } }),
+  apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null) => invoke<ApplyReport>('apply_reference_style', {
+    input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null } }),
+};
+
+// Portrait retouching: what AURA found in a photograph, and what a photographer asks for.
+export type PortraitFace = {
+  bbox: [number, number, number, number];
+  leftEye: [number, number]; rightEye: [number, number]; nose: [number, number]; mouth: [number, number];
+  rollDegrees: number; confidence: number; source: string; eyesMeasured: number; mouthMeasured: boolean;
+};
+export type PortraitRegion = { region: string; label: string; coverage: number; confidence: number; alphaBase64: string };
+export type PortraitAnalysis = {
+  photoId: string; overlayWidth: number; overlayHeight: number; faces: PortraitFace[]; regions: PortraitRegion[];
+  colourful: boolean; parseVersion: number; ms: number; notes: string[];
+};
+export type PortraitOp = { op: string; strength: number };
+export type RegionAdjustment = {
+  region: string; exposure?: number | null; contrast?: number | null; saturation?: number | null;
+  warmth?: number | null; shadows?: number | null; highlights?: number | null;
+};
+export type PortraitRetouch = {
+  photoId: string; ops: PortraitOp[]; adjustments: RegionAdjustment[]; hints: [number, number, number, number][];
+  protected: boolean; foreignOps: string[]; recipe: RecipeDto; explanation: string[];
+};
+export type SetPortraitRetouch = {
+  projectId: string; photoId: string; ops: PortraitOp[]; adjustments: RegionAdjustment[];
+  hints?: [number, number, number, number][] | null; label?: string | null;
+};
+
+export const portrait = {
+  analyse: (photoId: string) => invoke<PortraitAnalysis>('analyse_portrait', { input: { photoId } }),
+  settings: (photoId: string) => invoke<PortraitRetouch>('portrait_retouch', { input: { photoId } }),
+  set: (input: SetPortraitRetouch) => invoke<PortraitRetouch>('set_portrait_retouch', { input }),
+  auto: (projectId: string, photoId: string, style: string) =>
+    invoke<PortraitRetouch>('auto_portrait_retouch', { input: { projectId, photoId, style } }),
+};
+
+/** Ask the desktop for a folder; cancel leaves the current selection intact. */
+export async function pickPhotoFolder(title = 'Choose a photo folder'): Promise<string | null> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: true, multiple: false, title },
+  });
+  return Array.isArray(result) ? result[0] ?? null : result;
+}
+
+/** Select individual photographs without importing their entire folder. */
+export async function pickPhotos(): Promise<string[]> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: false, multiple: true, title: 'Choose photos to edit',
+      filters: [{ name: 'Photos', extensions: ['jpg', 'jpeg', 'jpe', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef'] }] },
+  });
+  return result === null ? [] : Array.isArray(result) ? result : [result];
 }
 
 import type {
@@ -313,6 +525,17 @@ import type {
   StyleComparisonDto,
   StylePairDto,
   StyleProfileDto,
+  LookBucketDto,
+  LookBucketsInput,
+  LookMatchDto,
+  LookProfileDto,
+  LookProfileInput,
+  LookStatusDto,
+  MeasureLookDto,
+  MeasureLookInput,
+  ReferenceOriginDto,
+  SelectLookInput,
+  SetLookStrengthInput,
   StyleStatusDto,
   SupportBundleDto,
   ToneDto,
@@ -918,6 +1141,8 @@ export const explain = {
  * same merge in Rust with an automated source and is refused there.
  */
 export const develop = {
+  enhancePhoto: (input: DevelopImageInput): Promise<RecipeDto> =>
+    invoke<RecipeDto>('enhance_photo', { input }),
   /** One photograph's edit, or the camera's own starting point when it has none. */
   imageRecipe: (input: DevelopImageInput): Promise<RecipeDto> =>
     invoke<RecipeDto>('image_recipe', { input }),
@@ -1041,7 +1266,6 @@ export const colour = {
  * promise about the code.
  */
 export const style = {
-
   /** What this project knows about style. */
   styleStatus: (projectId: string): Promise<StyleStatusDto> =>
     invoke<StyleStatusDto>('style_status', { projectId }),
@@ -1954,4 +2178,74 @@ export const learning = {
 
   /** What this machine can and cannot do. Leads with the second. */
   diagnosticsReport: (): Promise<DiagnosticsDto> => invoke<DiagnosticsDto>('diagnostics_report'),
+};
+
+/**
+ * PHASE-31. Matching a look somebody else published.
+ *
+ * Ten commands. Four read, one parses an address as it is typed, one measures, and four act on
+ * a selection.
+ *
+ * **Nothing here fetches anything.** `parseReference` reads text back and resolves nothing;
+ * `measureLook` takes a folder. The route that would go and get the photographs from a page is
+ * declared, refuses, and says why - see `docs/match-a-look.md`. Phase 04's rule is that the
+ * cloud gateway is the only crate that opens a socket, and a client-gallery fetcher is not a
+ * model provider.
+ *
+ * It is a separate namespace from `style` because the two answer different questions. `style`
+ * is what *this* photographer does, fitted from their own delivered pairs. This is what *that*
+ * page does, measured off finished JPEGs - a weaker kind of evidence, and one a caller should
+ * not be able to confuse with the other by reaching for the wrong function.
+ */
+export const look = {
+  /** What the match-a-look card shows: is a look selected, and over how much of the wedding. */
+  lookStatus: (projectId: string): Promise<LookStatusDto> =>
+    invoke<LookStatusDto>('look_status', { projectId }),
+
+  /** Every stored look, newest first. */
+  listLooks: (): Promise<LookProfileDto[]> => invoke<LookProfileDto[]>('list_looks', {}),
+
+  /**
+   * Read back what was typed into the address box.
+   *
+   * Called on every keystroke. It parses and **does not resolve**: there is no round trip to
+   * Instagram here and no tick to render, only the handle the text was understood as.
+   */
+  parseReference: (address: string): Promise<ReferenceOriginDto> =>
+    invoke<ReferenceOriginDto>('parse_reference', { address }),
+
+  /**
+   * One look's lighting buckets, as the matrix renders them.
+   *
+   * Pass the project to fill each row's measured `afterDe00`; without it a row says what the
+   * look asks for and stays `null` about what it did.
+   */
+  lookBuckets: (input: LookBucketsInput): Promise<LookBucketDto[]> =>
+    invoke<LookBucketDto[]>('look_buckets', { input }),
+
+  /** The last measured match on one project, or `null` when nothing has been measured. */
+  lookMatchReport: (projectId: string): Promise<LookMatchDto | null> =>
+    invoke<LookMatchDto | null>('look_match_report', { projectId }),
+
+  /**
+   * Measure a reference and store the look.
+   *
+   * Minutes rather than seconds on a real reference: it decodes every reference photograph and
+   * renders a sample of the wedding twice. The panel shows what it is doing.
+   */
+  measureLook: (input: MeasureLookInput): Promise<MeasureLookDto> =>
+    invoke<MeasureLookDto>('measure_look', { input }),
+
+  /** Point this project at a look, or pass `null` to go back to the baseline. */
+  selectLook: (input: SelectLookInput): Promise<void> => invoke<void>('select_look', { input }),
+
+  /** Apply a look at less than its measured strength. Never more. */
+  setLookStrength: (input: SetLookStrengthInput): Promise<void> =>
+    invoke<void>('set_look_strength', { input }),
+
+  /** Rename a look. */
+  renameLook: (input: LookProfileInput): Promise<void> => invoke<void>('rename_look', { input }),
+
+  /** Delete a look. A project that had it selected falls back to the baseline. */
+  forgetLook: (input: LookProfileInput): Promise<void> => invoke<void>('forget_look', { input }),
 };
