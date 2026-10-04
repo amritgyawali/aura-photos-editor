@@ -42,6 +42,7 @@ export type ToolId =
   | 'curate'
   | 'develop'
   | 'studio'
+  | 'profiles'
   | 'retouch'
   | 'look'
   | 'cleanup'
@@ -79,6 +80,7 @@ export const TOOLS: Record<ToolId, Tool> = {
   curate: { id: 'curate', title: 'Album', purpose: 'What AURA proposes after the cull.' },
   develop: { id: 'develop', title: 'Develop', purpose: 'How one photograph looks.' },
   studio: { id: 'studio', title: 'Photo studio', purpose: 'Review each edit, before and after, with undo.' },
+  profiles: { id: 'profiles', title: 'Choose a look', purpose: 'A named look applied on top of each photograph’s own edit.' },
   retouch: { id: 'retouch', title: 'Portrait retouch', purpose: 'Skin, eyes, teeth and hair, measured per face.' },
   look: { id: 'look', title: 'Match a look', purpose: 'Learn a look from reference photographs and apply it.' },
   cleanup: { id: 'cleanup', title: 'Cleanup', purpose: 'What AURA would tidy out of a frame.' },
@@ -115,6 +117,7 @@ export const STAGE_TOOLS: Record<StepId, ReadonlyArray<Tool>> = {
   edit: [
     TOOLS['develop'],
     TOOLS['studio'],
+    TOOLS['profiles'],
     TOOLS['retouch'],
     TOOLS['look'],
     TOOLS['cleanup'],

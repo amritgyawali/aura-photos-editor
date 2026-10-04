@@ -143,6 +143,68 @@ fn scan_files(root: &Path) -> Vec<aura_ingest::scan::ScannedFile> {
 // ------------------------------------------------------------------ idempotence
 
 #[test]
+fn file_picker_imports_all_five_roots_in_one_run() {
+    let harness = harness_with_files(&[
+        ("one.jpg", b"first portrait"),
+        ("two.jpg", b"second portrait"),
+        ("three.jpg", b"third portrait"),
+        ("four.jpg", b"fourth portrait"),
+        ("five.jpg", b"fifth portrait"),
+    ]);
+    let mut plan = plan_for(&harness);
+    plan.roots = ["one.jpg", "two.jpg", "three.jpg", "four.jpg", "five.jpg"]
+        .iter()
+        .map(|name| harness.root.join(name))
+        .collect();
+    let report = aura_ingest::run(&harness.catalog, &plan, &CancelToken::new(), &NullProgress)
+        .expect("all five file-picker roots import");
+    assert_eq!(report.files_imported, 5);
+    assert_eq!(report.photos_created, 5);
+    let (count, state, imported): (u64, String, u64) = harness
+        .catalog
+        .read(|conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT COUNT(*), state, files_imported FROM import_run WHERE import_id=?1",
+                    [plan.import_id.to_db()],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .expect("journal row"))
+        })
+        .expect("catalog read");
+    assert_eq!((count, state.as_str(), imported), (1, "completed", 5));
+}
+
+#[test]
+fn the_same_source_can_be_imported_into_a_second_collection() {
+    let mut harness = harness_with_files(&[("portrait.jpg", b"shared source photo")]);
+    assert_eq!(run(&harness).photos_created, 1);
+    harness.project_id = ProjectId::new();
+    let now = rfc3339(harness.catalog.clock().now_utc());
+    let project = ProjectRow {
+        project_id: harness.project_id.to_db(),
+        name: "Second collection".into(),
+        couple_label: None,
+        event_date: None,
+        timezone: "UTC".into(),
+        status: "active".into(),
+        created_at: now.clone(),
+        updated_at: now,
+    };
+    harness
+        .catalog
+        .writer()
+        .transact(move |tx| repo::create_project(tx, &project))
+        .expect("second project");
+    assert_eq!(run(&harness).photos_created, 1);
+    assert_eq!(
+        run(&harness).files_imported,
+        0,
+        "the second project remains idempotent"
+    );
+}
+
+#[test]
 fn second_import_of_identical_folder_inserts_nothing() {
     let harness = harness_with_generated_wedding();
 

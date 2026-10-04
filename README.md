@@ -68,6 +68,9 @@ uses the configured provider; local enhancement works without an API key.
 
 See [Photo Studio](docs/photo-studio.md) for automatic editing after import,
 reviewing every edit, matching reference colors, and rendering the final photos.
+The app opens on three steps - pick one of 21 [edit profiles](docs/edit-profiles.md)
+(16 researched looks and 5 learned from professional RAW before-and-afters), optionally
+paste an Instagram profile, then upload photos or a folder.
 
 ```bash
 rustup show                       # installs the pinned toolchain from rust-toolchain.toml

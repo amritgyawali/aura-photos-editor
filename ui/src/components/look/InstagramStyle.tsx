@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { api, asIpcError, inTauri, pickPhotoFolder } from '../../ipc/client';
 import { referenceStyle, type FetchReport, type ReferenceSelection } from './referenceStyle';
 
@@ -9,9 +9,13 @@ type Props = {
   onBusyChange: (busy: boolean) => void;
   onAddPhotos: () => void;
   onApply?: () => void;
+  /** Inside the start screen's second step, which supplies its own heading. */
+  compact?: boolean;
+  /** Shown instead of the full heading in compact mode. */
+  heading?: ReactNode;
 };
 
-export function InstagramStyle({ selection, disabled, onChange, onBusyChange, onAddPhotos, onApply }: Props): JSX.Element {
+export function InstagramStyle({ selection, disabled, onChange, onBusyChange, onAddPhotos, onApply, compact = false, heading }: Props): JSX.Element {
   const [address, setAddress] = useState('');
   const [limit, setLimit] = useState(240);
   const [busy, setBusy] = useState(false);
@@ -48,13 +52,14 @@ export function InstagramStyle({ selection, disabled, onChange, onBusyChange, on
   };
 
   const analysis = selection?.analysis;
-  return <section className="instagram-style" aria-label="Instagram style matching" aria-busy={busy}>
-    <div className="reference-heading"><div><span className="eyebrow">START WITH YOUR INSPIRATION</span>
+  return <section className={compact ? 'instagram-style is-compact' : 'instagram-style'} aria-label="Instagram style matching" aria-busy={busy}>
+    {compact && heading}
+    {!compact && <div className="reference-heading"><div><span className="eyebrow">START WITH YOUR INSPIRATION</span>
       <h1>Love their look?<br /><em>Make it part of yours.</em></h1>
       <p>Paste a photographer’s Instagram profile. Learn from the available photos, then automatically adapt the look to your own.</p>
-    </div><div className="reference-process" aria-label="Style matching steps"><span>1 · Add a reference</span><span>2 · Analyze the photos</span><span>3 · Edit your collection</span></div></div>
+    </div><div className="reference-process" aria-label="Style matching steps"><span>1 · Add a reference</span><span>2 · Analyze the photos</span><span>3 · Edit your collection</span></div></div>}
     <fieldset className="reference-form" disabled={disabled || busy}>
-      <label htmlFor="instagram-profile">Photographer’s Instagram profile</label>
+      <label htmlFor="instagram-profile">Photographer’s Instagram profile{compact ? ' (optional)' : ''}</label>
       <div className="reference-url-row"><input id="instagram-profile" type="text" inputMode="url" value={address} onChange={event => setAddress(event.target.value)} placeholder="https://www.instagram.com/chrisburkard/" />
         <button type="button" className="is-primary" disabled={!address.trim() || !inTauri()} onClick={() => void analyse(true)}>Analyze Instagram style</button></div>
       <div className="reference-options"><label>Photo limit <select value={limit} onChange={event => setLimit(Number(event.target.value))}><option value={60}>60 photos · quick study</option><option value={240}>240 photos · broader study</option><option value={2000}>All accessible · up to 2,000</option></select></label>

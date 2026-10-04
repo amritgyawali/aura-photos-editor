@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { api as photosApi, asIpcError, delivery as api, inTauri, learning as learnApi, pickPhotoFolder } from '../../ipc/client';
+import { api as photosApi, asIpcError, delivery as api, exportWatermarked, inTauri, learning as learnApi, pickPhotoFolder } from '../../ipc/client';
+import { WatermarkPanel, defaultWatermark, prepareWatermark } from './WatermarkPanel';
 import type {
   ConsentDto,
   DeliveryManifestDto,
@@ -70,9 +71,11 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
   const [files, setFiles] = useState<ExportFileDto[]>([]);
   const [manifest, setManifest] = useState<DeliveryManifestDto | null>(null);
   const [running, setRunning] = useState(false);
+  const [watermark, setWatermark] = useState(defaultWatermark);
+  const [readingLogo, setReadingLogo] = useState(false);
   const [photoIds, setPhotoIds] = useState<string[]>([]);
   const [imagesLoaded, setImagesLoaded] = useState(false);
-  useEffect(() => { onBusyChange?.(running); }, [onBusyChange, running]);
+  useEffect(() => { onBusyChange?.(running || readingLogo); }, [onBusyChange, running, readingLogo]);
   useEffect(() => {
     let active = true;
     setImagesLoaded(false); setPhotoIds([]);
@@ -246,6 +249,7 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
   }, [buildJob, onError, fail]);
 
   const onRun = useCallback(() => {
+    if (running || readingLogo) return;
     const job = buildJob();
     if (!job) {
       return;
@@ -253,7 +257,8 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
     setRunning(true);
     void (async () => {
       try {
-        await api.exportRun(job);
+        if (watermark.enabled) await exportWatermarked(job, prepareWatermark(watermark));
+        else await api.exportRun(job);
         // Every read re-runs: three of the things a finished export changes are only written at
         // the end, and a panel that patched its own state would show the delivery it predicted.
         await refreshExport();
@@ -265,7 +270,7 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
         setRunning(false);
       }
     })();
-  }, [buildJob, refreshExport, refreshDelivery, onError, fail]);
+  }, [buildJob, refreshExport, refreshDelivery, onError, fail, watermark, running, readingLogo]);
 
   const onBackup = useCallback(() => {
     if (!projectId) {
@@ -356,6 +361,7 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
         void pickPhotoFolder('Choose where to save the final photos').then(path => { if (path) setDestination(path); }).catch(fail);
       }}>Choose output folder</button>
       {imagesLoaded && photoIds.length > 0 && <>
+      <WatermarkPanel value={watermark} onChange={setWatermark} disabled={running} onReadingChange={setReadingLogo} />
       <ExportView
         status={status}
         presets={presets}
@@ -363,7 +369,7 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
         destination={destination}
         verify={verify}
         names={names}
-        running={running}
+        running={running || readingLogo}
         onSelectPreset={setSelected}
         onDestination={setDestination}
         onVerify={setVerify}

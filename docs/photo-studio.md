@@ -1,8 +1,62 @@
 # Photo Studio
 
+## Everyday portrait editing
+
+Import your photographs and open **Auto edit**. Select a thumbnail in the filmstrip;
+Left/Right arrows switch photographs, and Home/End select the first/last photo.
+The editor opens in **Essentials**, with one-click **Auto enhance photo**, presets,
+exposure, contrast, highlights, shadows, temperature, vibrance and crop. Switch to
+**Advanced** for the complete Develop controls without changing the photograph's edits.
+
+The RGB histogram measures the edited preview, sampling at most 100,000 pixels.
+Its near-black percentage counts pixels with all channels at or below 2; near-white
+counts any channel at or above 253. These display-space measurements help review
+clipping; they are not RAW sensor measurements or a portrait quality score.
+
+The photograph remains visible while edits save and render. Controls stay locked
+until the new recipe, history and preview arrive. Empty numeric fields revert on blur;
+Enter commits a value, Escape restores the stored value, and Enter followed by blur
+creates only one edit. Failed saves are shown next to a retry action.
+
+### Test with five real portraits
+
+`scripts/test-portrait-studio.py` exercises the running native application through
+its debug WebView, without substituting mocked IPC or generated pixel fixtures.
+It imports five JPEGs into a new collection, checks deterministic auto enhancement,
+manual-value protection, undo/redo and reset, exports five full-size PNGs, compares
+their decoded pixels with the full renderer, and checks SHA-256 hashes of the originals.
+It also checks the histogram, comparison, Essentials/Advanced views and filmstrip.
+
+With `playwright` and `pillow` installed, launch a debug desktop with the process-local
+environment variable `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223`,
+then run:
+
+```powershell
+python scripts/test-portrait-studio.py --photos PATH_TO_FIVE_JPEGS --output PATH_TO_RESULTS
+```
+
+Use a dedicated test folder. Results include `results.json`, before/after PNGs,
+`before-after.jpg`, two editor screenshots and the verified `exports` directory.
+This is functional validation on five portraits, not a general aesthetic quality benchmark.
+
+## The start screen: look, reference, photos
+
+AURA opens on **Start**, three steps on one page:
+
+1. **Pick an edit profile** - sixteen researched looks plus profiles learned from professional
+   RAW before-and-afters, each previewed by the export renderer. Choose one, set its strength and
+   compare before and after on the sample scene, or on your own photo once one is imported.
+2. **Match a photographer's Instagram** (optional) - described below. When you use both, the
+   reference is fitted on top of the profile.
+3. **Choose photos** or **Choose a folder**. The import starts and, when it finishes, every photo
+   is edited with your profile (and reference) automatically.
+
+How profiles adapt to each photo, and how the learned ones were measured, is in
+[edit-profiles.md](edit-profiles.md).
+
 ## Start with an Instagram reference
 
-The first section on the home screen is **Instagram style matching**. Paste a
+The second step on the start screen is **Instagram style matching**. Paste a
 public photographer profile and choose **Analyze Instagram style**, or use
 **Use saved reference photos** for a folder of at least 8 distinct JPEG/PNG images.
 Reference analysis works before a target collection exists. It shows the measured
@@ -53,7 +107,9 @@ trained vision model. Inspect intentionally dark or bright scenes before export.
 
 Enhancement measures each photo in linear light, limits exposure increases to
 protect bright highlights, and scales shadow and highlight adjustments to the
-image. Uniform black and white images are left neutral. PNG photos now import,
+image. Normally exposed midtones are preserved, and global darkening is capped
+at a quarter stop: a bright background is not proof that a face is overexposed.
+Uniform black and white images are left neutral. PNG photos now import,
 preview, edit and export alongside JPEG and supported camera RAW files. PNG
 processing uses 8-bit sRGB, reduces 16-bit input, and composites transparency on
 white; embedded non-sRGB profiles are not converted. HEIC/HEIF and unsupported

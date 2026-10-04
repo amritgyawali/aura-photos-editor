@@ -64,6 +64,17 @@ pub fn working_to_output(space: OutputColour) -> [[f32; 3]; 3] {
     narrow(mul(xyz_to_target, REC2020_TO_XYZ_D65))
 }
 
+/// Convert linear sRGB graphics into output primaries, without photographic tone mapping.
+#[must_use]
+pub fn srgb_to_output(space: OutputColour) -> [[f32; 3]; 3] {
+    let target = match space {
+        OutputColour::Srgb => return narrow(IDENTITY),
+        OutputColour::AdobeRgb => ADOBE_RGB_TO_XYZ_D65,
+        OutputColour::DisplayP3 => DISPLAY_P3_TO_XYZ_D65,
+    };
+    narrow(mul(invert(target).unwrap_or(IDENTITY), SRGB_TO_XYZ_D65))
+}
+
 /// sRGB's piecewise encoding.
 #[must_use]
 pub fn encode_srgb(linear: f32) -> f32 {

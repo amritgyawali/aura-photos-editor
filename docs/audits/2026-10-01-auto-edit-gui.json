@@ -1,0 +1,167 @@
+{
+  "steps": [
+    {
+      "label": "OS mouse: open collection and photo",
+      "status": "passed",
+      "result": "7f6d13f157c75a55452ba8cbd8eb11ee0bf7d5a1ffbe5182884364117bdbd2ac",
+      "seconds": 6.55
+    },
+    {
+      "label": "OS mouse: Auto enhance photo",
+      "status": "passed",
+      "result": {
+        "steps": [
+          "Light & colour: portrait: exposure +0.00 EV, highlights -13, shadows 6, whites +0, blacks +0, contrast +0, vibrance +6",
+          "Skin: Texture, tone evening and local light on 1 face(s).",
+          "Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+        ],
+        "ops": 5,
+        "hash": "351598531ec1a4afac17f7ca44170eff3bfe03d46fb6b2dec71d87c407b41442"
+      },
+      "seconds": 3.88
+    },
+    {
+      "label": "OS mouse: go back to step 1 and forward again",
+      "status": "passed",
+      "result": {
+        "opsAtStep1": 0,
+        "step1Hash": "92d40eaeb4b5d4dfcc2869e79cc41d5783ca91fda88cb3f35f2e08f299cfafa9",
+        "backAtHead": true
+      },
+      "seconds": 6.16
+    },
+    {
+      "label": "OS keyboard: weaken an automatic operation in Retouch",
+      "status": "passed",
+      "result": {
+        "taggedAutomaticOps": 5,
+        "strengthBefore": 0.12,
+        "strengthAfter": 0.07
+      },
+      "seconds": 10.43
+    },
+    {
+      "label": "OS keyboard: Ctrl+Z / Ctrl+Shift+Z",
+      "status": "passed",
+      "result": {
+        "undoChanged": true,
+        "redoRestored": true
+      },
+      "seconds": 5.49
+    },
+    {
+      "label": "Repeat Auto enhance keeps manual retouch",
+      "status": "passed",
+      "result": {
+        "status": "protected",
+        "opsAfterRepeat": 5
+      },
+      "seconds": 0.48
+    }
+  ],
+  "pageErrors": [],
+  "osInput": [
+    {
+      "mouse": "open collection",
+      "screen": [
+        176,
+        837
+      ]
+    },
+    {
+      "mouse": "studio tab",
+      "screen": [
+        176,
+        406
+      ]
+    },
+    {
+      "mouse": "select photograph",
+      "screen": [
+        453,
+        685
+      ]
+    },
+    {
+      "mouse": "Auto enhance photo",
+      "screen": [
+        1482,
+        642
+      ]
+    },
+    {
+      "mouse": "Go back to step 1",
+      "screen": [
+        507,
+        653
+      ]
+    },
+    {
+      "mouse": "Go forward to last step",
+      "screen": [
+        507,
+        823
+      ]
+    },
+    {
+      "mouse": "open Retouch",
+      "screen": [
+        1431,
+        565
+      ]
+    },
+    {
+      "mouse": "select first automatic operation",
+      "screen": [
+        649,
+        565
+      ]
+    },
+    {
+      "keys": "left",
+      "purpose": "weaken strength"
+    },
+    {
+      "keys": "left",
+      "purpose": "weaken strength"
+    },
+    {
+      "keys": "left",
+      "purpose": "weaken strength"
+    },
+    {
+      "keys": "left",
+      "purpose": "weaken strength"
+    },
+    {
+      "keys": "left",
+      "purpose": "weaken strength"
+    },
+    {
+      "mouse": "apply change",
+      "screen": [
+        1555,
+        775
+      ]
+    },
+    {
+      "keys": "ctrl+z",
+      "purpose": "undo"
+    },
+    {
+      "keys": "ctrl+shift+z",
+      "purpose": "redo"
+    }
+  ],
+  "project": "Auto edit GUI 02-42-47",
+  "photo": "portrait-smile-teeth.jpg",
+  "final": "7137509834b6a9f2ddf3594d609111d8643c896563c910101ff16c097588113a",
+  "originalUnchanged": true,
+  "history": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -13, shadows 6, whites +0, blacks +0, contrast +0, vibrance +6",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured.",
+    "Native retouch",
+    "Auto edit 1/1 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -13, shadows 6, whites +0, blacks +0, contrast +0, vibrance +6"
+  ]
+}

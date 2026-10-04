@@ -22,6 +22,22 @@ impl CatalogFrames {
     }
 }
 
+/// Display sRGB bytes to the renderer's linear Rec.2020 working space.
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn srgb8_to_working(bytes: &[u8]) -> Vec<f32> {
+    let transform = matrix::mul(working_space::xyz_d65_to_rec2020(), matrix::SRGB_TO_XYZ_D65);
+    let mut output = Vec::with_capacity(bytes.len());
+    for pixel in bytes.chunks_exact(3) {
+        let linear = std::array::from_fn(|i| {
+            f64::from(curve::srgb_decode(
+                f32::from(pixel.get(i).copied().unwrap_or(0)) / 255.0,
+            ))
+        });
+        output.extend(matrix::apply(transform, linear).map(|v| v as f32));
+    }
+    output
+}
+
 #[allow(clippy::cast_possible_truncation)]
 fn working_samples(buffer: &PixelBuffer) -> AuraResult<Vec<f32>> {
     let count = (buffer.width as usize)
@@ -30,20 +46,7 @@ fn working_samples(buffer: &PixelBuffer) -> AuraResult<Vec<f32>> {
         .filter(|n| *n > 0)
         .ok_or_else(|| aura_core::errors::raw::corrupt("Invalid render dimensions"))?;
     let samples = match &buffer.data {
-        PixelData::Srgb8(bytes) => {
-            let transform =
-                matrix::mul(working_space::xyz_d65_to_rec2020(), matrix::SRGB_TO_XYZ_D65);
-            let mut output = Vec::with_capacity(count);
-            for pixel in bytes.chunks_exact(3) {
-                let linear = std::array::from_fn(|i| {
-                    f64::from(curve::srgb_decode(
-                        f32::from(pixel.get(i).copied().unwrap_or(0)) / 255.0,
-                    ))
-                });
-                output.extend(matrix::apply(transform, linear).map(|v| v as f32));
-            }
-            output
-        }
+        PixelData::Srgb8(bytes) => srgb8_to_working(bytes),
         PixelData::Linear16(codes) => codes
             .iter()
             .map(|v| curve::linear_u16_to_scene(*v))

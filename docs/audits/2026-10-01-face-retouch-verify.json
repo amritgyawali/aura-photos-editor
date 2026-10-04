@@ -1,0 +1,595 @@
+{
+  "photos": [
+    {
+      "file": "group-office.jpg",
+      "seconds": 1.7,
+      "status": "complete",
+      "faces": 3,
+      "retouchedFaces": 3,
+      "skinOps": [
+        [
+          "0-texture",
+          0.67
+        ],
+        [
+          "0-tone",
+          0.28
+        ],
+        [
+          "0-light",
+          0.29
+        ],
+        [
+          "1-texture",
+          0.59
+        ],
+        [
+          "1-tone",
+          0.28
+        ],
+        [
+          "1-light",
+          0.26
+        ],
+        [
+          "2-texture",
+          0.53
+        ],
+        [
+          "2-tone",
+          0.26
+        ],
+        [
+          "2-light",
+          0.22
+        ]
+      ],
+      "otherOps": [
+        "color_match",
+        "micro_dodge_burn",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.11,
+        0.14,
+        0.2
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 12,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "landscape.jpg",
+      "seconds": 2.5,
+      "status": "complete",
+      "faces": 0,
+      "retouchedFaces": 0,
+      "skinOps": [],
+      "otherOps": [],
+      "faceMeanChange": []
+    },
+    {
+      "file": "pet-dog-indoor.jpg",
+      "seconds": 2.6,
+      "status": "complete",
+      "faces": 0,
+      "retouchedFaces": 0,
+      "skinOps": [],
+      "otherOps": [],
+      "faceMeanChange": []
+    },
+    {
+      "file": "portrait-1239291.jpg",
+      "seconds": 1.8,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.57
+        ],
+        [
+          "0-tone",
+          0.29
+        ],
+        [
+          "0-light",
+          0.24
+        ]
+      ],
+      "otherOps": [
+        "eye_detail",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.17
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 7,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-220453.jpg",
+      "seconds": 0.9,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.55
+        ],
+        [
+          "0-tone",
+          0.27
+        ],
+        [
+          "0-light",
+          0.25
+        ]
+      ],
+      "otherOps": [
+        "eye_detail",
+        "mattify",
+        "patch_heal",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.39
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 9,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-2379004.jpg",
+      "seconds": 0.9,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.52
+        ],
+        [
+          "0-tone",
+          0.27
+        ],
+        [
+          "0-light",
+          0.21
+        ]
+      ],
+      "otherOps": [
+        "color_match",
+        "eye_detail"
+      ],
+      "faceMeanChange": [
+        0.16
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 6,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-774909.jpg",
+      "seconds": 1.1,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.54
+        ],
+        [
+          "0-tone",
+          0.29
+        ],
+        [
+          "0-light",
+          0.22
+        ]
+      ],
+      "otherOps": [
+        "eye_clean",
+        "eye_detail",
+        "micro_dodge_burn",
+        "patch_heal",
+        "teeth",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.32
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 10,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-8386841.jpg",
+      "seconds": 3.5,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.57
+        ],
+        [
+          "0-tone",
+          0.31
+        ],
+        [
+          "0-light",
+          0.27
+        ]
+      ],
+      "otherOps": [
+        "color_match",
+        "eye_clean",
+        "eye_detail",
+        "micro_dodge_burn",
+        "under_eye"
+      ],
+      "faceMeanChange": [
+        0.16
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 9,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-glasses.jpg",
+      "seconds": 0.9,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.53
+        ],
+        [
+          "0-tone",
+          0.26
+        ],
+        [
+          "0-light",
+          0.22
+        ]
+      ],
+      "otherOps": [
+        "color_match",
+        "patch_heal"
+      ],
+      "faceMeanChange": [
+        0.26
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 7,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-outdoor-flowers.jpg",
+      "seconds": 1.9,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.56
+        ],
+        [
+          "0-tone",
+          0.27
+        ],
+        [
+          "0-light",
+          0.25
+        ]
+      ],
+      "otherOps": [
+        "eye_detail",
+        "mattify"
+      ],
+      "faceMeanChange": [
+        0.2
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 5,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-pink-backdrop.jpg",
+      "seconds": 1.8,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.52
+        ],
+        [
+          "0-tone",
+          0.26
+        ],
+        [
+          "0-light",
+          0.21
+        ]
+      ],
+      "otherOps": [
+        "eye_detail",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.21
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 5,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-smile-teeth.jpg",
+      "seconds": 0.8,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.53
+        ],
+        [
+          "0-tone",
+          0.29
+        ],
+        [
+          "0-light",
+          0.24
+        ]
+      ],
+      "otherOps": [
+        "eye_detail",
+        "micro_dodge_burn",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.35
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 8,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "portrait-yellow-backdrop.jpg",
+      "seconds": 0.7,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.51
+        ],
+        [
+          "0-tone",
+          0.26
+        ],
+        [
+          "0-light",
+          0.21
+        ]
+      ],
+      "otherOps": [
+        "color_match",
+        "eye_detail",
+        "under_eye",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.18
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 8,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "test-two-portraits.jpg",
+      "seconds": 1.7,
+      "status": "complete",
+      "faces": 2,
+      "retouchedFaces": 2,
+      "skinOps": [
+        [
+          "0-texture",
+          0.55
+        ],
+        [
+          "0-tone",
+          0.26
+        ],
+        [
+          "0-light",
+          0.21
+        ],
+        [
+          "1-texture",
+          0.58
+        ],
+        [
+          "1-tone",
+          0.27
+        ],
+        [
+          "1-light",
+          0.23
+        ]
+      ],
+      "otherOps": [
+        "eye_detail",
+        "under_eye",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.2,
+        0.38
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 10,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "two-people-meeting.jpg",
+      "seconds": 2.0,
+      "status": "complete",
+      "faces": 2,
+      "retouchedFaces": 2,
+      "skinOps": [
+        [
+          "0-texture",
+          0.62
+        ],
+        [
+          "0-tone",
+          0.3
+        ],
+        [
+          "0-light",
+          0.38
+        ],
+        [
+          "1-texture",
+          0.56
+        ],
+        [
+          "1-tone",
+          0.27
+        ],
+        [
+          "1-light",
+          0.22
+        ]
+      ],
+      "otherOps": [
+        "color_match",
+        "eye_detail"
+      ],
+      "faceMeanChange": [
+        0.13,
+        0.12
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 8,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "variant-monochrome.jpg",
+      "seconds": 1.0,
+      "status": "complete",
+      "faces": 1,
+      "retouchedFaces": 1,
+      "skinOps": [
+        [
+          "0-texture",
+          0.52
+        ],
+        [
+          "0-tone",
+          0.25
+        ],
+        [
+          "0-light",
+          0.21
+        ]
+      ],
+      "otherOps": [],
+      "faceMeanChange": [
+        0.33
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 3,
+        "manualKept": 1
+      }
+    },
+    {
+      "file": "variant-underexposed.jpg",
+      "seconds": 2.0,
+      "status": "complete",
+      "faces": 2,
+      "retouchedFaces": 2,
+      "skinOps": [
+        [
+          "0-texture",
+          0.66
+        ],
+        [
+          "0-tone",
+          0.27
+        ],
+        [
+          "0-light",
+          0.34
+        ],
+        [
+          "1-texture",
+          0.65
+        ],
+        [
+          "1-tone",
+          0.26
+        ],
+        [
+          "1-light",
+          0.23
+        ]
+      ],
+      "otherOps": [
+        "eye_detail",
+        "wrinkle"
+      ],
+      "faceMeanChange": [
+        0.08,
+        0.38
+      ],
+      "afterManual": {
+        "status": "complete",
+        "autoOps": 11,
+        "manualKept": 1
+      }
+    }
+  ]
+}

@@ -13,7 +13,7 @@ export default defineConfig({
       // machines and rustc's incremental dirs go stale under the watcher mid
       // scan, which crashes it with an UNKNOWN scandir. Nothing there is ever
       // an HMR input, so it is ignored unconditionally.
-      ignored: ['**/src-tauri/**'],
+      ignored: ['**/src-tauri/**', '**/dist/**'],
     },
   },
   build: { outDir: 'dist', target: 'es2022', sourcemap: true },

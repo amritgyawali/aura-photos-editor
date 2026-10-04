@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { api, asIpcError, inTauri, automaticStart, oneClickCancel } from './ipc/client';
+import { api, asIpcError, editProfiles, inTauri, automaticStart, oneClickCancel, type ProfileSelection } from './ipc/client';
 import { automaticBusy, useAutomatic } from './state/automaticStore';
 import { AutomaticProgress } from './components/workflow/AutomaticProgress';
 import { PhotoAnalysis } from './components/PhotoAnalysis';
@@ -21,6 +21,8 @@ import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
 import { CameraMatchPanel } from './components/camera/CameraMatchPanel';
 import { CleanupPanel } from './components/cleanup/CleanupPanel';
 import { InstagramStyle } from './components/look/InstagramStyle';
+import { ProfileGallery } from './components/profiles/ProfileGallery';
+import { readProfileSelection, saveProfileSelection } from './components/profiles/profileSelection';
 import { MatchLookPanel } from './components/look/MatchLookPanel';
 import { readReferenceSelection, saveReferenceSelection, type ReferenceSelection } from './components/look/referenceStyle';
 import { CullView } from './components/cull/CullView';
@@ -110,6 +112,21 @@ export function App(): JSX.Element {
     saveReferenceSelection(next);
   }, []);
   const [referenceBusy, setReferenceBusy] = useState(false);
+  // The edit profile - a named look applied on top of each photograph's own measured edit.
+  const [profile, setProfile] = useState<ProfileSelection | null>(readProfileSelection);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
+  const changeProfile = useCallback((next: ProfileSelection | null) => {
+    setProfile(next);
+    saveProfileSelection(next);
+  }, []);
+  useEffect(() => {
+    if (!inTauri()) return;
+    editProfiles
+      .list()
+      .then((list) => setProfileNames(Object.fromEntries(list.map((p) => [p.id, p.name]))))
+      .catch(() => undefined);
+  }, []);
+  const profileName = profile ? profileNames[profile.profileId] ?? profile.profileId : undefined;
   const [automaticRequest, setAutomaticRequest] = useState(0);
   const automaticSequence = useRef(0);
   const automaticConsumed = useCallback(() => setAutomaticRequest(0), []);
@@ -553,6 +570,8 @@ export function App(): JSX.Element {
               onAutomaticConsumed={automaticConsumed}
               onRender={() => goToStep(STEPS_BY_ID['export'])}
               reference={reference}
+              profile={profile}
+              profileName={profileName}
             />
           </details>
         </> : null;
@@ -644,6 +663,15 @@ export function App(): JSX.Element {
             )}
           </div>
         ) : null;
+      case 'profiles':
+        return (
+          <ProfileGallery
+            selection={profile}
+            disabled={editing || studioSaving}
+            onChange={changeProfile}
+            previewPhotoId={focusedPhotoId}
+          />
+        );
       case 'look':
         return (
           <div>

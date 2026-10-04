@@ -37,6 +37,21 @@ use crate::pool::{DecodePool, Handler};
 use crate::request::{Request, Served};
 use crate::source::{PreviewRecord, PreviewSource};
 
+fn cached_pixels(
+    mut buffer: PixelBuffer,
+    jpeg: &[u8],
+    limits: DecodeLimits,
+) -> AuraResult<PixelBuffer> {
+    let decoded = codec::decode_jpeg(jpeg, limits)?;
+    if (decoded.width, decoded.height) != (buffer.width, buffer.height) {
+        return Err(aura_core::errors::raw::corrupt(
+            "Encoded preview dimensions changed",
+        ));
+    }
+    buffer.data = PixelData::Srgb8(decoded.data);
+    Ok(buffer)
+}
+
 /// How the service is sized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreviewConfig {
@@ -397,7 +412,10 @@ impl Inner {
         });
         self.record(id, 1, &key, &result.buffer, result.jpeg.len() as u64);
 
-        Ok(result.buffer)
+        // Analysis and editing must see the same pixels before and after a
+        // restart. The durable preview is JPEG, so publish its decoded pixels
+        // on the first request too, rather than an uncompressed-only variant.
+        cached_pixels(result.buffer, &result.jpeg, limits)
     }
 
     fn decode_tier2(
@@ -498,7 +516,7 @@ impl Inner {
             result.jpeg.len() as u64,
         );
 
-        Ok(result.pair.srgb)
+        cached_pixels(result.pair.srgb, &result.jpeg, limits)
     }
 
     fn decode_tier3(&self, bytes: &[u8], path: &Path) -> AuraResult<PixelBuffer> {

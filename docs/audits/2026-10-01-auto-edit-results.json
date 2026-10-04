@@ -1,0 +1,2727 @@
+{
+ "build": "desktop debug build of 1095c08 minus refine/settings (see report)",
+ "photos": [
+  {
+   "file": "blemish-portrait-220453.jpg",
+   "seconds": 13.66,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -10,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/5 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -10, shadows 0, whites +0, blacks -9, contrast +0, vibrance +6",
+    "Auto edit 2/5 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/5 \u00b7 Blemishes: Healed 1 temporary-looking spot(s); kept 0 possible permanent mark(s).",
+    "Auto edit 4/5 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured.",
+    "Auto edit 5/5 \u00b7 Teeth & shine: Teeth yellow cast and skin shine where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 5%.",
+     "Tonal range stretched (whites +0, blacks -9): the frame used only 10%-95% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (41% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.930972,
+     "reason": "Compared 18 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.124719,
+      0.10221,
+      0.120525
+     ],
+     "findings": [
+      "Blemishes: healed 1 small spot that was redder than the surrounding skin.",
+      "Eyes: added subtle iris detail to 2 eyes.",
+      "Teeth: none clearly visible, so no whitening was applied.",
+      "Shine: softened specular highlights covering 14.1% of the skin."
+     ],
+     "spotsHealed": 1,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "patch_heal",
+    "eye_detail",
+    "eye_detail",
+    "mattify"
+   ]
+  },
+  {
+   "file": "blemish-portrait-smile-teeth.jpg",
+   "seconds": 0.76,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -13,
+    "shadows": 6,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/4 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -13, shadows 6, whites +0, blacks +0, contrast +0, vibrance +6",
+    "Auto edit 2/4 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/4 \u00b7 Blemishes: Healed 2 temporary-looking spot(s); kept 0 possible permanent mark(s).",
+    "Auto edit 4/4 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 13%.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (14% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.939897,
+     "reason": "Compared 13 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.116491,
+      0.114767,
+      0.113486
+     ],
+     "findings": [
+      "Blemishes: healed 2 small spots that were redder than the surrounding skin.",
+      "Eyes: added subtle iris detail to 2 eyes.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 2,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "patch_heal",
+    "patch_heal",
+    "eye_detail",
+    "eye_detail"
+   ]
+  },
+  {
+   "file": "blemish-portrait-yellow-backdrop.jpg",
+   "seconds": 0.74,
+   "global": {
+    "exposure": 0,
+    "contrast": 3,
+    "temperature": 4707,
+    "tint": -4,
+    "highlights": 0,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/4 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights 0, shadows 0, whites +16, blacks -15, contrast +3, vibrance +0, white balance 4707 K / -4",
+    "Auto edit 2/4 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/4 \u00b7 Blemishes: Healed 4 temporary-looking spot(s); kept 0 possible permanent mark(s).",
+    "Auto edit 4/4 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance unchanged: the frame is already colourful (67% average saturation).",
+     "Tonal range stretched (whites +16, blacks -15): the frame used only 14%-84% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 4707 K / tint -4: two independent estimates agreed on a cast; removed about 50% of it, measured on 3% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.939326,
+     "reason": "Compared 22 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.104984,
+      0.0844,
+      0.086442
+     ],
+     "findings": [
+      "Blemishes: healed 4 small spots that were redder than the surrounding skin.",
+      "Eyes: added subtle iris detail to 1 eye; lifted 1 under-eye shadow that measured darker than the cheek; left 1 eye alone because no open eye was visible.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 4,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "patch_heal",
+    "patch_heal",
+    "patch_heal",
+    "patch_heal",
+    "eye_detail",
+    "under_eye"
+   ]
+  },
+  {
+   "file": "cat-veterinary.jpg",
+   "seconds": 1.33,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5329,
+    "tint": -2,
+    "highlights": -14,
+    "shadows": 8,
+    "clarity": 8,
+    "dehaze": 0,
+    "vibrance": 17,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 30,
+     "detail": 25,
+     "masking": 50,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: general scene: exposure +0.00 EV, highlights -14, shadows 8, whites +0, blacks +0, contrast +0, vibrance +17, white balance 5329 K / -2"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as general scene (0 faces large enough to retouch).",
+     "Vibrance +17: average saturation measured 13%.",
+     "Clarity +8 for structure; no faces to protect.",
+     "Sharpening 30 with 50% edge masking.",
+     "White balance 5329 K / tint -2: two independent estimates agreed on a cast; removed about 65% of it, measured on 58% neutral areas with faces ignored."
+    ],
+    "kind": "general scene"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "food-flatlay.jpg",
+   "seconds": 1.39,
+   "global": {
+    "exposure": -0.25,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -18,
+    "shadows": 0,
+    "clarity": 8,
+    "dehaze": 0,
+    "vibrance": 12,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 30,
+     "detail": 25,
+     "masking": 50,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: general scene: exposure -0.25 EV, highlights -18, shadows 0, whites +8, blacks -6, contrast +0, vibrance +12"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as general scene (0 faces large enough to retouch).",
+     "Vibrance +12: average saturation measured 26%.",
+     "Clarity +8 for structure; no faces to protect.",
+     "Tonal range stretched (whites +8, blacks -6): the frame used only 8%-89% of the range.",
+     "Sharpening 30 with 50% edge masking.",
+     "White balance kept: the neutral areas and the edges disagree about the light (a coloured backdrop or mixed light)."
+    ],
+    "kind": "general scene"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "group-office.jpg",
+   "seconds": 0.84,
+   "global": {
+    "exposure": 0.326357,
+    "contrast": 0,
+    "temperature": 5438,
+    "tint": -13,
+    "highlights": 0,
+    "shadows": 11,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 4,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: portrait: exposure +0.33 EV, highlights 0, shadows 11, whites +0, blacks +0, contrast +0, vibrance +4, white balance 5438 K / -13",
+    "Auto edit 2/2 \u00b7 Skin: Texture, tone evening and local light on 1 face(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Exposure limited to +0.33 EV (the histogram asked for +0.72): brightening further would clip highlights on a face.",
+     "Vibrance +4: average saturation measured 26%.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5438 K / tint -13: two independent estimates agreed on a cast; removed about 65% of it, measured on 14% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.925339,
+     "reason": "Compared 12 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.123783,
+      0.084299,
+      0.085693
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: left 2 eyes alone because no open eye was visible.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn"
+   ]
+  },
+  {
+   "file": "landscape-sunset-hills.jpg",
+   "seconds": 1.33,
+   "global": {
+    "exposure": 0.590522,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 8,
+    "clarity": 8,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 30,
+     "detail": 25,
+     "masking": 50,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: general scene: exposure +0.59 EV, highlights 0, shadows 8, whites +0, blacks +0, contrast +0, vibrance +0"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as general scene (0 faces large enough to retouch).",
+     "Vibrance unchanged: the frame is already colourful (58% average saturation).",
+     "Clarity +8 for structure; no faces to protect.",
+     "Sharpening 30 with 50% edge masking.",
+     "White balance kept: not enough reliable neutral areas."
+    ],
+    "kind": "general scene"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "landscape.jpg",
+   "seconds": 1.34,
+   "global": {
+    "exposure": 0.75,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 12,
+    "clarity": 8,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 30,
+     "detail": 25,
+     "masking": 50,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: general scene: exposure +0.75 EV, highlights 0, shadows 12, whites +15, blacks +0, contrast +0, vibrance +0"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as general scene (0 faces large enough to retouch).",
+     "Vibrance unchanged: the frame is already colourful (49% average saturation).",
+     "Clarity +8 for structure; no faces to protect.",
+     "Tonal range stretched (whites +15, blacks +0): the frame used only 7%-84% of the range.",
+     "Sharpening 30 with 50% edge masking.",
+     "White balance kept: the neutral areas and the edges disagree about the light (a coloured backdrop or mixed light)."
+    ],
+    "kind": "general scene"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "pet-dog-indoor.jpg",
+   "seconds": 1.29,
+   "global": {
+    "exposure": 0.75,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 14,
+    "clarity": 8,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 30,
+     "detail": 25,
+     "masking": 50,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: general scene: exposure +0.75 EV, highlights 0, shadows 14, whites +0, blacks +0, contrast +0, vibrance +0"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as general scene (0 faces large enough to retouch).",
+     "Vibrance unchanged: the frame is already colourful (60% average saturation).",
+     "Clarity +8 for structure; no faces to protect.",
+     "Sharpening 30 with 50% edge masking.",
+     "White balance kept: a strong colour with no people in frame reads as the light's mood (sunset, blue hour or stage light)."
+    ],
+    "kind": "general scene"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "portrait-1239291.jpg",
+   "seconds": 2.41,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5775,
+    "tint": 9,
+    "highlights": -18,
+    "shadows": 2,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -18, shadows 2, whites +0, blacks -15, contrast +0, vibrance +6, white balance 5775 K / +9",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 11%.",
+     "Tonal range stretched (whites +0, blacks -15): the frame used only 14%-96% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5775 K / tint +9: two independent estimates agreed on a cast; removed about 65% of it, measured on 24% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.935988,
+     "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.132094,
+      0.113477,
+      0.113602
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 2 eyes.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail",
+    "eye_detail"
+   ]
+  },
+  {
+   "file": "portrait-220453.jpg",
+   "seconds": 0.76,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -10,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/5 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -10, shadows 0, whites +0, blacks -9, contrast +0, vibrance +6",
+    "Auto edit 2/5 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/5 \u00b7 Blemishes: Healed 1 temporary-looking spot(s); kept 0 possible permanent mark(s).",
+    "Auto edit 4/5 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured.",
+    "Auto edit 5/5 \u00b7 Teeth & shine: Teeth yellow cast and skin shine where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 5%.",
+     "Tonal range stretched (whites +0, blacks -9): the frame used only 10%-95% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (41% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.930814,
+     "reason": "Compared 18 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.121769,
+      0.096841,
+      0.116584
+     ],
+     "findings": [
+      "Blemishes: healed 1 small spot that was redder than the surrounding skin.",
+      "Eyes: added subtle iris detail to 2 eyes.",
+      "Teeth: none clearly visible, so no whitening was applied.",
+      "Shine: softened specular highlights covering 14.9% of the skin."
+     ],
+     "spotsHealed": 1,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "patch_heal",
+    "eye_detail",
+    "eye_detail",
+    "mattify"
+   ]
+  },
+  {
+   "file": "portrait-2379004.jpg",
+   "seconds": 0.68,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -18,
+    "shadows": 1,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 4,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -18, shadows 1, whites +0, blacks +0, contrast +0, vibrance +4",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +4: average saturation measured 16%.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (44% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.930731,
+     "reason": "Compared 12 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.109055,
+      0.092554,
+      0.088221
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Kept 1 darker mark that may be permanent (mole, freckle or beauty mark).",
+      "Eyes: added subtle iris detail to 1 eye; left 1 eye alone because no open eye was visible.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 1
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail"
+   ]
+  },
+  {
+   "file": "portrait-774909.jpg",
+   "seconds": 0.73,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5241,
+    "tint": 4,
+    "highlights": -12,
+    "shadows": 7,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 4,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/5 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -12, shadows 7, whites +0, blacks +0, contrast +0, vibrance +4, white balance 5241 K / +4",
+    "Auto edit 2/5 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/5 \u00b7 Blemishes: Healed 1 temporary-looking spot(s); kept 0 possible permanent mark(s).",
+    "Auto edit 4/5 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured.",
+    "Auto edit 5/5 \u00b7 Teeth & shine: Teeth yellow cast and skin shine where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +4: average saturation measured 19%.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5241 K / tint +4: two independent estimates agreed on a cast; removed about 65% of it, measured on 32% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.946196,
+     "reason": "Compared 20 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.118612,
+      0.110876,
+      0.098997
+     ],
+     "findings": [
+      "Blemishes: healed 1 small spot that was redder than the surrounding skin.",
+      "Eyes: added subtle iris detail to 2 eyes; reduced redness in 1 eye.",
+      "Teeth: reduced a measured yellow cast (41% of the visible tooth area)."
+     ],
+     "spotsHealed": 1,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "patch_heal",
+    "eye_detail",
+    "eye_clean",
+    "eye_detail",
+    "teeth"
+   ]
+  },
+  {
+   "file": "portrait-8386841.jpg",
+   "seconds": 0.64,
+   "global": {
+    "exposure": -0.25,
+    "contrast": 0,
+    "temperature": 5322,
+    "tint": 4,
+    "highlights": -14,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure -0.25 EV, highlights -14, shadows 0, whites +14, blacks +0, contrast +0, vibrance +6, white balance 5322 K / +4",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 10%.",
+     "Tonal range stretched (whites +14, blacks +0): the frame used only 3%-86% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5322 K / tint +4: two independent estimates agreed on a cast; removed about 65% of it, measured on 68% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.907847,
+     "reason": "Compared 27 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.131166,
+      0.129021,
+      0.134112
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 2 eyes; reduced redness in 1 eye; lifted 1 under-eye shadow that measured darker than the cheek.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail",
+    "eye_clean",
+    "eye_detail",
+    "under_eye"
+   ]
+  },
+  {
+   "file": "portrait-glasses.jpg",
+   "seconds": 0.74,
+   "global": {
+    "exposure": 0.15,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 15,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.15 EV, highlights 0, shadows 15, whites +18, blacks +0, contrast +0, vibrance +0",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Blemishes: Healed 3 temporary-looking spot(s); kept 0 possible permanent mark(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Exposure limited to +0.15 EV (the histogram asked for +0.75): the people are already brighter than the scene around them, so the darker mood is kept.",
+     "Vibrance unchanged: the frame is already colourful (52% average saturation).",
+     "Tonal range stretched (whites +18, blacks +0): the frame used only 4%-83% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: not enough reliable neutral areas."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.935296,
+     "reason": "Compared 23 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.111385,
+      0.090023,
+      0.093277
+     ],
+     "findings": [
+      "Blemishes: healed 3 small spots that were redder than the surrounding skin.",
+      "Eyes: left 2 eyes alone because no open eye was visible.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 3,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "patch_heal",
+    "patch_heal",
+    "patch_heal"
+   ]
+  },
+  {
+   "file": "portrait-outdoor-flowers.jpg",
+   "seconds": 0.58,
+   "global": {
+    "exposure": 0.097224,
+    "contrast": 1,
+    "temperature": 6023,
+    "tint": 4,
+    "highlights": 0,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 4,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/4 \u00b7 Light & colour: portrait: exposure +0.10 EV, highlights 0, shadows 0, whites +7, blacks -26, contrast +1, vibrance +4, white balance 6023 K / +4",
+    "Auto edit 2/4 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/4 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured.",
+    "Auto edit 4/4 \u00b7 Teeth & shine: Teeth yellow cast and skin shine where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +4: average saturation measured 20%.",
+     "Tonal range stretched (whites +7, blacks -26): the frame used only 22%-90% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 6023 K / tint +4: two independent estimates agreed on a cast; removed about 65% of it, measured on 16% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.866917,
+     "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.153868,
+      0.088956,
+      0.115286
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 1 eye; left 1 eye alone because no open eye was visible.",
+      "Teeth: visible and already neutral, so they were left alone.",
+      "Shine: softened specular highlights covering 2.1% of the skin."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail",
+    "mattify"
+   ]
+  },
+  {
+   "file": "portrait-pink-backdrop.jpg",
+   "seconds": 0.5,
+   "global": {
+    "exposure": 0,
+    "contrast": 6,
+    "temperature": 4875,
+    "tint": -19,
+    "highlights": -5,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 4,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -5, shadows 0, whites +11, blacks -32, contrast +6, vibrance +4, white balance 4875 K / -19",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +4: average saturation measured 30%.",
+     "Tonal range stretched (whites +11, blacks -32): the frame used only 25%-87% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 4875 K / tint -19: two independent estimates agreed on a cast; removed about 65% of it, measured on 7% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.921661,
+     "reason": "Compared 15 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.10731,
+      0.085611,
+      0.084956
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 1 eye; left 1 eye alone because no open eye was visible.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail"
+   ]
+  },
+  {
+   "file": "portrait-smile-teeth.jpg",
+   "seconds": 0.66,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -13,
+    "shadows": 6,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -13, shadows 6, whites +0, blacks +0, contrast +0, vibrance +6",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 13%.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (14% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.939816,
+     "reason": "Compared 15 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.115373,
+      0.112407,
+      0.112952
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 2 eyes.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail",
+    "eye_detail"
+   ]
+  },
+  {
+   "file": "portrait-yellow-backdrop.jpg",
+   "seconds": 0.58,
+   "global": {
+    "exposure": 0,
+    "contrast": 3,
+    "temperature": 4706,
+    "tint": -4,
+    "highlights": 0,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights 0, shadows 0, whites +16, blacks -15, contrast +3, vibrance +0, white balance 4706 K / -4",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance unchanged: the frame is already colourful (67% average saturation).",
+     "Tonal range stretched (whites +16, blacks -15): the frame used only 15%-84% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 4706 K / tint -4: two independent estimates agreed on a cast; removed about 50% of it, measured on 3% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.939354,
+     "reason": "Compared 24 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.104213,
+      0.085286,
+      0.086505
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 1 eye; lifted 1 under-eye shadow that measured darker than the cheek; left 1 eye alone because no open eye was visible.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail",
+    "under_eye"
+   ]
+  },
+  {
+   "file": "product-sneaker.jpg",
+   "seconds": 1.46,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 6009,
+    "tint": -9,
+    "highlights": -8,
+    "shadows": 4,
+    "clarity": 12,
+    "dehaze": 0,
+    "vibrance": 9,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 35,
+     "detail": 30,
+     "masking": 40,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: outdoor (sky or greenery): exposure +0.00 EV, highlights -8, shadows 4, whites +0, blacks +0, contrast +0, vibrance +9, white balance 6009 K / -9"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as outdoor (sky or greenery) (0 faces large enough to retouch).",
+     "Vibrance +9: average saturation measured 36%.",
+     "Clarity +12 for structure; no faces to protect.",
+     "Sharpening 35 with 40% edge masking.",
+     "White balance 6009 K / tint -9: two independent estimates agreed on a cast; removed about 65% of it, measured on 10% neutral areas with faces ignored.",
+     "Sky: balanced the bright sky above 57% of the frame height with a feathered gradient."
+    ],
+    "kind": "outdoor (sky or greenery)"
+   },
+   "faces": [],
+   "operations": [
+    "burn"
+   ]
+  },
+  {
+   "file": "test-alpha.png",
+   "seconds": 0.41,
+   "global": {
+    "exposure": -0.25,
+    "contrast": 8,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -23,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: portrait: exposure -0.25 EV, highlights -23, shadows 0, whites +0, blacks -35, contrast +8, vibrance +0",
+    "Auto edit 2/2 \u00b7 Skin: Texture, tone evening and local light on 1 face(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance unchanged: the frame is monochrome (2% average saturation).",
+     "Tonal range stretched (whites +0, blacks -35): the frame used only 79%-91% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (55% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.921792,
+     "reason": "Compared 27 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.10485,
+      0.082055,
+      0.089824
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes are too small at analysis resolution for automatic eye finishing.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn"
+   ]
+  },
+  {
+   "file": "test-black.png",
+   "seconds": 1.08,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 10,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 15,
+     "detail": 20,
+     "masking": 75,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: low light: exposure +0.00 EV, highlights 0, shadows 10, whites +0, blacks +0, contrast +0, vibrance +0"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": false,
+   "scene": {
+    "decisions": [
+     "Scene measured as low light (0 faces large enough to retouch).",
+     "Vibrance unchanged: the frame is monochrome (0% average saturation).",
+     "Shadows lifted a further +10 for a low-light frame.",
+     "Sharpening 15 with 75% edge masking.",
+     "White balance kept: the frame has no usable detail."
+    ],
+    "kind": "low light"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "test-bright.jpg",
+   "seconds": 0.37,
+   "global": {
+    "exposure": -0.25,
+    "contrast": 1,
+    "temperature": 5501,
+    "tint": -9,
+    "highlights": -25,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: portrait: exposure -0.25 EV, highlights -25, shadows 0, whites +0, blacks -35, contrast +1, vibrance +6, white balance 5501 K / -9"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 3%.",
+     "Tonal range stretched (whites +0, blacks -35): the frame used only 34%-93% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5501 K / tint -9: two independent estimates agreed on a cast; removed about 65% of it, measured on 2% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "skipped",
+     "confidence": 0.901778,
+     "reason": "No representative skin patch was available inside the face; patches may be clipped, too dark or highly textured.",
+     "strengths": [
+      0,
+      0,
+      0
+     ],
+     "findings": null,
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": []
+  },
+  {
+   "file": "test-cmyk.jpg",
+   "seconds": 0.4,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5762,
+    "tint": 11,
+    "highlights": -18,
+    "shadows": 3,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -18, shadows 3, whites +0, blacks -16, contrast +0, vibrance +6, white balance 5762 K / +11",
+    "Auto edit 2/2 \u00b7 Skin: Texture, tone evening and local light on 1 face(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 12%.",
+     "Tonal range stretched (whites +0, blacks -16): the frame used only 15%-96% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5762 K / tint +11: two independent estimates agreed on a cast; removed about 65% of it, measured on 23% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.935529,
+     "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.130367,
+      0.101051,
+      0.102185
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes are too small at analysis resolution for automatic eye finishing.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn"
+   ]
+  },
+  {
+   "file": "test-corrupt.jpg",
+   "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2001\",\"message\":\"AURA does not recognise this file as a photo it can develop. It has been set aside; the rest of the imp"
+  },
+  {
+   "file": "test-dark.jpg",
+   "seconds": 0.38,
+   "global": {
+    "exposure": 1.5,
+    "contrast": 7,
+    "temperature": 5681,
+    "tint": 9,
+    "highlights": 0,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: portrait: exposure +1.50 EV, highlights 0, shadows 0, whites +30, blacks +0, contrast +7, vibrance +6, white balance 5681 K / +9",
+    "Auto edit 2/2 \u00b7 Skin: Texture, tone evening and local light on 1 face(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Exposure raised to +1.50 EV: the frame is dark throughout, and the detected faces show it is underexposed rather than a silhouette.",
+     "Vibrance +6: average saturation measured 11%.",
+     "Tonal range stretched (whites +30, blacks +0): the frame used only 7%-33% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5681 K / tint +9: two independent estimates agreed on a cast; removed about 65% of it, measured on 31% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.932882,
+     "reason": "Compared 27 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded. Low skin signal reduces correction strength.",
+     "strengths": [
+      0.110103,
+      0.080321,
+      0.118007
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes are too small at analysis resolution for automatic eye finishing.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn"
+   ]
+  },
+  {
+   "file": "test-exif6.jpg",
+   "seconds": 0.94,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5733,
+    "tint": 9,
+    "highlights": -18,
+    "shadows": 3,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -18, shadows 3, whites +0, blacks -16, contrast +0, vibrance +6, white balance 5733 K / +9",
+    "Auto edit 2/2 \u00b7 Skin: Texture, tone evening and local light on 1 face(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 12%.",
+     "Tonal range stretched (whites +0, blacks -16): the frame used only 15%-96% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5733 K / tint +9: two independent estimates agreed on a cast; removed about 65% of it, measured on 20% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.936123,
+     "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.130142,
+      0.109304,
+      0.103364
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes are too small at analysis resolution for automatic eye finishing.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn"
+   ]
+  },
+  {
+   "file": "test-gray.jpg",
+   "seconds": 0.39,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -18,
+    "shadows": 2,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -18, shadows 2, whites +0, blacks -16, contrast +0, vibrance +0",
+    "Auto edit 2/2 \u00b7 Skin: Texture, tone evening and local light on 1 face(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance unchanged: the frame is monochrome (0% average saturation).",
+     "Tonal range stretched (whites +0, blacks -16): the frame used only 15%-96% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (80% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.928056,
+     "reason": "Compared 18 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.120192,
+      0.08,
+      0.092308
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes are too small at analysis resolution for automatic eye finishing.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn"
+   ]
+  },
+  {
+   "file": "test-gray16.tif",
+   "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2002\",\"message\":\"This photo file is damaged and could not be opened. Copy it from the card again, then re-run the import"
+  },
+  {
+   "file": "test-one-pixel.png",
+   "seconds": 1.11,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 0,
+     "detail": 25,
+     "masking": 0,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Portrait analysis: 0 face(s) detected."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": false,
+   "scene": {},
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "test-opaque.png",
+   "seconds": 0.42,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5747,
+    "tint": 10,
+    "highlights": -18,
+    "shadows": 3,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -18, shadows 3, whites +0, blacks -16, contrast +0, vibrance +6, white balance 5747 K / +10",
+    "Auto edit 2/2 \u00b7 Skin: Texture, tone evening and local light on 1 face(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 11%.",
+     "Tonal range stretched (whites +0, blacks -16): the frame used only 15%-96% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5747 K / tint +10: two independent estimates agreed on a cast; removed about 65% of it, measured on 23% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.935202,
+     "reason": "Compared 18 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.142186,
+      0.120334,
+      0.117097
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes are too small at analysis resolution for automatic eye finishing.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn"
+   ]
+  },
+  {
+   "file": "test-rgb.tif",
+   "error": "Page.evaluate: Error: {\"code\":\"AURA-RAW-2002\",\"message\":\"This photo file is damaged and could not be opened. Copy it from the card again, then re-run the import"
+  },
+  {
+   "file": "test-two-portraits.jpg",
+   "seconds": 0.46,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -12,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -12, shadows 0, whites +0, blacks -13, contrast +0, vibrance +6",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 2 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (2 faces large enough to retouch).",
+     "Vibrance +6: average saturation measured 6%.",
+     "Tonal range stretched (whites +0, blacks -13): the frame used only 13%-96% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (44% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.929439,
+     "reason": "Compared 15 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.120638,
+      0.090457,
+      0.087765
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes are too small at analysis resolution for automatic eye finishing.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    },
+    {
+     "face": 2,
+     "status": "retouched",
+     "confidence": 0.939046,
+     "reason": "Compared 16 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.136836,
+      0.094995,
+      0.103467
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 2 eyes; lifted 1 under-eye shadow that measured darker than the cheek.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail",
+    "under_eye",
+    "eye_detail"
+   ]
+  },
+  {
+   "file": "two-people-meeting.jpg",
+   "seconds": 0.52,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 5797,
+    "tint": -1,
+    "highlights": -6,
+    "shadows": 6,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -6, shadows 6, whites +10, blacks -6, contrast +0, vibrance +6, white balance 5797 K / -1",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 2 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (2 faces large enough to retouch).",
+     "Vibrance +6: average saturation measured 14%.",
+     "Tonal range stretched (whites +10, blacks -6): the frame used only 9%-88% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5797 K / tint -1: two independent estimates agreed on a cast; removed about 65% of it, measured on 39% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.92343,
+     "reason": "Compared 26 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.151889,
+      0.11624,
+      0.22
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 1 eye; left 1 eye alone because no open eye was visible.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    },
+    {
+     "face": 2,
+     "status": "retouched",
+     "confidence": 0.921634,
+     "reason": "Compared 13 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.14622,
+      0.088839,
+      0.098638
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: left 2 eyes alone because no open eye was visible.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail"
+   ]
+  },
+  {
+   "file": "variant-blue-cast.jpg",
+   "seconds": 1.33,
+   "global": {
+    "exposure": 0.75,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 9,
+    "clarity": 8,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 30,
+     "detail": 25,
+     "masking": 50,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: general scene: exposure +0.75 EV, highlights 0, shadows 9, whites +0, blacks +0, contrast +0, vibrance +0"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as general scene (0 faces large enough to retouch).",
+     "Vibrance unchanged: the frame is already colourful (50% average saturation).",
+     "Clarity +8 for structure; no faces to protect.",
+     "Sharpening 30 with 50% edge masking.",
+     "White balance kept: not enough reliable neutral areas."
+    ],
+    "kind": "general scene"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "variant-flat.jpg",
+   "seconds": 0.52,
+   "global": {
+    "exposure": 0,
+    "contrast": 5,
+    "temperature": 5824,
+    "tint": 4,
+    "highlights": 0,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 6,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights 0, shadows 0, whites +30, blacks -35, contrast +5, vibrance +6, white balance 5824 K / +4",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +6: average saturation measured 11%.",
+     "Tonal range stretched (whites +30, blacks -35): the frame used only 32%-69% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5824 K / tint +4: two independent estimates agreed on a cast; removed about 65% of it, measured on 33% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.87061,
+     "reason": "Compared 27 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.138168,
+      0.085561,
+      0.097751
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 1 eye; left 1 eye alone because no open eye was visible.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail"
+   ]
+  },
+  {
+   "file": "variant-hazy.jpg",
+   "seconds": 1.3,
+   "global": {
+    "exposure": 0,
+    "contrast": 3,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 0,
+    "clarity": 8,
+    "dehaze": 25,
+    "vibrance": 12,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 30,
+     "detail": 25,
+     "masking": 50,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: general scene: exposure +0.00 EV, highlights 0, shadows 0, whites +20, blacks -35, contrast +3, vibrance +12"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as general scene (0 faces large enough to retouch).",
+     "Vibrance +12: average saturation measured 22%.",
+     "Clarity +8 for structure; no faces to protect.",
+     "Dehaze +25: the darkest non-sky tones sit at 32% (a veil of haze).",
+     "Tonal range stretched (whites +20, blacks -35): the frame used only 34%-81% of the range.",
+     "Sharpening 30 with 50% edge masking.",
+     "White balance kept: a strong colour with no people in frame reads as the light's mood (sunset, blue hour or stage light)."
+    ],
+    "kind": "general scene"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "variant-monochrome.jpg",
+   "seconds": 1.53,
+   "global": {
+    "exposure": 0.15,
+    "contrast": 0,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 15,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/2 \u00b7 Light & colour: portrait: exposure +0.15 EV, highlights 0, shadows 15, whites +16, blacks +0, contrast +0, vibrance +0",
+    "Auto edit 2/2 \u00b7 Skin: Texture, tone evening and local light on 1 face(s)."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Exposure limited to +0.15 EV (the histogram asked for +0.75): the people are already brighter than the scene around them, so the darker mood is kept.",
+     "Vibrance unchanged: the frame is monochrome (0% average saturation).",
+     "Tonal range stretched (whites +16, blacks +0): the frame used only 4%-84% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: neutral areas (14% of the frame) are already neutral."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.930105,
+     "reason": "Compared 21 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.111173,
+      0.08,
+      0.089849
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Kept 2 darker marks that may be permanent (mole, freckle or beauty mark).",
+      "Eyes: left 2 eyes alone because no open eye was visible.",
+      "Teeth: visible and already neutral, so they were left alone."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 2
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn"
+   ]
+  },
+  {
+   "file": "variant-noisy-lowlight.jpg",
+   "seconds": 1.27,
+   "global": {
+    "exposure": 0.25,
+    "contrast": 4,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 10,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 7,
+     "detail": 20,
+     "masking": 75,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 50,
+     "detail": 50,
+     "luminance": 45,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: low light: exposure +0.25 EV, highlights 0, shadows 10, whites +30, blacks +0, contrast +4, vibrance +0"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as low light (0 faces large enough to retouch).",
+     "Vibrance unchanged: the frame is already colourful (54% average saturation).",
+     "Tonal range stretched (whites +30, blacks +0): the frame used only 1%-48% of the range.",
+     "Shadows lifted a further +10 for a low-light frame.",
+     "Noise reduction 45/50: measured noise 4.31% of full scale.",
+     "Sharpening 7 with 75% edge masking.",
+     "White balance kept: a strong colour with no people in frame reads as the light's mood (sunset, blue hour or stage light)."
+    ],
+    "kind": "low light"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "variant-overexposed.jpg",
+   "seconds": 1.31,
+   "global": {
+    "exposure": -0.25,
+    "contrast": 1,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": -25,
+    "shadows": 0,
+    "clarity": 8,
+    "dehaze": 0,
+    "vibrance": 12,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 30,
+     "detail": 25,
+     "masking": 50,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/1 \u00b7 Light & colour: general scene: exposure -0.25 EV, highlights -25, shadows 0, whites +0, blacks -11, contrast +1, vibrance +12"
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": null,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as general scene (0 faces large enough to retouch).",
+     "Vibrance +12: average saturation measured 22%.",
+     "Clarity +8 for structure; no faces to protect.",
+     "Tonal range stretched (whites +0, blacks -11): the frame used only 12%-93% of the range.",
+     "Sharpening 30 with 50% edge masking.",
+     "White balance kept: not enough reliable neutral areas."
+    ],
+    "kind": "general scene"
+   },
+   "faces": [],
+   "operations": []
+  },
+  {
+   "file": "variant-soft.jpg",
+   "seconds": 0.6,
+   "global": {
+    "exposure": 0,
+    "contrast": 3,
+    "temperature": 5500,
+    "tint": 0,
+    "highlights": 0,
+    "shadows": 0,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 0,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights 0, shadows 0, whites +16, blacks -17, contrast +3, vibrance +0",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance unchanged: the frame is already colourful (67% average saturation).",
+     "Tonal range stretched (whites +16, blacks -17): the frame used only 15%-84% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance kept: the neutral areas and the edges disagree about the light (a coloured backdrop or mixed light)."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.938993,
+     "reason": "Compared 25 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.103566,
+      0.085514,
+      0.087076
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 2 eyes; lifted 2 under-eye shadows that measured darker than the cheek.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail",
+    "under_eye",
+    "eye_detail",
+    "under_eye"
+   ]
+  },
+  {
+   "file": "variant-tungsten-cast.jpg",
+   "seconds": 0.7,
+   "global": {
+    "exposure": 0,
+    "contrast": 0,
+    "temperature": 4493,
+    "tint": 5,
+    "highlights": -9,
+    "shadows": 6,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 4,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +0.00 EV, highlights -9, shadows 6, whites +0, blacks +0, contrast +0, vibrance +4, white balance 4493 K / +5",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Teeth & shine: Teeth yellow cast and skin shine where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Vibrance +4: average saturation measured 34%.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 4493 K / tint +5: two independent estimates agreed on a cast; removed about 50% of it, measured on 9% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.935249,
+     "reason": "Compared 2 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.148138,
+      0.082591,
+      0.100552
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: left 2 eyes alone because no open eye was visible.",
+      "Teeth: reduced a measured yellow cast (35% of the visible tooth area)."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "teeth"
+   ]
+  },
+  {
+   "file": "variant-underexposed.jpg",
+   "seconds": 0.53,
+   "global": {
+    "exposure": 1.5,
+    "contrast": 4,
+    "temperature": 5496,
+    "tint": -10,
+    "highlights": 0,
+    "shadows": 15,
+    "clarity": 0,
+    "dehaze": 0,
+    "vibrance": 4,
+    "saturation": 0,
+    "sharpen": {
+     "amount": 20,
+     "detail": 25,
+     "masking": 70,
+     "radius": 1
+    },
+    "noise": {
+     "colour": 0,
+     "detail": 50,
+     "luminance": 0,
+     "model": "reference_v1"
+    }
+   },
+   "historySteps": [
+    "Auto edit 1/3 \u00b7 Light & colour: portrait: exposure +1.50 EV, highlights 0, shadows 15, whites +26, blacks +0, contrast +4, vibrance +4, white balance 5496 K / -10",
+    "Auto edit 2/3 \u00b7 Skin: Texture, tone evening and local light on 1 face(s).",
+    "Auto edit 3/3 \u00b7 Eyes: Iris detail, sclera redness, red-eye and under-eye shadows where measured."
+   ],
+   "idempotent": true,
+   "gotoOriginalRestoresPixels": true,
+   "gotoHeadRestoresPixels": true,
+   "manualKeptAfterRepeat": true,
+   "pixelsChanged": true,
+   "scene": {
+    "decisions": [
+     "Scene measured as portrait (1 face large enough to retouch).",
+     "Exposure raised to +1.50 EV: the frame is dark throughout, and the detected faces show it is underexposed rather than a silhouette.",
+     "Vibrance +4: average saturation measured 26%.",
+     "Tonal range stretched (whites +26, blacks +0): the frame used only 4%-77% of the range.",
+     "Sharpening 20 with 70% edge masking so skin texture is not exaggerated.",
+     "White balance 5496 K / tint -10: two independent estimates agreed on a cast; removed about 65% of it, measured on 14% neutral areas with faces ignored."
+    ],
+    "kind": "portrait"
+   },
+   "faces": [
+    {
+     "face": 1,
+     "status": "retouched",
+     "confidence": 0.916026,
+     "reason": "Compared 17 cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.",
+     "strengths": [
+      0.167746,
+      0.090281,
+      0.104395
+     ],
+     "findings": [
+      "Blemishes: no temporary-looking spots found (a spot must be small, round and redder than the skin around it).",
+      "Eyes: added subtle iris detail to 2 eyes.",
+      "Teeth: none clearly visible, so no whitening was applied."
+     ],
+     "spotsHealed": 0,
+     "marksKept": 0
+    }
+   ],
+   "operations": [
+    "skin_smooth",
+    "skin_uniformity",
+    "portrait_dodge_burn",
+    "eye_detail",
+    "eye_detail"
+   ]
+  }
+ ]
+}

@@ -2,6 +2,145 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Intelligent one-click editing — 2026-09-30
+
+- Auto enhance now measures the scene (portrait, group, landscape, low light, general) and
+  sets white balance (partial gray-pixel correction, faces ignored), vibrance, clarity,
+  dehaze, noise reduction and sharpening in addition to exposure and tone.
+- Outdoor frames with a bright sky get a feathered, highlight-only sky gradient.
+- Per face, on the 2048-px proxy: temporary blemishes (redder than surrounding skin) are
+  healed individually while darker, non-red marks are kept and counted; iris detail,
+  sclera redness, flash red-eye and under-eye shadows are corrected only when measured;
+  yellow teeth are whitened and skin shine is softened only when measured.
+- The pass saves up to six separate history steps (light & colour, sky, skin, blemishes,
+  eyes, teeth & shine). `history_step` accepts `goto:<seq>`; Develop's history list has
+  "Go back to here" for every step. Retouch tags automatic operations with their face.
+- Report explains every step, the scene decisions and per-face findings. ADR-0081.
+- Added measured fine-line, smile-line and nose-redness refinement, and a Retouch settings
+  panel (strength and feature switches) backed by the new `auto_retouch` command.
+- `scripts/check-ipc-surface.sh` now reads every typed IPC module, not only `client.ts`.
+- Retouch now offers **Face**, **Body skin** and **Face + body skin** with one Auto retouch
+  button; body skin is sampled below each face and matched to the same person's face colour.
+
+## Adaptive portrait retouch — 2026-09-30
+
+- Added bounded orientation fallbacks for sideways/upside-down face detection.
+- Added representative patch sampling, measured per-face retouch strengths and
+  an expandable explanation of automatic decisions in Develop and Retouch.
+- Fixed retouch-only Reset and snapshot restoration by tracking removed recipe
+  fields; manual merges and restored snapshots now record user provenance.
+- Retained offline processing, original-file preservation and manual protection.
+
+## Automatic portrait editing
+
+- Bundled a hash-verified YuNet face detector for offline CPU analysis, including five facial landmarks and multiple-face suppression.
+- Auto enhance and collection preparation now detect suitable faces, sample skin and save restrained texture, tone and dodge/burn adjustments as editable steps.
+- Added Auto portrait in Retouch, analysis feedback, persisted explanations and explicit no-face/manual-protection outcomes.
+- Repeat analysis keeps stable operation IDs and creates no duplicate history. Undo/redo and manual retouch protection remain available.
+- Fixed fresh-versus-cached preview differences so face analysis and editing previews stay consistent after restarting the app.
+- Added the bounded nearest/asymmetric/floor ONNX Resize operator and portrait integration checks. Small, occluded or unsuitable faces are skipped; targeting is landmark-guided, not semantic skin segmentation.
+
+## Advanced retouch selections
+
+- Added linear gradients, outside-shape inversion and brightness ranges to all 24 native retouch tools, with shared preview/export coverage.
+- Added numeric gradient endpoints, reverse direction, shadows/midtones/highlights presets and adjustable range falloff.
+- Added a disposable grayscale selection preview evaluated at the operation's position in the saved stack, with read-only zoom/pan.
+- Broad healing selections require a chosen source. Invalid selections are rejected before saving; old recipes preserve their behavior.
+- Added native/UI regression coverage and `scripts/test-retouch-selection.py` for five-portrait desktop and export verification.
+
+## Retouch comparison and draft protection
+
+- Added an aligned, draggable before/after split in Retouch, with shared zoom/pan, keyboard slider controls and comparison of unsaved previews.
+- Comparison gestures cannot paint or move a source. Moving the divider uses cached previews and does not change saved edits or exports.
+- Unsaved drafts now block saved-operation selection, stack changes and saved history navigation until Apply or Discard. Dirty saved-operation refinements also block tool switching, starting another operation and quick skin presets.
+- Added UI regression tests and a repeatable five-portrait desktop workflow in `scripts/test-retouch-comparison.py`.
+
+## Texture-aware patch healing
+
+- Added a native patch repair tool with surrounding-texture donor matching and local tone blending; existing Heal operations retain their behavior.
+- Small ellipses support automatic donor search. Painted and larger repairs require a chosen source, with validation in both the interface and native recipe path.
+- Fractional and overlapping source patches use immutable source pixels. Undo/redo, disposable previews, editable operations and export use the shared renderer.
+- Added behavior tests and extended the five-portrait desktop verification script with `--workflow patch-heal`.
+
+## Sample-guided portrait retouching
+
+- Added skin smoothing with edge protection and adjustable fine detail, sampled skin-tone evening that preserves luminance, and bounded skin dodge/burn that preserves RGB proportions.
+- Skin color tolerance intersects the existing ellipse/painted mask. The photographer selects the reference patch; this is not automatic face detection.
+- Added sample controls, full-photo targeting and preset persistence for tolerance/edge settings. Existing retouch operations keep their previous algorithms and recipe serialization.
+- Added synthetic behavior tests and a five-portrait desktop verification workflow. The [competitor audit](docs/retouch-competitor-audit.md) distinguishes working native behavior from unverified Retouch4me/SkinFiner parity.
+
+## Portrait editing: simpler controls and reliable review
+
+- Local auto enhancement preserves normally exposed portraits instead of forcing their median brightness toward middle gray; global darkening is limited to a quarter stop while highlights remain independently adjustable.
+- Fixed multi-file imports stopping after the first source: one import plan now creates one journal record, with counters spanning every source.
+- Source IDs include their collection so the same original folder can be used in separate collections without primary-key collisions.
+- The desktop now emits import completion and failure events, allowing the UI to release its import lock and start automatic editing after success.
+- Undo/redo navigation is replayed from persisted journal events. Saving an undo no longer discards the redo position; making a new edit still abandons the redo branch.
+- Essentials mode puts auto enhancement and everyday adjustments first; Advanced retains all Develop panels.
+- Filmstrip thumbnails show the actual imported photos and support Left/Right and Home/End navigation.
+- An RGB histogram reports the edited preview's tones and near-clipped pixel percentages.
+- Keep the last preview visible during saves and rendering; lock adjustments until refreshed state arrives and release the parent lock when the editor unmounts.
+- Numeric edits handle empty input, clamping and Escape; Enter/blur no longer submit the same edit twice. Disabled reset labels cannot change a recipe.
+- Added a repeatable native test for five real JPEG portraits, including full-size PNG export, original-file hashes, history and manual-setting protection.
+
+## Lightroom parity: every Develop panel, and one click that uses them
+
+**Every Lightroom Develop panel is in the photo studio**: Basic, Tone Curve (point, red, green,
+blue and parametric), Color Mixer, Black & White, Color Grading, Detail, Lens Corrections,
+Transform & Crop, Effects (post-crop vignette and grain) and Calibration, plus Auto, Presets with a
+strength slider and Sync Settings. Each control writes one recipe path as the photographer's own
+setting, which no automatic pass changes again. `docs/lightroom-parity.md` maps every Lightroom
+feature to where it lives here and says plainly what is not built yet (HDR and panorama merge, soft
+proofing, AI masks and content-aware remove on real photos, a GPU backend).
+
+**Five recipe blocks and four render stages, without moving a stored hash** (ADR-0070). Parametric
+and RGB curves compose into the existing curve stage; calibration, colour grading, the post-crop
+vignette and grain are new stages; all five blocks are absent from the canonical form while
+neutral. Streamed and whole-frame renders agree to the byte, and the XMP sidecar carries all of it
+in Lightroom's own attribute names. The merge now returns an omitted block to neutral, can turn
+black-and-white on (it could not set a leaf inside a null block), and will not let automation turn
+a person's monochrome off.
+
+**The one-click profiles use the real panels**: split-toned teal and orange, graded and grained
+film, toned monochromes, calibrated landscapes, and a highlight-priority vignette.
+
+## Edit profiles, a three-step start screen, and a DNG decoder that reads converted files
+
+**The start screen is now three steps: choose a look, optionally match an Instagram reference, and
+upload a photo or a folder.** When the import finishes every photo is edited with the chosen look
+automatically; with a reference as well, the reference is fitted on top of the look.
+
+**Edit profiles are residuals on a measurement, not presets.** Sixteen researched looks - light and
+airy, dark and moody, teal and orange, Portra film, vintage fade, golden hour, two monochromes,
+vivid landscape, soft portrait, neon night, editorial matte, fresh and crisp, romantic wedding,
+Nordic cool and true natural - each built from published before-and-after walkthroughs whose
+sources ship with it. Every application starts again from AURA's own measured correction, adds the
+look scaled by strength, then runs six guards that can only make the look gentler: highlight
+headroom, low-key frames, the frame's own colour lean, already-vivid frames, a RAW-learned look on
+an already-developed JPEG, and skin (the orange
+band is bounded in every colour profile). Nothing compounds, and nothing a person set is touched.
+Every card and the before/after are rendered by the export renderer. `docs/edit-profiles.md`.
+
+**Learned profiles copy professional retouchers' settings from RAW before-and-afters.**
+`ml/edit-profiles/fetch_fivek_pairs.py` downloads MIT-Adobe FiveK pairs - the camera DNG and a
+retoucher's final - and `crates/aura-app/tests/profile_fit.rs` decodes the DNG with AURA's own
+decoder, recovers the recipe that reproduces the final through the real renderer, and keeps the
+median of what the retoucher did beyond AURA's correction. Five ship, one per FiveK retoucher,
+learned from 110 RAW before-and-afters across eleven camera bodies; on 29 held-out RAW photos they
+bring AURA 6-17 % closer to the retoucher's final than the automatic correction alone. Each carries
+its held-out measurement, and on a photo the camera already developed it applies at half strength.
+That makes 21 profiles.
+
+**Converted DNGs decode correctly.** Doing that exposed four decoder defects that affected DNGs
+from Adobe DNG Converter: lossless-JPEG tiles were refused, the masked sensor border and the
+default crop were rendered, the black level ignored `BlackLevelDeltaV` - which on a converted
+Canon is where the whole black level is - leaving a lifted magenta haze, and a converted NEF's
+`LinearizationTable` was ignored. All four are fixed and tested; the fitter's residual against a
+retoucher's final fell from 12-21 to about 3 dE00.
+
+Two stale tests from the PNG commit are corrected: a PNG signature now sniffs as PNG, and tier 3
+decodes a developed JPEG at full size.
+
 ## Bring your own AI - nineteen providers, a first-run setup screen, and TLS
 
 Not a phase. Phase 04 shipped a governed cloud gateway that could reach four vendors, and the
