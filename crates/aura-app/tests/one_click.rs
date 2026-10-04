@@ -1,4 +1,4 @@
-//! The one-click finish, end to end, with no network and no clicks (ADR-0067).
+//! The one-click finish, end to end, with no network and no clicks (ADR-0068).
 //!
 //! Two JPEGs go in; delivered files come out, written and verified, with a
 //! sealed manifest. Every stage runs offline: the analysis pass is refused by

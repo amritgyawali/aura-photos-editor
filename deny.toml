@@ -2,7 +2,7 @@
 version = 2
 yanked  = "deny"
 # Every entry below arrives through `rustls-rustcrypto` 0.0.2-alpha, the pure-Rust
-# crypto provider ADR-0065 chose because the reference build machine has no C
+# crypto provider ADR-0066 chose because the reference build machine has no C
 # toolchain. It is the newest release and pins `rustls-webpki` ^0.102, so there is
 # no upgrade that clears these. Each is scoped to one advisory id with the reason
 # it does not reach this build; a new advisory against any of these crates still
@@ -53,7 +53,7 @@ exceptions = [
   # conditions on use or redistribution and no attribution requirement; the OSI
   # has not reviewed it because it is not a software licence. Scoped to this
   # crate so a second CDLA dependency still fails the gate. See
-  # docs/adr/ADR-0065-tls-and-the-provider-catalogue.md section 4.
+  # docs/adr/ADR-0066-tls-and-the-provider-catalogue.md section 4.
   { crate = "webpki-roots", allow = ["CDLA-Permissive-2.0"] },
 ]
 

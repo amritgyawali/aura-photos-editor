@@ -31,6 +31,7 @@ import { PhotoStudio } from './components/develop/PhotoStudio';
 import { ToneReviewQueue } from './components/develop/ToneReviewQueue';
 import { Inspector } from './components/explain/Inspector';
 import { FilterChips } from './components/explain/FilterChips';
+import { PortraitRetouch } from './components/develop/PortraitRetouch';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { MomentStack } from './components/grid/MomentStack';
 import { PeoplePanel } from './components/people/PeoplePanel';
@@ -620,6 +621,26 @@ export function App(): JSX.Element {
               />
             ) : (
               <p>Choose a photograph in the filmstrip to review and adjust its edit.</p>
+            )}
+          </div>
+        ) : null;
+      case 'retouch':
+        return activeProjectId ? (
+          <div>
+            <fieldset className="filmstrip-lock" disabled={editing || studioSaving}>
+              <Filmstrip rows={rows} />
+            </fieldset>
+            <button type="button" onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
+            {focusedPhotoId ? (
+              <PortraitRetouch
+                key={focusedPhotoId}
+                projectId={activeProjectId}
+                photoId={focusedPhotoId}
+                disabled={editing}
+                onBusyChange={setStudioSaving}
+              />
+            ) : (
+              <p>Choose a portrait in the filmstrip to retouch skin, eyes, teeth and hair.</p>
             )}
           </div>
         ) : null;

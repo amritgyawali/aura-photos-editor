@@ -45,6 +45,7 @@ aura-geometry      = { path = "../aura-geometry" }
 # `aura-cloud`, and where an accepted proposal meets `aura_recipe::schema::merge` - the
 # two edges `aura-generative` deliberately does not have.
 aura-generative    = { path = "../aura-generative" }
+aura-portrait      = { path = "../aura-portrait" }
 aura-recipe        = { path = "../aura-recipe" }
 aura-render        = { path = "../aura-render" }
 aura-look          = { path = "../aura-look" }

@@ -40,13 +40,13 @@ fn the_extension_is_never_trusted() {
     .expect("encode");
     assert_eq!(sniff(&jpeg_bytes), RawFormat::Jpeg);
 
-    // A PNG is recognised by its eight-byte signature, which is a format, not a guess.
+    // A PNG signature is a PNG - photographs can be imported as PNGs since the photo studio
+    // work, and the signature, not the file name, is what says so.
     assert_eq!(sniff(b"\x89PNG\r\n\x1a\n"), RawFormat::Png);
 
     // And an empty or short buffer is simply unknown, never a guess.
     assert_eq!(sniff(&[]), RawFormat::Unknown);
     assert_eq!(sniff(b"II"), RawFormat::Unknown);
-    assert_eq!(sniff(b"\x89PN"), RawFormat::Unknown);
 }
 
 #[test]

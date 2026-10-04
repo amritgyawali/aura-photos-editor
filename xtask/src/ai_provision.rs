@@ -9,7 +9,7 @@
 //! There is no second storage shape here to drift from the first.
 //!
 //! It is idempotent, and it is an xtask rather than startup code on purpose: a
-//! shipped build must still show the panel (ADR-0065), but this machine was
+//! shipped build must still show the panel (ADR-0066), but this machine was
 //! asked to be provisioned silently, and that is a developer action with a
 //! visible command behind it.
 //!

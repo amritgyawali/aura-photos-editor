@@ -5066,7 +5066,7 @@ export type PhotoAutoEditDto = {
   reasons: string[];
 };
 
-/** ADR-0067. Start the one-click finish. */
+/** ADR-0068. Start the one-click finish. */
 export type OneClickFinishInput = {
   projectId: string;
   destination: string;

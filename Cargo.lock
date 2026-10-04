@@ -114,6 +114,7 @@ dependencies = [
  "aura-look",
  "aura-models",
  "aura-people",
+ "aura-portrait",
  "aura-preview",
  "aura-qc",
  "aura-raw",
@@ -633,6 +634,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-portrait"
+version = "0.1.0"
+dependencies = [
+ "aura-raw",
+ "rayon",
+ "serde",
+]
+
+[[package]]
 name = "aura-preview"
 version = "0.1.0"
 dependencies = [
@@ -702,6 +712,7 @@ name = "aura-render"
 version = "0.1.0"
 dependencies = [
  "aura-core",
+ "aura-portrait",
  "aura-raw",
  "aura-recipe",
  "blake3",

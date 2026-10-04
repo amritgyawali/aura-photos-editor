@@ -9,7 +9,7 @@
 //! [`crate::catalog`], every one of which is HTTPS-only: a setup screen that
 //! collects a key it cannot use is worse than no setup screen.
 //!
-//! `docs/adr/ADR-0065-tls-and-the-provider-catalogue.md` discharges the waiver
+//! `docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` discharges the waiver
 //! and records what was traded. Three things are worth having in front of you
 //! before reading the code.
 //!
@@ -129,7 +129,7 @@ impl Connector for TlsConnector {
         let config = client_config().ok_or_else(|| {
             unreachable(
                 host,
-                "this build could not assemble a TLS configuration; see ADR-0065",
+                "this build could not assemble a TLS configuration; see ADR-0066",
             )
         })?;
 

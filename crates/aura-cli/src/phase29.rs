@@ -795,7 +795,7 @@ pub fn verify(args: &[String]) -> ExitCode {
         "      renderer this crate must not have, and no call in this repository has ever reached"
     );
     println!(
-        "      a vendor - ADR-0065 ships TLS but proves no round trip - so what is proved is that"
+        "      a vendor - ADR-0066 ships TLS but proves no round trip - so what is proved is that"
     );
     println!("      the validator refuses, not that a model helps.");
 

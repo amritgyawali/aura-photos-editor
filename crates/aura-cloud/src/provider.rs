@@ -16,7 +16,7 @@
 //! [`crate::cassette::CassetteTransport`] replays recorded responses,
 //! [`OfflineTransport`] refuses everything, and [`crate::http::HttpTransport`]
 //! is a real HTTP/1.1 client that speaks TLS through [`crate::tls`]. See
-//! `docs/adr/ADR-0065-tls-and-the-provider-catalogue.md` for what the pure-Rust
+//! `docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` for what the pure-Rust
 //! crypto provider under it trades.
 //!
 //! ## Retries, and why they are bounded so tightly

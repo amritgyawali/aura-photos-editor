@@ -13,7 +13,7 @@ import { useStore } from '../../state/store';
 import { useAutomatic } from '../../state/automaticStore';
 
 /**
- * One button that finishes a wedding. ADR-0067's surface.
+ * One button that finishes a wedding. ADR-0068's surface.
  *
  * The promise in the product's own words: analysis, framing, the cull, the AI
  * edit of every delivered frame, and the export - run in that order, through the

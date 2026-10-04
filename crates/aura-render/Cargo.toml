@@ -10,6 +10,7 @@ description  = "The develop engine: a colour-managed, deterministic, non-destruc
 
 [dependencies]
 aura-core    = { path = "../aura-core" }
+aura-portrait = { path = "../aura-portrait" }
 aura-raw     = { path = "../aura-raw" }
 aura-recipe  = { path = "../aura-recipe" }
 blake3       = { workspace = true }
@@ -30,6 +31,12 @@ tracing      = { workspace = true }
 # Deliberately absent: `wgpu`. See docs/adr/ADR-0029-render-pipeline.md section 4. The WGSL
 # sources ship, are compiled into the binary and are gated by `tests/shader_parity.rs`; what
 # does not ship is a backend nothing on this machine can execute or test.
+#
+# `aura-portrait` is the one crate below this one that reads a photograph for a *judgement*: it
+# finds faces and the regions of a portrait, and this crate resolves the masks and retouch
+# operators a recipe names through it. It depends on `aura-raw` and nothing above it, so the
+# edge runs one way, and a parse is a pure function of the pixels - which is what lets a render
+# re-derive its own masks from the four values a delivered file is re-created from.
 #
 # Also absent: `aura-catalog`. This crate stores nothing. `aura-recipe` owns migration 14 and
 # this one owns the pixels, which is what keeps a render a pure function of its inputs.

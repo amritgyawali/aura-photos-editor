@@ -8690,7 +8690,7 @@ pub struct DiagnosticsDto {
     /// The last few error codes, newest first, with their runbooks.
     pub recent_errors: Vec<IpcError>,
 }
-/// One reversible automatic edit. ADR-0066.
+/// One reversible automatic edit. ADR-0067.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoAutoEditInput {
@@ -8717,14 +8717,14 @@ pub struct PhotoAutoEditDto {
 }
 
 /// Start the one-click finish: analysis, framing, cull, per-frame AI edit and
-/// delivery, in one command. ADR-0067.
+/// delivery, in one command. ADR-0068.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OneClickFinishInput {
     /// The wedding.
     pub project_id: String,
     /// Absolute export folder, or empty for a unique folder under Pictures/AURA Exports.
-    /// The chosen folder is returned in progress. See ADR-0068.
+    /// The chosen folder is returned in progress. See ADR-0069.
     pub destination: String,
     /// The import to wait for, when the wizard has one still running.
     pub ingest_job_id: Option<String>,

@@ -1,4 +1,4 @@
-# ADR-0065 - TLS, and the provider catalogue behind the first-run setup screen
+# ADR-0066 - TLS, and the provider catalogue behind the first-run setup screen
 
 - **Status:** accepted
 - **Date:** 2026-09-04

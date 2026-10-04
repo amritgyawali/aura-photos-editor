@@ -84,6 +84,7 @@ pub mod moment_commands;
 pub mod people_commands;
 pub mod photo_enhance;
 mod photo_frames;
+pub mod portrait_commands;
 pub mod preview_commands;
 pub mod qc_commands;
 pub mod reference_style;
@@ -214,7 +215,7 @@ pub use retouch_commands::{
 };
 pub use state::AppState;
 mod auto_edit_commands;
-// ADR-0067. The one-click finish, and its three commands.
+// ADR-0068. The one-click finish, and its three commands.
 pub mod one_click_commands;
 pub use auto_edit_commands::{photo_analysis, photo_auto_edit};
 pub use one_click_commands::{

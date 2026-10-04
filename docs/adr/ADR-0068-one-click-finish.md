@@ -1,4 +1,4 @@
-# ADR-0067: The one-click finish
+# ADR-0068: The one-click finish
 
 Accepted 2026-09-12.
 
@@ -20,7 +20,7 @@ Add `one_click_finish` to `aura-app`: a shell-level pipeline that runs, in order
 4. `plan_geometry`, then `accept_geometry` over the review queue in bounded rounds;
 5. `cull_project` at the default mode, so the gallery exists before anything expensive
    runs per frame;
-6. `photo_auto_edit` (ADR-0066, unchanged) once per delivered frame, capped at
+6. `photo_auto_edit` (ADR-0067, unchanged) once per delivered frame, capped at
    `MAX_AI_EDITS = 600` frames so a run cannot produce a bill the photographer did not
    choose;
 7. `export_run` with the shipped `gallery` preset, read-back verification on, to the

@@ -443,16 +443,23 @@ fn tiled_full_decode_matches_a_whole_image_decode_on_xtrans() {
 
 #[test]
 fn tier_three_refuses_to_render_from_an_embedded_preview() {
+    // A RAW whose mosaic compression this build cannot decode, with a perfectly good JPEG
+    // preview inside it. Tier 3 must refuse rather than hand back the preview as though it were
+    // the sensor data.
     let directory = tempfile::tempdir().expect("temporary directory");
-    // A camera file that carries an embedded preview and a mosaic this build cannot
-    // decode - the CR2 case. Dropping the mosaic reference is how the fixture gets
-    // there: the container, its format and its previews are all real.
-    let mut loaded = load(directory.path(), FixtureOptions::default());
-    assert!(
-        !loaded.meta.previews.is_empty(),
-        "the fixture must carry an embedded preview for this to test anything"
+    let mut loaded = load(
+        directory.path(),
+        FixtureOptions {
+            with_preview: true,
+            ..FixtureOptions::default()
+        },
     );
-    loaded.meta.mosaic = None;
+    let mosaic = loaded
+        .meta
+        .mosaic
+        .as_mut()
+        .expect("the fixture has a mosaic");
+    mosaic.scheme = meta::MosaicScheme::Unsupported(34_713);
     let error = full::tier3(
         &loaded.bytes,
         &loaded.meta,
@@ -464,11 +471,11 @@ fn tier_three_refuses_to_render_from_an_embedded_preview() {
 }
 
 #[test]
-fn tier_three_decodes_a_developed_jpeg_rather_than_asking_for_a_mosaic() {
-    // A JPEG is the photograph itself rather than a camera's preview of one, so a
-    // full-resolution export decodes its pixels at their own size.
+fn a_plain_jpeg_is_its_own_full_resolution_image() {
+    // A JPEG or PNG photograph has no mosaic because it *is* the developed image, so tier 3
+    // decodes its own pixels - which is what lets a phone or camera JPEG be exported at full size.
     let directory = tempfile::tempdir().expect("temporary directory");
-    let path = directory.path().join("developed.jpg");
+    let path = directory.path().join("photo.jpg");
     let jpeg = aura_raw::codec::encode_jpeg(
         &aura_raw::codec::Rgb8 {
             width: 16,
@@ -478,9 +485,10 @@ fn tier_three_decodes_a_developed_jpeg_rather_than_asking_for_a_mosaic() {
         90,
     )
     .expect("encode a jpeg");
+    std::fs::write(&path, &jpeg).expect("write");
     let parsed = meta::read(&jpeg, &path).expect("a jpeg is readable");
     let buffer = full::tier3(&jpeg, &parsed, DecodeLimits::tier3(), clock().as_ref())
-        .expect("a developed jpeg decodes at tier 3");
+        .expect("a jpeg decodes at full resolution");
     assert_eq!((buffer.width, buffer.height), (16, 16));
 }
 

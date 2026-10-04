@@ -2552,7 +2552,7 @@ impl AppState {
     ///
     /// **No editorial judge is attached either.** Wiring one is a later change than this pass;
     /// the pass behaves exactly as it does with an unreachable provider, which is that every
-    /// proposal in the judgement band waits for a person. ADR-0065 made a public provider
+    /// proposal in the judgement band waits for a person. ADR-0066 made a public provider
     /// reachable - the reason nothing is attached here is that nothing attaches it, and phase
     /// 24's rule is that the absence produces a refusal rather than a silent approval.
     ///

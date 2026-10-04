@@ -26,7 +26,7 @@ answer, and nobody is asked twice. Invariant 6 is unchanged: the product edits a
 with none of this.
 
 **TLS ships, which is what makes the other two mean anything.** ADR-0009 waived it in phase 04 and
-`docs/adr/ADR-0065-tls-and-the-provider-catalogue.md` discharges the waiver. Sixteen of those
+`docs/adr/ADR-0066-tls-and-the-provider-catalogue.md` discharges the waiver. Sixteen of those
 nineteen rows are HTTPS-only, and *a setup screen that collects a key it cannot use is worse than
 no setup screen*. It arrives exactly where phase 04's own module comment said it would - through
 the `Connector` port - and `HttpTransport` now holds one connector per scheme, so a hosted key and
@@ -55,7 +55,7 @@ reports 263 = 263 = 263.
 machine cannot compile the desktop shell, every test uses the cassette transport, and the prices
 in the table are the vendors' published list prices rather than anything measured here - which is
 why they are only ever used to *refuse* a call, and why the spend meter reads the tokens the
-provider said it billed. The first successful round trip to any of the nineteen reopens ADR-0065's
+provider said it billed. The first successful round trip to any of the nineteen reopens ADR-0066's
 criteria the way the first real camera file reopens phase 02's.
 
 ## Post-review - the application becomes reachable, and every gate becomes enforced
@@ -120,6 +120,40 @@ repository.
 **None of this is evidence about a photograph.** Every model-capability flag is still false, no
 camera file has been decoded, nothing is calibrated and nothing has been signed. Section 7 of the
 review is the list, and it is unchanged.
+
+## Portrait retouch - finding a face, and what is in it, in a real photograph
+
+Every retouch phase from 18 to 22 was built against an input port nothing filled, because the face
+detector phase 06 ships finds no faces. On a real photograph the retouch stages were correct,
+tested and gated to zero. This change fills the port.
+
+**Faces.** `aura-portrait` evaluates OpenCV's published Haar cascades with its own pure-Rust
+Viola-Jones implementation - checked against OpenCV on 22 photographs, 80 of 80 boxes agreeing to
+within two pixels - over six scans (upright, tilted both ways, locally equalised, profile, mirrored
+profile) and accepts a candidate only with evidence: a skin-coloured centre and either many agreeing
+windows or a measured eye and mouth. Every false positive the extra scans produced on the
+evaluation set was removed without losing a face. Every one of the ten Monk Skin Tone swatches is
+found on a painted test face; the darkest only by the equalised scan, which is why it exists.
+
+**Regions.** Nineteen soft regions measured relative to each person: skin from a model of their own
+cheeks, lips redder than that skin, teeth brighter and less saturated than those lips, brows darker
+than that forehead, eyes, iris and sclera inside the measured eye openings, hair and body from
+colour models seeded beside the person and held against the ground beside them, and sky connected
+to the top of the frame.
+
+**Retouch.** Fourteen operators in the renderer: smooth skin (pores kept), even skin tone (toward
+the person's own tone), clear blemishes (moles and freckles kept), brighten under-eyes, reduce
+shine, face fill light, brighten eyes, iris detail, clear eye whites, define brows, whiten teeth,
+lip colour, define hair and blur background. Recipe masks of kind face, skin, subject, background
+and sky now render, and any region can be adjusted on its own. Nothing reshapes anybody and nothing
+changes a skin tone.
+
+**Workspace.** A Portrait retouch tab: what AURA found laid over the photograph, landmarks, a tool to
+draw a face AURA missed, a measured automatic retouch in three strengths with a sentence for every
+decision, the fourteen sliders and per-region adjustments.
+
+**What it does not claim:** accuracy on a real wedding, or equal accuracy across real skin tones.
+See `docs/portrait-retouch.md` and ADR-0065.
 
 ## Phase 31 - Matching a look somebody else published
 

@@ -6,7 +6,7 @@
 use aura_app::contract::ipc::{
     AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditDto, PhotoAutoEditInput,
 };
-// ADR-0067.
+// ADR-0068.
 use aura_app::contract::ipc::{OneClickFinishDto, OneClickFinishInput, OneClickStatusDto};
 use std::path::PathBuf;
 
@@ -3190,7 +3190,7 @@ async fn photo_auto_edit(
         .map_err(|_| background_request_failed())?
 }
 
-// ADR-0067. The one-click finish. These three are the thin end of the wedge: the
+// ADR-0068. The one-click finish. These three are the thin end of the wedge: the
 // pipeline itself runs on a thread inside `aura-app` and reports through the status
 // row, so these commands only start it, read it, and stop it.
 #[tauri::command]
@@ -3274,6 +3274,58 @@ async fn apply_reference_style(
     .map_err(|_| background_request_failed())?
 }
 
+#[tauri::command]
+async fn analyse_portrait(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::PortraitInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitAnalysisDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::analyse_portrait(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::PortraitInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::SetPortraitRetouchInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::set_portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn auto_portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::AutoPortraitRetouchInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::auto_portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 // `tauri::generate_context!` expands to an `unwrap` and a `HashMap` inside Tauri's own
 // generated code, which this workspace's disallowed lists cannot see past. Allowed here and
 // nowhere else: every other line of the shell is held to both rules.
@@ -3339,6 +3391,10 @@ fn main() {
             one_click_finish,
             one_click_status,
             one_click_cancel,
+            analyse_portrait,
+            portrait_retouch,
+            set_portrait_retouch,
+            auto_portrait_retouch,
             fetch_instagram_references,
             analyse_reference_style,
             apply_reference_style,
