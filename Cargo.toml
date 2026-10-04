@@ -11,6 +11,7 @@ members = [
   "crates/aura-models",
   "crates/aura-cloud",
   "crates/aura-index",
+  "crates/aura-portrait",
   "crates/aura-vision",
   "crates/aura-people",
   "crates/aura-brain-gallery",
@@ -129,4 +130,10 @@ overflow-checks = true
 debug           = "line-tables-only"
 
 [profile.dev.package."*"]
+opt-level = 2
+
+# The portrait parse scans a frame six ways with a boosted cascade; unoptimised, one painted
+# portrait takes seconds rather than milliseconds, which would turn every renderer test that
+# resolves a face mask into a wait. Overflow checks stay on, as everywhere in dev.
+[profile.dev.package.aura-portrait]
 opt-level = 2

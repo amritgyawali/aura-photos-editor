@@ -1,0 +1,25 @@
+[package]
+name         = "aura-portrait"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Measured portrait parsing: faces, landmarks and twenty regions - skin, eyes, iris, sclera, brows, lips, teeth, hair, body - found in a real photograph without a trained network"
+
+[dependencies]
+# `aura-raw` for one reason: invariant 8. The working space, the transfer function and the
+# matrices are phase 02's, and a second copy of any of them here would be a second answer to
+# what colour a pixel is.
+aura-raw     = { path = "../aura-raw" }
+rayon        = { workspace = true }
+serde        = { workspace = true }
+
+# Deliberately absent: `aura-render`, `aura-vision` and `aura-catalog`. This crate is below all
+# three - the renderer resolves its masks through it and the mask service seeds from it - so it
+# stores nothing, renders nothing and reaches no model runtime. A parse is a pure function of
+# the pixels it is handed, which is what lets the renderer re-derive it from the four values a
+# delivered file is re-created from.
+
+[dev-dependencies]

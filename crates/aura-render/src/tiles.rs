@@ -89,13 +89,25 @@ pub fn render_streamed(
         graph::Capabilities::default(),
     );
 
-    // A rotation is not streamable. Say so and render whole.
-    if clamped.geometry.rotate.abs() > f32::EPSILON || clamped.geometry.perspective.is_some() {
+    // A rotation is not streamable, and neither is a portrait: a face cut in half by a tile
+    // boundary is not a face, and the parse that finds it must see the whole frame. Say so and
+    // render whole.
+    if clamped.geometry.rotate.abs() > f32::EPSILON
+        || clamped.geometry.perspective.is_some()
+        || crate::portrait::wants_parse(&clamped)
+    {
         let mut whole = engine.render_frame(frame, &clamped, level, purpose, output)?;
         whole.notes.push(RenderNote {
             stage: Stage::Geometry.as_str().to_string(),
             reason: SkipReason::NotRequested,
-            detail: Some("a rotated frame is rendered whole rather than streamed".to_string()),
+            detail: Some(
+                if crate::portrait::wants_parse(&clamped) {
+                    "a portrait retouch is rendered whole rather than streamed"
+                } else {
+                    "a rotated frame is rendered whole rather than streamed"
+                }
+                .to_string(),
+            ),
         });
         return Ok(whole);
     }

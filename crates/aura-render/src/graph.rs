@@ -440,26 +440,39 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
             )
         })
         .count();
-    let generated_masks: Vec<String> = recipe
+    // Hints carry a face box and adjust nothing, so they neither run the stage nor need a
+    // generator note of their own.
+    let generated_masks: Vec<&aura_recipe::Mask> = recipe
         .masks
         .iter()
         .filter(|m| {
             !matches!(
                 m.kind,
                 aura_recipe::MaskKind::Linear | aura_recipe::MaskKind::Radial
-            )
+            ) && !crate::portrait::is_hint(m)
         })
+        .collect();
+    // Portrait masks resolve through `aura_portrait` when the build can parse a photograph.
+    // A brush stroke cannot be re-derived from pixels - it is somebody's hand - so it stays a
+    // generator this renderer does not have.
+    let resolvable = generated_masks
+        .iter()
+        .filter(|m| caps.mask_generators && crate::portrait::mask_region(m).is_some())
+        .count();
+    let unresolved: Vec<String> = generated_masks
+        .iter()
+        .filter(|m| !caps.mask_generators || crate::portrait::mask_region(m).is_none())
         .map(|m| m.id.clone())
         .collect();
 
-    if geometric_masks > 0 {
+    if geometric_masks > 0 || resolvable > 0 {
         stages.push(Stage::Masks);
     }
-    if !generated_masks.is_empty() && !caps.mask_generators {
+    if !unresolved.is_empty() {
         notes.push(RenderNote {
             stage: Stage::Masks.as_str().to_string(),
             reason: SkipReason::MaskGeneratorAbsent,
-            detail: Some(generated_masks.join(",")),
+            detail: Some(unresolved.join(",")),
         });
     } else if geometric_masks == 0 && generated_masks.is_empty() {
         notes.push(RenderNote {
@@ -484,18 +497,49 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         recipe.cleanup.first().map(|op| op.method.clone()),
     );
 
-    push!(
-        Stage::Retouch,
-        !recipe.retouch.is_empty() && caps.retouch_operators && !skip_heavy,
-        if recipe.retouch.is_empty() {
-            SkipReason::NotRequested
-        } else if !caps.retouch_operators {
-            SkipReason::OperatorAbsent
-        } else {
-            SkipReason::InteractivePath
-        },
-        recipe.retouch.first().map(|op| op.op.clone()),
-    );
+    // Portrait operators are light enough for the interactive path - a handful of running-sum
+    // blurs at a radius set by the face - so a photographer sees the retouch while moving the
+    // slider rather than only on export. Every other operator keeps phase 14's rule: it is
+    // heavy, and an operator this renderer does not execute is named rather than dropped.
+    let portrait_ops = recipe
+        .retouch
+        .iter()
+        .filter(|op| crate::portrait::is_operator(&op.op))
+        .count();
+    let foreign: Vec<String> = recipe
+        .retouch
+        .iter()
+        .filter(|op| !crate::portrait::is_operator(&op.op))
+        .map(|op| op.op.clone())
+        .collect();
+    if recipe.retouch.is_empty() {
+        notes.push(RenderNote {
+            stage: Stage::Retouch.as_str().to_string(),
+            reason: SkipReason::NotRequested,
+            detail: None,
+        });
+    } else if !caps.retouch_operators {
+        notes.push(RenderNote {
+            stage: Stage::Retouch.as_str().to_string(),
+            reason: SkipReason::OperatorAbsent,
+            detail: recipe.retouch.first().map(|op| op.op.clone()),
+        });
+    } else {
+        if portrait_ops > 0 {
+            stages.push(Stage::Retouch);
+        }
+        if !foreign.is_empty() {
+            notes.push(RenderNote {
+                stage: Stage::Retouch.as_str().to_string(),
+                reason: if skip_heavy {
+                    SkipReason::InteractivePath
+                } else {
+                    SkipReason::OperatorAbsent
+                },
+                detail: Some(foreign.join(",")),
+            });
+        }
+    }
 
     // PHASE-22, ADR-0047 section 2. `restoration.denoise` deliberately does **not** appear here.
     // Denoising is a sensor-domain operation and runs at `Stage::NoiseReduction`, index 6, thirteen
@@ -660,7 +704,12 @@ pub fn render_hash(
 /// different renderer.
 #[must_use]
 pub fn engine_string() -> String {
-    format!("{}+profiles.{}", ENGINE, crate::profiles::PROFILES_VER)
+    format!(
+        "{}+profiles.{}+portrait.{}",
+        ENGINE,
+        crate::profiles::PROFILES_VER,
+        aura_portrait::PARSE_VER
+    )
 }
 
 #[cfg(test)]
@@ -892,7 +941,11 @@ mod tests {
 
     #[test]
     fn the_engine_string_carries_the_profile_version() {
-        assert!(engine_string().ends_with(&format!("+profiles.{}", crate::profiles::PROFILES_VER)));
+        let engine = engine_string();
+        assert!(engine.contains(&format!("+profiles.{}+", crate::profiles::PROFILES_VER)));
+        // The portrait parse decides the pixels of every masked or retouched render, so its
+        // version is part of the engine as the profile table's is.
+        assert!(engine.ends_with(&format!("+portrait.{}", aura_portrait::PARSE_VER)));
     }
 
     #[test]

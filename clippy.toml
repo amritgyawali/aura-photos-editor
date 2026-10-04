@@ -21,6 +21,9 @@ doc-valid-idents = [
   # camera-matching engine and its baselines. `ColorChecker` is a Calibrite product, `TOML` is a
   # format, and the four brands are companies.
   "ColorChecker", "TOML", "Canon", "Nikon", "Fujifilm", "Panasonic",
+  # The portrait parse vendors OpenCV's published Haar cascades and cites the literature its
+  # colour maps come from; both names are spelled this way everywhere they appear.
+  "OpenCV", "AdaBoost", "YCbCr", "CIELAB",
 ]
 
 # Ban the APIs that break determinism or panic silently
