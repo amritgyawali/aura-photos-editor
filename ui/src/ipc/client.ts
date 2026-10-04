@@ -15,6 +15,39 @@ export const referenceStyle = {
   apply: (photoId: string, referenceId: string, strength: number) => invoke<ApplyReport>('apply_reference_style', { input: { photoId, referenceId, strength } }),
 };
 
+// Portrait retouching: what AURA found in a photograph, and what a photographer asks for.
+export type PortraitFace = {
+  bbox: [number, number, number, number];
+  leftEye: [number, number]; rightEye: [number, number]; nose: [number, number]; mouth: [number, number];
+  rollDegrees: number; confidence: number; source: string; eyesMeasured: number; mouthMeasured: boolean;
+};
+export type PortraitRegion = { region: string; label: string; coverage: number; confidence: number; alphaBase64: string };
+export type PortraitAnalysis = {
+  photoId: string; overlayWidth: number; overlayHeight: number; faces: PortraitFace[]; regions: PortraitRegion[];
+  colourful: boolean; parseVersion: number; ms: number; notes: string[];
+};
+export type PortraitOp = { op: string; strength: number };
+export type RegionAdjustment = {
+  region: string; exposure?: number | null; contrast?: number | null; saturation?: number | null;
+  warmth?: number | null; shadows?: number | null; highlights?: number | null;
+};
+export type PortraitRetouch = {
+  photoId: string; ops: PortraitOp[]; adjustments: RegionAdjustment[]; hints: [number, number, number, number][];
+  protected: boolean; foreignOps: string[]; recipe: RecipeDto; explanation: string[];
+};
+export type SetPortraitRetouch = {
+  projectId: string; photoId: string; ops: PortraitOp[]; adjustments: RegionAdjustment[];
+  hints?: [number, number, number, number][] | null; label?: string | null;
+};
+
+export const portrait = {
+  analyse: (photoId: string) => invoke<PortraitAnalysis>('analyse_portrait', { input: { photoId } }),
+  settings: (photoId: string) => invoke<PortraitRetouch>('portrait_retouch', { input: { photoId } }),
+  set: (input: SetPortraitRetouch) => invoke<PortraitRetouch>('set_portrait_retouch', { input }),
+  auto: (projectId: string, photoId: string, style: string) =>
+    invoke<PortraitRetouch>('auto_portrait_retouch', { input: { projectId, photoId, style } }),
+};
+
 /** Ask the desktop for a folder; cancel leaves the current selection intact. */
 export async function pickPhotoFolder(title = 'Choose a photo folder'): Promise<string | null> {
   const result: string | string[] | null = await invoke('plugin:dialog|open', {

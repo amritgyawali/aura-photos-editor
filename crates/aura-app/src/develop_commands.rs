@@ -468,7 +468,7 @@ fn load_history(state: &AppState, photo: PhotoId) -> Result<History, AuraError> 
 ///
 /// One dependency avoided for twenty lines. The alphabet is standard and there is no line
 /// wrapping, because the only consumer is a data URL.
-fn base64(bytes: &[u8]) -> String {
+pub(crate) fn base64(bytes: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {

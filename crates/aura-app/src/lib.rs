@@ -83,6 +83,7 @@ pub mod moment_commands;
 pub mod people_commands;
 pub mod photo_enhance;
 mod photo_frames;
+pub mod portrait_commands;
 pub mod preview_commands;
 pub mod qc_commands;
 pub mod reference_style;

@@ -3082,6 +3082,58 @@ async fn apply_reference_style(
     .map_err(|_| background_request_failed())?
 }
 
+#[tauri::command]
+async fn analyse_portrait(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::PortraitInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitAnalysisDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::analyse_portrait(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::PortraitInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::SetPortraitRetouchInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::set_portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn auto_portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::AutoPortraitRetouchInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::auto_portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -3124,6 +3176,10 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            analyse_portrait,
+            portrait_retouch,
+            set_portrait_retouch,
+            auto_portrait_retouch,
             fetch_instagram_references,
             analyse_reference_style,
             apply_reference_style,
