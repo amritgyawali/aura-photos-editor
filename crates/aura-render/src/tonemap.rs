@@ -225,7 +225,7 @@ impl CurveLut {
 
     /// A table sampled from a function of the curve-domain value, in increasing order of x.
     ///
-    /// ADR-0065: the parametric curve composes with the point curve into one table, so the
+    /// ADR-0070: the parametric curve composes with the point curve into one table, so the
     /// inner loop still does exactly one lookup per pixel.
     #[must_use]
     pub fn from_fn(identity: bool, mut f: impl FnMut(f32) -> f32) -> Self {

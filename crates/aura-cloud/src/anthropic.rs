@@ -76,38 +76,7 @@ impl Default for AnthropicProvider {
 /// records the table version every call was priced under.
 #[must_use]
 pub fn default_aliases() -> std::collections::BTreeMap<Tier, ModelAlias> {
-    let mut aliases = std::collections::BTreeMap::new();
-    aliases.insert(
-        Tier::Reasoning,
-        ModelAlias {
-            model: "claude-opus-4-5".to_string(),
-            input_per_mtok_usd: 5.00,
-            output_per_mtok_usd: 25.00,
-            image_tokens_per_mpixel: 1_400,
-            max_output_tokens: 8_192,
-        },
-    );
-    aliases.insert(
-        Tier::Balanced,
-        ModelAlias {
-            model: "claude-sonnet-4-5".to_string(),
-            input_per_mtok_usd: 3.00,
-            output_per_mtok_usd: 15.00,
-            image_tokens_per_mpixel: 1_400,
-            max_output_tokens: 8_192,
-        },
-    );
-    aliases.insert(
-        Tier::Cheap,
-        ModelAlias {
-            model: "claude-haiku-4-5".to_string(),
-            input_per_mtok_usd: 1.00,
-            output_per_mtok_usd: 5.00,
-            image_tokens_per_mpixel: 1_400,
-            max_output_tokens: 4_096,
-        },
-    );
-    aliases
+    crate::catalog::spec(ProviderKind::Anthropic).aliases()
 }
 
 impl Provider for AnthropicProvider {

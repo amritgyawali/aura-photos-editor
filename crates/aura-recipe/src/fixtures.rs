@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 
 use crate::contract::recipe::{
     Bw, Calibration, ChannelCurves, ColourGrade, Curve, EditSource, Effects, Geometry, Global,
-    HslShift, ImageRef, Lens, LensCoefficients, Mask, MaskKind, MaskParams, Noise,
-    ParametricCurve, Provenance, Recipe, Restoration, RetouchOp, Sharpen, ENGINE, SCHEMA_VERSION,
+    HslShift, ImageRef, Lens, LensCoefficients, Mask, MaskKind, MaskParams, Noise, ParametricCurve,
+    Provenance, Recipe, Restoration, RetouchOp, Sharpen, ENGINE, SCHEMA_VERSION,
 };
 
 /// A content hash that is obviously synthetic and is still 64 hex characters.

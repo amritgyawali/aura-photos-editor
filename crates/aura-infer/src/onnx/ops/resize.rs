@@ -64,13 +64,13 @@ pub(super) fn resize(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<V
         .and_then(|v| v.checked_mul(ow))
         .filter(|v| *v <= 16_777_216)
         .ok_or_else(|| invalid_graph("Resize output exceeds tensor limit"))?;
-    let mut data = Vec::with_capacity(count);
+    let mut resized = Vec::with_capacity(count);
     for plane in 0..n * c {
         for y in 0..oh {
             let iy = source_index(y, *sy, h);
             for x in 0..ow {
                 let ix = source_index(x, *sx, w);
-                data.push(
+                resized.push(
                     *input
                         .data
                         .get((plane * h + iy) * w + ix)
@@ -81,7 +81,7 @@ pub(super) fn resize(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<V
     }
     Ok(vec![Value::Float(Tensor {
         shape: vec![n, c, oh, ow],
-        data,
+        data: resized,
     })])
 }
 
@@ -110,6 +110,11 @@ fn source_index(index: usize, scale: f32, size: usize) -> usize {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::disallowed_methods,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::*;
     use crate::onnx::model::Attribute;

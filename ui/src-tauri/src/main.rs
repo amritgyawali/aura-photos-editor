@@ -3,6 +3,11 @@
 // lives here: the shell must stay thin enough to replace.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use aura_app::contract::ipc::{
+    AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditDto, PhotoAutoEditInput,
+};
+// ADR-0068.
+use aura_app::contract::ipc::{OneClickFinishDto, OneClickFinishInput, OneClickStatusDto};
 use std::path::PathBuf;
 
 use aura_app::contract::ipc::{
@@ -70,10 +75,10 @@ use aura_app::contract::ipc::{
     AnalyseCompositionInput, CompositionDto, CompositionPassDto, CompositionStatusDto,
     CreateProjectInput, CullPassDto, CullProjectInput, CullStatusDto, DecisionDto,
     DismissCompositionFlagInput, ExplainPanelDto, ExportBundleInput, FlaggedCompositionInput,
-    ImageRowLite, IpcError, JobHandle, LedgerDecisionDto, LedgerStatusDto, ListImagesInput,
-    OverrideDecisionInput, ProblemRow, ProjectHandle, ProjectSummary, RecordDecisionsDto,
-    RecordDecisionsInput, ResizeGalleryInput, ReviewQueueInput, SelectionDto, SetCameraLabelInput,
-    SetCullModeInput, StartIngestInput, SupportBundleDto,
+    ImageRowLite, IngestProgressDto, IpcError, JobHandle, LedgerDecisionDto, LedgerStatusDto,
+    ListImagesInput, OverrideDecisionInput, ProblemRow, ProjectHandle, ProjectSummary,
+    RecordDecisionsDto, RecordDecisionsInput, ResizeGalleryInput, ReviewQueueInput, SelectionDto,
+    SetCameraLabelInput, SetCullModeInput, StartIngestInput, SupportBundleDto,
 };
 // PHASE-16.
 // PHASE-17.
@@ -146,25 +151,27 @@ use aura_app::contract::ipc::{
 };
 // The types the ninety newly registered commands name.
 use aura_app::contract::ipc::{
-    AnalyseIntegrityInput, CacheStatsDto, ChapterHandleDto, ClassifyScenesInput,
-    CloudCacheStatsDto, CloudCallDto, CloudSpendDto, CloudStatusDto, DescriptorsDto,
-    DevelopImageInput, DevelopStatusDto, DismissFlagInput, DuplicateSetDto, EditMaskInput,
-    EmbedProgressDto, EmbedProjectInput, EmotionDto, EmotionPassDto, EmotionStatusDto,
-    EnsureMasksInput, EraseBiometricsDto, EraseBiometricsInput, FaceCropDto, FindSimilarInput,
-    FlaggedInput, GetPreviewInput, GroupMomentsInput, GroupPeopleDto, GroupPeopleInput,
-    HardwarePlanDto, HistoryDto, HistoryStepInput, IdentityCardDto, IdentityHandleDto,
-    IdentityTimelineDto, ImageSubjectsDto, IndexStatusDto, InferStatsDto, IntegrityDto,
-    IntegrityPassDto, IntegrityStatusDto, KeyCheckDto, LockMomentInput, MaskAllowanceDto, MaskDto,
-    MaskOverlayDto, MaskStatusDto, MergeChaptersInput, MergeIdentitiesInput, MergeMomentsInput,
-    ModelStatusDto, MomentDto, MomentEditDto, MomentHandleDto, MomentListDto, MomentPeakDto,
-    MomentStatusDto, MomentsInput, MoveBoundaryInput, PeopleStatusDto, PreferInput, PrefetchInput,
-    PreviewPayload, RankedByEmotionDto, RankedFrameDto, RankedInput, ReactionLinkDto, RecipeDto,
-    RenameIdentityInput, RenderCapsDto, RenderDto, RenderImageInput, ScanFacesDto, ScanFacesInput,
-    SceneDto, SceneProfileDto, ScoreEmotionInput, SetAiKeyInput, SetCacheBudgetInput,
-    SetChapterInput, SetCloudBudgetInput, SetCloudPrivacyInput, SetExecutionProviderInput,
-    SetIdentityImportanceInput, SetIdentityRoleInput, SetKeepHintInput, SetParamDto, SetParamInput,
-    SetPeakInput, SimilarResultDto, SnapshotInput, SplitChapterInput, SplitIdentityInput,
-    SplitMomentInput, StoryOutlineDto, StoryStatusDto, WarmupReportDto, WithinMomentInput,
+    AiProviderDto, AiSetupStatusDto, AnalyseIntegrityInput, CacheStatsDto, ChapterHandleDto,
+    ClassifyScenesInput, CloudCacheStatsDto, CloudCallDto, CloudSpendDto, CloudStatusDto,
+    DescriptorsDto, DevelopImageInput, DevelopStatusDto, DismissFlagInput, DuplicateSetDto,
+    EditMaskInput, EmbedProgressDto, EmbedProjectInput, EmotionDto, EmotionPassDto,
+    EmotionStatusDto, EnsureMasksInput, EraseBiometricsDto, EraseBiometricsInput, FaceCropDto,
+    FindSimilarInput, FlaggedInput, GetPreviewInput, GroupMomentsInput, GroupPeopleDto,
+    GroupPeopleInput, HardwarePlanDto, HistoryDto, HistoryStepInput, IdentityCardDto,
+    IdentityHandleDto, IdentityTimelineDto, ImageSubjectsDto, IndexStatusDto, InferStatsDto,
+    IntegrityDto, IntegrityPassDto, IntegrityStatusDto, KeyCheckDto, LockMomentInput,
+    MaskAllowanceDto, MaskDto, MaskOverlayDto, MaskStatusDto, MergeChaptersInput,
+    MergeIdentitiesInput, MergeMomentsInput, ModelStatusDto, MomentDto, MomentEditDto,
+    MomentHandleDto, MomentListDto, MomentPeakDto, MomentStatusDto, MomentsInput,
+    MoveBoundaryInput, PeopleStatusDto, PreferInput, PrefetchInput, PreviewPayload,
+    RankedByEmotionDto, RankedFrameDto, RankedInput, ReactionLinkDto, RecipeDto,
+    RenameIdentityInput, RenderCapsDto, RenderDto, RenderImageInput, SaveAiSetupInput,
+    ScanFacesDto, ScanFacesInput, SceneDto, SceneProfileDto, ScoreEmotionInput, SetAiKeyInput,
+    SetCacheBudgetInput, SetChapterInput, SetCloudBudgetInput, SetCloudPrivacyInput,
+    SetExecutionProviderInput, SetIdentityImportanceInput, SetIdentityRoleInput, SetKeepHintInput,
+    SetParamDto, SetParamInput, SetPeakInput, SimilarResultDto, SnapshotInput, SplitChapterInput,
+    SplitIdentityInput, SplitMomentInput, StoryOutlineDto, StoryStatusDto, WarmupReportDto,
+    WithinMomentInput,
 };
 use aura_app::AppState;
 use aura_core::paths::AppPaths;
@@ -206,6 +213,11 @@ fn start_ingest(
 #[tauri::command]
 fn cancel_job(state: State<'_, AppState>, job_id: String) -> IpcResult<bool> {
     aura_app::cancel_job(&state, &job_id)
+}
+
+#[tauri::command]
+fn ingest_progress(state: State<'_, AppState>, job_id: String) -> IpcResult<IngestProgressDto> {
+    aura_app::ingest_progress(&state, &job_id)
 }
 
 #[tauri::command]
@@ -849,6 +861,85 @@ fn catalog_path() -> Result<PathBuf, IpcError> {
     Ok(paths.data_dir.join("catalogs").join("default.sqlite"))
 }
 
+// UI AUDIT. The front end's audit log - every click, command and error the
+// photographer made - arrives here in batches and goes to one rolling JSONL file
+// under the same data directory as the catalog. The shell is the right place to
+// own it: it owns the window's life, the paths, and the panic hook, and the webview
+// is the one component that can lose its log on refresh, crash or close.
+//
+// Nothing in the engine reads this file; it exists so "what did they actually do"
+// has an answer after the window is gone. `logs/` beside `catalogs/`, rotated at
+// 32 MiB to two generations, because an infinite append is a full disk on a
+// machine that already carries RAW files.
+#[tauri::command]
+async fn ui_audit(batch: Vec<serde_json::Value>) -> IpcResult<()> {
+    tauri::async_runtime::spawn_blocking(move || write_audit_batch(&batch))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+/// The byte ceiling past which the file becomes `ui-audit.log.1` and `.1` becomes `.2`.
+const AUDIT_ROTATE_BYTES: u64 = 32 * 1024 * 1024;
+
+fn write_audit_batch(batch: &[serde_json::Value]) -> IpcResult<()> {
+    use std::io::Write;
+
+    let paths = AppPaths::resolve().map_err(IpcError::from)?;
+    let dir = paths.data_dir.join("logs");
+    let file_path = dir.join("ui-audit.log");
+
+    if std::fs::create_dir_all(&dir).is_err() {
+        return Err(IpcError::from(aura_core::errors::db::statement_failed(
+            "the audit log directory could not be created",
+            &std::io::Error::other("create_dir_all failed"),
+        )));
+    }
+    rotate_if_over_ceiling(&file_path);
+
+    let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file_path)
+    else {
+        return Err(IpcError::from(aura_core::errors::db::statement_failed(
+            "the audit log file could not be opened",
+            &std::io::Error::other("append open failed"),
+        )));
+    };
+    for entry in batch {
+        // One JSON value per line, exactly the format the panel offers for download,
+        // so the two halves of a support case - the live copy and the file - are the
+        // same shape and can be concatenated by hand if anyone ever needs that.
+        let Ok(line) = serde_json::to_string(entry) else {
+            continue;
+        };
+        if writeln!(file, "{line}").is_err() {
+            return Err(IpcError::from(aura_core::errors::db::statement_failed(
+                "the audit log file stopped taking lines",
+                &std::io::Error::other("write failed"),
+            )));
+        }
+    }
+    let _ = file.flush();
+    Ok(())
+}
+
+fn rotate_if_over_ceiling(path: &std::path::Path) {
+    let over_ceiling = std::fs::metadata(path).is_ok_and(|meta| meta.len() > AUDIT_ROTATE_BYTES);
+    if !over_ceiling {
+        return;
+    }
+    let second = path.with_file_name("ui-audit.log.2");
+    let first = path.with_file_name("ui-audit.log.1");
+    // `.2` dies first so the renames below cannot collide; each failure is acceptable
+    // - a missing rotation delays the next one, it does not lose lines that are
+    // already written.
+    let _ = std::fs::remove_file(&second);
+    if std::fs::rename(&first, &second).is_ok() || !first.exists() {
+        let _ = std::fs::rename(path, &first);
+    }
+}
+
 // PHASE-19. Every local light command can touch SQLite, and `sculpt_local` decodes proxies
 // and separates frequency bands over a whole gallery. All six go off the renderer thread for
 // the reason the tone block above gives.
@@ -1256,6 +1347,42 @@ async fn plan_geometry(
 // Every one of them goes through `spawn_blocking` for the reason phases 15 to 23 give:
 // a command that opens a catalog, decodes a proxy or renders must not run on the thread
 // the window paints from.
+
+// PHASE-04, extended for the provider catalogue and the first-run setup screen.
+#[tauri::command]
+async fn list_ai_providers(state: State<'_, AppState>) -> IpcResult<Vec<AiProviderDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::list_ai_providers(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn ai_setup_status(state: State<'_, AppState>) -> IpcResult<AiSetupStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::ai_setup_status(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn save_ai_setup(
+    state: State<'_, AppState>,
+    input: SaveAiSetupInput,
+) -> IpcResult<AiSetupStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::save_ai_setup(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn skip_ai_setup(state: State<'_, AppState>) -> IpcResult<AiSetupStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::skip_ai_setup(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
 
 // PHASE-04. The cloud AI gateway.
 #[tauri::command]
@@ -3044,27 +3171,68 @@ async fn diagnostics_report(state: State<'_, AppState>) -> IpcResult<Diagnostics
 }
 
 #[tauri::command]
-async fn enhance_portrait(
+async fn automatic_start(
     state: State<'_, AppState>,
-    input: aura_app::contract::ipc::DevelopImageInput,
-) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    input: AutomaticStartInput,
+) -> IpcResult<AutomaticStartDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        aura_app::photo_enhance::enhance_portrait(&app, &input)
-    })
-    .await
-    .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || aura_app::automatic_start(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
-async fn auto_retouch(
+async fn photo_analysis(
     state: State<'_, AppState>,
-    input: aura_app::smart_edit::AutoRetouchInput,
-) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    input: PhotoAutoEditInput,
+) -> IpcResult<PhotoAnalysisDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::smart_edit::auto_retouch(&app, &input))
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_analysis(&app, &input))
         .await
         .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_auto_edit(
+    state: State<'_, AppState>,
+    input: PhotoAutoEditInput,
+) -> IpcResult<PhotoAutoEditDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_auto_edit(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// ADR-0068. The one-click finish. These three are the thin end of the wedge: the
+// pipeline itself runs on a thread inside `aura-app` and reports through the status
+// row, so these commands only start it, read it, and stop it.
+#[tauri::command]
+async fn one_click_finish(
+    state: State<'_, AppState>,
+    input: OneClickFinishInput,
+) -> IpcResult<OneClickFinishDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::one_click_finish(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn one_click_status(job_id: String) -> IpcResult<OneClickStatusDto> {
+    tauri::async_runtime::spawn_blocking(move || aura_app::one_click_status(&job_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn one_click_cancel(job_id: String) -> IpcResult<bool> {
+    let found = tauri::async_runtime::spawn_blocking(move || {
+        let known = aura_app::one_click_status(&job_id).is_ok();
+        (known, aura_app::one_click_cancel(&job_id))
+    })
+    .await
+    .map_err(|_| background_request_failed())?;
+    Ok(found.1 && found.0)
 }
 
 #[tauri::command]
@@ -3117,6 +3285,82 @@ async fn apply_reference_style(
     })
     .await
     .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn analyse_portrait(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::PortraitInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitAnalysisDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::analyse_portrait(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::PortraitInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::SetPortraitRetouchInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::set_portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn auto_portrait_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::AutoPortraitRetouchInput,
+) -> IpcResult<aura_app::portrait_commands::PortraitRetouchDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::auto_portrait_retouch(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn enhance_portrait(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::DevelopImageInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::photo_enhance::enhance_portrait(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn auto_retouch(
+    state: State<'_, AppState>,
+    input: aura_app::smart_edit::AutoRetouchInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::smart_edit::auto_retouch(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -3240,13 +3484,29 @@ async fn native_retouch_selection_preview(
     .map_err(|_| background_request_failed())?
 }
 
+// `tauri::generate_context!` expands to an `unwrap` and a `HashMap` inside Tauri's own
+// generated code, which this workspace's disallowed lists cannot see past. Allowed here and
+// nowhere else: every other line of the shell is held to both rules.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    // The engine log: rolling daily files under the data directory, because a
+    // windows-subsystem build has no console and the only copy of a startup failure
+    // worth reading is the one that survived the crash. `Appender` opens the file per
+    // rollover rather than holding a handle, so it is moved into the subscriber and
+    // there is no guard to keep alive.
+    let appender = AppPaths::resolve().ok().map(|paths| {
+        let dir = paths.data_dir.join("logs");
+        let _ = std::fs::create_dir_all(&dir);
+        tracing_appender::rolling::daily(&dir, "aura-engine.log")
+    });
+    let subscriber = tracing_subscriber::fmt().with_env_filter(
+        tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+    );
+    match appender {
+        Some(file) => subscriber.with_writer(file).with_ansi(false).init(),
+        None => subscriber.init(),
+    }
 
     // A panic in the shell must produce a report, not a silent disappearance.
     std::panic::set_hook(Box::new(|info| {
@@ -3282,6 +3542,17 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            ui_audit,
+            automatic_start,
+            photo_analysis,
+            photo_auto_edit,
+            one_click_finish,
+            one_click_status,
+            one_click_cancel,
+            analyse_portrait,
+            portrait_retouch,
+            set_portrait_retouch,
+            auto_portrait_retouch,
             sync_settings,
             pick_white_balance,
             native_retouch_edit,
@@ -3301,6 +3572,7 @@ fn main() {
             list_projects,
             start_ingest,
             cancel_job,
+            ingest_progress,
             list_images,
             set_camera_label,
             list_problems,
@@ -3439,6 +3711,7 @@ fn main() {
             analyse_integrity,
             build_index,
             cancel_previews,
+            ai_setup_status,
             check_ai_key,
             classify_scenes,
             clear_ai_key,
@@ -3512,7 +3785,10 @@ fn main() {
             scene_profiles,
             score_emotion,
             segment_story,
+            list_ai_providers,
+            save_ai_setup,
             set_ai_key,
+            skip_ai_setup,
             set_cache_budget,
             set_chapter,
             set_cloud_budget,

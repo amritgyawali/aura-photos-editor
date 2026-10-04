@@ -1,4 +1,4 @@
-//! Native retouch commands; typed recipe extension, original-preserving history. ADR-0068.
+//! Native retouch commands; typed recipe extension, original-preserving history. ADR-0073.
 use crate::{
     commands::IpcResult,
     contract::ipc::{RenderDto, RenderNoteDto},
@@ -23,7 +23,7 @@ pub struct RetouchInput {
 
 fn invalid(message: &str) -> aura_core::AuraError {
     let mut e = aura_core::errors::render::recipe_invalid("native retouch", message);
-    e.user_message = message.to_owned();
+    message.clone_into(&mut e.user_message);
     e
 }
 
@@ -174,7 +174,7 @@ pub fn draft_preview(state: &AppState, input: &DraftInput) -> IpcResult<RenderDt
             .iter_mut()
             .find(|e| &e.id == id)
             .ok_or_else(|| invalid("Retouch operation no longer exists"))?;
-        draft.id = id.clone();
+        draft.id.clone_from(id);
         *current = draft;
     } else {
         // Stable unused ID keeps repeated draft renders cacheable without colliding with saved IDs.

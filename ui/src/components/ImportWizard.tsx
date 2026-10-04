@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { asIpcError, inTauri, pickPhotoFolder, pickPhotos } from '../ipc/client';
 
 export type ImportWizardProps = {
+  automatic?: boolean;
   disabled: boolean;
   onStart: (roots: string[]) => void;
   onCancel: () => void;
@@ -16,6 +17,7 @@ export type ImportWizardProps = {
  * real dialog when it is present.
  */
 export function ImportWizard({
+  automatic = false,
   disabled,
   onStart,
   onCancel,
@@ -51,6 +53,7 @@ export function ImportWizard({
     <section className="panel" aria-label="Import">
       <h2>Add your photos</h2>
       <p>Choose one photo or a whole collection. AURA adjusts each photo’s light and contrast automatically. Your originals stay untouched.</p>
+      {automatic && <p>AURA then analyzes, edits and exports them to Pictures / AURA Exports without further steps.</p>}
       <div className="import-actions">
         <button className="is-primary" type="button" disabled={disabled || running || picking || !inTauri()} onClick={() => void choose(true)}>{picking ? 'Choosing…' : 'Choose photos'}</button>
         <button type="button" disabled={disabled || running || picking || !inTauri()} onClick={() => void choose()}>Choose photo folder</button>
@@ -102,7 +105,7 @@ export function ImportWizard({
           disabled={disabled || running || roots.length === 0}
           onClick={() => onStart(roots)}
         >
-          Start import
+          {automatic ? 'Process these paths automatically' : 'Start import'}
         </button>
         <button type="button" disabled={!running} onClick={onCancel}>
           Stop

@@ -152,22 +152,22 @@ pub struct Global {
     pub noise: Noise,
     /// Lightroom's parametric tone curve: four regions and their three splits.
     ///
-    /// **Added by ADR-0065.** Every block from here down is optional and absent from the
+    /// **Added by ADR-0070.** Every block from here down is optional and absent from the
     /// canonical form while it is neutral, so a recipe written before it existed hashes exactly
     /// as it did - no stored render hash moves - and an older reader simply never sees it.
     #[serde(default, skip_serializing_if = "ParametricCurve::is_neutral")]
     pub parametric: ParametricCurve,
-    /// Per-channel point curves, applied after the luminance curve. ADR-0065.
+    /// Per-channel point curves, applied after the luminance curve. ADR-0070.
     #[serde(default, skip_serializing_if = "ChannelCurves::is_identity")]
     pub channel_curves: ChannelCurves,
     /// Three-way colour grading plus a global wheel: Lightroom's Color Grading panel.
-    /// ADR-0065.
+    /// ADR-0070.
     #[serde(default, skip_serializing_if = "ColourGrade::is_neutral")]
     pub colour_grade: ColourGrade,
-    /// Camera calibration: the shadow tint and the three primaries. ADR-0065.
+    /// Camera calibration: the shadow tint and the three primaries. ADR-0070.
     #[serde(default, skip_serializing_if = "Calibration::is_neutral")]
     pub calibration: Calibration,
-    /// Post-crop vignette and film grain: Lightroom's Effects panel. ADR-0065.
+    /// Post-crop vignette and film grain: Lightroom's Effects panel. ADR-0070.
     #[serde(default, skip_serializing_if = "Effects::is_neutral")]
     pub effects: Effects,
 }

@@ -64,7 +64,7 @@ pub const SUBSET: &[&str] = &[
     "geometry.crop",
     "geometry.rotate",
     "bw",
-    // ADR-0065. Lightroom's remaining creative panels, in its own attribute names.
+    // ADR-0070. Lightroom's remaining creative panels, in its own attribute names.
     "global.parametric",
     "global.channel_curves",
     "global.colour_grade",
@@ -205,7 +205,8 @@ pub fn write(recipe: &Recipe) -> String {
     out
 }
 
-/// The attributes of ADR-0065's blocks, each written only when its block is not neutral.
+/// The attributes of ADR-0070's blocks, each written only when its block is not neutral.
+#[allow(clippy::many_single_char_names)]
 fn write_creative(recipe: &Recipe, out: &mut String) {
     let g = &recipe.global;
     let mut attr = |name: &str, value: i16| {
@@ -272,7 +273,8 @@ fn write_creative(recipe: &Recipe, out: &mut String) {
     }
 }
 
-/// Read ADR-0065's attributes onto `out`. An absent attribute leaves the field as it was.
+/// Read ADR-0070's attributes onto `out`. An absent attribute leaves the field as it was.
+#[allow(clippy::many_single_char_names)]
 fn read_creative(attrs: &BTreeMap<String, String>, xml: &str, out: &mut Recipe) {
     let get = |name: &str| attrs.get(name).and_then(|s| parse_i16(s));
     let set = |name: &str, field: &mut i16| {

@@ -1,4 +1,15 @@
 //! Automatic portrait planning produces ordinary, reversible retouch operations.
+// Pixel indices are computed from bounds-checked planning coordinates; pixel geometry uses
+// the conventional single-letter names (x, y, w, h, l, t, r, b).
+#![allow(
+    clippy::indexing_slicing,
+    clippy::many_single_char_names,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 use aura_core::AuraResult;
 use aura_recipe::{
     retouch_tools::{self, BrushMask, BrushStroke, Edit, SkinSettings, Tool},
@@ -24,7 +35,7 @@ pub struct FaceAssessment {
     pub confidence: f32,
     pub reason: String,
     pub strengths: [f32; 3],
-    /// Measured finishing decisions for this face: spots, eyes, teeth and shine. ADR-0076.
+    /// Measured finishing decisions for this face: spots, eyes, teeth and shine. ADR-0081.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub findings: Vec<String>,
     #[serde(default)]
@@ -209,6 +220,7 @@ pub fn plan(
 }
 
 /// [`plan`], reusing faces the caller already detected on the same `rgb` thumbnail.
+#[allow(clippy::too_many_arguments)]
 /// # Errors
 /// Invalid pixels or a failed model run.
 pub fn plan_with_faces(
@@ -265,7 +277,7 @@ pub fn plan_with_faces(
         .filter(|e| group_of(&e.id) == Some(Group::Scene))
         .count();
     let detail_pixels = detail
-        .and_then(|(data, w, h)| portrait_features::Pixels::new(data, w, h))
+        .and_then(|(pixels, w, h)| portrait_features::Pixels::new(pixels, w, h))
         .or_else(|| portrait_features::Pixels::new(rgb, width, height));
     let mut planned: [Vec<Edit>; 5] = Default::default();
     let mut bodies = 0_usize;
@@ -547,7 +559,6 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
             nose,
             mouth: [mouth_a, mouth_b],
             mid,
-            mouth_centre: mouth,
             u,
             v,
             d: distance,
@@ -936,12 +947,6 @@ fn body_skin_region(
         grid: [gw, gh],
         origin: [x0, y0],
         cell,
-        seed: seeds.first().map(|&k| {
-            [
-                (x0 + (k % gw) * cell + cell / 2) as f32,
-                (y0 + (k / gw) * cell + cell / 2) as f32,
-            ]
-        }),
     })
 }
 
@@ -951,7 +956,6 @@ struct BodyRegion {
     grid: [usize; 2],
     origin: [usize; 2],
     cell: usize,
-    seed: Option<[f32; 2]>,
 }
 
 impl BodyRegion {
@@ -1025,7 +1029,6 @@ struct FaceFrame {
     nose: [f32; 2],
     mouth: [[f32; 2]; 2],
     mid: [f32; 2],
-    mouth_centre: [f32; 2],
     u: [f32; 2],
     v: [f32; 2],
     d: f32,
@@ -1331,7 +1334,7 @@ mod tests {
         let (w, h) = (200_usize, 300_usize);
         let skin = [150_u8, 105, 80];
         let mut rgb = Vec::with_capacity(w * h * 3);
-        for y in 0..h {
+        for _ in 0..h {
             for x in 0..w {
                 let outline = (44..52).contains(&x) || (148..156).contains(&x);
                 rgb.extend(if outline { [20, 20, 25] } else { skin });

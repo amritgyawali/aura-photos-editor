@@ -91,8 +91,15 @@ impl<'a> ExportPass<'a> {
     /// Run a job with an optional graphic baked into every output after resizing/sharpening.
     /// # Errors
     /// The same job and I/O failures as `run`, plus an invalid watermark.
-    pub fn run_with_watermark(&self, project: ProjectId, job: &ExportJob, watermark: Option<&crate::watermark::Watermark>) -> AuraResult<PassResult> {
-        if let Some(mark) = watermark { mark.validate()?; }
+    pub fn run_with_watermark(
+        &self,
+        project: ProjectId,
+        job: &ExportJob,
+        watermark: Option<&crate::watermark::Watermark>,
+    ) -> AuraResult<PassResult> {
+        if let Some(mark) = watermark {
+            mark.validate()?;
+        }
         // 1. The job, before a frame is rendered.
         job.validate()?;
 
@@ -193,7 +200,11 @@ impl<'a> ExportPass<'a> {
                 ));
             }
 
-            let sharpened = if let Some(mark) = watermark { mark.apply(&sharpened)? } else { sharpened };
+            let sharpened = if let Some(mark) = watermark {
+                mark.apply(&sharpened)?
+            } else {
+                sharpened
+            };
 
             // 4d. Encode.
             let (bytes, mut encode_reasons) = match set.format {

@@ -1,4 +1,4 @@
-//! Versioned local retouch authoring, carried by the recipe extension map. ADR-0068.
+//! Versioned local retouch authoring, carried by the recipe extension map. ADR-0073.
 use crate::{errors::recipe_invalid, Recipe};
 use aura_core::AuraResult;
 use serde::{Deserialize, Serialize};

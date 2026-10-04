@@ -1,4 +1,4 @@
-"""Build the photo set used to qualify one-click automatic editing (ADR-0076).
+"""Build the photo set used to qualify one-click automatic editing (ADR-0081).
 
 Downloads public Pexels photographs, copies the earlier capability-audit inputs when
 available, and derives controlled variants (colour casts, exposure errors, noise, haze,

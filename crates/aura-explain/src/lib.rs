@@ -20,6 +20,28 @@
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
+// The panic family, slice indexing and strict float comparison are banned in library code and
+// are how a test asserts. An inline `#[cfg(test)]` module is not compiled into the library at
+// all, so nothing it does can reach a photographer; the lints stay denied everywhere else in the
+// crate. The same exemption phases 14, 19, 22, 23, 24, 25, 26 and 27 took, for the same reason.
+//
+// This crate had no in-crate tests at all until the phases 01 to 30 review
+// (`docs/progress/PHASE-01-30-REVIEW.md` section 6.6), which is why it did not need the
+// exemption before.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+        clippy::disallowed_methods,
+        clippy::assertions_on_constants,
+        clippy::uninlined_format_args,
+        clippy::too_many_lines
+    )
+)]
 
 //! The record. Everything this product decides can be opened up, argued with, and
 //! reproduced a year later.

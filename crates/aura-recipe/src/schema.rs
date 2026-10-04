@@ -48,7 +48,7 @@ const IDENTITY_PATHS: [&str; 5] = [
 /// same failure `Explain::record` overwrites the autonomy band to prevent.
 const METADATA_PREFIX: &str = "provenance";
 
-/// Blocks that are absent from the canonical form while they are neutral. ADR-0065.
+/// Blocks that are absent from the canonical form while they are neutral. ADR-0070.
 ///
 /// A proposal that returns one of them to neutral *omits* it, and "omitted" must mean "back to
 /// neutral" rather than "not mentioned" - otherwise applying a look with a colour grade and
@@ -511,6 +511,7 @@ impl Recipe {
     ///
     /// Never fails and never refuses: this is the *value* half of the two kinds of wrong.
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn clamped(&self) -> Self {
         let mut out = self.clone();
         let g = &mut out.global;
@@ -539,7 +540,7 @@ impl Recipe {
             shift.s = shift.s.clamp(-100, 100);
             shift.l = shift.l.clamp(-100, 100);
         }
-        // ADR-0065. The splits are clamped apart from each other so a clamped curve is always a
+        // ADR-0070. The splits are clamped apart from each other so a clamped curve is always a
         // valid one; the amounts are ordinary sliders.
         let p = &mut g.parametric;
         for amount in [
@@ -645,12 +646,12 @@ mod tests {
             .contains(&"global.exposure".into()));
         proposal.global.exposure = 1.0;
         let (protected, _) = merge(&merged, &proposal, EditSource::Ai).unwrap();
-        assert_eq!(protected.global.exposure, 0.5);
+        assert!((protected.global.exposure - 0.5).abs() < f32::EPSILON);
     }
 
     #[test]
     fn a_neutral_new_block_leaves_the_canonical_form_and_the_hash_unchanged() {
-        // ADR-0065: the Lightroom-parity blocks must not move a single stored hash.
+        // ADR-0070: the Lightroom-parity blocks must not move a single stored hash.
         let recipe = fixtures::reference();
         let text = crate::canonical(&recipe).expect("canonical");
         for block in [

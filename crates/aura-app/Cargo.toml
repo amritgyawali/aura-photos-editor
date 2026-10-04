@@ -9,6 +9,7 @@ publish.workspace      = true
 description = "AURA application layer: typed IPC command surface shared by the desktop shell and the CLI."
 
 [dependencies]
+dirs.workspace = true
 aura-core    = { path = "../aura-core" }
 aura-catalog = { path = "../aura-catalog" }
 aura-ingest  = { path = "../aura-ingest" }
@@ -44,6 +45,7 @@ aura-geometry      = { path = "../aura-geometry" }
 # `aura-cloud`, and where an accepted proposal meets `aura_recipe::schema::merge` - the
 # two edges `aura-generative` deliberately does not have.
 aura-generative    = { path = "../aura-generative" }
+aura-portrait      = { path = "../aura-portrait" }
 aura-recipe        = { path = "../aura-recipe" }
 aura-render        = { path = "../aura-render" }
 aura-look          = { path = "../aura-look" }

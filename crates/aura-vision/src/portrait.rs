@@ -60,6 +60,7 @@ fn graph() -> AuraResult<&'static Mutex<Executable>> {
 /// allocating rotated full-size photographs. Return original-space geometry.
 /// # Errors
 /// Invalid pixels, a damaged bundled model, or an inference failure.
+#[allow(clippy::many_single_char_names)]
 pub fn detect(rgb: &[u8], width: u32, height: u32) -> AuraResult<Vec<PortraitFace>> {
     let w = width as usize;
     let h = height as usize;
@@ -109,6 +110,7 @@ fn original_pixel(x: usize, y: usize, w: usize, h: usize, turns: u8) -> (usize, 
     }
 }
 
+#[allow(clippy::too_many_lines, clippy::many_single_char_names)]
 fn detect_view(
     rgb: &[u8],
     original_w: usize,
@@ -271,6 +273,7 @@ fn detect_view(
 /// # Errors
 /// Invalid pixels or a failed model run.
 #[allow(
+    clippy::many_single_char_names,
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
@@ -404,7 +407,7 @@ mod tests {
         };
         // A large known face: no tiles, nothing changes.
         let blank = vec![120_u8; 700 * 700 * 3];
-        let faces = detect_small_faces(&blank, 700, 700, &[known.clone()]).unwrap();
+        let faces = detect_small_faces(&blank, 700, 700, std::slice::from_ref(&known)).unwrap();
         assert_eq!(faces.len(), 1);
         // No faces at all on a plain frame: tiles run and still find none.
         assert!(detect_small_faces(&blank, 700, 700, &[])

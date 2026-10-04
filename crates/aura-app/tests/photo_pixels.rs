@@ -1,4 +1,6 @@
 //! An actual JPEG import, local correction and render round trip.
+// Tests assert by unwrapping; a panic here is a failed test, never a photographer's crash.
+#![allow(clippy::unwrap_used, clippy::disallowed_methods)]
 use aura_app::contract::ipc::*;
 use aura_app::AppState;
 use aura_core::progress::{CancelToken, NullProgress};

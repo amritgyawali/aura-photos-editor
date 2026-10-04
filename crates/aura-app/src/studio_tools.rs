@@ -1,4 +1,4 @@
-//! Explicit, local authoring tools. See ADR-0067.
+//! Explicit, local authoring tools. See ADR-0072.
 use crate::{commands::IpcResult, contract::ipc::RecipeDto, AppState};
 use aura_core::{AuraError, AuraResult, PhotoId, ProjectId};
 use aura_recipe::{schema, EditSource};
@@ -35,7 +35,7 @@ pub(crate) fn require_member(state: &AppState, project: &str, photo: &str) -> Au
 
 fn invalid(message: &str) -> AuraError {
     let mut error = aura_core::errors::render::recipe_invalid("studio", message);
-    error.user_message = message.to_owned();
+    message.clone_into(&mut error.user_message);
     error
 }
 

@@ -1,4 +1,6 @@
-//! Deterministic, explicitly targeted native retouching. No learned segmentation. ADR-0068.
+//! Deterministic, explicitly targeted native retouching. No learned segmentation. ADR-0073.
+// Buffers come from dimension-checked input; all coordinates are bounded before indexing.
+#![allow(clippy::indexing_slicing)]
 use crate::retouch_mask::Coverage;
 use aura_recipe::retouch_tools::{Edit, Tool};
 
@@ -72,6 +74,7 @@ pub fn selection_mask(rgb: &[f32], width: usize, height: usize, edit: &Edit) -> 
         .collect()
 }
 
+#[allow(clippy::too_many_lines)]
 fn apply_one(
     rgb: &mut [f32],
     w: usize,
@@ -143,7 +146,7 @@ fn apply_one(
     if matches!(edit.tool, Tool::Heal | Tool::Clone) && source.is_none() {
         return;
     }
-    let donor_mean = source.map(|p| sample(rgb, w, h, p)).unwrap_or(center);
+    let donor_mean = source.map_or(center, |p| sample(rgb, w, h, p));
     // Match donor tone to a ring outside the target, not to the blemish itself.
     let mut ring = [0.0; 3];
     let mut ring_n = 0.0;
@@ -218,7 +221,7 @@ fn apply_one(
                     value = old.map(|v| v * 2.0_f32.powf(-0.75));
                 }
                 Tool::UnderEye => {
-                    let lift = (luma(broad) - lum).max(0.0).min(0.12);
+                    let lift = (luma(broad) - lum).clamp(0.0, 0.12);
                     value = old.map(|v| v * (lum + lift) / lum);
                 }
                 Tool::SkinColor | Tool::Makeup => {

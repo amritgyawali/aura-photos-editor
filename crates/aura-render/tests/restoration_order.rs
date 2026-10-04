@@ -75,7 +75,7 @@ fn sharpening_is_the_last_stage_that_changes_a_pixel_value() {
         .filter(|stage| stage.index() > Stage::Sharpen.index())
         .collect();
     //
-    // ADR-0065 adds exactly two, and they are the documented exception: the post-crop vignette
+    // ADR-0070 adds exactly two, and they are the documented exception: the post-crop vignette
     // is a smooth low-frequency gain drawn on the *cropped* frame, so it must follow geometry,
     // and grain must follow sharpening or the sharpener would amplify it into noise - which is
     // why Lightroom applies both last too. Neither is a tonal or spatial stage in the sense this

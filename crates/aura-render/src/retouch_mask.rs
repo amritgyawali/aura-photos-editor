@@ -1,4 +1,6 @@
-//! Resolution-independent brush coverage shared by preview and delivery. ADR-0069.
+//! Resolution-independent brush coverage shared by preview and delivery. ADR-0074.
+// Buffers come from dimension-checked input; all coordinates are bounded before indexing.
+#![allow(clippy::indexing_slicing)]
 use aura_recipe::retouch_tools::{BrushStroke, Edit};
 
 pub(crate) struct Coverage {

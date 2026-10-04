@@ -124,6 +124,8 @@ pub fn correction(rgb: &[u8]) -> aura_core::AuraResult<(f32, i16, i16, i16)> {
 mod tests {
     use super::*;
     #[test]
+    // The long literal is the point: it does not survive canonical rounding.
+    #[allow(clippy::excessive_precision, clippy::unreadable_literal)]
     fn rounded_portrait_coordinates_do_not_create_another_saved_step() {
         let mut proposal =
             aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "test");

@@ -792,7 +792,10 @@ pub fn verify(args: &[String]) -> ExitCode {
         "  C5  The cloud sequencing task has never reached a provider. Its contact sheets need a"
     );
     println!(
-        "      renderer this crate must not have, and TLS is waived - so what is proved is that"
+        "      renderer this crate must not have, and no call in this repository has ever reached"
+    );
+    println!(
+        "      a vendor - ADR-0066 ships TLS but proves no round trip - so what is proved is that"
     );
     println!("      the validator refuses, not that a model helps.");
 
@@ -967,7 +970,14 @@ fn ipc_parity() -> Result<usize, String> {
         let Some(end) = rest.find('\'') else {
             continue;
         };
-        invoked.insert(rest[..end].to_string());
+        let name = &rest[..end];
+        // `plugin:<name>|<command>` is answered by a Tauri plugin the shell registers with
+        // `.plugin(...)`, not by a `generate_handler!` entry, so it has no definition or
+        // handler to agree with. `scripts/check-ipc-surface.sh` skips it the same way.
+        if name.starts_with("plugin:") {
+            continue;
+        }
+        invoked.insert(name.to_string());
     }
 
     let mut problems = Vec::new();

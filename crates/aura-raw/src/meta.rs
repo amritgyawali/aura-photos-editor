@@ -586,6 +586,7 @@ fn scheme_for(
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn mosaic_from_ifd(
     file: &tiff::TiffFile<'_>,
     ifd: &tiff::Ifd,
