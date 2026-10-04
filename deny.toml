@@ -1,7 +1,28 @@
 [advisories]
 version = 2
 yanked  = "deny"
-ignore  = []
+# Every entry below arrives through `rustls-rustcrypto` 0.0.2-alpha, the pure-Rust
+# crypto provider ADR-0065 chose because the reference build machine has no C
+# toolchain. It is the newest release and pins `rustls-webpki` ^0.102, so there is
+# no upgrade that clears these. Each is scoped to one advisory id with the reason
+# it does not reach this build; a new advisory against any of these crates still
+# fails the gate. Remove an entry the day the provider stops pulling the crate in.
+ignore  = [
+  # rustls-webpki 0.102 is used by the provider for algorithm-identifier constants
+  # (`webpki::alg_id`) and nothing else. Certificate path building, CRL parsing and
+  # name-constraint checks run in rustls's own rustls-webpki 0.103, which is
+  # patched. The four advisories below are in code 0.102 never executes here.
+  { id = "RUSTSEC-2026-0049", reason = "webpki 0.102 CRL matching; CRLs are verified by webpki 0.103 in rustls" },
+  { id = "RUSTSEC-2026-0098", reason = "webpki 0.102 URI name constraints; path validation is webpki 0.103 in rustls" },
+  { id = "RUSTSEC-2026-0099", reason = "webpki 0.102 wildcard name constraints; path validation is webpki 0.103 in rustls" },
+  { id = "RUSTSEC-2026-0104", reason = "webpki 0.102 CRL parsing panic; this build parses no CRL with 0.102" },
+  # Marvin is a timing leak of an RSA *private* key during decryption or signing.
+  # aura-cloud is a TLS client built `with_no_client_auth`, so it only verifies
+  # server signatures with public keys and never performs a private-key operation.
+  { id = "RUSTSEC-2023-0071", reason = "rsa Marvin attack needs a private-key operation; the TLS client only verifies" },
+  # `paste` is a compile-time macro crate with no runtime code; unmaintained, not vulnerable.
+  { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained build-time macro code, pulled in by rustls-rustcrypto" },
+]
 
 [licenses]
 version = 2

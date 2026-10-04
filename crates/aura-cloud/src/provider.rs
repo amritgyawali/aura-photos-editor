@@ -62,13 +62,13 @@ pub enum ProviderKind {
     Google,
     /// OpenAI's models inside a customer's own Azure tenancy.
     AzureOpenAi,
-    /// OpenRouter, which fronts most of the others behind one key.
+    /// `OpenRouter`, which fronts most of the others behind one key.
     OpenRouter,
     /// Groq's inference service.
     Groq,
     /// Mistral's hosted endpoint.
     Mistral,
-    /// DeepSeek's hosted endpoint.
+    /// `DeepSeek`'s hosted endpoint.
     DeepSeek,
     /// xAI's Grok endpoint.
     XAi,
@@ -76,7 +76,7 @@ pub enum ProviderKind {
     Together,
     /// Fireworks AI.
     Fireworks,
-    /// DeepInfra.
+    /// `DeepInfra`.
     DeepInfra,
     /// Cerebras.
     Cerebras,

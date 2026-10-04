@@ -49,6 +49,9 @@ pub fn run(_args: &[String]) -> ExitCode {
     }
 }
 
+// `serde_json::json!` expands to an unwrap when it interpolates a value; serialising the
+// strings it is given here cannot fail.
+#[allow(clippy::disallowed_methods)]
 fn provision() -> Result<(), String> {
     let (key, base_url, model) = read_settings()?;
     if key.trim().is_empty() || base_url.trim().is_empty() {
@@ -76,7 +79,7 @@ fn provision() -> Result<(), String> {
     // 1. The text call the gateway's cheapest task would make.
     let url = format!("{base_url}/v1/chat/completions");
     let transport = HttpTransport::new();
-    if !transport.schemes().iter().any(|scheme| *scheme == "https") {
+    if !transport.schemes().contains(&"https") {
         return Err(
             "this build's transport cannot reach https; rebuild with the tls feature".to_string(),
         );
@@ -208,7 +211,7 @@ fn post(
     };
     let response = transport
         .send(&request, Duration::from_secs(120))
-        .map_err(|err| format!("{}", err.user_message))?;
+        .map_err(|err| err.user_message.to_string())?;
     if !(200..300).contains(&response.status) {
         let snippet = String::from_utf8_lossy(&response.body);
         return Err(format!(

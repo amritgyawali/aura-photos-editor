@@ -53,7 +53,7 @@ test:
     cargo test --workspace --doc
     cd ui && npm test
 
-# Every phase gate, 01 to 30. Sixteen of them ran nowhere on a push until the
+# Every phase gate, 01 to 31. Sixteen of them ran nowhere on a push until the
 # phases 01 to 30 review found it, phase 30's delivery guarantee and phase 13's
 # unattended-operation check among them - PHASE-01-30-REVIEW.md section 6.1.
 phases *ARGS:

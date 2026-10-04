@@ -367,6 +367,7 @@ fn uuid_like(now: &str, app_version: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use aura_core::clock::FixedClock;
     use time::OffsetDateTime;

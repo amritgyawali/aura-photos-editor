@@ -8708,7 +8708,7 @@ pub struct PhotoAutoEditInput {
 pub struct PhotoAutoEditDto {
     /// Saved recipe.
     pub recipe: RecipeDto,
-    /// Cloud, cache or local_fallback.
+    /// Cloud, cache or `local_fallback`.
     pub source: String,
     /// Model that answered, or local.
     pub model: String,

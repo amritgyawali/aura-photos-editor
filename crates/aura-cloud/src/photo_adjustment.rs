@@ -37,7 +37,7 @@ impl PhotoReadings {
     /// # Errors
     /// Refuses empty or incomplete RGB buffers.
     pub fn measure(rgb: &[u8], image_hash: String) -> AuraResult<Self> {
-        if rgb.is_empty() || rgb.len() % 3 != 0 {
+        if rgb.is_empty() || !rgb.len().is_multiple_of(3) {
             return Err(aura_core::errors::raw::corrupt(
                 "invalid auto-edit RGB preview",
             ));

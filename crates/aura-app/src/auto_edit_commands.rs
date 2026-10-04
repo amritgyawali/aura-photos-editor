@@ -15,6 +15,9 @@ use crate::develop_commands::{load_or_neutral, recipe_dto};
 use crate::AppState;
 
 /// Read actual pixels even when optional learned analysis models are unavailable.
+///
+/// # Errors
+/// Refuses a photograph outside the project, and one whose preview cannot be decoded.
 pub fn photo_analysis(
     state: &AppState,
     input: &PhotoAutoEditInput,

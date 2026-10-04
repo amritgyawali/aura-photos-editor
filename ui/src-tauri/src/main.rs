@@ -912,8 +912,7 @@ fn write_audit_batch(batch: &[serde_json::Value]) -> IpcResult<()> {
 }
 
 fn rotate_if_over_ceiling(path: &std::path::Path) {
-    let over_ceiling =
-        std::fs::metadata(path).map_or(false, |meta| meta.len() > AUDIT_ROTATE_BYTES);
+    let over_ceiling = std::fs::metadata(path).is_ok_and(|meta| meta.len() > AUDIT_ROTATE_BYTES);
     if !over_ceiling {
         return;
     }
@@ -3275,6 +3274,10 @@ async fn apply_reference_style(
     .map_err(|_| background_request_failed())?
 }
 
+// `tauri::generate_context!` expands to an `unwrap` and a `HashMap` inside Tauri's own
+// generated code, which this workspace's disallowed lists cannot see past. Allowed here and
+// nowhere else: every other line of the shell is held to both rules.
+#[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 fn main() {
     // The engine log: rolling daily files under the data directory, because a
     // windows-subsystem build has no console and the only copy of a startup failure

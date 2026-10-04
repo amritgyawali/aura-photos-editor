@@ -1,5 +1,10 @@
 //! Selection-to-delivery background workflow. See ADR-0068.
-use crate::contract::ipc::*;
+use crate::contract::ipc::{
+    AcceptGeometryInput, AutomaticStartDto, AutomaticStartInput, AutopilotStartInput,
+    CreateProjectInput, CullProjectInput, ExportJobInput, ExportSetInput, GeometryReviewInput,
+    IpcError, ListImagesInput, OneClickFinishDto, OneClickFinishInput, OneClickStatusDto,
+    PhotoAutoEditInput, PlanGeometryInput, RecipeDto, StartIngestInput,
+};
 use crate::AppState;
 use aura_core::progress::CancelToken;
 use parking_lot::Mutex;
@@ -19,10 +24,20 @@ struct JobSlot {
     project: String,
     child: Option<String>,
 }
+/// One entry of the run's `photo-edits.json`.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EditedPhoto {
+    photo_id: String,
+    source: String,
+    model: String,
+    reasons: Vec<String>,
+    recipe: RecipeDto,
+}
 fn error(message: &str) -> IpcError {
     let mut error: IpcError =
         aura_core::errors::render::recipe_invalid("automatic workflow", message).into();
-    error.message = message.to_owned();
+    message.clone_into(&mut error.message);
     error
 }
 fn update(job: &str, change: impl FnOnce(&mut OneClickStatusDto)) {
@@ -46,9 +61,7 @@ fn note(job: &str, message: String) {
     });
 }
 fn stopped(job: &str) -> bool {
-    JOBS.lock()
-        .get(job)
-        .map_or(true, |s| s.cancel.is_cancelled())
+    JOBS.lock().get(job).is_none_or(|s| s.cancel.is_cancelled())
 }
 fn child(job: &str, id: Option<String>) {
     if let Some(slot) = JOBS.lock().get_mut(job) {
@@ -76,6 +89,10 @@ fn output_folder(project: &str) -> Result<PathBuf, IpcError> {
 }
 
 /// Selecting files is the only required interaction. Existing manual edits remain protected.
+///
+/// # Errors
+/// Refuses while another run is active, when a selected path is missing or relative, and
+/// when the project, import or run cannot be started.
 pub fn automatic_start(
     state: &AppState,
     input: AutomaticStartInput,
@@ -90,28 +107,27 @@ pub fn automatic_start(
             return Err(error("Every selected path must exist and be absolute."));
         }
     }
-    let project = match input.project_id {
-        Some(id) => id,
-        None => {
-            let path = Path::new(input.roots.first().ok_or_else(|| error("No selection"))?);
-            let name = if path.is_dir() {
-                path.file_name()
-            } else {
-                path.parent().and_then(Path::file_name)
-            }
-            .and_then(|s| s.to_str())
-            .unwrap_or("Imported photos")
-            .to_string();
-            crate::create_project(
-                state,
-                CreateProjectInput {
-                    name,
-                    couple_names: None,
-                    event_date: None,
-                },
-            )?
-            .id
+    let project = if let Some(id) = input.project_id {
+        id
+    } else {
+        let path = Path::new(input.roots.first().ok_or_else(|| error("No selection"))?);
+        let name = if path.is_dir() {
+            path.file_name()
+        } else {
+            path.parent().and_then(Path::file_name)
         }
+        .and_then(|s| s.to_str())
+        .unwrap_or("Imported photos")
+        .to_string();
+        crate::create_project(
+            state,
+            CreateProjectInput {
+                name,
+                couple_names: None,
+                event_date: None,
+            },
+        )?
+        .id
     };
     let destination = output_folder(&project)?.to_string_lossy().into_owned();
     let ingest = crate::start_ingest(
@@ -144,6 +160,10 @@ pub fn automatic_start(
 }
 
 /// Start/re-run an existing project; an empty destination requests a unique default folder.
+///
+/// # Errors
+/// Refuses while another run is active, for an unknown project, and when the worker cannot
+/// be started.
 pub fn one_click_finish(
     state: &AppState,
     input: OneClickFinishInput,
@@ -152,6 +172,7 @@ pub fn one_click_finish(
     require_idle()?;
     start(state, input)
 }
+#[allow(clippy::too_many_lines)]
 fn start(state: &AppState, mut input: OneClickFinishInput) -> Result<OneClickFinishDto, IpcError> {
     aura_core::ProjectId::from_db(&input.project_id).map_err(|_| error("Invalid project id."))?;
     let exists = crate::list_projects(state)?
@@ -217,7 +238,14 @@ fn start(state: &AppState, mut input: OneClickFinishInput) -> Result<OneClickFin
                     "The automatic worker stopped unexpectedly. Completed files are preserved.",
                 ))
             });
-            let mut final_status = one_click_status(&worker_job).expect("registered worker status");
+            // The slot is inserted before this thread starts and removed only when the
+            // spawn fails, so it is always present here. Should that ever stop being
+            // true, release the job rather than panic on a background thread.
+            let Ok(mut final_status) = one_click_status(&worker_job) else {
+                worker.finish_job(&worker_job);
+                child(&worker_job, None);
+                return;
+            };
             {
                 let s = &mut final_status;
                 if s.status == "cancelling" {
@@ -238,7 +266,7 @@ fn start(state: &AppState, mut input: OneClickFinishInput) -> Result<OneClickFin
                         }
                         Err(err) => {
                             s.status = "failed".into();
-                            s.phase_label = err.message.clone();
+                            s.phase_label.clone_from(&err.message);
                             s.notes.push(format!("{}: {}", err.code, err.message));
                         }
                     }
@@ -271,6 +299,9 @@ fn start(state: &AppState, mut input: OneClickFinishInput) -> Result<OneClickFin
 }
 
 /// Current native progress survives changing tabs or reloading the frontend.
+///
+/// # Errors
+/// Refuses a job id this process is not running or has not kept.
 pub fn one_click_status(job_id: &str) -> Result<OneClickStatusDto, IpcError> {
     JOBS.lock().get(job_id).map(|s| s.status.clone()).ok_or_else(|| error("This run is no longer active in this application process. Check its output folder for aura-run.json."))
 }
@@ -303,6 +334,7 @@ pub fn one_click_cancel(job_id: &str) -> bool {
     true
 }
 
+#[allow(clippy::too_many_lines)]
 fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<(), IpcError> {
     let project = &input.project_id;
     if let Some(id) = &input.ingest_job_id {
@@ -356,7 +388,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         )?;
         let count = page.len();
         photos.extend(page);
-        offset += count as i64;
+        offset = offset.saturating_add(i64::try_from(count).unwrap_or(i64::MAX));
         if count < 250 {
             break;
         }
@@ -428,7 +460,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             s.model = checked
                 .as_ref()
                 .map(|c| c.model.clone())
-                .unwrap_or_default()
+                .unwrap_or_default();
         });
     } else {
         update(job, |s| s.model = "local reference".into());
@@ -574,7 +606,13 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                         s.local_edited += 1;
                     }
                 });
-                edited.push(serde_json::json!({"photoId":photo,"source":answer.source,"model":answer.model,"reasons":answer.reasons,"recipe":answer.recipe}));
+                edited.push(EditedPhoto {
+                    photo_id: photo.clone(),
+                    source: answer.source,
+                    model: answer.model,
+                    reasons: answer.reasons,
+                    recipe: answer.recipe,
+                });
             }
             Err(err) => {
                 update(job, |s| s.failed_edits += 1);

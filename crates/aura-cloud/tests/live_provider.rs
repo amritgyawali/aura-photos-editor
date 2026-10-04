@@ -9,8 +9,6 @@
 //! Skipped everywhere else; this test exists so "does my provider work" is one command
 //! rather than a guess. No cassette, no offline transport: the point is the network.
 
-use std::sync::Arc;
-
 use aura_catalog::consent::AlwaysConsent;
 use aura_cloud::audit::MemoryAudit;
 use aura_cloud::budget::{CostGovernor, MemoryBudget};
@@ -34,7 +32,7 @@ use aura_core::ProjectId;
 /// A 64x48 gradient with a dark left half and a bright right half.
 fn fixture_rgb() -> aura_raw::codec::Rgb8 {
     let (width, height) = (64u8, 48u8);
-    let data = (0..u32::from(width) * u32::from(height))
+    let samples = (0..u32::from(width) * u32::from(height))
         .flat_map(|i| {
             let x = (i % u32::from(width)) as u8;
             let y = (i / u32::from(width)) as u8;
@@ -51,7 +49,7 @@ fn fixture_rgb() -> aura_raw::codec::Rgb8 {
     aura_raw::codec::Rgb8 {
         width: u32::from(width),
         height: u32::from(height),
-        data,
+        data: samples,
     }
 }
 

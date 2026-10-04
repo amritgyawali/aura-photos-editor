@@ -444,9 +444,31 @@ fn tiled_full_decode_matches_a_whole_image_decode_on_xtrans() {
 #[test]
 fn tier_three_refuses_to_render_from_an_embedded_preview() {
     let directory = tempfile::tempdir().expect("temporary directory");
-    let path = directory.path().join("preview-only.jpg");
-    // A plain JPEG has no mosaic at all, which is the same situation as a RAW
-    // whose compression we cannot decode.
+    // A camera file that carries an embedded preview and a mosaic this build cannot
+    // decode - the CR2 case. Dropping the mosaic reference is how the fixture gets
+    // there: the container, its format and its previews are all real.
+    let mut loaded = load(directory.path(), FixtureOptions::default());
+    assert!(
+        !loaded.meta.previews.is_empty(),
+        "the fixture must carry an embedded preview for this to test anything"
+    );
+    loaded.meta.mosaic = None;
+    let error = full::tier3(
+        &loaded.bytes,
+        &loaded.meta,
+        DecodeLimits::tier3(),
+        clock().as_ref(),
+    )
+    .expect_err("tier 3 has no fallback");
+    assert_eq!(error.code.0, "AURA-RAW-2007");
+}
+
+#[test]
+fn tier_three_decodes_a_developed_jpeg_rather_than_asking_for_a_mosaic() {
+    // A JPEG is the photograph itself rather than a camera's preview of one, so a
+    // full-resolution export decodes its pixels at their own size.
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let path = directory.path().join("developed.jpg");
     let jpeg = aura_raw::codec::encode_jpeg(
         &aura_raw::codec::Rgb8 {
             width: 16,
@@ -456,12 +478,10 @@ fn tier_three_refuses_to_render_from_an_embedded_preview() {
         90,
     )
     .expect("encode a jpeg");
-    std::fs::write(&path, &jpeg).expect("write");
-
     let parsed = meta::read(&jpeg, &path).expect("a jpeg is readable");
-    let error = full::tier3(&jpeg, &parsed, DecodeLimits::tier3(), clock().as_ref())
-        .expect_err("tier 3 has no fallback");
-    assert_eq!(error.code.0, "AURA-RAW-2007");
+    let buffer = full::tier3(&jpeg, &parsed, DecodeLimits::tier3(), clock().as_ref())
+        .expect("a developed jpeg decodes at tier 3");
+    assert_eq!((buffer.width, buffer.height), (16, 16));
 }
 
 // ------------------------------------------------------------ failure paths

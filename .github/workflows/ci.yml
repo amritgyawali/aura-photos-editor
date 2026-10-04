@@ -161,7 +161,7 @@ jobs:
   # caught it if they had stopped.
   #
   # This lane runs the whole set through `scripts/check-phase-gates.sh`, which enumerates the
-  # gate modules `aura-cli` compiles and refuses to run if there are not thirty of them. A
+  # gate modules `aura-cli` compiles and refuses to run if there are not thirty-one of them. A
   # workflow that named each gate as its own step is a workflow somebody forgets to extend,
   # which is precisely how sixteen of them went unenforced.
   #
