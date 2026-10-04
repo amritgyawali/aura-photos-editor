@@ -66,7 +66,8 @@ pass** at `AURA_PERF_HOST_SCALE=4`: `fmt`, `banned`, `clippy`, `contracts`, `mod
 container, with `budgets` failing on phase 14's row; at host scale 4 that row passes here
 too, which matches what that report predicted.
 
-**One gate is host-sensitive.** Run *without* `AURA_PERF_HOST_SCALE`, phase 14 fails one
+**One gate is host-sensitive.** *(Two, as of the post-review pass - see
+[section 10.4](#104-a-second-gate-turned-out-to-be-host-sensitive-and-nothing-had-noticed).)* Run *without* `AURA_PERF_HOST_SCALE`, phase 14 fails one
 check on this container: the 2048 px proxy renders in **619 ms** against a **450 ms**
 guardrail. That guardrail was measured on a development machine roughly four times faster
 and assumes a GPU backend this build does not link. CI sets `AURA_PERF_HOST_SCALE=4` for
@@ -203,6 +204,11 @@ These are things this review verified directly, not claims copied from a documen
 ## 6. What this review found that the exit reports do not record
 
 Eight items. None is a correctness bug in shipped logic. Four are real process gaps.
+
+> **All eight are closed.** See [section 10](#10-what-was-done-about-section-6) for what was
+> changed and what each fix is and is not evidence of. The findings are left below exactly as
+> they were written, because a review edited into agreement with the work it prompted is a
+> review nobody can check.
 
 ### 6.1 Sixteen of the thirty phase gates never run in CI *(the most consequential finding)*
 
@@ -386,6 +392,117 @@ this review independently confirms:
 
 > The arithmetic is right, the refusals refuse, the bounds bind and the guarantees are
 > enforced where they are enforceable. **None of it is a claim about a wedding.**
+
+---
+
+## 10. What was done about section 6
+
+**Date:** 2026-09-03. Every item in section 6 is closed. Nothing in sections 7.1 or 7.2 is:
+those need camera files, consented weddings, a GPU backend, measured profiles, a certificate
+and photographers, and none of them can be closed by writing code.
+
+### 10.1 The eight items
+
+| # | Finding | What changed | Verified how |
+|---|---|---|---|
+| 6.1 | Sixteen of thirty phase gates ran in no CI job | `scripts/check-phase-gates.sh` runs all thirty and **refuses to run at all unless it finds thirty gate modules**, so adding a phase without wiring its gate in is a red build. New CI lane `phase-gates`; new `phases` release gate; `just phases`. | The script was run over all thirty gates on the reference machine. |
+| 6.2 | No `phase-12-verify` recipe | Added, in the position the other twenty-nine are in. | `just --list` |
+| 6.3 | The desktop shell is compiled by nothing | New CI lane `shell`: installs Tauri's Linux prerequisites, builds the front end, then `cargo check`, `cargo clippy -D warnings` and `cargo fmt --check` over `ui/src-tauri`. `just shell-check` is the local half. | **Not verified on the reference machine, and it cannot be.** See 10.2. |
+| 6.4 | 42 of 82 UI files unreachable from `main.tsx` | A workspace shell. Nine workspaces (`WorkspaceNav`), four new containers (`DevelopWorkspace`, `CleanupPanel`, `StoryPanel`, `StylePanel`), a per-photograph inspector rail (`Inspector`), a white-balance review queue (`ToneReviewQueue`), and `DuplicatePanel` wired into `MomentStack`. **0 of 89 unreachable.** | `src/reachability.test.ts`, which is the durable half of the fix: it walks the import graph from `main.tsx` and fails on one orphan. |
+| 6.5 | 1.9 MB of a tool's AST cache committed | `git rm -r crates/graphify-out`; `.gitignore` widened to `graphify-out/` so it cannot come back under another path. | `git status` |
+| 6.6 | `aura-cull` and `aura-explain` had no in-crate tests | 37 in `aura-cull` (fusion, sizing, modes, diversity) and 41 in `aura-explain` (calibration, policy, decision). Both crates take the `#![cfg_attr(test, allow(...))]` exemption phases 14 and 19 to 27 already use. | `cargo test -p aura-cull -p aura-explain --lib` |
+| 6.7 | `eval_cleanup.py` had no `--self-test` | Five cases, four of which make the metric fail. Wired into CI and into `just cleanup-eval`. | `python ml/models/generative/eval_cleanup.py --self-test` |
+| 6.8 | Doctests are run by nothing | `cargo test --workspace --doc` added to CI lane 2, to `just test` and as its own release gate. | Still zero doctests; the point is that the next one is compiled. |
+
+### 10.2 What these fixes are not evidence of
+
+**The shell fix is unverified here.** `ui/src-tauri` cannot be compiled on the reference
+Windows machine: the GNU toolchain has no `gcc` for the `cc` crate and the MSVC toolchain has
+no linker, which is the same absence the phase 03 notes record. The CI lane is written and is
+correct as far as reading it goes, and **the first CI run is what proves it** - if the shell
+has a type error, that run is where it appears. The lane is therefore a fix to the *process*
+gap, and it may yet reveal a code gap underneath.
+
+**Reachability is not usability.** `reachability.test.ts` proves a static import path exists
+from the entry point to every source file. It does not prove a panel is sized correctly, that
+its controls make sense next to each other, or that a photographer can find them. Nobody has
+used this application. The new shell has never been run, because it cannot be built here.
+
+**In-crate tests are not the eval harnesses.** The 78 new tests exercise arithmetic and
+refusals against inputs this repository authored, exactly as everything else in the product
+does. They are a regression net under a future refactor, which is what section 6.6 asked for;
+they are not new evidence about photographs.
+
+### 10.3 The shell's lockfile was nine crates out of date
+
+Attempting the shell build on the reference machine did not get far enough to type-check
+anything, but it got far enough to resolve dependencies - and `ui/src-tauri/Cargo.lock` moved by
+158 lines. It was missing **nine crates `aura-app` has depended on since phase 22**:
+`aura-brain-gallery`, `aura-curate`, `aura-delivery`, `aura-export`, `aura-generative`,
+`aura-geometry`, `aura-learn`, `aura-qc` and `aura-restore`.
+
+That is finding 6.3 as a fact rather than as an inference. A lockfile drifts only when nothing
+resolves against it, and this one had not been touched since roughly phase 21 while the crate it
+locks gained nine dependencies. The refreshed lockfile is committed with this work; whether the
+shell's *code* still type-checks against those nine crates is what the new CI lane answers, and
+nobody knows the answer yet.
+
+### 10.4 A second gate turned out to be host-sensitive, and nothing had noticed
+
+Section 2 recorded phase 14 as **the** host-sensitive gate. Running all thirty on the reference
+Windows machine found a second: phase 04's gateway-overhead row asserts 15 ms per cached call and
+measured **66.7 ms** here. The gap is the SQLite round trip the response cache does, which is disk
+speed rather than arithmetic.
+
+It was not visible before for a plain reason: **that row never honoured `AURA_PERF_HOST_SCALE`.**
+Phase 14's guardrail multiplies by `aura_perf::host_scale()` and phase 04's did not, so the
+container this review first ran on cleared 15 ms on that path and the question never came up. It
+does now: `phase04::overhead_budget_ms` applies the scale exactly as phase 14 does, the row reads
+`40.82 ms per call against a 60 ms budget` here, and the developer-machine figure in the source is
+unchanged. Sizes, counts and costs are still never scaled.
+
+That makes **two of thirty** gates host-sensitive rather than one, and both are timing rows on a
+build with no GPU backend. Any further gate that asserts a wall clock should reach for
+`aura_perf::host_scale()` in the same breath.
+
+The same machine needs `AURA_PERF_HOST_SCALE=6` rather than CI's 4 for `aura-perf` itself: at 4
+the three phase 14 CPU render rows miss by 3 %, 4 % and 34 % (1,850 ms against 1,800; 939 against
+900; 712 ms per megapixel against 532). At 6 **all 116 budget assertions pass**. Nothing in the
+render path was touched by this work, so the figures are a statement about the host, which is what
+the scale exists to say. It is worth writing down that a reference *developer* machine can be
+slower than a shared CI runner on a single-threaded floating-point path.
+
+### 10.5 One defect found while writing the tests
+
+`Calibrator::fit_isotonic` guarded on the number of *outcomes* and not on the fitted map, so a
+set of outcomes that were all correct, all wrong, or all at one confidence produced a
+"calibration" that returned **one constant for every input**. Its own doc comment had described
+returning the identity in exactly that case since phase 13, and nothing checked it - the crate
+had no unit tests, which is what finding 6.6 was about.
+
+The consequence would not have been subtle. A constant at 1.0 puts every decision in the
+product into the `Auto` band; a constant at 0.0 puts every decision into review; and either way
+the ordering the review queue is sorted by is destroyed. It is unreachable today because
+nothing is calibrated (condition C2 of the phase 13 exit report), and it would have become
+reachable on the first fit.
+
+`calibration::is_constant` is the fix and
+`a_fit_over_nothing_returns_the_identity_rather_than_a_constant` is the test. It is the same
+family as the defects the exit reports already record: **a guard written in a doc comment is
+not a guard**, and the way that is discovered is by writing a test that asserts what the
+comment says.
+
+### 10.6 What the counts are now
+
+| Thing | Was | Is |
+|---|---|---|
+| Phase gates run by CI | 14 of 30 | **30 of 30** |
+| Release gates | 9 | **11** |
+| UI source files unreachable from `main.tsx` | 42 of 82 | **0 of 89** |
+| UI tests | 456 | **491** |
+| In-crate tests in `aura-cull` / `aura-explain` | 0 / 0 | **37 / 41** |
+| Python eval harnesses with `--self-test` | 22 of 23 | **23 of 23** |
+| Anything compiling `ui/src-tauri` | nothing | **CI lane 4** |
 
 ---
 

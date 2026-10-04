@@ -74,6 +74,19 @@ const RECOMPOSE_MS: u128 = 1_500;
 /// Section 11's per-image monochrome row.
 const MIX_MS: u128 = 25;
 
+/// The three budgets above, at the speed of the machine actually running them.
+///
+/// Every other timing budget in this crate is multiplied by `aura_perf::host_scale`
+/// and this file was not, which is a phase 29 oversight rather than a decision:
+/// section 11's numbers are stated against a reference machine, and a budget that
+/// ignores the host is a budget that measures the host. The symptom was a
+/// re-composition landing at 1,522 ms against 1,500 - one and a half per cent
+/// over, in a debug build, on a loaded laptop - which says nothing at all about
+/// the algorithm the row exists to bound.
+fn scaled(budget_ms: u128) -> u128 {
+    budget_ms * u128::from(aura_perf::host_scale())
+}
+
 /// How many frames the pass budget is measured over.
 ///
 /// Six hundred rather than a thousand, because the pass is linear in frames and the budget is
@@ -170,7 +183,7 @@ fn a_whole_curation_is_inside_its_budget() {
     let outline = pass.run(project, None, None).expect("the pass runs");
     let elapsed = started.elapsed().as_millis();
 
-    let scaled = PASS_MS_PER_1K * u128::from(PASS_FRAMES) / 1_000;
+    let scaled = scaled(PASS_MS_PER_1K) * u128::from(PASS_FRAMES) / 1_000;
     println!(
         "curation: {} frames in {} ms (budget {} ms at this size, {} ms per 1,000)",
         PASS_FRAMES, elapsed, scaled, PASS_MS_PER_1K
@@ -236,15 +249,17 @@ fn a_re_composition_after_a_drag_is_inside_its_budget() {
         .expect("the album re-composes");
     let elapsed = started.elapsed().as_millis();
 
+    let budget = scaled(RECOMPOSE_MS);
     println!(
-        "re-composition: {} images in {} ms (budget {} ms)",
+        "re-composition: {} images in {} ms (budget {} ms, {} ms on the reference machine)",
         order.len(),
         elapsed,
+        budget,
         RECOMPOSE_MS
     );
     assert!(
-        elapsed <= RECOMPOSE_MS,
-        "a re-composition took {elapsed} ms against a {RECOMPOSE_MS} ms budget"
+        elapsed <= budget,
+        "a re-composition took {elapsed} ms against a {budget} ms budget"
     );
 }
 
@@ -265,18 +280,19 @@ fn one_monochrome_mix_is_inside_its_budget() {
     let elapsed = started.elapsed().as_micros();
 
     let per_image = elapsed / u128::from(PASS_FRAMES);
+    let budget_us = scaled(MIX_MS) * 1_000;
     println!(
-        "monochrome: {} frames read in {} us, {} us each (budget {} ms), {} offered",
+        "monochrome: {} frames read in {} us, {} us each (budget {} us, {} ms on the reference          machine), {} offered",
         PASS_FRAMES,
         elapsed,
         per_image,
+        budget_us,
         MIX_MS,
         picks.len()
     );
     assert!(
-        per_image <= MIX_MS * 1_000,
-        "a mix took {per_image} us against a {} us budget",
-        MIX_MS * 1_000
+        per_image <= budget_us,
+        "a mix took {per_image} us against a {budget_us} us budget"
     );
 }
 

@@ -67,38 +67,7 @@ impl Default for GoogleProvider {
 /// The shipped alias table.
 #[must_use]
 pub fn default_aliases() -> BTreeMap<Tier, ModelAlias> {
-    let mut aliases = BTreeMap::new();
-    aliases.insert(
-        Tier::Reasoning,
-        ModelAlias {
-            model: "gemini-2.5-pro".to_string(),
-            input_per_mtok_usd: 1.25,
-            output_per_mtok_usd: 10.00,
-            image_tokens_per_mpixel: 500,
-            max_output_tokens: 8_192,
-        },
-    );
-    aliases.insert(
-        Tier::Balanced,
-        ModelAlias {
-            model: "gemini-2.5-flash".to_string(),
-            input_per_mtok_usd: 0.30,
-            output_per_mtok_usd: 2.50,
-            image_tokens_per_mpixel: 500,
-            max_output_tokens: 8_192,
-        },
-    );
-    aliases.insert(
-        Tier::Cheap,
-        ModelAlias {
-            model: "gemini-2.5-flash-lite".to_string(),
-            input_per_mtok_usd: 0.10,
-            output_per_mtok_usd: 0.40,
-            image_tokens_per_mpixel: 500,
-            max_output_tokens: 4_096,
-        },
-    );
-    aliases
+    crate::catalog::spec(ProviderKind::Google).aliases()
 }
 
 impl Provider for GoogleProvider {

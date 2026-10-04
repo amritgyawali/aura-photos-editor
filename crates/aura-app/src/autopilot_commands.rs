@@ -247,9 +247,7 @@ impl AppRunner {
             .catalog()
             .read(move |conn: &rusqlite::Connection| {
                 conn.query_row(
-                    "SELECT COUNT(*) FROM cull_keep k
-                   JOIN cull_run r ON r.run_id = k.run_id
-                  WHERE r.project_id = ?1",
+                    "SELECT COUNT(*) FROM selection WHERE project_id = ?1",
                     rusqlite::params![key],
                     |row| row.get::<_, i64>(0),
                 )

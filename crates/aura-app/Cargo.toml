@@ -9,6 +9,7 @@ publish.workspace      = true
 description = "AURA application layer: typed IPC command surface shared by the desktop shell and the CLI."
 
 [dependencies]
+dirs.workspace = true
 aura-core    = { path = "../aura-core" }
 aura-catalog = { path = "../aura-catalog" }
 aura-ingest  = { path = "../aura-ingest" }

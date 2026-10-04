@@ -221,6 +221,17 @@ fn import_root(
 /// The version string stamped onto rows this crate writes.
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// Roots and cameras belong to a project. Hashing only a path or serial makes
+// their primary keys collide when a photographer starts another project.
+// Existing rows retain their IDs through the repository's scoped upserts.
+fn project_scoped_id(prefix: &str, project_id: &str, value: &str) -> String {
+    let mut hash = blake3::Hasher::new();
+    hash.update(project_id.as_bytes());
+    hash.update(&[0]);
+    hash.update(value.as_bytes());
+    format!("{prefix}_{}", hash.finalize().to_hex())
+}
+
 fn register_root(
     catalog: &Catalog,
     plan: &ImportPlan,
@@ -231,10 +242,7 @@ fn register_root(
         return Err(aura_core::errors::io::not_found(root));
     }
     let row = SourceRootRow {
-        root_id: format!(
-            "src_{}",
-            blake3::hash(root.to_string_lossy().as_bytes()).to_hex()
-        ),
+        root_id: project_scoped_id("src", &plan.project_id.to_db(), &root.to_string_lossy()),
         project_id: plan.project_id.to_db(),
         abs_path: root.to_string_lossy().to_string(),
         volume_label: None,
@@ -453,7 +461,7 @@ fn record_camera_and_gps(
 
     if let Some(serial) = camera_key(facts) {
         let camera = CameraRow {
-            camera_id: format!("cam_{}", blake3::hash(serial.as_bytes()).to_hex()),
+            camera_id: project_scoped_id("cam", project_id, &serial),
             project_id: project_id.to_string(),
             make: facts.camera_make.clone(),
             model: facts.camera_model.clone(),

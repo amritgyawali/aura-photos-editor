@@ -732,7 +732,7 @@ impl EmotionPass {
         self.store.catalog().read(move |conn| {
             let mut statement = conn
                 .prepare(
-                    "SELECT p.photo_id, p.timeline_time, mi.moment_id, COALESCE(p.camera_id, '')
+                    "SELECT p.photo_id, p.timeline_time, mi.moment_id, COALESCE(p.camera_serial, '')
                        FROM photo p
                        JOIN image_interaction e ON e.photo_id = p.photo_id
                        LEFT JOIN moment_images mi ON mi.photo_id = p.photo_id

@@ -9,7 +9,7 @@ Everything here exists to make that unlikely, and recoverable when it happens an
 
 ## The checklist
 
-`ops/release/release.toml` is the gate. `ops/release/check.sh` runs it. Nine things have to be
+`ops/release/release.toml` is the gate. `ops/release/check.sh` runs it. Eleven things have to be
 green, and each one names who owns it and why it is there:
 
 | Gate | What it catches |
@@ -20,9 +20,16 @@ green, and each one names who owns it and why it is there:
 | `contracts` | A frozen contract that moved without an ADR and a re-lock. |
 | `models` | An unsigned manifest, a digest that moved, a model with no card. |
 | `tests` | The workspace suite. |
+| `doctests` | A documentation example that stopped compiling. `--all-targets` does not cover them. |
+| `phases` | All thirty phase gates, through `scripts/check-phase-gates.sh`. |
 | `budgets` | Every performance budget in `perf/budgets.toml`, as assertions. |
 | `ui` | The front end's own tests and its type check. |
 | `ipc` | The three files that have to agree about the command surface. |
+
+`doctests` and `phases` were added after the independent review of phases 01 to 30. The `tests`
+row had claimed to include the phase gates and did not - they are `aura-cli verify` subcommands
+rather than test functions - so sixteen of the thirty ran nowhere on a push, phase 30's delivery
+guarantee and phase 13's unattended-operation check among them.
 
 Four sign-offs follow, by role rather than by name, so a release is never blocked on one person
 being awake.

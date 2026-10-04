@@ -6,13 +6,13 @@ use std::path::PathBuf;
 use aura_catalog::model::ProjectRow;
 use aura_catalog::repo::PhotoOrder;
 use aura_catalog::{repo, rfc3339};
-use aura_core::progress::{CancelToken, NullProgress};
+use aura_core::progress::CancelToken;
 use aura_core::{ImportId, ProjectId};
 use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 
 use crate::contract::ipc::{
-    CreateProjectInput, ImageRowLite, JobHandle, ListImagesInput, ProblemRow, ProjectHandle,
-    ProjectSummary, SetCameraLabelInput, StartIngestInput,
+    CreateProjectInput, ImageRowLite, IngestProgressDto, JobHandle, ListImagesInput, ProblemRow,
+    ProjectHandle, ProjectSummary, SetCameraLabelInput, StartIngestInput,
 };
 use crate::state::AppState;
 
@@ -97,6 +97,7 @@ pub fn start_ingest(state: &AppState, input: &StartIngestInput) -> IpcResult<Job
     let job_id = import_id.to_db();
     let cancel = CancelToken::new();
     state.register_job(&job_id, cancel.clone());
+    let counter = state.register_import(&job_id);
 
     let plan = ImportPlan {
         import_id,
@@ -105,7 +106,7 @@ pub fn start_ingest(state: &AppState, input: &StartIngestInput) -> IpcResult<Job
         mode: ImportMode::Reference,
         extensions: Vec::new(),
         extract_embedded_previews: false,
-        settle_window_ms: 2_000,
+        settle_window_ms: 0,
     };
 
     let worker_state = state.clone();
@@ -113,7 +114,8 @@ pub fn start_ingest(state: &AppState, input: &StartIngestInput) -> IpcResult<Job
     std::thread::Builder::new()
         .name("aura-ingest".into())
         .spawn(move || {
-            let outcome = aura_ingest::run(worker_state.catalog(), &plan, &cancel, &NullProgress);
+            let progress = crate::state::CountingProgress::new(counter);
+            let outcome = aura_ingest::run(worker_state.catalog(), &plan, &cancel, &progress);
             match outcome {
                 Ok(report) => tracing::info!(
                     target: "ingest",
@@ -130,6 +132,7 @@ pub fn start_ingest(state: &AppState, input: &StartIngestInput) -> IpcResult<Job
                     "import failed"
                 ),
             }
+            worker_state.finish_import(&worker_job_id);
             worker_state.finish_job(&worker_job_id);
         })
         .map_err(|e| {
@@ -140,6 +143,38 @@ pub fn start_ingest(state: &AppState, input: &StartIngestInput) -> IpcResult<Job
         })?;
 
     Ok(JobHandle { job_id })
+}
+
+/// How far one import has got.
+///
+/// Polled rather than pushed. The shell has an event bus and this could ride it, but a bar
+/// driven by events goes wrong in one specific way: a dropped event leaves the panel showing a
+/// number that will never be corrected, and the last event is the one that says the run is
+/// over. Asking is dull and cannot get stuck.
+///
+/// `running` false with `done == total` is a finished import; `running` false with `done`
+/// short of `total` is one that was stopped or failed. `known` false means this process never
+/// started that job - after a window reload, say - and the panel should stop drawing a bar
+/// rather than show a run it cannot see the end of.
+///
+/// # Errors
+///
+/// Never. The signature matches the rest of the surface.
+pub fn ingest_progress(state: &AppState, job_id: &str) -> IpcResult<IngestProgressDto> {
+    Ok(match state.import_watch(job_id) {
+        Some((done, total, running)) => IngestProgressDto {
+            known: true,
+            done,
+            total,
+            running,
+        },
+        None => IngestProgressDto {
+            known: false,
+            done: 0,
+            total: 0,
+            running: false,
+        },
+    })
 }
 
 /// Ask a running import to stop. Cancellation is cooperative and typed.
