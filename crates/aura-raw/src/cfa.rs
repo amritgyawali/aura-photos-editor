@@ -126,20 +126,20 @@ fn crop_to_picture(plane: Mosaic, mosaic: &MosaicRef) -> Mosaic {
         return plane;
     }
     let stride = plane.width as usize;
-    let mut cropped = Vec::with_capacity(w as usize * h as usize);
+    let mut pixels = Vec::with_capacity(w as usize * h as usize);
     for row in y as usize..(y + h) as usize {
         let start = row * stride + x as usize;
         if let Some(line) = plane.data.get(start..start + w as usize) {
-            cropped.extend_from_slice(line);
+            pixels.extend_from_slice(line);
         }
     }
-    if cropped.len() != w as usize * h as usize {
+    if pixels.len() != w as usize * h as usize {
         return plane;
     }
     Mosaic {
         width: w,
         height: h,
-        data: cropped,
+        data: pixels,
     }
 }
 

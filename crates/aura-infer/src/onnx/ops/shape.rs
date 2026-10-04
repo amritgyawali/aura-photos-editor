@@ -203,25 +203,31 @@ pub(super) fn transpose(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Ve
     let mut output = Tensor::zeros(shape.clone());
 
     let source_strides = strides(&input.shape);
-    let count = element_count(&shape);
-    for index in 0..count {
-        // Walk the destination in order, so the writes are sequential and the
-        // reads scatter - the cheaper direction for cache and the only one that
-        // keeps the loop free of a division per axis on the write side.
-        let mut remaining = index;
-        let mut source = 0usize;
-        for (axis, size) in shape.iter().enumerate() {
-            let stride: usize = shape.get(axis + 1..).map_or(1, element_count);
-            let extent = (*size).max(1);
-            let coordinate = remaining
-                .checked_div(stride)
-                .map_or(0, |steps| steps % extent);
-            remaining -= coordinate * stride;
-            let source_axis = perm.get(axis).copied().unwrap_or(0);
-            source += coordinate * source_strides.get(source_axis).copied().unwrap_or(1);
-        }
-        if let Some(slot) = output.data.get_mut(index) {
-            *slot = sample(input, source);
+    // Walk the destination in order, so the writes are sequential and the reads
+    // scatter - the cheaper direction for cache. An odometer over the destination
+    // coordinates moves the source index by the permuted stride of whichever axis
+    // ticked, with no division per element.
+    let steps: Vec<usize> = perm
+        .iter()
+        .map(|axis| source_strides.get(*axis).copied().unwrap_or(1))
+        .collect();
+    let mut coordinate = vec![0usize; rank];
+    let mut source = 0usize;
+    for slot in &mut output.data {
+        *slot = sample(input, source);
+        for axis in (0..rank).rev() {
+            let (Some(c), Some(size), Some(step)) =
+                (coordinate.get_mut(axis), shape.get(axis), steps.get(axis))
+            else {
+                break;
+            };
+            *c += 1;
+            source += step;
+            if *c < *size {
+                break;
+            }
+            source -= step * *c;
+            *c = 0;
         }
     }
     Ok(vec![Value::Float(output)])

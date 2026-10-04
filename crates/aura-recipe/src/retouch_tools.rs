@@ -2,9 +2,15 @@
 use crate::{errors::recipe_invalid, Recipe};
 use aura_core::AuraResult;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub const KEY: &str = "studio_retouch_v1";
+/// Segmentation mattes that retouch operations refer to by id. ADR-0082.
+pub const MATTE_KEY: &str = "studio_retouch_mattes_v1";
 pub const MAX_EDITS: usize = 256;
+pub const MAX_MATTES: usize = 64;
+/// At most this many cells per matte; the renderer refines its edges at full resolution.
+pub const MAX_MATTE_CELLS: usize = 256 * 256;
 pub const MAX_STROKES: usize = 128;
 pub const MAX_POINTS: usize = 8192;
 
@@ -131,6 +137,141 @@ pub struct Edit {
     pub skin: Option<SkinSettings>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection: Option<Selection>,
+    /// A segmentation matte from [`MATTE_KEY`] that limits the operation to, for example,
+    /// one person's face skin. Multiplies the region, brush and selection coverage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matte: Option<String>,
+}
+
+/// A soft selection measured by the skin segmenter, stored compactly. ADR-0082.
+///
+/// `data` is base64 of a run-length code: each byte is `(level << 4) | (run - 1)`, where
+/// `level` is coverage in fifteenths (0..15, decoded as `level * 17`) and `run` is 1..16 cells
+/// in row-major order. Sixteen levels are enough because the renderer re-derives the soft
+/// edge from the photograph itself.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct Matte {
+    /// Normalized left, top, right, bottom of the grid.
+    pub bounds: [f32; 4],
+    pub width: u32,
+    pub height: u32,
+    pub data: String,
+}
+
+const BASE64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+fn base64_encode(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b = [
+            chunk.first().copied().unwrap_or(0),
+            chunk.get(1).copied().unwrap_or(0),
+            chunk.get(2).copied().unwrap_or(0),
+        ];
+        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
+        for (k, shift) in [18_u32, 12, 6, 0].into_iter().enumerate() {
+            if k <= chunk.len() {
+                out.push(char::from(
+                    BASE64
+                        .get(((n >> shift) & 63) as usize)
+                        .copied()
+                        .unwrap_or(b'A'),
+                ));
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+fn base64_decode(text: &str) -> Option<Vec<u8>> {
+    let bytes = text.as_bytes();
+    if !bytes.len().is_multiple_of(4) {
+        return None;
+    }
+    let value = |c: u8| -> Option<u32> {
+        BASE64
+            .iter()
+            .position(|v| *v == c)
+            .and_then(|p| u32::try_from(p).ok())
+    };
+    let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
+    for chunk in bytes.chunks(4) {
+        let pad = chunk.iter().rev().take_while(|c| **c == b'=').count();
+        if pad > 2 {
+            return None;
+        }
+        let mut n = 0_u32;
+        for (k, c) in chunk.iter().enumerate() {
+            let v = if k >= 4 - pad { 0 } else { value(*c)? };
+            n = (n << 6) | v;
+        }
+        let decoded = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
+        out.extend_from_slice(decoded.get(..3 - pad)?);
+    }
+    Some(out)
+}
+
+impl Matte {
+    /// Encode coverage values (0..=255, row-major, `width * height` of them).
+    #[must_use]
+    pub fn encode(bounds: [f32; 4], width: u32, height: u32, alpha: &[u8]) -> Self {
+        let mut runs: Vec<u8> = Vec::new();
+        let mut current: Option<(u8, u8)> = None;
+        for value in alpha {
+            let level = ((u16::from(*value) * 15 + 127) / 255) as u8;
+            current = match current {
+                Some((l, run)) if l == level && run < 16 => Some((l, run + 1)),
+                Some((l, run)) => {
+                    runs.push((l << 4) | (run - 1));
+                    Some((level, 1))
+                }
+                None => Some((level, 1)),
+            };
+        }
+        if let Some((l, run)) = current {
+            runs.push((l << 4) | (run - 1));
+        }
+        Self {
+            bounds,
+            width,
+            height,
+            data: base64_encode(&runs),
+        }
+    }
+
+    /// Coverage values 0..=255, row-major, or `None` when the data does not decode to exactly
+    /// `width * height` cells.
+    #[must_use]
+    pub fn decode(&self) -> Option<Vec<u8>> {
+        let cells = (self.width as usize).checked_mul(self.height as usize)?;
+        if cells == 0 || cells > MAX_MATTE_CELLS {
+            return None;
+        }
+        let mut out = Vec::with_capacity(cells);
+        for byte in base64_decode(&self.data)? {
+            let level = (byte >> 4) * 17;
+            for _ in 0..=(byte & 15) {
+                out.push(level);
+            }
+            if out.len() > cells {
+                return None;
+            }
+        }
+        (out.len() == cells).then_some(out)
+    }
+
+    fn valid(&self) -> bool {
+        let [l, t, r, b] = self.bounds;
+        self.bounds
+            .iter()
+            .all(|v| v.is_finite() && (0.0..=1.0).contains(v))
+            && r > l
+            && b > t
+            && self.decode().is_some()
+    }
 }
 
 /// Validate retouch parameters and aggregate authoring limits.
@@ -227,6 +368,7 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
 /// # Errors
 /// Returns a recipe error if the stored extension is malformed or fails validation.
 pub fn read(recipe: &Recipe) -> AuraResult<Vec<Edit>> {
+    read_mattes(recipe)?;
     let Some(value) = recipe.extra.get(KEY) else {
         return Ok(Vec::new());
     };
@@ -236,12 +378,69 @@ pub fn read(recipe: &Recipe) -> AuraResult<Vec<Edit>> {
     Ok(edits)
 }
 
-/// Store validated native operations without modifying other recipe fields.
+/// Read and validate the segmentation mattes retouch operations refer to.
 ///
 /// # Errors
-/// Returns a recipe error if validation or serialization fails.
-pub fn write(recipe: &mut Recipe, edits: &[Edit]) -> AuraResult<()> {
+/// Returns a recipe error if the stored mattes are malformed or too many.
+pub fn read_mattes(recipe: &Recipe) -> AuraResult<BTreeMap<String, Matte>> {
+    let Some(value) = recipe.extra.get(MATTE_KEY) else {
+        return Ok(BTreeMap::new());
+    };
+    let mattes: BTreeMap<String, Matte> = serde_json::from_value(value.clone())
+        .map_err(|_| recipe_invalid(MATTE_KEY, "invalid matte format"))?;
+    if mattes.len() > MAX_MATTES
+        || mattes
+            .iter()
+            .any(|(id, m)| id.is_empty() || id.len() > 100 || !m.valid())
+    {
+        return Err(recipe_invalid(MATTE_KEY, "invalid or too many mattes"));
+    }
+    Ok(mattes)
+}
+
+/// Store operations together with the mattes they use. Mattes no operation refers to are
+/// dropped, so removing an automatic operation never leaves its selection behind.
+///
+/// # Errors
+/// Returns a recipe error if validation or serialization fails, or an operation refers to
+/// a matte that is not given.
+pub fn write_with_mattes(
+    recipe: &mut Recipe,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
+) -> AuraResult<()> {
     validate(edits)?;
+    let used: BTreeMap<String, Matte> = mattes
+        .iter()
+        .filter(|(id, _)| {
+            edits
+                .iter()
+                .any(|e| e.matte.as_deref() == Some(id.as_str()))
+        })
+        .map(|(id, m)| (id.clone(), m.clone()))
+        .collect();
+    if edits
+        .iter()
+        .filter_map(|e| e.matte.as_deref())
+        .any(|id| !used.contains_key(id))
+    {
+        return Err(recipe_invalid(
+            MATTE_KEY,
+            "an operation refers to a missing matte",
+        ));
+    }
+    if used.len() > MAX_MATTES || used.values().any(|m| !m.valid()) {
+        return Err(recipe_invalid(MATTE_KEY, "invalid or too many mattes"));
+    }
+    if used.is_empty() {
+        recipe.extra.remove(MATTE_KEY);
+    } else {
+        recipe.extra.insert(
+            MATTE_KEY.into(),
+            serde_json::to_value(&used)
+                .map_err(|_| recipe_invalid(MATTE_KEY, "cannot serialize mattes"))?,
+        );
+    }
     // Keep an empty array after clearing so merge records the deletion as a user edit.
     recipe.extra.insert(
         KEY.into(),
@@ -249,6 +448,17 @@ pub fn write(recipe: &mut Recipe, edits: &[Edit]) -> AuraResult<()> {
             .map_err(|_| recipe_invalid(KEY, "cannot serialize retouch operations"))?,
     );
     Ok(())
+}
+
+/// Store validated native operations without modifying other recipe fields.
+///
+/// # Errors
+/// Returns a recipe error if validation or serialization fails.
+pub fn write(recipe: &mut Recipe, edits: &[Edit]) -> AuraResult<()> {
+    validate(edits)?;
+    // Losing a skin matte must never turn a skin-only operation into a broad brush edit.
+    let mattes = read_mattes(recipe)?;
+    write_with_mattes(recipe, edits, &mattes)
 }
 
 fn validate_selection(edit: &Edit) -> AuraResult<()> {
@@ -287,4 +497,65 @@ fn validate_selection(edit: &Edit) -> AuraResult<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+mod matte_tests {
+    use super::*;
+
+    #[test]
+    fn writing_a_missing_or_corrupt_matte_never_expands_the_selection() {
+        let mut recipe = crate::fixtures::neutral(crate::fixtures::FIXTURE_HASH, "test");
+        let edit: Edit = serde_json::from_value(serde_json::json!({
+            "id": "skin", "tool": "dodge", "enabled": true,
+            "region": [0.5, 0.5, 1.0, 1.0], "source": null,
+            "amount": 0.5, "feather": 0.0, "radius": 0.01,
+            "texture": 1.0, "tone": 0.5, "warmth": 0.0, "tint": 0.0,
+            "matte": "missing-skin"
+        }))
+        .unwrap();
+        let before = recipe.clone();
+        assert!(write(&mut recipe, &[edit]).is_err());
+        assert_eq!(recipe.extra, before.extra);
+        recipe
+            .extra
+            .insert(MATTE_KEY.into(), serde_json::json!({"broken": 5}));
+        assert!(write(&mut recipe, &[]).is_err());
+    }
+
+    #[test]
+    fn mattes_round_trip_through_sixteen_levels_and_refuse_bad_data() {
+        let alpha: Vec<u8> = (0..37 * 23)
+            .map(|i| {
+                if i % 37 < 10 {
+                    0
+                } else if i % 37 < 30 {
+                    255
+                } else {
+                    (i * 7 % 256) as u8
+                }
+            })
+            .collect();
+        let matte = Matte::encode([0.1, 0.2, 0.6, 0.9], 37, 23, &alpha);
+        let decoded = matte.decode().unwrap();
+        assert_eq!(decoded.len(), alpha.len());
+        for (a, b) in alpha.iter().zip(&decoded) {
+            assert!(a.abs_diff(*b) <= 9, "{a} {b}");
+        }
+        assert!(matte.valid());
+        // Long uniform runs compress to a byte per sixteen cells.
+        let flat = Matte::encode([0.0, 0.0, 1.0, 1.0], 256, 256, &vec![255; 256 * 256]);
+        assert!(flat.data.len() < 6000, "{}", flat.data.len());
+        assert_eq!(flat.decode().unwrap().len(), 256 * 256);
+        let mut short = matte.clone();
+        short.width += 1;
+        assert!(short.decode().is_none());
+        let mut garbage = matte.clone();
+        garbage.data = "!!!!".into();
+        assert!(garbage.decode().is_none());
+        let mut inverted = matte;
+        inverted.bounds = [0.6, 0.2, 0.1, 0.9];
+        assert!(!inverted.valid());
+    }
 }

@@ -622,6 +622,7 @@ pub fn analyse(
                 tint: 0.0,
                 mask: None,
                 skin: None,
+                matte: None,
                 selection: Some(Selection {
                     inverted: false,
                     gradient: Some(Gradient {
@@ -1067,7 +1068,10 @@ fn run_with(
             retouch_tools::validate(&stack)?;
             if !stack.is_empty() || merged.extra.contains_key(retouch_tools::KEY) {
                 let mut with_stack = merged.clone();
-                retouch_tools::write(&mut with_stack, &stack)?;
+                // Mattes for the planned operations, plus any already stored for the
+                // photographer's own operations.
+                let mattes = portrait_auto::mattes_for(&current, &portrait)?;
+                retouch_tools::write_with_mattes(&mut with_stack, &stack, &mattes)?;
                 let source = if retouch_owned {
                     EditSource::User
                 } else {
@@ -1192,6 +1196,7 @@ mod tests {
             mask: None,
             skin: None,
             selection: None,
+            matte: None,
         };
         let manual = edit("manual");
         let skin = edit("auto-portrait-v1-0-texture");

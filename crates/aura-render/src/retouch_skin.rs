@@ -156,6 +156,19 @@ fn correction(
     }
 }
 
+/// 1 for skin-bright pixels, falling to 0 for pixels under a third of the sample's brightness.
+fn hair_guard(p: [f32; 3], sample: [f32; 3]) -> f32 {
+    let ratio = luma(p) / luma(sample).max(EPSILON);
+    let t = ((ratio - 0.3) / 0.2).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Whether colour likeness to the sample limits the operation: always for brush and region
+/// selections, and for a segmentation matte only when skin settings are given as well.
+fn uses_colour(edit: &Edit) -> bool {
+    edit.matte.is_none() || edit.skin.is_some()
+}
+
 /// Skin connected to the sample point, as a soft 0..1 weight over `coverage.bounds`.
 ///
 /// A flood fill on a coarse grid of cell means: a cell joins when its colour is close to the
@@ -314,7 +327,12 @@ pub(crate) fn selection(
 ) -> Vec<f32> {
     let settings = edit.skin.unwrap_or_default();
     let connected = connected_weight(rgb, w, h, edit, coverage);
-    let sample = edit.source.map(|p| reference(rgb, w, h, p));
+    // A segmentation matte already says which pixels are this person's skin; colour likeness
+    // to one sample is then only applied when the operation asks for it explicitly.
+    let sample = edit
+        .source
+        .filter(|_| uses_colour(edit))
+        .map(|p| reference(rgb, w, h, p));
     let [x0, y0, x1, y1] = coverage.bounds;
     let mut out = vec![0.0; w * h];
     for y in y0..y1 {
@@ -375,6 +393,7 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
         wide.push(broad);
     }
     let connected = connected_weight(rgb, w, h, edit, coverage);
+    let colour = uses_colour(edit);
     for y in y0..y1 {
         for x in x0..x1 {
             let i = (y * w + x) * 3;
@@ -389,14 +408,18 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
             });
             // Selection checks the original pixel as well as its neighborhood, so
             // averaging across a lip/hair/background boundary cannot paint over it.
-            let alpha = reach
-                * coverage.at(x, y, w, h)
-                * edit.amount
-                * affinity(old, sample, settings.tolerance).min(affinity(
+            let likeness = if colour {
+                affinity(old, sample, settings.tolerance).min(affinity(
                     low,
                     sample,
                     settings.tolerance,
-                ));
+                ))
+            } else {
+                // A matte is coarser than a lash, a brow hair or stubble. Pixels far darker
+                // than the sampled skin are hair, not skin, at any resolution: never lift them.
+                hair_guard(old, sample)
+            };
+            let alpha = reach * coverage.at(x, y, w, h) * edit.amount * likeness;
             if alpha <= 0.0 {
                 continue;
             }

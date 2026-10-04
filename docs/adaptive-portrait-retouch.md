@@ -24,7 +24,7 @@ Undo restores the prior version. Manual merges and snapshot restoration carry
 user provenance rather than inheriting the preceding automatic pass's label.
 
 The pinned YuNet weights are unchanged. Detection policy is
-`yunet-2023mar-aura320-rotation-v2`; planner policy is `sample-consensus-v2`.
+`yunet-2023mar-aura320-rotation-v2`; planner policy is `sample-consensus-v3`.
 No cloud service, account or model download is needed. No-face images can take
 longer because of bounded orientation fallbacks. `AURA_DISABLE_AUTO_PORTRAIT=1`
 still disables automatic portrait analysis.

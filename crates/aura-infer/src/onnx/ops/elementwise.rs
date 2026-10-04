@@ -183,16 +183,61 @@ where
     let shape = broadcast_shape(&left.shape, &right.shape, op)?;
     let count = element_count(&shape);
 
-    let mut output = Tensor::zeros(shape.clone());
-    for index in 0..count {
-        let coordinate = unravel(index, &shape);
-        let a = sample(left, ravel(&coordinate, &left.shape));
-        let b = sample(right, ravel(&coordinate, &right.shape));
-        if let Some(slot) = output.data.get_mut(index) {
-            *slot = f(a, b);
+    if left.shape == right.shape && left.data.len() == count && right.data.len() == count {
+        return Ok(vec![Value::Float(Tensor {
+            shape,
+            data: left
+                .data
+                .iter()
+                .zip(&right.data)
+                .map(|(a, b)| f(*a, *b))
+                .collect(),
+        })]);
+    }
+    // Walk the output in order with an odometer; each operand advances by its own
+    // stride, which is zero along a broadcast axis. Same arithmetic as indexing every
+    // coordinate, without a division or an allocation per element.
+    let strides_of = |operand: &[usize]| -> Vec<usize> {
+        let rank = shape.len();
+        let offset = rank - operand.len();
+        let mut strides = vec![0usize; rank];
+        let mut stride = 1usize;
+        for axis in (0..operand.len()).rev() {
+            let size = operand.get(axis).copied().unwrap_or(1);
+            if let Some(slot) = strides.get_mut(axis + offset) {
+                *slot = if size == 1 { 0 } else { stride };
+            }
+            stride *= size;
+        }
+        strides
+    };
+    let (left_strides, right_strides) = (strides_of(&left.shape), strides_of(&right.shape));
+    let mut coordinate = vec![0usize; shape.len()];
+    let (mut a_index, mut b_index) = (0usize, 0usize);
+    let mut values = Vec::with_capacity(count);
+    for _ in 0..count {
+        values.push(f(sample(left, a_index), sample(right, b_index)));
+        for axis in (0..shape.len()).rev() {
+            let (Some(c), Some(size)) = (coordinate.get_mut(axis), shape.get(axis)) else {
+                break;
+            };
+            let a_step = left_strides.get(axis).copied().unwrap_or(0);
+            let b_step = right_strides.get(axis).copied().unwrap_or(0);
+            *c += 1;
+            a_index += a_step;
+            b_index += b_step;
+            if *c < *size {
+                break;
+            }
+            a_index -= a_step * *c;
+            b_index -= b_step * *c;
+            *c = 0;
         }
     }
-    Ok(vec![Value::Float(output)])
+    Ok(vec![Value::Float(Tensor {
+        shape,
+        data: values,
+    })])
 }
 
 /// Numpy broadcasting: align from the right, each dimension must match or be 1.
@@ -219,29 +264,4 @@ fn dimension_from_right(shape: &[usize], from_right: usize) -> usize {
     } else {
         shape.get(shape.len() - from_right).copied().unwrap_or(1)
     }
-}
-
-/// Turn a flat index into coordinates in a shape.
-fn unravel(mut index: usize, shape: &[usize]) -> Vec<usize> {
-    let mut coordinate = vec![0usize; shape.len()];
-    for axis in (0..shape.len()).rev() {
-        let size = shape.get(axis).copied().unwrap_or(1).max(1);
-        if let Some(slot) = coordinate.get_mut(axis) {
-            *slot = index % size;
-        }
-        index /= size;
-    }
-    coordinate
-}
-
-/// Turn coordinates into a flat index, folding broadcast dimensions to zero.
-fn ravel(coordinate: &[usize], shape: &[usize]) -> usize {
-    let mut index = 0usize;
-    let offset = coordinate.len().saturating_sub(shape.len());
-    for (axis, size) in shape.iter().enumerate() {
-        let value = coordinate.get(axis + offset).copied().unwrap_or(0);
-        let value = if *size == 1 { 0 } else { value };
-        index = index * size + value;
-    }
-    index
 }

@@ -14,9 +14,11 @@ import './precision-retouch.css';
 export function automaticLabel(id: string): string {
   const scene = /^auto-scene-v\d+-/.exec(id);
   if (scene) return ' · Auto (scene)';
-  const face = /^auto-portrait-v\d+-(\d+)-(body-)?/.exec(id);
+  if (/^auto-portrait-v\d+-backdrop$/.test(id)) return ' · Auto (backdrop)';
+  const face = /^auto-portrait-v\d+-(\d+)-(body-|lines-neck|hair-|fabric)?/.exec(id);
   if (!face) return '';
-  return ` · Auto (${face[2] ? 'body' : 'face'} ${Number(face[1]) + 1})`;
+  const kind = face[2] === 'hair-' ? 'hair' : face[2] === 'fabric' ? 'clothes' : face[2] ? 'body' : 'face';
+  return ` · Auto (${kind} ${Number(face[1]) + 1})`;
 }
 
 export function NativeRetouchWorkspace({projectId, photoId, disabled = false, revision = 0, onClose, onBusyChange}: {
@@ -156,7 +158,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           try { await nativeRetouch.autoRetouch(projectId,photoId,options); }
           finally { if(mounted.current)setAnalysing(false); }
         })}/>
-        <p className="lr-hint">Automatically finds faces and samples cheek/forehead skin. All resulting steps can be edited below or undone.</p>
+        <p className="lr-hint">Detects face and body skin locally. Reuse detected skin selections in any retouch tool, preview the mask, or refine it with the brush. All steps can be edited or undone.</p>
         <PortraitAutoReport recipe={recipe}/>
         {dirty&&<p className="lr-hint">{draftNotice}</p>}
         <details open><summary>Saved retouch operations ({edits.length})</summary>
@@ -172,9 +174,9 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           </li>)}</ol>
         </details>
       </div>
-      <RetouchControls draft={draft} selected={selected} count={edits.length} disabled={blocked||!preview} sourceMode={sourceMode} live={live} dirty={dirty}
+      <RetouchControls draft={draft} edits={edits} selected={selected} count={edits.length} disabled={blocked||!preview} sourceMode={sourceMode} live={live} dirty={dirty}
         onChange={change} onTool={chooseTool} onSourceMode={()=>{setSourceMode(v=>!v);setCompare(false);setMaskView(false);setSplit(false);}} onLive={setLive} onApply={apply}
-        onSelectAll={()=>{setMode('ellipse');change({region:[.5,.5,1,1],mask:null,feather:0,selection:{...draft.selection,inverted:false,gradient:null}});}}
+        onSelectAll={()=>{setMode('ellipse');change({region:[.5,.5,1,1],mask:null,matte:null,feather:0,selection:{...draft.selection,inverted:false,gradient:null}});}}
         onNew={()=>{if(dirty){setError(draftNotice);return;}setSelected(null);change({id:'draft',enabled:true});}} onDiscard={discard} onPreset={preset}/>
 
     </div>

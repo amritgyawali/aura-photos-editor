@@ -96,6 +96,7 @@ pub mod qc_commands;
 pub mod reference_style;
 pub mod restore_commands;
 pub mod retouch_commands;
+pub mod retouch_settings;
 pub mod smart_edit;
 pub mod state;
 pub mod story_commands;

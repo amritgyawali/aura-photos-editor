@@ -1,7 +1,8 @@
 //! The operator subset, and the dispatch that refuses everything else.
 //!
-//! Twenty operators. That number is a decision, not an accident: it is what the
-//! backbones planned for phases 05 to 11 need, and every one of them is
+//! Twenty-two operators. That number is a decision, not an accident: it is what the
+//! backbones planned for phases 05 to 11 need, plus `ConvTranspose` and `ReduceSum`
+//! for the bundled skin segmenter (ADR-0082), and every one of them is
 //! implemented here with a fixed accumulation order so that two machines agree
 //! bit for bit. Adding an operator is a normal change with tests; running one we
 //! have not implemented is not possible, because [`is_supported`] is checked at
@@ -15,6 +16,7 @@ mod conv;
 mod elementwise;
 mod linear;
 mod pool;
+mod reduce;
 mod resize;
 mod shape;
 
@@ -48,6 +50,8 @@ pub const SUPPORTED: &[&str] = &[
     "QuantizeLinear",
     "DequantizeLinear",
     "Resize",
+    "ConvTranspose",
+    "ReduceSum",
 ];
 
 /// True when this build implements the operator.
@@ -87,6 +91,8 @@ pub fn eval(
         "Flatten" => shape::flatten(node, inputs)?,
         "Transpose" => shape::transpose(node, inputs)?,
         "Resize" => resize::resize(node, inputs)?,
+        "ConvTranspose" => conv::conv_transpose(node, inputs)?,
+        "ReduceSum" => reduce::reduce_sum(node, inputs)?,
         "QuantizeLinear" => shape::quantize_linear(node, inputs)?,
         "DequantizeLinear" => shape::dequantize_linear(node, inputs)?,
         other => {

@@ -866,8 +866,7 @@ fn schema_text(catalog: &Arc<Catalog>) -> AuraResult<String> {
 fn ipc_parity() -> Result<usize, String> {
     let shell = std::fs::read_to_string("ui/src-tauri/src/main.rs")
         .map_err(|err| format!("ui/src-tauri/src/main.rs could not be read: {err}"))?;
-    let client = std::fs::read_to_string("ui/src/ipc/client.ts")
-        .map_err(|err| format!("ui/src/ipc/client.ts could not be read: {err}"))?;
+    let client = crate::ipc_sources::client_sources()?;
 
     let mut defined: BTreeSet<String> = BTreeSet::new();
     let mut expecting = false;

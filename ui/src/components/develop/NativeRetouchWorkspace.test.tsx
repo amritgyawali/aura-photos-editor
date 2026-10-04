@@ -14,6 +14,19 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('clears the AI restriction when selecting the entire photo', async () => {
+  const saved = { ...freshRetouch(), id: 'auto-portrait-v1-0-texture', tool: 'frequency' as const, matte: 'auto-portrait-v1-0-face' };
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([saved]);
+  open();
+  await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button', { name: /1\. Frequency separation/ }));
+  expect(screen.getByText(/AI mask active/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Select entire photo' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Update selected retouch' }));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'update', [
+    expect.objectContaining({ matte: null, mask: null, region: [.5, .5, 1, 1] }),
+  ]));
+});
 it('automatically retouches once, refreshes saved steps and report, and supports undo',async()=>{
   let finish: ()=>void = ()=>{};
   vi.mocked(nativeRetouch.autoPortrait).mockImplementation(()=>new Promise(resolve=>{finish=()=>resolve({} as never);}));

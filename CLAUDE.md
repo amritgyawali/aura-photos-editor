@@ -156,6 +156,9 @@ Never load two phase files into one session.
 | One-click intelligent editing and step history | `docs/adr/ADR-0081-intelligent-auto-edit-and-step-history.md`, `crates/aura-app/src/smart_edit.rs`, `crates/aura-app/src/portrait_features.rs` |
 | What Auto enhance does, in the product's own words | `docs/automatic-editing.md` |
 | Auto-edit qualification on the real app | `scripts/prepare-auto-edit-fixtures.py`, `scripts/test-auto-edit-v3.py`, `scripts/test-auto-edit-gui.py` |
+| Segmented face/body skin and the 52 retouch settings | `docs/adr/ADR-0082-segmented-skin-and-retouch-settings.md` |
+| The skin segmenter (model, card, converter) | `assets/models/selfie_multiclass/`, `crates/aura-vision/src/skin.rs`, `ml/models/skin/` |
+| Automatic retouch settings, in the product's own words | `docs/automatic-retouch-settings.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 | Portrait parsing and portrait retouch decisions | `docs/adr/ADR-0065-measured-portrait-parsing-and-portrait-retouch.md` |
 | Faces, landmarks and the nineteen portrait regions | `crates/aura-portrait/` |

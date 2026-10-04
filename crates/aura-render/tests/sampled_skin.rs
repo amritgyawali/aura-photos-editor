@@ -22,6 +22,7 @@ fn operation(tool: Tool) -> Edit {
         warmth: 0.0,
         tint: 0.0,
         selection: None,
+        matte: None,
         mask: None,
         skin: Some(SkinSettings {
             tolerance: 0.2,
