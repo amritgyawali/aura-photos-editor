@@ -1,6 +1,10 @@
 # Deliberately NOT a workspace member: the desktop shell pulls the whole Tauri
 # toolchain, and `cargo test --workspace` must stay fast and headless in CI.
 # Build it with `cargo tauri dev` or `cargo build --manifest-path ui/src-tauri/Cargo.toml`.
+# Keep the standalone shell independent even in a checkout nested inside another workspace.
+[workspace]
+resolver = "2"
+
 [package]
 name = "aura-desktop"
 version = "0.1.0"

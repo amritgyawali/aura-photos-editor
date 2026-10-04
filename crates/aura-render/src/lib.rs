@@ -118,6 +118,7 @@ pub mod restore;
 pub mod retouch;
 mod retouch_heal;
 mod retouch_mask;
+mod retouch_matte;
 mod retouch_skin;
 pub mod retouch_tools;
 pub mod shaders;
