@@ -1,6 +1,6 @@
-# ADR-0066: Selection-to-export workflow
+# ADR-0068: Selection-to-export workflow
 
-Accepted 2026-09-19. Extends ADR-0065 for the current desktop workflow.
+Accepted 2026-09-19. Extends ADR-0067 for the current desktop workflow.
 
 Selecting photographs can create a project, import the files, measure the actual
 pixels, apply reversible per-photo adjustments, and export verified JPEGs to a

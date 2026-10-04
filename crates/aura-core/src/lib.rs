@@ -43,6 +43,7 @@ pub mod contract {
     pub mod learn;
     pub mod ledger;
     pub mod local;
+    pub mod look;
     pub mod micro;
     pub mod moment;
     pub mod people;

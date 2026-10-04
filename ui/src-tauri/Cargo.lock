@@ -158,6 +158,7 @@ dependencies = [
  "aura-ingest",
  "aura-jobs",
  "aura-learn",
+ "aura-look",
  "aura-models",
  "aura-people",
  "aura-preview",
@@ -513,6 +514,26 @@ dependencies = [
  "toml 0.8.2",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aura-look"
+version = "0.1.0"
+dependencies = [
+ "aura-catalog",
+ "aura-core",
+ "aura-raw",
+ "aura-recipe",
+ "aura-render",
+ "aura-style",
+ "blake3",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "time",
+ "tracing",
+ "uuid",
+ "walkdir",
 ]
 
 [[package]]

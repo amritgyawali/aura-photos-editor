@@ -9,7 +9,6 @@ publish.workspace      = true
 description  = "RAW containers, the three decode tiers and the colour pipeline"
 
 [dependencies]
-png.workspace = true
 aura-core  = { path = "../aura-core" }
 serde      = { workspace = true }
 serde_json = { workspace = true }
@@ -17,9 +16,9 @@ tracing    = { workspace = true }
 zune-jpeg  = { workspace = true }
 jpeg-encoder = { workspace = true }
 rayon      = { workspace = true }
+png        = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
 tempfile = { workspace = true }
-png      = { workspace = true }
 time     = { workspace = true }

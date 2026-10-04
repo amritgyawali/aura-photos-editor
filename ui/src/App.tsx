@@ -20,10 +20,14 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
 import { CameraMatchPanel } from './components/camera/CameraMatchPanel';
 import { CleanupPanel } from './components/cleanup/CleanupPanel';
+import { InstagramStyle } from './components/look/InstagramStyle';
+import { MatchLookPanel } from './components/look/MatchLookPanel';
+import { readReferenceSelection, saveReferenceSelection, type ReferenceSelection } from './components/look/referenceStyle';
 import { CullView } from './components/cull/CullView';
 import { CuratePanel } from './components/curate/CuratePanel';
 import { DeliveryPanel } from './components/delivery/DeliveryPanel';
 import { DevelopWorkspace } from './components/develop/DevelopWorkspace';
+import { PhotoStudio } from './components/develop/PhotoStudio';
 import { ToneReviewQueue } from './components/develop/ToneReviewQueue';
 import { Inspector } from './components/explain/Inspector';
 import { FilterChips } from './components/explain/FilterChips';
@@ -95,6 +99,26 @@ export function App(): JSX.Element {
 
   const [tourOpen, setTourOpen] = useState(false);
   const [guideRefresh, setGuideRefresh] = useState(0);
+
+  // PHASE-31 and the photo studio. The reference look a photographer chose survives a restart,
+  // and a request to edit automatically is a counter rather than a flag so that asking twice is
+  // two requests: `AutopilotPanel` consumes it and resets it to zero.
+  const [reference, setReference] = useState<ReferenceSelection | null>(readReferenceSelection);
+  const changeReference = useCallback((next: ReferenceSelection | null) => {
+    setReference(next);
+    saveReferenceSelection(next);
+  }, []);
+  const [referenceBusy, setReferenceBusy] = useState(false);
+  const [automaticRequest, setAutomaticRequest] = useState(0);
+  const automaticSequence = useRef(0);
+  const automaticConsumed = useCallback(() => setAutomaticRequest(0), []);
+  const [editing, setEditing] = useState(false);
+  const [studioSaving, setStudioSaving] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const editBusyChanged = useCallback((working: boolean) => {
+    setEditing(working);
+    if (!working) setRevision((value) => value + 1);
+  }, []);
 
   /**
    * Enter a step: its tools become the tab list, and its default tool opens.
@@ -518,7 +542,18 @@ export function App(): JSX.Element {
           <Filmstrip rows={rows} />
           <button type="button" onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
           <PhotoAnalysis projectId={activeProjectId} photoId={focusedPhotoId} />
-          <details><summary>Advanced model analysis</summary><AutopilotPanel projectId={activeProjectId} onError={setError} /></details>
+          <details open={automaticRequest > 0 || undefined}><summary>Advanced model analysis</summary>
+            <AutopilotPanel
+              key={activeProjectId}
+              projectId={activeProjectId}
+              onError={setError}
+              onBusyChange={editBusyChanged}
+              automaticRequest={automaticRequest}
+              onAutomaticConsumed={automaticConsumed}
+              onRender={() => goToStep(STEPS_BY_ID['export'])}
+              reference={reference}
+            />
+          </details>
         </> : null;
       case 'people':
         return activeProjectId ? <PeoplePanel projectId={activeProjectId} onError={setError} /> : null;
@@ -567,6 +602,54 @@ export function App(): JSX.Element {
             </div>
           </div>
         ) : null;
+      case 'studio':
+        return activeProjectId ? (
+          <div>
+            <fieldset className="filmstrip-lock" disabled={editing || studioSaving}>
+              <Filmstrip rows={rows} />
+            </fieldset>
+            <button type="button" onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
+            {focusedPhotoId ? (
+              <PhotoStudio
+                key={focusedPhotoId}
+                projectId={activeProjectId}
+                photoId={focusedPhotoId}
+                disabled={editing}
+                revision={revision}
+                onBusyChange={setStudioSaving}
+              />
+            ) : (
+              <p>Choose a photograph in the filmstrip to review and adjust its edit.</p>
+            )}
+          </div>
+        ) : null;
+      case 'look':
+        return (
+          <div>
+            <InstagramStyle
+              selection={reference}
+              disabled={referenceBusy || editing}
+              onChange={changeReference}
+              onBusyChange={setReferenceBusy}
+              onAddPhotos={() => setTool('import')}
+              onApply={
+                activeProjectId && rows.length
+                  ? () => {
+                      setStep('analyze');
+                      setTool('autopilot');
+                      setAutomaticRequest(++automaticSequence.current);
+                    }
+                  : undefined
+              }
+            />
+            {activeProjectId ? (
+              <details className="advanced-tools">
+                <summary>Advanced lighting-bucket look profiles</summary>
+                <MatchLookPanel key={activeProjectId} projectId={activeProjectId} onError={setError} />
+              </details>
+            ) : null}
+          </div>
+        );
       case 'cleanup':
         return activeProjectId ? (
           <CleanupPanel projectId={activeProjectId} photoId={focusedPhotoId} onError={setError} />

@@ -47,15 +47,17 @@ pub fn tier3(
     clock: &dyn Clock,
 ) -> AuraResult<PixelBuffer> {
     if matches!(meta.format, crate::RawFormat::Jpeg | crate::RawFormat::Png) {
-        let decoded = crate::thumb::tier1(
+        // A JPEG is already a developed image. Full-resolution export should
+        // decode its pixels, not ask for a sensor mosaic that does not exist.
+        return crate::thumb::tier1(
             bytes,
             meta,
             u32::MAX,
             limits,
             clock,
             std::path::Path::new("photo"),
-        )?;
-        return Ok(decoded.buffer);
+        )
+        .map(|decoded| decoded.buffer);
     }
     let (result, decode_ms) = timed(clock, || {
         let (mosaic, levels, matrix) = prepare(bytes, meta, limits)?;

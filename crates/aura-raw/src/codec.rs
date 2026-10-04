@@ -21,63 +21,55 @@ pub struct Rgb8 {
     pub data: Vec<u8>,
 }
 
-/// Decode PNG, expanding palettes and greyscale and compositing alpha over white.
+/// Decode PNG to the editor's sRGB8 surface. Alpha is composited on white;
+/// 16-bit samples are reduced to 8-bit. Original files remain untouched.
 ///
 /// # Errors
-/// Refuses corrupt images and dimensions beyond the decode allocation limits.
+/// Returns a typed decode error for corrupt data or excessive dimensions.
 pub fn decode_png(bytes: &[u8], limits: DecodeLimits) -> AuraResult<Rgb8> {
-    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+    let mut decoder = png::Decoder::new_with_limits(
+        std::io::Cursor::new(bytes),
+        png::Limits {
+            bytes: usize::try_from(limits.max_alloc_bytes).unwrap_or(usize::MAX),
+        },
+    );
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
-    decoder.set_limits(png::Limits {
-        bytes: usize::try_from(limits.max_alloc_bytes).unwrap_or(usize::MAX),
-    });
     let mut reader = decoder
         .read_info()
         .map_err(|e| corrupt(format!("PNG header: {e}")))?;
     let info = reader.info();
     check_dimensions(info.width, info.height, 8, limits)?;
-    let mut samples = vec![0; reader.output_buffer_size()];
-    let info = reader
-        .next_frame(&mut samples)
+    let mut decoded = vec![0; reader.output_buffer_size()];
+    let frame = reader
+        .next_frame(&mut decoded)
         .map_err(|e| corrupt(format!("PNG pixels: {e}")))?;
-    let channels = info.color_type.samples();
-    let mut data = Vec::with_capacity(info.width as usize * info.height as usize * 3);
-    for pixel in samples
-        .get(..info.buffer_size())
-        .ok_or_else(|| corrupt("truncated PNG output"))?
-        .chunks_exact(channels)
+    let samples = frame.color_type.samples();
+    let mut pixels = Vec::with_capacity(frame.width as usize * frame.height as usize * 3);
+    for pixel in decoded
+        .get(..frame.buffer_size())
+        .unwrap_or_default()
+        .chunks_exact(samples)
     {
-        let first = pixel.first().copied().unwrap_or(0);
-        let (red, green, blue, alpha) = match info.color_type {
-            png::ColorType::Rgb => (
-                first,
-                pixel.get(1).copied().unwrap_or(0),
-                pixel.get(2).copied().unwrap_or(0),
-                255,
-            ),
-            png::ColorType::Rgba => (
-                first,
-                pixel.get(1).copied().unwrap_or(0),
-                pixel.get(2).copied().unwrap_or(0),
-                pixel.get(3).copied().unwrap_or(255),
-            ),
-            png::ColorType::Grayscale => (first, first, first, 255),
-            png::ColorType::GrayscaleAlpha => {
-                (first, first, first, pixel.get(1).copied().unwrap_or(255))
-            }
-            png::ColorType::Indexed => return Err(corrupt("PNG palette was not expanded")),
+        let (rgb, alpha) = match pixel {
+            [gray] => ([*gray; 3], 255),
+            [gray, alpha] => ([*gray; 3], *alpha),
+            [r, g, b] => ([*r, *g, *b], 255),
+            [r, g, b, alpha] => ([*r, *g, *b], *alpha),
+            _ => return Err(corrupt("Unsupported PNG channel layout")),
         };
-        for value in [red, green, blue] {
-            data.push(
-                ((u32::from(value) * u32::from(alpha) + 255 * (255 - u32::from(alpha)) + 127) / 255)
-                    as u8,
-            );
+        for value in rgb {
+            // Composite in linear light so translucent edges retain their color.
+            let a = f32::from(alpha) / 255.0;
+            let linear = crate::colour::curve::srgb_decode(f32::from(value) / 255.0);
+            pixels.push(crate::colour::curve::quantise_u8(
+                crate::colour::curve::srgb_encode(linear * a + 1.0 - a),
+            ));
         }
     }
     Ok(Rgb8 {
-        width: info.width,
-        height: info.height,
-        data,
+        width: frame.width,
+        height: frame.height,
+        data: pixels,
     })
 }
 

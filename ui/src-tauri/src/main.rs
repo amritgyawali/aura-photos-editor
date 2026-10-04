@@ -6,7 +6,7 @@
 use aura_app::contract::ipc::{
     AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditDto, PhotoAutoEditInput,
 };
-// ADR-0065.
+// ADR-0067.
 use aura_app::contract::ipc::{OneClickFinishDto, OneClickFinishInput, OneClickStatusDto};
 use std::path::PathBuf;
 
@@ -88,9 +88,11 @@ use aura_app::contract::ipc::{
 };
 use aura_app::contract::ipc::{
     AdoptProfileInput, CompareProfilesInput, ExportProfileDto, ExportProfileInput,
-    ImportProfileDto, ImportProfileInput, ProfileReportDto, ScanArchiveDto, ScanArchiveInput,
-    SetProjectProfileInput, StyleComparisonDto, StylePairDto, StyleProfileDto, StyleStatusDto,
-    TrainProfileDto, TrainProfileInput,
+    ImportProfileDto, ImportProfileInput, LookBucketDto, LookBucketsInput, LookMatchDto,
+    LookProfileDto, LookProfileInput, LookStatusDto, MeasureLookDto, MeasureLookInput,
+    ProfileReportDto, ReferenceOriginDto, ScanArchiveDto, ScanArchiveInput, SelectLookInput,
+    SetLookStrengthInput, SetProjectProfileInput, StyleComparisonDto, StylePairDto,
+    StyleProfileDto, StyleStatusDto, TrainProfileDto, TrainProfileInput,
 };
 // PHASE-25. The gallery consistency surface: nine commands whose subject is a wedding
 // rather than a photograph. `GalleryStatusDto` carries two denominators and a panel has to
@@ -526,6 +528,111 @@ async fn estimate_tone(
 // yet, so the shell has nothing to hand it. The command exists, its shape is frozen and its
 // error is the honest one - `AURA-ML-5073`, "not enough usable pairs" - rather than a silent
 // success. See condition C3 in `docs/progress/PHASE-17-EXIT.md`.
+// ---------------------------------------------------------------------------
+// PHASE-31 - matching a look somebody else published
+// ---------------------------------------------------------------------------
+//
+// Ten commands. `measure_look` is the only one that does work; the rest read.
+//
+// **`parse_reference` is deliberately synchronous and deliberately infallible.** The panel calls
+// it on every keystroke so the address box can show the handle it understood, and a command that
+// went to a thread pool to parse a string would be a spinner on the third character of
+// `instagram.com/`. It resolves nothing and contacts nothing - see `aura_look::source`'s header
+// for the two separate reasons this build does not go and fetch the page.
+
+#[tauri::command]
+async fn look_status(state: State<'_, AppState>, project_id: String) -> IpcResult<LookStatusDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::look_status(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_looks(state: State<'_, AppState>) -> IpcResult<Vec<LookProfileDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::list_looks(&app))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+fn parse_reference(address: String) -> IpcResult<ReferenceOriginDto> {
+    Ok(aura_app::parse_reference(&address))
+}
+
+#[tauri::command]
+async fn look_buckets(
+    state: State<'_, AppState>,
+    input: LookBucketsInput,
+) -> IpcResult<Vec<LookBucketDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::look_buckets(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn look_match_report(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<LookMatchDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::look_match_report(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+// The long one: it walks a folder, decodes every reference photograph, renders a sample of the
+// photographer's own frames twice and then refines against them. Minutes rather than seconds on
+// a real reference, which is why it is on the blocking pool and why the panel shows what it is
+// doing rather than a bare spinner.
+#[tauri::command]
+async fn measure_look(
+    state: State<'_, AppState>,
+    input: MeasureLookInput,
+) -> IpcResult<MeasureLookDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::measure_look(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn select_look(state: State<'_, AppState>, input: SelectLookInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::select_look(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_look_strength(
+    state: State<'_, AppState>,
+    input: SetLookStrengthInput,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_look_strength(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn rename_look(state: State<'_, AppState>, input: LookProfileInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::rename_look(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn forget_look(state: State<'_, AppState>, input: LookProfileInput) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::forget_look(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn style_status(state: State<'_, AppState>, project_id: String) -> IpcResult<StyleStatusDto> {
     let app = state.inner().clone();
@@ -3084,7 +3191,7 @@ async fn photo_auto_edit(
         .map_err(|_| background_request_failed())?
 }
 
-// ADR-0065. The one-click finish. These three are the thin end of the wedge: the
+// ADR-0067. The one-click finish. These three are the thin end of the wedge: the
 // pipeline itself runs on a thread inside `aura-app` and reports through the status
 // row, so these commands only start it, read it, and stop it.
 #[tauri::command]
@@ -3114,6 +3221,58 @@ async fn one_click_cancel(job_id: String) -> IpcResult<bool> {
     .await
     .map_err(|_| background_request_failed())?;
     Ok(found.1 && found.0)
+}
+
+#[tauri::command]
+async fn enhance_photo(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::DevelopImageInput,
+) -> IpcResult<aura_app::contract::ipc::RecipeDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::photo_enhance::enhance_photo(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn fetch_instagram_references(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::FetchInstagramInput,
+) -> IpcResult<aura_app::reference_style::FetchReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::fetch_instagram(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn analyse_reference_style(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::AnalyseReferenceInput,
+) -> IpcResult<aura_app::reference_style::ReferenceAnalysis> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::analyse_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn apply_reference_style(
+    state: State<'_, AppState>,
+    input: aura_app::reference_style::ApplyReferenceInput,
+) -> IpcResult<aura_app::reference_style::ApplyReferenceReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::reference_style::apply_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 fn main() {
@@ -3177,6 +3336,10 @@ fn main() {
             one_click_finish,
             one_click_status,
             one_click_cancel,
+            fetch_instagram_references,
+            analyse_reference_style,
+            apply_reference_style,
+            enhance_photo,
             create_project,
             list_projects,
             start_ingest,
@@ -3219,6 +3382,16 @@ fn main() {
             set_colour_override,
             select_colour_variant,
             estimate_colour,
+            look_status,
+            list_looks,
+            parse_reference,
+            look_buckets,
+            look_match_report,
+            measure_look,
+            select_look,
+            set_look_strength,
+            rename_look,
+            forget_look,
             style_status,
             list_profiles,
             profile_report,

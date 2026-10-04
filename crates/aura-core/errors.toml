@@ -2314,3 +2314,30 @@ summary      = "The licence could not be checked and the offline grace period is
 user_message = "AURA could not check your licence, so it is carrying on offline. Everything works; connect within the grace period to keep it that way."
 runbook      = "docs/runbooks/AURA-REL-12004.md"
 introduced   = "PHASE-30"
+
+[[error]]
+code         = "AURA-ML-5146"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "A reference a look was to be measured from was refused"
+user_message = "AURA could not read a look from that reference, so nothing has changed. Point it at a folder holding more of the photographs you want to match."
+runbook      = "docs/runbooks/AURA-ML-5146.md"
+introduced   = "PHASE-31"
+
+[[error]]
+code         = "AURA-ML-5147"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A look could not be measured, selected or applied"
+user_message = "AURA could not apply that look. Your photographs are exactly as they were."
+runbook      = "docs/runbooks/AURA-ML-5147.md"
+introduced   = "PHASE-31"
+
+[[error]]
+code         = "AURA-ML-5148"
+severity     = "degraded"
+recovery     = "fallback"
+summary      = "A look was measured against a different render engine or measurer"
+user_message = "That look was worked out by an earlier version of AURA, so it is being measured again before it is used."
+runbook      = "docs/runbooks/AURA-ML-5148.md"
+introduced   = "PHASE-31"

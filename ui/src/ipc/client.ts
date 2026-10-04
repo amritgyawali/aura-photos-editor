@@ -103,7 +103,7 @@ export const photoAnalysis = (input: PhotoAutoEditInput): Promise<PhotoAnalysisD
 export const automaticStart = (input: { roots: string[]; projectId: string | null }): Promise<AutomaticStartDto> =>
   invoke<AutomaticStartDto>('automatic_start', { input });
 
-/** ADR-0065. Start the whole delivery pipeline. Returns immediately; poll `oneClickStatus`. */
+/** ADR-0067. Start the whole delivery pipeline. Returns immediately; poll `oneClickStatus`. */
 export const oneClickFinish = (input: OneClickFinishInput): Promise<OneClickFinishDto> =>
   invoke<OneClickFinishDto>('one_click_finish', { input });
 
@@ -121,6 +121,37 @@ export async function pickImportPaths(directory: boolean): Promise<string[]> {
       filters: directory ? [] : [{ name: 'Photographs', extensions: ['jpg', 'jpeg', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef', 'tif', 'tiff'] }] },
   });
   return result === null ? [] : typeof result === 'string' ? [result] : result;
+}
+
+export type ReferenceAnalysis = {
+  id: string; origin: string; measured: number; skipped: number; colors: string[];
+  brightness: number; contrast: number; warmth: number; saturation: number;
+};
+export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
+export type FetchReport = { folder: string; fetched: number; skipped: number; complete: boolean; message: string };
+export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
+
+export const referenceStyle = {
+  fetch: (address: string, limit: number, cancelId: string) => invoke<FetchReport>('fetch_instagram_references', { input: { address, limit, cancelId } }),
+  analyse: (address: string, folder: string, cancelId: string) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId } }),
+  apply: (photoId: string, referenceId: string, strength: number) => invoke<ApplyReport>('apply_reference_style', { input: { photoId, referenceId, strength } }),
+};
+
+/** Ask the desktop for a folder; cancel leaves the current selection intact. */
+export async function pickPhotoFolder(title = 'Choose a photo folder'): Promise<string | null> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: true, multiple: false, title },
+  });
+  return Array.isArray(result) ? result[0] ?? null : result;
+}
+
+/** Select individual photographs without importing their entire folder. */
+export async function pickPhotos(): Promise<string[]> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: false, multiple: true, title: 'Choose photos to edit',
+      filters: [{ name: 'Photos', extensions: ['jpg', 'jpeg', 'jpe', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef'] }] },
+  });
+  return result === null ? [] : Array.isArray(result) ? result : [result];
 }
 
 import type {
@@ -423,6 +454,17 @@ import type {
   StyleComparisonDto,
   StylePairDto,
   StyleProfileDto,
+  LookBucketDto,
+  LookBucketsInput,
+  LookMatchDto,
+  LookProfileDto,
+  LookProfileInput,
+  LookStatusDto,
+  MeasureLookDto,
+  MeasureLookInput,
+  ReferenceOriginDto,
+  SelectLookInput,
+  SetLookStrengthInput,
   StyleStatusDto,
   SupportBundleDto,
   ToneDto,
@@ -1028,6 +1070,8 @@ export const explain = {
  * same merge in Rust with an automated source and is refused there.
  */
 export const develop = {
+  enhancePhoto: (input: DevelopImageInput): Promise<RecipeDto> =>
+    invoke<RecipeDto>('enhance_photo', { input }),
   /** One photograph's edit, or the camera's own starting point when it has none. */
   imageRecipe: (input: DevelopImageInput): Promise<RecipeDto> =>
     invoke<RecipeDto>('image_recipe', { input }),
@@ -1151,7 +1195,6 @@ export const colour = {
  * promise about the code.
  */
 export const style = {
-
   /** What this project knows about style. */
   styleStatus: (projectId: string): Promise<StyleStatusDto> =>
     invoke<StyleStatusDto>('style_status', { projectId }),
@@ -2064,4 +2107,74 @@ export const learning = {
 
   /** What this machine can and cannot do. Leads with the second. */
   diagnosticsReport: (): Promise<DiagnosticsDto> => invoke<DiagnosticsDto>('diagnostics_report'),
+};
+
+/**
+ * PHASE-31. Matching a look somebody else published.
+ *
+ * Ten commands. Four read, one parses an address as it is typed, one measures, and four act on
+ * a selection.
+ *
+ * **Nothing here fetches anything.** `parseReference` reads text back and resolves nothing;
+ * `measureLook` takes a folder. The route that would go and get the photographs from a page is
+ * declared, refuses, and says why - see `docs/match-a-look.md`. Phase 04's rule is that the
+ * cloud gateway is the only crate that opens a socket, and a client-gallery fetcher is not a
+ * model provider.
+ *
+ * It is a separate namespace from `style` because the two answer different questions. `style`
+ * is what *this* photographer does, fitted from their own delivered pairs. This is what *that*
+ * page does, measured off finished JPEGs - a weaker kind of evidence, and one a caller should
+ * not be able to confuse with the other by reaching for the wrong function.
+ */
+export const look = {
+  /** What the match-a-look card shows: is a look selected, and over how much of the wedding. */
+  lookStatus: (projectId: string): Promise<LookStatusDto> =>
+    invoke<LookStatusDto>('look_status', { projectId }),
+
+  /** Every stored look, newest first. */
+  listLooks: (): Promise<LookProfileDto[]> => invoke<LookProfileDto[]>('list_looks', {}),
+
+  /**
+   * Read back what was typed into the address box.
+   *
+   * Called on every keystroke. It parses and **does not resolve**: there is no round trip to
+   * Instagram here and no tick to render, only the handle the text was understood as.
+   */
+  parseReference: (address: string): Promise<ReferenceOriginDto> =>
+    invoke<ReferenceOriginDto>('parse_reference', { address }),
+
+  /**
+   * One look's lighting buckets, as the matrix renders them.
+   *
+   * Pass the project to fill each row's measured `afterDe00`; without it a row says what the
+   * look asks for and stays `null` about what it did.
+   */
+  lookBuckets: (input: LookBucketsInput): Promise<LookBucketDto[]> =>
+    invoke<LookBucketDto[]>('look_buckets', { input }),
+
+  /** The last measured match on one project, or `null` when nothing has been measured. */
+  lookMatchReport: (projectId: string): Promise<LookMatchDto | null> =>
+    invoke<LookMatchDto | null>('look_match_report', { projectId }),
+
+  /**
+   * Measure a reference and store the look.
+   *
+   * Minutes rather than seconds on a real reference: it decodes every reference photograph and
+   * renders a sample of the wedding twice. The panel shows what it is doing.
+   */
+  measureLook: (input: MeasureLookInput): Promise<MeasureLookDto> =>
+    invoke<MeasureLookDto>('measure_look', { input }),
+
+  /** Point this project at a look, or pass `null` to go back to the baseline. */
+  selectLook: (input: SelectLookInput): Promise<void> => invoke<void>('select_look', { input }),
+
+  /** Apply a look at less than its measured strength. Never more. */
+  setLookStrength: (input: SetLookStrengthInput): Promise<void> =>
+    invoke<void>('set_look_strength', { input }),
+
+  /** Rename a look. */
+  renameLook: (input: LookProfileInput): Promise<void> => invoke<void>('rename_look', { input }),
+
+  /** Delete a look. A project that had it selected falls back to the baseline. */
+  forgetLook: (input: LookProfileInput): Promise<void> => invoke<void>('forget_look', { input }),
 };

@@ -77,12 +77,16 @@ pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
 pub mod local_commands;
+pub mod look_commands;
 pub mod mask_commands;
 pub mod micro_commands;
 pub mod moment_commands;
 pub mod people_commands;
+pub mod photo_enhance;
+mod photo_frames;
 pub mod preview_commands;
 pub mod qc_commands;
+pub mod reference_style;
 pub mod restore_commands;
 pub mod retouch_commands;
 pub mod state;
@@ -170,6 +174,10 @@ pub use learn_commands::{
 pub use local_commands::{
     accept_local, image_local, local_review_queue, local_status, sculpt_local, set_local_strength,
 };
+pub use look_commands::{
+    forget_look, list_looks, look_buckets, look_match_report, look_status, measure_look,
+    parse_reference, rename_look, select_look, set_look_strength,
+};
 pub use mask_commands::{
     edit_mask, ensure_masks, image_masks, mask_allowance, mask_kinds, mask_overlay, mask_status,
     regenerate_mask,
@@ -206,7 +214,7 @@ pub use retouch_commands::{
 };
 pub use state::AppState;
 mod auto_edit_commands;
-// ADR-0065. The one-click finish, and its three commands.
+// ADR-0067. The one-click finish, and its three commands.
 pub mod one_click_commands;
 pub use auto_edit_commands::{photo_analysis, photo_auto_edit};
 pub use one_click_commands::{

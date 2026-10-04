@@ -20,6 +20,7 @@ members = [
   "crates/aura-explain",
   "crates/aura-recipe",
   "crates/aura-style",
+  "crates/aura-look",
   "crates/aura-render",
   "crates/aura-retouch",
   "crates/aura-restore",
@@ -101,7 +102,7 @@ rayon             = "1"
 crossbeam-channel = "0.5"
 parking_lot       = "0.12"
 
-# TLS for the cloud gateway (phase 04's waiver, discharged in ADR-0063). No
+# TLS for the cloud gateway (phase 04's waiver, discharged in ADR-0065). No
 # default features: rustls defaults to `aws-lc-rs`, which needs a C compiler.
 rustls            = { version = "0.23", default-features = false, features = ["std", "tls12", "logging"] }
 rustls-rustcrypto = "0.0.2-alpha"

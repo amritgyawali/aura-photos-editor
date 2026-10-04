@@ -78,7 +78,9 @@ pub fn tier2(
 ) -> AuraResult<TierTwo> {
     let mut warnings = Vec::new();
     let resolved = profile::resolve(&meta.make, &meta.model, meta.colour_matrix);
-    if resolved.source == ProfileSource::Generic {
+    if resolved.source == ProfileSource::Generic
+        && !matches!(meta.format, crate::RawFormat::Jpeg | crate::RawFormat::Png)
+    {
         warnings.push(profile_missing(&meta.make, &meta.model));
     }
 
@@ -198,6 +200,8 @@ fn render_working(
     // says so.
     let preview = if let Some(image) = embedded {
         image.clone()
+    } else if meta.format == crate::RawFormat::Png {
+        codec::decode_png(bytes, limits)?
     } else {
         let reference = meta
             .best_preview()
@@ -205,11 +209,7 @@ fn render_working(
         let stream = bytes
             .get(reference.offset..reference.offset.saturating_add(reference.len))
             .ok_or_else(|| aura_core::errors::raw::corrupt("preview range is outside the file"))?;
-        if meta.format == crate::RawFormat::Png {
-            codec::decode_png(stream, limits)?
-        } else {
-            codec::decode_jpeg(stream, limits)?
-        }
+        codec::decode_jpeg(stream, limits)?
     };
 
     let linear_srgb = demosaic::from_srgb8(&preview.data, preview.width, preview.height);

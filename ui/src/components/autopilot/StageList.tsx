@@ -147,6 +147,10 @@ export function StageList({ stages, disabled, onToggle, current }: StageListProp
                 worth a look
               </span>
             ) : null}
+            {row && <details className="stage-evidence"><summary>Step details</summary>
+              <p>{row.itemsDone} of {row.itemsTotal} items · {(row.elapsedMs / 1000).toFixed(1)} seconds · {row.attempts} attempts</p>
+              {row.reasons.length > 0 && <ul>{row.reasons.map((reason, index) => <li key={`${reason}:${index}`}>{reason}</li>)}</ul>}
+            </details>}
           </li>
         );
       })}

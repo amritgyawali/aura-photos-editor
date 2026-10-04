@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { asIpcError, inTauri, delivery as api, learning as learnApi } from '../../ipc/client';
-import { api as libraryApi, pickImportPaths } from '../../ipc/client';
+import { api as photosApi, asIpcError, delivery as api, inTauri, learning as learnApi, pickPhotoFolder } from '../../ipc/client';
 import type {
   ConsentDto,
   DeliveryManifestDto,
@@ -58,36 +57,37 @@ export type DeliveryPanelProps = {
   profileId: string | null;
   /** Surface an error to the app's banner. The same shape every other panel uses. */
   onError: (error: { code: string; message: string } | null) => void;
+  onBusyChange?: (busy: boolean) => void;
 };
 
-export function DeliveryPanel({ projectId, profileId, onError }: DeliveryPanelProps) {
+export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: DeliveryPanelProps) {
   const [status, setStatus] = useState<ExportStatusDto | null>(null);
   const [presets, setPresets] = useState<ExportPresetDto[]>([]);
   const [selected, setSelected] = useState('gallery');
-  const [imageIds, setImageIds] = useState<string[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    setImageIds([]);
-    if (projectId && inTauri()) void (async () => {
-      const ids: string[] = [];
-      for (let offset = 0; ; offset += 250) {
-        const page = await libraryApi.listImages({ projectId, offset, limit: 250, orderBy: 'timeline' });
-        if (cancelled) return;
-        ids.push(...page.map((row) => row.id));
-        if (page.length < 250) break;
-      }
-      setImageIds(ids);
-    })().catch((error: unknown) => {
-      if (!cancelled) { const ipc = asIpcError(error); onError({ code: ipc.code, message: ipc.message }); }
-    });
-    return () => { cancelled = true; };
-  }, [projectId, onError]);
   const [destination, setDestination] = useState('');
   const [verify, setVerify] = useState(true);
   const [names, setNames] = useState<ExportNameDto[] | null>(null);
   const [files, setFiles] = useState<ExportFileDto[]>([]);
   const [manifest, setManifest] = useState<DeliveryManifestDto | null>(null);
   const [running, setRunning] = useState(false);
+  const [photoIds, setPhotoIds] = useState<string[]>([]);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+  useEffect(() => { onBusyChange?.(running); }, [onBusyChange, running]);
+  useEffect(() => {
+    let active = true;
+    setImagesLoaded(false); setPhotoIds([]);
+    if (!projectId) return;
+    void (async () => {
+      const ids: string[] = [];
+      for (let offset = 0; active; offset += 240) {
+        const page = await photosApi.listImages({ projectId, offset, limit: 240, orderBy: 'timeline' });
+        ids.push(...page.map(photo => photo.id));
+        if (page.length < 240) break;
+      }
+      if (active) { setPhotoIds(ids); setImagesLoaded(true); }
+    })().catch(error => { if (active) { const ipc = asIpcError(error); onError({ code: ipc.code, message: ipc.message }); } });
+    return () => { active = false; };
+  }, [projectId, onError]);
 
   const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatusDto | null>(null);
   const [providers, setProviders] = useState<ProviderDto[]>([]);
@@ -111,7 +111,7 @@ export function DeliveryPanel({ projectId, profileId, onError }: DeliveryPanelPr
 
   /** Build the job from what the dialog holds. Whole, never field by field. */
   const buildJob = useCallback((): ExportJobInput | null => {
-    if (!projectId) {
+    if (!projectId || !imagesLoaded || photoIds.length === 0) {
       return null;
     }
     const preset = presets.find((p) => p.name === selected);
@@ -123,10 +123,9 @@ export function DeliveryPanel({ projectId, profileId, onError }: DeliveryPanelPr
       sets: [
         {
           name: preset.name,
-          // The gallery the export is over. The panel that mounts this passes the ids it holds;
-          // an empty list is refused by `ExportJob::validate` rather than silently exporting
-          // nothing, which is the behaviour a caller wants when it has not loaded yet.
-          imageIds,
+          // Export the imported collection, including its first render. Previously exported
+          // files cannot supply this list because it is empty before the first export.
+          imageIds: photoIds,
           format: preset.format,
           quality: preset.quality,
           colour: preset.colour,
@@ -147,7 +146,7 @@ export function DeliveryPanel({ projectId, profileId, onError }: DeliveryPanelPr
       stripCameraSerial: true,
       verify,
     };
-  }, [projectId, presets, selected, imageIds, destination, verify]);
+  }, [projectId, presets, selected, photoIds, imagesLoaded, destination, verify]);
 
   const refreshExport = useCallback(async () => {
     if (!projectId) {
@@ -352,12 +351,11 @@ export function DeliveryPanel({ projectId, profileId, onError }: DeliveryPanelPr
 
   return (
     <div className="delivery-panel">
-      <div className="row">
-        <button type="button" disabled={running || !projectId} onClick={() => {
-          void pickImportPaths(true).then((paths) => { if (paths[0]) setDestination(paths[0]); }).catch(fail);
-        }}>Choose export folder</button>
-        <span>{imageIds.length} imported photographs available for export</span>
-      </div>
+      <p>{imagesLoaded ? `Render all ${photoIds.length} imported photos using their saved edits.` : 'Loading photos for rendering…'}</p>
+      <button type="button" disabled={running} onClick={() => {
+        void pickPhotoFolder('Choose where to save the final photos').then(path => { if (path) setDestination(path); }).catch(fail);
+      }}>Choose output folder</button>
+      {imagesLoaded && photoIds.length > 0 && <>
       <ExportView
         status={status}
         presets={presets}
@@ -372,7 +370,9 @@ export function DeliveryPanel({ projectId, profileId, onError }: DeliveryPanelPr
         onPreviewNames={onPreviewNames}
         onRun={onRun}
       />
+      </>}
       <ManifestView manifest={manifest} files={files} />
+      <details className="advanced-tools"><summary>Delivery, learning & diagnostics</summary>
       <DeliveryView
         status={deliveryStatus}
         providers={providers}
@@ -392,6 +392,7 @@ export function DeliveryPanel({ projectId, profileId, onError }: DeliveryPanelPr
         onConsent={onConsent}
       />
       <DiagnosticsView report={report} />
+      </details>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-//! Selection-to-delivery background workflow. See ADR-0066.
+//! Selection-to-delivery background workflow. See ADR-0068.
 use crate::contract::ipc::*;
 use crate::AppState;
 use aura_core::progress::CancelToken;

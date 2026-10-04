@@ -1,4 +1,4 @@
-# ADR-0064: Usable photograph editing
+# ADR-0066: Usable photograph editing
 
 Accepted 2026-09-09 for the local desktop workflow.
 

@@ -8,7 +8,7 @@
 //! * Phase 03's interpreter implements a documented ONNX opset 13 subset with **no `Resize` and no
 //!   `ConvTranspose`**, which is most of a U-Net's decoder. A pack could be downloaded and still
 //!   not run.
-//! * No cloud path here reaches an image *generator* in any case. ADR-0063 made public providers
+//! * No cloud path here reaches an image *generator* in any case. ADR-0065 made public providers
 //!   reachable over TLS, and none of the nineteen in `aura_cloud::catalog` is wired to a
 //!   generative image endpoint - which is deliberate, and is what section 3 below argues for.
 //!

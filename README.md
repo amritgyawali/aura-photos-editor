@@ -66,6 +66,9 @@ For the desktop import → automatic edit → export workflow, see
 [Photo editing quickstart](docs/photo-editing-quickstart.md). Cloud vision editing
 uses the configured provider; local enhancement works without an API key.
 
+See [Photo Studio](docs/photo-studio.md) for automatic editing after import,
+reviewing every edit, matching reference colors, and rendering the final photos.
+
 ```bash
 rustup show                       # installs the pinned toolchain from rust-toolchain.toml
 just setup                        # git hooks + npm install

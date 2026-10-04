@@ -10,6 +10,8 @@ import type {
   AutopilotSummaryDto,
 } from '../../ipc/types';
 import { Autopilot } from './Autopilot';
+import { prepareCollection, type PreparedPhoto } from './prepareCollection';
+import type { ReferenceSelection } from '../look/referenceStyle';
 
 /**
  * PHASE-28. The container that wires the five autopilot views to the nine autopilot commands.
@@ -43,6 +45,11 @@ export type AutopilotPanelProps = {
   projectId: string | null;
   /** Surface an error to the app's banner. The same shape every other panel uses. */
   onError: (error: { code: string; message: string } | null) => void;
+  onBusyChange?: (busy: boolean) => void;
+  automaticRequest?: number;
+  onAutomaticConsumed?: () => void;
+  onRender?: () => void;
+  reference?: ReferenceSelection | null;
 };
 
 /** How often the panel asks what the run is doing, while one is running. */
@@ -57,7 +64,7 @@ function toBanner(error: unknown): { code: string; message: string } {
   };
 }
 
-export function AutopilotPanel({ projectId, onError }: AutopilotPanelProps) {
+export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequest = 0, onAutomaticConsumed, onRender, reference }: AutopilotPanelProps) {
   const [status, setStatus] = useState<AutopilotStatusDto | null>(null);
   const [stages, setStages] = useState<AutopilotStageDto[]>([]);
   const [summary, setSummary] = useState<AutopilotSummaryDto | null>(null);
@@ -66,6 +73,13 @@ export function AutopilotPanel({ projectId, onError }: AutopilotPanelProps) {
   const [preflight, setPreflight] = useState<AutopilotPreflightDto | null>(null);
   const [disabled, setDisabled] = useState<string[]>([]);
   const [zeroTouch, setZeroTouch] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
+  const stopPreparation = useRef(false);
+  const consumedRequest = useRef(0);
+  const [preparation, setPreparation] = useState<string | null>(null);
+  const [prepared, setPrepared] = useState<PreparedPhoto[]>([]);
+  useEffect(() => { onBusyChange?.(starting || progress !== null); }, [starting, progress, onBusyChange]);
 
   // What the poll is watching, without making the effect depend on the value it sets.
   const running = useRef(false);
@@ -125,16 +139,38 @@ export function AutopilotPanel({ projectId, onError }: AutopilotPanelProps) {
     return () => window.clearInterval(timer);
   }, [onError, progress, projectId, reload]);
 
-  const openPreflight = useCallback(async () => {
-    if (!projectId) {
+  const openPreflight = useCallback(async (includeAdvanced = true) => {
+    if (!projectId || startingRef.current || running.current) {
       return;
     }
+    startingRef.current = true;
+    setStarting(true);
+    stopPreparation.current = false;
+    setPrepared([]);
     try {
-      setPreflight(await api.autopilotPreflight(projectId));
+      const results = await prepareCollection(projectId, () => stopPreparation.current, setPreparation,
+        photo => setPrepared(current => [...current, photo]), reference);
+      setPrepared(results);
+      if (stopPreparation.current) { setPreparation('Stopped. Completed edits are saved.'); return; }
+      const ready = results.filter(photo => photo.outcome === 'ready').length;
+      setPreparation(`${ready} of ${results.length} photos prepared with local enhancement.`);
+      if (ready === 0 || !includeAdvanced) return;
+      const report = await api.autopilotPreflight(projectId);
+      if (!report.permitsStart) { setPreflight(report); return; }
+      setPreflight(null);
+      setProgress(await api.autopilotStart({ projectId, disabled, zeroTouch, allowOnBattery: false, quietMode: true }));
     } catch (error) {
       onError(toBanner(error));
+    } finally { startingRef.current = false; setStarting(false); }
+  }, [disabled, onError, projectId, zeroTouch, reference]);
+
+  useEffect(() => {
+    if (automaticRequest > 0 && consumedRequest.current !== automaticRequest && projectId) {
+      consumedRequest.current = automaticRequest;
+      onAutomaticConsumed?.();
+      void openPreflight(false);
     }
-  }, [onError, projectId]);
+  }, [automaticRequest, onAutomaticConsumed, openPreflight, projectId]);
 
   const start = useCallback(async () => {
     if (!projectId) {
@@ -214,6 +250,27 @@ export function AutopilotPanel({ projectId, onError }: AutopilotPanelProps) {
   }
 
   return (
+    <div aria-busy={starting}>
+    <section className="quick-edit" aria-label="Automatic photo editing">
+      <div><span className="eyebrow">MADE FOR YOUR PHOTO</span><h2>Good light. A natural finish.</h2>
+        <p>{reference ? `Your photos will be matched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength, with individual tone and color adjustments.` : 'Each photo gets its own exposure, shadow and highlight adjustments. Works locally, with no model downloads or account.'}</p></div>
+      <button type="button" className="is-primary" disabled={starting || progress !== null} onClick={() => void openPreflight(false)}>{starting ? 'Editing your photos…' : 'Auto edit all photos'}</button>
+    </section>
+    {preparation && <section className="automatic-result" aria-label="Automatic preparation">
+      <p role="status">{preparation}</p>
+      {starting && <button type="button" onClick={() => { stopPreparation.current = true; }}>Stop automatic editing</button>}
+      {!starting && !progress && prepared.some(photo => photo.outcome === 'ready') && <>
+        <h2>{prepared.filter(photo => photo.outcome === 'ready').length} photos have saved edits, ready to render.</h2>
+        <p>{prepared.filter(photo => photo.outcome === 'failed').length} photos need attention. Review the steps below whenever you want to see what changed.</p>
+        <button type="button" className="is-primary" onClick={onRender}>Render final output →</button>
+      </>}
+      <details><summary>Review automatic preparation ({prepared.length} photos)</summary>
+        <ol className="preparation-log">{prepared.map(photo => <li key={photo.photoId}><strong>{photo.name} · {photo.outcome === 'ready' ? 'Prepared' : 'Needs attention'}</strong><p>{photo.detail}</p></li>)}</ol>
+      </details>
+    </section>}
+    <details className="advanced-tools" open={progress !== null || preflight !== null ? true : undefined}>
+    <summary>Advanced wedding workflow &amp; analysis</summary>
+    <fieldset className="autopilot-lock" disabled={starting}>
     <Autopilot
       status={status}
       stages={stages}
@@ -230,5 +287,7 @@ export function AutopilotPanel({ projectId, onError }: AutopilotPanelProps) {
       onToggleStage={toggleStage}
       onZeroTouch={toggleZeroTouch}
     />
+    </fieldset></details>
+    </div>
   );
 }
