@@ -12,3 +12,11 @@
 Local artifacts are in `output/desktop-check` (screenshots, recipe, export and manifest). Run `scripts/verify-restored-studio.py` against an isolated debug catalog to reproduce the control-driven workflow. All pixel editing is performed by AURA, not the automation script.
 
 The original PR #43 was merged externally during validation. Follow-up fixes are delivered in PR #44 targeting main; no merge was performed by this work session.
+
+## Final checks and installation
+
+All GitHub checks passed for b54b0b0: Rust tests on Windows/macOS/Linux, phase gates, benchmarks, strict lints, UI tests/build, desktop type-check and dependency policy.
+
+Installed-bundle launcher verification passed with an isolated catalog. Restart preserved the recipe hash, all 236 operations, Deep blemish cleanup enabled, and the 220-spot preference. The user's existing session was never terminated by the verification; only the separate test process was closed.
+
+The installed executable is the successfully built and visually tested restored-studio bundle (SHA-256 `9b83c43d49a9623b8b7a36489474c94a329d4d89b56dda541615c15db998e003`). A later local rebuild hit corrupted compiler metadata, so the launcher retains this tested bundle until an explicit successful `-Rebuild`. Later source changes include lint/test fixes, wording, and main's complete-workflow portrait pass; they are not claimed to be in that installed snapshot.

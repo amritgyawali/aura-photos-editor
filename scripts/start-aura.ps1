@@ -8,7 +8,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$desktopExe = Join-Path $projectRoot 'target\desktop-launch\debug\aura-desktop.exe'
+$buildExe = Join-Path $projectRoot 'target\desktop-launch\debug\aura-desktop.exe'
+$installedExe = Join-Path $projectRoot 'app\aura-desktop.exe'
+$useInstalled = -not $Rebuild -and (Test-Path -LiteralPath $installedExe)
+$desktopExe = if ($useInstalled) { $installedExe } else { $buildExe }
 $logDir = Join-Path $projectRoot '.work-checks\launcher'
 $launchLock = $null
 $ownsLock = $false
@@ -47,7 +50,7 @@ try {
     }
 
     $needsBuild = $Rebuild -or -not (Test-Path -LiteralPath $desktopExe)
-    if (-not $needsBuild -and -not $running) {
+    if (-not $useInstalled -and -not $needsBuild -and -not $running) {
         $builtAt = (Get-Item -LiteralPath $desktopExe).LastWriteTimeUtc
         # Scan only build inputs, never the large Cargo caches or node_modules.
         foreach ($inputPath in @(
@@ -90,6 +93,10 @@ try {
         try {
             Invoke-BuildStep 'cargo.exe' @('build', '--locked', '--manifest-path', 'ui/src-tauri/Cargo.toml', '--target-dir', 'target/desktop-launch', '--features', 'custom-protocol', '-j', '1') 'desktop.log'
         } finally { Pop-Location }
+        if (Test-Path -LiteralPath $installedExe) {
+            Copy-Item -LiteralPath $buildExe -Destination $installedExe -Force
+            $desktopExe = $installedExe
+        }
     }
 
     if ($InstallShortcuts) {

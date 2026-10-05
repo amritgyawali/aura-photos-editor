@@ -9,7 +9,9 @@ subsequent launches. Clicking again brings the existing window forward.
 
 To recreate the shortcuts, run `& '.\Start AURA.cmd' -InstallShortcuts` in
 PowerShell. Keep the repository folder in place because the shortcuts point to it.
-The launcher builds the app if it is missing or its source files have changed,
+When `app/aura-desktop.exe` is installed, the launcher opens that tested bundle.
+Use `-Rebuild` to replace it after changing source. Without an installed bundle,
+the launcher builds the app if it is missing or its source files have changed,
 using Node.js, Rust and the Windows C++ build tools described in the README.
 After source changes, close AURA and open the shortcut again. To force a rebuild,
 run `& '.\Start AURA.cmd' -Rebuild`. Build logs are in `.work-checks/launcher`;
