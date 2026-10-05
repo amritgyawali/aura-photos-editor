@@ -4,7 +4,12 @@
 //! For each one this prints what the automatic edit decides before any face is considered: the
 //! histogram's tone correction, what the scene's intent changed about it, and every decision
 //! with its reason. The assertions are bounds, not taste.
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods
+)]
 
 use aura_app::{photo_enhance, portrait_features::Pixels, smart_edit};
 

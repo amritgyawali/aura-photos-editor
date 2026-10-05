@@ -19,7 +19,9 @@
 #![allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss
+    clippy::cast_sign_loss,
+    // Plane coordinates never exceed the analysis edge, so a signed cast cannot wrap.
+    clippy::cast_possible_wrap
 )]
 
 use std::collections::BTreeMap;
@@ -127,6 +129,8 @@ pub struct Measure {
     pub dhash: u64,
 }
 
+// The signature is serde's: `serialize_with` hands the field over by reference.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn hex<S: serde::Serializer>(value: &u64, serializer: S) -> Result<S::Ok, S::Error> {
     serializer.serialize_str(&format!("{value:016x}"))
 }
@@ -314,14 +318,13 @@ impl Plane {
                 if x >= plane_width {
                     break;
                 }
-                let mut channels = pixel.iter().map(|value| f32::from(*value));
-                let (r, g, b) = (
-                    channels.next().unwrap_or_default(),
-                    channels.next().unwrap_or_default(),
-                    channels.next().unwrap_or_default(),
-                );
+                let luminance: f32 = pixel
+                    .iter()
+                    .zip([0.2126, 0.7152, 0.0722])
+                    .map(|(value, weight)| f32::from(*value) * weight)
+                    .sum();
                 if let Some(cell) = values.get_mut(y * plane_width + x) {
-                    *cell += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                    *cell += luminance;
                 }
             }
         }
@@ -577,10 +580,9 @@ fn same_burst(a: &Frame, b: &Frame) -> bool {
     }
 }
 
-/// Decide the whole collection. `frames` is in timeline order.
-#[must_use]
-pub fn decide(frames: &[Frame]) -> Report {
-    let mut verdicts: Vec<Verdict> = frames
+/// The verdict each frame gets on its own, before bursts are considered.
+fn first_verdicts(frames: &[Frame]) -> Vec<Verdict> {
+    frames
         .iter()
         .map(|frame| {
             let (reason, detail) = match &frame.measure {
@@ -613,25 +615,30 @@ pub fn decide(frames: &[Frame]) -> Report {
                 measure: frame.measure.clone(),
             }
         })
-        .collect();
+        .collect()
+}
 
-    // A wedding where the focus and exposure rules reject a large share is a deliberate
-    // style (soft film scans, a dark reception shot wide open), not a run of mistakes.
-    let technical_rejects = verdicts.iter().filter(|v| !v.keep).count();
-    let rules_withdrawn =
-        !frames.is_empty() && technical_rejects as f32 / frames.len() as f32 > IMPLAUSIBLE_SHARE;
-    if rules_withdrawn {
-        for verdict in verdicts.iter_mut().filter(|v| !v.keep) {
-            verdict.detail = format!("Delivered anyway. Would have been: {}", verdict.detail);
-            verdict.reason = Reason::RulesWithdrawn;
-            verdict.keep = true;
-        }
+/// A wedding where the focus and exposure rules reject a large share is a deliberate style
+/// (soft film scans, a dark reception shot wide open), not a run of mistakes. Returns whether
+/// the rules were withdrawn.
+fn withdraw_if_implausible(verdicts: &mut [Verdict]) -> bool {
+    let rejected = verdicts.iter().filter(|v| !v.keep).count();
+    if verdicts.is_empty() || rejected as f32 / verdicts.len() as f32 <= IMPLAUSIBLE_SHARE {
+        return false;
     }
+    for verdict in verdicts.iter_mut().filter(|v| !v.keep) {
+        verdict.detail = format!("Delivered anyway. Would have been: {}", verdict.detail);
+        verdict.reason = Reason::RulesWithdrawn;
+        verdict.keep = true;
+    }
+    true
+}
 
-    // Bursts: deliverable frames that are near-identical and close together. They need not
-    // be neighbours - a second camera's frame, or a rejected one, often sits between two frames
-    // of the same burst - so each frame is compared with the few that follow it. Frames the
-    // camera did not time must be neighbours.
+/// Bursts: deliverable frames that are near-identical and close together. They need not be
+/// neighbours - a second camera's frame, or a rejected one, often sits between two frames of
+/// the same burst - so each frame is compared with the few that follow it. Frames the camera
+/// did not time must be neighbours.
+fn find_bursts(frames: &[Frame], verdicts: &[Verdict]) -> Vec<Vec<usize>> {
     let candidates: Vec<usize> = (0..frames.len())
         .filter(|index| {
             verdicts
@@ -646,11 +653,11 @@ pub fn decide(frames: &[Frame]) -> Report {
                 .get(first)
                 .zip(candidates.get(second))
                 .and_then(|(a, b)| frames.get(*a).zip(frames.get(*b)));
-            let Some((a, b)) = pair else {
+            let Some((earlier, later)) = pair else {
                 continue;
             };
-            let timed = a.time_ms.is_some() && b.time_ms.is_some();
-            if (!timed && second != first + 1) || !same_burst(a, b) {
+            let timed = earlier.time_ms.is_some() && later.time_ms.is_some();
+            if (!timed && second != first + 1) || !same_burst(earlier, later) {
                 continue;
             }
             let (keep, merge) = (
@@ -672,70 +679,80 @@ pub fn decide(frames: &[Frame]) -> Report {
             grouped.entry(*label).or_default().push(*index);
         }
     }
-    let bursts: Vec<Vec<usize>> = grouped
+    grouped
         .into_values()
         .filter(|members| members.len() > 1)
-        .collect();
+        .collect()
+}
 
-    for (number, members) in bursts.iter().enumerate() {
-        let measures: Vec<(usize, &Measure)> = members
-            .iter()
-            .filter_map(|i| frames.get(*i)?.measure.as_ref().map(|m| (*i, m)))
-            .collect();
-        let best_eyes = measures
-            .iter()
-            .filter_map(|(_, m)| m.eye_contrast)
-            .reduce(f32::max);
-        let mut ranked: Vec<(usize, f32)> = measures
-            .iter()
-            .map(|(i, m)| (*i, quality(m, best_eyes)))
-            .collect();
-        // A hand-edited frame is always delivered, so it leads its burst.
-        ranked.sort_by(|a, b| {
-            let edited = |i: usize| frames.get(i).is_some_and(|f| f.edited_by_hand);
-            edited(b.0)
-                .cmp(&edited(a.0))
-                .then(b.1.total_cmp(&a.1))
-                .then(a.0.cmp(&b.0))
-        });
-        let keepers = match members.len() {
-            0..=5 => 1,
-            6..=12 => 2,
-            _ => 3,
-        };
-        let Some(&(best, best_quality)) = ranked.first() else {
+/// Keep the best of one burst and leave the rest out, naming the frame delivered instead.
+fn settle_burst(frames: &[Frame], verdicts: &mut [Verdict], number: usize, members: &[usize]) {
+    let measures: Vec<(usize, &Measure)> = members
+        .iter()
+        .filter_map(|i| frames.get(*i)?.measure.as_ref().map(|m| (*i, m)))
+        .collect();
+    let best_eyes = measures
+        .iter()
+        .filter_map(|(_, m)| m.eye_contrast)
+        .reduce(f32::max);
+    let mut ranked: Vec<(usize, f32)> = measures
+        .iter()
+        .map(|(i, m)| (*i, quality(m, best_eyes)))
+        .collect();
+    let edited = |index: usize| frames.get(index).is_some_and(|f| f.edited_by_hand);
+    // A hand-edited frame is always delivered, so it leads its burst.
+    ranked.sort_by(|a, b| {
+        edited(b.0)
+            .cmp(&edited(a.0))
+            .then(b.1.total_cmp(&a.1))
+            .then(a.0.cmp(&b.0))
+    });
+    let keepers = match members.len() {
+        0..=5 => 1,
+        6..=12 => 2,
+        _ => 3,
+    };
+    let Some(&(best, best_quality)) = ranked.first() else {
+        return;
+    };
+    let best_name = frames
+        .get(best)
+        .map(|f| f.file_name.clone())
+        .unwrap_or_default();
+    let best_id = frames.get(best).map(|f| f.photo_id.clone());
+    for (rank, (index, own)) in ranked.iter().enumerate() {
+        let Some(verdict) = verdicts.get_mut(*index) else {
             continue;
         };
-        let best_name = frames
-            .get(best)
-            .map(|f| f.file_name.clone())
-            .unwrap_or_default();
-        let best_id = frames.get(best).map(|f| f.photo_id.clone());
-        for (rank, (index, own)) in ranked.iter().enumerate() {
-            let edited = frames.get(*index).is_some_and(|f| f.edited_by_hand);
-            let Some(verdict) = verdicts.get_mut(*index) else {
-                continue;
-            };
-            verdict.burst = Some(number + 1);
-            if rank < keepers || edited {
-                if !edited && verdict.reason == Reason::Keep {
-                    verdict.reason = Reason::BestOfBurst;
-                    verdict.detail = format!(
-                        "Best of a burst of {}: quality {own:.3} from sharpness and open eyes.",
-                        members.len()
-                    );
-                }
-            } else {
-                verdict.keep = false;
-                verdict.reason = Reason::BurstDuplicate;
-                verdict.kept_instead.clone_from(&best_id);
+        verdict.burst = Some(number);
+        if rank < keepers || edited(*index) {
+            if !edited(*index) && verdict.reason == Reason::Keep {
+                verdict.reason = Reason::BestOfBurst;
                 verdict.detail = format!(
-                    "Near-identical to {best_name}, which is delivered instead: quality {own:.3} against {best_quality:.3}."
+                    "Best of a burst of {}: quality {own:.3} from sharpness and open eyes.",
+                    members.len()
                 );
             }
+        } else {
+            verdict.keep = false;
+            verdict.reason = Reason::BurstDuplicate;
+            verdict.kept_instead.clone_from(&best_id);
+            verdict.detail = format!(
+                "Near-identical to {best_name}, which is delivered instead: quality {own:.3} against {best_quality:.3}."
+            );
         }
     }
+}
 
+/// Decide the whole collection. `frames` is in timeline order.
+#[must_use]
+pub fn decide(frames: &[Frame]) -> Report {
+    let mut verdicts = first_verdicts(frames);
+    let rules_withdrawn = withdraw_if_implausible(&mut verdicts);
+    let bursts = find_bursts(frames, &verdicts);
+    for (number, members) in bursts.iter().enumerate() {
+        settle_burst(frames, &mut verdicts, number + 1, members);
+    }
     let count = |reason: Reason| verdicts.iter().filter(|v| v.reason == reason).count();
     let counts = Counts {
         frames: frames.len(),

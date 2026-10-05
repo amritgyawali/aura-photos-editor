@@ -689,7 +689,7 @@ mod tests {
                 for x in 0..size {
                     // A deterministic blocky texture, four pixels to a block.
                     let h = ((x / 4) * 7 + (y / 4) * 13) % 5;
-                    let v = (h as i32 - 2) * grain;
+                    let v = (i32::try_from(h).unwrap_or(0) - 2) * grain;
                     let spot = red_spots && (x / 4 + y / 4) % 9 == 0;
                     let c = |base: i32, extra: i32| (base + v + extra).clamp(0, 255) as u8;
                     rgb.extend([

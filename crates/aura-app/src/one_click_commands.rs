@@ -715,9 +715,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     // on - and it costs about three seconds a photograph to produce them. An unattended run
     // therefore measures instead, and the learned pass is opt-in for whoever is validating it.
     let mut advanced = false;
-    if !learned_analysis_enabled() {
-        note(job, "Learned scene, people and framing analysis was not run: its bundled models are placeholders and nothing in this build is calibrated. Each photograph was measured instead, and its framing is preserved.".into());
-    } else {
+    if learned_analysis_enabled() {
         match crate::autopilot_start(
             state,
             &AutopilotStartInput {
@@ -766,6 +764,8 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                 ),
             ),
         }
+    } else {
+        note(job, "Learned scene, people and framing analysis was not run: its bundled models are placeholders and nothing in this build is calibrated. Each photograph was measured instead, and its framing is preserved.".into());
     }
     if stopped(job) {
         return Ok(());
