@@ -104,6 +104,12 @@ fn remaining(started_ms: u64, now_ms: u64, done: usize, total: usize) -> String 
     }
 }
 
+/// Whether to run the learned analysis pass. Off unless `AURA_LEARNED_ANALYSIS=1`: see the
+/// note where it is read.
+fn learned_analysis_enabled() -> bool {
+    std::env::var_os("AURA_LEARNED_ANALYSIS").is_some_and(|value| value == "1")
+}
+
 /// The cull that needs no learned model: focus, motion, exposure and bursts, measured from
 /// each photograph. `None` means the run was stopped. Nothing is deleted, and a frame that
 /// cannot be measured is delivered.
@@ -704,25 +710,62 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         note(job, "No working provider or cloud disabled by privacy settings; using measured local reference edits. Configure a vision model in AI provider for semantic photo-aware choices.".into());
     }
 
-    // Optional learned analysis is never presented as successful pixel/face recognition
-    // when the bundled model preflight refuses it. Every photo still receives a real edit.
+    // Learned scene, people and framing analysis. Every model it consults is still a
+    // placeholder and nothing in this build is calibrated, so its readings may not be acted
+    // on - and it costs about three seconds a photograph to produce them. An unattended run
+    // therefore measures instead, and the learned pass is opt-in for whoever is validating it.
     let mut advanced = false;
-    match crate::autopilot_start(state, &AutopilotStartInput { project_id: project.clone(), disabled: vec![], zero_touch: true, allow_on_battery: false, quiet_mode: false }) {
-        Ok(_) => {
-            phase(job, "analyze", "Running available advanced analysis models.", photos.len() as u64);
-            let deadline = state.clock().monotonic_ms().saturating_add(6 * 3600 * 1000);
-            loop {
-                if stopped(job) { let _ = crate::autopilot_cancel(state, project); return Ok(()); }
-                match crate::autopilot_progress(state, project)? {
-                    Some(p) if p.status == "running" => update(job, |s| s.phase_label = p.stage_title),
-                    Some(p) => { advanced = p.status == "completed"; break; }
-                    None => break,
+    if !learned_analysis_enabled() {
+        note(job, "Learned scene, people and framing analysis was not run: its bundled models are placeholders and nothing in this build is calibrated. Each photograph was measured instead, and its framing is preserved.".into());
+    } else {
+        match crate::autopilot_start(
+            state,
+            &AutopilotStartInput {
+                project_id: project.clone(),
+                disabled: vec![],
+                zero_touch: true,
+                allow_on_battery: false,
+                quiet_mode: false,
+            },
+        ) {
+            Ok(_) => {
+                phase(
+                    job,
+                    "analyze",
+                    "Running available advanced analysis models.",
+                    photos.len() as u64,
+                );
+                let deadline = state
+                    .clock()
+                    .monotonic_ms()
+                    .saturating_add(6 * 3600 * 1000);
+                // The progress row exists only while the run does; the summary says how it ended.
+                while let Some(p) = crate::autopilot_progress(state, project)? {
+                    if stopped(job) {
+                        let _ = crate::autopilot_cancel(state, project);
+                        return Ok(());
+                    }
+                    update(job, |s| s.phase_label = p.stage_title);
+                    if state.clock().monotonic_ms() > deadline {
+                        let _ = crate::autopilot_cancel(state, project);
+                        return Err(error("Advanced analysis timed out and was stopped."));
+                    }
+                    std::thread::sleep(Duration::from_millis(500));
                 }
-                if state.clock().monotonic_ms() > deadline { let _ = crate::autopilot_cancel(state, project); return Err(error("Advanced analysis timed out and was stopped.")); }
-                std::thread::sleep(Duration::from_millis(500));
+                advanced = crate::autopilot_commands::autopilot_summary(state, project)?
+                    .is_some_and(|summary| summary.status == "completed");
+                if !advanced {
+                    note(job, "Learned analysis finished without a result this run may act on; each photograph was measured instead.".into());
+                }
             }
+            Err(err) => note(
+                job,
+                format!(
+                    "Optional learned analysis unavailable: {}. Pixel-based analysis completed; automatic face/subject claims are not made.",
+                    err.message
+                ),
+            ),
         }
-        Err(err) => note(job, format!("Optional learned analysis unavailable: {}. Pixel-based analysis completed; automatic face/subject claims are not made.", err.message)),
     }
     if stopped(job) {
         return Ok(());
@@ -757,12 +800,6 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                 }
             }
         }
-    } else {
-        note(
-            job,
-            "Preserved original framing because validated subject-aware analysis was unavailable."
-                .into(),
-        );
     }
     phase(
         job,

@@ -61,12 +61,27 @@ def os_click(page, locator):
     return True
 
 
-def working_set_mb(pid):
-    try:
-        row = subprocess.check_output(['tasklist', '/FI', f'PID eq {pid}', '/FO', 'CSV', '/NH'], text=True)
-        return int(row.strip().split('","')[-1].strip('" K\n').replace(',', '').replace('.', '')) / 1024
-    except Exception:  # noqa: BLE001
-        return 0.0
+class MemoryCounters(ctypes.Structure):
+    _fields_ = [('cb', ctypes.c_ulong), ('PageFaultCount', ctypes.c_ulong),
+                ('PeakWorkingSetSize', ctypes.c_size_t), ('WorkingSetSize', ctypes.c_size_t),
+                ('QuotaPeakPagedPoolUsage', ctypes.c_size_t), ('QuotaPagedPoolUsage', ctypes.c_size_t),
+                ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t), ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
+                ('PagefileUsage', ctypes.c_size_t), ('PeakPagefileUsage', ctypes.c_size_t),
+                ('PrivateUsage', ctypes.c_size_t)]
+
+
+def memory_mb(pid):
+    """(working set, committed private memory) of the application, in megabytes."""
+    kernel32 = ctypes.windll.kernel32
+    kernel32.OpenProcess.restype = ctypes.c_void_p
+    handle = kernel32.OpenProcess(0x1000 | 0x0010, False, pid)
+    if not handle:
+        return 0.0, 0.0
+    counters = MemoryCounters()
+    counters.cb = ctypes.sizeof(counters)
+    ok = ctypes.windll.psapi.GetProcessMemoryInfo(ctypes.c_void_p(handle), ctypes.byref(counters), counters.cb)
+    kernel32.CloseHandle(ctypes.c_void_p(handle))
+    return (counters.WorkingSetSize / 1048576, counters.PrivateUsage / 1048576) if ok else (0.0, 0.0)
 
 
 def lab_mean(path):
@@ -234,12 +249,18 @@ def main():
             run = page.evaluate('() => JSON.parse(sessionStorage.getItem("aura-automatic-run")).state')
             report['run'] = {'jobId': run['jobId'], 'projectId': run['projectId']}
             print('started', run['jobId'], flush=True)
-            status, phase, phase_started, peak, shot = {}, None, started, 0.0, False
+            status, phase, phase_started, peak, committed, shot = {}, None, started, 0.0, 0.0, False
+            samples, sampled = [], 0.0
             deadline = started + args.timeout_min * 60
             while time.monotonic() < deadline:
                 status = page.evaluate('async (job) => await window.__TAURI_INTERNALS__.invoke("one_click_status", { jobId: job })', run['jobId'])
-                peak = max(peak, working_set_mb(app.pid))
+                working, private = memory_mb(app.pid)
+                peak, committed = max(peak, working), max(committed, private)
                 now = time.monotonic()
+                if now - sampled >= 10:
+                    sampled = now
+                    samples.append({'seconds': round(now - started), 'phase': status['phase'], 'done': status['itemsDone'],
+                                    'workingSetMb': round(working), 'committedMb': round(private)})
                 label = f"{status['phase']}: {status['phaseLabel'].split('.')[0][:70]}" if status['phase'] != 'edit' else 'edit'
                 if label != phase:
                     if phase is not None:
@@ -254,12 +275,14 @@ def main():
                     report['phases'].append({'phase': phase, 'seconds': round(now - phase_started, 1)})
                     break
                 if status['phase'] == 'edit' and status['itemsDone'] % 100 == 0 and status['itemsDone']:
-                    print(f"{now - started:8.0f}s  edited {status['itemsDone']}/{status['itemsTotal']}  memory {peak:.0f} MB", flush=True)
+                    print(f"{now - started:8.0f}s  edited {status['itemsDone']}/{status['itemsTotal']}  memory {peak:.0f} MB working, {committed:.0f} MB committed", flush=True)
                 time.sleep(2)
             total = time.monotonic() - started
             report['status'] = status
             report['seconds'] = round(total, 1)
             report['peakWorkingSetMb'] = round(peak)
+            report['peakCommittedMb'] = round(committed)
+            report['memorySamples'] = samples
             report['pageErrors'] = errors
             time.sleep(2)
             page.screenshot(path=str(out / 'done.png'))
@@ -315,7 +338,7 @@ def main():
         if args.truth and exports:
             report['editAgainstOriginals'] = score_edits(manifest, folder, args.truth, exports)
     (out / 'wedding-run-report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
-    brief = {k: report[k] for k in ('sourceFiles', 'imported', 'seconds', 'peakWorkingSetMb', 'delivery') if k in report}
+    brief = {k: report[k] for k in ('sourceFiles', 'imported', 'seconds', 'peakWorkingSetMb', 'peakCommittedMb', 'phases', 'delivery', 'cull', 'cullAgainstGroundTruth', 'editAgainstOriginals') if k in report}
     brief['status'] = {k: status.get(k) for k in ('status', 'frames', 'analyzed', 'selected', 'localEdited', 'aiEdited', 'failedEdits', 'written', 'verified')}
     brief['notes'] = status.get('notes')
     print(json.dumps(brief, indent=1))

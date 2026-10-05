@@ -18,6 +18,12 @@ All notable changes to AURA. One entry per phase, newest first.
   give every run its own export folder.
 - Build the decode, inference, render and export crates at the highest optimisation level
   in the desktop shell.
+- Read highlights as evidence of exposure: a frame whose brightest tones stop well short of
+  white is lifted, up to one stop and never past clipping a face; skin at or near clipping is
+  darkened. Add the brightest neutral tones as a third white-balance estimate that vetoes a
+  cast the light does not have and allows more of a confirmed one to be removed.
+- Find bursts across a frame from another camera or a rejected frame, and skip the learned
+  analysis pass whose placeholder models the run could not act on (three seconds a photo).
 
 ## Per-face adaptive retouch and scene intent — 2026-10-05
 

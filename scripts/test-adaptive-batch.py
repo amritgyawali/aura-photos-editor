@@ -226,13 +226,11 @@ try:
 
         # The window itself: open the project and Retouch, and use the control with real input.
         try:
-            os_click(page, page.get_by_role('button', name='Weddings', exact=True))
-            if not page.get_by_role('button', name=f'{name} {len(photos)}', exact=True).count():
-                os_click(page, page.get_by_role('button', name='Import', exact=True))
-                os_click(page, page.get_by_role('button', name='Weddings', exact=True))
+            # The studio shell: collections are in the sidebar and Auto edit is a workspace.
+            page.reload()
+            page.wait_for_function('() => !!window.__TAURI_INTERNALS__')
             os_click(page, page.get_by_role('button', name=f'{name} {len(photos)}', exact=True))
-            os_click(page, page.locator('button', has_text='4 Edit').or_(page.locator('button', has_text='Edit').filter(has_text='edits')).first)
-            os_click(page, page.get_by_role('button', name='Photo studio', exact=True))
+            os_click(page, page.get_by_role('button', name='Auto edit One click, start to finish', exact=True))
             page.screenshot(path=str(OUT / 'ui-project.png'))
             if portraits:
                 option = page.get_by_role('option', name=portraits[0]['file'], exact=True)

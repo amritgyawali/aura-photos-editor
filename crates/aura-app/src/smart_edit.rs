@@ -132,6 +132,24 @@ fn intent(m: &Measure) -> Option<SceneKind> {
     }
 }
 
+/// Highlights as evidence of underexposure. A finished photograph has something near white in
+/// it - cloth, paper, a window, a specular - and a frame whose very brightest tones stop well
+/// short of white, with nothing saying the darkness is the scene, was exposed too low. Returns
+/// the lift in EV and where the brightest tones sit, or `None` when the frame already reaches
+/// white. The lift is only ever part of the room there is, so it cannot clip what it measured.
+fn highlight_lift(px: &Pixels<'_>) -> Option<(f32, f32)> {
+    let (w, h) = (px.width, px.height);
+    let mut display: Vec<f32> = (0..h)
+        .flat_map(|y| (0..w).map(move |x| (x, y)))
+        .map(|(x, y)| aura_raw::colour::curve::srgb_encode(luma(px.linear(x, y))))
+        .collect();
+    let top = percentile(&mut display, 0.995);
+    let room = (aura_raw::colour::curve::srgb_decode(0.95)
+        / aura_raw::colour::curve::srgb_decode(top).max(0.005))
+    .log2();
+    (room > 0.5).then(|| ((room * 0.8).min(1.0), top))
+}
+
 fn big_faces(faces: &[PortraitFace]) -> usize {
     faces
         .iter()
@@ -182,6 +200,18 @@ pub fn respect_intent(
     if tone.0 < -1e-3 && m.p98 < 0.95 {
         tone.0 = 0.0;
         why.push("nothing is near clipping, so darkening would only grey the whites".to_owned());
+    }
+    // Without people to confirm it, take less of the room, and less again in a frame that is
+    // dark throughout, where dimness is as likely to be the place as the exposure.
+    if let Some((lift, top)) = highlight_lift(px) {
+        let lift = (lift * 0.75).min(if m.median < 0.22 { 0.5 } else { 1.0 });
+        if lift > tone.0 + 1e-3 {
+            tone.0 = lift;
+            why.push(format!(
+                "nothing in the frame comes near white (its brightest tones reach {:.0}%), so it is lifted as underexposed",
+                top * 100.0
+            ));
+        }
     }
     // Intent has the last word: neither rule above may undo it.
     match intent(&m) {
@@ -408,6 +438,10 @@ enum Neutral {
         tint: i16,
         cast: f32,
         coverage: f32,
+        /// The share of the measured cast that is removed.
+        strength: f32,
+        /// The frame's brightest tones show the same cast.
+        confirmed: bool,
     },
     /// Both estimates agree the light is already neutral.
     Neutral { coverage: f32 },
@@ -517,6 +551,30 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
         };
     }
     let estimate = ((centre.0 + edge.0) * 0.5, (centre.1 + edge.1) * 0.5);
+    // A third, independent reading: the brightest unclipped tones. Whites, paper, cloth and
+    // speculars take the colour of the light and nothing else, so when they are neutral the
+    // light is, whatever the scene's own colours add up to - a finished photograph with warm
+    // wood or foliage in it reads as a cast to the other two. And when they show the same cast,
+    // more of it can be removed with confidence.
+    let whites = white_patch(&samples);
+    let confirmed = match whites {
+        Some(patch) if patch.0.hypot(patch.1) < 0.07 && estimate.0.hypot(estimate.1) >= 0.04 => {
+            return Neutral::Unsure {
+                reason: "the brightest tones in the frame are neutral, so the light is; the colour elsewhere belongs to the scene",
+            };
+        }
+        // A handful of near-neutral pixels agreeing with each other is one coloured object,
+        // not three witnesses; the whites only add confidence where the neutral area is real.
+        Some(patch) => coverage >= 0.1 && (estimate.0 - patch.0).hypot(estimate.1 - patch.1) <= 0.1,
+        None => false,
+    };
+    let estimate = match whites {
+        Some(patch) if confirmed => (
+            (centre.0 + edge.0 + patch.0) / 3.0,
+            (centre.1 + edge.1 + patch.1) / 3.0,
+        ),
+        _ => estimate,
+    };
     let cast = estimate.0.hypot(estimate.1);
     if cast < 0.04 {
         return Neutral::Neutral { coverage };
@@ -530,7 +588,12 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
     }
     // Keep part of the light's character: correct mild casts more than strong ones, so a
     // tungsten reception still reads as warm evening light rather than a studio.
-    let strength = if cast > 0.25 { 0.5 } else { 0.65 };
+    let strength = match (confirmed, cast > 0.25) {
+        (true, true) => 0.7,
+        (true, false) => 0.85,
+        (false, true) => 0.5,
+        (false, false) => 0.65,
+    };
     let virtual_gray = [
         0.18 * (estimate.0 * strength).exp(),
         0.18,
@@ -542,11 +605,43 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
             tint: t.clamp(-40, 40),
             cast,
             coverage,
+            strength,
+            confirmed,
         },
         Err(_) => Neutral::Unsure {
             reason: "the measured cast is outside the supported range",
         },
     }
+}
+
+/// The colour of the brightest unclipped near-neutral tones, as `(ln r/g, ln b/g)`. `None`
+/// when there are too few of them, they are not bright, or they do not agree with each other
+/// (coloured lights rather than white things).
+fn white_patch(samples: &[(f32, f32, f32)]) -> Option<(f32, f32)> {
+    if samples.len() < 400 {
+        return None;
+    }
+    let mut lumas: Vec<f32> = samples.iter().map(|sample| sample.2).collect();
+    let floor = percentile(&mut lumas, 0.97);
+    if floor <= 0.25 {
+        return None;
+    }
+    let (mut red, mut blue): (Vec<f32>, Vec<f32>) = samples
+        .iter()
+        .filter(|sample| sample.2 >= floor)
+        .map(|sample| (sample.0, sample.1))
+        .unzip();
+    if red.len() < 30 {
+        return None;
+    }
+    let deviation = |values: &[f32]| {
+        let mean = values.iter().sum::<f32>() / values.len() as f32;
+        (values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32).sqrt()
+    };
+    if deviation(&red).hypot(deviation(&blue)) >= 0.16 {
+        return None;
+    }
+    Some((percentile(&mut red, 0.5), percentile(&mut blue, 0.5)))
 }
 
 /// Decide the global adjustments for one photograph.
@@ -731,12 +826,19 @@ pub fn analyse(
         Some(Neutral::Correct {
             kelvin,
             tint,
-            cast,
             coverage,
+            strength,
+            confirmed,
+            ..
         }) => {
             decisions.push(format!(
-                "White balance {kelvin} K / tint {tint:+}: two independent estimates agreed on a cast; removed about {}% of it, measured on {:.0}% neutral areas with faces ignored.",
-                if cast > 0.25 { 50 } else { 65 },
+                "White balance {kelvin} K / tint {tint:+}: two independent estimates agreed on a cast{}; removed about {:.0}% of it, measured on {:.0}% neutral areas with faces ignored.",
+                if confirmed {
+                    ", and the frame's brightest tones show the same one"
+                } else {
+                    ""
+                },
+                strength * 100.0,
                 coverage * 100.0
             ));
             Some((kelvin, tint))
@@ -862,6 +964,21 @@ fn face_exposure_cap(
     let frame_high = percentile(&mut frame, 0.95);
     let face_high = percentile(&mut face, 0.98);
     let face_median = aura_raw::colour::curve::srgb_encode(percentile(&mut face, 0.5));
+    // Skin at or near clipping is overexposure whatever the histogram or the background says:
+    // there is no detail left in it to keep. This is a ceiling, never a target brightness.
+    let hot = face.iter().filter(|value| **value > 0.85).count() as f32 / face.len() as f32;
+    if hot > 0.12 {
+        let down = -(0.2 + (hot - 0.12) * 2.0).min(0.7);
+        if down < exposure {
+            return (
+                down,
+                Some(format!(
+                    "Exposure {down:+.2} EV: {:.0}% of the skin on the detected faces is at or near clipping, which is overexposure whatever the rest of the frame looks like.",
+                    hot * 100.0
+                )),
+            );
+        }
+    }
     // A dark frame around a face is evidence of underexposure only when the face itself is
     // dark. Dark hair, dark clothes and a grey wall around a well-lit face are not, and
     // brightening them would lighten somebody's skin for no photographic reason.
@@ -873,6 +990,12 @@ fn face_exposure_cap(
     // not theirs: at most a small lift, however far the median sits from middle grey.
     let surroundings = exposure > 0.25 && face_median >= frame_median;
     let exposure = if surroundings { 0.25 } else { exposure };
+    // The surroundings rule answers a histogram that wants middle grey. Highlights are a
+    // different witness: when nothing in the frame, the people included, comes near white, the
+    // whole frame is low, and a night scene is the one exception.
+    let night = intent(&measure(px, faces)) == Some(SceneKind::Night);
+    let anchor = highlight_lift(px).filter(|(lift, _)| !night && *lift > exposure);
+    let exposure = anchor.map_or(exposure, |(lift, _)| lift);
     // Nor is a white wall evidence that the people in front of it are overexposed.
     if exposure < 0.0 && face_median < 0.6 {
         return (
@@ -892,6 +1015,15 @@ fn face_exposure_cap(
     let low_key = frame_high > 0.75 && face_median > frame_median * 1.25;
     if low_key {
         capped = capped.min(0.15);
+    }
+    if let Some((_, top)) = anchor {
+        return (
+            capped,
+            Some(format!(
+                "Exposure {capped:+.2} EV (the histogram asked for {requested:+.2}): nothing in the frame, the people included, comes near white (its brightest tones reach {:.0}%), which is underexposure rather than a mood. The lift stops before any face would clip.",
+                top * 100.0
+            )),
+        );
     }
     if capped > requested + 1e-3 {
         return (

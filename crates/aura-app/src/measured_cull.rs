@@ -56,6 +56,8 @@ const BURST_BITS: u32 = 6;
 const BURST_BITS_UNTIMED: u32 = 3;
 /// Longest gap between two frames of one burst.
 const BURST_GAP_MS: i64 = 2500;
+/// How many following frames a frame is compared with when looking for its burst.
+const BURST_WINDOW: usize = 8;
 /// Above this share of technical rejections the rules are judging a style, not a mistake.
 const IMPLAUSIBLE_SHARE: f32 = 0.40;
 
@@ -626,35 +628,54 @@ pub fn decide(frames: &[Frame]) -> Report {
         }
     }
 
-    // Bursts are runs of consecutive deliverable frames that are near-identical.
-    let mut bursts: Vec<Vec<usize>> = Vec::new();
-    let mut current: Vec<usize> = Vec::new();
-    for index in 0..frames.len() {
-        let groupable = |i: usize| {
+    // Bursts: deliverable frames that are near-identical and close together. They need not
+    // be neighbours - a second camera's frame, or a rejected one, often sits between two frames
+    // of the same burst - so each frame is compared with the few that follow it. Frames the
+    // camera did not time must be neighbours.
+    let candidates: Vec<usize> = (0..frames.len())
+        .filter(|index| {
             verdicts
-                .get(i)
+                .get(*index)
                 .is_some_and(|v| v.keep && v.reason != Reason::Unmeasured)
-        };
-        let joins = current.last().is_some_and(|last| {
-            groupable(index)
-                && frames
-                    .get(*last)
-                    .zip(frames.get(index))
-                    .is_some_and(|(a, b)| same_burst(a, b))
-        });
-        if !joins {
-            if current.len() > 1 {
-                bursts.push(std::mem::take(&mut current));
+        })
+        .collect();
+    let mut labels: Vec<usize> = (0..candidates.len()).collect();
+    for first in 0..candidates.len() {
+        for second in first + 1..candidates.len().min(first + 1 + BURST_WINDOW) {
+            let pair = candidates
+                .get(first)
+                .zip(candidates.get(second))
+                .and_then(|(a, b)| frames.get(*a).zip(frames.get(*b)));
+            let Some((a, b)) = pair else {
+                continue;
+            };
+            let timed = a.time_ms.is_some() && b.time_ms.is_some();
+            if (!timed && second != first + 1) || !same_burst(a, b) {
+                continue;
             }
-            current.clear();
-        }
-        if groupable(index) {
-            current.push(index);
+            let (keep, merge) = (
+                labels.get(first).copied().unwrap_or(first),
+                labels.get(second).copied().unwrap_or(second),
+            );
+            if keep != merge {
+                for label in &mut labels {
+                    if *label == merge {
+                        *label = keep;
+                    }
+                }
+            }
         }
     }
-    if current.len() > 1 {
-        bursts.push(current);
+    let mut grouped: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (position, label) in labels.iter().enumerate() {
+        if let Some(index) = candidates.get(position) {
+            grouped.entry(*label).or_default().push(*index);
+        }
     }
+    let bursts: Vec<Vec<usize>> = grouped
+        .into_values()
+        .filter(|members| members.len() > 1)
+        .collect();
 
     for (number, members) in bursts.iter().enumerate() {
         let measures: Vec<(usize, &Measure)> = members
@@ -919,6 +940,29 @@ mod tests {
         assert_eq!(a.kept_instead.as_deref(), Some("b"));
         assert_eq!(report.verdicts[1].reason, Reason::BestOfBurst);
         assert_eq!(report.verdicts[3].burst, None);
+    }
+
+    #[test]
+    fn a_burst_survives_another_camera_or_a_rejected_frame_in_the_middle() {
+        let frames = [
+            frame("a", &scene(1, 1, 1), Some(1_000)),
+            frame("second-camera", &scene(7, 0, 0), Some(1_200)),
+            frame("b", &scene(1, 2, 2), Some(1_400)),
+            frame("blurred", &scene(8, 12, 12), Some(1_600)),
+            frame("c", &scene(1, 0, 0), Some(1_900)),
+        ];
+        let report = decide(&frames);
+        assert_eq!(report.kept(), ["second-camera", "c"]);
+        assert_eq!(report.counts.bursts, 1);
+        assert_eq!(report.counts.burst_duplicates, 2);
+        assert_eq!(report.counts.out_of_focus, 1);
+        // Frames the camera did not time are only a burst when they are neighbours.
+        let untimed = [
+            frame("a", &scene(1, 0, 0), None),
+            frame("between", &scene(7, 0, 0), None),
+            frame("b", &scene(1, 1, 1), None),
+        ];
+        assert_eq!(decide(&untimed).counts.bursts, 0);
     }
 
     #[test]

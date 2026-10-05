@@ -96,7 +96,54 @@ It only ever errs toward keeping:
   `photo-cull.json` beside the export, and summarised in the run notes.
 - **Cull first** on the start screen switches it off.
 
-### A run that fits in memory
+### Bursts need not be neighbours
+
+A burst is found by comparing each deliverable frame with the eight that follow it, not only
+with the next one. The first real run showed why: a second camera's frame, or a rejected one,
+often sits between two frames of the same burst in the timeline, and a neighbours-only rule
+then delivered two of a burst of three. Frames the camera did not time must still be
+neighbours.
+
+### The learned analysis pass is skipped
+
+The run used to start the autopilot's learned analysis (people, focus heads, moments, framing)
+and wait for it. Every model that pass consults is a placeholder and nothing in this build is
+calibrated, so its result may not be acted on; and the loop that waited for it could never
+see it complete, because the progress row it polled exists only while the run does. On sixty
+photographs it took 175 seconds and produced nothing the run used. It is now off unless
+`AURA_LEARNED_ANALYSIS=1`, the run says so in its notes, and when it is switched on its
+outcome is read from the run summary.
+
+### Highlights as evidence of exposure
+
+The histogram correction leaves a frame alone when its median sits in a wide normal band,
+which is right for a finished photograph and wrong for one exposed a stop low: measured
+against 62 professional photographs darkened by one stop, it left a median error of 0.69 EV.
+`smart_edit::highlight_lift` adds a second witness. A frame whose very brightest tones (the
+99.5th percentile) stop more than half a stop short of white, and that is not a night scene,
+is lifted by 80% of that room, to at most one stop.
+
+- With people in frame the lift replaces the "surroundings" cap, which answers a different
+  argument, and is still stopped before any face would clip.
+- Without people it takes three quarters of that, and no more than half a stop in a frame
+  that is dark throughout.
+- Skin at or near clipping (more than 12% of the face above 85% linear) is darkened by 0.2 to
+  0.7 EV whatever the histogram says. It is a ceiling, never a target brightness for skin.
+
+On the same 62 photographs one stop under, the prototype of this rule left 0.15 EV.
+
+### A third witness for white balance
+
+Two estimates (grey pixels, grey edges) had to agree before a cast was corrected, and on
+finished photographs they agreed on a cast that was not there in 39 of 62: warm wood, foliage
+and coloured clothes average to a colour. `white_patch` reads the brightest unclipped
+near-neutral tones, which take the colour of the light and little else.
+
+- When those tones are neutral, the light is, and nothing is corrected. In the prototype this
+  removed 20 of the 39 false corrections and cost two real ones.
+- When they show the same cast and at least a tenth of the frame is neutral area, 85% of a
+  mild cast and 70% of a strong one is removed, instead of 65% and 50%.
+
 
 `photo-edits.json` is written one entry at a time (`EditLog`) and closed even when the run
 is stopped, so two thousand recipes are never held at once. The edit phase reports the file
@@ -126,11 +173,21 @@ with a review before export.
   retouched and rendered on the processor. `scripts/test-wedding-run.py` measures it.
 - A stopped run does not resume where it stopped; running it again edits every photograph
   again. A repeat edit saves nothing new, so the result is the same, but the time is spent.
+- The highlight rule assumes a photograph should contain something near white. A finished
+  photograph with a deliberate matte look, or a dim scene with no light source in frame, is
+  lifted when it should not be: two of 62 finished photographs were, by 0.4 and 0.5 EV.
+- White balance is still wrong where a scene offers no neutral reference. A portrait in a pale
+  pink blouse against a pink backdrop is read as a white blouse in pink light and is made
+  cooler; a strong cast with no people in frame is kept as the light's mood; and where the two
+  estimates disagree nothing is corrected. The estimate itself is off by about 0.10 in
+  log-chroma, half the size of a mild cast, which is why only part of any cast is removed.
+- An overexposed frame with no people in it is not darkened: clipping without a face says
+  nothing about intent. Its highlights are recovered and that is all.
 
 ## Verification
 
-`crates/aura-app/src/measured_cull.rs` unit tests (focus, motion, exposure, bursts, the
-hand-edited and unmeasured guarantees, the withdrawal), `crates/aura-app/tests/one_click.rs`
+`crates/aura-app/src/measured_cull.rs` unit tests (focus, motion, exposure, bursts with a
+frame between them, the hand-edited and unmeasured guarantees, the withdrawal), `crates/aura-app/tests/one_click.rs`
 (the run writes `photo-cull.json`, keeps a hand-edited frame and reports the cull),
 `ui/src/components/workflow/FinishFolder.test.tsx`, and `scripts/test-wedding-run.py`, which
 presses the real button in the real window and scores the cull and the edit against a
