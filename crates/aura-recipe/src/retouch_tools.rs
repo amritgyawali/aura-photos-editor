@@ -328,7 +328,7 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || edit.source.is_some_and(|p| !p.iter().all(|v| unit(*v)))
             || !edit.source_scale.is_finite()
             || !(0.2..=1.0).contains(&edit.source_scale)
-            || (edit.source_scale != 1.0 && edit.tool == Tool::PatchHeal && edit.source.is_none())
+            || (edit.source_scale < 1.0 && edit.tool == Tool::PatchHeal && edit.source.is_none())
             || (matches!(
                 edit.tool,
                 Tool::Clone

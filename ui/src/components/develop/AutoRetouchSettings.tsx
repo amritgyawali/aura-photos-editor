@@ -128,7 +128,9 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
   const scope = SCOPES.find(([value]) => value === options.scope) ?? SCOPES[0];
   const change = (key: keyof RetouchSettings, value: number | boolean) => {
     setPreset('custom');
-    setOptions({ ...options, settings: { ...settings, [key]: value } });
+    setOptions({ ...options, settings: { ...settings, [key]: value,
+      ...(key === 'deepBlemishCleanup' && value === false ? { maxSpots: Math.min(24, settings.maxSpots) } : {}),
+    } });
   };
   const choose = ([id, , values, intensity]: Preset) => {
     setPreset(id);
