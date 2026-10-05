@@ -74,8 +74,33 @@ strip         = "debuginfo"
 [profile.dev.package.aura-app]
 opt-level = 2
 
+# The pixel paths an unattended run spends its hours in: decode, inference, render,
+# retouch planning and export. Two thousand photographs at opt-level 2 is a longer night
+# than it needs to be, and these crates are small enough that level 3 costs little to build.
+# ADR-0088.
 [profile.dev.package.aura-render]
-opt-level = 2
+opt-level = 3
 
 [profile.dev.package.aura-vision]
-opt-level = 2
+opt-level = 3
+
+[profile.dev.package.aura-raw]
+opt-level = 3
+
+[profile.dev.package.aura-infer]
+opt-level = 3
+
+[profile.dev.package.aura-preview]
+opt-level = 3
+
+[profile.dev.package.aura-export]
+opt-level = 3
+
+[profile.dev.package.aura-portrait]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+
+[profile.dev.package.jpeg-encoder]
+opt-level = 3

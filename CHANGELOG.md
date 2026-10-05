@@ -2,6 +2,23 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## One studio, and a wedding finished from one folder — 2026-10-05
+
+- Merge the adaptive editor into the permanent studio: one application, one shortcut
+  (**AURA Photo Studio**), the studio shell with the per-face adaptive engine. ADR-0088.
+- Add **Finish a whole folder** to the start screen: import, cull, edit, retouch and export
+  from one press, with the look and reference chosen above it, on the native worker.
+- Add a measured cull for runs without learned analysis: unusable exposure, missed focus,
+  motion blur and burst duplicates, from each photograph's pixels. It never rejects a
+  hand-edited or unmeasurable frame, withdraws itself when it would reject an implausible
+  share, deletes nothing and writes every decision to `photo-cull.json`.
+- Give the unattended run the same per-photo edit as the studio (the measured edit, or the
+  chosen profile and reference) instead of the thumbnail-histogram fallback.
+- Write the run's edit report as it goes, show the file being edited and the time left, and
+  give every run its own export folder.
+- Build the decode, inference, render and export crates at the highest optimisation level
+  in the desktop shell.
+
 ## Per-face adaptive retouch and scene intent — 2026-10-05
 
 - Measure every face before retouching it (size in the frame, skin texture, colour evenness,

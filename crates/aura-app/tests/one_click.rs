@@ -130,6 +130,8 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
             project_id: project.id.clone(),
             destination: destination.display().to_string(),
             ingest_job_id: None,
+            look: None,
+            keep_everything: false,
         },
     )
     .expect("start");
@@ -173,6 +175,29 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
             .iter()
             .any(|line| line.contains("local reference") || line.contains("no working provider")),
         "the offline pipeline must say the provider did not answer: {:?}",
+        final_row.notes,
+    );
+
+    // The measured cull runs when the learned one cannot, never drops a frame a person
+    // edited or one it could not judge, and writes down every decision it made.
+    let cull: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(destination.join("photo-cull.json")).expect("cull report"),
+    )
+    .expect("cull json");
+    let verdicts = cull["verdicts"].as_array().expect("one verdict per frame");
+    assert_eq!(verdicts.len(), 2);
+    assert!(verdicts.iter().all(|verdict| verdict["keep"] == true));
+    assert!(verdicts
+        .iter()
+        .any(|verdict| verdict["reason"] == "edited_by_hand"));
+    assert_eq!(cull["counts"]["kept"], 2);
+    assert_eq!(final_row.selected, 2);
+    assert!(
+        final_row
+            .notes
+            .iter()
+            .any(|line| line.starts_with("Measured cull:")),
+        "the run must say what the cull did: {:?}",
         final_row.notes,
     );
 
@@ -249,6 +274,8 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
             project_id: project.id,
             destination: dir.path().join("cancelled-out").display().to_string(),
             ingest_job_id: Some("waiting-import".into()),
+            look: None,
+            keep_everything: false,
         },
     )
     .expect("previous worker is fully finished");
@@ -274,6 +301,9 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
         aura_app::contract::ipc::AutomaticStartInput {
             project_id: None,
             roots: vec![],
+            look: None,
+            keep_everything: false,
+            destination: None,
         },
     )
     .expect_err("empty selection");

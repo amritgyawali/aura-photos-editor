@@ -83,6 +83,7 @@ pub mod integrity_commands;
 pub mod local_commands;
 pub mod look_commands;
 pub mod mask_commands;
+pub mod measured_cull;
 pub mod micro_commands;
 pub mod moment_commands;
 pub mod people_commands;

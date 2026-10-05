@@ -5071,6 +5071,27 @@ export type OneClickFinishInput = {
   projectId: string;
   destination: string;
   ingestJobId: string | null;
+  /** ADR-0088. The look chosen on the start screen; absent means the measured edit alone. */
+  look?: AutomaticLookInput | null;
+  /** ADR-0088. Deliver every readable frame instead of running the measured cull. */
+  keepEverything?: boolean;
+};
+
+/** ADR-0088. Strengths are whole percentages: profile `0..150`, reference `0..100`. */
+export type AutomaticLookInput = {
+  profileId?: string | null;
+  profileStrength?: number;
+  referenceId?: string | null;
+  referenceStrength?: number;
+};
+
+/** ADR-0088. Selecting a folder is the only required interaction. */
+export type AutomaticStartInput = {
+  roots: string[];
+  projectId: string | null;
+  look?: AutomaticLookInput | null;
+  keepEverything?: boolean;
+  destination?: string | null;
 };
 
 /** The job handle; progress is `oneClickStatus`. */
