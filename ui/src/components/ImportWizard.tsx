@@ -53,7 +53,7 @@ export function ImportWizard({
     <section className="panel" aria-label="Import">
       <h2>Add your photos</h2>
       <p>Choose one photo or a whole collection. AURA adjusts each photo’s light and contrast automatically. Your originals stay untouched.</p>
-      {automatic && <p>AURA then analyzes, edits and exports them to Pictures / AURA Exports without further steps.</p>}
+      {automatic && <p>AURA analyzes and edits each photo separately, automatically retouches detected portraits using that photo's saved settings, and exports to Pictures / AURA Exports. Photos without detected people skip portrait retouching.</p>}
       <div className="import-actions">
         <button className="is-primary" type="button" disabled={disabled || running || picking || !inTauri()} onClick={() => void choose(true)}>{picking ? 'Choosing…' : 'Choose photos'}</button>
         <button type="button" disabled={disabled || running || picking || !inTauri()} onClick={() => void choose()}>Choose photo folder</button>

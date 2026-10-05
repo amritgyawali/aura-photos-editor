@@ -2,6 +2,14 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Automatic portrait retouch after import — 2026-10-05
+
+- Run the bundled portrait retoucher after each photo's automatic light/color edit and
+  before export, including offline runs where optional analysis models are unavailable.
+- Reuse each photo's own retouch preferences, preserve manual work, and avoid portrait
+  operations on photos without detected people. Export reports contain the final retouched
+  recipe. Retouch failures are reported and do not prevent other photos from finishing.
+
 ## Independent batch editing and saved retouch choices — 2026-10-05
 
 - Search and select photos for local batch editing. Each photo is measured independently;

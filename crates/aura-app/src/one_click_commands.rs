@@ -1,9 +1,9 @@
 //! Selection-to-delivery background workflow. See ADR-0069.
 use crate::contract::ipc::{
     AcceptGeometryInput, AutomaticStartDto, AutomaticStartInput, AutopilotStartInput,
-    CreateProjectInput, CullProjectInput, ExportJobInput, ExportSetInput, GeometryReviewInput,
-    IpcError, ListImagesInput, OneClickFinishDto, OneClickFinishInput, OneClickStatusDto,
-    PhotoAutoEditInput, PlanGeometryInput, RecipeDto, StartIngestInput,
+    CreateProjectInput, CullProjectInput, DevelopImageInput, ExportJobInput, ExportSetInput,
+    GeometryReviewInput, IpcError, ListImagesInput, OneClickFinishDto, OneClickFinishInput,
+    OneClickStatusDto, PhotoAutoEditInput, PlanGeometryInput, RecipeDto, StartIngestInput,
 };
 use crate::AppState;
 use aura_core::progress::CancelToken;
@@ -573,7 +573,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     phase(
         job,
         "edit",
-        "Choosing and applying an individual edit to every selected photo.",
+        "Editing and retouching each photo using its own measurements and preferences.",
         targets.len() as u64,
     );
     let mut edited = Vec::new();
@@ -594,6 +594,24 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             crate::auto_edit_commands::photo_auto_edit_local(state, &request)
         };
         child(job, None);
+        if stopped(job) {
+            return Ok(());
+        }
+        // Always run the bundled portrait pass, even when optional analysis/cloud is
+        // unavailable. It reads this photo's saved choices, protects manual work, and
+        // leaves photos without detected people free of portrait operations. Run it
+        // AFTER grading so its luminance selections use the exposure being exported.
+        let result = result.and_then(|mut answer| {
+            update(job, |s| {
+                s.phase_label = format!("Retouching photo {} of {}.", index + 1, targets.len());
+            });
+            answer.recipe = crate::photo_enhance::enhance_portrait(
+                state,
+                &DevelopImageInput { photo_id: photo.clone() },
+            )?;
+            answer.reasons.push("Local portrait retouch evaluated with this photo's saved preferences. Applied and skipped corrections are recorded in its portrait report.".into());
+            Ok(answer)
+        });
         if stopped(job) {
             return Ok(());
         }
@@ -619,7 +637,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                 note(
                     job,
                     format!(
-                        "{} edit failed; exporting its previous reversible recipe: {}",
+                        "{} edit or retouch failed; exporting its last saved reversible recipe: {}",
                         photo, err.message
                     ),
                 );

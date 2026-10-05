@@ -43,3 +43,19 @@ Advanced project-wide model analysis remains a separate workflow. Stopping waits
 current native operation; it cannot interrupt that operation midway. Scene recognition and
 blemish detection remain heuristics requiring visual review, particularly on unusual lighting
 or permanent facial marks. Automated tests do not establish expert-level quality on every photo.
+
+## Import workflow follow-up
+
+The native selection-to-export workflow now invokes `enhance_portrait` after each successful
+cloud or local grade, before delivery. This is the same bundled retoucher used by the editor;
+it does not depend on optional autopilot analysis being available. Running after the grade
+preserves the chosen global settings and gives brightness masks the exposure that will render.
+The returned recipe replaces the earlier grade in `photo-edits.json`, so the report describes
+what is actually exported. A retouch failure increments failed edits, records a visible note,
+and leaves the last saved recipe available for export while other photographs continue.
+Cancellation is checked both before and after this native pass. The existing device-level
+portrait disable switch remains honored and is recorded inside the photo's portrait report.
+
+The offline delivery regression verifies that every frame receives a portrait assessment,
+different saved scopes stay separate, manual exposure and originals remain unchanged,
+no portrait operations are created for abstract frames, and report hashes match saved recipes.
