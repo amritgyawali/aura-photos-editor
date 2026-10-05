@@ -16,6 +16,8 @@ fn operation() -> Edit {
         amount: 1.0,
         feather: 0.2,
         radius: 0.01,
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,
@@ -47,6 +49,80 @@ fn blemish(rgb: &mut [f32]) {
             }
         }
     }
+}
+
+#[test]
+fn small_clean_source_repairs_large_target_without_copying_nearby_defect() {
+    let clean = surface();
+    let mut damaged = clean.clone();
+    blemish(&mut damaged);
+    // This defect lies inside a full-size donor, outside its smaller clean centre.
+    for y in 62..=66 {
+        for x in 36..=38 {
+            for c in 0..3 {
+                damaged[(y * W + x) * 3 + c] *= 0.1;
+            }
+        }
+    }
+    let mut edit = operation();
+    edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
+    edit.source_scale = 0.25;
+    retouch_tools::validate(&[edit.clone()]).unwrap();
+    let before = damaged.clone();
+    apply(&mut damaged, W, W, &[edit]);
+    for y in 61..=67 {
+        for x in 61..=67 {
+            for c in 0..3 {
+                let i = (y * W + x) * 3 + c;
+                assert!((damaged[i] - clean[i]).abs() < 0.005);
+            }
+        }
+    }
+    for y in 0..W {
+        for x in 0..W {
+            if (x as f32 - 64.0).hypot(y as f32 - 64.0) >= 7.0 {
+                let i = (y * W + x) * 3;
+                assert_eq!(&damaged[i..i + 3], &before[i..i + 3]);
+            }
+        }
+    }
+}
+
+#[test]
+fn legacy_donor_defaults_to_original_scale_and_invalid_scales_are_rejected() {
+    let original = operation();
+    let mut json = serde_json::to_value(&original).unwrap();
+    json.as_object_mut().unwrap().remove("sourceScale");
+    let parsed: Edit = serde_json::from_value(json).unwrap();
+    assert_eq!(parsed, original);
+    for scale in [0.0, 0.19, 1.1, f32::NAN] {
+        let mut invalid = original.clone();
+        invalid.source_scale = scale;
+        assert!(retouch_tools::validate(&[invalid]).is_err());
+    }
+    let mut no_source = original;
+    no_source.source_scale = 0.5;
+    assert!(retouch_tools::validate(&[no_source]).is_err());
+}
+
+#[test]
+fn small_donors_preserve_fine_texture_instead_of_enlarging_pores() {
+    let mut rgb: Vec<f32> = (0..W * W)
+        .flat_map(|i| {
+            let pore = if i % 2 == 0 { 0.02 } else { -0.02 };
+            [0.4 + pore, 0.3 + pore, 0.2 + pore]
+        })
+        .collect();
+    blemish(&mut rgb);
+    let mut edit = operation();
+    edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
+    edit.source_scale = 0.25;
+    apply(&mut rgb, W, W, &[edit]);
+    let detail = (61..67)
+        .map(|x| (rgb[(64 * W + x + 1) * 3] - rgb[(64 * W + x) * 3]).abs())
+        .sum::<f32>()
+        / 6.0;
+    assert!(detail > 0.012, "fine donor texture was blurred: {detail}");
 }
 
 #[test]

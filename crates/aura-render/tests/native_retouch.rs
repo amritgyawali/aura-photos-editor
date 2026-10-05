@@ -17,6 +17,8 @@ fn edit(tool: Tool) -> Edit {
         amount: 0.7,
         feather: 0.5,
         radius: 0.01,
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.3,
@@ -640,5 +642,90 @@ fn selection_preview_uses_only_preceding_operations_and_never_changes_recipe() {
         engine
             .retouch_selection(&image, &recipe, &draft, Some("second"))
             .unwrap()
+    );
+}
+
+#[test]
+fn pore_separation_retains_fine_detail_reduces_blotches_and_preserves_colour_and_light() {
+    let (w, h) = (256, 96);
+    let make = |pore: bool, blotch: bool| -> Vec<f32> {
+        (0..w * h)
+            .flat_map(|i| {
+                let x = (i % w) as f32;
+                let base = 0.25 + x * 0.0004;
+                let detail = if pore {
+                    if i % 2 == 0 {
+                        0.008
+                    } else {
+                        -0.008
+                    }
+                } else {
+                    0.0
+                };
+                let mark = if blotch {
+                    0.03 * (x * std::f32::consts::TAU / 24.0).sin()
+                } else {
+                    0.0
+                };
+                let value = base + detail + mark;
+                [value, value * 0.65, value * 0.4]
+            })
+            .collect()
+    };
+    let mut op = edit(Tool::Frequency);
+    op.region = [0.5, 0.5, 1.0, 1.0];
+    op.feather = 0.0;
+    op.amount = 1.0;
+    op.radius = 0.05;
+    op.texture = 0.9;
+    op.tone = 0.95;
+    op.preserve_microtexture = true;
+    let render = |src: &[f32]| {
+        let mut out = src.to_vec();
+        aura_render::retouch_tools::apply(&mut out, w, h, &[op.clone()]);
+        out
+    };
+    let base = make(false, false);
+    let pores = make(true, false);
+    let blotch = make(false, true);
+    let base_after = render(&base);
+    let pores_after = render(&pores);
+    let blotch_after = render(&blotch);
+    let energy = |a: &[f32], b: &[f32]| -> f32 {
+        (32..64)
+            .flat_map(|y| (48..208).map(move |x| (y * w + x) * 3))
+            .map(|i| (a[i] - b[i]).powi(2))
+            .sum::<f32>()
+            .sqrt()
+    };
+    let pore_gain = energy(&pores_after, &base_after) / energy(&pores, &base);
+    let blotch_gain = energy(&blotch_after, &base_after) / energy(&blotch, &base);
+    assert!(pore_gain > 0.75 && pore_gain < 1.1, "pore gain {pore_gain}");
+    assert!(blotch_gain < 0.5, "blotch gain {blotch_gain}");
+    for y in 32..64 {
+        for x in 48..208 {
+            let i = (y * w + x) * 3;
+            assert!(
+                (base_after[i] - base[i]).abs() < 1e-5,
+                "broad lighting changed"
+            );
+            assert!((pores_after[i + 1] / pores_after[i] - 0.65).abs() < 1e-5);
+            assert!((pores_after[i + 2] / pores_after[i] - 0.4).abs() < 1e-5);
+        }
+    }
+    let mut neutral = pores.clone();
+    op.tone = 0.0;
+    op.texture = 1.0;
+    aura_render::retouch_tools::apply(&mut neutral, w, h, &[op.clone()]);
+    assert_eq!(neutral, pores);
+    let mut legacy = serde_json::to_value(&op).unwrap();
+    legacy
+        .as_object_mut()
+        .unwrap()
+        .remove("preserveMicrotexture");
+    assert!(
+        !serde_json::from_value::<Edit>(legacy)
+            .unwrap()
+            .preserve_microtexture
     );
 }

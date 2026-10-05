@@ -31,7 +31,7 @@ describe('automatic retouch settings', () => {
     const { rerender } = render(<AutoRetouchSettings disabled={false} onRun={vi.fn()} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Body skin' }));
     expect((screen.getByLabelText('Teeth') as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByTitle(/avoiding likely moles and freckles/)).toBeTruthy();
+    expect(screen.getByTitle(/Repairs measured spots/)).toBeTruthy();
     rerender(<AutoRetouchSettings disabled busy onRun={vi.fn()} />);
     expect((screen.getByRole('button', { name: 'Detecting and retouching…' }) as HTMLButtonElement).closest('fieldset')?.disabled).toBe(true);
   });
@@ -45,10 +45,10 @@ describe('automatic retouch settings', () => {
     expect(automaticLabel('auto-portrait-v1-0-fabric')).toBe(' · Auto (clothes 1)');
     expect(automaticLabel('auto-portrait-v1-backdrop')).toBe(' · Auto (backdrop)');
   });
-  it('offers every one of the fifty-two fine controls exactly once', () => {
+  it('offers every one of the fifty-four fine controls exactly once', () => {
     const keys = SETTING_GROUPS.flatMap(([, controls]) => controls.map(([key]) => key));
-    expect(keys.length).toBe(52);
-    expect(new Set(keys).size).toBe(52);
+    expect(keys.length).toBe(54);
+    expect(new Set(keys).size).toBe(54);
     expect([...keys].sort()).toEqual(Object.keys(DEFAULT_RETOUCH_SETTINGS).sort());
   });
   it('applies a preset, then marks a hand change as custom and sends it', () => {
@@ -66,4 +66,14 @@ describe('automatic retouch settings', () => {
     expect(sent?.settings).toEqual(expect.objectContaining({ smoothing: .85, contour: .5, skinWarmth: -0.4, mainSubjectOnly: true }));
     expect(PRESETS.every(([, , values]) => Object.keys(values).every(k => k in DEFAULT_RETOUCH_SETTINGS))).toBe(true);
   });
+});
+
+it('runs deep cleanup with explicit dark-mark removal and retained fine texture', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({
+    deepBlemishCleanup: true, removeDarkMarks: true, maxSpots: 220, texture: .85,
+  }) }));
 });

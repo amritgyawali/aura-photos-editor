@@ -96,7 +96,12 @@ pub fn apply_with_mattes(
         } else if edit.tool == Tool::AutoBlemish {
             auto_spots(rgb, width, height, edit, &coverage);
         } else {
-            apply_one(rgb, width, height, edit, &coverage, None);
+            let refine_edges = edit
+                .matte
+                .as_ref()
+                .and_then(|id| mattes.get(id))
+                .is_none_or(|matte| matte.refine_edges);
+            apply_one(rgb, width, height, edit, &coverage, None, refine_edges);
         }
     }
 }
@@ -153,6 +158,7 @@ fn apply_one(
     edit: &Edit,
     coverage: &Coverage,
     clip: Option<&Coverage>,
+    refine_matte_edges: bool,
 ) {
     let [cx, cy, rx, ry] = edit.region;
     let radius = (edit.radius * w.min(h) as f32).round().max(1.0) as usize;
@@ -177,14 +183,41 @@ fn apply_one(
     );
     let mut narrow = Vec::new();
     let mut wide = Vec::new();
+    let mut fine = Vec::new();
+    let separate_pores = edit.tool == Tool::Frequency && edit.preserve_microtexture;
+    // A protected surface finish averages only selected skin. Hair, lips and eyes
+    // must not darken the blur near its boundary or be selected by a colour gate.
+    let weights: Option<Vec<f32>> = (!refine_matte_edges).then(|| {
+        (by..by + bh)
+            .flat_map(|y| (bx..bx + bw).map(move |x| coverage.at(x, y, w, h)))
+            .collect()
+    });
+    let weighted_blur = |plane: &[f32], r: usize| {
+        if let Some(weights) = &weights {
+            let values: Vec<_> = plane.iter().zip(weights).map(|(v, a)| v * a).collect();
+            let values = crate::bands::blur(&values, bw, bh, r);
+            let blurred_weights = crate::bands::blur(weights, bw, bh, r);
+            values
+                .iter()
+                .zip(blurred_weights)
+                .zip(plane)
+                .map(|((v, a), old)| if a > 1e-5 { v / a } else { *old })
+                .collect()
+        } else {
+            crate::bands::blur(plane, bw, bh, r)
+        }
+    };
     if needs_bands {
         for c in 0..3 {
             let plane: Vec<f32> = (by..by + bh)
                 .flat_map(|y| (bx..bx + bw).map(move |x| (y * w + x) * 3 + c))
                 .map(|i| rgb[i])
                 .collect();
-            narrow.push(crate::bands::blur(&plane, bw, bh, radius));
-            wide.push(crate::bands::blur(&plane, bw, bh, radius * 3));
+            narrow.push(weighted_blur(&plane, radius));
+            wide.push(weighted_blur(&plane, radius * 3));
+            if separate_pores {
+                fine.push(weighted_blur(&plane, (radius / 5).max(1)));
+            }
         }
     }
     let center = sample(rgb, w, h, [cx, cy]);
@@ -220,7 +253,8 @@ fn apply_one(
     let donor_mean = source.map_or(center, |p| sample(rgb, w, h, p));
     // Segmented operations on skin and hair skip much darker structures inside the matte.
     // Clothes and backdrops keep their own shadows and are not guarded.
-    let guard_reference = (edit.matte.is_some()
+    let guard_reference = (refine_matte_edges
+        && edit.matte.is_some()
         && !matches!(
             edit.tool,
             Tool::Fabric | Tool::Backdrop | Tool::Heal | Tool::Clone
@@ -291,9 +325,18 @@ fn apply_one(
                 Tool::Frequency | Tool::Wrinkle | Tool::Fabric => {
                     let amount = if edit.tool == Tool::Wrinkle { 0.5 } else { 1.0 };
                     for c in 0..3 {
-                        value[c] = old[c]
-                            + edit.tone * amount * (broad[c] - low[c])
-                            + (edit.texture - 1.0) * (old[c] - low[c]);
+                        value[c] = if separate_pores {
+                            // Keep the real fine-detail band while attenuating larger
+                            // irregularities. Both corrections have zero response to
+                            // constant colour and preserve broad face illumination.
+                            old[c] + edit.tone * (broad[c] - low[c])
+                                - edit.tone * 0.8 * (fine[c][i] - low[c])
+                                + (edit.texture - 1.0) * (old[c] - fine[c][i])
+                        } else {
+                            old[c]
+                                + edit.tone * amount * (broad[c] - low[c])
+                                + (edit.texture - 1.0) * (old[c] - low[c])
+                        };
                     }
                 }
                 Tool::Backdrop => {
@@ -445,7 +488,7 @@ fn auto_spots(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: &Cover
             continue;
         }
         let spot_coverage = Coverage::new(&spot, w, h);
-        apply_one(rgb, w, h, &spot, &spot_coverage, Some(coverage));
+        apply_one(rgb, w, h, &spot, &spot_coverage, Some(coverage), true);
         chosen.push((x, y));
     }
 }

@@ -121,6 +121,10 @@ pub struct Edit {
     pub region: [f32; 4],
     /// Normalized donor/reference point; mandatory for clone and color matching.
     pub source: Option<[f32; 2]>,
+    /// Patch-heal donor footprint relative to the target (1 keeps the original scale).
+    /// Smaller clean donors can cover dense blemishes; only used with an explicit source.
+    #[serde(default = "default_source_scale")]
+    pub source_scale: f32,
     pub amount: f32,
     /// Feather fraction: 0 is a hard edge, 1 is fully feathered.
     pub feather: f32,
@@ -128,6 +132,10 @@ pub struct Edit {
     pub radius: f32,
     /// High-band gain. 1 preserves the original high band.
     pub texture: f32,
+    /// Separate fine pores from larger uneven texture during frequency separation.
+    /// Off for old recipes; on for the automatic deep skin finish.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub preserve_microtexture: bool,
     pub tone: f32,
     pub warmth: f32,
     pub tint: f32,
@@ -157,6 +165,18 @@ pub struct Matte {
     pub width: u32,
     pub height: u32,
     pub data: String,
+    /// Re-detect fine image edges when upsampling. Disable for an already protected
+    /// soft surface selection, so blemishes cannot cut holes in their own correction.
+    #[serde(default = "default_refine_edges")]
+    pub refine_edges: bool,
+}
+
+fn default_refine_edges() -> bool {
+    true
+}
+
+fn default_source_scale() -> f32 {
+    1.0
 }
 
 const BASE64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -239,6 +259,7 @@ impl Matte {
             width,
             height,
             data: base64_encode(&runs),
+            refine_edges: true,
         }
     }
 
@@ -305,6 +326,9 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || !edit.tint.is_finite()
             || !(-1.0..=1.0).contains(&edit.tint)
             || edit.source.is_some_and(|p| !p.iter().all(|v| unit(*v)))
+            || !edit.source_scale.is_finite()
+            || !(0.2..=1.0).contains(&edit.source_scale)
+            || (edit.source_scale != 1.0 && edit.tool == Tool::PatchHeal && edit.source.is_none())
             || (matches!(
                 edit.tool,
                 Tool::Clone

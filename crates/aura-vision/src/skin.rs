@@ -47,7 +47,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::portrait::PortraitFace;
 
-pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v2";
+#[path = "skin_orientation.rs"]
+mod orientation;
+
+pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v3";
 pub const MODEL_HASH: &str = "10eee962bb85d9f5d0b292376f595ce70d810becfcef17feeb4762e62d8a7754";
 const SIDE: usize = 256;
 const CLASSES: usize = 6;
@@ -751,6 +754,37 @@ pub fn analyse(
     if w < 8 || h < 8 || w.checked_mul(h).and_then(|n| n.checked_mul(3)) != Some(rgb.len()) {
         return Err(invalid("Invalid skin analysis pixels"));
     }
+    if faces.iter().any(|face| {
+        let [l, t, r, b] = face.bounds;
+        face.bounds
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+            || l >= r
+            || t >= b
+            || face.landmarks.iter().flatten().any(|v| !v.is_finite())
+            || !face.confidence.is_finite()
+    }) {
+        return Err(invalid("Invalid skin analysis face geometry"));
+    }
+    let image = working(rgb, w, h, WORKING_EDGE);
+    let turns = orientation::upright_turns(faces, w, h);
+    if turns == 0 {
+        return analyse_upright(&image, faces, options);
+    }
+    // Rotate only the bounded analysis proxy. Stored selections and sample points
+    // must return to original coordinates before the planner or renderer sees them.
+    let image = orientation::image(&image, turns);
+    let faces: Vec<_> = faces.iter().map(|f| orientation::face(f, turns)).collect();
+    let mut result = analyse_upright(&image, &faces, options)?;
+    orientation::restore(&mut result, (4 - turns) % 4);
+    Ok(result)
+}
+
+fn analyse_upright(
+    image: &Image,
+    faces: &[PortraitFace],
+    options: Options,
+) -> AuraResult<Analysis> {
     let precision = if options.precision.is_finite() {
         options.precision.clamp(0.0, 1.0)
     } else {
@@ -768,9 +802,8 @@ pub fn analyse(
     } else {
         precision
     };
-    let image = working(rgb, w, h, WORKING_EDGE);
     let (w, h) = (image.w, image.h);
-    let (field, passes) = segment(&image, faces, options.max_crops)?;
+    let (field, passes) = segment(image, faces, options.max_crops)?;
     let luma = image.luma();
     // The network's grid is w / 256 working pixels; the refinement radius follows it, and the
     // photographer's softness widens it.
@@ -863,7 +896,7 @@ pub fn analyse(
                 }
             }
         }
-        let face_model = colour_model(&image, &confident);
+        let face_model = colour_model(image, &confident);
         let gate: Option<Vec<f32>> = face_model.as_ref().map(|model| {
             (0..w * h)
                 .map(|i| {
@@ -895,7 +928,7 @@ pub fn analyse(
         let body_confident: Vec<usize> = (0..w * h)
             .filter(|&i| body_regions[k][i] && body_plane[i] > 0.85)
             .collect();
-        let body_model = colour_model(&image, &body_confident).or(face_model);
+        let body_model = colour_model(image, &body_confident).or(face_model);
         let mut body: Vec<f32> = (0..w * h)
             .map(|i| body_plane[i] * body_support[i])
             .collect();
@@ -1087,6 +1120,16 @@ mod tests {
     #[test]
     fn blank_frames_have_no_people_and_invalid_buffers_are_refused() {
         assert!(analyse(&[0; 10], 4, 4, &[], Options::default()).is_err());
+        let mut face = PortraitFace {
+            bounds: [0.1, 0.1, 0.9, 0.9],
+            landmarks: [[0.5, 0.5]; 5],
+            confidence: 0.9,
+        };
+        face.landmarks[0][0] = f32::NAN;
+        assert!(analyse(&[128; 8 * 8 * 3], 8, 8, &[face.clone()], Options::default()).is_err());
+        face.landmarks[0][0] = 0.5;
+        face.bounds = [0.8, 0.1, 0.2, 0.9];
+        assert!(analyse(&[128; 8 * 8 * 3], 8, 8, &[face], Options::default()).is_err());
         let analysis = analyse(&vec![128; 64 * 48 * 3], 64, 48, &[], Options::default()).unwrap();
         assert!(analysis.people.is_empty());
         assert_eq!(analysis.passes, 1);

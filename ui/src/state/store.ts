@@ -51,7 +51,7 @@ export const useStore = create<ViewState>((set) => ({
   setProjects: (projects) => set({ projects }),
 
   setActiveProject: (activeProjectId) =>
-    set({
+    set((state) => state.activeProjectId === activeProjectId ? state : {
       activeProjectId,
       rows: [],
       loadedPages: 0,

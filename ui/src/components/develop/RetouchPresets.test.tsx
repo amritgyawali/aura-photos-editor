@@ -36,3 +36,9 @@ it('round-trips skin controls, strips extra sample data and rejects an invalid r
   payload.items[0]!.settings.skin.tolerance=.9;
   expect(()=>parseRetouchPresets(JSON.stringify(payload))).toThrow('invalid');
 });
+it('remembers fine texture preservation and defaults old presets to off', () => {
+  const payload = {version:1,items:[{name:'Pores',settings:{...freshRetouch(),tool:'frequency',preserveMicrotexture:true}}]};
+  expect(parseRetouchPresets(JSON.stringify(payload))[0]?.settings.preserveMicrotexture).toBe(true);
+  const legacy = {version:1,items:[{name:'Old',settings:freshRetouch()}]};
+  expect(parseRetouchPresets(JSON.stringify(legacy))[0]?.settings.preserveMicrotexture).toBe(false);
+});

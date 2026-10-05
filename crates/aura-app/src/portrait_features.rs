@@ -5,7 +5,7 @@
 //! around it; a tooth is whitened only when it is yellower than the frame's own neutral; an
 //! under-eye is lifted only when it is darker than the same person's cheek. Dark spots that
 //! are not redder than their surroundings (moles, freckles, beauty marks) are always kept and
-//! counted, because a permanent mark is part of somebody's face. ADR-0081.
+//! counted in the default pass. The separate opt-in deep cleanup can include dark marks.
 //!
 //! Each finding becomes an ordinary, editable native retouch operation with a stable ID, so
 //! the photographer can inspect, weaken, disable or remove any single one of them.
@@ -27,7 +27,8 @@ use aura_vision::portrait::PortraitFace;
 use serde::{Deserialize, Serialize};
 
 /// The planner version recorded in the report; bump on any behavioural change.
-pub const VERSION: &str = "measured-features-v2";
+pub const VERSION: &str = "measured-features-v3";
+pub(crate) mod deep_blemish;
 /// At most this many healed spots per face. A face with more is left for a person to judge.
 pub const MAX_SPOTS: usize = 12;
 /// More compact red marks than this on one face is a pattern (freckles), not blemishes.
@@ -344,6 +345,8 @@ fn base_edit(id: String, tool: Tool, amount: f32, px: &Pixels<'_>, region_px: [f
         amount: amount.clamp(0.0, 1.0),
         feather: 0.7,
         radius: 0.002,
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,
