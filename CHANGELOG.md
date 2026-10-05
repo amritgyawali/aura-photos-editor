@@ -11,6 +11,42 @@ All notable changes to AURA. One entry per phase, newest first.
   face while requiring stronger skin confidence for donors, and tighten lip protection
   so nearby cheeks receive the finishing pass. Keep facial features and originals intact.
 
+## One studio, and a wedding finished from one folder — 2026-10-05
+
+- Merge the adaptive editor into the permanent studio: one application, one shortcut
+  (**AURA Photo Studio**), the studio shell with the per-face adaptive engine. ADR-0088.
+- Add **Finish a whole folder** to the start screen: import, cull, edit, retouch and export
+  from one press, with the look and reference chosen above it, on the native worker.
+- Add a measured cull for runs without learned analysis: unusable exposure, missed focus,
+  motion blur and burst duplicates, from each photograph's pixels. It never rejects a
+  hand-edited or unmeasurable frame, withdraws itself when it would reject an implausible
+  share, deletes nothing and writes every decision to `photo-cull.json`.
+- Give the unattended run the same per-photo edit as the studio (the measured edit, or the
+  chosen profile and reference) instead of the thumbnail-histogram fallback.
+- Write the run's edit report as it goes, show the file being edited and the time left, and
+  give every run its own export folder.
+- Build the decode, inference, render and export crates at the highest optimisation level
+  in the desktop shell.
+- Read highlights as evidence of exposure: a frame whose brightest tones stop well short of
+  white is lifted, up to one stop and never past clipping a face; skin at or near clipping is
+  darkened. Add the brightest neutral tones as a third white-balance estimate that vetoes a
+  cast the light does not have and allows more of a confirmed one to be removed.
+- Find bursts across a frame from another camera or a rejected frame, and skip the learned
+  analysis pass whose placeholder models the run could not act on (three seconds a photo).
+
+## Per-face adaptive retouch and scene intent — 2026-10-05
+
+- Measure every face before retouching it (size in the frame, skin texture, colour evenness,
+  light direction, shine, compact marks, expression lines, shadow depth, frame noise, group
+  size) and tune the chosen retouch settings for that face. Each photo in a batch gets its
+  own amounts; the report says what changed and why, and **Adapt to each face** switches it off.
+- Read a scene's intent before correcting its tone: night scenes stay dark, high-key frames
+  stay bright, toned monochromes keep their colour, and a frame whose highlights already reach
+  white is lifted through its shadows instead of its exposure. ADR-0086.
+- Add whole-face deep blemish cleanup with protected dark marks, a separate pore-texture band
+  and smaller patch donors (ADR-0085), and upright-normalised skin segmentation (ADR-0084).
+- Restore the larger spot limit with deep cleanup when reopening a photo.
+
 ## Automatic portrait retouch after import — 2026-10-05
 
 - Run the bundled portrait retoucher after each photo's automatic light/color edit and

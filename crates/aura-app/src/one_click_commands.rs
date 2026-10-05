@@ -1,14 +1,17 @@
-//! Selection-to-delivery background workflow. See ADR-0069.
+//! Selection-to-delivery background workflow. See ADR-0069, and ADR-0088 for the measured
+//! cull, the look carried from the start screen and the per-photo edit the studio shares.
 use crate::contract::ipc::{
-    AcceptGeometryInput, AutomaticStartDto, AutomaticStartInput, AutopilotStartInput,
-    CreateProjectInput, CullProjectInput, DevelopImageInput, ExportJobInput, ExportSetInput,
-    GeometryReviewInput, IpcError, ListImagesInput, OneClickFinishDto, OneClickFinishInput,
-    OneClickStatusDto, PhotoAutoEditInput, PlanGeometryInput, RecipeDto, StartIngestInput,
+    AcceptGeometryInput, AutomaticLookInput, AutomaticStartDto, AutomaticStartInput,
+    AutopilotStartInput, CreateProjectInput, CullProjectInput, DevelopImageInput, ExportJobInput,
+    ExportSetInput, GeometryReviewInput, ImageRowLite, IpcError, ListImagesInput,
+    OneClickFinishDto, OneClickFinishInput, OneClickStatusDto, PhotoAutoEditInput,
+    PlanGeometryInput, RecipeDto, StartIngestInput,
 };
 use crate::AppState;
 use aura_core::progress::CancelToken;
 use parking_lot::Mutex;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -33,6 +36,233 @@ struct EditedPhoto {
     model: String,
     reasons: Vec<String>,
     recipe: RecipeDto,
+}
+
+/// `photo-edits.json`, written as the run goes. A wedding is two thousand recipes with a
+/// few hundred retouch operations each, and holding them all to write one array at the end
+/// is how a long run dies of memory on the laptop it was meant for.
+struct EditLog {
+    file: Option<std::io::BufWriter<std::fs::File>>,
+    path: PathBuf,
+    entries: usize,
+}
+
+impl EditLog {
+    fn create(path: PathBuf) -> Result<Self, IpcError> {
+        let mut file = std::io::BufWriter::new(
+            std::fs::File::create(&path).map_err(|e| aura_core::errors::io::from_io(&e, &path))?,
+        );
+        file.write_all(b"[")
+            .map_err(|e| aura_core::errors::io::from_io(&e, &path))?;
+        Ok(Self {
+            file: Some(file),
+            path,
+            entries: 0,
+        })
+    }
+
+    fn push(&mut self, entry: &EditedPhoto) -> Result<(), IpcError> {
+        let Some(file) = self.file.as_mut() else {
+            return Ok(());
+        };
+        let body = serde_json::to_vec(entry).map_err(|e| error(&e.to_string()))?;
+        let separator: &[u8] = if self.entries == 0 { b"\n" } else { b",\n" };
+        file.write_all(separator)
+            .and_then(|()| file.write_all(&body))
+            .map_err(|e| aura_core::errors::io::from_io(&e, &self.path))?;
+        self.entries += 1;
+        Ok(())
+    }
+
+    /// Close the array. A stopped or failed run still leaves a file that parses.
+    fn close(&mut self) -> Result<(), IpcError> {
+        let Some(mut file) = self.file.take() else {
+            return Ok(());
+        };
+        file.write_all(b"\n]\n")
+            .and_then(|()| file.flush())
+            .map_err(|e| aura_core::errors::io::from_io(&e, &self.path).into())
+    }
+}
+
+impl Drop for EditLog {
+    fn drop(&mut self) {
+        let _ = self.close();
+    }
+}
+
+/// "About 1 h 20 min left", from the photographs already finished in this phase.
+fn remaining(started_ms: u64, now_ms: u64, done: usize, total: usize) -> String {
+    if done == 0 || total <= done {
+        return String::new();
+    }
+    let left = now_ms.saturating_sub(started_ms) / done as u64 * (total - done) as u64 / 1000;
+    match left {
+        0..=89 => " About a minute left.".into(),
+        90..=3599 => format!(" About {} min left.", left.div_ceil(60)),
+        _ => format!(" About {} h {} min left.", left / 3600, left % 3600 / 60),
+    }
+}
+
+/// Whether to run the learned analysis pass. Off unless `AURA_LEARNED_ANALYSIS=1`: see the
+/// note where it is read.
+fn learned_analysis_enabled() -> bool {
+    std::env::var_os("AURA_LEARNED_ANALYSIS").is_some_and(|value| value == "1")
+}
+
+/// The cull that needs no learned model: focus, motion, exposure and bursts, measured from
+/// each photograph. `None` means the run was stopped. Nothing is deleted, and a frame that
+/// cannot be measured is delivered.
+fn measured_cull(
+    state: &AppState,
+    job: &str,
+    project: &str,
+    photos: &[ImageRowLite],
+    readable: &[String],
+    destination: &Path,
+) -> Result<Option<Vec<String>>, IpcError> {
+    phase(
+        job,
+        "cull",
+        "Culling: measuring focus, motion, exposure and bursts in each photo.",
+        readable.len() as u64,
+    );
+    let times = crate::measured_cull::camera_times(state, project).unwrap_or_default();
+    let wanted: BTreeSet<&String> = readable.iter().collect();
+    let mut frames = Vec::with_capacity(readable.len());
+    for photo in photos.iter().filter(|photo| wanted.contains(&photo.id)) {
+        if stopped(job) {
+            return Ok(None);
+        }
+        frames.push(
+            crate::measured_cull::measure_photo(state, project, photo, &times).unwrap_or_else(
+                |_| crate::measured_cull::Frame {
+                    photo_id: photo.id.clone(),
+                    file_name: photo.file_name.clone(),
+                    measure: None,
+                    time_ms: None,
+                    edited_by_hand: false,
+                },
+            ),
+        );
+        let done = frames.len() as u64;
+        update(job, |s| s.items_done = done);
+    }
+    let report = crate::measured_cull::decide(&frames);
+    let path = destination.join("photo-cull.json");
+    std::fs::write(
+        &path,
+        serde_json::to_vec_pretty(&report).map_err(|e| error(&e.to_string()))?,
+    )
+    .map_err(|e| aura_core::errors::io::from_io(&e, &path))?;
+    note(job, report.summary());
+    let kept = report.kept();
+    Ok(Some(if kept.is_empty() {
+        readable.to_vec()
+    } else {
+        kept
+    }))
+}
+
+/// One photograph's edit and retouch - the same three paths the studio's own batch takes,
+/// so a wedding finished unattended and a photo edited by hand in the studio agree.
+fn edit_one(
+    state: &AppState,
+    job: &str,
+    project: &str,
+    photo: &str,
+    look: Option<&AutomaticLookInput>,
+    cloud: bool,
+) -> Result<EditedPhoto, IpcError> {
+    let develop = DevelopImageInput {
+        photo_id: photo.to_owned(),
+    };
+    if let Some(look) = look {
+        let mut reasons = Vec::new();
+        let profile = look.profile_id.clone().filter(|id| !id.is_empty());
+        let strength = f32::from(look.profile_strength.min(150)) / 100.0;
+        // A profile already contains the measured correction, so it replaces the plain one.
+        let mut recipe = if let Some(id) = &profile {
+            let report = crate::edit_profiles::apply_edit_profile(
+                state,
+                &crate::edit_profiles::ApplyProfileInput {
+                    photo_id: photo.to_owned(),
+                    profile_id: id.clone(),
+                    strength,
+                },
+            )?;
+            reasons.push(format!(
+                "Look {id} at {}% over this photo's own measured correction.",
+                look.profile_strength.min(150)
+            ));
+            reasons.extend(report.adaptations);
+            crate::photo_enhance::enhance_portrait(state, &develop)?
+        } else {
+            crate::photo_enhance::enhance_photo(state, &develop)?
+        };
+        if let Some(reference) = look.reference_id.clone().filter(|id| !id.is_empty()) {
+            let fitted = crate::reference_style::apply_reference(
+                state,
+                &crate::reference_style::ApplyReferenceInput {
+                    photo_id: photo.to_owned(),
+                    reference_id: reference,
+                    strength: f32::from(look.reference_strength.min(100)) / 100.0,
+                    profile_id: profile.clone(),
+                    profile_strength: profile.as_ref().map(|_| strength),
+                },
+            )?;
+            reasons.push(format!(
+                "Reference look fitted at {}%: distance to the reference {:.3} before, {:.3} after.",
+                look.reference_strength.min(100),
+                fitted.before_distance,
+                fitted.after_distance
+            ));
+            recipe = crate::image_recipe(state, &develop)?;
+        }
+        reasons.push("Portrait retouch evaluated with this photo's saved preferences.".into());
+        return Ok(EditedPhoto {
+            photo_id: photo.to_owned(),
+            source: "local".into(),
+            model: "AURA measured edit with your look".into(),
+            reasons,
+            recipe,
+        });
+    }
+    if cloud {
+        let id = format!("{job}-{photo}");
+        child(job, Some(id.clone()));
+        let answer = crate::photo_auto_edit(
+            state,
+            &PhotoAutoEditInput {
+                project_id: project.to_owned(),
+                photo_id: photo.to_owned(),
+                job_id: id,
+            },
+        );
+        child(job, None);
+        let mut answer = answer?;
+        // Run the portrait pass AFTER grading so its luminance selections use the exposure
+        // being exported. It reads this photo's saved choices and protects manual work.
+        answer.recipe = crate::photo_enhance::enhance_portrait(state, &develop)?;
+        answer.reasons.push("Local portrait retouch evaluated with this photo's saved preferences. Applied and skipped corrections are recorded in its portrait report.".into());
+        return Ok(EditedPhoto {
+            photo_id: photo.to_owned(),
+            source: answer.source,
+            model: answer.model,
+            reasons: answer.reasons,
+            recipe: answer.recipe,
+        });
+    }
+    // The measured edit: light, colour, white balance and scene from this photograph's own
+    // pixels, then skin, blemishes, eyes and teeth for each detected person.
+    let recipe = crate::photo_enhance::enhance_photo(state, &develop)?;
+    Ok(EditedPhoto {
+        photo_id: photo.to_owned(),
+        source: "local".into(),
+        model: "AURA measured edit".into(),
+        reasons: vec!["Light, colour, white balance and scene measured from this photograph; portrait retouch evaluated with its saved preferences. Every decision is recorded as a step in its history.".into()],
+        recipe,
+    })
 }
 fn error(message: &str) -> IpcError {
     let mut error: IpcError =
@@ -83,9 +313,12 @@ fn require_idle() -> Result<(), IpcError> {
 }
 fn output_folder(project: &str) -> Result<PathBuf, IpcError> {
     let pictures = dirs::picture_dir().unwrap_or(aura_core::paths::AppPaths::resolve()?.data_dir);
-    Ok(pictures
-        .join("AURA Exports")
-        .join(format!("{project}-{}", uuid::Uuid::new_v4())))
+    Ok(unique_folder(&pictures.join("AURA Exports"), project))
+}
+/// Every run gets a folder of its own, so two weddings sent to one drive never share a
+/// report or overwrite each other's files.
+fn unique_folder(parent: &Path, project: &str) -> PathBuf {
+    parent.join(format!("{project}-{}", uuid::Uuid::new_v4()))
 }
 
 /// Selecting files is the only required interaction. Existing manual edits remain protected.
@@ -129,7 +362,15 @@ pub fn automatic_start(
         )?
         .id
     };
-    let destination = output_folder(&project)?.to_string_lossy().into_owned();
+    let destination = match input.destination.filter(|chosen| !chosen.trim().is_empty()) {
+        Some(chosen) if Path::new(chosen.trim()).is_absolute() => {
+            unique_folder(Path::new(chosen.trim()), &project)
+        }
+        Some(_) => return Err(error("The export folder must be an absolute path.")),
+        None => output_folder(&project)?,
+    }
+    .to_string_lossy()
+    .into_owned();
     let ingest = crate::start_ingest(
         state,
         &StartIngestInput {
@@ -143,6 +384,8 @@ pub fn automatic_start(
             project_id: project.clone(),
             destination: destination.clone(),
             ingest_job_id: Some(ingest.job_id.clone()),
+            look: input.look,
+            keep_everything: input.keep_everything,
         },
     );
     match result {
@@ -467,25 +710,62 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         note(job, "No working provider or cloud disabled by privacy settings; using measured local reference edits. Configure a vision model in AI provider for semantic photo-aware choices.".into());
     }
 
-    // Optional learned analysis is never presented as successful pixel/face recognition
-    // when the bundled model preflight refuses it. Every photo still receives a real edit.
+    // Learned scene, people and framing analysis. Every model it consults is still a
+    // placeholder and nothing in this build is calibrated, so its readings may not be acted
+    // on - and it costs about three seconds a photograph to produce them. An unattended run
+    // therefore measures instead, and the learned pass is opt-in for whoever is validating it.
     let mut advanced = false;
-    match crate::autopilot_start(state, &AutopilotStartInput { project_id: project.clone(), disabled: vec![], zero_touch: true, allow_on_battery: false, quiet_mode: false }) {
-        Ok(_) => {
-            phase(job, "analyze", "Running available advanced analysis models.", photos.len() as u64);
-            let deadline = state.clock().monotonic_ms().saturating_add(6 * 3600 * 1000);
-            loop {
-                if stopped(job) { let _ = crate::autopilot_cancel(state, project); return Ok(()); }
-                match crate::autopilot_progress(state, project)? {
-                    Some(p) if p.status == "running" => update(job, |s| s.phase_label = p.stage_title),
-                    Some(p) => { advanced = p.status == "completed"; break; }
-                    None => break,
+    if learned_analysis_enabled() {
+        match crate::autopilot_start(
+            state,
+            &AutopilotStartInput {
+                project_id: project.clone(),
+                disabled: vec![],
+                zero_touch: true,
+                allow_on_battery: false,
+                quiet_mode: false,
+            },
+        ) {
+            Ok(_) => {
+                phase(
+                    job,
+                    "analyze",
+                    "Running available advanced analysis models.",
+                    photos.len() as u64,
+                );
+                let deadline = state
+                    .clock()
+                    .monotonic_ms()
+                    .saturating_add(6 * 3600 * 1000);
+                // The progress row exists only while the run does; the summary says how it ended.
+                while let Some(p) = crate::autopilot_progress(state, project)? {
+                    if stopped(job) {
+                        let _ = crate::autopilot_cancel(state, project);
+                        return Ok(());
+                    }
+                    update(job, |s| s.phase_label = p.stage_title);
+                    if state.clock().monotonic_ms() > deadline {
+                        let _ = crate::autopilot_cancel(state, project);
+                        return Err(error("Advanced analysis timed out and was stopped."));
+                    }
+                    std::thread::sleep(Duration::from_millis(500));
                 }
-                if state.clock().monotonic_ms() > deadline { let _ = crate::autopilot_cancel(state, project); return Err(error("Advanced analysis timed out and was stopped.")); }
-                std::thread::sleep(Duration::from_millis(500));
+                advanced = crate::autopilot_commands::autopilot_summary(state, project)?
+                    .is_some_and(|summary| summary.status == "completed");
+                if !advanced {
+                    note(job, "Learned analysis finished without a result this run may act on; each photograph was measured instead.".into());
+                }
             }
+            Err(err) => note(
+                job,
+                format!(
+                    "Optional learned analysis unavailable: {}. Pixel-based analysis completed; automatic face/subject claims are not made.",
+                    err.message
+                ),
+            ),
         }
-        Err(err) => note(job, format!("Optional learned analysis unavailable: {}. Pixel-based analysis completed; automatic face/subject claims are not made.", err.message)),
+    } else {
+        note(job, "Learned scene, people and framing analysis was not run: its bundled models are placeholders and nothing in this build is calibrated. Each photograph was measured instead, and its framing is preserved.".into());
     }
     if stopped(job) {
         return Ok(());
@@ -520,12 +800,6 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                 }
             }
         }
-    } else {
-        note(
-            job,
-            "Preserved original framing because validated subject-aware analysis was unavailable."
-                .into(),
-        );
     }
     phase(
         job,
@@ -566,8 +840,24 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                 ),
             ),
         }
+    } else if input.keep_everything {
+        note(
+            job,
+            "Every readable photograph is delivered: the cull was switched off for this run."
+                .into(),
+        );
     } else {
-        note(job, "Every readable photograph is retained; no images were rejected without reliable learned analysis.".into());
+        match measured_cull(
+            state,
+            job,
+            project,
+            &photos,
+            &readable,
+            Path::new(&input.destination),
+        )? {
+            Some(kept) => targets = kept,
+            None => return Ok(()),
+        }
     }
     update(job, |s| s.selected = targets.len() as u64);
     phase(
@@ -576,61 +866,53 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         "Editing and retouching each photo using its own measurements and preferences.",
         targets.len() as u64,
     );
-    let mut edited = Vec::new();
+    let look = input
+        .look
+        .as_ref()
+        .filter(|look| look.profile_id.is_some() || look.reference_id.is_some());
+    if look.is_some() && use_cloud {
+        note(job, "The look you chose is applied to every photograph, so the configured provider was not asked for its own grade.".into());
+    }
+    let names: BTreeMap<&str, &str> = photos
+        .iter()
+        .map(|photo| (photo.id.as_str(), photo.file_name.as_str()))
+        .collect();
+    let mut edits = EditLog::create(Path::new(&input.destination).join("photo-edits.json"))?;
+    let started = state.clock().monotonic_ms();
     for (index, photo) in targets.iter().enumerate() {
         if stopped(job) {
             return Ok(());
         }
-        let id = format!("{job}-{photo}");
-        child(job, Some(id.clone()));
-        let request = PhotoAutoEditInput {
-            project_id: project.clone(),
-            photo_id: photo.clone(),
-            job_id: id,
-        };
-        let result = if use_cloud && index < MAX_AI_EDITS {
-            crate::photo_auto_edit(state, &request)
-        } else {
-            crate::auto_edit_commands::photo_auto_edit_local(state, &request)
-        };
-        child(job, None);
-        if stopped(job) {
-            return Ok(());
-        }
-        // Always run the bundled portrait pass, even when optional analysis/cloud is
-        // unavailable. It reads this photo's saved choices, protects manual work, and
-        // leaves photos without detected people free of portrait operations. Run it
-        // AFTER grading so its luminance selections use the exposure being exported.
-        let result = result.and_then(|mut answer| {
-            update(job, |s| {
-                s.phase_label = format!("Retouching photo {} of {}.", index + 1, targets.len());
-            });
-            answer.recipe = crate::photo_enhance::enhance_portrait(
-                state,
-                &DevelopImageInput { photo_id: photo.clone() },
-            )?;
-            answer.reasons.push("Local portrait retouch evaluated with this photo's saved preferences. Applied and skipped corrections are recorded in its portrait report.".into());
-            Ok(answer)
+        let left = remaining(started, state.clock().monotonic_ms(), index, targets.len());
+        update(job, |s| {
+            s.phase_label = format!(
+                "Editing and retouching photo {} of {}: {}.{left}",
+                index + 1,
+                targets.len(),
+                names.get(photo.as_str()).copied().unwrap_or("photograph")
+            );
         });
+        let result = edit_one(
+            state,
+            job,
+            project,
+            photo,
+            look,
+            use_cloud && look.is_none() && index < MAX_AI_EDITS,
+        );
         if stopped(job) {
             return Ok(());
         }
         match result {
-            Ok(answer) => {
+            Ok(entry) => {
                 update(job, |s| {
-                    if answer.source == "cloud" || answer.source == "cache" {
+                    if entry.source == "cloud" || entry.source == "cache" {
                         s.ai_edited += 1;
                     } else {
                         s.local_edited += 1;
                     }
                 });
-                edited.push(EditedPhoto {
-                    photo_id: photo.clone(),
-                    source: answer.source,
-                    model: answer.model,
-                    reasons: answer.reasons,
-                    recipe: answer.recipe,
-                });
+                edits.push(&entry)?;
             }
             Err(err) => {
                 update(job, |s| s.failed_edits += 1);
@@ -638,22 +920,18 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                     job,
                     format!(
                         "{} edit or retouch failed; exporting its last saved reversible recipe: {}",
-                        photo, err.message
+                        names.get(photo.as_str()).copied().unwrap_or(photo),
+                        err.message
                     ),
                 );
             }
         }
         update(job, |s| s.items_done = (index + 1) as u64);
     }
-    if use_cloud && targets.len() > MAX_AI_EDITS {
+    if use_cloud && look.is_none() && targets.len() > MAX_AI_EDITS {
         note(job, format!("Provider calls capped at {MAX_AI_EDITS}; ALL remaining photos received local adaptive edits and remain in the export."));
     }
-    let report = Path::new(&input.destination).join("photo-edits.json");
-    std::fs::write(
-        &report,
-        serde_json::to_vec_pretty(&edited).map_err(|e| error(&e.to_string()))?,
-    )
-    .map_err(|e| aura_core::errors::io::from_io(&e, &report))?;
+    edits.close()?;
     if stopped(job) {
         return Ok(());
     }

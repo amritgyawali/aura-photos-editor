@@ -129,7 +129,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
   const change = (key: keyof RetouchSettings, value: number | boolean) => {
     setPreset('custom');
     setOptions({ ...options, settings: { ...settings, [key]: value,
-      ...(key === 'deepBlemishCleanup' && value === false ? { maxSpots: Math.min(24, settings.maxSpots) } : {}),
+      ...(key === 'deepBlemishCleanup' && !value ? { maxSpots: Math.min(settings.maxSpots, 24), removeDarkMarks: false } : {}),
     } });
   };
   const choose = ([id, , values, intensity]: Preset) => {
@@ -150,7 +150,12 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
       </label>)}
       {preset === 'custom' && <span className="lr-hint">Custom</span>}
     </div>
+    <label className="retouch-toggle" title="Measures each face (skin texture, colour evenness, light, shine, marks, facial hair, size in the frame, noise) and tunes the settings below for it. Your settings stay the style; each photo gets its own amounts.">
+      <input type="checkbox" checked={options.adaptive !== false} onChange={event => setOptions({ ...options, adaptive: event.target.checked })} />Adapt to each face
+    </label>
+    <p className="lr-hint">{options.adaptive !== false ? 'Each face is measured and gets its own amounts; the report lists what was changed and why.' : 'The settings below are used exactly as set on every face.'}</p>
     <p className="lr-hint">{scope?.[2]} Skin is found by AI segmentation and measured against the same person's own skin; every result becomes an ordinary operation you can adjust, disable or remove below.</p>
+    {settings.deepBlemishCleanup && <p className="lr-hint">Deep cleanup searches the full detected face. {settings.removeDarkMarks ? 'Dark-mark removal is on and can also remove freckles or beauty marks. Review the before/after.' : 'Dark marks are protected.'}</p>}
     <button type="button" className="retouch-primary" disabled={disabled || busy} onClick={() => onRun(options)}>{busy ? 'Detecting and retouching…' : `Auto retouch: ${scope?.[1] ?? 'Face'}`}</button>
     <details>
       <summary>Strength and details</summary>

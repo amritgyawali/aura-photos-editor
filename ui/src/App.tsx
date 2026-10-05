@@ -1,5 +1,6 @@
 import { AdvancedTools } from './components/AdvancedTools';
 import { AutomaticProgress } from './components/workflow/AutomaticProgress';
+import { FinishFolder } from './components/workflow/FinishFolder';
 import { automaticBusy, useAutomatic } from './state/automaticStore';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -286,6 +287,11 @@ export function App(): JSX.Element {
 
   const focusedPhoto = rows[focusedIndex] ?? null;
 
+  // The native run created the collection; show it while the import and the edit fill it in.
+  const automaticStarted = useCallback((projectId: string) => {
+    void refreshProjects().then(() => { setActiveProject(projectId); setWorkspace('library'); });
+  }, [refreshProjects, setActiveProject]);
+
   const chooseAndImport = async (folder = false) => {
     if (choosingPhotos) return;
     setChoosingPhotos(true);
@@ -343,18 +349,20 @@ export function App(): JSX.Element {
                 <p>Paste a public profile link to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
           </div>
           {workspace === 'start' && <section className="start-step start-upload" aria-label="Add photos">
-            <header className="step-heading"><span className="step-number">3</span><div><span className="eyebrow">YOUR PHOTOS</span><h2>Upload a photo or a whole folder</h2>
+            <header className="step-heading"><span className="step-number">3</span><div><span className="eyebrow">YOUR PHOTOS</span><h2>Finish a whole folder, or upload to review first</h2>
               <p>JPEG, PNG and supported camera RAW files. Your originals are never changed; every edit can be undone.</p></div></header>
             <div className="start-summary" aria-label="What will be applied">
               <span>Look: <strong>{profileName ?? 'Auto only'}</strong>{profile ? ` · ${Math.round(profile.strength * 100)}%` : ''}</span>
               <span>Reference: <strong>{reference ? reference.analysis.origin || 'Saved photos' : 'None'}</strong></span>
             </div>
+            <FinishFolder disabled={locked} profile={profile} reference={reference} onStarted={automaticStarted} onError={setError} />
             <div className="import-actions">
-              <button className="is-primary" type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport()}>{choosingPhotos ? 'Choosing…' : 'Choose photos'}</button>
+              <button type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport()}>{choosingPhotos ? 'Choosing…' : 'Choose photos'}</button>
               <button type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport(true)}>Choose a folder</button>
               {activeProjectId && rows.length > 0 && <button type="button" disabled={locked} onClick={() => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}>Apply to the {rows.length} photos in this collection</button>}
             </div>
             {progress.running && <p role="status">Importing {progress.done} of {progress.total || '…'} photos. Editing starts automatically when the import finishes.</p>}
+            <p className="studio-footnote">Choose photos or Choose a folder imports and edits, then waits for you to review before you export.</p>
             {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
           </section>}
           {!activeProjectId ? workspace === 'start' ? null : <section className="studio-welcome">

@@ -1,4 +1,4 @@
-# ADR-0084: Permanent reference studio and texture-preserving cleanup
+# ADR-0087: Permanent reference studio and texture-preserving cleanup
 
 Status: accepted
 Date: 2026-10-05

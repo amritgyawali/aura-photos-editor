@@ -1,4 +1,5 @@
-//! The automatic retouch's fine controls, including opt-in deep blemish cleanup.
+//! The automatic retouch's fine controls in ten groups (ADR-0082), including opt-in deep
+//! blemish cleanup (ADR-0085).
 //!
 //! Modelled on what professional portrait retouching tools expose (frequency-separated skin
 //! smoothing that keeps pores, tone and light evening, measured blemish healing, dodge and

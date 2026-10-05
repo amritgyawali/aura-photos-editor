@@ -25,7 +25,18 @@ describe('automatic retouch settings', () => {
     expect(screen.getByText(/Strength: Subtle \(60%\)/)).toBeTruthy();
     fireEvent.click(screen.getByLabelText('Teeth'));
     fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
-    expect(run).toHaveBeenCalledWith({ intensity: 0.6, blemishes: true, eyes: true, teeth: false, refine: true, scope: 'face', settings: DEFAULT_RETOUCH_SETTINGS });
+    expect(run).toHaveBeenCalledWith({ intensity: 0.6, blemishes: true, eyes: true, teeth: false, refine: true, scope: 'face', settings: DEFAULT_RETOUCH_SETTINGS, adaptive: true });
+  });
+  it('adapts to each face unless the photographer wants the settings used exactly', () => {
+    const run = vi.fn();
+    render(<AutoRetouchSettings disabled={false} onRun={run} />);
+    const adapt = screen.getByLabelText('Adapt to each face') as HTMLInputElement;
+    expect(adapt.checked).toBe(true);
+    expect(screen.getByText(/Each face is measured and gets its own amounts/)).toBeTruthy();
+    fireEvent.click(adapt);
+    expect(screen.getByText(/used exactly as set on every face/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
+    expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ adaptive: false }));
   });
   it('turns face details off for body skin only and disables everything while busy', () => {
     const { rerender } = render(<AutoRetouchSettings disabled={false} onRun={vi.fn()} />);
@@ -45,11 +56,23 @@ describe('automatic retouch settings', () => {
     expect(automaticLabel('auto-portrait-v1-0-fabric')).toBe(' · Auto (clothes 1)');
     expect(automaticLabel('auto-portrait-v1-backdrop')).toBe(' · Auto (backdrop)');
   });
-  it('offers every one of the fifty-four fine controls exactly once', () => {
+  it('offers every fine control exactly once', () => {
     const keys = SETTING_GROUPS.flatMap(([, controls]) => controls.map(([key]) => key));
     expect(keys.length).toBe(54);
     expect(new Set(keys).size).toBe(54);
     expect([...keys].sort()).toEqual(Object.keys(DEFAULT_RETOUCH_SETTINGS).sort());
+  });
+  it('runs deep cleanup as one native pass and exposes dark-mark removal', () => {
+    const run = vi.fn();
+    render(<AutoRetouchSettings disabled={false} onRun={run} />);
+    fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
+    expect(screen.getByText(/can also remove freckles or beauty marks/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Blemishes'));
+    expect(screen.getByLabelText('Most spots per face').getAttribute('max')).toBe('220');
+    fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({
+      deepBlemishCleanup: true, removeDarkMarks: true, maxSpots: 220, keepFreckles: false,
+    }) }));
   });
   it('applies a preset, then marks a hand change as custom and sends it', () => {
     const run = vi.fn();

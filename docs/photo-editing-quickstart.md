@@ -2,8 +2,10 @@
 
 ## Open AURA on Windows
 
-Open **AURA Photo Editor** from the Desktop or Start menu, or double-click
-**Start AURA.cmd** in the repository folder. The app runs with its interface
+Open **AURA Photo Studio** from the Desktop or Start menu, or double-click
+**Start AURA.cmd** in the repository folder. There is one application; the earlier
+"AURA Photo Editor" shortcut opened the same one and is removed when the shortcut is
+installed. The app runs with its interface
 bundled inside; no terminal commands or development server are needed for
 subsequent launches. Clicking again brings the existing window forward.
 
@@ -29,13 +31,47 @@ selected photos; each keeps its own saved retouch preferences and manual edits.
 Use **Export** to select a destination and render the saved results.
 
 Extra tools (camera matching, culling, portrait regions, object cleanup, provider
-setup and diagnostics) live under **Advanced** in the same studio interface.
-The complete collection workflow is also available there when needed.
+setup and diagnostics) live under **Advanced** in the same studio interface. The
+complete collection workflow there re-runs the same unattended pipeline on a collection
+you have already imported.
 
 Portrait retouch uses each photo's saved scope, strength and fine controls, or
 natural defaults for a new photo. Photos without detected people receive no
 portrait operations. The complete collection workflow also runs this local
 portrait pass after light/color correction and before verified export.
+
+## Finish a whole folder
+
+On **Start**, step three, press **Finish a whole folder** and choose the folder. Nothing else
+needs a click. AURA then, in this order:
+
+1. **Imports** every JPEG, PNG and supported RAW file in the folder into a new collection
+   named after it. Originals are read, never written.
+2. **Measures** each photograph: light, clipping, colour and white balance.
+3. **Culls**, when *Cull first* is ticked: leaves out black or blown-out frames, frames with
+   nothing in focus, frames smeared by motion, and all but the sharpest frame of each burst
+   (open eyes win over a blink). A photograph you have edited yourself is never left out, and
+   one that cannot be measured is delivered. Nothing is deleted: a frame left out stays in
+   the collection, and `photo-cull.json` in the export folder lists every decision with its
+   measurements.
+4. **Edits each remaining photograph on its own measurements** - exposure, highlights,
+   shadows, contrast, white balance, vibrance, noise and sharpening - using the look and the
+   reference you chose in steps one and two, or the measured edit alone.
+5. **Retouches every detected person**: skin, blemishes, eyes and teeth, tuned to each face.
+   Photographs without people receive no portrait operations.
+6. **Exports** the result, reads every file back and seals a manifest.
+
+The panel at the top of the window shows the phase, the photograph being edited, an estimate
+of the time left, and every note the run made. **Stop automatic processing** keeps what is
+finished. You can change tabs while it works; keep AURA open.
+
+Under **Folder and export location** you can paste the folder instead of choosing it, and
+choose where the finished photographs go. Each run makes its own folder there; the default is
+Pictures > AURA Exports. A wedding of two thousand photographs takes hours on a laptop
+processor: let it run, and check the drive you export to has room.
+
+Use **Choose photos** or **Choose a folder** instead when you want to review the edits
+before anything is exported.
 
 ## Edit individual photographs
 

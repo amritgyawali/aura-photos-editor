@@ -157,9 +157,12 @@ Never load two phase files into one session.
 | What Auto enhance does, in the product's own words | `docs/automatic-editing.md` |
 | Auto-edit qualification on the real app | `scripts/prepare-auto-edit-fixtures.py`, `scripts/test-auto-edit-v3.py`, `scripts/test-auto-edit-gui.py` |
 | Segmented face/body skin and the 52 retouch settings | `docs/adr/ADR-0082-segmented-skin-and-retouch-settings.md` |
+| Per-face adaptive retouch and scene intent | `docs/adr/ADR-0086-adaptive-retouch-and-scene-intent.md`, `crates/aura-app/src/portrait_features/expert.rs`, `scripts/test-adaptive-batch.py` |
 | The skin segmenter (model, card, converter) | `assets/models/selfie_multiclass/`, `crates/aura-vision/src/skin.rs`, `ml/models/skin/` |
 | Automatic retouch settings, in the product's own words | `docs/automatic-retouch-settings.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
+| One studio, the unattended run and the measured cull | `docs/adr/ADR-0088-one-studio-and-the-unattended-wedding-run.md`, `crates/aura-app/src/one_click_commands.rs`, `crates/aura-app/src/measured_cull.rs`, `ui/src/components/workflow/FinishFolder.tsx` |
+| Finishing a folder in the real app, scored against ground truth | `scripts/test-wedding-run.py`, results in `docs/unified-studio-validation.md` |
 | Portrait parsing and portrait retouch decisions | `docs/adr/ADR-0065-measured-portrait-parsing-and-portrait-retouch.md` |
 | Faces, landmarks and the nineteen portrait regions | `crates/aura-portrait/` |
 | The vendored Haar cascades, their converter and their card | `crates/aura-portrait/data/`, `docs/model-cards/haar_cascades.md` |

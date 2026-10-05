@@ -1,4 +1,6 @@
 /target
+# The installed desktop build the launcher opens. A binary, not source.
+/app/
 /.work-checks
 /ui/src-tauri/target
 # Tauri writes its capability schemas here on every build. Generated, not authored.

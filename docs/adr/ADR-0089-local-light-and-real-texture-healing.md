@@ -1,4 +1,4 @@
-# ADR-0085: Match blemish repairs to local light while preserving real texture
+# ADR-0089: Match blemish repairs to local light while preserving real texture
 
 Status: accepted
 Date: 2026-10-06

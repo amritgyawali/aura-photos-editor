@@ -18,8 +18,36 @@ function savedSettings(recipe: RecipeDto): string | undefined {
       const value: unknown = g[key];
       if (typeof value === 'number' && Number.isFinite(value)) parts.push(`${label} ${key === 'exposure' ? value.toFixed(2) : value}${unit}`);
     }
+    const retouch = adaptedRetouch(body.studio_portrait_auto_v1);
+    if (retouch) parts.push(retouch);
     return parts.join(' · ') || undefined;
   } catch { return undefined; }
+}
+
+const RETOUCH_LABELS: Record<string, string> = {
+  smoothing: 'smoothing', texture: 'pore texture', toneEvenness: 'tone', lightEvenness: 'light', shine: 'shine',
+  microDodgeBurn: 'dodge & burn', maxSpots: 'spots up to',
+};
+
+/** The retouch amounts this photo's faces were given, which differ from photo to photo. */
+function adaptedRetouch(report: unknown): string | undefined {
+  if (!report || typeof report !== 'object') return undefined;
+  const rows: unknown = (report as { assessments?: unknown }).assessments;
+  if (!Array.isArray(rows)) return undefined;
+  const faces: string[] = [];
+  for (const row of rows) {
+    const expert = row && typeof row === 'object' ? (row as { expert?: unknown; face?: unknown }) : null;
+    const adjusted = expert?.expert && typeof expert.expert === 'object' ? (expert.expert as { adjusted?: unknown }).adjusted : null;
+    if (!adjusted || typeof adjusted !== 'object' || typeof expert?.face !== 'number') continue;
+    const changes = Object.entries(RETOUCH_LABELS).flatMap(([key, label]) => {
+      const pair: unknown = (adjusted as Record<string, unknown>)[key];
+      if (!Array.isArray(pair) || typeof pair[1] !== 'number' || !Number.isFinite(pair[1])) return [];
+      return [`${label} ${key === 'maxSpots' ? Math.round(pair[1]) : `${Math.round(pair[1] * 100)}%`}`];
+    });
+    faces.push(`face ${expert.face}: ${changes.length ? changes.join(', ') : 'chosen settings'}`);
+    if (faces.length === 3) break;
+  }
+  return faces.length ? `Retouch tuned per face (${faces.join('; ')})` : undefined;
 }
 
 /** A real pixel-based baseline before optional model stages. Every outcome is reviewable. */

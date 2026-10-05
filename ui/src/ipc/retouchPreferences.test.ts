@@ -8,7 +8,7 @@ const recipe = (options: unknown) => ({ body: JSON.stringify({ studio_portrait_a
 it('restores all fine controls and per-photo scope without sharing mutable defaults', () => {
   const settings = Object.fromEntries(Object.entries(DEFAULT_RETOUCH_SETTINGS).map(([key, value]) =>
     [key, typeof value === 'boolean' ? !value : key === 'maxSpots' ? 7 : .23]));
-  const saved = { intensity: .65, scope: 'face_and_body', blemishes: false, refine: true, eyes: false, teeth: true, settings };
+  const saved = { intensity: .65, scope: 'face_and_body', blemishes: false, refine: true, eyes: false, teeth: true, adaptive: false, settings };
   expect(readRetouchPreferences(recipe(saved))).toEqual(saved);
   const first = readRetouchPreferences(recipe(saved));
   first.settings!.smoothing = .9;
@@ -30,7 +30,12 @@ it.each(['bad json', 'null', '[]', '{}', '{"studio_portrait_auto_v1":{"options":
   expect(actual.settings).not.toBe(DEFAULT_RETOUCH_SETTINGS);
 });
 
- it('restores deep cleanup limits without enabling them for ordinary retouch', () => {
+it('restores the adaptive choice and the larger spot limit only with deep cleanup', () => {
   expect(readRetouchPreferences(recipe({ settings: { maxSpots: 220, deepBlemishCleanup: true } })).settings?.maxSpots).toBe(220);
   expect(readRetouchPreferences(recipe({ settings: { maxSpots: 220, deepBlemishCleanup: false } })).settings?.maxSpots).toBe(24);
+  expect(readRetouchPreferences(recipe({ settings: { maxSpots: 180, deepBlemishCleanup: true } })).settings?.maxSpots).toBe(180);
+  expect(readRetouchPreferences(recipe({ settings: { maxSpots: 180 } })).settings?.maxSpots).toBe(24);
+  expect(readRetouchPreferences(recipe({ adaptive: false })).adaptive).toBe(false);
+  expect(readRetouchPreferences(recipe({ adaptive: 'no' })).adaptive).toBe(true);
+  expect(readRetouchPreferences().adaptive).toBe(true);
 });

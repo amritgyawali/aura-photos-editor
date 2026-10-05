@@ -1,6 +1,6 @@
 import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import type { AutomaticStartDto, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
+import type { AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
 
 import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
 
@@ -100,7 +100,7 @@ export const photoAutoEdit = (input: PhotoAutoEditInput): Promise<PhotoAutoEditD
 export const photoAnalysis = (input: PhotoAutoEditInput): Promise<PhotoAnalysisDto> =>
   invoke<PhotoAnalysisDto>('photo_analysis', { input });
 
-export const automaticStart = (input: { roots: string[]; projectId: string | null }): Promise<AutomaticStartDto> =>
+export const automaticStart = (input: AutomaticStartInput): Promise<AutomaticStartDto> =>
   invoke<AutomaticStartDto>('automatic_start', { input });
 
 /** ADR-0068. Start the whole delivery pipeline. Returns immediately; poll `oneClickStatus`. */

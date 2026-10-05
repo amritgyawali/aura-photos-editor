@@ -9,9 +9,12 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $buildExe = Join-Path $projectRoot 'target\desktop-launch\debug\aura-desktop.exe'
+# An installed copy in app\ is opened as it is: a photographer's machine does not need the
+# build tools, and a finished build is not rebuilt because a source file was touched.
 $installedExe = Join-Path $projectRoot 'app\aura-desktop.exe'
 $useInstalled = -not $Rebuild -and (Test-Path -LiteralPath $installedExe)
 $desktopExe = if ($useInstalled) { $installedExe } else { $buildExe }
+$productName = 'AURA Photo Studio'
 $logDir = Join-Path $projectRoot '.work-checks\launcher'
 $launchLock = $null
 $ownsLock = $false
@@ -105,14 +108,17 @@ try {
             [Environment]::GetFolderPath('Desktop'),
             [Environment]::GetFolderPath('Programs')
         )) {
-            $shortcut = $shortcutShell.CreateShortcut((Join-Path $folder 'AURA Photo Editor.lnk'))
+            # One product, one shortcut: the earlier name opened the same application.
+            $earlier = Join-Path $folder 'AURA Photo Editor.lnk'
+            if (Test-Path -LiteralPath $earlier) { Remove-Item -LiteralPath $earlier -Force }
+            $shortcut = $shortcutShell.CreateShortcut((Join-Path $folder "$productName.lnk"))
             $shortcut.TargetPath = Join-Path $PSHOME 'powershell.exe'
             $shortcut.Arguments = '-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + (Join-Path $PSScriptRoot 'start-aura.ps1') + '"'
             $shortcut.WorkingDirectory = $projectRoot
             $shortcut.IconLocation = (Join-Path $projectRoot 'ui\src-tauri\icons\icon.ico')
-            $shortcut.Description = 'Open AURA Photo Editor'
+            $shortcut.Description = "Open $productName"
             $shortcut.Save()
-            Write-Host "Installed AURA Photo Editor shortcut in $folder"
+            Write-Host "Installed $productName shortcut in $folder"
         }
     }
     if ($NoLaunch) { exit 0 }

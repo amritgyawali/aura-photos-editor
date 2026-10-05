@@ -65,6 +65,16 @@ describe('view store', () => {
     expect(state.problems).toHaveLength(0);
     expect(state.activeProjectId).toBe('prj_2');
   });
+
+  it('clicking the current collection preserves the loaded photo and selection', () => {
+    useStore.getState().setActiveProject('current');
+    useStore.getState().replaceRows([row('a'), row('b')]);
+    useStore.getState().focusIndex(1);
+    useStore.getState().selectOnly('b');
+    const before = useStore.getState();
+    useStore.getState().setActiveProject('current');
+    expect(useStore.getState()).toBe(before);
+  });
 });
 
 it('keeps the loaded photo and selection when the active collection is clicked again', () => {

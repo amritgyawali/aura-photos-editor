@@ -33,7 +33,7 @@ export function AutomaticProgress({ onFinished }: { onFinished: (projectId: stri
   return <section className="panel automatic-progress" aria-label="Automatic processing" aria-live="polite">
     <strong>{status?.phaseLabel ?? 'Starting automatic processing…'}</strong>
     {status && <>
-      <p>{status.frames} photos · {status.analyzed ?? 0} analyzed · {status.aiEdited} AI edits · {status.localEdited} local edits · {status.verified} verified exports · {status.failedEdits ?? 0} failed edits</p>
+      <p>{status.frames} photos · {status.analyzed ?? 0} analyzed{status.selected > 0 && status.frames > status.selected ? ` · ${status.frames - status.selected} left out by the cull` : ''} · {status.aiEdited + status.localEdited} of {status.selected || status.frames} edited and retouched · {status.verified} verified exports · {status.failedEdits ?? 0} failed edits</p>
       {busy && status.itemsTotal > 0 && <progress value={status.itemsDone} max={status.itemsTotal} aria-label={status.phase} />}
       <p>Output: <code>{status.destination}</code></p>
       {status.notes.length > 0 && <details open={status.status === 'failed' || status.status === 'completed_with_issues'}><summary>Run notes ({status.notes.length})</summary><ul>{status.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></details>}

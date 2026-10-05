@@ -66,18 +66,7 @@ pub fn photo_auto_edit(
 ) -> IpcResult<PhotoAutoEditDto> {
     let cancel = CancelToken::new();
     state.register_job(&input.job_id, cancel.clone());
-    let result = edit(state, input, &cancel, false);
-    state.finish_job(&input.job_id);
-    result
-}
-
-pub(crate) fn photo_auto_edit_local(
-    state: &AppState,
-    input: &PhotoAutoEditInput,
-) -> IpcResult<PhotoAutoEditDto> {
-    let cancel = CancelToken::new();
-    state.register_job(&input.job_id, cancel.clone());
-    let result = edit(state, input, &cancel, true);
+    let result = edit(state, input, &cancel);
     state.finish_job(&input.job_id);
     result
 }
@@ -86,7 +75,6 @@ fn edit(
     state: &AppState,
     input: &PhotoAutoEditInput,
     cancel: &CancelToken,
-    force_local: bool,
 ) -> IpcResult<PhotoAutoEditDto> {
     let invalid =
         |field: &str| aura_core::errors::render::recipe_invalid(field, "invalid identifier");
@@ -116,7 +104,7 @@ fn edit(
     let image = crop(&SourceImage::new(&buffer), PayloadPolicy::default())?;
     let readings = PhotoReadings::measure(rgb, image.content_hash.clone())?;
     let task = PhotoAutoEdit { image };
-    let answer = if force_local || policy.blur_faces {
+    let answer = if policy.blur_faces {
         use aura_cloud::contract::cloud::{CloudResult, CloudTask};
         let value = task.local_fallback(&readings)?;
         CloudResult::local(value, 0.35, uuid::Uuid::new_v4())

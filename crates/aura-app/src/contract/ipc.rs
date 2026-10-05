@@ -8728,6 +8728,32 @@ pub struct OneClickFinishInput {
     pub destination: String,
     /// The import to wait for, when the wizard has one still running.
     pub ingest_job_id: Option<String>,
+    /// The look chosen on the start screen; absent means the measured edit alone. ADR-0088.
+    #[serde(default)]
+    pub look: Option<AutomaticLookInput>,
+    /// Deliver every readable frame instead of running the measured cull. ADR-0088.
+    #[serde(default)]
+    pub keep_everything: bool,
+}
+
+/// The look an unattended run applies to every delivered frame, exactly as the studio's own
+/// batch does: a profile over the measured correction, then a reference fitted on top.
+/// Strengths are whole percentages so the run's input stays comparable. ADR-0088.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomaticLookInput {
+    /// An edit profile, or none for the measured correction alone.
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    /// That profile's strength, `0..=150`.
+    #[serde(default)]
+    pub profile_strength: u8,
+    /// A cached reference analysis to fit on top, or none.
+    #[serde(default)]
+    pub reference_id: Option<String>,
+    /// That reference's strength, `0..=100`.
+    #[serde(default)]
+    pub reference_strength: u8,
 }
 
 /// The job handle; progress is `one_click_status`.
@@ -8801,6 +8827,16 @@ pub struct AutomaticStartInput {
     pub roots: Vec<String>,
     /// Existing project, or create one from the selection.
     pub project_id: Option<String>,
+    /// The look chosen on the start screen. ADR-0088.
+    #[serde(default)]
+    pub look: Option<AutomaticLookInput>,
+    /// Deliver every readable frame instead of running the measured cull. ADR-0088.
+    #[serde(default)]
+    pub keep_everything: bool,
+    /// Absolute folder to make this run's own export folder inside, or absent for
+    /// Pictures/AURA Exports.
+    #[serde(default)]
+    pub destination: Option<String>,
 }
 
 /// Everything the UI needs to follow a native background run.

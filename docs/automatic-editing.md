@@ -19,6 +19,25 @@ back through. Nothing leaves your computer and your original file is never chang
 A step that finds nothing to do is not saved. Running Auto enhance again on an unchanged
 photo saves nothing new.
 
+### Every photo gets its own settings
+
+Before a face is retouched AURA measures it: how large it is in the frame, how even its skin
+texture and colour are, how directional the light is, how much of it is shiny, how many small
+marks it has, and how noisy the frame is. The retouch settings you chose are then turned up
+or down *for that face*. Smooth skin is left nearly alone; rough skin in a close-up gets more
+smoothing with its pores kept; a small face in a group gets a light touch; hard light is not
+flattened; a noisy frame is not given plastic skin. Your settings remain the style - a
+control you set to zero stays off.
+
+Under **Automatic decisions by face** every tuned face lists what was changed and why, and a
+batch result shows each photo's amounts. Untick **Adapt to each face** in Retouch to have
+your settings used exactly as set.
+
+The same idea applies to light and colour when nobody is in the frame. A night scene is not
+brightened into grey, a bright white scene is not darkened, a sepia or toned black-and-white
+keeps its colour, and when the brightest parts of a photo are already near white the dark
+parts are lifted with Shadows rather than Exposure.
+
 ### Choosing what is retouched, and how much
 
 In **Retouch**, the **Automatic retouch** box offers three choices:
@@ -39,6 +58,29 @@ and the next **Auto enhance** remembers your choice.
 There is no body segmentation model. A background close to the person's skin colour (beige
 walls, wood, sand) can be softened slightly; the report says so when much of the area matches,
 and each body operation has an ordinary brush mask you can erase.
+
+## How exposure and white balance are decided
+
+**Exposure** has three witnesses, and none of them is a target brightness for skin.
+
+- The histogram: a frame whose midtones sit far from the middle is moved part of the way.
+- The highlights: a photograph normally has something near white in it. When the very
+  brightest tones stop more than half a stop short of white and the frame is not a night
+  scene, it is lifted by most of that room, at most one stop. With people in frame the lift
+  stops before any face would clip; without people it is smaller.
+- The faces: skin at or near clipping is overexposure whatever else is in the frame, and is
+  brought back by 0.2 to 0.7 EV. A subject already brighter than a bright frame around it is
+  a low-key portrait and keeps its mood.
+
+**White balance** is corrected only when independent readings agree: the near-neutral areas,
+the average colour of edges, and the brightest unclipped tones. If the brightest tones are
+neutral, the light is neutral and the colour elsewhere belongs to the scene. If all three
+show the same cast, most of it is removed; if only two do, about half to two thirds. A strong
+colour with no people in frame is kept as the light's mood, and so is a toned monochrome.
+
+What this cannot know: a blouse that is pale pink rather than white, a wall that is cream
+rather than lit warm, or a matte look that keeps its whites low on purpose. Each of those is
+read as light, and corrected. Check coloured backdrops and deliberate looks before delivery.
 
 ## Going back and editing by hand
 

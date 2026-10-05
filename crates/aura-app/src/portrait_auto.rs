@@ -46,6 +46,9 @@ pub struct FaceAssessment {
     pub spots_healed: usize,
     #[serde(default)]
     pub marks_kept: usize,
+    /// What was measured about this face and how the chosen settings were tuned for it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expert: Option<portrait_features::expert::Summary>,
 }
 
 /// One saved history step of an automatic pass.
@@ -378,6 +381,17 @@ pub fn plan_with_faces(
                 .map(|(i, _)| i)
         })
         .flatten();
+    let context = portrait_features::expert::Context {
+        faces: report
+            .faces
+            .iter()
+            .filter(|f| (f.bounds[2] - f.bounds[0]) * (f.bounds[3] - f.bounds[1]) >= 0.008)
+            .count(),
+        noise: detail_pixels
+            .as_ref()
+            .filter(|_| options.adaptive)
+            .map_or(0.0, crate::smart_edit::noise_sigma),
+    };
     let mut planned: [Vec<Edit>; 5] = Default::default();
     let mut bodies = 0_usize;
     for (index, face) in report.faces.iter().enumerate() {
@@ -391,10 +405,36 @@ pub fn plan_with_faces(
                 findings: Vec::new(),
                 spots_healed: 0,
                 marks_kept: 0,
+                expert: None,
             });
             continue;
         }
         let person = segmentation.people.get(index);
+        // The chosen settings are the style; this face's own readings decide how much of each
+        // it gets. The frame-wide choices above (detection, main subject, backdrop) are not
+        // per face and keep the chosen values.
+        let mut expert = None;
+        let chosen_deep = settings.deep_blemish_cleanup;
+        let (settings, options) = match detail_pixels
+            .as_ref()
+            .filter(|_| options.adaptive)
+            .and_then(|px| portrait_features::expert::assess(face, px))
+        {
+            Some(condition) => {
+                let tuned = portrait_features::expert::tune(&settings, &condition, &context);
+                let mut tuned_options = options;
+                tuned_options.settings = tuned.settings;
+                tuned_options.intensity = (options.intensity * tuned.intensity).clamp(0.25, 1.5);
+                expert = Some(portrait_features::expert::summary(
+                    &settings,
+                    &tuned,
+                    condition,
+                    tuned_options.intensity,
+                ));
+                (tuned.settings, tuned_options)
+            }
+            None => (settings, options),
+        };
         // A face found only on the larger rendition is too small in the thumbnail to sample;
         // plan it on the larger pixels instead.
         let eye_px = {
@@ -485,8 +525,9 @@ pub fn plan_with_faces(
         if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
                 let mut feature_options = options;
-                // Deep cleanup replaces the sparse four-patch search; never stack both.
-                if settings.deep_blemish_cleanup {
+                // Deep cleanup replaces the sparse four-patch search; never stack both. When the
+                // adaptive pass chose it, the sparse search still runs so the two can be compared.
+                if settings.deep_blemish_cleanup && chosen_deep {
                     feature_options.blemishes = false;
                 }
                 features = portrait_features::plan(
@@ -507,11 +548,22 @@ pub fn plan_with_faces(
                         &settings,
                         face_matte.as_ref().map(|m| &m.matte),
                     );
-                    features.blemishes = deep.blemishes;
-                    features.report.spots_healed = deep.report.spots_healed;
-                    features.report.marks_kept = deep.report.marks_kept;
-                    features.report.findings.extend(deep.report.findings);
-                    if !features.blemishes.is_empty() {
+                    // The whole-face search protects dark marks, so on a face whose marks are
+                    // dark it can repair fewer spots than the sparse one. Keep the better plan.
+                    let use_deep = chosen_deep || deep.blemishes.len() > features.blemishes.len();
+                    if use_deep {
+                        features.blemishes = deep.blemishes;
+                        features.report.spots_healed = deep.report.spots_healed;
+                        features.report.marks_kept = deep.report.marks_kept;
+                        features.report.findings.extend(deep.report.findings);
+                    } else {
+                        features.report.findings.push(format!(
+                            "Whole-face cleanup found {} repairable spot(s) with dark marks protected, no more than the standard search ({}); the standard repairs were kept. Dark marks are only removed when you switch on Remove dark marks.",
+                            deep.blemishes.len(),
+                            features.blemishes.len()
+                        ));
+                    }
+                    if use_deep && !features.blemishes.is_empty() {
                         if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
                             portrait_features::deep_blemish::surface_finish(
                                 face, index, px, PREFIX, &settings, &m.matte,
@@ -572,6 +624,9 @@ pub fn plan_with_faces(
             findings.insert(0, body.reason.clone());
         }
         findings.insert(0, segmentation.finding(index));
+        if let Some(summary) = &expert {
+            findings.extend(summary.notes.iter().map(|note| format!("Adaptive: {note}")));
+        }
         let mut strengths = [0.0; 3];
         for (strength, edit) in strengths.iter_mut().zip(&plan.edits) {
             *strength = edit.amount;
@@ -585,6 +640,7 @@ pub fn plan_with_faces(
             findings,
             spots_healed: features.report.spots_healed,
             marks_kept: features.report.marks_kept,
+            expert,
         });
         if wanted == 0 {
             continue;

@@ -17,7 +17,7 @@ struct Spot {
 }
 
 // Deterministic four-connected components, including zero-valued mask holes.
-fn components(mask: &[bool], w: usize, h: usize) -> Vec<Vec<usize>> {
+pub(super) fn components(mask: &[bool], w: usize, h: usize) -> Vec<Vec<usize>> {
     let mut seen = vec![false; mask.len()];
     let mut out = Vec::new();
     for start in 0..mask.len() {

@@ -30,6 +30,17 @@ it('edits and renders each imported photograph without another user action', asy
   expect(result[1]?.settings).toContain('6200 K');
 });
 
+it('reports the retouch amounts each photo was given, which differ between photos', async () => {
+  const face = (smoothing: number, extra: Record<string, [number, number]> = {}) => ({ face: 1, expert: { adjusted: { smoothing: [.5, smoothing], ...extra } } });
+  vi.mocked(develop.imageRecipe).mockImplementation(async ({ photoId }) => ({ body: JSON.stringify({ global: { exposure: 0 },
+    studio_portrait_auto_v1: { message: 'ok', assessments: photoId === 'a'
+      ? [face(.33)] : [face(.71, { maxSpots: [12, 80], unknownControl: [0, 1] }), { face: 2, expert: { adjusted: {} } }, { face: 3 }] } }) }) as never);
+  const result = await prepareCollection('project', () => false, vi.fn(), vi.fn());
+  expect(result[0]?.settings).toContain('Retouch tuned per face (face 1: smoothing 33%)');
+  expect(result[1]?.settings).toContain('face 1: smoothing 71%, spots up to 80; face 2: chosen settings)');
+  expect(result[1]?.settings).not.toContain('unknownControl');
+});
+
 it('edits only requested photos and treats an empty selection as no work', async () => {
   const results = await prepareCollection('project', () => false, vi.fn(), vi.fn(), null, null, undefined, ['b']);
   expect(results.map(photo => photo.photoId)).toEqual(['b']);
