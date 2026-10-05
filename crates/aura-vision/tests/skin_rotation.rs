@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 //! Real-photo rotation regression. No ground-truth accuracy claim is made here.
 #![allow(clippy::unwrap_used, clippy::indexing_slicing)]
 use aura_vision::{portrait, skin};
