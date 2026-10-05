@@ -18,11 +18,16 @@ runtime logs are in `%APPDATA%\AURA\logs`.
 ## Finish a project with one button
 
 Choose **Choose photos** or **Choose folders** on the welcome screen or Import
-step. Selection starts import, pixel analysis, individual automatic edits and
+step. Selection starts import, pixel analysis, individual automatic edits, local portrait retouch and
 verified export. The output appears in a unique folder under **Pictures / AURA
 Exports**; its full path and progress stay visible while you change tools. Keep
 AURA open until the run finishes. **Stop automatic processing** preserves work
 already completed and waits for any active export to finish.
+
+Portrait retouch runs automatically after each photo's light/color correction, even offline.
+It uses that photo's saved scope, strength and fine controls, or natural defaults for a new
+photo. Photos without detected people receive no portrait operations. Review the result and
+adjust **Automatic retouch** when needed; detection can miss small or obscured faces.
 
 Create/open a wedding, import your photographs, and select an output folder in
 **Finish everything**. Press **Finish everything** to run the existing analysis,

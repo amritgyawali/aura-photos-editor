@@ -10,13 +10,15 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use aura_app::contract::ipc::{CreateProjectInput, OneClickFinishInput};
+use aura_app::contract::ipc::{
+    CreateProjectInput, DevelopImageInput, ListImagesInput, OneClickFinishInput,
+};
 use aura_app::{
     create_project, export_manifest, one_click_cancel, one_click_finish, one_click_status, AppState,
 };
 use aura_cloud::keys::MemoryKeyStore;
 use aura_core::progress::{CancelToken, NullProgress};
-use aura_core::{ImportId, ProjectId};
+use aura_core::{ImportId, PhotoId, ProjectId};
 use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 use aura_raw::codec::{encode_jpeg, Rgb8};
 
@@ -72,6 +74,54 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
     )
     .expect("import");
     assert_eq!(report.files_imported, 2, "the fixture is two frames");
+
+    let photos = aura_app::list_images(
+        &state,
+        &ListImagesInput {
+            project_id: project.id.clone(),
+            offset: 0,
+            limit: 10,
+            order_by: None,
+        },
+    )
+    .expect("photos");
+    let customized = &photos[0].id;
+    let photo_id = PhotoId::from_db(customized).expect("photo id");
+    let mut recipe = aura_app::develop_commands::load_or_neutral(&state, photo_id).expect("recipe");
+    recipe.global.exposure = 0.73;
+    recipe
+        .provenance
+        .user_edited_fields
+        .push("global.exposure".into());
+    let options = aura_app::portrait_features::Options {
+        intensity: 0.6,
+        teeth: false,
+        scope: aura_app::portrait_features::Scope::Body,
+        ..Default::default()
+    };
+    let mut saved_options = serde_json::Map::new();
+    saved_options.insert(
+        "options".into(),
+        serde_json::to_value(options).expect("options"),
+    );
+    recipe
+        .extra
+        .insert(aura_app::portrait_auto::KEY.into(), saved_options.into());
+    state
+        .recipe_store()
+        .save(
+            &ProjectId::from_db(&project.id).expect("project id"),
+            &photo_id,
+            &recipe,
+            &["global.exposure".into()],
+            "Saved photo-specific choices",
+        )
+        .expect("save preferences");
+    let originals: Vec<_> = (0..2)
+        .map(|index| {
+            std::fs::read(dir.path().join(format!("frame-{index}.jpg"))).expect("original")
+        })
+        .collect();
 
     let destination = dir.path().join("out");
     let handle = one_click_finish(
@@ -131,6 +181,52 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
         .expect("a completed delivery seals a manifest");
     assert_eq!(u64::from(manifest.files), final_row.written);
     assert!(destination.exists(), "the destination the button was given");
+
+    // Even when advanced analysis is unavailable, the local portrait pass runs for
+    // EVERY photo and the delivery report carries its final, persisted recipe.
+    let edits: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(destination.join("photo-edits.json")).expect("edit report"),
+    )
+    .expect("json report");
+    let edits = edits.as_array().expect("per-photo results");
+    assert_eq!(edits.len(), 2);
+    for entry in edits {
+        let id = entry["photoId"].as_str().expect("photo id");
+        let saved = aura_app::image_recipe(
+            &state,
+            &DevelopImageInput {
+                photo_id: id.into(),
+            },
+        )
+        .expect("saved recipe");
+        assert_eq!(entry["recipe"]["recipeHash"], saved.recipe_hash);
+        let body: serde_json::Value = serde_json::from_str(&saved.body).expect("recipe json");
+        let portrait = &body[aura_app::portrait_auto::KEY];
+        assert_eq!(portrait["status"], "complete");
+        assert_eq!(portrait["detectedFaces"], 0);
+        assert_eq!(
+            portrait["operations"], 0,
+            "no skin edits on abstract images"
+        );
+        assert_eq!(
+            portrait["options"]["scope"],
+            if id == customized { "body" } else { "face" }
+        );
+        assert_eq!(portrait["options"]["teeth"], id != customized);
+        if id == customized {
+            assert!((body["global"]["exposure"].as_f64().expect("exposure") - 0.73).abs() < 0.0001);
+            assert!(
+                (portrait["options"]["intensity"].as_f64().expect("strength") - 0.6).abs() < 0.0001
+            );
+        }
+    }
+    for (index, original) in originals.iter().enumerate() {
+        assert_eq!(
+            &std::fs::read(dir.path().join(format!("frame-{index}.jpg")))
+                .expect("original after edit"),
+            original
+        );
+    }
 
     // Cancel after completion is a no-op on a finished token, and the row keeps
     // its answer until the process forgets it.
