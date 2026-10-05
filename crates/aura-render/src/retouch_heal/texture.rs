@@ -22,10 +22,10 @@ fn solve(mut a: [[f32; 4]; 3]) -> Option<[f32; 3]> {
             *value /= divisor;
         }
         let pivot_row = a[col];
-        for row in 0..3 {
+        for (row, values) in a.iter_mut().enumerate() {
             if row != col {
-                let factor = a[row][col];
-                for (value, pivot_value) in a[row].iter_mut().zip(pivot_row).skip(col) {
+                let factor = values[col];
+                for (value, pivot_value) in values.iter_mut().zip(pivot_row).skip(col) {
                     *value -= factor * pivot_value;
                 }
             }
@@ -102,12 +102,14 @@ impl TextureHeal {
     }
 
     pub(super) fn at(&self, image: Image<'_>, source: Donor, x: f32, y: f32) -> Option<[f32; 3]> {
-        let donor = source.at(image, x, y)?;
+        let donor = source.texture_at(image, x, y)?;
         let mut low = [0.0; 3];
         let mut count = 0.0;
         for dy in -2..=2 {
             for dx in -2..=2 {
-                if let Some(p) = source.at(
+                // Filtering also stays inside the clean donor footprint. Sampling
+                // beyond it could reintroduce a nearby defect into the high band.
+                if let Some(p) = source.texture_at(
                     image,
                     x + dx as f32 * self.texture_radius * 0.5,
                     y + dy as f32 * self.texture_radius * 0.5,
