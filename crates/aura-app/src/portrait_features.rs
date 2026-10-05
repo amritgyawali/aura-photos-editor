@@ -27,7 +27,7 @@ use aura_vision::portrait::PortraitFace;
 use serde::{Deserialize, Serialize};
 
 /// The planner version recorded in the report; bump on any behavioural change.
-pub const VERSION: &str = "measured-features-v3";
+pub const VERSION: &str = "measured-features-v4";
 pub(crate) mod deep_blemish;
 /// At most this many healed spots per face. A face with more is left for a person to judge.
 pub const MAX_SPOTS: usize = 12;
@@ -347,6 +347,7 @@ fn base_edit(id: String, tool: Tool, amount: f32, px: &Pixels<'_>, region_px: [f
         radius: 0.002,
         source_scale: 1.0,
         preserve_microtexture: false,
+        texture_heal: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,

@@ -18,6 +18,7 @@ fn operation() -> Edit {
         radius: 0.01,
         source_scale: 1.0,
         preserve_microtexture: false,
+        texture_heal: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,
@@ -46,6 +47,56 @@ fn blemish(rgb: &mut [f32]) {
         for x in 62..=66 {
             for c in 0..3 {
                 rgb[(y * W + x) * 3 + c] *= 0.4;
+            }
+        }
+    }
+}
+
+#[test]
+fn texture_heal_preserves_lighting_and_real_pores_across_skin_tones() {
+    for exposure in [0.35, 1.0, 1.8] {
+        let clean: Vec<_> = surface().into_iter().map(|v| v * exposure).collect();
+        let mut damaged = clean.clone();
+        // A real donor pattern with a different low-frequency colour and light.
+        for y in 50..80 {
+            for x in 18..46 {
+                for c in 0..3 {
+                    damaged[(y * W + x) * 3 + c] +=
+                        (0.03 + (x as f32 - 32.0) * 0.002 + if x % 2 == 0 { 0.01 } else { -0.01 })
+                            * exposure;
+                }
+            }
+        }
+        blemish(&mut damaged);
+        let before = damaged.clone();
+        let mut edit = operation();
+        edit.texture_heal = true;
+        edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
+        let serialized = serde_json::to_string(&edit).unwrap();
+        let saved: Edit = serde_json::from_str(&serialized).unwrap();
+        apply(&mut damaged, W, W, &[saved.clone()]);
+        let mut replay = before.clone();
+        apply(&mut replay, W, W, &[saved]);
+        assert_eq!(damaged, replay, "saved heals must reproduce exactly");
+        let mean_error = (61..68)
+            .flat_map(|y| (61..68).map(move |x| (y * W + x) * 3))
+            .map(|i| damaged[i] - clean[i])
+            .sum::<f32>()
+            .abs()
+            / 49.0;
+        assert!(mean_error < 0.004 * exposure, "colour drift: {mean_error}");
+        let detail = (61..67)
+            .map(|x| (damaged[(64 * W + x + 1) * 3] - damaged[(64 * W + x) * 3]).abs())
+            .sum::<f32>()
+            / 6.0;
+        assert!(detail > 0.01 * exposure, "donor pores lost: {detail}");
+        assert!((damaged[(64 * W + 64) * 3] - clean[(64 * W + 64) * 3]).abs() < 0.02 * exposure);
+        for y in 0..W {
+            for x in 0..W {
+                if (x as f32 - 64.0).hypot(y as f32 - 64.0) >= 7.0 {
+                    let i = (y * W + x) * 3;
+                    assert_eq!(&damaged[i..i + 3], &before[i..i + 3]);
+                }
             }
         }
     }

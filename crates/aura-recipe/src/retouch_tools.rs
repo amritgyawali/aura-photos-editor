@@ -136,6 +136,9 @@ pub struct Edit {
     /// Off for old recipes; on for the automatic deep skin finish.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub preserve_microtexture: bool,
+    /// Transfer real donor texture over a robust local lighting fit. Old heals stay unchanged.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub texture_heal: bool,
     pub tone: f32,
     pub warmth: f32,
     pub tint: f32,

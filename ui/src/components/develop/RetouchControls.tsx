@@ -87,6 +87,7 @@ export function RetouchControls(props: Props) {
     {(sampled || bands || ['micro_dodge_burn', 'eye_detail', 'under_eye', 'backdrop'].includes(draft.tool)) && <label>Frequency radius (% of short edge)
       <input type="number" min="0.05" max="5" step="0.05" value={Number((draft.radius * 100).toFixed(2))} onChange={event => onChange({ radius: Number(event.target.value) / 100 })}/>
     </label>}
+      {draft.tool === 'patch_heal' && <label className="retouch-toggle"><input type="checkbox" checked={draft.textureHeal ?? false} onChange={event => onChange({ textureHeal: event.target.checked })}/>Match local lighting with real skin texture</label>}
     {bands && <>
       {draft.tool === 'frequency' && <label className="retouch-toggle"><input type="checkbox" checked={draft.preserveMicrotexture ?? false} onChange={event => onChange({ preserveMicrotexture: event.target.checked })}/>Preserve fine skin texture</label>}
       <label>Tone smoothing ({Math.round(draft.tone * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.tone} onChange={event => onChange({ tone: Number(event.target.value) })}/></label>

@@ -145,7 +145,11 @@ fn candidates(
         let score: Vec<_> = (0..w * h)
             .map(|i| {
                 let dark = (bg[i] - fine[i]) / (bg[i] + 0.08);
-                dark.max(0.0) + (-dark).max(0.0) * 0.65 + redness[i].max(0.0) * 1.5
+                // Isolated bright pores are texture, not acne. A bright head must
+                // also carry local redness to consume a repair slot.
+                dark.max(0.0)
+                    + (-dark).max(0.0).min(redness[i].max(0.0) * 4.0)
+                    + redness[i].max(0.0) * 1.5
             })
             .collect();
         // Higher thresholds split touching marks that merge at the sensitive threshold.
@@ -179,7 +183,11 @@ fn candidates(
                 }
                 let repair = (reach * 1.2 + 1.5 * scale).max(3.5 * scale);
                 let at = y.round() as usize * w + x.round() as usize;
-                if inside[at] < repair * 1.1 + 1.0 || peak < threshold * 1.25 {
+                // A dark halo around an isolated bright pore is not a dark lesion.
+                if (fine[at] > bg[at] && redness[at] <= 0.003)
+                    || inside[at] < repair * 1.1 + 1.0
+                    || peak < threshold * 1.25
+                {
                     continue;
                 }
                 // Large repairs first within a severity tier; suppress duplicate scales below.
@@ -187,7 +195,7 @@ fn candidates(
                     x,
                     y,
                     radius: repair,
-                    score: peak * area.sqrt(),
+                    score: peak * area.powf(0.75),
                     red: rmax,
                 });
             }
@@ -269,6 +277,17 @@ fn donor(
     None
 }
 
+// Landmark mouth corners can sit outside the visible lip. Inset the capsule's
+// segment before adding its lip-height radius, rather than protecting a cheek-wide
+// circle around each corner. This still covers the original corner coordinates.
+fn lip_protection(g: &Geometry) -> super::Capsule {
+    super::Capsule {
+        a: super::add(super::add(g.mouth[0], g.u, g.d * 0.10), g.v, g.d * 0.08),
+        b: super::add(super::add(g.mouth[1], g.u, -g.d * 0.10), g.v, g.d * 0.08),
+        r: g.d * 0.18,
+    }
+}
+
 pub(crate) fn plan(
     face: &PortraitFace,
     index: usize,
@@ -300,6 +319,7 @@ pub(crate) fn plan(
     }
     let (w, h) = (x1 - x0, y1 - y0);
     let mut mask = vec![false; w * h];
+    let mut donor_mask = vec![false; w * h];
     let mut lum = vec![0.0_f32; w * h];
     let mut red = vec![0.0_f32; w * h];
     for y in 0..h {
@@ -308,19 +328,19 @@ pub(crate) fn plan(
             let i = y * w + x;
             lum[i] = p[0] * 0.2126 + p[1] * 0.7152 + p[2] * 0.0722;
             red[i] = (p[0] - (p[1] + p[2]) * 0.5) / (p[0] + p[1] + p[2] + 0.05);
-            mask[i] = matte.at(
+            let confidence = matte.at(
                 (x + x0) as f32 / px.width as f32,
                 (y + y0) as f32 / px.height as f32,
-            ) > 0.55;
+            );
+            mask[i] = confidence > 0.20;
+            donor_mask[i] = confidence > 0.55;
         }
     }
-    close_holes(&mut mask, w, h, g.d * 0.07);
+    close_holes(&mut mask, w, h, g.d * 0.15);
     let mut exclusions = g.exclusions();
-    exclusions.push(super::Capsule {
-        a: super::add(g.mouth[0], g.v, g.d * 0.08),
-        b: super::add(g.mouth[1], g.v, g.d * 0.08),
-        r: g.d * 0.23,
-    });
+    if let Some(lips) = exclusions.get_mut(6) {
+        *lips = lip_protection(&g);
+    }
     for y in 0..h {
         for x in 0..w {
             let point = [(x + x0) as f32 + 0.5, (y + y0) as f32 + 0.5];
@@ -340,7 +360,7 @@ pub(crate) fn plan(
         let contrast = (fine[i] - broad[i]).abs() / (broad[i] + 0.08);
         let redness = (red[i] - broad_red[i]).max(0.0);
         let raw_contrast = (lum[i] - broad[i]).abs() / (broad[i] + 0.08);
-        clean[i] &= contrast < 0.085 && raw_contrast < 0.20 && redness < 0.025;
+        clean[i] &= donor_mask[i] && contrast < 0.085 && raw_contrast < 0.20 && redness < 0.025;
     }
     for spot in &spots {
         disk(&mut clean, w, h, spot.x, spot.y, spot.radius * 0.8);
@@ -390,14 +410,15 @@ pub(crate) fn plan(
             (source[0] + x0 as f32 + 0.5) / px.width as f32,
             (source[1] + y0 as f32 + 0.5) / px.height as f32,
         ]);
-        edit.feather = 0.20;
+        edit.feather = 0.35;
+        edit.texture_heal = true;
         edit.source_scale = source_scale;
         // No coarse matte: the entire disk was checked against the repaired skin mask.
         // Applying the unfilled matte here would protect the centre of a dark blemish.
         out.blemishes.push(edit);
     }
     out.report.spots_healed = out.blemishes.len();
-    out.report.findings.push(format!("Deep blemish cleanup: {} texture-transfer repairs across segmented face skin; {} marks kept, {} spots skipped without a clean donor. {}",
+    out.report.findings.push(format!("Deep blemish cleanup: {} local-light-matched texture repairs across segmented face skin; {} marks kept, {} spots skipped without a clean donor. {}",
         out.report.spots_healed,out.report.marks_kept,no_donor,
         if settings.remove_dark_marks {"Dark-mark removal enabled; review freckles and beauty marks."} else {"Dark marks protected."}));
     out
@@ -442,11 +463,7 @@ pub(crate) fn surface_finish(
             g.d * 0.19,
         ));
     }
-    exclusions.push(super::Capsule {
-        a: super::add(g.mouth[0], g.v, g.d * 0.08),
-        b: super::add(g.mouth[1], g.v, g.d * 0.08),
-        r: g.d * 0.25,
-    });
+    exclusions.push(lip_protection(&g));
     for y in 0..h {
         for x in 0..w {
             let point = [
@@ -459,7 +476,7 @@ pub(crate) fn surface_finish(
         }
     }
     let distance = clearance(&selected, w, h);
-    let feather = (g.d * 0.14 / cell).max(2.0);
+    let feather = (g.d * 0.08 / cell).max(2.0);
     let alpha: Vec<_> = distance
         .iter()
         .map(|d| {
@@ -541,6 +558,34 @@ mod tests {
                 .0
                 .is_empty());
         }
+    }
+    #[test]
+    fn bright_pores_do_not_spend_the_acne_budget() {
+        let mut lum = vec![0.4; 128 * 128];
+        for y in (16..112).step_by(12) {
+            for x in (16..112).step_by(12) {
+                for dy in 0..3 {
+                    for dx in 0..3 {
+                        lum[(y + dy) * 128 + x + dx] = 0.65;
+                    }
+                }
+            }
+        }
+        let spots = candidates(
+            &lum,
+            &vec![0.1; 128 * 128],
+            &vec![true; 128 * 128],
+            128,
+            128,
+            100.0,
+            0.9,
+        )
+        .0;
+        assert!(
+            spots.is_empty(),
+            "highlight pores consumed repair budget: {}",
+            spots.len()
+        );
     }
     #[test]
     fn donor_is_disjoint_and_never_uses_another_spot() {

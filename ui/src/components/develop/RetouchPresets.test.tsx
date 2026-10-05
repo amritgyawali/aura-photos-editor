@@ -42,3 +42,10 @@ it('remembers fine texture preservation and defaults old presets to off', () => 
   const legacy = {version:1,items:[{name:'Old',settings:freshRetouch()}]};
   expect(parseRetouchPresets(JSON.stringify(legacy))[0]?.settings.preserveMicrotexture).toBe(false);
 });
+
+it('preserves local-light texture healing in saved presets', () => {
+  const payload = {version:1,items:[{name:'Clean skin',settings:{...freshRetouch(),tool:'patch_heal',textureHeal:true}}]};
+  expect(parseRetouchPresets(JSON.stringify(payload))[0]?.settings.textureHeal).toBe(true);
+  payload.items[0]!.settings.textureHeal = 'invalid' as unknown as boolean;
+  expect(() => parseRetouchPresets(JSON.stringify(payload))).toThrow();
+});
