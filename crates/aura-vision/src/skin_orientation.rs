@@ -145,7 +145,9 @@ mod tests {
                         0.25 + (y as f32 + 0.5) * 0.5 / 2.0,
                     ];
                     let q = point(p, turns);
-                    assert_eq!(original.at(p[0], p[1]), rotated.at(q[0], q[1]));
+                    assert!(
+                        (original.at(p[0], p[1]) - rotated.at(q[0], q[1])).abs() < f32::EPSILON
+                    );
                 }
             }
             matte(&mut rotated, 4 - turns);
