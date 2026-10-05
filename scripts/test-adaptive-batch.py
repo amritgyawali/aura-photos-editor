@@ -189,6 +189,41 @@ try:
             report['checks']['exactPassHasNoAdaptation'] = all(a.get('expert') is None for a in body['assessments'])
             report['checks']['exactPassRemembered'] = body['options'].get('adaptive') is False
 
+        # Full automation: the one-press path a photographer uses (import, edit, retouch,
+        # export), on a fresh project, with nothing chosen by hand.
+        try:
+            auto_name = 'Adaptive one press ' + time.strftime('%H-%M-%S')
+            auto = call('create_project', name=auto_name, coupleNames=None, eventDate=None)['id']
+            subset = SOURCES[::3]
+            call('start_ingest', projectId=auto, roots=[str(p) for p in subset])
+            rows, deadline = [], time.monotonic() + 300
+            while len(rows) < len(subset) and time.monotonic() < deadline:
+                rows = call('list_images', projectId=auto, offset=0, limit=240, orderBy='timeline')
+                time.sleep(0.5)
+            destination = OUT / ('export-' + time.strftime('%H-%M-%S'))
+            destination.mkdir(parents=True, exist_ok=True)
+            job = call('one_click_finish', projectId=auto, destination=str(destination), ingestJobId=None)['jobId']
+            status, deadline = {}, time.monotonic() + 1500
+            while time.monotonic() < deadline:
+                status = page.evaluate('async (j)=>await window.__TAURI_INTERNALS__.invoke("one_click_status",{jobId:j})', job)
+                if status.get('status') not in ('running', 'cancelling'):
+                    break
+                time.sleep(2)
+            files = sorted(str(f.relative_to(destination)) for f in destination.rglob('*') if f.is_file())
+            tuned = 0
+            for row in rows:
+                body = json.loads(call('image_recipe', photoId=row['id'])['body'])
+                tuned += sum(1 for a in body.get('studio_portrait_auto_v1', {}).get('assessments', []) if a.get('expert'))
+            report['onePress'] = {
+                'photos': len(rows), 'status': status.get('status'), 'phase': status.get('phase'),
+                'analyzed': status.get('analyzed'), 'localEdited': status.get('localEdited'),
+                'failedEdits': status.get('failedEdits'), 'exportedFiles': len([f for f in files if f.lower().endswith(('.jpg', '.jpeg', '.tif', '.png'))]),
+                'facesTunedInSavedRecipes': tuned, 'files': files[:30], 'folder': str(destination),
+            }
+        except Exception as error:  # noqa: BLE001
+            report['onePress'] = {'error': str(error)[:400]}
+        (OUT / 'results.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
+
         # The window itself: open the project and Retouch, and use the control with real input.
         try:
             os_click(page, page.get_by_role('button', name='Weddings', exact=True))
@@ -247,3 +282,4 @@ finally:
     proc.terminate()
 print(json.dumps(report['checks'], indent=2))
 print(json.dumps(report['ui'], indent=2))
+print(json.dumps(report.get('onePress'), indent=2))
