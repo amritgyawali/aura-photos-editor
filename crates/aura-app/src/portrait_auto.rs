@@ -46,6 +46,9 @@ pub struct FaceAssessment {
     pub spots_healed: usize,
     #[serde(default)]
     pub marks_kept: usize,
+    /// What was measured about this face and how the chosen settings were tuned for it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expert: Option<portrait_features::expert::Summary>,
 }
 
 /// One saved history step of an automatic pass.
@@ -154,6 +157,7 @@ pub fn group_of(id: &str) -> Option<Group> {
             || rest.contains("-makeup-")
             || rest.contains("-hair-")
             || rest.ends_with("-fabric")
+            || rest.ends_with("-surface-finish")
             || rest == "backdrop"
         {
             Group::Finishing
@@ -377,6 +381,17 @@ pub fn plan_with_faces(
                 .map(|(i, _)| i)
         })
         .flatten();
+    let context = portrait_features::expert::Context {
+        faces: report
+            .faces
+            .iter()
+            .filter(|f| (f.bounds[2] - f.bounds[0]) * (f.bounds[3] - f.bounds[1]) >= 0.008)
+            .count(),
+        noise: detail_pixels
+            .as_ref()
+            .filter(|_| options.adaptive)
+            .map_or(0.0, crate::smart_edit::noise_sigma),
+    };
     let mut planned: [Vec<Edit>; 5] = Default::default();
     let mut bodies = 0_usize;
     for (index, face) in report.faces.iter().enumerate() {
@@ -390,10 +405,35 @@ pub fn plan_with_faces(
                 findings: Vec::new(),
                 spots_healed: 0,
                 marks_kept: 0,
+                expert: None,
             });
             continue;
         }
         let person = segmentation.people.get(index);
+        // The chosen settings are the style; this face's own readings decide how much of each
+        // it gets. The frame-wide choices above (detection, main subject, backdrop) are not
+        // per face and keep the chosen values.
+        let mut expert = None;
+        let (settings, options) = match detail_pixels
+            .as_ref()
+            .filter(|_| options.adaptive)
+            .and_then(|px| portrait_features::expert::assess(face, px))
+        {
+            Some(condition) => {
+                let tuned = portrait_features::expert::tune(&settings, &condition, &context);
+                let mut tuned_options = options;
+                tuned_options.settings = tuned.settings;
+                tuned_options.intensity = (options.intensity * tuned.intensity).clamp(0.25, 1.5);
+                expert = Some(portrait_features::expert::summary(
+                    &settings,
+                    &tuned,
+                    condition,
+                    tuned_options.intensity,
+                ));
+                (tuned.settings, tuned_options)
+            }
+            None => (settings, options),
+        };
         // A face found only on the larger rendition is too small in the thumbnail to sample;
         // plan it on the larger pixels instead.
         let eye_px = {
@@ -483,15 +523,47 @@ pub fn plan_with_faces(
         let mut features = portrait_features::FeatureEdits::default();
         if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
+                let mut feature_options = options;
+                // Deep cleanup replaces the sparse four-patch search; never stack both.
+                if settings.deep_blemish_cleanup {
+                    feature_options.blemishes = false;
+                }
                 features = portrait_features::plan(
                     face,
                     index,
                     px,
                     exposure,
                     PREFIX,
-                    &options,
+                    &feature_options,
                     face_matte.as_ref().map(|m| m.id.as_str()),
                 );
+                if options.blemishes && settings.deep_blemish_cleanup {
+                    let deep = portrait_features::deep_blemish::plan(
+                        face,
+                        index,
+                        px,
+                        PREFIX,
+                        &settings,
+                        face_matte.as_ref().map(|m| &m.matte),
+                    );
+                    features.blemishes = deep.blemishes;
+                    features.report.spots_healed = deep.report.spots_healed;
+                    features.report.marks_kept = deep.report.marks_kept;
+                    features.report.findings.extend(deep.report.findings);
+                    if !features.blemishes.is_empty() {
+                        if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
+                            portrait_features::deep_blemish::surface_finish(
+                                face, index, px, PREFIX, &settings, &m.matte,
+                            )
+                        }) {
+                            if let Some(id) = &finish.matte {
+                                mattes.insert(id.clone(), matte);
+                            }
+                            features.finishing.push(finish);
+                            features.report.findings.push("Deep cleanup: blended repaired skin with a continuous, feature-protected surface finish; strength follows Skin smoothing and texture follows Keep pore texture.".into());
+                        }
+                    }
+                }
             }
         }
         features.finishing.extend(garments);
@@ -508,6 +580,20 @@ pub fn plan_with_faces(
             edits.retain(|e| !overridden.contains(&e.id));
         }
         let used: usize = planned.iter().map(Vec::len).sum();
+        if settings.deep_blemish_cleanup {
+            let non_spots = plan.edits.len()
+                + body.edits.len()
+                + features.refine.len()
+                + features.eyes.len()
+                + features.finishing.len();
+            let room =
+                retouch_tools::MAX_EDITS.saturating_sub(manual + scene_ops + used + non_spots);
+            if features.blemishes.len() > room {
+                features.blemishes.truncate(room);
+                features.report.spots_healed = features.blemishes.len();
+                features.report.findings.push(format!("Operation budget: retained {room} of this face's proposed spot repairs; existing edits are preserved."));
+            }
+        }
         let mut wanted = plan.edits.len()
             + body.edits.len()
             + features.blemishes.len()
@@ -525,6 +611,9 @@ pub fn plan_with_faces(
             findings.insert(0, body.reason.clone());
         }
         findings.insert(0, segmentation.finding(index));
+        if let Some(summary) = &expert {
+            findings.extend(summary.notes.iter().map(|note| format!("Adaptive: {note}")));
+        }
         let mut strengths = [0.0; 3];
         for (strength, edit) in strengths.iter_mut().zip(&plan.edits) {
             *strength = edit.amount;
@@ -538,6 +627,7 @@ pub fn plan_with_faces(
             findings,
             spots_healed: features.report.spots_healed,
             marks_kept: features.report.marks_kept,
+            expert,
         });
         if wanted == 0 {
             continue;
@@ -818,6 +908,8 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
             } else {
                 (distance * 0.045 / short).clamp(0.001, 0.012)
             },
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: if smooth { 0.7 } else { 1.0 },
             tone: if smooth { 0.9 } else { 0.5 },
             warmth: 0.0,
@@ -939,6 +1031,8 @@ fn plan_body(
         } else {
             (fw * 0.03 / short).clamp(0.001, 0.012)
         },
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: if tool == Tool::SkinSmooth { 0.75 } else { 1.0 },
         tone: if tool == Tool::SkinSmooth { 0.9 } else { 0.5 },
         warmth: 0.0,
@@ -1688,6 +1782,8 @@ fn face_extras(
             id: format!("{PREFIX}{index}-{name}"),
             tool,
             amount: amount.min(0.95),
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,
@@ -1845,6 +1941,8 @@ fn plan_face_from_matte(
             } else {
                 (d * 0.045 / short).clamp(0.001, 0.012)
             },
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: if smooth { 0.7 } else { 1.0 },
             tone: if smooth { 0.9 } else { 0.5 },
             warmth: 0.0,
@@ -1934,6 +2032,8 @@ fn plan_body_matte(
             amount: amount.min(0.95),
             feather,
             radius: (fw * 0.03 / short).clamp(0.001, 0.012),
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,
@@ -2085,6 +2185,8 @@ fn hair_ops(
         amount: amount.min(0.95),
         feather: 0.6,
         radius: 0.0015,
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.0,
         warmth: 0.0,
@@ -2128,6 +2230,8 @@ fn fabric_op(index: usize, matte: &MatteUse, face: &PortraitFace, settings: &Set
         amount: (settings.fabric * 0.9).min(0.95),
         feather: 0.0,
         radius: (face_height * 0.04).clamp(0.002, 0.02),
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.85,
         warmth: 0.0,
@@ -2160,6 +2264,8 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
         amount: (settings.backdrop * 0.7).min(0.95),
         feather: 0.0,
         radius: (face_height * 0.03).clamp(0.002, 0.015),
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,
@@ -2691,6 +2797,8 @@ mod tests {
             amount: 1.0,
             feather: 0.6,
             radius: 0.002,
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,

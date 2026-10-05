@@ -1,4 +1,5 @@
-//! The automatic retouch's fine controls: fifty-two named settings in ten groups. ADR-0082.
+//! The automatic retouch's fine controls in ten groups (ADR-0082), including opt-in deep
+//! blemish cleanup (ADR-0085).
 //!
 //! Modelled on what professional portrait retouching tools expose (frequency-separated skin
 //! smoothing that keeps pores, tone and light evening, measured blemish healing, dodge and
@@ -63,7 +64,11 @@ pub struct Settings {
     // -- Blemishes -------------------------------------------------------------------------
     /// How small a departure from the surrounding skin still counts as a blemish.
     pub blemish_sensitivity: f32,
-    /// At most this many spots healed per face (1..=24).
+    /// Search the complete segmented face at several spot sizes.
+    pub deep_blemish_cleanup: bool,
+    /// Include compact dark marks; may also remove freckles or beauty marks.
+    pub remove_dark_marks: bool,
+    /// At most this many spots healed per face (1..=220 in deep cleanup).
     pub max_spots: u8,
     /// Treat a field of many small marks as freckles and keep all of them.
     pub keep_freckles: bool,
@@ -154,6 +159,8 @@ impl Default for Settings {
             skin_warmth: 0.0,
             skin_tint: 0.0,
             blemish_sensitivity: 0.5,
+            deep_blemish_cleanup: false,
+            remove_dark_marks: false,
             max_spots: 12,
             keep_freckles: true,
             forehead_lines: 0.5,
@@ -192,7 +199,7 @@ impl Default for Settings {
 }
 
 /// Number of named settings in [`Settings`], for documentation and the UI's own check.
-pub const COUNT: usize = 52;
+pub const COUNT: usize = 54;
 
 fn unit(v: f32, fallback: f32) -> f32 {
     if v.is_finite() {
@@ -235,7 +242,11 @@ impl Settings {
             skin_warmth: signed(self.skin_warmth),
             skin_tint: signed(self.skin_tint),
             blemish_sensitivity: unit(self.blemish_sensitivity, d.blemish_sensitivity),
-            max_spots: self.max_spots.clamp(1, 24),
+            deep_blemish_cleanup: self.deep_blemish_cleanup,
+            remove_dark_marks: self.remove_dark_marks,
+            max_spots: self
+                .max_spots
+                .clamp(1, if self.deep_blemish_cleanup { 220 } else { 24 }),
             keep_freckles: self.keep_freckles,
             forehead_lines: unit(self.forehead_lines, d.forehead_lines),
             crows_feet: unit(self.crows_feet, d.crows_feet),
@@ -291,7 +302,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn there_are_fifty_two_settings_and_old_options_get_neutral_values() {
+    fn all_settings_round_trip_and_old_options_get_neutral_values() {
         let value = serde_json::to_value(Settings::default()).unwrap();
         assert_eq!(value.as_object().unwrap().len(), COUNT);
         // The wire names the UI sends (ui/src/ipc/nativeRetouch.ts).
@@ -311,6 +322,7 @@ mod tests {
         assert!((parsed.smoothing - 0.8).abs() < 1e-6);
         assert_eq!(parsed.texture, Settings::default().texture);
         assert_eq!(parsed.skin_warmth, 0.0);
+        assert!(!parsed.deep_blemish_cleanup && !parsed.remove_dark_marks);
     }
 
     #[test]
@@ -327,6 +339,13 @@ mod tests {
         assert_eq!(wild.skin_warmth, -1.0);
         assert_eq!(wild.glow, 0.0);
         assert_eq!(wild.max_spots, 24);
+        let deep = Settings {
+            deep_blemish_cleanup: true,
+            max_spots: 255,
+            ..Settings::default()
+        }
+        .sanitised();
+        assert_eq!(deep.max_spots, 220);
         assert_eq!(gain(0.5), 1.0);
         assert!(threshold(1.0, 1.0) < threshold(1.0, 0.5));
         assert!(threshold(1.0, 0.0) > 1.0);

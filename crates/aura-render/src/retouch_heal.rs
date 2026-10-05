@@ -151,7 +151,37 @@ impl ToneField {
     }
 }
 
-fn tone_field(image: Image<'_>, coverage: &Coverage, offset: [f32; 2]) -> ToneField {
+#[derive(Clone, Copy)]
+struct Donor {
+    offset: [f32; 2],
+    centre: [f32; 2],
+    scale: f32,
+    half_extent: [f32; 2],
+}
+
+impl Donor {
+    fn at(self, image: Image<'_>, x: f32, y: f32) -> Option<[f32; 3]> {
+        if self.scale == 1.0 {
+            return image.at(x + self.offset[0], y + self.offset[1]);
+        }
+        // Reflect the smaller clean source rather than stretching its pores into
+        // large blurred blobs. Tone matching still follows the target boundary.
+        let reflect = |v: f32, radius: f32| {
+            let t = (v + radius).rem_euclid(4.0 * radius);
+            if t <= 2.0 * radius {
+                t - radius
+            } else {
+                3.0 * radius - t
+            }
+        };
+        image.at(
+            self.centre[0] + reflect(x - self.centre[0], self.half_extent[0]) + self.offset[0],
+            self.centre[1] + reflect(y - self.centre[1], self.half_extent[1]) + self.offset[1],
+        )
+    }
+}
+
+fn tone_field(image: Image<'_>, coverage: &Coverage, source: Donor) -> ToneField {
     let [x0, y0, x1, y1] = coverage.bounds;
     let origin = [x0.saturating_sub(1), y0.saturating_sub(1)];
     let end = [x1.min(image.w - 1), y1.min(image.h - 1)];
@@ -171,7 +201,7 @@ fn tone_field(image: Image<'_>, coverage: &Coverage, offset: [f32; 2]) -> ToneFi
             let px = origin[0] as f32 + x as f32 * step[0];
             let py = origin[1] as f32 + y as f32 * step[1];
             let old = image.at(px, py);
-            let donor = image.at(px + offset[0], py + offset[1]);
+            let donor = source.at(image, px, py);
             let boundary = x == 0
                 || y == 0
                 || x + 1 == w
@@ -232,7 +262,19 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
     let Some(offset) = choose_offset(image, edit, coverage.bounds) else {
         return;
     };
-    let field = tone_field(image, coverage, offset);
+    let source = Donor {
+        offset,
+        centre: [
+            edit.region[0] * w as f32 - 0.5,
+            edit.region[1] * h as f32 - 0.5,
+        ],
+        scale: edit.source_scale,
+        half_extent: [
+            edit.region[2] * w as f32 * edit.source_scale,
+            edit.region[3] * h as f32 * edit.source_scale,
+        ],
+    };
+    let field = tone_field(image, coverage, source);
     let mut patches = Vec::with_capacity((x1 - x0) * (y1 - y0));
     for y in y0..y1 {
         for x in x0..x1 {
@@ -241,7 +283,7 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
             let alpha = coverage.at(x, y, w, h) * edit.amount;
             let mut value = old;
             if alpha > 0.0 {
-                if let Some(donor) = image.at(x as f32 + offset[0], y as f32 + offset[1]) {
+                if let Some(donor) = source.at(image, x as f32, y as f32) {
                     let bias = field.at(x, y);
                     value = std::array::from_fn(|c| {
                         old[c] + alpha * ((donor[c] + bias[c]).max(0.0) - old[c])

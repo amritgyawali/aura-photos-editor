@@ -18,15 +18,16 @@ export function readRetouchPreferences(recipe?: RecipeDto | null): AutoRetouchOp
       options.intensity = Math.max(.25, Math.min(1.5, saved.intensity));
     }
     if (saved.scope === 'face' || saved.scope === 'body' || saved.scope === 'face_and_body') options.scope = saved.scope;
-    for (const key of ['blemishes', 'refine', 'eyes', 'teeth'] as const) {
+    for (const key of ['blemishes', 'refine', 'eyes', 'teeth', 'adaptive'] as const) {
       if (typeof saved[key] === 'boolean') options[key] = saved[key];
     }
     if (record(saved.settings)) {
+      const spotLimit = saved.settings.deepBlemishCleanup === true ? 220 : 24;
       for (const key of Object.keys(settings) as (keyof RetouchSettings)[]) {
         const value = saved.settings[key];
         if (typeof settings[key] === 'boolean' && typeof value === 'boolean') Object.assign(settings, { [key]: value });
         else if (typeof settings[key] === 'number' && typeof value === 'number' && Number.isFinite(value)) {
-          const bounded = key === 'maxSpots' ? Math.round(Math.max(1, Math.min(24, value)))
+          const bounded = key === 'maxSpots' ? Math.round(Math.max(1, Math.min(spotLimit, value)))
             : Math.max(signed.has(key) ? -1 : 0, Math.min(1, value));
           Object.assign(settings, { [key]: bounded });
         }

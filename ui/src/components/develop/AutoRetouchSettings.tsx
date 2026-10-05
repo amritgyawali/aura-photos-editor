@@ -13,7 +13,7 @@ const SCOPES: [RetouchScope, string, string][] = [
 ];
 
 const FEATURES: [keyof Pick<AutoRetouchOptions, 'blemishes' | 'refine' | 'eyes' | 'teeth'>, string, string][] = [
-  ['blemishes', 'Heal blemishes', 'Targets small red spots while avoiding likely moles and freckles. Review marks before export.'],
+  ['blemishes', 'Heal blemishes', 'Repairs measured spots with nearby skin texture. Dark marks are kept unless Remove dark marks is enabled.'],
   ['refine', 'Soften lines and redness', 'Fine lines, smile lines and redness beside the nose, only where they measure stronger than the cheek.'],
   ['eyes', 'Eyes', 'Iris detail, redness in the whites, flash red-eye and under-eye shadows, only where measured.'],
   ['teeth', 'Teeth', 'Reduce a measured yellow cast on visible teeth.'],
@@ -32,7 +32,7 @@ export const SETTING_GROUPS: [string, Control[]][] = [
   ]],
   ['Skin', [
     ['smoothing', 'Skin smoothing', 'unit', 'Mid-scale unevenness between pores and facial form. 50% is the measured amount.'],
-    ['texture', 'Keep pore texture', 'unit', 'How much fine texture survives smoothing; never plastic.'],
+    ['texture', 'Keep pore texture', 'unit', 'Retains original fine skin detail separately from larger uneven texture. Review at full size.'],
     ['smoothingSize', 'Smoothing size', 'unit', 'Small evens fine unevenness, large evens broad patches.'],
     ['toneEvenness', 'Even skin tone', 'unit', 'Blotchy colour evened toward the same person’s own skin.'],
     ['lightEvenness', 'Even skin light', 'unit', 'Patchy light within the skin evened.'],
@@ -46,6 +46,8 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['skinTint', 'Skin tint', 'signed', 'Magenta or green skin tint. Neutral by default.'],
   ]],
   ['Blemishes', [
+    ['deepBlemishCleanup', 'Deep blemish cleanup', 'toggle', 'Search the complete segmented face at multiple spot sizes. Eyes, brows, lips and creases remain protected.'],
+    ['removeDarkMarks', 'Remove dark marks', 'toggle', 'Include compact dark spots in deep cleanup. This may also remove freckles or beauty marks; review the result.'],
     ['blemishSensitivity', 'Blemish sensitivity', 'unit', 'How small a departure still counts as a spot.'],
     ['maxSpots', 'Most spots per face', 'count', 'A face with more is left for you to judge.'],
     ['keepFreckles', 'Keep freckles', 'toggle', 'A field of many small marks is treated as freckles and kept.'],
@@ -101,6 +103,7 @@ type Preset = [string, string, Partial<RetouchSettings>, number?];
 /** Starting points modelled on common retouching looks; every control stays adjustable. */
 export const PRESETS: Preset[] = [
   ['natural', 'Natural', {}],
+  ['acne', 'Deep acne cleanup', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 220, blemishSensitivity: .9, smoothing: .8, texture: .85, toneEvenness: .7, microDodgeBurn: .65, poreRefine: .3, shine: .85, hairDetail: .4, hairShine: .2 }],
   ['subtle', 'Subtle', { smoothing: .35, toneEvenness: .4, microDodgeBurn: .15, eyeWhitening: .1, underEyeLines: .15 }, .8],
   ['soft', 'Soft glow', { smoothing: .75, texture: .4, glow: .4, eyeWhitening: .4, darkCircles: .7, blush: .2 }],
   ['beauty', 'Polished beauty', { smoothing: .85, toneEvenness: .75, microDodgeBurn: .6, poreRefine: .4, contour: .5, highlight: .5, lipColour: .35, lashDefinition: .5, browDefinition: .4, irisBrightness: .4, eyeWhitening: .4, hairDetail: .4, hairShine: .3 }],
@@ -125,7 +128,9 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
   const scope = SCOPES.find(([value]) => value === options.scope) ?? SCOPES[0];
   const change = (key: keyof RetouchSettings, value: number | boolean) => {
     setPreset('custom');
-    setOptions({ ...options, settings: { ...settings, [key]: value } });
+    setOptions({ ...options, settings: { ...settings, [key]: value,
+      ...(key === 'deepBlemishCleanup' && !value ? { maxSpots: Math.min(settings.maxSpots, 24), removeDarkMarks: false } : {}),
+    } });
   };
   const choose = ([id, , values, intensity]: Preset) => {
     setPreset(id);
@@ -145,7 +150,12 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
       </label>)}
       {preset === 'custom' && <span className="lr-hint">Custom</span>}
     </div>
+    <label className="retouch-toggle" title="Measures each face (skin texture, colour evenness, light, shine, marks, facial hair, size in the frame, noise) and tunes the settings below for it. Your settings stay the style; each photo gets its own amounts.">
+      <input type="checkbox" checked={options.adaptive !== false} onChange={event => setOptions({ ...options, adaptive: event.target.checked })} />Adapt to each face
+    </label>
+    <p className="lr-hint">{options.adaptive !== false ? 'Each face is measured and gets its own amounts; the report lists what was changed and why.' : 'The settings below are used exactly as set on every face.'}</p>
     <p className="lr-hint">{scope?.[2]} Skin is found by AI segmentation and measured against the same person's own skin; every result becomes an ordinary operation you can adjust, disable or remove below.</p>
+    {settings.deepBlemishCleanup && <p className="lr-hint">Deep cleanup searches the full detected face. {settings.removeDarkMarks ? 'Dark-mark removal is on and can also remove freckles or beauty marks. Review the before/after.' : 'Dark marks are protected.'}</p>}
     <button type="button" className="retouch-primary" disabled={disabled || busy} onClick={() => onRun(options)}>{busy ? 'Detecting and retouching…' : `Auto retouch: ${scope?.[1] ?? 'Face'}`}</button>
     <details>
       <summary>Strength and details</summary>
@@ -168,7 +178,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
           </label>;
         }
         const n = Number(value);
-        const [min, max, scale] = kind === 'signed' ? [-100, 100, 100] : kind === 'count' ? [1, 24, 1] : [0, 100, 100];
+        const [min, max, scale] = kind === 'signed' ? [-100, 100, 100] : kind === 'count' ? [1, settings.deepBlemishCleanup ? 220 : 24, 1] : [0, 100, 100];
         const shown = kind === 'count' ? String(n) : kind === 'signed' ? `${n > 0 ? '+' : ''}${Math.round(n * 100)}` : percent(n);
         return <label key={key} title={hint}>{name}: {shown}
           <input type="range" min={min} max={max} step={1} value={Math.round(n * scale)} aria-label={name}

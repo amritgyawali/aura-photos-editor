@@ -52,6 +52,7 @@ export type RetouchSettings = {
   smoothing: number; texture: number; smoothingSize: number; toneEvenness: number; lightEvenness: number; microDodgeBurn: number;
   poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
   blemishSensitivity: number; maxSpots: number; keepFreckles: boolean;
+  deepBlemishCleanup: boolean; removeDarkMarks: boolean;
   foreheadLines: number; crowsFeet: number; smileLines: number; underEyeLines: number; neckLines: number;
   darkCircles: number; eyeBags: number;
   eyeWhitening: number; eyeVessels: number; irisDetail: number; irisBrightness: number; redEye: boolean; lashDefinition: number; browDefinition: number;
@@ -65,6 +66,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   smoothing: .5, texture: .5, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
   blemishSensitivity: .5, maxSpots: 12, keepFreckles: true,
+  deepBlemishCleanup: false, removeDarkMarks: false,
   foreheadLines: .5, crowsFeet: .5, smileLines: .5, underEyeLines: .25, neckLines: 0,
   darkCircles: .5, eyeBags: .25,
   eyeWhitening: .2, eyeVessels: .5, irisDetail: .5, irisBrightness: 0, redEye: true, lashDefinition: 0, browDefinition: 0,
@@ -73,13 +75,16 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   bodySmoothing: .5, bodyTone: .5, matchBodyToFace: .25, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
   hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0,
 };
-export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope; settings?: RetouchSettings };
-export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true, scope: 'face' };
+/** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */
+export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope; settings?: RetouchSettings; adaptive?: boolean };
+export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true, scope: 'face', adaptive: true };
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8, connected: true };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 export type NativeRetouchEdit = {
   id: string; tool: RetouchTool; enabled: boolean; region: [number, number, number, number];
   source: [number, number] | null; amount: number; feather: number; radius: number;
+  sourceScale?: number;
+  preserveMicrotexture?: boolean;
   texture: number; tone: number; warmth: number; tint: number;
   mask?: BrushMask | null;
   skin?: SkinSettings | null;

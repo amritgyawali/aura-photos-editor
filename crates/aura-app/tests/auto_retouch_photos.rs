@@ -44,6 +44,21 @@ fn preset(name: &str) -> portrait_features::Options {
     };
     let s = &mut options.settings;
     match name {
+        "deep" => {
+            s.deep_blemish_cleanup = true;
+            s.remove_dark_marks = true;
+            s.keep_freckles = false;
+            s.max_spots = 220;
+            s.blemish_sensitivity = 0.9;
+            s.smoothing = 0.8;
+            s.texture = 0.85;
+            s.tone_evenness = 0.7;
+            s.micro_dodge_burn = 0.65;
+            s.pore_refine = 0.3;
+            s.shine = 0.85;
+            s.hair_detail = 0.4;
+            s.hair_shine = 0.2;
+        }
         "soft" => {
             s.smoothing = 0.75;
             s.texture = 0.4;
@@ -150,6 +165,16 @@ fn retouches_real_photographs() {
             let mut with = recipe.clone();
             retouch_tools::write_with_mattes(&mut with, &stack, &plan.mattes).unwrap();
             aura_recipe::schema::Validation::check(&with).unwrap();
+            std::fs::write(
+                path.with_file_name(format!("{stem}.{name}.recipe.json")),
+                serde_json::to_vec_pretty(&with).unwrap(),
+            )
+            .unwrap();
+            std::fs::write(
+                path.with_file_name(format!("{stem}.{name}.report.json")),
+                serde_json::to_vec_pretty(&plan.report).unwrap(),
+            )
+            .unwrap();
             let mattes = retouch_tools::read_mattes(&with).unwrap();
             let mut linear: Vec<f32> = working_pixels(&rgb);
             let source = linear.clone();
