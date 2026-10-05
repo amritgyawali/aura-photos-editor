@@ -181,7 +181,9 @@ fn candidates(
                 if (half + root) / (half - root).max(0.2) > 5.5 || reach > 18.0 * scale {
                     continue;
                 }
-                let repair = (reach * 1.2 + 1.5 * scale).max(3.5 * scale);
+                // Keep the measured lesion inside the fully repaired core; the
+                // feather belongs on surrounding healthy skin, not on the acne rim.
+                let repair = (reach * 1.4 + 1.5 * scale).max(3.5 * scale);
                 let at = y.round() as usize * w + x.round() as usize;
                 // A dark halo around an isolated bright pore is not a dark lesion.
                 if (fine[at] > bg[at] && redness[at] <= 0.003)
@@ -410,7 +412,7 @@ pub(crate) fn plan(
             (source[0] + x0 as f32 + 0.5) / px.width as f32,
             (source[1] + y0 as f32 + 0.5) / px.height as f32,
         ]);
-        edit.feather = 0.35;
+        edit.feather = 0.25;
         edit.texture_heal = true;
         edit.source_scale = source_scale;
         // No coarse matte: the entire disk was checked against the repaired skin mask.
@@ -712,6 +714,17 @@ mod tests {
             rendered[spot] > before[spot] + 0.1,
             "native heal must actually remove dark defect"
         );
+        for y in 286..=294 {
+            for x in 166..=174 {
+                if (x as f32 - 170.0).hypot(y as f32 - 290.0) <= 4.0 {
+                    let i = (y * 512 + x) * 3;
+                    assert!(
+                        (rendered[i] - 150.0 / 255.0).abs() < 0.01,
+                        "lesion rim must be repaired before blending into healthy skin"
+                    );
+                }
+            }
+        }
         let eye = (205 * 512 + 195) * 3;
         assert_eq!(&rendered[eye..eye + 3], &before[eye..eye + 3]);
         let lip = (380 * 512 + 255) * 3;
