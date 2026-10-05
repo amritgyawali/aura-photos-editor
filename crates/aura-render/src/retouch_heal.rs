@@ -5,6 +5,8 @@
 use crate::retouch_mask::Coverage;
 use aura_recipe::retouch_tools::Edit;
 
+mod texture;
+
 const RING_SAMPLES: usize = 32;
 const GRID_LIMIT: usize = 64;
 const RELAXATION_PASSES: usize = 96;
@@ -274,7 +276,13 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
             edit.region[3] * h as f32 * edit.source_scale,
         ],
     };
-    let field = tone_field(image, coverage, source);
+    let texture = edit
+        .texture_heal
+        .then(|| texture::TextureHeal::new(image, source))
+        .flatten();
+    let field = texture
+        .is_none()
+        .then(|| tone_field(image, coverage, source));
     let mut patches = Vec::with_capacity((x1 - x0) * (y1 - y0));
     for y in y0..y1 {
         for x in x0..x1 {
@@ -284,10 +292,15 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
             let mut value = old;
             if alpha > 0.0 {
                 if let Some(donor) = source.at(image, x as f32, y as f32) {
-                    let bias = field.at(x, y);
-                    value = std::array::from_fn(|c| {
-                        old[c] + alpha * ((donor[c] + bias[c]).max(0.0) - old[c])
-                    });
+                    let target = if let Some(ref heal) = texture {
+                        heal.at(image, source, x as f32, y as f32).unwrap_or(donor)
+                    } else if let Some(ref field) = field {
+                        let bias = field.at(x, y);
+                        std::array::from_fn(|c| (donor[c] + bias[c]).max(0.0))
+                    } else {
+                        donor
+                    };
+                    value = std::array::from_fn(|c| old[c] + alpha * (target[c] - old[c]));
                 }
             }
             patches.push(value);
