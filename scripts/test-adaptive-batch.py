@@ -191,9 +191,10 @@ try:
 
         # The window itself: open the project and Retouch, and use the control with real input.
         try:
-            page.reload()
-            page.wait_for_function('() => !!window.__TAURI_INTERNALS__')
             os_click(page, page.get_by_role('button', name='Weddings', exact=True))
+            if not page.get_by_role('button', name=f'{name} {len(photos)}', exact=True).count():
+                os_click(page, page.get_by_role('button', name='Import', exact=True))
+                os_click(page, page.get_by_role('button', name='Weddings', exact=True))
             os_click(page, page.get_by_role('button', name=f'{name} {len(photos)}', exact=True))
             os_click(page, page.locator('button', has_text='4 Edit').or_(page.locator('button', has_text='Edit').filter(has_text='edits')).first)
             os_click(page, page.get_by_role('button', name='Photo studio', exact=True))
@@ -226,7 +227,10 @@ try:
                 page.screenshot(path=str(OUT / 'ui-retouch.png'))
         except Exception as error:  # noqa: BLE001 - the measured results above stand on their own
             report['ui']['error'] = str(error)[:400]
-            page.screenshot(path=str(OUT / 'ui-error.png'))
+            try:
+                page.screenshot(path=str(OUT / 'ui-error.png'))
+            except Exception:  # noqa: BLE001
+                pass
 
         if tiles:
             width = 900

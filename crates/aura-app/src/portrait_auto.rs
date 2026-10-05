@@ -414,6 +414,7 @@ pub fn plan_with_faces(
         // it gets. The frame-wide choices above (detection, main subject, backdrop) are not
         // per face and keep the chosen values.
         let mut expert = None;
+        let chosen_deep = settings.deep_blemish_cleanup;
         let (settings, options) = match detail_pixels
             .as_ref()
             .filter(|_| options.adaptive)
@@ -524,8 +525,9 @@ pub fn plan_with_faces(
         if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
                 let mut feature_options = options;
-                // Deep cleanup replaces the sparse four-patch search; never stack both.
-                if settings.deep_blemish_cleanup {
+                // Deep cleanup replaces the sparse four-patch search; never stack both. When the
+                // adaptive pass chose it, the sparse search still runs so the two can be compared.
+                if settings.deep_blemish_cleanup && chosen_deep {
                     feature_options.blemishes = false;
                 }
                 features = portrait_features::plan(
@@ -546,11 +548,22 @@ pub fn plan_with_faces(
                         &settings,
                         face_matte.as_ref().map(|m| &m.matte),
                     );
-                    features.blemishes = deep.blemishes;
-                    features.report.spots_healed = deep.report.spots_healed;
-                    features.report.marks_kept = deep.report.marks_kept;
-                    features.report.findings.extend(deep.report.findings);
-                    if !features.blemishes.is_empty() {
+                    // The whole-face search protects dark marks, so on a face whose marks are
+                    // dark it can repair fewer spots than the sparse one. Keep the better plan.
+                    let use_deep = chosen_deep || deep.blemishes.len() > features.blemishes.len();
+                    if use_deep {
+                        features.blemishes = deep.blemishes;
+                        features.report.spots_healed = deep.report.spots_healed;
+                        features.report.marks_kept = deep.report.marks_kept;
+                        features.report.findings.extend(deep.report.findings);
+                    } else {
+                        features.report.findings.push(format!(
+                            "Whole-face cleanup found {} repairable spot(s) with dark marks protected, no more than the standard search ({}); the standard repairs were kept. Dark marks are only removed when you switch on Remove dark marks.",
+                            deep.blemishes.len(),
+                            features.blemishes.len()
+                        ));
+                    }
+                    if use_deep && !features.blemishes.is_empty() {
                         if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
                             portrait_features::deep_blemish::surface_finish(
                                 face, index, px, PREFIX, &settings, &m.matte,

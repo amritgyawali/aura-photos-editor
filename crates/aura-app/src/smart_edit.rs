@@ -869,6 +869,10 @@ fn face_exposure_cap(
         Some(raised) if face_median < 0.3 => exposure.max(raised),
         _ => exposure,
     };
+    // And when the people are not darker than the frame around them, the frame's darkness is
+    // not theirs: at most a small lift, however far the median sits from middle grey.
+    let surroundings = exposure > 0.25 && face_median >= frame_median;
+    let exposure = if surroundings { 0.25 } else { exposure };
     // Nor is a white wall evidence that the people in front of it are overexposed.
     if exposure < 0.0 && face_median < 0.6 {
         return (
@@ -907,6 +911,13 @@ fn face_exposure_cap(
                 } else {
                     "brightening further would clip highlights on a face"
                 }
+            )),
+        )
+    } else if surroundings {
+        (
+            exposure,
+            Some(format!(
+                "Exposure limited to {exposure:+.2} EV (the histogram asked for {requested:+.2}): the people are not darker than the frame around them, so its dark hair, clothes or background are not a reason to lighten them."
             )),
         )
     } else {
