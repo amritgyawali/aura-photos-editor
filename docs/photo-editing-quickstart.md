@@ -15,32 +15,32 @@ After source changes, close AURA and open the shortcut again. To force a rebuild
 run `& '.\Start AURA.cmd' -Rebuild`. Build logs are in `.work-checks/launcher`;
 runtime logs are in `%APPDATA%\AURA\logs`.
 
-## Finish a project with one button
+## The permanent studio workspace
 
-Choose **Choose photos** or **Choose folders** on the welcome screen or Import
-step. Selection starts import, pixel analysis, individual automatic edits, local portrait retouch and
-verified export. The output appears in a unique folder under **Pictures / AURA
-Exports**; its full path and progress stay visible while you change tools. Keep
-AURA open until the run finishes. **Stop automatic processing** preserves work
-already completed and waits for any active export to finish.
+AURA always opens the plum studio with **Start, Photos, Auto edit, Instagram
+style, Export, Advanced** in its sidebar. System theme and old saved theme
+preferences do not replace this layout. Collections stay in the sidebar.
 
-Portrait retouch runs automatically after each photo's light/color correction, even offline.
-It uses that photo's saved scope, strength and fine controls, or natural defaults for a new
-photo. Photos without detected people receive no portrait operations. Review the result and
-adjust **Automatic retouch** when needed; detection can miss small or obscured faces.
+On Start, choose a look, optionally add a reference, then choose photographs or
+a folder. Import starts local automatic editing. In **Auto edit**, choose all or
+selected photos; each keeps its own saved retouch preferences and manual edits.
+Use **Export** to select a destination and render the saved results.
 
-Create/open a wedding, import your photographs, and select an output folder in
-**Finish everything**. Press **Finish everything** to run the existing analysis,
-framing, culling, automatic editing and export pipeline. Progress, local fallbacks
-and exported file counts appear beneath the button. Cloud editing requires your
-configured provider; local enhancement works without an API key.
+Extra tools (camera matching, culling, portrait regions, object cleanup, provider
+setup and diagnostics) live under **Advanced** in the same studio interface.
+The complete collection workflow is also available there when needed.
+
+Portrait retouch uses each photo's saved scope, strength and fine controls, or
+natural defaults for a new photo. Photos without detected people receive no
+portrait operations. The complete collection workflow also runs this local
+portrait pass after light/color correction and before verified export.
 
 ## Edit individual photographs
 
-1. Run the desktop application, create a wedding/project, and open it.
-2. Choose **Choose photos** or **Choose folders** to import and process. JPEG
+1. Run the desktop application, create a collection, and open it.
+2. Choose **Choose photos** or **Choose a folder** to import and process. JPEG
    and PNG work directly; camera RAW support depends on the camera/encoding.
-3. Select a photograph in Library, then open **Develop**. **Auto edit photo**
+3. Select a photograph in Photos, then open **Auto edit**. **Auto edit photo**
    adjusts one photo; **Auto edit all photos** processes every imported photo
    sequentially. Stop preserves completed edits.
 4. Use **Show original** to compare. Adjust exposure, contrast, highlights,
@@ -83,3 +83,12 @@ cargo build --locked --manifest-path ui/src-tauri/Cargo.toml --target-dir target
 
 The default catalog persists in the current Windows user's AURA application data
 folder. Preview caches are disposable; keep the originals in their imported locations.
+
+## Deep acne cleanup
+
+Open **Auto edit > Retouch**, select **Deep acne cleanup**, and run automatic
+retouch. This opt-in preset includes compact dark marks and can affect freckles
+or beauty marks. Review the selection and saved operations before export.
+Frequency separation can retain fine texture while smoothing broader unevenness;
+healing borrows nearby skin texture. Every operation stays editable and undoable.
+No automatic pass guarantees complete skin selection or removal of every mark.

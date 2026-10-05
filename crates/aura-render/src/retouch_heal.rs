@@ -161,7 +161,7 @@ struct Donor {
 
 impl Donor {
     fn at(self, image: Image<'_>, x: f32, y: f32) -> Option<[f32; 3]> {
-        if self.scale == 1.0 {
+        if self.scale >= 1.0 {
             return image.at(x + self.offset[0], y + self.offset[1]);
         }
         // Reflect the smaller clean source rather than stretching its pores into

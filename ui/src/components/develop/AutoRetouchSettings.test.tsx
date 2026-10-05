@@ -77,3 +77,12 @@ it('runs deep cleanup with explicit dark-mark removal and retained fine texture'
     deepBlemishCleanup: true, removeDarkMarks: true, maxSpots: 220, texture: .85,
   }) }));
 });
+
+it('returns the spot limit to the ordinary range when deep cleanup is disabled', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
+  fireEvent.click(screen.getByLabelText('Deep blemish cleanup'));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ deepBlemishCleanup: false, maxSpots: 24 }) }));
+});

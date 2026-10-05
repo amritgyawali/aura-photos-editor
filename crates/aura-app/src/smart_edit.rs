@@ -1019,7 +1019,7 @@ fn run_with(
             Group::Blemishes,
             "Blemishes",
             format!(
-                "Healed {spots} temporary-looking spot(s); kept {kept} possible permanent mark(s)."
+                "Repaired {spots} measured spot(s); kept {kept} possible permanent mark(s)."
             ),
         ),
         (
@@ -1115,7 +1115,7 @@ fn run_with(
             &merged,
             &changes.changed,
             &format!(
-                "{} {}/{total} · {}: {}",
+                "{} {}/{total} Â· {}: {}",
                 if chosen.is_some() {
                     "Auto retouch (your settings)"
                 } else if global {

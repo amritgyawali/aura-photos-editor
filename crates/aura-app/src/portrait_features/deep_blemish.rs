@@ -85,8 +85,8 @@ fn clearance(mask: &[bool], w: usize, h: usize) -> Vec<f32> {
             if mask[i] {
                 d[i] = (d[i - 1] + 1.0)
                     .min(d[i - w] + 1.0)
-                    .min(d[i - w - 1] + 1.414)
-                    .min(d[i - w + 1] + 1.414);
+                    .min(d[i - w - 1] + std::f32::consts::SQRT_2)
+                    .min(d[i - w + 1] + std::f32::consts::SQRT_2);
             }
         }
     }
@@ -97,8 +97,8 @@ fn clearance(mask: &[bool], w: usize, h: usize) -> Vec<f32> {
                 d[i] = d[i]
                     .min(d[i + 1] + 1.0)
                     .min(d[i + w] + 1.0)
-                    .min(d[i + w + 1] + 1.414)
-                    .min(d[i + w - 1] + 1.414);
+                    .min(d[i + w + 1] + std::f32::consts::SQRT_2)
+                    .min(d[i + w - 1] + std::f32::consts::SQRT_2);
             }
         }
     }
