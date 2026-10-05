@@ -162,7 +162,7 @@ Never load two phase files into one session.
 | Automatic retouch settings, in the product's own words | `docs/automatic-retouch-settings.md` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 | One studio, the unattended run and the measured cull | `docs/adr/ADR-0088-one-studio-and-the-unattended-wedding-run.md`, `crates/aura-app/src/one_click_commands.rs`, `crates/aura-app/src/measured_cull.rs`, `ui/src/components/workflow/FinishFolder.tsx` |
-| Finishing a folder in the real app, scored against ground truth | `scripts/test-wedding-run.py` |
+| Finishing a folder in the real app, scored against ground truth | `scripts/test-wedding-run.py`, results in `docs/unified-studio-validation.md` |
 | Portrait parsing and portrait retouch decisions | `docs/adr/ADR-0065-measured-portrait-parsing-and-portrait-retouch.md` |
 | Faces, landmarks and the nineteen portrait regions | `crates/aura-portrait/` |
 | The vendored Haar cascades, their converter and their card | `crates/aura-portrait/data/`, `docs/model-cards/haar_cascades.md` |
