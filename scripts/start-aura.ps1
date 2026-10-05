@@ -96,6 +96,10 @@ try {
         try {
             Invoke-BuildStep 'cargo.exe' @('build', '--locked', '--manifest-path', 'ui/src-tauri/Cargo.toml', '--target-dir', 'target/desktop-launch', '--features', 'custom-protocol', '-j', '1') 'desktop.log'
         } finally { Pop-Location }
+        if (Test-Path -LiteralPath $installedExe) {
+            Copy-Item -LiteralPath $buildExe -Destination $installedExe -Force
+            $desktopExe = $installedExe
+        }
     }
 
     if ($InstallShortcuts) {

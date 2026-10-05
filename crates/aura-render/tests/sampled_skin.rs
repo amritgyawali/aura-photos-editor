@@ -19,6 +19,7 @@ fn operation(tool: Tool) -> Edit {
         radius: 0.025,
         source_scale: 1.0,
         preserve_microtexture: false,
+        texture_heal: false,
         texture: 1.0,
         tone: 1.0,
         warmth: 0.0,

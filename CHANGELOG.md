@@ -2,6 +2,15 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Local-light matched acne repair - 2026-10-06
+
+- Deep cleanup transfers clean donor texture over the surrounding skin's measured light
+  and colour. Existing saved heals keep their original rendering; each new repair remains
+  editable, with a reusable tool preset option.
+- Prioritize compact dark/red marks over bright pores. Recover uncertain skin inside the
+  face while requiring stronger skin confidence for donors, and tighten lip protection
+  so nearby cheeks receive the finishing pass. Keep facial features and originals intact.
+
 ## One studio, and a wedding finished from one folder — 2026-10-05
 
 - Merge the adaptive editor into the permanent studio: one application, one shortcut

@@ -85,6 +85,7 @@ export type NativeRetouchEdit = {
   source: [number, number] | null; amount: number; feather: number; radius: number;
   sourceScale?: number;
   preserveMicrotexture?: boolean;
+  textureHeal?: boolean;
   texture: number; tone: number; warmth: number; tint: number;
   mask?: BrushMask | null;
   skin?: SkinSettings | null;
