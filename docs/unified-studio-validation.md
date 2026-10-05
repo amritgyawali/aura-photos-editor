@@ -48,7 +48,7 @@ photograph (2.5 s edit and retouch, 9.6 s render, encode and read back). Peak co
 **Not run.** The collection built for it was written to drive D:, which Windows marks "Full
 Repair Needed", and the drive emptied the folder at frame 1,144. The photographer then asked
 for a ten-photograph test. What the measurements above say about a run of that size: at camera
-size it is about seven and a half hours on this laptop for 2,000 delivered frames, fewer after
+size it is a little over seven hours on this laptop for 2,000 delivered frames, fewer after
 the cull; memory did not grow across 62 photographs; the edit report is written a photograph
 at a time; and one failed photograph does not stop the rest. The run itself is unproven.
 
