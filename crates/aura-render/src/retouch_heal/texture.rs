@@ -18,14 +18,15 @@ fn solve(mut a: [[f32; 4]; 3]) -> Option<[f32; 3]> {
         if divisor.abs() < 1e-6 {
             return None;
         }
-        for j in col..4 {
-            a[col][j] /= divisor;
+        for value in a[col].iter_mut().skip(col) {
+            *value /= divisor;
         }
+        let pivot_row = a[col];
         for row in 0..3 {
             if row != col {
                 let factor = a[row][col];
-                for j in col..4 {
-                    a[row][j] -= factor * a[col][j];
+                for (value, pivot_value) in a[row].iter_mut().zip(pivot_row).skip(col) {
+                    *value -= factor * pivot_value;
                 }
             }
         }
