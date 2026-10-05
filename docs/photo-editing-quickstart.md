@@ -30,6 +30,11 @@ Extra tools (camera matching, culling, portrait regions, object cleanup, provide
 setup and diagnostics) live under **Advanced** in the same studio interface.
 The complete collection workflow is also available there when needed.
 
+Portrait retouch uses each photo's saved scope, strength and fine controls, or
+natural defaults for a new photo. Photos without detected people receive no
+portrait operations. The complete collection workflow also runs this local
+portrait pass after light/color correction and before verified export.
+
 ## Edit individual photographs
 
 1. Run the desktop application, create a collection, and open it.
@@ -81,7 +86,7 @@ folder. Preview caches are disposable; keep the originals in their imported loca
 
 ## Deep acne cleanup
 
-Open **Auto edit ? Retouch**, select **Deep acne cleanup**, and run automatic
+Open **Auto edit > Retouch**, select **Deep acne cleanup**, and run automatic
 retouch. This opt-in preset includes compact dark marks and can affect freckles
 or beauty marks. Review the selection and saved operations before export.
 Frequency separation can retain fine texture while smoothing broader unevenness;
