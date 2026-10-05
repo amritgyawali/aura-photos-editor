@@ -19,6 +19,25 @@ back through. Nothing leaves your computer and your original file is never chang
 A step that finds nothing to do is not saved. Running Auto enhance again on an unchanged
 photo saves nothing new.
 
+### Every photo gets its own settings
+
+Before a face is retouched AURA measures it: how large it is in the frame, how even its skin
+texture and colour are, how directional the light is, how much of it is shiny, how many small
+marks it has, and how noisy the frame is. The retouch settings you chose are then turned up
+or down *for that face*. Smooth skin is left nearly alone; rough skin in a close-up gets more
+smoothing with its pores kept; a small face in a group gets a light touch; hard light is not
+flattened; a noisy frame is not given plastic skin. Your settings remain the style - a
+control you set to zero stays off.
+
+Under **Automatic decisions by face** every tuned face lists what was changed and why, and a
+batch result shows each photo's amounts. Untick **Adapt to each face** in Retouch to have
+your settings used exactly as set.
+
+The same idea applies to light and colour when nobody is in the frame. A night scene is not
+brightened into grey, a bright white scene is not darkened, a sepia or toned black-and-white
+keeps its colour, and when the brightest parts of a photo are already near white the dark
+parts are lifted with Shadows rather than Exposure.
+
 ### Choosing what is retouched, and how much
 
 In **Retouch**, the **Automatic retouch** box offers three choices:

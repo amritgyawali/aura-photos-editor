@@ -2,6 +2,19 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Per-face adaptive retouch and scene intent — 2026-10-05
+
+- Measure every face before retouching it (size in the frame, skin texture, colour evenness,
+  light direction, shine, compact marks, expression lines, shadow depth, frame noise, group
+  size) and tune the chosen retouch settings for that face. Each photo in a batch gets its
+  own amounts; the report says what changed and why, and **Adapt to each face** switches it off.
+- Read a scene's intent before correcting its tone: night scenes stay dark, high-key frames
+  stay bright, toned monochromes keep their colour, and a frame whose highlights already reach
+  white is lifted through its shadows instead of its exposure. ADR-0086.
+- Add whole-face deep blemish cleanup with protected dark marks, a separate pore-texture band
+  and smaller patch donors (ADR-0085), and upright-normalised skin segmentation (ADR-0084).
+- Restore the larger spot limit with deep cleanup when reopening a photo.
+
 ## Automatic portrait retouch after import — 2026-10-05
 
 - Run the bundled portrait retoucher after each photo's automatic light/color edit and

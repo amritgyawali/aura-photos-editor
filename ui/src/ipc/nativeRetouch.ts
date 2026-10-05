@@ -75,8 +75,9 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   bodySmoothing: .5, bodyTone: .5, matchBodyToFace: .25, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
   hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0,
 };
-export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope; settings?: RetouchSettings };
-export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true, scope: 'face' };
+/** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */
+export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope; settings?: RetouchSettings; adaptive?: boolean };
+export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true, scope: 'face', adaptive: true };
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8, connected: true };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 export type NativeRetouchEdit = {

@@ -43,6 +43,33 @@ it('restores distinct saved retouch choices after switching photos and undoing',
   fireEvent.click(automatic);
   expect(nativeRetouch.autoRetouch).toHaveBeenCalledTimes(1);
 });
+it('saves separate fine skin texture control with frequency separation', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), { target: { value: 'frequency' } });
+  fireEvent.click(screen.getByLabelText('Preserve fine skin texture'));
+  fireEvent.change(screen.getByLabelText('Texture gain (100%)'), { target: { value: '.85' } });
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ tool: 'frequency', preserveMicrotexture: true, texture: .85 }),
+  ]));
+});
+it('edits a smaller patch donor and resets its scale when the source is cleared', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), { target: { value: 'patch_heal' } });
+  fireEvent.change(screen.getByLabelText('Source X (%)'), { target: { value: '40' } });
+  fireEvent.change(screen.getByLabelText('Source patch size'), { target: { value: '.35' } });
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ tool: 'patch_heal', sourceScale: .35, source: [.4, .5] }),
+  ]));
+  await screen.findByAltText('Retouched photograph');
+  await waitFor(() => expect((screen.getByText('Clear source') as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByText('Clear source'));
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ source: null, sourceScale: 1 }),
+  ]));
+});
 it('clears the AI restriction when selecting the entire photo', async () => {
   const saved = { ...freshRetouch(), id: 'auto-portrait-v1-0-texture', tool: 'frequency' as const, matte: 'auto-portrait-v1-0-face' };
   vi.mocked(nativeRetouch.edit).mockResolvedValue([saved]);
