@@ -49,11 +49,21 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
     .expect("project");
 
     // Two originals on disk, imported synchronously so the run needs no ingest wait.
+    // Two different photographs, not a burst: the second is mirrored, so the measured cull
+    // has no reason to treat it as a duplicate of the first.
     for (index, seed) in [20u8, 140].into_iter().enumerate() {
+        let data = if index == 0 {
+            gradient(seed)
+        } else {
+            gradient(seed)
+                .chunks_exact(80 * 3)
+                .flat_map(|row| row.chunks_exact(3).rev().flatten().copied())
+                .collect()
+        };
         let rgb = Rgb8 {
             width: 80,
             height: 60,
-            data: gradient(seed),
+            data,
         };
         let bytes = encode_jpeg(&rgb, 92).expect("jpeg");
         std::fs::write(dir.path().join(format!("frame-{index}.jpg")), bytes).expect("write");
