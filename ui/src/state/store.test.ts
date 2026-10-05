@@ -66,3 +66,12 @@ describe('view store', () => {
     expect(state.activeProjectId).toBe('prj_2');
   });
 });
+
+it('keeps the loaded photo and selection when the active collection is clicked again', () => {
+  useStore.getState().setActiveProject('same');
+  useStore.getState().replaceRows([row('keep')]);
+  useStore.getState().selectOnly('keep');
+  const before = useStore.getState();
+  useStore.getState().setActiveProject('same');
+  expect(useStore.getState()).toBe(before);
+});

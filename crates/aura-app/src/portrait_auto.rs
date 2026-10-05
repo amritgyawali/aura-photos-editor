@@ -154,6 +154,7 @@ pub fn group_of(id: &str) -> Option<Group> {
             || rest.contains("-makeup-")
             || rest.contains("-hair-")
             || rest.ends_with("-fabric")
+            || rest.ends_with("-surface-finish")
             || rest == "backdrop"
         {
             Group::Finishing
@@ -483,15 +484,47 @@ pub fn plan_with_faces(
         let mut features = portrait_features::FeatureEdits::default();
         if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
+                let mut feature_options = options;
+                // Deep cleanup replaces the sparse four-patch search; never stack both.
+                if settings.deep_blemish_cleanup {
+                    feature_options.blemishes = false;
+                }
                 features = portrait_features::plan(
                     face,
                     index,
                     px,
                     exposure,
                     PREFIX,
-                    &options,
+                    &feature_options,
                     face_matte.as_ref().map(|m| m.id.as_str()),
                 );
+                if options.blemishes && settings.deep_blemish_cleanup {
+                    let deep = portrait_features::deep_blemish::plan(
+                        face,
+                        index,
+                        px,
+                        PREFIX,
+                        &settings,
+                        face_matte.as_ref().map(|m| &m.matte),
+                    );
+                    features.blemishes = deep.blemishes;
+                    features.report.spots_healed = deep.report.spots_healed;
+                    features.report.marks_kept = deep.report.marks_kept;
+                    features.report.findings.extend(deep.report.findings);
+                    if !features.blemishes.is_empty() {
+                        if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
+                            portrait_features::deep_blemish::surface_finish(
+                                face, index, px, PREFIX, &settings, &m.matte,
+                            )
+                        }) {
+                            if let Some(id) = &finish.matte {
+                                mattes.insert(id.clone(), matte);
+                            }
+                            features.finishing.push(finish);
+                            features.report.findings.push("Deep cleanup: blended repaired skin with a continuous, feature-protected surface finish; strength follows Skin smoothing and texture follows Keep pore texture.".into());
+                        }
+                    }
+                }
             }
         }
         features.finishing.extend(garments);
@@ -508,6 +541,20 @@ pub fn plan_with_faces(
             edits.retain(|e| !overridden.contains(&e.id));
         }
         let used: usize = planned.iter().map(Vec::len).sum();
+        if settings.deep_blemish_cleanup {
+            let non_spots = plan.edits.len()
+                + body.edits.len()
+                + features.refine.len()
+                + features.eyes.len()
+                + features.finishing.len();
+            let room =
+                retouch_tools::MAX_EDITS.saturating_sub(manual + scene_ops + used + non_spots);
+            if features.blemishes.len() > room {
+                features.blemishes.truncate(room);
+                features.report.spots_healed = features.blemishes.len();
+                features.report.findings.push(format!("Operation budget: retained {room} of this face's proposed spot repairs; existing edits are preserved."));
+            }
+        }
         let mut wanted = plan.edits.len()
             + body.edits.len()
             + features.blemishes.len()
@@ -818,6 +865,8 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
             } else {
                 (distance * 0.045 / short).clamp(0.001, 0.012)
             },
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: if smooth { 0.7 } else { 1.0 },
             tone: if smooth { 0.9 } else { 0.5 },
             warmth: 0.0,
@@ -939,6 +988,8 @@ fn plan_body(
         } else {
             (fw * 0.03 / short).clamp(0.001, 0.012)
         },
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: if tool == Tool::SkinSmooth { 0.75 } else { 1.0 },
         tone: if tool == Tool::SkinSmooth { 0.9 } else { 0.5 },
         warmth: 0.0,
@@ -1688,6 +1739,8 @@ fn face_extras(
             id: format!("{PREFIX}{index}-{name}"),
             tool,
             amount: amount.min(0.95),
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,
@@ -1845,6 +1898,8 @@ fn plan_face_from_matte(
             } else {
                 (d * 0.045 / short).clamp(0.001, 0.012)
             },
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: if smooth { 0.7 } else { 1.0 },
             tone: if smooth { 0.9 } else { 0.5 },
             warmth: 0.0,
@@ -1934,6 +1989,8 @@ fn plan_body_matte(
             amount: amount.min(0.95),
             feather,
             radius: (fw * 0.03 / short).clamp(0.001, 0.012),
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,
@@ -2085,6 +2142,8 @@ fn hair_ops(
         amount: amount.min(0.95),
         feather: 0.6,
         radius: 0.0015,
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.0,
         warmth: 0.0,
@@ -2128,6 +2187,8 @@ fn fabric_op(index: usize, matte: &MatteUse, face: &PortraitFace, settings: &Set
         amount: (settings.fabric * 0.9).min(0.95),
         feather: 0.0,
         radius: (face_height * 0.04).clamp(0.002, 0.02),
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.85,
         warmth: 0.0,
@@ -2160,6 +2221,8 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
         amount: (settings.backdrop * 0.7).min(0.95),
         feather: 0.0,
         radius: (face_height * 0.03).clamp(0.002, 0.015),
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,
@@ -2691,6 +2754,8 @@ mod tests {
             amount: 1.0,
             feather: 0.6,
             radius: 0.002,
+            source_scale: 1.0,
+            preserve_microtexture: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,

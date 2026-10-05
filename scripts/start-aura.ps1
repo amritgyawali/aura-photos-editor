@@ -39,8 +39,9 @@ try {
     catch [System.Threading.AbandonedMutexException] { $ownsLock = $true }
     if (-not $ownsLock) { exit 0 }
 
-    $running = Get-Process -Name aura-desktop -ErrorAction SilentlyContinue |
-        Where-Object { $_.Path -eq $desktopExe } | Select-Object -First 1
+    # An older installed copy may still own the catalog and an unsaved draft.
+    # Focus it until it closes; the next launch uses this checkout's bundled UI.
+    $running = Get-Process -Name aura-desktop -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($Rebuild -and $running) {
         throw 'Close AURA before rebuilding, then run Start AURA.cmd -Rebuild again.'
     }

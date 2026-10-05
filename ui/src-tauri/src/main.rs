@@ -857,6 +857,16 @@ fn background_request_failed() -> IpcError {
 }
 
 fn catalog_path() -> Result<PathBuf, IpcError> {
+    // Test a native debug build without closing the photographer's open catalog.
+    // Release builds always use the standard per-user catalog.
+    #[cfg(debug_assertions)]
+    if let Some(value) = std::env::var_os("AURA_TEST_CATALOG") {
+        let path = PathBuf::from(value);
+        if !path.is_absolute() {
+            return Err(aura_core::errors::io::not_found(&path).into());
+        }
+        return Ok(path);
+    }
     let paths = AppPaths::resolve().map_err(IpcError::from)?;
     Ok(paths.data_dir.join("catalogs").join("default.sqlite"))
 }

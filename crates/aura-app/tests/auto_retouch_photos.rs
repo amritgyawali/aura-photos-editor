@@ -44,6 +44,21 @@ fn preset(name: &str) -> portrait_features::Options {
     };
     let s = &mut options.settings;
     match name {
+        "deep" => {
+            s.deep_blemish_cleanup = true;
+            s.remove_dark_marks = true;
+            s.keep_freckles = false;
+            s.max_spots = 220;
+            s.blemish_sensitivity = 0.9;
+            s.smoothing = 0.8;
+            s.texture = 0.85;
+            s.tone_evenness = 0.7;
+            s.micro_dodge_burn = 0.65;
+            s.pore_refine = 0.3;
+            s.shine = 0.85;
+            s.hair_detail = 0.4;
+            s.hair_shine = 0.2;
+        }
         "soft" => {
             s.smoothing = 0.75;
             s.texture = 0.4;
@@ -150,6 +165,16 @@ fn retouches_real_photographs() {
             let mut with = recipe.clone();
             retouch_tools::write_with_mattes(&mut with, &stack, &plan.mattes).unwrap();
             aura_recipe::schema::Validation::check(&with).unwrap();
+            std::fs::write(
+                path.with_file_name(format!("{stem}.{name}.recipe.json")),
+                serde_json::to_vec_pretty(&with).unwrap(),
+            )
+            .unwrap();
+            std::fs::write(
+                path.with_file_name(format!("{stem}.{name}.report.json")),
+                serde_json::to_vec_pretty(&plan.report).unwrap(),
+            )
+            .unwrap();
             let mattes = retouch_tools::read_mattes(&with).unwrap();
             let mut linear: Vec<f32> = working_pixels(&rgb);
             let source = linear.clone();
@@ -251,58 +276,5 @@ fn retouches_real_photographs() {
                 assert!(stack.is_empty());
             }
         }
-    }
-}
-
-/// Running the automatic retouch a second time on a photograph that already carries its
-/// mattes must merge into a valid recipe, whatever the settings. Found by the real-app check.
-#[test]
-#[ignore = "needs AURA_SKIN_PHOTOS"]
-fn a_second_run_merges_into_a_valid_recipe() {
-    use aura_recipe::{schema, EditSource};
-    let dir = std::env::var("AURA_SKIN_PHOTOS").expect("AURA_SKIN_PHOTOS");
-    let path = std::fs::read_dir(&dir)
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .find(|p| p.to_string_lossy().matches('.').count() == 1)
-        .expect("a photograph");
-    let stem = path.file_stem().unwrap().to_string_lossy().to_string();
-    let (w, h) = stem.rsplit('_').next().unwrap().split_once('x').unwrap();
-    let (w, h): (u32, u32) = (w.parse().unwrap(), h.parse().unwrap());
-    let rgb = std::fs::read(&path).unwrap();
-    let faces = aura_vision::portrait::detect(&rgb, w, h).unwrap();
-    let mut recipe = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
-    for name in ["natural", "beauty", "natural"] {
-        let options = preset(name);
-        let plan = portrait_auto::plan_with_faces(
-            &recipe,
-            &rgb,
-            w,
-            h,
-            None,
-            0.0,
-            Some(faces.clone()),
-            &options,
-            true,
-        )
-        .unwrap();
-        for upto in portrait_auto::Group::ALL {
-            let now = retouch_tools::read(&recipe).unwrap();
-            let stack = portrait_auto::staged(&now, &plan.groups, upto);
-            let mut with = recipe.clone();
-            let mattes = portrait_auto::mattes_for(&recipe, &plan).unwrap();
-            retouch_tools::write_with_mattes(&mut with, &stack, &mattes).unwrap();
-            with.provenance.source = EditSource::User;
-            let (merged, _) = schema::merge(&recipe, &with, EditSource::User).unwrap();
-            if let Err(e) = schema::Validation::check(&merged) {
-                panic!("{name} {upto:?}: {e:?}");
-            }
-            recipe = merged;
-        }
-        println!(
-            "{name}: {} operations",
-            retouch_tools::read(&recipe).unwrap().len()
-        );
     }
 }

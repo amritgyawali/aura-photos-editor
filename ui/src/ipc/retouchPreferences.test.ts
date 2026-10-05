@@ -29,3 +29,8 @@ it.each(['bad json', 'null', '[]', '{}', '{"studio_portrait_auto_v1":{"options":
   expect(actual).toEqual({ ...DEFAULT_AUTO_RETOUCH, settings: DEFAULT_RETOUCH_SETTINGS });
   expect(actual.settings).not.toBe(DEFAULT_RETOUCH_SETTINGS);
 });
+
+ it('restores deep cleanup limits without enabling them for ordinary retouch', () => {
+  expect(readRetouchPreferences(recipe({ settings: { maxSpots: 220, deepBlemishCleanup: true } })).settings?.maxSpots).toBe(220);
+  expect(readRetouchPreferences(recipe({ settings: { maxSpots: 220, deepBlemishCleanup: false } })).settings?.maxSpots).toBe(24);
+});

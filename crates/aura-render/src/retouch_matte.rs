@@ -63,7 +63,7 @@ impl MattePlane {
         }
         // Pixels per matte cell; below about one and a half there is no edge to recover.
         let scale = (1.0 / sx).max(1.0 / sy);
-        if scale >= 1.5 {
+        if scale >= 1.5 && matte.refine_edges {
             let guide: Vec<[f32; 3]> = (y0..y1)
                 .flat_map(|y| (x0..x1).map(move |x| (y * w + x) * 3))
                 // Perceptual, so an edge in the shadows counts as much as one in the light.

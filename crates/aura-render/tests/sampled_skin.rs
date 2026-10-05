@@ -17,6 +17,8 @@ fn operation(tool: Tool) -> Edit {
         amount: 1.0,
         feather: 0.0,
         radius: 0.025,
+        source_scale: 1.0,
+        preserve_microtexture: false,
         texture: 1.0,
         tone: 1.0,
         warmth: 0.0,

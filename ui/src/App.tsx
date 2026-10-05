@@ -1,55 +1,57 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { api, asIpcError, editProfiles, inTauri, automaticStart, oneClickCancel, type ProfileSelection } from './ipc/client';
-import { automaticBusy, useAutomatic } from './state/automaticStore';
+import { AdvancedTools } from './components/AdvancedTools';
 import { AutomaticProgress } from './components/workflow/AutomaticProgress';
-import { PhotoAnalysis } from './components/PhotoAnalysis';
-import { nav } from './audit/log';
+import { automaticBusy, useAutomatic } from './state/automaticStore';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { api, asIpcError, editProfiles, inTauri, pickPhotoFolder, pickPhotos, type ProfileSelection } from './ipc/client';
+import { ProfileGallery } from './components/profiles/ProfileGallery';
+import { readProfileSelection, saveProfileSelection } from './components/profiles/profileSelection';
+import { InstagramStyle } from './components/look/InstagramStyle';
+import { readReferenceSelection, saveReferenceSelection, type ReferenceSelection } from './components/look/referenceStyle';
 import { AiKeysPanel } from './components/AiKeysPanel';
-import { AiSetup } from './components/AiSetup';
 import { CacheSettings } from './components/CacheSettings';
 import { Filmstrip } from './components/Filmstrip';
 import { HardwarePanel } from './components/HardwarePanel';
 import { ImportWizard } from './components/ImportWizard';
-import { LogPanel } from './components/LogPanel';
-import { OnboardingOverlay } from './components/OnboardingOverlay';
 import { ProblemsPanel } from './components/ProblemsPanel';
 import { ProjectSwitcher } from './components/ProjectSwitcher';
-import { ThemeToggle } from './components/ThemeToggle';
-import { WelcomeScreen } from './components/WelcomeScreen';
 import { AutopilotPanel } from './components/autopilot/AutopilotPanel';
-import { CameraMatchPanel } from './components/camera/CameraMatchPanel';
-import { CleanupPanel } from './components/cleanup/CleanupPanel';
-import { InstagramStyle } from './components/look/InstagramStyle';
-import { ProfileGallery } from './components/profiles/ProfileGallery';
-import { readProfileSelection, saveProfileSelection } from './components/profiles/profileSelection';
 import { MatchLookPanel } from './components/look/MatchLookPanel';
-import { readReferenceSelection, saveReferenceSelection, type ReferenceSelection } from './components/look/referenceStyle';
-import { CullView } from './components/cull/CullView';
 import { CuratePanel } from './components/curate/CuratePanel';
 import { DeliveryPanel } from './components/delivery/DeliveryPanel';
-import { DevelopWorkspace } from './components/develop/DevelopWorkspace';
 import { PhotoStudio } from './components/develop/PhotoStudio';
-import { ToneReviewQueue } from './components/develop/ToneReviewQueue';
-import { Inspector } from './components/explain/Inspector';
-import { FilterChips } from './components/explain/FilterChips';
-import { PortraitRetouch } from './components/develop/PortraitRetouch';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
-import { MomentStack } from './components/grid/MomentStack';
-import { PeoplePanel } from './components/people/PeoplePanel';
 import { QcPanel } from './components/qc/QcPanel';
-import { StoryPanel } from './components/story/StoryPanel';
-import { StylePanel } from './components/style/StylePanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
-import { WorkflowGuide } from './components/workflow/WorkflowGuide';
-import { OneClickRunner } from './components/workflow/OneClickRunner';
-import { STEPS_BY_ID, type Step, type StepId } from './components/workflow/steps';
-import { DEFAULT_TOOL, STAGE_TOOLS, SYSTEM_TOOLS, TOOLS, type ToolId } from './components/workflow/stages';
 import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
 
 export function App(): JSX.Element {
-  const busy = useAutomatic(automaticBusy);
+  const [workspace, setWorkspace] = useState('start');
+  const workflowBusy = useAutomatic(automaticBusy);
+  const [profile, setProfile] = useState<ProfileSelection | null>(readProfileSelection);
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
+  const changeProfile = useCallback((next: ProfileSelection | null) => { setProfile(next); saveProfileSelection(next); }, []);
+  const [reference, setReference] = useState<ReferenceSelection | null>(readReferenceSelection);
+  const [analysingReference, setAnalysingReference] = useState(false);
+  const [choosingPhotos, setChoosingPhotos] = useState(false);
+  const [queuedImport, setQueuedImport] = useState<{ projectId: string; roots: string[] } | null>(null);
+  const [ingestReady, setIngestReady] = useState<string | null>(null);
+  const changeReference = useCallback((next: ReferenceSelection | null) => { setReference(next); saveReferenceSelection(next); }, []);
+  const [editing, setEditing] = useState(false);
+  const [matching, setMatching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [automaticRequest, setAutomaticRequest] = useState(0);
+  const automaticSequence = useRef(0);
+  const automaticConsumed = useCallback(() => setAutomaticRequest(0), []);
+  const editAfterImport = useRef(false);
+  const importFinished = useRef(false);
+  const editBusyChanged = useCallback((busy: boolean) => {
+    setEditing(busy);
+    if (!busy) setRevision(value => value + 1);
+  }, []);
   const projects = useStore((state) => state.projects);
   const activeProjectId = useStore((state) => state.activeProjectId);
   const rows = useStore((state) => state.rows);
@@ -58,98 +60,6 @@ export function App(): JSX.Element {
   const progress = useStore((state) => state.progress);
   const lastError = useStore((state) => state.lastError);
   const focusedIndex = useStore((state) => state.focusedIndex);
-  const focusIndex = useStore((state) => state.focusIndex);
-  const selectOnly = useStore((state) => state.selectOnly);
-
-  // Where the middle of the application is: the step, and the tool open inside it.
-  //
-  // Two pieces of state rather than one because they answer different questions.
-  // The step is the phase of the work - what the wedding needs next, and which tools
-  // exist at all. The tool is where the photographer is *within* that phase. Switching
-  // steps resets to the step's default tool, which is what makes "specific tools come
-  // in each step" a property of the shell rather than of discipline: a cull-stage tab
-  // list simply does not contain Delivery, so there is nothing to misclick.
-  const [step, setStep] = useState<StepId>('import');
-  const [tool, setTool] = useState<ToolId>(DEFAULT_TOOL['import']);
-
-  // Which photographs the library is filtered to.
-  //
-  // The filter is a list of ids rather than a predicate, because the thing doing the filtering
-  // is the catalog: `flagged_images`, `flagged_composition` and the review queues all answer
-  // with ids, and re-deriving the same answer in the browser would be a second implementation
-  // of a judgement the product has already made. `null` is "no filter", never "no matches".
-  const [filtered, setFiltered] = useState<string[] | null>(null);
-
-  // Tool changes go to the log as *movements*, not presses: the click listener
-  // already recorded the button, and what a support case needs is the sequence of
-  // places the photographer was in. One effect rather than twenty call-site edits.
-  const previousTool = useRef<ToolId | null>(null);
-  useEffect(() => {
-    if (previousTool.current !== null) {
-      nav(previousTool.current, tool);
-    }
-    previousTool.current = tool;
-  }, [tool]);
-
-  // Whether the AI question has been answered, and whether the screen that asks it is open.
-  //
-  // `null` is "we have not looked yet", which is a third state rather than a missing boolean:
-  // rendering the setup screen while the answer is still in flight would flash it in front of
-  // every photographer who answered it months ago. The screen appears only once the catalog has
-  // said the question is outstanding.
-  const [aiAnswered, setAiAnswered] = useState<boolean | null>(null);
-  const [setupOpen, setSetupOpen] = useState(false);
-
-  const [tourOpen, setTourOpen] = useState(false);
-  const [guideRefresh, setGuideRefresh] = useState(0);
-
-  // PHASE-31 and the photo studio. The reference look a photographer chose survives a restart,
-  // and a request to edit automatically is a counter rather than a flag so that asking twice is
-  // two requests: `AutopilotPanel` consumes it and resets it to zero.
-  const [reference, setReference] = useState<ReferenceSelection | null>(readReferenceSelection);
-  const changeReference = useCallback((next: ReferenceSelection | null) => {
-    setReference(next);
-    saveReferenceSelection(next);
-  }, []);
-  const [referenceBusy, setReferenceBusy] = useState(false);
-  // The edit profile - a named look applied on top of each photograph's own measured edit.
-  const [profile, setProfile] = useState<ProfileSelection | null>(readProfileSelection);
-  const [profileNames, setProfileNames] = useState<Record<string, string>>({});
-  const changeProfile = useCallback((next: ProfileSelection | null) => {
-    setProfile(next);
-    saveProfileSelection(next);
-  }, []);
-  useEffect(() => {
-    if (!inTauri()) return;
-    editProfiles
-      .list()
-      .then((list) => setProfileNames(Object.fromEntries(list.map((p) => [p.id, p.name]))))
-      .catch(() => undefined);
-  }, []);
-  const profileName = profile ? profileNames[profile.profileId] ?? profile.profileId : undefined;
-  const [automaticRequest, setAutomaticRequest] = useState(0);
-  const automaticSequence = useRef(0);
-  const automaticConsumed = useCallback(() => setAutomaticRequest(0), []);
-  const [editing, setEditing] = useState(false);
-  const [studioSaving, setStudioSaving] = useState(false);
-  const [revision, setRevision] = useState(0);
-  const editBusyChanged = useCallback((working: boolean) => {
-    setEditing(working);
-    if (!working) setRevision((value) => value + 1);
-  }, []);
-
-  /**
-   * Enter a step: its tools become the tab list, and its default tool opens.
-   *
-   * The old bar scrolled a sidebar panel and flashed it. There is no sidebar to
-   * scroll any more - a step *is* the view now - so the jump is two setStates and
-   * a refresh of the step evidence, which a run may have just changed underneath.
-   */
-  const goToStep = useCallback((next: Step) => {
-    setStep(next.id);
-    setTool(next.defaultTool);
-    setGuideRefresh((current) => current + 1);
-  }, []);
 
   const setProjects = useStore((state) => state.setProjects);
   const setActiveProject = useStore((state) => state.setActiveProject);
@@ -188,6 +98,7 @@ export function App(): JSX.Element {
           limit: PAGE_SIZE,
           orderBy: 'timeline',
         });
+        if (useStore.getState().activeProjectId !== projectId) return;
         if (replace) {
           replaceRows(next);
         } else if (next.length > 0) {
@@ -205,33 +116,9 @@ export function App(): JSX.Element {
     void refreshProjects();
   }, [refreshProjects]);
 
-  // The tour, once, when there is nothing to look at instead. A photographer who
-  // has seen it never sees it again; one with a wedding already open does not
-  // need it - the application is the better teacher than a modal over real work.
   useEffect(() => {
-    // The tour remains available on request; file selection is never blocked by it.
-  }, [projects.length]);
-
-  // The AI setup question, asked once. It is deliberately not gated on a project: choosing a
-  // provider is a decision about this installation rather than about one wedding, and asking it
-  // before the first import is what makes it the *first* thing rather than an interruption in
-  // the middle of one.
-  useEffect(() => {
-    if (!inTauri()) {
-      setAiAnswered(true);
-      return;
-    }
-    void api
-      .aiSetupStatus()
-      .then((status) => {
-        setAiAnswered(status.completed);
-        // Cloud setup is optional; local automatic editing needs no credentials.
-      })
-      .catch(() => {
-        // A credential store that will not answer must not stop the application opening.
-        // The AI panel reports the same failure in a place where it is actionable.
-        setAiAnswered(true);
-      });
+    if (!inTauri()) return;
+    editProfiles.list().then(list => setProfileNames(Object.fromEntries(list.map(p => [p.id, p.name])))).catch(() => undefined);
   }, []);
 
   // A different wedding is a different set of pixels; keeping the old bitmaps
@@ -256,8 +143,10 @@ export function App(): JSX.Element {
       return;
     }
     let dispose: (() => void) | null = null;
+    let disposed = false;
     void api
       .onPreviewEvent((event) => {
+        if (disposed) return;
         if (event.kind === 'failed') {
           markThumbnailFailed(event.photoId, event.message);
         } else if (event.kind === 'ready' && activeProjectId) {
@@ -268,14 +157,16 @@ export function App(): JSX.Element {
               level: event.tier >= 2 ? 'proxy' : 'thumb',
               priority: 'background',
             })
-            .then((payload) => putThumbnail(event.photoId, payload))
+            .then((payload) => { if (!disposed) putThumbnail(event.photoId, payload); })
             .catch(() => undefined);
         }
       })
       .then((unlisten) => {
+        if (disposed) { unlisten(); return; }
         dispose = unlisten;
-      });
+      }).catch(() => undefined);
     return () => {
+      disposed = true;
       dispose?.();
     };
   }, [activeProjectId, markThumbnailFailed, putThumbnail]);
@@ -286,7 +177,7 @@ export function App(): JSX.Element {
       if (inTauri()) {
         void api
           .listProblems(activeProjectId)
-          .then(setProblems)
+          .then(next => { if (useStore.getState().activeProjectId === activeProjectId) setProblems(next); })
           .catch((error: unknown) => {
             const ipc = asIpcError(error);
             setError({ code: ipc.code, message: ipc.message });
@@ -295,78 +186,29 @@ export function App(): JSX.Element {
     }
   }, [activeProjectId, loadPage, setError, setProblems]);
 
-  // The import bar, and the only thing that ever clears it.
-  //
-  // `startImport` sets `running` and returns; nothing here used to ask what happened, so the
-  // wizard read "0 of ? files" for the life of the window, the Stop button stayed live, and the
-  // grid did not refresh until the project was switched away and back. The counts come from the
-  // pass itself rather than from counting rows, because a file that turned out to be a duplicate
-  // is a file the import finished and not a photograph it created.
-  useEffect(() => {
-    if (!progress.running || !progress.jobId || !inTauri()) {
-      return;
-    }
-    const jobId = progress.jobId;
-    let cancelled = false;
-
-    const finish = (): void => {
-      setProgress({ running: false, jobId: null });
-      setGuideRefresh((current) => current + 1);
-      void refreshProjects();
-      if (activeProjectId) {
-        void loadPage(activeProjectId, 0, true);
-        void api.listProblems(activeProjectId).then(setProblems).catch(() => undefined);
-      }
-    };
-
-    const timer = window.setInterval(() => {
-      void api
-        .ingestProgress(jobId)
-        .then((update) => {
-          if (cancelled) {
-            return;
-          }
-          setProgress({ done: update.done, total: update.total });
-          if (!update.running) {
-            finish();
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            finish();
-          }
-        });
-    }, 400);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [
-    progress.running,
-    progress.jobId,
-    activeProjectId,
-    loadPage,
-    setProblems,
-    setProgress,
-    refreshProjects,
-  ]);
-
   useEffect(() => {
     if (!inTauri()) {
       return;
     }
     let dispose: (() => void) | null = null;
+    let disposed = false;
     void api
       .onIngestEvent((event) => {
+        if (disposed) return;
         if (event.kind === 'progress') {
           setProgress({ done: event.done, total: event.total, running: true });
         } else if (event.kind === 'finished') {
+          importFinished.current = true;
           setProgress({ running: false, jobId: null });
-          setGuideRefresh((current) => current + 1);
+          if (editAfterImport.current && event.inserted > 0) {
+            editAfterImport.current = false;
+            setWorkspace('edit');
+            setAutomaticRequest(++automaticSequence.current);
+          }
+          editAfterImport.current = false;
           if (activeProjectId) {
             void loadPage(activeProjectId, 0, true);
-            void api.listProblems(activeProjectId).then(setProblems).catch(() => undefined);
+            void api.listProblems(activeProjectId).then(next => { if (useStore.getState().activeProjectId === activeProjectId) setProblems(next); }).catch(() => undefined);
           }
           void refreshProjects();
         } else if (event.kind === 'warning') {
@@ -374,45 +216,55 @@ export function App(): JSX.Element {
         }
       })
       .then((unlisten) => {
+        if (disposed) { unlisten(); return; }
         dispose = unlisten;
-      });
+        setIngestReady(activeProjectId);
+      }).catch(cause => { if (!disposed) { setQueuedImport(null); const error = asIpcError(cause); setError({ code: error.code, message: error.message }); } });
     return () => {
+      disposed = true;
       dispose?.();
     };
   }, [activeProjectId, loadPage, refreshProjects, setError, setProblems, setProgress]);
 
   const startImport = useCallback(
     async (roots: string[]) => {
-      if (!inTauri() || roots.length === 0 || automaticBusy(useAutomatic.getState())) {
+      if (!activeProjectId || !inTauri()) {
         return;
       }
-      useAutomatic.setState({ starting: true, error: null });
       try {
-        const handle = await automaticStart({ projectId: activeProjectId, roots });
-        useAutomatic.getState().adopt(handle.jobId, handle.projectId);
-        setActiveProject(handle.projectId);
-        setProgress({ running: true, jobId: handle.ingestJobId, done: 0, total: 0 });
-        void refreshProjects();
+        editAfterImport.current = true;
+        importFinished.current = false;
+        setProgress({ running: true, jobId: null, done: 0, total: 0 });
+        const handle = await api.startIngest({ projectId: activeProjectId, roots });
+        if (!importFinished.current) {
+          setProgress({ running: true, jobId: handle.jobId, done: 0, total: 0 });
+          if (!editAfterImport.current) await api.cancelJob(handle.jobId);
+        }
       } catch (error) {
-        useAutomatic.setState({ starting: false });
+        editAfterImport.current = false;
+        setProgress({ running: false, jobId: null });
         const ipc = asIpcError(error);
         setError({ code: ipc.code, message: ipc.message });
       }
     },
-    [activeProjectId, setError, setProgress, setActiveProject, refreshProjects],
+    [activeProjectId, setError, setProgress],
   );
 
   const cancelImport = useCallback(async () => {
-    const automaticJob = useAutomatic.getState().jobId;
-    if (automaticJob && busy) {
-      await oneClickCancel(automaticJob);
-      return;
-    }
+    editAfterImport.current = false;
     if (progress.jobId && inTauri()) {
-      await api.cancelJob(progress.jobId);
-      setProgress({ running: false, jobId: null });
+      try { await api.cancelJob(progress.jobId); }
+      catch (error) { const ipc = asIpcError(error); setError({ code: ipc.code, message: ipc.message }); }
     }
-  }, [progress.jobId, setProgress, busy]);
+  }, [progress.jobId, setError]);
+
+  useEffect(() => {
+    if (queuedImport && queuedImport.projectId === activeProjectId && ingestReady === activeProjectId) {
+      const roots = queuedImport.roots;
+      setQueuedImport(null);
+      void startImport(roots);
+    }
+  }, [activeProjectId, ingestReady, queuedImport, startImport]);
 
   const createProject = useCallback(
     async (name: string) => {
@@ -423,6 +275,7 @@ export function App(): JSX.Element {
         const handle = await api.createProject({ name, coupleNames: null, eventDate: null });
         await refreshProjects();
         setActiveProject(handle.id);
+        return handle.id;
       } catch (error) {
         const ipc = asIpcError(error);
         setError({ code: ipc.code, message: ipc.message });
@@ -432,389 +285,118 @@ export function App(): JSX.Element {
   );
 
   const focusedPhoto = rows[focusedIndex] ?? null;
-  const focusedPhotoId = focusedPhoto?.id ?? null;
 
-  /**
-   * Jump the grid to one photograph, from wherever it was named.
-   *
-   * Six panels can name a frame - the similar list, the moment browser, the cull view's
-   * rejections, the outlier list, the QC queue and the review queue - and all six mean the same
-   * thing by it: show me that one. In the old shell a focus change while another workspace was
-   * up scrolled a hidden grid; here the jump also opens Library, because "show me" has to be
-   * *seen* to be an answer. A photograph in this product is only ever understood beside the
-   * frames around it.
-   */
-  const openPhoto = useCallback(
-    (photoId: string) => {
-      const index = rows.findIndex((row) => row.id === photoId);
-      if (index >= 0) {
-        focusIndex(index);
-        selectOnly(photoId);
-        setTool('library');
-      }
-    },
-    [focusIndex, rows, selectOnly],
-  );
-
-  // A `Set` rather than the list itself: `Array.includes` inside a `filter` is quadratic, and a
-  // filter chip on a four-thousand-frame wedding is exactly the case that matters.
-  const filteredSet = useMemo(() => (filtered ? new Set(filtered) : null), [filtered]);
-  const visibleRows = useMemo(
-    () => (filteredSet ? rows.filter((row) => filteredSet.has(row.id)) : rows),
-    [filteredSet, rows],
-  );
-
-  /** The tabs this step offers, then the always-available system tools, deduplicated. */
-  const stageTools = useMemo(() => {
-    const seen = new Set<ToolId>();
-    return [...STAGE_TOOLS[step], ...SYSTEM_TOOLS].filter((entry) => {
-      if (seen.has(entry.id)) {
-        return false;
-      }
-      seen.add(entry.id);
-      return true;
-    });
-  }, [step]);
-
-  /**
-   * The middle of the application: one tool's panel, full width.
-   *
-   * The panels themselves are unchanged and keep their props; what changed is that
-   * only the *open* one is mounted. The old shell kept ten sidebar panels mounted and
-   * visible at once - every one of them polling the catalog on its own cadence even
-   * while the photographer was reading a different one. A stage of one tool is less
-   * traffic, less visual noise, and the same "one answer per question" discipline the
-   * data layer has always had.
-   */
-  const stageContent = (): JSX.Element | null => {
-    if (!activeProjectId && tool !== 'weddings') {
-      return (
-        <WelcomeScreen
-          onImport={(roots) => void startImport(roots)}
-          busy={busy}
-          aiAnswered={aiAnswered === true}
-          onCreateProject={(name) => void createProject(name)}
-          onFirstRun={() => setTourOpen(true)}
-        />
-      );
-    }
-    switch (tool) {
-      case 'weddings':
-        return (
-          <ProjectSwitcher
-            projects={projects}
-            activeProjectId={activeProjectId}
-            onSelect={setActiveProject}
-            onCreate={(name) => void createProject(name)}
-          />
-        );
-      case 'import':
-        return (
-          <ImportWizard
-            automatic
-            disabled={busy}
-            running={progress.running}
-            done={progress.done}
-            total={progress.total}
-            onStart={(roots) => void startImport(roots)}
-            onCancel={() => void cancelImport()}
-          />
-        );
-      case 'problems':
-        return <ProblemsPanel problems={problems} />;
-      case 'library':
-        return activeProjectId ? (
-          <div className="workspace">
-            <div className="photo-browser">
-              {/* PHASE-09 and PHASE-11. The chips are the catalog's own answers: every one of
-                  them is a query rather than a verdict, and a chip that found nothing and a
-                  chip nobody could evaluate are drawn differently. */}
-              <FilterChips
-                projectId={activeProjectId}
-                onSelect={(photoIds) => setFiltered(photoIds.length === 0 ? null : photoIds)}
-              />
-              {filtered ? (
-                <p className="filter-note">
-                  Showing {visibleRows.length} of {rows.length} photographs.{' '}
-                  <button type="button" onClick={() => setFiltered(null)}>
-                    Show everything
-                  </button>
-                </p>
-              ) : null}
-              <VirtualGrid
-                rows={visibleRows}
-                onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)}
-              />
-              <Filmstrip rows={visibleRows} />
-            </div>
-            <Inspector
-              projectId={activeProjectId}
-              photoId={focusedPhotoId}
-              onSelect={openPhoto}
-              onError={setError}
-            />
-          </div>
-        ) : null;
-      case 'autopilot':
-        return activeProjectId ? <>
-          <Filmstrip rows={rows} />
-          <button type="button" onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
-          <PhotoAnalysis projectId={activeProjectId} photoId={focusedPhotoId} />
-          <details open={automaticRequest > 0 || undefined}><summary>Advanced model analysis</summary>
-            <AutopilotPanel
-              key={activeProjectId}
-              projectId={activeProjectId}
-              onError={setError}
-              onBusyChange={editBusyChanged}
-              automaticRequest={automaticRequest}
-              onAutomaticConsumed={automaticConsumed}
-              onRender={() => goToStep(STEPS_BY_ID['export'])}
-              reference={reference}
-              profile={profile}
-              profileName={profileName}
-            />
-          </details>
-        </> : null;
-      case 'people':
-        return activeProjectId ? <PeoplePanel projectId={activeProjectId} onError={setError} /> : null;
-      case 'story':
-        return activeProjectId ? <StoryPanel projectId={activeProjectId} onError={setError} /> : null;
-      case 'moments':
-        return activeProjectId ? <MomentStack projectId={activeProjectId} /> : null;
-      case 'gallery':
-        return activeProjectId ? (
-          <GalleryPanel
-            projectId={activeProjectId}
-            selectedPhotoId={focusedPhotoId}
-            onSelectPhoto={openPhoto}
-            onError={setError}
-          />
-        ) : null;
-      case 'qc':
-        return activeProjectId ? <QcPanel projectId={activeProjectId} onError={setError} /> : null;
-      case 'cameras':
-        return activeProjectId ? (
-          <CameraMatchPanel projectId={activeProjectId} onError={setError} />
-        ) : null;
-      case 'cull':
-        return activeProjectId ? (
-          <CullView projectId={activeProjectId} onOpenImage={openPhoto} />
-        ) : null;
-      case 'curate':
-        return activeProjectId ? <CuratePanel projectId={activeProjectId} onError={setError} /> : null;
-      case 'develop':
-        return activeProjectId ? (
-          <div>
-            <Filmstrip rows={rows} />
-            <button type="button" onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
-            <div className="workspace">
-            <DevelopWorkspace
-              key={`${activeProjectId}:${focusedPhotoId}`}
-              projectId={activeProjectId}
-              photoId={focusedPhotoId}
-              onError={setError}
-            />
-            <ToneReviewQueue
-              projectId={activeProjectId}
-              onOpen={openPhoto}
-              onError={setError}
-            />
-            </div>
-          </div>
-        ) : null;
-      case 'studio':
-        return activeProjectId ? (
-          <div>
-            <fieldset className="filmstrip-lock" disabled={editing || studioSaving}>
-              <Filmstrip rows={rows} />
-            </fieldset>
-            <button type="button" onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
-            {focusedPhotoId ? (
-              <PhotoStudio
-                key={focusedPhotoId}
-                projectId={activeProjectId}
-                photoId={focusedPhotoId}
-                disabled={editing}
-                revision={revision}
-                onBusyChange={setStudioSaving}
-              />
-            ) : (
-              <p>Choose a photograph in the filmstrip to review and adjust its edit.</p>
-            )}
-          </div>
-        ) : null;
-      case 'retouch':
-        return activeProjectId ? (
-          <div>
-            <fieldset className="filmstrip-lock" disabled={editing || studioSaving}>
-              <Filmstrip rows={rows} />
-            </fieldset>
-            <button type="button" onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
-            {focusedPhotoId ? (
-              <PortraitRetouch
-                key={focusedPhotoId}
-                projectId={activeProjectId}
-                photoId={focusedPhotoId}
-                disabled={editing}
-                onBusyChange={setStudioSaving}
-              />
-            ) : (
-              <p>Choose a portrait in the filmstrip to retouch skin, eyes, teeth and hair.</p>
-            )}
-          </div>
-        ) : null;
-      case 'profiles':
-        return (
-          <ProfileGallery
-            selection={profile}
-            disabled={editing || studioSaving}
-            onChange={changeProfile}
-            previewPhotoId={focusedPhotoId}
-          />
-        );
-      case 'look':
-        return (
-          <div>
-            <InstagramStyle
-              selection={reference}
-              disabled={referenceBusy || editing}
-              onChange={changeReference}
-              onBusyChange={setReferenceBusy}
-              onAddPhotos={() => setTool('import')}
-              onApply={
-                activeProjectId && rows.length
-                  ? () => {
-                      setStep('analyze');
-                      setTool('autopilot');
-                      setAutomaticRequest(++automaticSequence.current);
-                    }
-                  : undefined
-              }
-            />
-            {activeProjectId ? (
-              <details className="advanced-tools">
-                <summary>Advanced lighting-bucket look profiles</summary>
-                <MatchLookPanel key={activeProjectId} projectId={activeProjectId} onError={setError} />
-              </details>
-            ) : null}
-          </div>
-        );
-      case 'cleanup':
-        return activeProjectId ? (
-          <CleanupPanel projectId={activeProjectId} photoId={focusedPhotoId} onError={setError} />
-        ) : null;
-      case 'style':
-        return activeProjectId ? <StylePanel projectId={activeProjectId} onError={setError} /> : null;
-      case 'oneClick':
-        return (
-          <OneClickRunner
-            onFinished={() => {
-              setGuideRefresh((current) => current + 1);
-            }}
-          />
-        );
-      case 'delivery':
-        return activeProjectId ? (
-          <DeliveryPanel projectId={activeProjectId} profileId={null} onError={setError} />
-        ) : null;
-      case 'cache':
-        return <CacheSettings projectId={activeProjectId} onError={setError} />;
-      case 'hardware':
-        return <HardwarePanel onError={setError} />;
-      case 'ai':
-        return (
-          <AiKeysPanel
-            projectId={activeProjectId}
-            onError={setError}
-            onOpenSetup={() => setSetupOpen(true)}
-          />
-        );
-      case 'log':
-        return <LogPanel />;
-      default:
-        return null;
-    }
+  const chooseAndImport = async (folder = false) => {
+    if (choosingPhotos) return;
+    setChoosingPhotos(true);
+    try {
+      const roots = folder ? [await pickPhotoFolder('Choose a folder of photos to edit')].filter((path): path is string => path !== null) : await pickPhotos();
+      if (!roots.length) return;
+      const target = activeProjectId ?? await createProject('My photo collection');
+      if (target) { setWorkspace('library'); setQueuedImport({ projectId: target, roots }); }
+    } catch (cause) { const error = asIpcError(cause); setError({ code: error.code, message: error.message }); }
+    finally { setChoosingPhotos(false); }
   };
 
-  const activeStep = STEPS_BY_ID[step];
+  const locked = workflowBusy || editing || matching || saving || exporting || progress.running || analysingReference || choosingPhotos || queuedImport !== null;
+  const profileName = profile ? profileNames[profile.profileId] ?? profile.profileId : undefined;
+  const tabs = [
+    ['start', 'Start', 'Look, reference, photos'],
+    ['library', 'Photos', 'Browse your collection'],
+    ['edit', 'Auto edit', 'One click, start to finish'],
+    ['look', 'Instagram style', 'Your reference, your photos'],
+    ['export', 'Export', 'Ready to share'],
+    ['advanced', 'Advanced', 'Quality, curation & settings'],
+  ];
 
   return (
-    <div className="app">
-      {setupOpen && aiAnswered !== null ? (
-        <AiSetup
-          onDone={(status) => {
-            setAiAnswered(status.completed);
-            setSetupOpen(false);
-          }}
-          onDismiss={() => setSetupOpen(false)}
-          onError={setError}
-        />
-      ) : null}
-      {tourOpen ? <OnboardingOverlay onDismiss={() => setTourOpen(false)} /> : null}
-
-      <header className="topbar">
-        <span className="sidebar-brand">AURA</span>
-        <span className="topbar-project">
-          {activeProjectId === null
-            ? 'No wedding open'
-            : (projects.find((project) => project.id === activeProjectId)?.name ?? 'Wedding')}
-        </span>
-        <ThemeToggle />
-      </header>
-
-      <main className="main">
-        <AutomaticProgress onFinished={(projectId) => {
-          setGuideRefresh(current => current + 1);
-          if (projectId === activeProjectId) void loadPage(projectId, 0, true);
-          void refreshProjects();
-        }} />
-        <WorkflowGuide currentStep={step} onGo={goToStep} refreshToken={guideRefresh} />
-
-        <div className="stage-nav">
-          <div className="stage-tabs" role="tablist" aria-label={`${activeStep.title} tools`}>
-            {stageTools.map((entry, index) => {
-              const isSystem = SYSTEM_TOOLS.some((row) => row.id === entry.id);
-              const divider =
-                isSystem && index > 0 && !SYSTEM_TOOLS.some((row) => row.id === stageTools[index - 1]?.id);
-              return (
-                <span key={entry.id} className="stage-tab-wrap">
-                  {divider ? <span className="stage-tab-divider" aria-hidden="true" /> : null}
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={tool === entry.id}
-                    title={entry.purpose}
-                    className={tool === entry.id ? 'is-active' : undefined}
-                    onClick={() => {
-                      setTool(entry.id);
-                    }}
-                  >
-                    {entry.title}
-                  </button>
-                </span>
-              );
-            })}
+    <div className="app aura-studio">
+      <aside className="sidebar studio-sidebar">
+        <div className="studio-brand"><span className="brand-mark" aria-hidden="true">a</span><div><strong>AURA</strong><span>PHOTO STUDIO</span></div></div>
+        <nav className="studio-nav" aria-label="Workspace">
+          {tabs.map(([id, title, description]) => <button key={id} type="button" aria-current={workspace === id ? 'page' : undefined}
+            disabled={locked && workspace !== id} onClick={() => setWorkspace(id ?? 'library')}><strong>{title}</strong><span>{description}</span></button>)}
+        </nav>
+        <fieldset className="project-picker" disabled={locked}>
+          <ProjectSwitcher projects={projects} activeProjectId={activeProjectId} onSelect={setActiveProject} onCreate={name => void createProject(name)} />
+        </fieldset>
+        <p className="sidebar-note">A little direction.<br />A look that feels like you.</p>
+      </aside>
+      <main className="main studio-main">
+        <header className="studio-topbar">
+          <span>{projects.find(project => project.id === activeProjectId)?.name ?? 'Your creative workspace'}</span>
+          <span>{activeProjectId ? `${projects.find(project => project.id === activeProjectId)?.photoCount ?? rows.length} photos` : 'Welcome to AURA'}</span>
+        </header>
+        {lastError && <div className="banner" role="alert"><span>{lastError.message}</span><button type="button" onClick={() => setError(null)}>Dismiss</button></div>}
+        <div className="studio-content">
+          <AutomaticProgress onFinished={() => { void refreshProjects(); if (activeProjectId) void loadPage(activeProjectId, 0, true); }} />
+          {workspace === 'start' && <div className="start-flow">
+            <header className="start-hero"><span className="eyebrow">LESS EDITING. MORE CREATING.</span>
+              <h1>Choose a look. Add a reference.<br /><em>Drop in your photos.</em></h1>
+              <p>Three steps to a finished, consistent set. AURA measures each photograph first, then applies your look on top - so bright, dark, warm and cool frames all land in the same place.</p></header>
+            <ProfileGallery selection={profile} disabled={locked} onChange={changeProfile} previewPhotoId={focusedPhoto?.id ?? null} />
+          </div>}
+          <div hidden={workspace !== 'start' && workspace !== 'look'} className={workspace === 'start' ? 'start-reference' : undefined}>
+            <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}
+              onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
+              heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a photographer’s Instagram</h2>
+                <p>Paste a public profile link to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
           </div>
-          <p className="stage-purpose">
-            <span className="stage-step-number" aria-hidden="true">
-              {activeStep.number}
-            </span>
-            {activeStep.purpose}
-          </p>
+          {workspace === 'start' && <section className="start-step start-upload" aria-label="Add photos">
+            <header className="step-heading"><span className="step-number">3</span><div><span className="eyebrow">YOUR PHOTOS</span><h2>Upload a photo or a whole folder</h2>
+              <p>JPEG, PNG and supported camera RAW files. Your originals are never changed; every edit can be undone.</p></div></header>
+            <div className="start-summary" aria-label="What will be applied">
+              <span>Look: <strong>{profileName ?? 'Auto only'}</strong>{profile ? ` · ${Math.round(profile.strength * 100)}%` : ''}</span>
+              <span>Reference: <strong>{reference ? reference.analysis.origin || 'Saved photos' : 'None'}</strong></span>
+            </div>
+            <div className="import-actions">
+              <button className="is-primary" type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport()}>{choosingPhotos ? 'Choosing…' : 'Choose photos'}</button>
+              <button type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport(true)}>Choose a folder</button>
+              {activeProjectId && rows.length > 0 && <button type="button" disabled={locked} onClick={() => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}>Apply to the {rows.length} photos in this collection</button>}
+            </div>
+            {progress.running && <p role="status">Importing {progress.done} of {progress.total || '…'} photos. Editing starts automatically when the import finishes.</p>}
+            {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
+          </section>}
+          {!activeProjectId ? workspace === 'start' ? null : <section className="studio-welcome">
+            <span className="eyebrow">LESS EDITING. MORE CREATING.</span>
+            <h1>Or start with<br /><em>your own photos.</em></h1>
+            <p>Portraits, travel, family, or everyday moments. Start a collection, choose your photos, and let AURA balance the light. Review the result, add your touch, and export.</p>
+            <button className="is-primary" type="button" disabled={!inTauri() || locked} onClick={() => setWorkspace('start')}>Choose a look and photos</button>
+            {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
+            <div className="welcome-contact-sheet" aria-hidden="true"><div /><div /><div /><div /><div /><div /></div>
+            <div className="welcome-features"><div><strong>One-click editing</strong><span>Light, color and a consistent finish.</span></div><div><strong>Reference matching</strong><span>Learn a look from saved photos.</span></div><div><strong>Always your original</strong><span>Saved edits with undo and reset.</span></div></div>
+          </section> : <>
+            {workspace === 'library' && <>
+              <header className="workspace-heading"><div><span className="eyebrow">YOUR COLLECTION</span><h1>Start with a great photo.</h1></div><button className="is-primary" type="button" disabled={locked || rows.length === 0} onClick={() => setWorkspace('edit')}>Go to auto edit →</button></header>
+              <ImportWizard disabled={locked} running={progress.running} done={progress.done} total={progress.total} onStart={roots => void startImport(roots)} onCancel={() => void cancelImport()} />
+              {rows.length > 0 ? <div className="studio-library"><VirtualGrid rows={rows} onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)} /></div> : <div className="studio-empty"><strong>Your next great edit starts here.</strong><p>Choose a folder above. Your photos will appear here.</p></div>}
+            </>}
+            <div hidden={workspace !== 'edit'}>
+              <div className="workspace-heading"><div><span className="eyebrow">LIGHT. COLOR. FINISH.</span><h1>A good starting point, in one click.</h1></div><button type="button" disabled={locked} onClick={() => setWorkspace('look')}>Match a reference look →</button></div>
+              <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
+                automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference}
+                profile={profile} profileName={profileName} />
+              {workspace === 'edit' && focusedPhoto && <>
+                <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
+                <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} disabled={editing || workflowBusy} revision={revision} onBusyChange={setSaving} />
+                <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
+              </>}
+            </div>
+            {workspace === 'look' && <details className="advanced-tools"><summary>Advanced lighting-bucket look profiles</summary><MatchLookPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={setMatching} /></details>}
+            {workspace === 'export' && <><header className="workspace-heading"><div><span className="eyebrow">THE FINISHING TOUCH</span><h1>Render your final output.</h1></div></header><DeliveryPanel key={activeProjectId} projectId={activeProjectId} profileId={null} onError={setError} onBusyChange={setExporting} /></>}
+            {workspace === 'advanced' && <><header className="workspace-heading"><div><span className="eyebrow">MORE CONTROL</span><h1>The details make the difference.</h1></div></header>
+              <AdvancedTools onBusyChange={setSaving} projectId={activeProjectId} photoId={focusedPhoto?.id ?? null} onError={setError}
+                onRefresh={() => { void refreshProjects(); void loadPage(activeProjectId, 0, true); }}
+                onOpen={id => { const index = rows.findIndex(row => row.id === id); if (index >= 0) { useStore.getState().focusIndex(index); useStore.getState().selectOnly(id); setWorkspace('edit'); } }} />
+              <details className="advanced-tools"><summary>Quality review</summary><QcPanel projectId={activeProjectId} onError={setError} /></details>
+              <details className="advanced-tools"><summary>Gallery consistency</summary><GalleryPanel projectId={activeProjectId} onError={setError} /></details>
+              <details className="advanced-tools"><summary>Albums & curation</summary><CuratePanel projectId={activeProjectId} onError={setError} /></details>
+              <details className="advanced-tools"><summary>AI provider</summary><AiKeysPanel projectId={activeProjectId} onError={setError} /></details>
+              <details className="advanced-tools"><summary>Performance & storage</summary><HardwarePanel onError={setError} /><CacheSettings projectId={activeProjectId} onError={setError} /></details>
+            </>}
+            {problems.length > 0 && <details className="advanced-tools"><summary>Problems to review ({problems.length})</summary><ProblemsPanel problems={problems} /></details>}
+          </>}
         </div>
-
-        {lastError && (
-          <div className="banner" role="alert">
-            <strong>{lastError.code}</strong> {lastError.message}
-            <button type="button" onClick={() => setError(null)}>
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        <section className="stage" aria-label={TOOLS[tool].purpose}>
-          {stageContent()}
-        </section>
       </main>
     </div>
   );
