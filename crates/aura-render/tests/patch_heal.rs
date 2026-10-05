@@ -74,7 +74,7 @@ fn texture_heal_preserves_lighting_and_real_pores_across_skin_tones() {
         edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
         let serialized = serde_json::to_string(&edit).unwrap();
         let saved: Edit = serde_json::from_str(&serialized).unwrap();
-        apply(&mut damaged, W, W, &[saved.clone()]);
+        apply(&mut damaged, W, W, std::slice::from_ref(&saved));
         let mut replay = before.clone();
         apply(&mut replay, W, W, &[saved]);
         assert_eq!(damaged, replay, "saved heals must reproduce exactly");
