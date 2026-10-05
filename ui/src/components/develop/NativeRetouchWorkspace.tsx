@@ -64,6 +64,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const beforeSrc=useMemo(()=>before?rgbDataUrl(before):null,[before]);
   const comparisonReady=Boolean(!maskView&&beforeSrc&&src&&before&&rendered&&before.width===rendered.width&&before.height===rendered.height);
   const stackBlocked=blocked||dirty;
+  const retouchRecipe=recipe?.photoId===photoId?recipe:null;
   const draftNotice='Apply or discard your draft before selecting saved operations or changing history.';
   const save=async(action:()=>Promise<unknown>, appliesDraft=false)=>{
     if(dirty&&!appliesDraft){setError(draftNotice);return;}
@@ -153,7 +154,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         </div>
         <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}</p>
         <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>
-        <AutoRetouchSettings disabled={stackBlocked||!preview} busy={analysing} onRun={options=>void save(async()=>{
+        <AutoRetouchSettings key={`${photoId}:${retouchRecipe?.recipeHash ?? 'loading'}`} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} busy={analysing} onRun={options=>void save(async()=>{
           setAnalysing(true);
           try { await nativeRetouch.autoRetouch(projectId,photoId,options); }
           finally { if(mounted.current)setAnalysing(false); }

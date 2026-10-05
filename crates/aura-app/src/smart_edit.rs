@@ -491,19 +491,17 @@ pub fn analyse(
         ));
     }
     // Haze is an outdoor property; a bright studio backdrop has a high floor too.
-    let dehaze = if matches!(kind, SceneKind::Landscape | SceneKind::General)
-        && m.dark_floor > 0.13
-        && (m.high - m.dark_floor) < 0.75
-    {
-        let amount = ((m.dark_floor - 0.1) * 150.0).clamp(5.0, 25.0) as i16;
-        decisions.push(format!(
-            "Dehaze +{amount}: the darkest non-sky tones sit at {:.0}% (a veil of haze).",
-            m.dark_floor * 100.0
-        ));
-        amount
-    } else {
-        0
-    };
+    let dehaze =
+        if kind == SceneKind::Landscape && m.dark_floor > 0.13 && (m.high - m.dark_floor) < 0.75 {
+            let amount = ((m.dark_floor - 0.1) * 150.0).clamp(5.0, 25.0) as i16;
+            decisions.push(format!(
+                "Dehaze +{amount}: the darkest non-sky tones sit at {:.0}% (a veil of haze).",
+                m.dark_floor * 100.0
+            ));
+            amount
+        } else {
+            0
+        };
     // A flat frame that never reaches black or white: set the end points, like the
     // Shift-double-click on Whites and Blacks. Low-light frames keep their dark floor.
     // Judge the range after the exposure this pass applies, or a brightened frame would be
@@ -770,6 +768,21 @@ fn apply_global(recipe: &mut Recipe, tone: (f32, i16, i16, i16), plan: &GlobalPl
     }
 }
 
+/// Selections must use the exposure that survives the recipe merge.
+fn effective_exposure(base: &Recipe, proposed: f32, global: bool) -> f32 {
+    if global
+        && !base
+            .provenance
+            .user_edited_fields
+            .iter()
+            .any(|field| field == "global.exposure" || field == "global")
+    {
+        proposed
+    } else {
+        base.global.exposure
+    }
+}
+
 fn saved_changed(base: &Recipe, merged: &Recipe) -> aura_core::AuraResult<bool> {
     Ok(aura_recipe::recipe_hash(base)? != aura_recipe::recipe_hash(merged)?)
 }
@@ -887,7 +900,7 @@ fn run_with(
         }
     }
     // Luminance selections are evaluated after the global exposure the same pass applies.
-    let exposure = if global { tone.0 } else { base.global.exposure };
+    let exposure = effective_exposure(&base, tone.0, global);
     let portrait = portrait_auto::plan_with_faces(
         &base,
         rgb,
@@ -917,7 +930,7 @@ fn run_with(
             .and_then(|(d, w, h)| Pixels::new(d, w, h))
             .or_else(|| Pixels::new(rgb, thumb.width, thumb.height));
         if let Some(px) = px {
-            let mut plan = analyse(&px, frame.as_ref(), &faces, tone.0);
+            let mut plan = analyse(&px, frame.as_ref(), &faces, exposure);
             if let Some(note) = exposure_note.take() {
                 plan.decisions.insert(1, note);
             }
@@ -1006,6 +1019,11 @@ fn run_with(
             format!(
                 "Healed {spots} temporary-looking spot(s); kept {kept} possible permanent mark(s)."
             ),
+        ),
+        (
+            Group::Refine,
+            "Fine lines & redness",
+            "Targeted softening measured against this person's own cheek texture and colour.".into(),
         ),
         (
             Group::Eyes,
@@ -1122,6 +1140,30 @@ mod tests {
 
     fn pixels(rgb: &[u8], w: u32, h: u32) -> Pixels<'_> {
         Pixels::new(rgb, w, h).unwrap()
+    }
+
+    #[test]
+    fn selections_follow_saved_exposure_when_manual_or_retouch_only() {
+        let mut base = aura_recipe::fixtures::neutral("test", "test");
+        base.global.exposure = -0.75;
+        assert!((effective_exposure(&base, 1.0, true) - 1.0).abs() < f32::EPSILON);
+        assert!((effective_exposure(&base, 1.0, false) + 0.75).abs() < f32::EPSILON);
+        base.provenance
+            .user_edited_fields
+            .push("global.exposure".into());
+        assert!((effective_exposure(&base, 1.0, true) + 0.75).abs() < f32::EPSILON);
+        base.provenance.user_edited_fields = vec!["global".into()];
+        assert!((effective_exposure(&base, 1.0, true) + 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn bright_studio_and_product_frames_are_not_mistaken_for_haze() {
+        for colour in [[225, 220, 215], [180, 170, 160], [128, 128, 128]] {
+            let rgb = colour.repeat(100 * 100);
+            let plan = analyse(&pixels(&rgb, 100, 100), None, &[], 0.0);
+            assert_eq!(plan.kind, SceneKind::General);
+            assert_eq!(plan.dehaze, 0);
+        }
     }
 
     #[test]

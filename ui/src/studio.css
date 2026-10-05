@@ -299,3 +299,11 @@ summary { cursor: pointer; padding: 12px 0; color: var(--muted); }
 .portrait-slider small { color: var(--muted); font-size: 11px; }
 .portrait-slider input[type='range'] { width: 100%; }
 .portrait-explanation { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; display: grid; gap: 4px; }
+
+.batch-picker { margin: 16px 0; padding: 14px; border: 1px solid var(--line); border-radius: 8px; }
+.batch-picker summary { cursor: pointer; font-weight: 600; }
+.batch-picker fieldset { display: flex; flex-wrap: wrap; gap: 12px; min-width: 0; }
+.batch-picker fieldset > label { flex-basis: 100%; }
+.batch-photo-list { display: grid; gap: 8px; width: 100%; max-height: 280px; overflow: auto; }
+.batch-photo-list label { display: flex; align-items: center; gap: 8px; min-height: 32px; overflow-wrap: anywhere; }
+.batch-photo-list input { flex-shrink: 0; }

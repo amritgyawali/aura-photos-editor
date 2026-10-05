@@ -11,6 +11,7 @@ import type {
 } from '../../ipc/types';
 import { Autopilot } from './Autopilot';
 import { prepareCollection, type PreparedPhoto } from './prepareCollection';
+import { BatchPhotoPicker } from './BatchPhotoPicker';
 import type { ReferenceSelection } from '../look/referenceStyle';
 import type { ProfileSelection } from '../../ipc/client';
 
@@ -83,6 +84,8 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
   const consumedRequest = useRef(0);
   const [preparation, setPreparation] = useState<string | null>(null);
   const [prepared, setPrepared] = useState<PreparedPhoto[]>([]);
+  const [selected, setSelected] = useState<string[] | null>(null);
+  useEffect(() => () => { stopPreparation.current = true; }, []);
   useEffect(() => { onBusyChange?.(starting || progress !== null); }, [starting, progress, onBusyChange]);
 
   // What the poll is watching, without making the effect depend on the value it sets.
@@ -143,18 +146,19 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     return () => window.clearInterval(timer);
   }, [onError, progress, projectId, reload]);
 
-  const openPreflight = useCallback(async (includeAdvanced = true) => {
+  const openPreflight = useCallback(async (includeAdvanced = true, photoIds?: readonly string[], retry = false) => {
     if (!projectId || startingRef.current || running.current) {
       return;
     }
     startingRef.current = true;
     setStarting(true);
     stopPreparation.current = false;
-    setPrepared([]);
+    if (!retry) setPrepared([]);
+    onError(null);
     try {
       const results = await prepareCollection(projectId, () => stopPreparation.current, setPreparation,
-        photo => setPrepared(current => [...current, photo]), reference, profile, profileName);
-      setPrepared(results);
+        photo => setPrepared(current => [...current.filter(row => row.photoId !== photo.photoId), photo]), reference, profile, profileName, photoIds);
+      if (!retry) setPrepared(results);
       if (stopPreparation.current) { setPreparation('Stopped. Completed edits are saved.'); return; }
       const ready = results.filter(photo => photo.outcome === 'ready').length;
       setPreparation(`${ready} of ${results.length} photos prepared with local enhancement.`);
@@ -260,18 +264,20 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
         <p>{[profile ? `The ${profileName ?? profile.profileId} profile at ${Math.round(profile.strength * 100)}% adapts to each photo's own light.` : '',
           reference ? `Your photos will be matched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength, with individual tone and color adjustments.` : '',
           !profile && !reference ? 'Each photo gets its own exposure, shadow and highlight adjustments. Works locally, with no model downloads or account.' : ''].filter(Boolean).join(' ')}</p></div>
-      <button type="button" className="is-primary" disabled={starting || progress !== null} onClick={() => void openPreflight(false)}>{starting ? 'Editing your photos…' : 'Auto edit all photos'}</button>
+      <button type="button" className="is-primary" disabled={starting || progress !== null || selected?.length === 0} onClick={() => void openPreflight(false, selected ?? undefined)}>{starting ? 'Editing your photos…' : selected === null ? 'Auto edit all photos' : `Auto edit ${selected.length} selected photos`}</button>
     </section>
+    <BatchPhotoPicker key={projectId} projectId={projectId} disabled={starting || progress !== null} selected={selected} onSelect={setSelected} />
     {preparation && <section className="automatic-result" aria-label="Automatic preparation">
       <p role="status">{preparation}</p>
       {starting && <button type="button" onClick={() => { stopPreparation.current = true; }}>Stop automatic editing</button>}
+      {!starting && !progress && prepared.some(photo => photo.outcome === 'failed') && <button type="button" onClick={() => void openPreflight(false, prepared.filter(photo => photo.outcome === 'failed').map(photo => photo.photoId), true)}>Retry failed photos only</button>}
       {!starting && !progress && prepared.some(photo => photo.outcome === 'ready') && <>
         <h2>{prepared.filter(photo => photo.outcome === 'ready').length} photos have saved edits, ready to render.</h2>
         <p>{prepared.filter(photo => photo.outcome === 'failed').length} photos need attention. Review the steps below whenever you want to see what changed.</p>
         <button type="button" className="is-primary" onClick={onRender}>Render final output →</button>
       </>}
       <details><summary>Review automatic preparation ({prepared.length} photos)</summary>
-        <ol className="preparation-log">{prepared.map(photo => <li key={photo.photoId}><strong>{photo.name} · {photo.outcome === 'ready' ? 'Prepared' : 'Needs attention'}</strong><p>{photo.detail}</p></li>)}</ol>
+        <ol className="preparation-log">{prepared.map(photo => <li key={photo.photoId}><strong>{photo.name} · {photo.outcome === 'ready' ? 'Prepared' : 'Needs attention'}</strong><p>{photo.detail}</p>{photo.settings && <p>{photo.settings}</p>}</li>)}</ol>
       </details>
     </section>}
     <details className="advanced-tools" open={progress !== null || preflight !== null ? true : undefined}>

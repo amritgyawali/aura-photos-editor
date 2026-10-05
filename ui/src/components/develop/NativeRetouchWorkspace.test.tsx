@@ -14,6 +14,35 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('restores distinct saved retouch choices after switching photos and undoing', async () => {
+  const saved = (photoId: string, recipeHash: string, scope: string, smoothing: number) => ({ photoId, recipeHash,
+    body: JSON.stringify({ studio_portrait_auto_v1: { options: { scope, intensity: .6, teeth: false, settings: { smoothing } } } }) }) as never;
+  vi.mocked(develop.imageRecipe).mockResolvedValueOnce(saved('a', 'a1', 'body', .2));
+  const props = { projectId: 'project', onClose: vi.fn(), onBusyChange: vi.fn() };
+  const { rerender } = render(<NativeRetouchWorkspace {...props} photoId="a" />);
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Auto retouch: Body skin' }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByText('Skin'));
+  expect((screen.getByLabelText('Skin smoothing') as HTMLInputElement).value).toBe('20');
+  vi.mocked(develop.imageRecipe).mockResolvedValueOnce(saved('b', 'b1', 'face', .8));
+  rerender(<NativeRetouchWorkspace {...props} photoId="b" />);
+  await waitFor(() => expect((screen.getByLabelText('Skin smoothing') as HTMLInputElement).value).toBe('80'));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
+  await waitFor(() => expect(nativeRetouch.autoRetouch).toHaveBeenCalledWith('project', 'b', expect.objectContaining({
+    scope: 'face', intensity: .6, teeth: false, settings: expect.objectContaining({ smoothing: .8 }),
+  })));
+  await waitFor(() => expect((screen.getByText('Undo') as HTMLButtonElement).disabled).toBe(false));
+  vi.mocked(develop.imageRecipe).mockResolvedValueOnce(saved('b', 'b0', 'face_and_body', .35));
+  fireEvent.click(screen.getByText('Undo'));
+  await waitFor(() => expect((screen.getByLabelText('Skin smoothing') as HTMLInputElement).value).toBe('35'));
+  expect(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' })).toBeTruthy();
+  vi.mocked(develop.imageRecipe).mockRejectedValueOnce(new Error('Cannot load photo c'));
+  rerender(<NativeRetouchWorkspace {...props} photoId="c" />);
+  await screen.findByText('Cannot load photo c');
+  const automatic = screen.getByRole('button', { name: 'Auto retouch: Face' });
+  expect(automatic.closest('fieldset')?.disabled).toBe(true);
+  fireEvent.click(automatic);
+  expect(nativeRetouch.autoRetouch).toHaveBeenCalledTimes(1);
+});
 it('clears the AI restriction when selecting the entire photo', async () => {
   const saved = { ...freshRetouch(), id: 'auto-portrait-v1-0-texture', tool: 'frequency' as const, matte: 'auto-portrait-v1-0-face' };
   vi.mocked(nativeRetouch.edit).mockResolvedValue([saved]);
