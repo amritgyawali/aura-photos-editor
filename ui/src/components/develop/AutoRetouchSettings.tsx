@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import type { RecipeDto } from '../../ipc/types';
+import { readRetouchPreferences } from '../../ipc/retouchPreferences';
 import {
-  DEFAULT_AUTO_RETOUCH, DEFAULT_RETOUCH_SETTINGS,
+  DEFAULT_RETOUCH_SETTINGS,
   type AutoRetouchOptions, type RetouchScope, type RetouchSettings,
 } from '../../ipc/nativeRetouch';
 
@@ -11,7 +13,7 @@ const SCOPES: [RetouchScope, string, string][] = [
 ];
 
 const FEATURES: [keyof Pick<AutoRetouchOptions, 'blemishes' | 'refine' | 'eyes' | 'teeth'>, string, string][] = [
-  ['blemishes', 'Heal blemishes', 'Small spots redder than the surrounding skin. Moles and freckles are always kept.'],
+  ['blemishes', 'Heal blemishes', 'Targets small red spots while avoiding likely moles and freckles. Review marks before export.'],
   ['refine', 'Soften lines and redness', 'Fine lines, smile lines and redness beside the nose, only where they measure stronger than the cheek.'],
   ['eyes', 'Eyes', 'Iris detail, redness in the whites, flash red-eye and under-eye shadows, only where measured.'],
   ['teeth', 'Teeth', 'Reduce a measured yellow cast on visible teeth.'],
@@ -112,9 +114,11 @@ export const PRESETS: Preset[] = [
 const percent = (v: number) => `${Math.round(v * 100)}%`;
 
 /** Choose what the automatic retouch works on and how strongly, then run it. */
-export function AutoRetouchSettings({ disabled, busy = false, onRun }: { disabled: boolean; busy?: boolean; onRun: (options: AutoRetouchOptions) => void }) {
-  const [options, setOptions] = useState<AutoRetouchOptions>({ ...DEFAULT_AUTO_RETOUCH, settings: DEFAULT_RETOUCH_SETTINGS });
-  const [preset, setPreset] = useState('natural');
+export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: { disabled: boolean; busy?: boolean; onRun: (options: AutoRetouchOptions) => void; recipe?: RecipeDto | null }) {
+  const [options, setOptions] = useState<AutoRetouchOptions>(() => readRetouchPreferences(recipe));
+  const [preset, setPreset] = useState(() => options.intensity === 1 &&
+    (Object.keys(DEFAULT_RETOUCH_SETTINGS) as (keyof RetouchSettings)[]).every(key =>
+      options.settings?.[key] === DEFAULT_RETOUCH_SETTINGS[key]) ? 'natural' : 'custom');
   const settings = options.settings ?? DEFAULT_RETOUCH_SETTINGS;
   const label = options.intensity < 0.8 ? 'Subtle' : options.intensity > 1.2 ? 'Polished' : 'Natural';
   const faceFeatures = options.scope !== 'body';
@@ -142,7 +146,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun }: { disable
       {preset === 'custom' && <span className="lr-hint">Custom</span>}
     </div>
     <p className="lr-hint">{scope?.[2]} Skin is found by AI segmentation and measured against the same person's own skin; every result becomes an ordinary operation you can adjust, disable or remove below.</p>
-    <button type="button" className="retouch-primary" onClick={() => onRun(options)}>{busy ? 'Detecting and retouching…' : `Auto retouch: ${scope?.[1] ?? 'Face'}`}</button>
+    <button type="button" className="retouch-primary" disabled={disabled || busy} onClick={() => onRun(options)}>{busy ? 'Detecting and retouching…' : `Auto retouch: ${scope?.[1] ?? 'Face'}`}</button>
     <details>
       <summary>Strength and details</summary>
       <label>Strength: {label} ({Math.round(options.intensity * 100)}%)
@@ -172,6 +176,6 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun }: { disable
         </label>;
       })}
     </details>)}
-    <p className="lr-hint">Running it again replaces the automatic operations; operations you added yourself are kept. Undo restores the previous version.</p>
+    <p className="lr-hint">These choices belong to this photo only. Running it again replaces the automatic operations; operations you added yourself are kept. Undo restores the previous version.</p>
   </fieldset>;
 }

@@ -31,7 +31,7 @@ describe('automatic retouch settings', () => {
     const { rerender } = render(<AutoRetouchSettings disabled={false} onRun={vi.fn()} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Body skin' }));
     expect((screen.getByLabelText('Teeth') as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByTitle(/Moles and freckles are always kept/)).toBeTruthy();
+    expect(screen.getByTitle(/avoiding likely moles and freckles/)).toBeTruthy();
     rerender(<AutoRetouchSettings disabled busy onRun={vi.fn()} />);
     expect((screen.getByRole('button', { name: 'Detecting and retouching…' }) as HTMLButtonElement).closest('fieldset')?.disabled).toBe(true);
   });

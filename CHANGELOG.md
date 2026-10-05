@@ -2,6 +2,18 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Independent batch editing and saved retouch choices — 2026-10-05
+
+- Search and select photos for local batch editing. Each photo is measured independently;
+  the result lists its saved exposure, white balance and tone adjustments.
+- Retry only failed or interrupted photos while keeping successful results. Finish pending
+  preview work before moving to another photo, even when a recipe read fails.
+- Restore each photo's saved retouch scope, strength, feature switches and all 52 fine
+  controls when opening it or undoing edits; validate legacy or malformed saved options.
+- Use manually protected exposure when planning brightness selections. Restrict automatic
+  dehaze to measured landscapes so bright studio and product photos keep their appearance.
+- Give fine lines and redness their own reported history step. ADR-0083.
+
 ## Skin selection and independent retouch corrections — 2026-10-04
 
 - Partition connected skin regions between nearby detected people; preserve the full image
