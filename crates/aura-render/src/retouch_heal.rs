@@ -166,6 +166,10 @@ impl Donor {
         if self.scale >= 1.0 {
             return image.at(x + self.offset[0], y + self.offset[1]);
         }
+        self.texture_at(image, x, y)
+    }
+
+    fn texture_at(self, image: Image<'_>, x: f32, y: f32) -> Option<[f32; 3]> {
         // Reflect the smaller clean source rather than stretching its pores into
         // large blurred blobs. Tone matching still follows the target boundary.
         let reflect = |v: f32, radius: f32| {

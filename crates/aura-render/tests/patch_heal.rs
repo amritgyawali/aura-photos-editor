@@ -103,6 +103,31 @@ fn texture_heal_preserves_lighting_and_real_pores_across_skin_tones() {
 }
 
 #[test]
+fn texture_filter_never_borrows_a_defect_outside_its_clean_source() {
+    let mut clean = surface();
+    blemish(&mut clean);
+    let mut dirty = clean.clone();
+    // Source spans x=25..39. A black stripe just outside must not enter
+    // the low band and create a bright halo inside the repaired area.
+    for y in 48..80 {
+        for x in 40..44 {
+            dirty[(y * W + x) * 3..(y * W + x) * 3 + 3].fill(0.0);
+        }
+    }
+    let mut edit = operation();
+    edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
+    edit.texture_heal = true;
+    apply(&mut clean, W, W, std::slice::from_ref(&edit));
+    apply(&mut dirty, W, W, &[edit]);
+    for y in 58..71 {
+        for x in 58..71 {
+            let i = (y * W + x) * 3;
+            assert_eq!(&clean[i..i + 3], &dirty[i..i + 3]);
+        }
+    }
+}
+
+#[test]
 fn small_clean_source_repairs_large_target_without_copying_nearby_defect() {
     let clean = surface();
     let mut damaged = clean.clone();
