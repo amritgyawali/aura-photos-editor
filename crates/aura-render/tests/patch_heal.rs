@@ -53,7 +53,7 @@ fn blemish(rgb: &mut [f32]) {
 }
 
 #[test]
-fn texture_heal_preserves_lighting_and_real_pores_across_skin_tones() {
+fn texture_heal_preserves_lighting_and_real_pores_across_exposure_levels() {
     for exposure in [0.35, 1.0, 1.8] {
         let clean: Vec<_> = surface().into_iter().map(|v| v * exposure).collect();
         let mut damaged = clean.clone();

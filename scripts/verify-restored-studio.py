@@ -20,6 +20,7 @@ def main():
     parser.add_argument('output', type=Path)
     parser.add_argument('--port', type=int, default=9337)
     parser.add_argument('--resume', action='store_true')
+    parser.add_argument('--require-texture-heal', action='store_true')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     original_hash = hashlib.sha256(args.source.read_bytes()).hexdigest()
@@ -69,6 +70,25 @@ def main():
         page.get_by_role('heading', name='Precision, at your pace.').scroll_into_view_if_needed()
         page.screenshot(path=str(args.output / 'retouch.png'))
         (args.output / 'retouch.txt').write_text(page.locator('main').inner_text(), encoding='utf-8')
+        if args.require_texture_heal:
+            # Read-only evidence from the native app. All edits above use its controls.
+            recipe = page.evaluate("""async () => {
+                const invoke = window.__TAURI_INTERNALS__.invoke;
+                const projects = await invoke('list_projects');
+                const project = projects.find(p => p.name === 'Restored studio verification');
+                if (!project) throw new Error('Test collection is missing');
+                const images = await invoke('list_images', {input: {
+                    projectId: project.id, offset: 0, limit: 10, orderBy: null
+                }});
+                if (images.length !== 1) throw new Error('Expected one test portrait');
+                return invoke('image_recipe', {input: {photoId: images[0].id}});
+            }""")
+            body = json.loads(recipe['body'])
+            edits = body['studio_retouch_v1']
+            repairs = [edit for edit in edits if edit['tool'] == 'patch_heal']
+            assert repairs and all(edit.get('textureHeal') for edit in repairs)
+            assert any(edit.get('preserveMicrotexture') for edit in edits)
+            (args.output / 'recipe.json').write_text(json.dumps(recipe, indent=2), encoding='utf-8')
         page.get_by_role('button', name='Export Ready to share', exact=True).click()
         page.get_by_test_id('destination').fill(str((args.output / 'export').resolve()))
         page.get_by_test_id('verify').check()
