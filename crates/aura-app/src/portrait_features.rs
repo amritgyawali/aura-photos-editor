@@ -350,6 +350,8 @@ fn base_edit(id: String, tool: Tool, amount: f32, px: &Pixels<'_>, region_px: [f
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        sensitivity: None,
+        keep_dark_marks: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,

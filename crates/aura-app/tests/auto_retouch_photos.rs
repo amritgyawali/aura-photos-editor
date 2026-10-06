@@ -59,6 +59,25 @@ fn preset(name: &str) -> portrait_features::Options {
             s.hair_detail = 0.4;
             s.hair_shine = 0.2;
         }
+        // Heal, frequency separation, dodge and burn, then real texture back. ADR-0090.
+        "pro" => {
+            s.deep_blemish_cleanup = true;
+            s.remove_dark_marks = true;
+            s.keep_freckles = false;
+            s.max_spots = 220;
+            s.blemish_sensitivity = 0.8;
+            s.frequency_heal = 1.0;
+            s.texture_graft = 0.75;
+            s.smoothing = 0.8;
+            s.texture = 0.85;
+            s.tone_evenness = 0.7;
+            s.light_evenness = 0.5;
+            s.micro_dodge_burn = 0.65;
+            s.pore_refine = 0.3;
+            s.shine = 0.85;
+            s.hair_detail = 0.4;
+            s.hair_shine = 0.2;
+        }
         "soft" => {
             s.smoothing = 0.75;
             s.texture = 0.4;

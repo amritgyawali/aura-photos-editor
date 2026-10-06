@@ -158,6 +158,7 @@ pub fn group_of(id: &str) -> Option<Group> {
             || rest.contains("-hair-")
             || rest.ends_with("-fabric")
             || rest.ends_with("-surface-finish")
+            || rest.ends_with("-texture-graft")
             || rest == "backdrop"
         {
             Group::Finishing
@@ -522,8 +523,42 @@ pub fn plan_with_faces(
             edit.amount = (edit.amount * options.intensity).clamp(0.05, 0.95);
         }
         let mut features = portrait_features::FeatureEdits::default();
+        // Frequency healing runs before every other operation on this face, on the
+        // photograph as it was taken. ADR-0090.
+        let mut clear: Option<Edit> = None;
         if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
+                // The surface selection frequency healing, the finish and the graft share.
+                let surface = face_matte
+                    .as_ref()
+                    .filter(|_| settings.frequency_heal > 0.0 || settings.texture_graft > 0.0)
+                    .and_then(|m| {
+                        portrait_features::deep_blemish::surface_matte(face, px, &m.matte)
+                            .map(|surface| (m, surface))
+                    });
+                if let Some((m, surface)) = &surface {
+                    clear = portrait_features::deep_blemish::frequency_heal(
+                        face, index, px, PREFIX, &settings, &m.matte,
+                    )
+                    .filter(|_| options.blemishes);
+                    if clear.is_some() {
+                        mattes.insert(
+                            portrait_features::deep_blemish::surface_matte_id(PREFIX, index),
+                            surface.clone(),
+                        );
+                    }
+                }
+                // What is left after frequency healing is what the spot repairs are for.
+                let healed = clear
+                    .as_ref()
+                    .zip(surface.as_ref())
+                    .and_then(|(edit, (_, s))| {
+                        portrait_features::deep_blemish::after_frequency_heal(px, edit, s)
+                    });
+                let healed_px = healed.as_deref().and_then(|bytes| {
+                    portrait_features::Pixels::new(bytes, px.width as u32, px.height as u32)
+                });
+                let spot_px = healed_px.as_ref().unwrap_or(px);
                 let mut feature_options = options;
                 // Deep cleanup replaces the sparse four-patch search; never stack both. When the
                 // adaptive pass chose it, the sparse search still runs so the two can be compared.
@@ -543,7 +578,7 @@ pub fn plan_with_faces(
                     let deep = portrait_features::deep_blemish::plan(
                         face,
                         index,
-                        px,
+                        spot_px,
                         PREFIX,
                         &settings,
                         face_matte.as_ref().map(|m| &m.matte),
@@ -563,7 +598,7 @@ pub fn plan_with_faces(
                             features.blemishes.len()
                         ));
                     }
-                    if use_deep && !features.blemishes.is_empty() {
+                    if use_deep && (!features.blemishes.is_empty() || clear.is_some()) {
                         if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
                             portrait_features::deep_blemish::surface_finish(
                                 face, index, px, PREFIX, &settings, &m.matte,
@@ -577,7 +612,31 @@ pub fn plan_with_faces(
                         }
                     }
                 }
+                if clear.is_some() {
+                    features.report.findings.push(format!(
+                        "Frequency healing: rebuilt the tone under compact marks across this face from the clean skin around each one, keeping the pores in place; {} spot{} it left were then repaired with donor texture. {}",
+                        features.blemishes.len(),
+                        if features.blemishes.len() == 1 { "" } else { "s" },
+                        if settings.remove_dark_marks { "Dark marks are included; review freckles and beauty marks." } else { "Dark marks that are not redder than the skin around them are kept." },
+                    ));
+                }
+                // The graft goes last: it restores what everything before it cost.
+                if let Some((m, surface)) = &surface {
+                    if let Some(graft) = portrait_features::deep_blemish::texture_graft(
+                        face, index, px, PREFIX, &settings, &m.matte,
+                    ) {
+                        mattes.insert(
+                            portrait_features::deep_blemish::surface_matte_id(PREFIX, index),
+                            surface.clone(),
+                        );
+                        features.finishing.push(graft);
+                        features.report.findings.push("Texture graft: limited glints this skin's own pores never reach, then brought fine texture back to the level this face's clean skin had, using pore detail borrowed from that same skin. Nothing is generated.".into());
+                    }
+                }
             }
+        }
+        if clear.as_ref().is_some_and(|e| overridden.contains(&e.id)) {
+            clear = None;
         }
         features.finishing.extend(garments);
         // A manually adjusted automatic step occupies its original slot. Do not add a
@@ -595,6 +654,7 @@ pub fn plan_with_faces(
         let used: usize = planned.iter().map(Vec::len).sum();
         if settings.deep_blemish_cleanup {
             let non_spots = plan.edits.len()
+                + usize::from(clear.is_some())
                 + body.edits.len()
                 + features.refine.len()
                 + features.eyes.len()
@@ -608,6 +668,7 @@ pub fn plan_with_faces(
             }
         }
         let mut wanted = plan.edits.len()
+            + usize::from(clear.is_some())
             + body.edits.len()
             + features.blemishes.len()
             + features.refine.len()
@@ -615,6 +676,7 @@ pub fn plan_with_faces(
             + features.finishing.len();
         if manual + scene_ops + used + wanted > retouch_tools::MAX_EDITS {
             plan = FacePlan::skip("The saved retouch stack has reached its operation limit.");
+            clear = None;
             body = FacePlan::skip("");
             features = portrait_features::FeatureEdits::default();
             wanted = 0;
@@ -649,6 +711,7 @@ pub fn plan_with_faces(
         report.operations += wanted;
         bodies += usize::from(!body.edits.is_empty());
         let [skin, spots, refine, eyes, finishing] = &mut planned;
+        skin.extend(clear);
         skin.extend(plan.edits);
         for edit in body.edits {
             if group_of(&edit.id) == Some(Group::Blemishes) {
@@ -924,6 +987,8 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
             source_scale: 1.0,
             preserve_microtexture: false,
             texture_heal: false,
+            sensitivity: None,
+            keep_dark_marks: false,
             texture: if smooth { 0.7 } else { 1.0 },
             tone: if smooth { 0.9 } else { 0.5 },
             warmth: 0.0,
@@ -1048,6 +1113,8 @@ fn plan_body(
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        sensitivity: None,
+        keep_dark_marks: false,
         texture: if tool == Tool::SkinSmooth { 0.75 } else { 1.0 },
         tone: if tool == Tool::SkinSmooth { 0.9 } else { 0.5 },
         warmth: 0.0,
@@ -1800,6 +1867,8 @@ fn face_extras(
             source_scale: 1.0,
             preserve_microtexture: false,
             texture_heal: false,
+            sensitivity: None,
+            keep_dark_marks: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,
@@ -1960,6 +2029,8 @@ fn plan_face_from_matte(
             source_scale: 1.0,
             preserve_microtexture: false,
             texture_heal: false,
+            sensitivity: None,
+            keep_dark_marks: false,
             texture: if smooth { 0.7 } else { 1.0 },
             tone: if smooth { 0.9 } else { 0.5 },
             warmth: 0.0,
@@ -2052,6 +2123,8 @@ fn plan_body_matte(
             source_scale: 1.0,
             preserve_microtexture: false,
             texture_heal: false,
+            sensitivity: None,
+            keep_dark_marks: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,
@@ -2206,6 +2279,8 @@ fn hair_ops(
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        sensitivity: None,
+        keep_dark_marks: false,
         texture: 1.0,
         tone: 0.0,
         warmth: 0.0,
@@ -2252,6 +2327,8 @@ fn fabric_op(index: usize, matte: &MatteUse, face: &PortraitFace, settings: &Set
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        sensitivity: None,
+        keep_dark_marks: false,
         texture: 1.0,
         tone: 0.85,
         warmth: 0.0,
@@ -2287,6 +2364,8 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        sensitivity: None,
+        keep_dark_marks: false,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,
@@ -2821,6 +2900,8 @@ mod tests {
             source_scale: 1.0,
             preserve_microtexture: false,
             texture_heal: false,
+            sensitivity: None,
+            keep_dark_marks: false,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,

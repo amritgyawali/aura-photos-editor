@@ -65,6 +65,25 @@ fn matte_planes(
     planes
 }
 
+/// The operation's selection on the current frame, limited by its matte. `None` when the
+/// operation names a matte that is missing or selects nothing.
+fn coverage_of(
+    edit: &Edit,
+    width: usize,
+    height: usize,
+    rgb: &[f32],
+    planes: &BTreeMap<String, Option<MattePlane>>,
+) -> Option<Coverage> {
+    let coverage = Coverage::for_edit(edit, width, height, rgb);
+    match &edit.matte {
+        None => Some(coverage),
+        Some(id) => match planes.get(id) {
+            Some(Some(plane)) => Some(coverage.with_matte(plane, width, height)),
+            _ => None,
+        },
+    }
+}
+
 /// [`apply`], with the segmentation mattes operations refer to. An operation whose matte is
 /// missing or selects nothing is skipped rather than applied to its whole region.
 pub fn apply_with_mattes(
@@ -78,14 +97,21 @@ pub fn apply_with_mattes(
         return;
     }
     let planes = matte_planes(rgb, width, height, edits, mattes);
+    // A texture graft measures the texture the skin had from the frame as it is now, before
+    // any operation has run - not from whatever the operations before it left behind.
+    let references: BTreeMap<&str, crate::retouch_texture::Reference> = edits
+        .iter()
+        .filter(|e| e.enabled && e.amount > 0.0 && e.tool == Tool::TextureGraft)
+        .filter_map(|edit| {
+            let coverage = coverage_of(edit, width, height, rgb, &planes)?;
+            crate::retouch_texture::Reference::capture(rgb, width, height, edit, coverage.bounds)
+                .map(|reference| (edit.id.as_str(), reference))
+        })
+        .collect();
     for edit in edits.iter().filter(|e| e.enabled && e.amount > 0.0) {
-        let mut coverage = Coverage::for_edit(edit, width, height, rgb);
-        if let Some(id) = &edit.matte {
-            match planes.get(id) {
-                Some(Some(plane)) => coverage = coverage.with_matte(plane, width, height),
-                _ => continue,
-            }
-        }
+        let Some(coverage) = coverage_of(edit, width, height, rgb, &planes) else {
+            continue;
+        };
         if matches!(
             edit.tool,
             Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
@@ -93,6 +119,17 @@ pub fn apply_with_mattes(
             crate::retouch_skin::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::PatchHeal {
             crate::retouch_heal::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::FrequencyHeal {
+            crate::retouch_clear::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::TextureGraft {
+            crate::retouch_texture::apply(
+                rgb,
+                width,
+                height,
+                edit,
+                &coverage,
+                references.get(edit.id.as_str()),
+            );
         } else if edit.tool == Tool::AutoBlemish {
             auto_spots(rgb, width, height, edit, &coverage);
         } else {
@@ -148,6 +185,30 @@ pub fn selection_mask_with_mattes(
         .flat_map(|y| (0..width).map(move |x| (x, y)))
         .map(|(x, y)| coverage.at(x, y, width, height))
         .collect()
+}
+
+/// Where frequency healing would rebuild tone: 0 for untouched skin, 1 inside a compact
+/// mark, with the feathered rim in between. Measured on the given frame exactly as rendering
+/// would, so a preview of it is a preview of the repair. Zero for any other tool.
+#[must_use]
+pub fn frequency_heal_marks(
+    rgb: &[f32],
+    width: usize,
+    height: usize,
+    edit: &Edit,
+    mattes: &BTreeMap<String, Matte>,
+) -> Vec<f32> {
+    if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
+        return Vec::new();
+    }
+    if edit.tool != Tool::FrequencyHeal {
+        return vec![0.0; width * height];
+    }
+    let planes = matte_planes(rgb, width, height, std::slice::from_ref(edit), mattes);
+    coverage_of(edit, width, height, rgb, &planes).map_or_else(
+        || vec![0.0; width * height],
+        |coverage| crate::retouch_clear::mark_plane(rgb, width, height, edit, &coverage),
+    )
 }
 
 #[allow(clippy::too_many_lines)]
@@ -406,6 +467,8 @@ fn apply_one(
                     }
                 }
                 Tool::PatchHeal
+                | Tool::FrequencyHeal
+                | Tool::TextureGraft
                 | Tool::AutoBlemish
                 | Tool::SkinSmooth
                 | Tool::SkinUniformity

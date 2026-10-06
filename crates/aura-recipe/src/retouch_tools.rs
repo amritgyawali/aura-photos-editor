@@ -109,8 +109,17 @@ pub enum Tool {
     SkinUniformity,
     PortraitDodgeBurn,
     PatchHeal,
+    /// Finds compact marks inside the selection and rebuilds the tone under each one from
+    /// the clean skin around it, leaving pore-scale detail where it is. ADR-0090.
+    FrequencyHeal,
+    /// Brings fine texture back up to the selection's own typical level by borrowing real
+    /// pore detail from clean skin in the same selection. ADR-0090.
+    TextureGraft,
 }
 
+// Each flag is an independent opt-in that old recipes read as off; none of them is a state
+// of the others.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Edit {
@@ -139,6 +148,14 @@ pub struct Edit {
     /// Transfer real donor texture over a robust local lighting fit. Old heals stay unchanged.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub texture_heal: bool,
+    /// How readily frequency healing calls a compact deviation a mark, 0..=1. Absent means
+    /// 0.5. Only read by [`Tool::FrequencyHeal`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sensitivity: Option<f32>,
+    /// Frequency healing leaves marks that are darker but not redder than the skin around
+    /// them, so a mole or a freckle is never removed by default-off automation.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub keep_dark_marks: bool,
     pub tone: f32,
     pub warmth: f32,
     pub tint: f32,
@@ -331,6 +348,7 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || edit.source.is_some_and(|p| !p.iter().all(|v| unit(*v)))
             || !edit.source_scale.is_finite()
             || !(0.2..=1.0).contains(&edit.source_scale)
+            || edit.sensitivity.is_some_and(|v| !unit(v))
             || (edit.source_scale < 1.0 && edit.tool == Tool::PatchHeal && edit.source.is_none())
             || (matches!(
                 edit.tool,
