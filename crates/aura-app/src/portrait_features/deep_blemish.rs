@@ -791,9 +791,13 @@ pub(crate) fn after_frequency_heal(
     )
 }
 
-/// The texture graft over the surface selection (ADR-0090): fine relief the skin's own pores
-/// never reach is limited, and real pore detail from the same face is added where retouching
-/// left the skin flatter than it was.
+/// The texture restore over a face's whole skin (ADR-0090): the photograph's own pore
+/// detail is put back where healing and smoothing removed it, glints and pits limited to this
+/// skin's range, and detail is borrowed from clean skin only where a blemish was rebuilt.
+///
+/// `matte_id` names the stored selection it runs over. The automatic pass gives it the
+/// segmented face skin rather than the surface selection, so the nose - which the surface
+/// finish leaves out - gets its pores back too.
 pub(crate) fn texture_graft(
     face: &PortraitFace,
     index: usize,
@@ -801,6 +805,7 @@ pub(crate) fn texture_graft(
     prefix: &str,
     settings: &Settings,
     matte: &Matte,
+    matte_id: &str,
 ) -> Option<aura_recipe::retouch_tools::Edit> {
     let g = Geometry::new(face, px)?;
     if g.d < 40.0 || settings.texture_graft <= 0.0 {
@@ -812,10 +817,11 @@ pub(crate) fn texture_graft(
         1.0,
         px,
         matte,
-        surface_matte_id(prefix, index),
+        matte_id.to_owned(),
     );
-    // A pore is about a hundredth of the eye distance across.
-    edit.radius = (g.d * 0.0085 / px.width.min(px.height) as f32).clamp(0.0005, 0.05);
+    // Pores, and the finest grain of skin around them: about an eightieth of the eye
+    // distance. Smaller misses what smoothing removed; larger brings back blotches.
+    edit.radius = (g.d * 0.012 / px.width.min(px.height) as f32).clamp(0.0005, 0.05);
     // The level asked for, relative to the clean skin this face had: 60 % at the lowest
     // setting, all of it at the highest.
     edit.texture = 0.6 + 0.4 * settings.texture_graft.clamp(0.0, 1.0);
@@ -1257,9 +1263,9 @@ mod tests {
         // Pores: a fixed pattern of a few codes, so there is texture to keep and to borrow.
         for (i, pixel) in rgb.chunks_exact_mut(3).enumerate() {
             let (x, y) = (i % 512, i / 512);
-            let v = ((x * 7 + y * 13) % 5) as i16 - 2;
+            let v = [0_u8, 2, 4, 6, 8][(x * 7 + y * 13) % 5];
             for c in pixel {
-                *c = (i16::from(*c) + v * 2).clamp(0, 255) as u8;
+                *c = (*c + v).saturating_sub(4);
             }
         }
         // Three inflamed marks on the cheeks, and features that must not move.
@@ -1286,7 +1292,7 @@ mod tests {
         let prefix = "auto-portrait-v1-";
         let off = Settings::default();
         assert!(frequency_heal(&face, 0, &px, prefix, &off, &matte).is_none());
-        assert!(texture_graft(&face, 0, &px, prefix, &off, &matte).is_none());
+        assert!(texture_graft(&face, 0, &px, prefix, &off, &matte, "face").is_none());
         let settings = Settings {
             frequency_heal: 1.0,
             texture_graft: 0.75,
@@ -1294,7 +1300,16 @@ mod tests {
             ..Settings::default()
         };
         let clear = frequency_heal(&face, 0, &px, prefix, &settings, &matte).unwrap();
-        let graft = texture_graft(&face, 0, &px, prefix, &settings, &matte).unwrap();
+        let graft = texture_graft(
+            &face,
+            0,
+            &px,
+            prefix,
+            &settings,
+            &matte,
+            &surface_matte_id(prefix, 0),
+        )
+        .unwrap();
         let surface = surface_matte(&face, &px, &matte).unwrap();
         aura_recipe::retouch_tools::validate(&[clear.clone(), graft.clone()]).unwrap();
         // Frequency healing is saved with the skin step, so it runs before everything else

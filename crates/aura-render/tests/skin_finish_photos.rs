@@ -14,6 +14,9 @@
 //! | `clear` | one frequency heal over the recipe's surface selection |
 //! | `graft` | one texture graft over the recipe's surface selection |
 //!
+//! The recipe's own frequency heal and texture graft are left out of the first four, so a
+//! stack says where they go. Those four take `scale` (every strength multiplied) and `max`
+//! (at most this many kept): `skin:scale=0.3`, `spots:max=40`.
 //! `clear` and `graft` take parameters after a colon, separated by semicolons:
 //! `clear:radius=0.0045;sens=0.6;tone=1;texture=0.5;dark=0` or `graft:radius=0.003;texture=1`.
 //! The result is written as `NAME_WxH.finish.LABEL.rgb` (`AURA_FINISH_LABEL`, default `lab`),
@@ -125,19 +128,38 @@ fn finishes_real_photographs() {
             .expect("a surface finish to take the selection from");
         let is_spot = |e: &&Edit| e.id.contains("-spot-");
         let is_finish = |e: &&Edit| e.id.ends_with("-surface-finish");
+        let is_new = |e: &&Edit| matches!(e.tool, Tool::FrequencyHeal | Tool::TextureGraft);
         let mut stack: Vec<Edit> = Vec::new();
         for (n, token) in stack_spec.split(',').enumerate() {
             let (name, parameters) = token.split_once(':').unwrap_or((token, ""));
+            // Planned operations, with every strength multiplied by `scale` and at most
+            // `max` of them kept: `skin:scale=0.3`, `spots:max=40`.
+            let planned_with = |keep: &dyn Fn(&&Edit) -> bool| -> Vec<Edit> {
+                let (mut scale, mut max) = (1.0_f32, usize::MAX);
+                for pair in parameters.split(';').filter(|p| !p.is_empty()) {
+                    let (key, value) = pair.split_once('=').expect("key=value");
+                    match key {
+                        "scale" => scale = value.parse().expect("a number"),
+                        "max" => max = value.parse().expect("a count"),
+                        other => panic!("unknown parameter {other}"),
+                    }
+                }
+                planned
+                    .iter()
+                    .filter(|e| keep(e) && !is_new(e))
+                    .take(max)
+                    .cloned()
+                    .map(|mut e| {
+                        e.amount = (e.amount * scale).clamp(0.0, 1.0);
+                        e
+                    })
+                    .collect()
+            };
             match name {
-                "base" => stack.extend(planned.iter().cloned()),
-                "skin" => stack.extend(
-                    planned
-                        .iter()
-                        .filter(|e| !is_spot(e) && !is_finish(e))
-                        .cloned(),
-                ),
-                "spots" => stack.extend(planned.iter().filter(is_spot).cloned()),
-                "finish" => stack.extend(planned.iter().filter(is_finish).cloned()),
+                "base" => stack.extend(planned_with(&|_| true)),
+                "skin" => stack.extend(planned_with(&|e| !is_spot(e) && !is_finish(e))),
+                "spots" => stack.extend(planned_with(&is_spot)),
+                "finish" => stack.extend(planned_with(&is_finish)),
                 "clear" => stack.push(authored(
                     surface,
                     Tool::FrequencyHeal,

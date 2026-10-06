@@ -620,17 +620,14 @@ pub fn plan_with_faces(
                         if settings.remove_dark_marks { "Dark marks are included; review freckles and beauty marks." } else { "Dark marks that are not redder than the skin around them are kept." },
                     ));
                 }
-                // The graft goes last: it restores what everything before it cost.
-                if let Some((m, surface)) = &surface {
+                // The restore goes last: it puts back the pores everything before it cost,
+                // over the whole segmented face skin - the nose included.
+                if let Some(m) = &face_matte {
                     if let Some(graft) = portrait_features::deep_blemish::texture_graft(
-                        face, index, px, PREFIX, &settings, &m.matte,
+                        face, index, px, PREFIX, &settings, &m.matte, &m.id,
                     ) {
-                        mattes.insert(
-                            portrait_features::deep_blemish::surface_matte_id(PREFIX, index),
-                            surface.clone(),
-                        );
                         features.finishing.push(graft);
-                        features.report.findings.push("Texture graft: limited glints this skin's own pores never reach, then brought fine texture back to the level this face's clean skin had, using pore detail borrowed from that same skin. Nothing is generated.".into());
+                        features.report.findings.push("Texture restore: put this face's own pore detail back where healing and smoothing had removed it, in the same place it was photographed, with glints and deep pits limited to this skin's own range; only healed blemishes borrowed pores from clean skin nearby. Nothing is generated.".into());
                     }
                 }
             }

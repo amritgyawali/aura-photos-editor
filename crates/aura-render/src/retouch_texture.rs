@@ -1,21 +1,22 @@
-//! Texture graft: bring fine skin texture back to an even, natural level with real pores.
+//! Texture restore: put the skin's own pores back after healing and smoothing.
 //!
-//! Healing and smoothing both cost texture, and they cost it unevenly: a repaired spot is
-//! flatter than the skin beside it, and the skin beside it still carries every glint it had.
-//! The result reads as patches. This operation evens the two out, in that order:
+//! A retoucher who smooths skin on a frequency-separated layer leaves the high band, the
+//! pores, untouched. Smoothing operators that are not separated, and several of them stacked,
+//! still cost fine detail, and the face reads as plastic: no pores on the nose, no grain on
+//! the cheeks. This operation runs last and restores that detail from the photograph itself:
 //!
-//! 1. **Limit.** Fine relief far above this skin's own normal pore contrast - the bright
-//!    ridges of an oily highlight - is compressed toward the normal range. Dark relief is
-//!    limited only at the extreme, so a stray hair is never half erased.
-//! 2. **Measure.** The texture level a region *should* have is read from the photograph as it
-//!    was before any retouch operation ran, capped at the selection's typical level so a patch
-//!    of rough or blemished skin does not ask for roughness back, and averaged widely so a
-//!    region that was out of focus stays out of focus.
-//! 3. **Graft.** Where the current level falls short, pore detail is borrowed from clean skin
-//!    elsewhere in the same selection of the same photograph, placed as overlapping tiles so
-//!    no seam and no repeat shows, and scaled to supply exactly the missing energy.
+//! 1. **Own detail, in place.** For every cell, the target is the fine detail the photograph
+//!    had at that very cell before any retouch operation ran. Pores come back exactly where
+//!    they were, at the strength they had; nothing is moved or repeated.
+//! 2. **Limit.** That detail is first compressed where it goes far beyond this skin's own
+//!    pore contrast - the bright ridges of an oily highlight, the deepest pits - with a knee,
+//!    so ordinary pores pass through unchanged.
+//! 3. **Borrow only where a mark was.** Where an earlier operation rebuilt the tone - a healed
+//!    blemish - the photograph's own detail there was the blemish's rim, so detail is borrowed
+//!    from clean skin in the same selection instead, as overlapping tiles scaled to the level
+//!    this skin's smoother skin has.
 //!
-//! The graft multiplies luminance, so it follows the light it lands in and changes no colour.
+//! The change multiplies luminance, so it follows the light it lands in and changes no colour.
 //! Nothing is synthesised: every pore written here was photographed on this person. ADR-0090.
 // Every plane covers one bounded rectangle and every index is derived from it.
 #![allow(clippy::indexing_slicing)]
@@ -24,10 +25,10 @@ use crate::retouch_planes::{centre_and_spread, luma, quantile, smoothstep, Rect,
 use aura_recipe::retouch_tools::Edit;
 
 /// Bright relief beyond this many robust spreads is a glint rather than a pore.
-const GLINT_LIMIT: f32 = 2.4;
+const GLINT_LIMIT: f32 = 2.0;
 /// Dark relief is limited a little later than bright relief: an open pore is darker than
 /// a glint is bright, and a stray hair should fade evenly rather than break up.
-const PIT_LIMIT: f32 = 3.2;
+const PIT_LIMIT: f32 = 2.6;
 /// The level a region is asked to have is capped at this share of the selection's own
 /// distribution: the smoother third of a face is what its clean skin looks like.
 const CLEAN_SHARE: f32 = 0.35;
@@ -39,6 +40,13 @@ const TILE: f32 = 12.0;
 const DONOR_TRIES: u32 = 40;
 /// How many samples the robust statistics are measured from.
 const SAMPLES: usize = 60_000;
+/// The scale, in pore radii, at which a rebuilt mark is told apart from smoothing: a change
+/// at this scale that the same change four times wider does not explain.
+const HEAL_SCALE: f32 = 3.0;
+/// That localized change of tone, in natural-log units, below which the photograph's own
+/// detail is restored, and above which detail is borrowed instead.
+const HEAL_LOW: f32 = 0.04;
+const HEAL_HIGH: f32 = 0.1;
 
 fn px(radius: f32, factor: f32) -> usize {
     (radius * factor).round().max(1.0) as usize
@@ -257,60 +265,35 @@ fn tiles(
 }
 
 /// The change to log luminance for every cell of the rectangle, before strength.
-#[allow(clippy::too_many_lines)]
-fn plan(
-    now: &[f32],
+/// Pore detail borrowed from clean skin, and the level it should be scaled to, for the
+/// cells where an earlier operation rebuilt the tone and the photograph's own detail there
+/// belonged to the mark.
+fn borrowed(
+    fine_original: &[f32],
     original: &[f32],
     alpha: &[f32],
     rect: Rect,
     radius: f32,
-    edit: &Edit,
+    normal: f32,
     manual: Option<[f32; 2]>,
-) -> Vec<f32> {
+) -> (Vec<f32>, Vec<f32>) {
     let Rect { w, h, .. } = rect;
     let n = rect.len();
-    let pore = Weighted::new(alpha, w, h, px(radius, 1.0));
     let local = Weighted::new(alpha, w, h, px(radius, 4.0));
-    let fine_of = |plane: &[f32]| -> Vec<f32> {
-        pore.mean(plane)
-            .iter()
-            .zip(plane)
-            .map(|(low, v)| v - low)
-            .collect()
-    };
-    let level_of = |fine: &[f32]| -> Vec<f32> {
-        let squared: Vec<f32> = fine.iter().map(|v| v * v).collect();
-        local
-            .mean(&squared)
-            .iter()
-            .map(|v| v.max(0.0).sqrt())
-            .collect()
-    };
-    let fine_original = fine_of(original);
-    let level_original = level_of(&fine_original);
-    let Some((_, normal)) = centre_and_spread(&mut sampled(&fine_original, alpha, 0.6)) else {
-        return vec![0.0; n];
-    };
-    if normal <= 1e-6 {
-        return vec![0.0; n];
-    }
-    // 1. Limit relief the selection's own pores never reach.
-    let glints = edit.tone.clamp(0.0, 1.0);
-    let fine_now = fine_of(now);
-    let limited: Vec<f32> = fine_now
+    let squared: Vec<f32> = fine_original.iter().map(|v| v * v).collect();
+    let level_original: Vec<f32> = local
+        .mean(&squared)
         .iter()
-        .map(|v| {
-            let limit = if *v > 0.0 { GLINT_LIMIT } else { PIT_LIMIT } * normal;
-            v + glints * (knee(*v, limit) - v)
-        })
+        .map(|v| v.max(0.0).sqrt())
         .collect();
-    let level_now = level_of(&limited);
-    // 2. The level each region should have: the original, capped and widely averaged.
+    // The level a rebuilt region is given: the original, capped at the smoother share of
+    // this skin and widely averaged, so a blemished patch does not ask for its roughness back.
     let mut levels = sampled(&level_original, alpha, 0.6);
     let typical = quantile(&mut levels, CLEAN_SHARE).unwrap_or(normal);
     let capped: Vec<f32> = level_original.iter().map(|v| v.min(typical)).collect();
     let regional = Weighted::new(alpha, w, h, px(radius, 24.0)).mean(&capped);
-    // 3. Clean donors: ordinary texture, no blotch, mark, glint or edge underneath.
+    // Clean donors: ordinary texture, no blotch, mark, glint or edge underneath.
+    let pore = Weighted::new(alpha, w, h, px(radius, 1.0));
     let broad = Weighted::new(alpha, w, h, px(radius, 5.0)).mean(original);
     let mid: Vec<f32> = pore
         .mean(original)
@@ -334,17 +317,83 @@ fn plan(
         .zip(&level_original)
         .map(|(v, level)| v / level.max(typical * 0.3))
         .collect();
-    let grafted = tiles(&detail, &clean, rect, radius, manual);
+    (tiles(&detail, &clean, rect, radius, manual), regional)
+}
+
+/// The change to log luminance for every cell of the rectangle, before strength.
+///
+/// The target for every cell is the fine detail the photograph had **at that cell** before
+/// any retouch operation ran, with glints and pits limited to this skin's own pore range.
+/// Healing and smoothing that removed pores therefore get exactly those pores back, in the
+/// same place, and skin that was left alone only has its glints limited. Only where an
+/// earlier operation rebuilt the tone - a healed blemish, whose own detail was the mark's
+/// rim - is detail borrowed from clean skin instead.
+fn plan(
+    now: &[f32],
+    original: &[f32],
+    alpha: &[f32],
+    rect: Rect,
+    radius: f32,
+    edit: &Edit,
+    manual: Option<[f32; 2]>,
+) -> Vec<f32> {
+    let Rect { w, h, .. } = rect;
+    let n = rect.len();
+    let pore = Weighted::new(alpha, w, h, px(radius, 1.0));
+    let fine_of = |plane: &[f32]| -> Vec<f32> {
+        pore.mean(plane)
+            .iter()
+            .zip(plane)
+            .map(|(low, v)| v - low)
+            .collect()
+    };
+    let fine_original = fine_of(original);
+    let Some((_, normal)) = centre_and_spread(&mut sampled(&fine_original, alpha, 0.6)) else {
+        return vec![0.0; n];
+    };
+    if normal <= 1e-6 {
+        return vec![0.0; n];
+    }
+    let fine_now = fine_of(now);
+    let glints = edit.tone.clamp(0.0, 1.0);
+    let limit = |v: f32| {
+        let bound = if v > 0.0 { GLINT_LIMIT } else { PIT_LIMIT } * normal;
+        v + glints * (knee(v, bound) - v)
+    };
+    // Where an earlier operation rebuilt a mark, the tone moved a lot in a small place. Dodge
+    // and burn, tone and light evening move it too, but across a whole region: the change is
+    // band-passed so only a change about the size of a mark counts.
+    let moved: Vec<f32> = now.iter().zip(original).map(|(a, b)| a - b).collect();
+    let near = Weighted::new(alpha, w, h, px(radius, HEAL_SCALE)).mean(&moved);
+    let wide = Weighted::new(alpha, w, h, px(radius, HEAL_SCALE * 4.0)).mean(&moved);
+    let healed: Vec<f32> = near
+        .iter()
+        .zip(&wide)
+        .map(|(a, b)| smoothstep(HEAL_LOW, HEAL_HIGH, (a - b).abs()))
+        .collect();
+    let donors = healed.iter().any(|v| *v > 0.0).then(|| {
+        borrowed(
+            &fine_original,
+            original,
+            alpha,
+            rect,
+            radius,
+            normal,
+            manual,
+        )
+    });
     let wanted = edit.texture.clamp(0.0, 2.0);
     (0..n)
         .map(|i| {
-            let target = regional[i] * wanted;
-            let missing = (target * target - level_now[i] * level_now[i])
-                .max(0.0)
-                .sqrt();
-            // Below a tenth of the target the difference is measurement noise.
-            let missing = missing * smoothstep(0.1, 0.3, missing / target.max(1e-6));
-            (limited[i] - fine_now[i] + missing * grafted[i]).clamp(-MAX_CHANGE, MAX_CHANGE)
+            let own = limit(fine_original[i]) * wanted;
+            let target = match &donors {
+                Some((grafted, regional)) if healed[i] > 0.0 => {
+                    let lent = limit(grafted[i] * regional[i]) * wanted;
+                    own + healed[i] * (lent - own)
+                }
+                _ => own,
+            };
+            (target - fine_now[i]).clamp(-MAX_CHANGE, MAX_CHANGE)
         })
         .collect()
 }

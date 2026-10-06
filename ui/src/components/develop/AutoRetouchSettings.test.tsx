@@ -115,14 +115,14 @@ it('offers a professional preset: frequency healing first, real texture back las
   render(<AutoRetouchSettings disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Professional retouch' }));
   expect(screen.getByText(/Frequency healing rebuilds the tone under each mark first/)).toBeTruthy();
-  expect(screen.getByText(/restores real pore texture from the same face/)).toBeTruthy();
+  expect(screen.getByText(/puts this face’s own pores back, nose included/)).toBeTruthy();
   fireEvent.click(screen.getByText('Blemishes'));
   expect(screen.getByText('Frequency healing: 100%')).toBeTruthy();
   fireEvent.click(screen.getByText('Skin'));
-  expect(screen.getByText('Restore skin texture: 75%')).toBeTruthy();
+  expect(screen.getByText('Restore skin texture: 80%')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({
-    deepBlemishCleanup: true, removeDarkMarks: true, frequencyHeal: 1, textureGraft: .75, microDodgeBurn: .65, texture: .85,
+    deepBlemishCleanup: true, removeDarkMarks: true, frequencyHeal: 1, textureGraft: .8, microDodgeBurn: .55, texture: .9, smoothing: .35,
   }) }));
 });
 

@@ -23,7 +23,7 @@
 #![allow(clippy::indexing_slicing)]
 use crate::retouch_mask::Coverage;
 use crate::retouch_planes::{
-    blur, centre_and_spread, distance_to, groups, luma, smoothstep, Rect, Weighted,
+    blur, centre_and_spread, distance_to, groups, luma, smoothstep, Group, Rect, Weighted,
 };
 use aura_recipe::retouch_tools::Edit;
 
@@ -33,6 +33,8 @@ const SCALES: [f32; 3] = [1.0, 2.0, 3.2];
 const TIERS: [f32; 3] = [1.0, 1.8, 2.8];
 /// A group longer than this many times its width is a line, not a spot.
 const MAX_ELONGATION: f32 = 5.5;
+/// Directions a candidate's surroundings are read in.
+const SECTORS: usize = 8;
 /// How many samples the robust spreads are measured from.
 const SPREAD_SAMPLES: usize = 60_000;
 /// Find-and-rebuild passes one operation makes.
@@ -121,6 +123,70 @@ fn spread(values: &[f32], alpha: &[f32]) -> f32 {
         .map(|(v, _)| *v)
         .collect();
     centre_and_spread(&mut samples).map_or(0.0, |(_, s)| s)
+}
+
+/// The skin around a candidate, read in eight directions.
+struct Surround<'a> {
+    luma: &'a [f32],
+    red: &'a [f32],
+    alpha: &'a [f32],
+    w: usize,
+    h: usize,
+    radius: f32,
+}
+
+impl Surround<'_> {
+    /// Whether the group is a mark: darker - or redder - than the selected skin on every side
+    /// of it.
+    ///
+    /// A blemish sits in skin. The pocket of shadow beside the inner corner of an eye, the
+    /// side of a nose or the edge of a jaw is darker than the skin on one side and no darker
+    /// than the skin on the other, and rebuilding it from the bright side paints a blotch.
+    /// A ring just outside the group is read in eight sectors; at least six must be skin, and
+    /// all but one of those must be clearly brighter (or less red) than the group.
+    fn encloses(&self, group: &Group, deepest: f32, reddest: f32) -> bool {
+        let Self { w, h, radius, .. } = *self;
+        let area = group.cells.len() as f32;
+        let own_luma = group.cells.iter().map(|i| self.luma[*i]).sum::<f32>() / area;
+        let own_red = group.cells.iter().map(|i| self.red[*i]).sum::<f32>() / area;
+        let mut valid = 0;
+        let mut darker_than = 0;
+        let mut redder_than = 0;
+        for sector in 0..SECTORS {
+            let (mut sum_luma, mut sum_red, mut count) = (0.0_f32, 0.0_f32, 0.0_f32);
+            for step in 0..3 {
+                let distance = group.reach + radius * (0.75 + 0.6 * step as f32);
+                for offset in [-0.3_f32, 0.0, 0.3] {
+                    let angle =
+                        (sector as f32 + 0.5 + offset) / SECTORS as f32 * std::f32::consts::TAU;
+                    let x = (group.centre[0] + angle.cos() * distance).round();
+                    let y = (group.centre[1] + angle.sin() * distance).round();
+                    if x < 0.0 || y < 0.0 || x >= w as f32 || y >= h as f32 {
+                        continue;
+                    }
+                    let i = y as usize * w + x as usize;
+                    if self.alpha[i] > 0.5 {
+                        sum_luma += self.luma[i];
+                        sum_red += self.red[i];
+                        count += 1.0;
+                    }
+                }
+            }
+            if count < 3.0 {
+                continue;
+            }
+            valid += 1;
+            let ring_luma = sum_luma / count;
+            if (ring_luma - own_luma) / ring_luma.max(1e-6) > deepest * 0.3 {
+                darker_than += 1;
+            }
+            if own_red - sum_red / count > reddest * 0.3 {
+                redder_than += 1;
+            }
+        }
+
+        valid >= SECTORS - 2 && (darker_than >= valid - 1 || redder_than >= valid - 1)
+    }
 }
 
 /// What one pass found.
@@ -227,6 +293,19 @@ fn marks(field: &Field, sensitivity: f32, keep_dark: bool) -> Option<Marks> {
                 // A mark no redder than its surroundings may be a mole or a freckle.
                 let dark_only = keep_dark && reddest < 0.6;
                 if peak < tier * 1.25 || bright_pore || dark_only {
+                    continue;
+                }
+                let deepest = group.cells.iter().map(|i| dark[*i]).fold(0.0, f32::max);
+                let reddest_raw = group.cells.iter().map(|i| redder[*i]).fold(0.0, f32::max);
+                let shape = Surround {
+                    luma: &fine_luma,
+                    red: &fine_red,
+                    alpha: &field.alpha,
+                    w,
+                    h,
+                    radius: r,
+                };
+                if !shape.encloses(&group, deepest, reddest_raw) {
                     continue;
                 }
                 for &i in &group.cells {
