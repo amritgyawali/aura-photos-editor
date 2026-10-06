@@ -20,3 +20,6 @@ graphify-out/
 __pycache__/
 *.pyc
 /.work-checks/
+# Evidence from running the application on photographs: exports, recipes, screenshots.
+# Written by the verification scripts for a person to look at; portraits are not committed.
+/output
