@@ -54,6 +54,12 @@ One operation over a skin selection rather than one per spot.
 It runs twice inside one operation: with the strongest marks gone, the skin between
 them is a truer reference. A pixel no group reached is not written at all.
 
+A selection's soft edge says where marks are looked for, not how much of a mark is
+rebuilt: coverage of a quarter or more counts as fully selected. The surface selection
+is feathered a twelfth of the eye distance away from every brow, eye and lip, and a
+spot in that band was otherwise found weakly or not at all and healed by half - and half
+a mark is still a mark. Coverage of zero is still never touched.
+
 `sensitivity` and `keep_dark_marks` are new optional fields of a retouch operation.
 Both are absent from recipes that do not use them, so an old recipe reads back
 byte-identical. With `keep_dark_marks`, a mark that is not also redder than its
@@ -61,7 +67,9 @@ surroundings is left alone; the automatic pass sets it unless *Remove dark marks
 
 ### Texture restore (`Tool::TextureGraft`, `aura-render/src/retouch_texture.rs`)
 
-Runs last, over the segmented face skin - the nose included.
+Runs last, over the segmented face skin joined with the surface selection: the nose,
+which the surface selection leaves out, and the shadowed skin the segmenter missed, which
+only the surface selection reaches.
 
 1. **Own detail, in place.** For every pixel the target is the fine detail (about an
    eightieth of the eye distance) the photograph had **at that pixel** before any retouch
@@ -75,8 +83,11 @@ Runs last, over the segmented face skin - the nose included.
    photograph's own detail there was the blemish's rim, and putting it back would bring the
    blemish back. Those places are found by a *localized* change of tone: the change at three
    pore radii minus the same change at twelve, so dodge and burn, tone and light evening -
-   which move whole regions - do not count. There, detail is borrowed as overlapping tiles
-   from clean skin in the same selection, scaled to the level this skin's smoother third has.
+   which move whole regions - do not count. The zone is then widened by two pore radii,
+   because the rim of a rebuilt mark - the raised ring of a pustule - is where the tone
+   changed least and the photograph's own detail is most the mark's. There, detail is
+   borrowed as overlapping tiles from clean skin in the same selection, scaled to the level
+   this skin's smoother third has.
 
 The change multiplies luminance. It moves no tone and no colour, and for skin with no
 measurable texture it does nothing.
@@ -91,9 +102,14 @@ Frequency healing, the surface finish and the graft share one stored matte.
   relative to the same face: at least 5 % of its median luminance and 60 % of its
   red-over-blue share. On the test portrait shadowed marks kept 80 % of that share,
   black hair a quarter and a grey backdrop none.
-- A brow is excluded where it is: cells inside the brow area that are below 62 % of
-  the face's median luminance, with a margin, plus a narrow band along the brow line
-  for brows that are no darker than the skin.
+- Where the segmenter saw no skin at all, the selection grows the same distance again
+  into skin-coloured cells **inside the oval the face detector drew**. Inside it, a
+  skin-coloured cell touching the selection is the same face; outside it, the same colour
+  is a neck or an ear.
+- A brow is excluded where it is: cells inside the brow area that are below 62 % of the
+  luminance of the skin **around them** (the 60th percentile of skin-coloured cells within
+  a fifth of the eye distance), with a margin, plus a narrow band along the brow line for
+  brows that are no darker than the skin.
 
 ### Order
 
@@ -125,6 +141,17 @@ were right, and three things caused it.
 - **A heal detector that read dodge and burn as healing.** Detecting rebuilt marks by how
   far the tone moved also caught micro dodge and burn and tone evening, so rough borrowed
   texture landed on the smooth nose bridge. Only a localized change counts now.
+
+A later look at that version, at 200 %, found the dark side of the face untreated:
+
+- **The segmenter missed a band of shadowed cheek and jaw**, and the selection only grew
+  where the segmenter saw *some* skin, so a purple mark by the jaw and every spot in that
+  band were never looked at. The growth into skin-coloured cells inside the detector's
+  oval is the fix; it is what most often fails on darker skin in shadow.
+- **A third of the forehead was taken for brow.** The brow test compared a cell with the
+  face's median luminance, which an oily highlight on the lit side pushes up, so the whole
+  shadowed forehead above one brow measured as hair and was excluded, pustules included.
+  It now compares a cell with the skin around it.
 
 Earlier attempts, before that review:
 
@@ -163,6 +190,8 @@ Earlier attempts, before that review:
   it cannot recover the pores the blemish covered.
 - A mark at the very edge of the skin selection has fewer than six sectors of skin around
   it and is left for the spot repairs.
+- Skin the segmenter missed is only reached inside the face detector's box-shaped oval. A
+  detector box that stops short of the chin leaves the bottom of the jaw to the segmenter.
 - Every threshold was set on one synthetic acne portrait and on painted fixtures.
   Nobody has compared a result with a retoucher's, there is no study across skin
   tones on real people, and "compact mark" is a measurement, not a diagnosis.
@@ -178,10 +207,13 @@ Earlier attempts, before that review:
 - Frequency healing and the texture restore were then rendered on the synthetic acne
   portrait at 100 % and 200 % and looked at, and the application was driven through the
   Professional retouch preset. `docs/professional-retouch-validation.md` records it.
-- `portrait_features::deep_blemish` unit tests: the selection reaches a shadowed mark
-  and hinted shadow skin, refuses hair, a grey wall and background, excludes the brow
-  and includes the forehead above it; both operations are off by default and share
-  one selection; eyes, lips and unselected pixels keep their bytes.
+- A mark where a soft selection is a third to two thirds selected is rebuilt as
+  completely as the marks inside it (the earlier handling left a third of its contrast).
+- `portrait_features::deep_blemish` unit tests: the selection reaches a shadowed mark,
+  hinted shadow skin and shadowed skin the segmenter did not hint at all, refuses hair, a
+  grey wall, background and skin outside the face's oval, excludes both brows and
+  includes the forehead above them, lit and in shadow; both operations are off by
+  default and share one selection; eyes, lips and unselected pixels keep their bytes.
 - `crates/aura-render/tests/skin_finish_photos.rs` and
   `crates/aura-app/tests/auto_retouch_photos.rs` (preset `pro`) are the by-hand checks
   on real pixels. `docs/professional-retouch-validation.md` records what was run.

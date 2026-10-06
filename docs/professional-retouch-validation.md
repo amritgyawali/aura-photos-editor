@@ -21,8 +21,11 @@ and then read back what the application saved; it edits no pixels.
 | Run | What the controls did | Operations saved | Retouch | Export |
 |---|---|---|---|---|
 | 1 | New collection, import, the import's automatic edit, **Retouch**, **Professional retouch**, **Auto retouch: Face**, export with verification | 237 | 18.2 s | 11.8 s |
-| 2 | **Reset photo**, then the same preset and export: the retouch on the photograph as taken | 237 | 18.1 s | 11.3 s |
-| 3 | Run 2 again | 237 | 17.9 s | 11.3 s |
+| 2 | **Reset photo**, then the same preset and export: the retouch on the photograph as taken | 237 | 17.9 s | 11.3 s |
+| 3 | Run 2 again | 237 | 17.9 s | 12.1 s |
+
+These are the runs of the final build, with the fixes in "The shadowed side of the face"
+below; the earlier build's runs took the same time to within 0.3 s.
 
 Times are single runs on this 8 GB laptop with other programs open, not a benchmark.
 
@@ -32,13 +35,13 @@ surface finish, hair detail, 1 texture restore, and the line, eye and under-eye 
 face measured for. The script asserts that frequency healing is the face's first automatic
 operation and the texture restore comes after the finish; that healing and the finish
 share the feature-protected surface selection; and that the restore runs over the
-segmented face skin.
+segmented face skin joined with that selection.
 
 - Every export was read back and verified by the application (`verified: true`, one file).
 - The original file's hash was the same after every run.
-- Runs 2 and 3 saved the same recipe (hash `861e0664...3de1`), and their exported JPEGs
-  are **byte-identical** (429,648 bytes, BLAKE3 `c649bc38...3bb3`).
-- Run 1's export (491,063 bytes) includes the import's automatic edit, which on this
+- Runs 2 and 3 saved the same recipe (hash `f31a776d...`), and their exported JPEGs
+  are **byte-identical** (429,878 bytes, BLAKE3 `aa686fc5...`).
+- Run 1's export (490,819 bytes) includes the import's automatic edit, which on this
   portrait raised exposure by 0.56 EV and so lightens the whole photograph, skin included.
   That edit is earlier behaviour and not part of this change; run 2 exists so the retouch
   can be judged without it.
@@ -46,7 +49,8 @@ segmented face skin.
 Evidence is under `output/professional-retouch/` (ignored by git): the original, both
 exports, a side-by-side, the face at 100 % and the nose, both cheeks and the forehead at
 200 %, the saved recipe, both `verification.json` files and two screenshots of the
-application.
+application. The earlier build's exports are kept as `previous-*.jpg`, and the
+`compare-*.jpg` crops show the original, the earlier build and this one side by side.
 
 ## The first version, and what was wrong with it
 
@@ -57,6 +61,29 @@ over it, a brown blotch beside the inner corner of one eye, and a nose with its 
 gone. ADR-0090 records the four causes and the fixes; in short, the texture step now puts
 back each pixel's own photographed detail instead of borrowed tiles, a shadow is no longer
 taken for a mark, and the preset smooths far less.
+
+## The shadowed side of the face
+
+Looking at that version at 200 %, the lit side was clean and the dark side was not: a
+purple mark by the jaw and the spots around it were exactly as photographed. The stored
+selections showed why. The segmenter had left out a band of shadowed cheek and jaw on
+the dark side of the face, and the surface selection could only grow where the segmenter
+saw *some* skin, so frequency healing, the finish and the restore never looked there. And
+above one brow a third of the forehead was excluded as "brow", because the brow test
+compared each cell with the face's median luminance, which the oily highlight on the lit
+side had pushed up.
+
+Three changes, and ADR-0090 records each:
+
+- The selection also grows into skin-coloured cells the segmenter saw nothing of, inside
+  the oval the face detector drew. A neck or an ear outside it stays out.
+- A brow is darker than the skin **around it**, not than the face's typical skin.
+- A mark in the soft edge of a selection is healed as fully as one inside it, and the
+  texture restore borrows across the rim of a healed mark as well as inside it.
+
+With them, the band of shadowed cheek and jaw and the forehead above the shadowed brow
+are healed, evened and given their own pores back like the rest of the face, and the
+purple mark by the jaw is gone.
 
 ## What it looks like now
 
@@ -70,20 +97,22 @@ person's inspection of one image; nobody else has judged this version.
 - The nose keeps its shape, its shading and its nostril edges. The highlight on its tip is
   softer than in the original, because glints are limited.
 - The shadow beside the inner corner of each eye is untouched.
+- The shadowed cheek and jaw are as clean and as even as the lit side.
 
 **Still visible:**
 
 - One small white spot on the forehead. It is not red, so it is kept by rule: a compact
   bright spot may be a piercing.
-- At 200 %, faint traces of a few marks on the shadowed cheek, and the original pitting of
-  the skin beside the nose. The restore puts back the photograph's own detail, so texture a
+- At 200 %, a faint ring where one pustule was on the lit cheek, a few faint spots on
+  the shadowed cheek, a small skin-coloured bump on the jaw, and the original pitting of
+  the cheeks. The restore puts back the photograph's own detail, so texture a
   person would rather lose is limited to the skin's ordinary range but not removed.
 - 220 spot repairs are still planned after frequency healing, the whole budget, on this
   portrait.
 
 ## Automated checks run locally
 
-- `cargo test -p aura-render`: 290 tests passed, including the 7 painted-fixture tests in
+- `cargo test -p aura-render`: every test passed, including the 8 painted-fixture tests in
   `skin_finish.rs` and the 5 plane tests. On those fixtures a mark 38 % darker than the
   skin around it is rebuilt to within 1.0 to 1.3 % of it.
 - `cargo test -p aura-recipe -p aura-app --lib` and the retouch integration tests
@@ -92,8 +121,8 @@ person's inspection of one image; nobody else has judged this version.
 - `cargo clippy -p aura-recipe -p aura-render -p aura-app --all-targets -- -D warnings`:
   clean. `cargo fmt --all -- --check` and `scripts/check-banned.sh`: clean.
 - UI: `tsc --noEmit` clean; the full suite (686 tests) passed before the final preset
-  change, and the three retouch test files (40 tests) passed after it; production build
-  succeeded.
+  change, and the develop and IPC tests (202) passed after the last change; production
+  build succeeded.
 
 `cargo test --workspace --all-targets`, the phase gates and the three-platform matrix
 were left to CI on the pull request.

@@ -170,6 +170,10 @@ Skin with nothing wrong with it is not altered at all.
 - **Keep dark marks (moles, freckles)**: leaves marks that are darker but not redder
   than the skin around them.
 
+A selection's soft edge decides where marks are looked for, not how much of one is
+removed: a mark in the outer part of a feathered edge is rebuilt as completely as one in
+the middle. Pixels outside the selection are never touched.
+
 A bright spot that is not also red is kept, because it may be a piercing rather than a
 whitehead. Marks are found on the pixels being rendered, so check a full-size export:
 a small preview and the export can differ in which faint marks are rebuilt.

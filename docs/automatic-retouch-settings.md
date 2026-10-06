@@ -30,6 +30,11 @@ The order a retoucher works in, as one press:
 5. **Restore skin texture** last: this face's own pores put back where the steps above
    removed them, nose included, with oily glints and deep pits limited.
 
+Steps 1, 4 and 5 work on the whole face, including the side in shadow. A segmenter is often
+unsure of skin in deep shadow - most often on darker skin - so where it left skin out, any
+skin-coloured area inside the outline of the detected face that touches the rest of the
+skin is included as well. A neck or an ear outside that outline is not.
+
 Dark-mark removal is part of this preset and can also remove a freckle or a beauty mark;
 switch *Remove dark marks* off to keep them. Every step is an ordinary operation in the
 list below the photograph: open it to change it, or switch it off.
