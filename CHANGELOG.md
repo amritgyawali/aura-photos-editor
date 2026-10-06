@@ -28,7 +28,8 @@ All notable changes to AURA. One entry per phase, newest first.
   pore refinement), tone and light evening, micro dodge and burn, spot repairs planned on
   what is left, the frequency-separation finish, and the texture restore last over the
   whole face skin, nose and shadowed side included. Both new controls are off in
-  every other preset, so existing presets plan what they planned before.
+  every other preset; the only change another preset sees is that *Deep acne cleanup*'s
+  surface finish uses the shared selection, so it reaches the same shadowed skin.
 - Both operations are ordinary tools in the Retouch workspace, with their own controls.
 
 ## Local-light matched acne repair - 2026-10-06

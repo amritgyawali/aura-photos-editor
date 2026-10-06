@@ -118,8 +118,11 @@ and sees the photograph as taken. Spot repairs are then planned on the pixels it
 leaves. The texture restore is saved with the finishing step and runs last.
 
 Both are **off by default** (`frequency_heal`, `texture_graft` in the automatic
-settings). Every existing preset plans what it planned before. A new
-**Professional retouch** preset turns both on together with deep cleanup.
+settings) and off in every existing preset. A new **Professional retouch** preset turns
+both on together with deep cleanup. The one thing an existing preset sees change is deep
+cleanup's surface finish, which now runs over the shared selection above: *Deep acne
+cleanup* smooths the shadowed skin and the forehead above the brows that its finish used
+to leave out.
 
 ## What was tried and removed
 
