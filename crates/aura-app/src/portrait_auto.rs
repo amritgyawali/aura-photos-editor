@@ -621,11 +621,31 @@ pub fn plan_with_faces(
                     ));
                 }
                 // The restore goes last: it puts back the pores everything before it cost,
-                // over the whole segmented face skin - the nose included.
+                // over the whole segmented face skin - the nose included - and the shadowed
+                // skin the surface selection reached beyond it.
                 if let Some(m) = &face_matte {
+                    let restore = surface.as_ref().and_then(|(_, s)| {
+                        portrait_features::deep_blemish::restore_matte(&m.matte, s).map(|matte| {
+                            (
+                                portrait_features::deep_blemish::restore_matte_id(PREFIX, index),
+                                matte,
+                            )
+                        })
+                    });
                     if let Some(graft) = portrait_features::deep_blemish::texture_graft(
-                        face, index, px, PREFIX, &settings, &m.matte, &m.id,
+                        face,
+                        index,
+                        px,
+                        PREFIX,
+                        &settings,
+                        &m.matte,
+                        restore
+                            .as_ref()
+                            .map_or(m.id.as_str(), |(id, _)| id.as_str()),
                     ) {
+                        if let Some((id, matte)) = restore {
+                            mattes.insert(id, matte);
+                        }
                         features.finishing.push(graft);
                         features.report.findings.push("Texture restore: put this face's own pore detail back where healing and smoothing had removed it, in the same place it was photographed, with glints and deep pits limited to this skin's own range; only healed blemishes borrowed pores from clean skin nearby. Nothing is generated.".into());
                     }

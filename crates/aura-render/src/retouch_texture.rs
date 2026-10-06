@@ -47,6 +47,8 @@ const HEAL_SCALE: f32 = 3.0;
 /// detail is restored, and above which detail is borrowed instead.
 const HEAL_LOW: f32 = 0.04;
 const HEAL_HIGH: f32 = 0.1;
+/// How far past a rebuilt mark, in pore radii, detail is still borrowed rather than restored.
+const HEAL_RIM: f32 = 2.0;
 
 fn px(radius: f32, factor: f32) -> usize {
     (radius * factor).round().max(1.0) as usize
@@ -366,10 +368,18 @@ fn plan(
     let moved: Vec<f32> = now.iter().zip(original).map(|(a, b)| a - b).collect();
     let near = Weighted::new(alpha, w, h, px(radius, HEAL_SCALE)).mean(&moved);
     let wide = Weighted::new(alpha, w, h, px(radius, HEAL_SCALE * 4.0)).mean(&moved);
-    let healed: Vec<f32> = near
+    let found: Vec<f32> = near
         .iter()
         .zip(&wide)
         .map(|(a, b)| smoothstep(HEAL_LOW, HEAL_HIGH, (a - b).abs()))
+        .collect();
+    // The rim of a rebuilt mark - a raised ring, the edge of a pustule - is where the tone
+    // changed least and the photograph's own detail is most the mark's. Borrow across it too.
+    let healed: Vec<f32> = Weighted::new(alpha, w, h, px(radius, HEAL_RIM))
+        .mean(&found)
+        .iter()
+        .zip(&found)
+        .map(|(around, own)| own.max((around * 2.0).min(1.0)))
         .collect();
     let donors = healed.iter().any(|v| *v > 0.0).then(|| {
         borrowed(

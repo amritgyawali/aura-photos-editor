@@ -266,6 +266,31 @@ fn frequency_healing_changes_nothing_outside_its_selection() {
     assert!(contrast(&after, [200, 190], 5.0) > 0.3);
 }
 
+#[test]
+fn a_mark_in_the_soft_edge_of_a_selection_is_rebuilt_as_fully_as_one_inside_it() {
+    let before = marked([0.42, 0.30, 0.22], 1.0);
+    let mut edit = operation(Tool::FrequencyHeal);
+    // Nothing selected at the left edge, everything from just left of the middle on.
+    edit.selection = Some(retouch_tools::Selection {
+        gradient: Some(retouch_tools::Gradient {
+            start: [0.0, 0.5],
+            end: [0.45, 0.5],
+        }),
+        ..retouch_tools::Selection::default()
+    });
+    retouch_tools::validate(std::slice::from_ref(&edit)).unwrap();
+    let coverage = aura_render::retouch_tools::selection_mask(&before, W, W, &edit);
+    let soft = coverage[60 * W + 60];
+    assert!(soft > 0.3 && soft < 0.7, "the fixture's edge is {soft}");
+    let mut after = before.clone();
+    apply(&mut after, W, W, std::slice::from_ref(&edit));
+    // Half a mark is still a mark: the one in the soft edge goes as completely as the others.
+    for centre in SPOTS {
+        let is = contrast(&after, centre, 5.0);
+        assert!(is.abs() < 0.03, "mark at {centre:?}: {is}");
+    }
+}
+
 /// A patch of skin flattened by an earlier operation, then the graft.
 fn flattened_then_grafted(graft: bool) -> (Vec<f32>, Vec<f32>) {
     let before = skin([0.42, 0.30, 0.22], 1.0);

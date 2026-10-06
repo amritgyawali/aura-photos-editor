@@ -510,12 +510,17 @@ fn cell_colours(px: &Pixels<'_>, bounds: [f32; 4], w: usize, h: usize) -> Vec<[f
         .collect()
 }
 
-fn median(mut values: Vec<f32>) -> Option<f32> {
+fn median(values: Vec<f32>) -> Option<f32> {
+    quantile(values, 0.5)
+}
+
+/// The value a share `q` of `values` lies below.
+fn quantile(mut values: Vec<f32>, q: f32) -> Option<f32> {
     if values.is_empty() {
         return None;
     }
-    let mid = values.len() / 2;
-    let (_, value, _) = values.select_nth_unstable_by(mid, f32::total_cmp);
+    let at = ((values.len() - 1) as f32 * q.clamp(0.0, 1.0)).round() as usize;
+    let (_, value, _) = values.select_nth_unstable_by(at, f32::total_cmp);
     Some(*value)
 }
 
@@ -523,11 +528,12 @@ fn median(mut values: Vec<f32>) -> Option<f32> {
 /// shares: a feathered alpha per matte cell.
 ///
 /// Small enclosed holes and narrow skin-like notches in the segmenter's outline are filled, so
-/// a dark mark the segmenter left out is inside the selection. Eyes, the nose tip and lips are
-/// removed by landmark. A brow is removed where it is: the cells that are clearly darker than
-/// this face's own skin inside the brow area, plus a narrow band along the brow line for brows
-/// that are no darker than the skin - so a lit forehead above the brow is not left as an
-/// untreated patch.
+/// a dark mark the segmenter left out is inside the selection, and skin-coloured cells inside
+/// the face's oval that touch it are added, so shadowed skin the segmenter missed is too. Eyes,
+/// the nose tip and lips are removed by landmark. A brow is removed where it is: the cells
+/// inside the brow area that are clearly darker than the skin around them, plus a narrow band
+/// along the brow line for brows that are no darker than the skin - so a forehead above the
+/// brow, lit or in shadow, is not left as an untreated patch.
 fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec<u8>> {
     let [l, t, r, b] = matte.bounds;
     let (w, h) = (matte.width, matte.height);
@@ -570,6 +576,29 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec
         .map(|(a, like)| *a > 12 && *like)
         .collect();
     grow(&mut selected, w, h, &hinted, (g.d * 0.35 / cell) as usize);
+    let centre = |i: usize| {
+        [
+            (l + ((i % w) as f32 + 0.5) / w as f32 * (r - l)) * px.width as f32,
+            (t + ((i / w) as f32 + 0.5) / h as f32 * (b - t)) * px.height as f32,
+        ]
+    };
+    // Where the segmenter saw no skin at all - a band of shadowed cheek and jaw, which on
+    // darker skin can be most of one side of a face - only the photograph can say it is skin.
+    // Inside the oval the detector drew around the face, a skin-coloured cell that touches the
+    // selection is the same face; outside it, the same colour is a neck or an ear.
+    let [fl, ft, fr, fb] = g.bounds;
+    let oval_centre = [(fl + fr) * 0.5, (ft + fb) * 0.5];
+    let oval_axes = [((fr - fl) * 0.5).max(1.0), ((fb - ft) * 0.5).max(1.0)];
+    let in_face: Vec<bool> = (0..w * h)
+        .map(|i| {
+            let [x, y] = centre(i);
+            skin_like[i]
+                && ((x - oval_centre[0]) / oval_axes[0]).powi(2)
+                    + ((y - oval_centre[1]) / oval_axes[1]).powi(2)
+                    <= 1.0
+        })
+        .collect();
+    grow(&mut selected, w, h, &in_face, (g.d * 0.35 / cell) as usize);
     // Creases are protected during spot replacement, but a continuous surface
     // finish must span them: otherwise they become conspicuous untreated strips.
     let mut exclusions = vec![super::Capsule::disk(
@@ -588,17 +617,26 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec
         brow_areas.push(super::Capsule::disk(brow, g.d * 0.24));
     }
     exclusions.push(lip_protection(g));
-    let centre = |i: usize| {
-        [
-            (l + ((i % w) as f32 + 0.5) / w as f32 * (r - l)) * px.width as f32,
-            (t + ((i / w) as f32 + 0.5) / h as f32 * (b - t)) * px.height as f32,
-        ]
-    };
     // Brow hair wherever it actually is, with a margin of two cells or 4 % of the eye distance.
+    // Hair is darker than the skin right around it - not than this face's typical skin: on
+    // the shadowed side of a face the whole forehead is darker than that, and is still skin.
+    let reach = (g.d * 0.2 / cell).max(2.0) as usize;
+    let local_skin = |i: usize| {
+        let (x, y) = (i % w, i / w);
+        let mut around = Vec::with_capacity((2 * reach + 1).pow(2));
+        for row in y.saturating_sub(reach)..(y + reach + 1).min(h) {
+            for j in row * w + x.saturating_sub(reach)..row * w + (x + reach + 1).min(w) {
+                if skin_like[j] {
+                    around.push(super::luma(colours[j]));
+                }
+            }
+        }
+        quantile(around, 0.6).unwrap_or(skin_luma)
+    };
     let not_brow: Vec<bool> = (0..w * h)
         .map(|i| {
-            !(super::luma(colours[i]) < skin_luma * 0.62
-                && brow_areas.iter().any(|area| area.contains(centre(i))))
+            !(brow_areas.iter().any(|area| area.contains(centre(i)))
+                && super::luma(colours[i]) < local_skin(i) * 0.62)
         })
         .collect();
     let to_brow = clearance(&not_brow, w, h);
@@ -649,6 +687,36 @@ pub(crate) fn surface_matte(
 /// The id of the matte [`surface_matte`] is stored under.
 pub(crate) fn surface_matte_id(prefix: &str, index: usize) -> String {
     format!("{prefix}{index}-surface")
+}
+
+/// What the texture restore runs over: the segmented face skin - the nose included, which the
+/// surface selection leaves out - and wherever the surface selection reached beyond it, so the
+/// shadowed skin the segmenter missed gets its pores back after healing and smoothing too.
+pub(crate) fn restore_matte(
+    face: &Matte,
+    surface: &aura_recipe::retouch_tools::Matte,
+) -> Option<aura_recipe::retouch_tools::Matte> {
+    let reached = surface.decode()?;
+    if reached.len() != face.alpha.len() {
+        return None;
+    }
+    let alpha: Vec<u8> = face
+        .alpha
+        .iter()
+        .zip(&reached)
+        .map(|(a, b)| (*a).max(*b))
+        .collect();
+    Some(aura_recipe::retouch_tools::Matte::encode(
+        face.bounds,
+        u32::try_from(face.width).ok()?,
+        u32::try_from(face.height).ok()?,
+        &alpha,
+    ))
+}
+
+/// The id of the matte [`restore_matte`] is stored under.
+pub(crate) fn restore_matte_id(prefix: &str, index: usize) -> String {
+    format!("{prefix}{index}-skin")
 }
 
 /// An operation over the whole surface selection of one face.
@@ -1218,7 +1286,19 @@ mod tests {
                 fill(&mut rgb, [px, py, px + 5, py + 5], colour);
             }
         }
-        // Brows: dark hair where a brow is, lit forehead above it.
+        // A band of shadowed cheek the segmenter saw nothing of at all, inside the face...
+        for y in 50..95 {
+            for x in 70..84 {
+                alpha[y * w + x] = 0;
+                let [px, py] = cell(x, y);
+                fill(&mut rgb, [px, py, px + 5, py + 5], [70, 45, 33]);
+            }
+        }
+        // ...and skin below the face's outline - a neck - that it equally did not select.
+        fill(&mut rgb, [102, 432, 140, 487], [150, 100, 75]);
+        // Brows: dark hair where a brow is. The forehead above the left one is lit; above the
+        // right one it is in shadow, darker than this face's typical skin and still skin.
+        fill(&mut rgb, [290, 125, 350, 160], [75, 50, 37]);
         for eye in [195, 317] {
             fill(&mut rgb, [eye - 35, 160, eye + 35, 171], [40, 28, 22]);
         }
@@ -1240,6 +1320,16 @@ mod tests {
         );
         assert_eq!(at(16, 43), 0, "hair in a notch was selected");
         assert!(at(88, 90) > 200, "hinted shadow skin was not reached");
+        assert!(
+            at(78, 72) > 200,
+            "shadowed cheek inside the face, with no hint, was not reached: {}",
+            at(78, 72)
+        );
+        assert_eq!(
+            at(4, 120),
+            0,
+            "skin outside the face's outline was selected"
+        );
         assert_eq!(at(90, 20), 0, "a grey wall was selected as skin");
         assert_eq!(at(4, 60), 0, "background was selected");
         // The brow itself is out; the forehead a fifth of the eye distance above it is in.
@@ -1250,6 +1340,13 @@ mod tests {
             at(column as usize, row(138.0)) > 150,
             "lit forehead above the brow is still left out: {}",
             at(column as usize, row(138.0))
+        );
+        let right = ((317.0_f32 - 102.4) / 3.2) as usize;
+        assert_eq!(at(right, row(165.0)), 0, "the brow in shadow was selected");
+        assert!(
+            at(right, row(140.0)) > 150,
+            "the shadowed forehead above the brow was taken for brow: {}",
+            at(right, row(140.0))
         );
         // Eyes and lips stay out, as before.
         assert_eq!(at(column as usize, row(205.0)), 0);

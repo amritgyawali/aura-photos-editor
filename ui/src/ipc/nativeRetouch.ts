@@ -8,7 +8,7 @@ export const RETOUCH_TOOLS = [
   ['clone', 'Clone stamp', 'Repair', 'Copies the selected source patch into the target.'],
   ['auto_blemish', 'Auto spot cleanup', 'Skin', 'Finds small dark spots inside your selection. Review permanent marks and fine details afterward.'],
   ['frequency', 'Frequency separation', 'Skin', 'Adjust tonal unevenness and fine texture independently.'],
-  ['texture_graft', 'Restore skin texture', 'Skin', 'Limits glints, then brings fine texture back to the level this skin had before retouching, with pore detail borrowed from clean skin in the same selection. Nothing is generated.'],
+  ['texture_graft', 'Restore skin texture', 'Skin', 'Puts this skin’s own pore detail back where earlier steps removed it, in the same place, with glints and deep pits limited; healed blemishes borrow pores from clean skin nearby. Nothing is generated.'],
   ['skin_smooth', 'Skin smoothing · protect detail', 'Sampled skin', 'Smooths uneven texture between fine detail and facial form. Sample skin first; similar colors inside your selection receive the effect.'],
   ['skin_uniformity', 'Even sampled skin tone', 'Sampled skin', 'Reduces color differences toward your skin sample while preserving brightness. Select one person at a time.'],
   ['portrait_dodge_burn', 'Skin dodge and burn · protect edges', 'Sampled skin', 'Balances local light with bounded exposure changes while preserving RGB proportions. Sample skin and review facial edges.'],

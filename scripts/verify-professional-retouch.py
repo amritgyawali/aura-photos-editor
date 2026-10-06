@@ -119,10 +119,11 @@ def main():
         order = [edit['id'] for edit in edits]
         assert order.index(heal[0]['id']) < order.index(finish[0]['id']) < order.index(graft[0]['id'])
         # Healing and the finish share the feature-protected surface selection; the texture
-        # restore runs over the whole segmented face skin, so the nose gets its pores back.
+        # restore runs over the segmented face skin joined with that selection, so the nose
+        # and the shadowed skin the segmenter missed both get their pores back.
         mattes = body['studio_retouch_mattes_v1']
         assert heal[0]['matte'] == finish[0]['matte'] and heal[0]['matte'] in mattes
-        assert graft[0]['matte'].endswith('-face') and graft[0]['matte'] in mattes
+        assert graft[0]['matte'].endswith('-skin') and graft[0]['matte'] in mattes
         for wanted in ('micro_dodge_burn', 'portrait_dodge_burn', 'skin_smooth', 'skin_uniformity'):
             assert wanted in tools, f'{wanted} is missing from the pass'
         repairs = [edit for edit in edits if edit['tool'] == 'patch_heal']

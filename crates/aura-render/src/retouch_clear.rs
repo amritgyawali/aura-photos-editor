@@ -46,11 +46,15 @@ const RELIEF_LIMIT: f32 = 1.5;
 const GLINT_ALLOWANCE: f32 = 2.0;
 /// Luminance above this multiple of the local mean is a glint, not the skin's own tone.
 const GLINT_CLIP: f32 = 1.06;
+/// Selection coverage at or above this counts as fully selected. A selection's soft edge says
+/// where marks are looked for, not how much of one is rebuilt: half a mark is still a mark,
+/// and a spot beside a brow or an eye sits in the feather that keeps smoothing off them.
+const FULLY_SELECTED: f32 = 0.25;
 
 /// What the operation works on: the rectangle, its pixels and the selection inside it.
 struct Field {
     rect: Rect,
-    /// Selection coverage, 0..=1.
+    /// Selection coverage, 0..=1, with the outer part of a soft edge counted as selected.
     alpha: Vec<f32>,
     channels: [Vec<f32>; 3],
     luma: Vec<f32>,
@@ -79,7 +83,7 @@ impl Field {
         for (x, y) in rect.cells() {
             let i = (y * w + x) * 3;
             let p = [rgb[i], rgb[i + 1], rgb[i + 2]];
-            alpha.push(coverage.at(x, y, w, h));
+            alpha.push(smoothstep(0.0, FULLY_SELECTED, coverage.at(x, y, w, h)));
             for (channel, value) in channels.iter_mut().zip(p) {
                 channel.push(value);
             }
@@ -454,7 +458,7 @@ fn pass(
     let keep = edit.texture.clamp(0.0, 1.0);
     let smooth_mark = blur(&mark, rect.w, rect.h, 1);
     for (i, (x, y)) in rect.cells().enumerate() {
-        let reach = smooth_mark[i].min(1.0) * coverage.at(x, y, w, h);
+        let reach = smooth_mark[i].min(1.0) * field.alpha[i];
         let weight = reach * edit.amount;
         if weight <= 0.0 {
             continue;
