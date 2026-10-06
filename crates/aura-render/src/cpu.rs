@@ -122,6 +122,52 @@ pub struct CpuEngine {
 }
 
 impl CpuEngine {
+    /// Saved selection coverage before crop, using the same masks and operation order as
+    /// rendering. It does not write history or alter the supplied recipe.
+    /// # Errors
+    /// Invalid recipe, missing operation or unavailable source pixels.
+    pub fn saved_retouch_selection(
+        &self,
+        image: &PhotoId,
+        recipe: &Recipe,
+        only: Option<&str>,
+    ) -> AuraResult<(Vec<u8>, u32, u32)> {
+        aura_recipe::schema::Validation::check(recipe)?;
+        let edits = aura_recipe::retouch_tools::read(recipe)?;
+        if only.is_some_and(|id| !edits.iter().any(|e| e.id == id)) {
+            return Err(aura_core::errors::render::recipe_invalid(
+                "saved retouch selection",
+                "operation no longer exists",
+            ));
+        }
+        let mattes = aura_recipe::retouch_tools::read_mattes(recipe)?;
+        let mut prepared = recipe.clone();
+        aura_recipe::retouch_tools::write(&mut prepared, &[])?;
+        prepared.geometry = aura_recipe::Geometry::default();
+        prepared.global.effects = aura_recipe::Effects::default();
+        prepared.global.sharpen.amount = 0;
+        let prepared = prepared.clamped();
+        let level = RenderLevel::Screen(1600, 1200);
+        let frame = self.source.frame(image, level)?;
+        let plan = graph::plan(&prepared, RenderPurpose::Interactive, frame.kind, self.caps);
+        let (rgb, width, height, _) = self.working_buffer(&frame, &prepared, &plan, level, None);
+        let mask = crate::retouch_tools::saved_selection(
+            &rgb,
+            width as usize,
+            height as usize,
+            &edits,
+            &mattes,
+            only,
+        );
+        Ok((
+            mask.into_iter()
+                .flat_map(|v| [(v * 255.0).round() as u8; 3])
+                .collect(),
+            width,
+            height,
+        ))
+    }
+
     /// Render the authored selection at the draft's actual position in the stack.
     /// The RGB bytes encode coverage directly; they are not color-managed photo pixels.
     /// # Errors

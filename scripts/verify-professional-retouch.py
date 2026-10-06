@@ -51,6 +51,7 @@ def main():
     parser.add_argument('--port', type=int, default=9337)
     parser.add_argument('--resume', action='store_true', help='the collection already holds the portrait')
     parser.add_argument('--retouch-only', action='store_true', help='reset the automatic global edit first')
+    parser.add_argument('--acne-only', action='store_true', help='preserve detail and run only blemish repair')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     original_hash = hashlib.sha256(args.source.read_bytes()).hexdigest()
@@ -85,18 +86,20 @@ def main():
             while True:
                 body = json.loads(page.evaluate(READ_RECIPE, COLLECTION)['body'])
                 if not body['global']['exposure'] and not body.get('studio_retouch_v1'):
+                    reset_global = body['global']
                     break
                 assert time.monotonic() < deadline, 'Reset photo did not clear the automatic edit'
                 time.sleep(0.5)
             expect(retouch).to_be_enabled()
         page.screenshot(path=str(args.output / 'develop.png'))
         retouch.click()
-        page.get_by_role('radio', name='Professional retouch', exact=True).check()
+        preset = 'Acne only \u00b7 preserve detail' if args.acne_only else 'Professional retouch'
+        page.get_by_role('radio', name=preset, exact=True).check()
         expect(page.get_by_text('Frequency healing rebuilds the tone under each mark first')).to_be_visible()
         run = page.get_by_role('button', name='Auto retouch: Face', exact=True)
         started = time.monotonic()
         run.click()
-        print('Running the Professional retouch preset inside AURA', flush=True)
+        print(f'Running {preset} inside AURA', flush=True)
         expect(run).to_be_enabled()
         expect(page.get_by_alt_text('Retouched photograph')).to_be_visible()
         retouch_seconds = time.monotonic() - started
@@ -113,23 +116,33 @@ def main():
         heal = [edit for edit in edits if edit['tool'] == 'frequency_heal']
         graft = [edit for edit in edits if edit['tool'] == 'texture_graft']
         finish = [edit for edit in edits if edit['id'].endswith('-surface-finish')]
-        assert len(heal) == 1 and len(graft) == 1 and len(finish) == 1, tools
-        # The order a retoucher works in: marks first, texture back last.
-        assert automatic[0]['tool'] == 'frequency_heal', automatic[0]['id']
-        order = [edit['id'] for edit in edits]
-        assert order.index(heal[0]['id']) < order.index(finish[0]['id']) < order.index(graft[0]['id'])
-        # Healing and the finish share the feature-protected surface selection; the texture
-        # restore runs over the segmented face skin joined with that selection, so the nose
-        # and the shadowed skin the segmenter missed both get their pores back.
-        mattes = body['studio_retouch_mattes_v1']
-        assert heal[0]['matte'] == finish[0]['matte'] and heal[0]['matte'] in mattes
-        assert graft[0]['matte'].endswith('-skin') and graft[0]['matte'] in mattes
-        for wanted in ('micro_dodge_burn', 'portrait_dodge_burn', 'skin_smooth', 'skin_uniformity'):
-            assert wanted in tools, f'{wanted} is missing from the pass'
+        if args.acne_only:
+            assert len(heal) == 1 and not graft and not finish, tools
+            assert set(tools) <= {'frequency_heal', 'patch_heal'}, tools
+            assert all(edit['matte'].endswith(('-feature-safe', '-feature-guard')) for edit in edits)
+            assert body['studio_portrait_auto_v1']['options']['settings']['protectEyeArea']
+            assert body['studio_portrait_auto_v1']['options']['settings']['protectNoseDetail']
+        else:
+            assert len(heal) == 1 and len(graft) == 1 and len(finish) == 1, tools
+            # The order a retoucher works in: marks first, texture back last.
+            assert automatic[0]['tool'] == 'frequency_heal', automatic[0]['id']
+            order = [edit['id'] for edit in edits]
+            assert order.index(heal[0]['id']) < order.index(finish[0]['id']) < order.index(graft[0]['id'])
+            # Healing and the finish share the feature-protected surface selection; the texture
+            # restore runs over the segmented face skin joined with that selection, so the nose
+            # and the shadowed skin the segmenter missed both get their pores back.
+            mattes = body['studio_retouch_mattes_v1']
+            assert heal[0]['matte'] == finish[0]['matte'] and heal[0]['matte'] in mattes
+            assert graft[0]['matte'].endswith(('-skin', '-skin-feature-safe')) and graft[0]['matte'] in mattes
+            for wanted in ('micro_dodge_burn', 'portrait_dodge_burn', 'skin_smooth', 'skin_uniformity'):
+                assert wanted in tools, f'{wanted} is missing from the pass'
         repairs = [edit for edit in edits if edit['tool'] == 'patch_heal']
         assert all(edit.get('textureHeal') for edit in repairs)
+        if args.acne_only:
+            assert all(abs(edit['amount'] - .65) < 1e-5 and abs(edit['feather'] - .65) < 1e-5 for edit in repairs)
         if args.retouch_only:
             assert not body['global']['exposure'], body['global']
+            assert body['global'] == reset_global, 'Retouch changed the global photo adjustments'
 
         page.get_by_role('button', name='Export Ready to share', exact=True).click()
         page.get_by_test_id('destination').fill(str((args.output / 'export').resolve()))
@@ -156,6 +169,7 @@ def main():
             'original_sha256': original_hash,
             'recipe_hash': recipe.get('recipeHash'),
             'retouch_only': args.retouch_only,
+            'preset': preset,
             'global_exposure_ev': body['global']['exposure'],
             'operations': len(edits),
             'tools': {tool: tools.count(tool) for tool in sorted(set(tools))},

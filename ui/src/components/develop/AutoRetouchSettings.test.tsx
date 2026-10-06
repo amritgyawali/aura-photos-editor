@@ -5,6 +5,14 @@ import { DEFAULT_RETOUCH_SETTINGS } from '../../ipc/nativeRetouch';
 import { automaticLabel } from './NativeRetouchWorkspace';
 
 describe('automatic retouch settings', () => {
+  it('limits Acne only to blemishes and preserves eye and nose detail without beauty finishing',()=>{
+    const run=vi.fn();
+    render(<AutoRetouchSettings disabled={false} onRun={run}/>);
+    fireEvent.click(screen.getByRole('radio',{name:'Acne only · preserve detail'}));
+    fireEvent.click(screen.getByRole('button',{name:'Auto retouch: Face'}));
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({eyes:false,teeth:false,refine:false,blemishes:true,scope:'face',
+      settings:expect.objectContaining({protectEyeArea:true,protectNoseDetail:true,smoothing:0,toneEvenness:0,lightEvenness:0,shine:0,textureGraft:0,hairDetail:0})}));
+  });
   it('offers face, body skin and face + body skin, and runs the chosen one', () => {
     const run = vi.fn();
     render(<AutoRetouchSettings disabled={false} onRun={run} />);
@@ -58,8 +66,8 @@ describe('automatic retouch settings', () => {
   });
   it('offers every fine control exactly once', () => {
     const keys = SETTING_GROUPS.flatMap(([, controls]) => controls.map(([key]) => key));
-    expect(keys.length).toBe(56);
-    expect(new Set(keys).size).toBe(56);
+    expect(keys.length).toBe(58);
+    expect(new Set(keys).size).toBe(58);
     expect([...keys].sort()).toEqual(Object.keys(DEFAULT_RETOUCH_SETTINGS).sort());
   });
   it('runs deep cleanup as one native pass and exposes dark-mark removal', () => {
@@ -115,7 +123,7 @@ it('offers a professional preset: frequency healing first, real texture back las
   render(<AutoRetouchSettings disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Professional retouch' }));
   expect(screen.getByText(/Frequency healing rebuilds the tone under each mark first/)).toBeTruthy();
-  expect(screen.getByText(/puts this face’s own pores back, nose included/)).toBeTruthy();
+  expect(screen.getByText(/restores the original pores within the selected skin/)).toBeTruthy();
   fireEvent.click(screen.getByText('Blemishes'));
   expect(screen.getByText('Frequency healing: 100%')).toBeTruthy();
   fireEvent.click(screen.getByText('Skin'));
@@ -130,7 +138,7 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
   expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
   expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
   for (const [id, , values] of PRESETS) {
-    if (id === 'pro') continue;
+    if (id === 'pro' || id === 'acne_only') continue;
     expect(values.frequencyHeal ?? 0).toBe(0);
     expect(values.textureGraft ?? 0).toBe(0);
   }

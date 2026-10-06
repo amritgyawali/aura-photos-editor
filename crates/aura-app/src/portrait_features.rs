@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 pub const VERSION: &str = "measured-features-v4";
 pub(crate) mod deep_blemish;
 pub mod expert;
+pub(crate) mod eye_guard;
 /// At most this many healed spots per face. A face with more is left for a person to judge.
 pub const MAX_SPOTS: usize = 12;
 /// More compact red marks than this on one face is a pattern (freckles), not blemishes.

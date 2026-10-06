@@ -98,6 +98,11 @@ try {
         } finally { Pop-Location }
         if (Test-Path -LiteralPath $installedExe) {
             Copy-Item -LiteralPath $buildExe -Destination $installedExe -Force
+            # GNU builds use a companion WebView loader rather than the static loader.
+            $webViewLoader = Join-Path (Split-Path -Parent $buildExe) 'WebView2Loader.dll'
+            if (Test-Path -LiteralPath $webViewLoader) {
+                Copy-Item -LiteralPath $webViewLoader -Destination (Split-Path -Parent $installedExe) -Force
+            }
             $desktopExe = $installedExe
         }
     }

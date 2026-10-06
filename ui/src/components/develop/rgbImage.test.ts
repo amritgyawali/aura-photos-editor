@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { rgbDataUrl } from './rgbImage';
+import { coverageDataUrl, rgbDataUrl } from './rgbImage';
 import type { RenderDto } from '../../ipc/types';
 
 describe('rendered RGB display', () => {
+  it('tints only selected pixels and rejects mismatched coverage',()=>{
+    const photo={width:2,height:1,rgbBase64:btoa(String.fromCharCode(90,100,110,90,100,110))};
+    const mask={...photo,rgbBase64:btoa(String.fromCharCode(0,0,0,255,255,255))};
+    const url=coverageDataUrl(photo,mask,.5);
+    const bytes=Uint8Array.from(atob(url?.split(',')[1]??''),c=>c.charCodeAt(0));
+    expect(Array.from(bytes.slice(54,60))).toEqual([110,100,90,150,160,65]);
+    expect(coverageDataUrl(photo,{...mask,width:1},.5)).toBeNull();
+  });
   it('encodes red and blue pixels with a correct top-down BMP header and row padding', () => {
     const source = { width: 1, height: 2, rgbBase64: btoa(String.fromCharCode(255, 0, 0, 0, 0, 255)) } as RenderDto;
     const url = rgbDataUrl(source);

@@ -50,7 +50,7 @@ export type RetouchScope = 'face' | 'body' | 'face_and_body';
  * measured strength. Signed values are -1..1. Missing keys take the Rust defaults.
  */
 export type RetouchSettings = {
-  aiSkinDetection: boolean; mainSubjectOnly: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean;
+  aiSkinDetection: boolean; mainSubjectOnly: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean; protectEyeArea: boolean; protectNoseDetail: boolean;
   smoothing: number; texture: number; smoothingSize: number; toneEvenness: number; lightEvenness: number; microDodgeBurn: number;
   poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
   blemishSensitivity: number; maxSpots: number; keepFreckles: boolean;
@@ -66,7 +66,7 @@ export type RetouchSettings = {
   hairDetail: number; hairShine: number; fabric: number; backdrop: number;
 };
 export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
-  aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true,
+  aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
   smoothing: .5, texture: .5, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
   blemishSensitivity: .5, maxSpots: 12, keepFreckles: true,
@@ -122,4 +122,5 @@ export const nativeRetouch = {
   preview: (projectId: string, photoId: string, before = false) => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before}),
   draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId}}),
   selectionPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<SelectionPreview>('native_retouch_selection_preview',{input:{projectId,photoId,edit,replaceId}}),
+  savedSelection: (projectId: string, photoId: string, operationId: string|null) => invoke<SelectionPreview>('native_retouch_saved_selection',{input:{projectId,photoId,operationId}}),
 };

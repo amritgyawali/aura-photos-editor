@@ -29,6 +29,8 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['maskPrecision', 'Skin mask precision', 'unit', 'Higher keeps beard, brows, lips and make-up further out of the skin selection.'],
     ['edgeSoftness', 'Mask edge softness', 'unit', 'How gradually the retouch fades out at the edge of the skin.'],
     ['protectFacialHair', 'Protect beard and stubble', 'toggle', 'Never smooth facial hair.'],
+    ['protectNoseDetail', 'Preserve nose detail', 'toggle', 'Keeps the nose bridge, nostril edges, pores and natural shading out of automatic face corrections.'],
+    ['protectEyeArea', 'Protect eyes and surrounding skin', 'toggle', 'Keeps eyelids, inner corners and natural eye shadows unchanged by automatic retouch. Turn off only when you want the eye controls to work there. Manual retouch is always available.'],
   ]],
   ['Skin', [
     ['smoothing', 'Skin smoothing', 'unit', 'Mid-scale unevenness between pores and facial form. 50% is the measured amount.'],
@@ -105,6 +107,7 @@ type Preset = [string, string, Partial<RetouchSettings>, number?];
 /** Starting points modelled on common retouching looks; every control stays adjustable. */
 export const PRESETS: Preset[] = [
   ['natural', 'Natural', {}],
+  ['acne_only', 'Acne only · preserve detail', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 80, blemishSensitivity: .6, frequencyHeal: .9, textureGraft: 0, smoothing: 0, toneEvenness: 0, lightEvenness: 0, microDodgeBurn: 0, shine: 0, redness: 0, foreheadLines: 0, crowsFeet: 0, smileLines: 0, underEyeLines: 0, darkCircles: 0, eyeBags: 0, eyeWhitening: 0, eyeVessels: 0, irisDetail: 0, redEye: false, teethWhitening: 0, protectEyeArea: true, protectNoseDetail: true }],
   ['acne', 'Deep acne cleanup', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 220, blemishSensitivity: .9, smoothing: .8, texture: .85, toneEvenness: .7, microDodgeBurn: .65, poreRefine: .3, shine: .85, hairDetail: .4, hairShine: .2 }],
   ['pro', 'Professional retouch', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 220, blemishSensitivity: .8, frequencyHeal: 1, textureGraft: .8, smoothing: .35, texture: .9, toneEvenness: .6, microDodgeBurn: .55, shine: .7, hairDetail: .4, hairShine: .2 }],
   ['subtle', 'Subtle', { smoothing: .35, toneEvenness: .4, microDodgeBurn: .15, eyeWhitening: .1, underEyeLines: .15 }, .8],
@@ -137,7 +140,9 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
   };
   const choose = ([id, , values, intensity]: Preset) => {
     setPreset(id);
-    setOptions({ ...options, intensity: intensity ?? 1, settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values } });
+    setOptions({ ...options, intensity: intensity ?? 1, settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values },
+      ...(id === 'acne_only' ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face' as const } : {}),
+    });
   };
   return <fieldset className="auto-retouch-settings" disabled={disabled}>
     <legend>Automatic retouch</legend>
@@ -159,7 +164,9 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
     <p className="lr-hint">{options.adaptive !== false ? 'Each face is measured and gets its own amounts; the report lists what was changed and why.' : 'The settings below are used exactly as set on every face.'}</p>
     <p className="lr-hint">{scope?.[2]} Skin is found by AI segmentation and measured against the same person's own skin; every result becomes an ordinary operation you can adjust, disable or remove below.</p>
     {settings.deepBlemishCleanup && <p className="lr-hint">Deep cleanup searches the full detected face. {settings.removeDarkMarks ? 'Dark-mark removal is on and can also remove freckles or beauty marks. Review the before/after.' : 'Dark marks are protected.'}</p>}
-    {(settings.frequencyHeal > 0 || settings.textureGraft > 0) && <p className="lr-hint">{settings.frequencyHeal > 0 ? 'Frequency healing rebuilds the tone under each mark first and keeps the pores. ' : ''}{settings.textureGraft > 0 ? 'Texture restore runs last and puts this face’s own pores back, nose included.' : ''}</p>}
+    {(settings.frequencyHeal > 0 || settings.textureGraft > 0) && <p className="lr-hint">{settings.frequencyHeal > 0 ? 'Frequency healing rebuilds the tone under each mark first and keeps the pores. ' : ''}{settings.textureGraft > 0 ? 'Texture restore runs last and restores the original pores within the selected skin. Protected details stay unchanged.' : ''}</p>}
+    {settings.protectEyeArea && options.scope !== 'body' && <p className="lr-hint">Eye protection is on. Automatic face retouch leaves eyelids, inner corners and natural eye shadows alone, including when eye controls are enabled. Use Show retouched areas to inspect the saved selection. You can change this under Skin detection.</p>}
+    {settings.protectNoseDetail && options.scope !== 'body' && <p className="lr-hint">Nose detail is protected: bridge, nostrils, pores and natural shading stay out of automatic retouch.</p>}
     <button type="button" className="retouch-primary" disabled={disabled || busy} onClick={() => onRun(options)}>{busy ? 'Detecting and retouching…' : `Auto retouch: ${scope?.[1] ?? 'Face'}`}</button>
     <details>
       <summary>Strength and details</summary>

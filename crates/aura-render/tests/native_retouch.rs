@@ -649,6 +649,76 @@ fn selection_preview_uses_only_preceding_operations_and_never_changes_recipe() {
 }
 
 #[test]
+fn saved_coverage_obeys_stack_order_disabled_steps_and_matte_holes() {
+    use aura_recipe::retouch_tools::{LuminanceRange, Matte, Selection};
+    let engine = CpuEngine::new(
+        Arc::new(fixtures::StaticSource::new(fixtures::grey_frame(
+            80, 80, 0.18,
+        ))),
+        FixedClock::at(time::OffsetDateTime::UNIX_EPOCH),
+    );
+    let photo = aura_core::PhotoId::new();
+    let mut recipe =
+        aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "Bench-01");
+    let mut first = edit(Tool::Dodge);
+    first.id = "first".into();
+    first.amount = 1.;
+    first.region = [0.5, 0.5, 1., 1.];
+    first.feather = 0.;
+    let mut second = first.clone();
+    second.id = "second".into();
+    second.tool = Tool::Burn;
+    second.selection = Some(Selection {
+        luminance: Some(LuminanceRange {
+            low: 0.1,
+            high: 16.,
+            softness: 0.,
+        }),
+        ..Selection::default()
+    });
+    second.matte = Some("skin".into());
+    let mut matte = Matte::encode(
+        [0., 0., 1., 1.],
+        4,
+        4,
+        &[
+            255, 255, 255, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 255,
+        ],
+    );
+    matte.refine_edges = false;
+    let mattes = std::collections::BTreeMap::from([("skin".into(), matte)]);
+    retouch_tools::write_with_mattes(&mut recipe, &[first.clone(), second.clone()], &mattes)
+        .unwrap();
+    let snapshot = recipe.clone();
+    let (after, _, _) = engine
+        .saved_retouch_selection(&photo, &recipe, Some("second"))
+        .unwrap();
+    assert!(after.iter().any(|v| *v > 0));
+    let center = (40 * 80 + 40) * 3;
+    assert_eq!(after.get(center), Some(&0));
+    assert_eq!(recipe, snapshot);
+    first.enabled = false;
+    retouch_tools::write_with_mattes(&mut recipe, &[first, second.clone()], &mattes).unwrap();
+    assert!(engine
+        .saved_retouch_selection(&photo, &recipe, Some("second"))
+        .unwrap()
+        .0
+        .iter()
+        .all(|v| *v == 0));
+    second.enabled = false;
+    retouch_tools::write_with_mattes(&mut recipe, &[second], &mattes).unwrap();
+    assert!(engine
+        .saved_retouch_selection(&photo, &recipe, None)
+        .unwrap()
+        .0
+        .iter()
+        .all(|v| *v == 0));
+    assert!(engine
+        .saved_retouch_selection(&photo, &recipe, Some("missing"))
+        .is_err());
+}
+
+#[test]
 fn pore_separation_retains_fine_detail_reduces_blotches_and_preserves_colour_and_light() {
     let (w, h) = (256, 96);
     let make = |pore: bool, blotch: bool| -> Vec<f32> {

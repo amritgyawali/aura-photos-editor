@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { asIpcError, develop } from '../../ipc/client';
 import { freshRetouch, nativeRetouch, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool, type BrushStroke } from '../../ipc/nativeRetouch';
 import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { AutoRetouchSettings } from './AutoRetouchSettings';
-import { rgbDataUrl } from './rgbImage';
+import { coverageDataUrl, rgbDataUrl } from './rgbImage';
+import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
 import { RetouchCanvas, type RetouchMode } from './RetouchCanvas';
 import { RetouchControls, validRetouch } from './RetouchControls';
 import { useRetouchDraftPreview } from './useRetouchDraftPreview';
@@ -34,6 +35,10 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const [compare,setCompare] = useState(false);
   const [split,setSplit] = useState(false);
   const [maskView,setMaskView] = useState(false);
+  const [coverageView,setCoverageView] = useState(false);
+  const [coverageOperation,setCoverageOperation] = useState<string|null>(null);
+  const [coverageOpacity,setCoverageOpacity] = useState(.5);
+  const displayedCoverageOpacity = useDeferredValue(coverageOpacity);
   const [overlay,setOverlay] = useState(true);
   const [sourceMode,setSourceMode] = useState(false);
   const [history,setHistory] = useState<HistoryDto|null>(null);
@@ -59,6 +64,12 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     return ()=>{active=false;};
   },[projectId,photoId,refresh,revision]);
   const blocked = busy || disabled;
+  const coverage = useSavedRetouchCoverage(projectId, photoId, `${recipe?.recipeHash}:${refresh}:${revision}`,
+    coverageOperation, coverageView && !blocked);
+  const coverageSrc = useMemo(() => coverage.image && preview
+    ? coverageDataUrl(preview, coverage.image, displayedCoverageOpacity) : null, [coverage.image, preview, displayedCoverageOpacity]);
+  useEffect(() => { setCoverageOperation(null); setCoverageView(false); }, [photoId, projectId]);
+  useEffect(() => { if (coverageOperation && !edits.some(e => e.id === coverageOperation)) setCoverageOperation(null); }, [edits, coverageOperation]);
   const rendered=maskView?draftState.image:compare?before:draftState.image??preview;
   const src=useMemo(()=>rendered?rgbDataUrl(rendered):null,[rendered]);
   const beforeSrc=useMemo(()=>before?rgbDataUrl(before):null,[before]);
@@ -74,7 +85,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     catch(cause){if(mounted.current){setError(asIpcError(cause).message);setBusy(false);}}
     finally {lock.current=false;}
   };
-  const change=(patch:Partial<NativeRetouchEdit>)=>{setDraft(value=>({...value,...patch}));setDirty(true);setCompare(false);};
+  const change=(patch:Partial<NativeRetouchEdit>)=>{setDraft(value=>({...value,...patch}));setDirty(true);setCompare(false);setCoverageView(false);};
   const autoPortrait=()=>void save(async()=>{
     setAnalysing(true);
     try { await nativeRetouch.autoPortrait(photoId); }
@@ -120,7 +131,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     else if(event.key.toLowerCase()==='v')chooseMode('ellipse');
     else if(event.key==='[')setBrushRadius(v=>Math.max(.0005,v/1.2));
     else if(event.key===']')setBrushRadius(v=>Math.min(.25,v*1.2));
-    else if(event.key==='Enter')apply();
+    else if(event.key==='Enter'&&!coverageView)apply();
     else return;
     event.preventDefault();
   }}>
@@ -139,19 +150,31 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     </div>}
     <div className="studio-layout">
       <div>
-        <RetouchCanvas src={src} width={rendered?.width??preview?.width??1200} height={rendered?.height??preview?.height??800} compare={compare} beforeSrc={comparisonReady?beforeSrc:null} split={split&&!compare&&!maskView} maskView={maskView} disabled={blocked}
+        <RetouchCanvas src={coverageView?coverageSrc:src} width={rendered?.width??preview?.width??1200} height={rendered?.height??preview?.height??800} compare={compare} beforeSrc={comparisonReady?beforeSrc:null} split={split&&!compare&&!maskView&&!coverageView} maskView={maskView} coverageView={coverageView} disabled={blocked}
           draft={draft} mode={mode} radius={brushRadius} opacity={brushOpacity} overlay={overlay} sourceMode={sourceMode}
           onTarget={point=>change({region:[...point,draft.region[2],draft.region[3]]})}
           onGradient={(start,end)=>change({mask:null,selection:{...draft.selection,gradient:{start,end}}})}
           onSource={point=>{change({source:point});setSourceMode(false);}} onStroke={addStroke} onNotice={setError}/>
         <div className="studio-history">
-          <button type="button" disabled={blocked||!before} aria-pressed={compare} onClick={()=>{setMaskView(false);setCompare(v=>!v);}}>{compare?'Show retouched':'Show before retouch'}</button>
-          <button type="button" disabled={!comparisonReady||blocked} aria-pressed={split&&!compare&&!maskView} onClick={()=>{setCompare(false);setSplit(v=>compare||!v);}}>Split comparison</button>
-          <button type="button" disabled={blocked||(!maskView&&!validRetouch(draft))} aria-pressed={maskView} onClick={()=>{setCompare(false);setSplit(false);setMaskView(v=>!v);}}>Preview selection mask</button>
+          <button type="button" disabled={blocked||!before} aria-pressed={compare} onClick={()=>{setCoverageView(false);setMaskView(false);setCompare(v=>!v);}}>{compare?'Show retouched':'Show before retouch'}</button>
+          <button type="button" disabled={!comparisonReady||blocked} aria-pressed={split&&!compare&&!maskView&&!coverageView} onClick={()=>{setCoverageView(false);setCompare(false);setSplit(v=>compare||!v);}}>Split comparison</button>
+          <button type="button" disabled={blocked||(!maskView&&!validRetouch(draft))} aria-pressed={maskView} onClick={()=>{setCoverageView(false);setCompare(false);setSplit(false);setMaskView(v=>!v);}}>Preview selection mask</button>
+          <button type="button" disabled={stackBlocked||!edits.length} aria-pressed={coverageView} onClick={()=>{setCompare(false);setSplit(false);setMaskView(false);setCoverageView(v=>!v);}}>Show retouched areas</button>
           <button type="button" aria-pressed={overlay} onClick={()=>setOverlay(v=>!v)}>Selection overlay</button>
           <button type="button" disabled={stackBlocked||!history?.canUndo} onClick={()=>void save(()=>develop.historyStep({projectId,photoId,action:'undo'}))}>Undo</button>
           <button type="button" disabled={stackBlocked||!history?.canRedo} onClick={()=>void save(()=>develop.historyStep({projectId,photoId,action:'redo'}))}>Redo</button>
         </div>
+        {coverageView && <div className="retouch-coverage-controls" aria-label="Saved retouch coverage">
+          <label>Show selection for<select value={coverageOperation??''} disabled={blocked} onChange={event=>setCoverageOperation(event.target.value||null)}>
+            <option value="">All enabled saved retouch</option>
+            {edits.map((edit,index)=><option key={edit.id} value={edit.id}>{index+1}. {RETOUCH_TOOLS.find(t=>t[0]===edit.tool)?.[1]}{automaticLabel(edit.id)}{edit.enabled?'':' (disabled)'}</option>)}
+          </select></label>
+          <label>Overlay visibility<input type="range" min=".15" max=".85" step=".05" value={coverageOpacity} onChange={event=>setCoverageOpacity(Number(event.target.value))}/></label>
+          <p><span className="retouch-coverage-swatch"/> Teal shows the saved retouch selections, including their soft edges. Clear areas are excluded. A selected pixel may stay unchanged when the tool finds nothing to correct. Disabled steps and unsaved drafts are excluded.</p>
+          {coverage.pending && <p role="status">Reading saved retouch selections…</p>}
+          {coverage.error && <p role="alert">Could not show retouch coverage: {coverage.error}</p>}
+          {coverage.image && !coverageSrc && <p role="alert">Coverage does not match this preview. Reload retouch to try again.</p>}
+        </div>}
         <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}</p>
         <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>
         <AutoRetouchSettings key={`${photoId}:${retouchRecipe?.recipeHash ?? 'loading'}`} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} busy={analysing} onRun={options=>void save(async()=>{

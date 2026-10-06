@@ -2,6 +2,20 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Eye and nose protection, saved retouch coverage - 2026-10-06
+
+- Protect eyelids, inner corners, orbital shadows and nose detail throughout automatic
+  face retouch, including smoothing and texture restoration. Controls default to on;
+  manual edits remain available and existing saved recipes are unchanged until rerun.
+- Add **Acne only · preserve detail**, with smoothing, tone/light correction, eye/teeth
+  finishing and hair edits off. It repairs marks without adding a beauty finish.
+- Add **Show retouched areas**: a teal overlay of enabled saved selections, all steps or
+  one selected step, with adjustable visibility. Viewing never creates an edit.
+- Reject stale coverage after changing photos or recipes; protected mask holes stay
+  excluded at preview and export sizes. See ADR-0091.
+- Residual spot repairs after frequency healing use partial strength and softer edges
+  to retain original detail and reduce circular texture patches.
+
 ## Frequency healing, a texture graft and a Professional retouch preset - 2026-10-06
 
 - Add **frequency healing**: one operation that finds compact marks across a skin

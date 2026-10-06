@@ -346,7 +346,9 @@ pub(crate) fn plan(
     for y in 0..h {
         for x in 0..w {
             let point = [(x + x0) as f32 + 0.5, (y + y0) as f32 + 0.5];
-            if exclusions.iter().any(|e| e.contains(point)) {
+            if exclusions.iter().any(|e| e.contains(point))
+                || (super::eye_guard::feature_weight(&g, point, settings) < 1.0)
+            {
                 mask[y * w + x] = false;
             }
         }
@@ -401,10 +403,13 @@ pub(crate) fn plan(
             continue;
         };
         let centre = [spot.x + x0 as f32 + 0.5, spot.y + y0 as f32 + 0.5];
+        // After frequency healing, repair only the remaining defect. A full replacement
+        // here can flatten already-corrected skin and leave a circular texture boundary.
+        let residual = settings.frequency_heal > 0.0;
         let mut edit = base_edit(
             format!("{prefix}{index}-spot-deep-{}", out.blemishes.len()),
             Tool::PatchHeal,
-            1.0,
+            if residual { 0.65 } else { 1.0 },
             px,
             [centre[0], centre[1], spot.radius, spot.radius],
         );
@@ -412,7 +417,7 @@ pub(crate) fn plan(
             (source[0] + x0 as f32 + 0.5) / px.width as f32,
             (source[1] + y0 as f32 + 0.5) / px.height as f32,
         ]);
-        edit.feather = 0.25;
+        edit.feather = if residual { 0.65 } else { 0.25 };
         edit.texture_heal = true;
         edit.source_scale = source_scale;
         // No coarse matte: the entire disk was checked against the repaired skin mask.
@@ -1117,6 +1122,26 @@ mod tests {
         assert_eq!(&rendered[eye..eye + 3], &before[eye..eye + 3]);
         let lip = (380 * 512 + 255) * 3;
         assert_eq!(&rendered[lip..lip + 3], &before[lip..lip + 3]);
+        settings.frequency_heal = 0.9;
+        let residual = plan(
+            &face,
+            0,
+            &pixels,
+            "auto-portrait-v1-",
+            &settings,
+            Some(&matte),
+        );
+        let mut softened = before.clone();
+        aura_render::retouch_tools::apply(&mut softened, 512, 512, &residual.blemishes);
+        assert!(
+            softened[spot] > before[spot],
+            "residual repair still reduces the mark"
+        );
+        assert!(
+            softened[spot] < rendered[spot],
+            "residual repair retains some original detail"
+        );
+        assert_eq!(&softened[eye..eye + 3], &before[eye..eye + 3]);
         let mask =
             aura_render::retouch_tools::selection_mask(&before, 512, 512, &planned.blemishes[0]);
         for (i, alpha) in mask.iter().enumerate() {

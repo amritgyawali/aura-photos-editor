@@ -655,6 +655,25 @@ pub fn plan_with_faces(
         if clear.as_ref().is_some_and(|e| overridden.contains(&e.id)) {
             clear = None;
         }
+        if (settings.protect_eye_area || settings.protect_nose_detail) && options.scope.face() {
+            if let Some(px) = &detail_pixels {
+                portrait_features::eye_guard::protect(
+                    face,
+                    px,
+                    plan.edits
+                        .iter_mut()
+                        .chain(clear.iter_mut())
+                        .chain(features.blemishes.iter_mut())
+                        .chain(features.refine.iter_mut())
+                        .chain(features.eyes.iter_mut())
+                        .chain(features.finishing.iter_mut()),
+                    &mut mattes,
+                    &format!("{PREFIX}{index}-feature-guard"),
+                    &settings,
+                )?;
+                features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Protected regions are excluded from every automatic face step, including healing and texture restoration. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected" } else { "adjustable" }));
+            }
+        }
         features.finishing.extend(garments);
         // A manually adjusted automatic step occupies its original slot. Do not add a
         // second automatic correction on top, including when the user disabled that step.
@@ -2601,7 +2620,7 @@ mod tests {
         edited.id = format!("manual-{original_id}");
         edited.enabled = false;
         let mut recipe = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
-        retouch_tools::write(&mut recipe, &[edited.clone()]).unwrap();
+        retouch_tools::write_with_mattes(&mut recipe, &[edited.clone()], &initial.mattes).unwrap();
         let options = portrait_features::Options {
             settings: Settings {
                 ai_skin_detection: false,
