@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { freshRetouch, RETOUCH_TOOLS, type NativeRetouchEdit } from '../../ipc/nativeRetouch';
 
 const KEY = 'aura.retouch.presets.v1';
-const FIELDS = ['tool', 'amount', 'feather', 'radius', 'texture', 'tone', 'warmth', 'tint', 'skin', 'preserveMicrotexture', 'textureHeal'] as const;
+const FIELDS = ['tool', 'amount', 'feather', 'radius', 'texture', 'tone', 'warmth', 'tint', 'skin', 'preserveMicrotexture', 'textureHeal', 'sensitivity', 'keepDarkMarks'] as const;
 type Settings = Pick<NativeRetouchEdit, typeof FIELDS[number]>;
 type Preset = { name: string; settings: Settings };
 
@@ -20,6 +20,8 @@ export function parseRetouchPresets(value: string | null): Preset[] {
       || s.texture < 0 || s.texture > 2 || s.tone < 0 || s.tone > 1 || Math.abs(s.warmth) > 1 || Math.abs(s.tint) > 1
       || (s.textureHeal !== undefined && typeof s.textureHeal !== 'boolean')
       || (s.preserveMicrotexture !== undefined && typeof s.preserveMicrotexture !== 'boolean')
+      || (s.keepDarkMarks !== undefined && typeof s.keepDarkMarks !== 'boolean')
+      || (s.sensitivity != null && (!Number.isFinite(s.sensitivity) || s.sensitivity < 0 || s.sensitivity > 1))
       || (s.skin && (!Number.isFinite(s.skin.tolerance) || s.skin.tolerance < .015 || s.skin.tolerance > .3
         || !Number.isFinite(s.skin.edgeProtection) || s.skin.edgeProtection < 0 || s.skin.edgeProtection > 1))) {
       throw new Error('Saved retouch presets contain invalid settings.');
@@ -33,6 +35,8 @@ function settingsOnly(draft: Settings): Settings {
   const result = Object.fromEntries(FIELDS.map(key => [key, draft[key]])) as Settings;
   result.textureHeal = draft.textureHeal ?? false;
   result.preserveMicrotexture = draft.preserveMicrotexture ?? false;
+  result.keepDarkMarks = draft.keepDarkMarks ?? false;
+  result.sensitivity = draft.sensitivity ?? null;
   if (result.skin) result.skin = { tolerance: result.skin.tolerance, edgeProtection: result.skin.edgeProtection };
   return result;
 }

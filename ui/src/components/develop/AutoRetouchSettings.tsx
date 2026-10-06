@@ -44,10 +44,12 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['skinBrightness', 'Skin brightness', 'signed', 'Brighten or deepen the face skin. Neutral by default.'],
     ['skinWarmth', 'Skin warmth', 'signed', 'Warmer or cooler skin. Neutral by default.'],
     ['skinTint', 'Skin tint', 'signed', 'Magenta or green skin tint. Neutral by default.'],
+    ['textureGraft', 'Restore skin texture', 'unit', 'After healing and smoothing: limits glints, then brings fine texture back to the level this face’s clean skin had, with pores borrowed from that same skin. Nothing is generated. Off at 0%.'],
   ]],
   ['Blemishes', [
     ['deepBlemishCleanup', 'Deep blemish cleanup', 'toggle', 'Search the complete segmented face at multiple spot sizes. Eyes, brows, lips and creases remain protected.'],
     ['removeDarkMarks', 'Remove dark marks', 'toggle', 'Include compact dark spots in deep cleanup. This may also remove freckles or beauty marks; review the result.'],
+    ['frequencyHeal', 'Frequency healing', 'unit', 'Rebuilds the tone under every compact mark from the clean skin around it and keeps the pores. Runs first; spot repairs then handle what it left. Off at 0%.'],
     ['blemishSensitivity', 'Blemish sensitivity', 'unit', 'How small a departure still counts as a spot.'],
     ['maxSpots', 'Most spots per face', 'count', 'A face with more is left for you to judge.'],
     ['keepFreckles', 'Keep freckles', 'toggle', 'A field of many small marks is treated as freckles and kept.'],
@@ -104,6 +106,7 @@ type Preset = [string, string, Partial<RetouchSettings>, number?];
 export const PRESETS: Preset[] = [
   ['natural', 'Natural', {}],
   ['acne', 'Deep acne cleanup', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 220, blemishSensitivity: .9, smoothing: .8, texture: .85, toneEvenness: .7, microDodgeBurn: .65, poreRefine: .3, shine: .85, hairDetail: .4, hairShine: .2 }],
+  ['pro', 'Professional retouch', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 220, blemishSensitivity: .8, frequencyHeal: 1, textureGraft: .75, smoothing: .8, texture: .85, toneEvenness: .7, microDodgeBurn: .65, poreRefine: .3, shine: .85, hairDetail: .4, hairShine: .2 }],
   ['subtle', 'Subtle', { smoothing: .35, toneEvenness: .4, microDodgeBurn: .15, eyeWhitening: .1, underEyeLines: .15 }, .8],
   ['soft', 'Soft glow', { smoothing: .75, texture: .4, glow: .4, eyeWhitening: .4, darkCircles: .7, blush: .2 }],
   ['beauty', 'Polished beauty', { smoothing: .85, toneEvenness: .75, microDodgeBurn: .6, poreRefine: .4, contour: .5, highlight: .5, lipColour: .35, lashDefinition: .5, browDefinition: .4, irisBrightness: .4, eyeWhitening: .4, hairDetail: .4, hairShine: .3 }],
@@ -156,6 +159,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
     <p className="lr-hint">{options.adaptive !== false ? 'Each face is measured and gets its own amounts; the report lists what was changed and why.' : 'The settings below are used exactly as set on every face.'}</p>
     <p className="lr-hint">{scope?.[2]} Skin is found by AI segmentation and measured against the same person's own skin; every result becomes an ordinary operation you can adjust, disable or remove below.</p>
     {settings.deepBlemishCleanup && <p className="lr-hint">Deep cleanup searches the full detected face. {settings.removeDarkMarks ? 'Dark-mark removal is on and can also remove freckles or beauty marks. Review the before/after.' : 'Dark marks are protected.'}</p>}
+    {(settings.frequencyHeal > 0 || settings.textureGraft > 0) && <p className="lr-hint">{settings.frequencyHeal > 0 ? 'Frequency healing rebuilds the tone under each mark first and keeps the pores. ' : ''}{settings.textureGraft > 0 ? 'The texture graft runs last and restores real pore texture from the same face.' : ''}</p>}
     <button type="button" className="retouch-primary" disabled={disabled || busy} onClick={() => onRun(options)}>{busy ? 'Detecting and retouching…' : `Auto retouch: ${scope?.[1] ?? 'Face'}`}</button>
     <details>
       <summary>Strength and details</summary>

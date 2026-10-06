@@ -4,9 +4,11 @@ import type { RecipeDto, RenderDto } from './types';
 export const RETOUCH_TOOLS = [
   ['heal', 'Heal blemish / flyaway / lint', 'Repair', 'Samples nearby pixels; choose a source for precise repairs.'],
   ['patch_heal', 'Texture-aware patch heal', 'Repair', 'Matches nearby texture and blends surrounding light. Auto source works on small ellipses; choose a source for painted or larger repairs.'],
+  ['frequency_heal', 'Frequency healing · marks', 'Repair', 'Finds compact marks in the selection and rebuilds the tone under each one from the clean skin around it. Pores stay where they are; creases and hair are left alone.'],
   ['clone', 'Clone stamp', 'Repair', 'Copies the selected source patch into the target.'],
   ['auto_blemish', 'Auto spot cleanup', 'Skin', 'Finds small dark spots inside your selection. Review permanent marks and fine details afterward.'],
   ['frequency', 'Frequency separation', 'Skin', 'Adjust tonal unevenness and fine texture independently.'],
+  ['texture_graft', 'Restore skin texture', 'Skin', 'Limits glints, then brings fine texture back to the level this skin had before retouching, with pore detail borrowed from clean skin in the same selection. Nothing is generated.'],
   ['skin_smooth', 'Skin smoothing · protect detail', 'Sampled skin', 'Smooths uneven texture between fine detail and facial form. Sample skin first; similar colors inside your selection receive the effect.'],
   ['skin_uniformity', 'Even sampled skin tone', 'Sampled skin', 'Reduces color differences toward your skin sample while preserving brightness. Select one person at a time.'],
   ['portrait_dodge_burn', 'Skin dodge and burn · protect edges', 'Sampled skin', 'Balances local light with bounded exposure changes while preserving RGB proportions. Sample skin and review facial edges.'],
@@ -53,6 +55,8 @@ export type RetouchSettings = {
   poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
   blemishSensitivity: number; maxSpots: number; keepFreckles: boolean;
   deepBlemishCleanup: boolean; removeDarkMarks: boolean;
+  /** Frequency healing and the texture graft (ADR-0090); 0 is off. */
+  frequencyHeal: number; textureGraft: number;
   foreheadLines: number; crowsFeet: number; smileLines: number; underEyeLines: number; neckLines: number;
   darkCircles: number; eyeBags: number;
   eyeWhitening: number; eyeVessels: number; irisDetail: number; irisBrightness: number; redEye: boolean; lashDefinition: number; browDefinition: number;
@@ -67,6 +71,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
   blemishSensitivity: .5, maxSpots: 12, keepFreckles: true,
   deepBlemishCleanup: false, removeDarkMarks: false,
+  frequencyHeal: 0, textureGraft: 0,
   foreheadLines: .5, crowsFeet: .5, smileLines: .5, underEyeLines: .25, neckLines: 0,
   darkCircles: .5, eyeBags: .25,
   eyeWhitening: .2, eyeVessels: .5, irisDetail: .5, irisBrightness: 0, redEye: true, lashDefinition: 0, browDefinition: 0,
@@ -86,6 +91,10 @@ export type NativeRetouchEdit = {
   sourceScale?: number;
   preserveMicrotexture?: boolean;
   textureHeal?: boolean;
+  /** Frequency healing only: how readily a compact deviation counts as a mark (default 0.5). */
+  sensitivity?: number | null;
+  /** Frequency healing only: leave marks that are darker but not redder than the skin around them. */
+  keepDarkMarks?: boolean;
   texture: number; tone: number; warmth: number; tint: number;
   mask?: BrushMask | null;
   skin?: SkinSettings | null;

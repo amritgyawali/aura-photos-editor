@@ -49,3 +49,16 @@ it('preserves local-light texture healing in saved presets', () => {
   payload.items[0]!.settings.textureHeal = 'invalid' as unknown as boolean;
   expect(() => parseRetouchPresets(JSON.stringify(payload))).toThrow();
 });
+
+it('remembers frequency-healing sensitivity and dark-mark protection, and refuses bad values', () => {
+  const payload = {version:1,items:[{name:'Marks',settings:{...freshRetouch(),tool:'frequency_heal',sensitivity:.8,keepDarkMarks:true}}]};
+  const saved = parseRetouchPresets(JSON.stringify(payload))[0]?.settings;
+  expect(saved?.sensitivity).toBe(.8);
+  expect(saved?.keepDarkMarks).toBe(true);
+  const legacy = {version:1,items:[{name:'Old',settings:freshRetouch()}]};
+  const old = parseRetouchPresets(JSON.stringify(legacy))[0]?.settings;
+  expect(old?.sensitivity).toBeNull();
+  expect(old?.keepDarkMarks).toBe(false);
+  payload.items[0]!.settings.sensitivity = 1.5;
+  expect(() => parseRetouchPresets(JSON.stringify(payload))).toThrow('invalid');
+});

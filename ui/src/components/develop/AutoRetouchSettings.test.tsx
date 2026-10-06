@@ -58,8 +58,8 @@ describe('automatic retouch settings', () => {
   });
   it('offers every fine control exactly once', () => {
     const keys = SETTING_GROUPS.flatMap(([, controls]) => controls.map(([key]) => key));
-    expect(keys.length).toBe(54);
-    expect(new Set(keys).size).toBe(54);
+    expect(keys.length).toBe(56);
+    expect(new Set(keys).size).toBe(56);
     expect([...keys].sort()).toEqual(Object.keys(DEFAULT_RETOUCH_SETTINGS).sort());
   });
   it('runs deep cleanup as one native pass and exposes dark-mark removal', () => {
@@ -108,4 +108,38 @@ it('returns the spot limit to the ordinary range when deep cleanup is disabled',
   fireEvent.click(screen.getByLabelText('Deep blemish cleanup'));
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ deepBlemishCleanup: false, maxSpots: 24 }) }));
+});
+
+it('offers a professional preset: frequency healing first, real texture back last', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByRole('radio', { name: 'Professional retouch' }));
+  expect(screen.getByText(/Frequency healing rebuilds the tone under each mark first/)).toBeTruthy();
+  expect(screen.getByText(/restores real pore texture from the same face/)).toBeTruthy();
+  fireEvent.click(screen.getByText('Blemishes'));
+  expect(screen.getByText('Frequency healing: 100%')).toBeTruthy();
+  fireEvent.click(screen.getByText('Skin'));
+  expect(screen.getByText('Restore skin texture: 75%')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({
+    deepBlemishCleanup: true, removeDarkMarks: true, frequencyHeal: 1, textureGraft: .75, microDodgeBurn: .65, texture: .85,
+  }) }));
+});
+
+it('keeps frequency healing and the texture graft off unless a preset or a person turns them on', () => {
+  expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
+  expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
+  for (const [id, , values] of PRESETS) {
+    if (id === 'pro') continue;
+    expect(values.frequencyHeal ?? 0).toBe(0);
+    expect(values.textureGraft ?? 0).toBe(0);
+  }
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  expect(screen.queryByText(/Frequency healing rebuilds the tone/)).toBeNull();
+  fireEvent.click(screen.getByText('Blemishes'));
+  fireEvent.change(screen.getByLabelText('Frequency healing'), { target: { value: '60' } });
+  expect(screen.getByText('Custom')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ frequencyHeal: .6, textureGraft: 0 }) }));
 });

@@ -53,6 +53,27 @@ it('saves separate fine skin texture control with frequency separation', async (
     expect.objectContaining({ tool: 'frequency', preserveMicrotexture: true, texture: .85 }),
   ]));
 });
+it('saves frequency healing with its own sensitivity and dark-mark protection', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), { target: { value: 'frequency_heal' } });
+  expect(screen.getByText(/skin with nothing wrong with it is left exactly as it is/)).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Mark sensitivity (50%)'), { target: { value: '.8' } });
+  fireEvent.click(screen.getByLabelText('Keep dark marks (moles, freckles)'));
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ tool: 'frequency_heal', sensitivity: .8, keepDarkMarks: true }),
+  ]));
+});
+it('saves a texture graft with its level and glint limit, with no source required', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), { target: { value: 'texture_graft' } });
+  expect(screen.getByText(/nothing is generated/)).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Texture level (100%)'), { target: { value: '.9' } });
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ tool: 'texture_graft', texture: .9, source: null }),
+  ]));
+});
 it('edits a smaller patch donor and resets its scale when the source is cleared', async () => {
   open(); await screen.findByAltText('Retouched photograph');
   fireEvent.change(screen.getByLabelText('Tool'), { target: { value: 'patch_heal' } });
