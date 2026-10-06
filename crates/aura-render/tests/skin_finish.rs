@@ -162,7 +162,7 @@ fn frequency_healing_rebuilds_compact_marks_and_leaves_lines_and_clean_skin_alon
             contrast(&after, centre, 5.0),
         );
         assert!(was > 0.3, "the fixture mark at {centre:?} measures {was}");
-        assert!(is.abs() < 0.05, "mark at {centre:?}: {was} -> {is}");
+        assert!(is.abs() < 0.025, "mark at {centre:?}: {was} -> {is}");
     }
     // A crease is long and thin: never a mark, at any threshold, and never partly healed.
     for x in (40..190).step_by(10) {
@@ -214,7 +214,7 @@ fn frequency_healing_measures_ratios_so_exposure_and_skin_tone_do_not_change_wha
             apply(&mut after, W, W, std::slice::from_ref(&edit));
             for centre in SPOTS {
                 let is = contrast(&after, centre, 5.0);
-                assert!(is.abs() < 0.06, "tone {tone:?} at {exposure}x: {is}");
+                assert!(is.abs() < 0.025, "tone {tone:?} at {exposure}x: {is}");
             }
             // The same repair, scaled: nothing here knows how bright the frame is.
             for (scaled, expected) in after.iter().zip(&reference) {

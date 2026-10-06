@@ -123,9 +123,18 @@ fn spread(values: &[f32], alpha: &[f32]) -> f32 {
     centre_and_spread(&mut samples).map_or(0.0, |(_, s)| s)
 }
 
-/// Cells that belong to a compact mark, as a soft 0..=1 weight with a feathered rim.
+/// What one pass found.
+struct Marks {
+    /// 0..=1 for every cell: 1 over a mark and a margin of healthy skin around it, then a
+    /// feathered rim.
+    weight: Vec<f32>,
+    /// The cells of the marks themselves, before the margin.
+    core: Vec<bool>,
+}
+
+/// Cells that belong to a compact mark. `None` when there are none.
 #[allow(clippy::too_many_lines)]
-fn marks(field: &Field, sensitivity: f32, keep_dark: bool) -> Vec<f32> {
+fn marks(field: &Field, sensitivity: f32, keep_dark: bool) -> Option<Marks> {
     let Rect { w, h, .. } = field.rect;
     let n = field.rect.len();
     let r = field.radius;
@@ -227,16 +236,20 @@ fn marks(field: &Field, sensitivity: f32, keep_dark: bool) -> Vec<f32> {
         }
     }
     if !marked.iter().any(|on| *on) {
-        return vec![0.0; n];
+        return None;
     }
     // The lesion sits inside the fully rebuilt core; the feather lies on healthy skin.
     let grow = r * 0.5 + 1.0;
     let feather = r * 0.9 + 1.0;
-    distance_to(&marked, w, h)
+    let weight = distance_to(&marked, w, h)
         .iter()
         .zip(&field.alpha)
         .map(|(d, a)| (1.0 - smoothstep(grow, grow + feather, *d)) * smoothstep(0.0, 0.2, *a))
-        .collect()
+        .collect();
+    Some(Marks {
+        weight,
+        core: marked,
+    })
 }
 
 /// The tone under each mark, rebuilt from unmarked selected skin at the smallest
@@ -313,21 +326,37 @@ fn pass(
         return false;
     };
     let rect = field.rect;
-    let mark = marks(
+    let Some(Marks { weight: mark, core }) = marks(
         &field,
         edit.sensitivity.unwrap_or(0.5),
         edit.keep_dark_marks,
-    );
-    if !mark.iter().any(|m| *m > 0.0) {
+    ) else {
         return false;
-    }
+    };
     let rebuilt = rebuilt_tone(&field, &mark);
-    let tone = Weighted::new(&field.alpha, rect.w, rect.h, px(field.radius, 1.0));
-    let low: [Vec<f32>; 3] = [
-        tone.mean(&field.channels[0]),
-        tone.mean(&field.channels[1]),
-        tone.mean(&field.channels[2]),
-    ];
+    // A mark's own tone is measured over the mark, and the skin's over the skin. Averaged
+    // together, a small mark's tone is mostly the skin around it, and the mark itself is
+    // then left over as "detail" that survives its own repair as a faint dark core.
+    let inside: Vec<f32> = core.iter().map(|on| f32::from(u8::from(*on))).collect();
+    let outside: Vec<f32> = field
+        .alpha
+        .iter()
+        .zip(&inside)
+        .map(|(a, on)| a * (1.0 - on))
+        .collect();
+    let own = Weighted::new(&inside, rect.w, rect.h, px(field.radius, 1.0));
+    let around = Weighted::new(&outside, rect.w, rect.h, px(field.radius, 1.0));
+    let lesion = blur(&inside, rect.w, rect.h, 1);
+    let low: [Vec<f32>; 3] = std::array::from_fn(|c| {
+        let within = own.mean(&field.channels[c]);
+        around
+            .mean(&field.channels[c])
+            .iter()
+            .zip(within)
+            .zip(&lesion)
+            .map(|((skin, within), share)| skin + share.min(1.0) * (within - skin))
+            .collect()
+    });
     // Normal pore contrast for this selection, as a ratio of fine detail to tone, measured
     // on unmarked skin only.
     let relief: Vec<f32> = (0..rect.len())
