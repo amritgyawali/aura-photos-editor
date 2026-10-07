@@ -35,7 +35,8 @@ as the full one arrives, and the status line says which one is on screen.
 
 Every editing preview goes through one function that keeps finished previews in memory (384 MiB,
 least recently used out) and on disk (`cache/edited-previews-v1`, 3 GiB, least recently used
-out, written beside its final name and renamed into place). The key is the photograph, the
+out, written beside its final name and renamed into place). It never takes the last 2 GiB of
+the disk it is on: when that disk is nearly full, previews are kept in memory only. The key is the photograph, the
 original's content hash from the catalog, the level, the purpose and the renderer's own hash of
 the request (canonical recipe, engine, output). A changed edit, original or engine is a new key,
 so nothing stale is shown; a truncated file is a miss. Unsaved drafts are held in memory only.

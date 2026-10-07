@@ -211,34 +211,44 @@ fn write_disk(dir: &Path, path: &Path, image: &RenderedImage) -> std::io::Result
     std::fs::rename(&partial, path)
 }
 
-/// Keep the disk cache inside its budget, removing the least recently used files first.
-fn prune_disk(dir: &Path) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    let mut files: Vec<(std::time::SystemTime, u64, PathBuf)> = entries
-        .filter_map(Result::ok)
-        .filter_map(|entry| {
-            let meta = entry.metadata().ok()?;
-            if !meta.is_file() {
-                return None;
-            }
-            Some((meta.modified().ok()?, meta.len(), entry.path()))
+/// Free space the preview cache never takes from the disk it lives on: a full system disk is
+/// a far worse problem than a preview rendered again.
+const DISK_RESERVE: u64 = 2 * 1024 * 1024 * 1024;
+
+/// Make room for a file of `incoming` bytes: the cache stays inside [`DISK_BYTES`] and leaves
+/// [`DISK_RESERVE`] free on its disk, removing the least recently used files first. False when
+/// there is no room even with the cache empty, and the preview is then kept in memory only.
+fn make_room(dir: &Path, incoming: u64) -> bool {
+    let mut files: Vec<(std::time::SystemTime, u64, PathBuf)> = std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .filter_map(|entry| {
+                    let meta = entry.metadata().ok()?;
+                    if !meta.is_file() {
+                        return None;
+                    }
+                    Some((meta.modified().ok()?, meta.len(), entry.path()))
+                })
+                .collect()
         })
-        .collect();
+        .unwrap_or_default();
     let mut total: u64 = files.iter().map(|(_, len, _)| len).sum();
-    if total <= DISK_BYTES {
-        return;
+    let free = fs4::available_space(dir).unwrap_or(0);
+    let limit = DISK_BYTES.min((total + free).saturating_sub(DISK_RESERVE));
+    if incoming > limit {
+        return false;
     }
     files.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.2.cmp(&b.2)));
     for (_, len, path) in files {
-        if total <= DISK_BYTES {
+        if total + incoming <= limit {
             break;
         }
         if std::fs::remove_file(&path).is_ok() {
             total = total.saturating_sub(len);
         }
     }
+    total + incoming <= limit
 }
 
 /// Remove every cached editing preview, in memory and on disk.
@@ -327,10 +337,12 @@ pub(crate) fn render(
         return Ok(image);
     }
     let dir = disk_dir(state);
-    if let Err(error) = write_disk(&dir, &path, &image) {
-        tracing::warn!(target: "cache.stats", detail = %error, "editing preview cache write failed");
-    } else {
-        prune_disk(&dir);
+    let room = std::fs::create_dir_all(&dir).is_ok()
+        && make_room(&dir, u64::try_from(size(&image)).unwrap_or(u64::MAX));
+    if room {
+        if let Err(error) = write_disk(&dir, &path, &image) {
+            tracing::warn!(target: "cache.stats", detail = %error, "editing preview cache write failed");
+        }
     }
     Ok(image)
 }
@@ -393,6 +405,22 @@ mod tests {
         let bytes = std::fs::read(&path).unwrap();
         std::fs::write(&path, &bytes[..bytes.len() - 1]).unwrap();
         assert!(read_disk(&path, std::time::SystemTime::UNIX_EPOCH).is_none());
+    }
+
+    #[test]
+    fn the_disk_cache_never_takes_more_than_its_budget_or_the_reserve() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("old.bin"), [0_u8; 16]).unwrap();
+        assert!(make_room(dir.path(), 16), "a small preview fits");
+        assert!(
+            !make_room(dir.path(), DISK_BYTES + 1),
+            "nothing above the budget is written"
+        );
+        let free = fs4::available_space(dir.path()).unwrap();
+        assert!(
+            !make_room(dir.path(), free.saturating_sub(DISK_RESERVE) + 1 + 16),
+            "the reserve stays free"
+        );
     }
 
     #[test]

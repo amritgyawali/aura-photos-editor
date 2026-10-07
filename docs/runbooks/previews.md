@@ -30,7 +30,7 @@ ready; the status line says which one is on screen. Finished editing previews ar
 ```text
 in the window   -> the last ~640 MB of previews, for the session (moving between sections is instant)
 in the app      -> the last 384 MB of finished previews, for the session
-on disk         -> cache/edited-previews-v1/<key>.bin, up to 3 GB, oldest removed first
+on disk         -> cache/edited-previews-v1/<key>.bin, up to 3 GB and never the disk's last 2 GB
 ```
 
 The key is the photograph, the original's content hash, the size, and the renderer's hash of
