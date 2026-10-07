@@ -680,7 +680,23 @@ pub fn plan_with_faces(
                     &format!("{PREFIX}{index}-feature-guard"),
                     &settings,
                 )?;
-                features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Protected eyes are excluded from every automatic face step, healing and texture restoration included. A protected nose keeps its pores, shape and shading out of smoothing and toning; marks on it are still repaired, and the nostrils are never touched. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected" } else { "adjustable" }));
+                features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Protected eyes are excluded from every automatic face step, healing and texture restoration included; the dark-circle correction works only below the lower lashes. A protected nose keeps its pores, shape and shading out of smoothing and toning; marks on it are still repaired, and the nostrils are never touched. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected" } else { "adjustable" }));
+            }
+        } else if options.scope.face() {
+            // Without detail protection the dark-circle correction still never reaches the
+            // eye itself, its lids or its lashes.
+            if let Some(px) = &detail_pixels {
+                portrait_features::eye_guard::protect(
+                    face,
+                    px,
+                    features
+                        .eyes
+                        .iter_mut()
+                        .filter(|e| portrait_features::eye_guard::is_dark_circle(e)),
+                    &mut mattes,
+                    &format!("{PREFIX}{index}-feature-guard"),
+                    &settings,
+                )?;
             }
         }
         features.finishing.extend(garments);

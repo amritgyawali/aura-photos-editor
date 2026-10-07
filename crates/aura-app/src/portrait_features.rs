@@ -1241,7 +1241,10 @@ fn eyes(
     let mut detailed = 0;
     let mut red_eye = 0;
     let mut lifted = 0;
+    let mut deepest = 0.0_f32;
     let mut closed = 0;
+    let circles = gain(settings.dark_circles);
+    let mut circle_found = Vec::with_capacity(2);
     for (eye, name) in g.eyes.into_iter().zip(names) {
         // The landmark sits near the lower lid; the opening is centred slightly above it.
         let centre = add(eye, g.v, -0.03 * d);
@@ -1487,44 +1490,10 @@ fn eyes(
             ));
             red_eye += 1;
         }
-        // Under-eye: lift only when this area is darker than the same person's cheek.
-        let under = Capsule {
-            a: add(add(eye, g.v, 0.27 * d), g.u, -0.12 * d),
-            b: add(add(eye, g.v, 0.27 * d), g.u, 0.12 * d),
-            r: 0.07 * d,
-        };
-        let cheek = Capsule::disk(add(eye, g.v, 0.6 * d), 0.1 * d);
-        let mean_luma = |c: Capsule| {
-            let mut sum = 0.0;
-            let mut n = 0.0;
-            c.each(px, |x, y| {
-                let p = px.linear(x, y);
-                if skin.affine(p) {
-                    sum += luma(p);
-                    n += 1.0;
-                }
-            });
-            (n >= 6.0).then(|| sum / n)
-        };
-        let circles = gain(settings.dark_circles);
-        if let (Some(u_l), Some(c_l), true) = (mean_luma(under), mean_luma(cheek), circles > 0.0) {
-            let drop = 1.0 - u_l / c_l.max(1e-4);
-            if drop > 0.08 - 0.03 * (circles - 1.0) {
-                let mut edit = masked(
-                    base_edit(
-                        format!("{prefix}{face}-undereye-{name}"),
-                        Tool::UnderEye,
-                        ((drop - 0.05) * 2.5).clamp(0.15, 0.55) * circles,
-                        px,
-                        [eye[0], eye[1], 0.3 * d, 0.3 * d],
-                    ),
-                    px,
-                    &[under],
-                );
-                edit.feather = 0.85;
-                edit.radius = (0.1 * d / short).clamp(0.0005, 0.05);
-                out.eyes.push(edit);
-                lifted += 1;
+        // Dark circles: measured here, planned for both eyes together after the loop.
+        if circles > 0.0 {
+            if let Some(found) = dark_circle(g, eye, px) {
+                circle_found.push((eye, name, found));
             }
         }
         // Eye bags: the puffy band below the shadow, evened rather than removed.
@@ -1550,6 +1519,48 @@ fn eyes(
             out.eyes.push(edit);
         }
     }
+    // Dark circles: the shadow between the lower lashes and the cheek, measured against this
+    // person's own cheek just below it and corrected toward it - brightness and cast, never
+    // past it, pores kept. Decided per face, not per eye: when one circle is clearly there,
+    // the other open eye is corrected too (by its own measurement, which may be much less),
+    // so one eye is never finished and the other left as shot. ADR-0094.
+    let clear = |f: &DarkCircle| {
+        f.drop > 0.07 - 0.025 * (circles - 1.0) || (f.cast > 0.025 && f.drop > 0.03)
+    };
+    if circle_found.iter().any(|(_, _, f)| clear(f)) {
+        for (eye, name, found) in circle_found
+            .into_iter()
+            .filter(|(_, _, f)| f.drop > 0.03 || (f.cast > 0.025 && f.drop > 0.015))
+        {
+            let band = under_eye_band(g, eye);
+            let mut edit = masked(
+                base_edit(
+                    format!("{prefix}{face}-undereye-{name}"),
+                    Tool::UnderEye,
+                    // The share of the shadow removed: most of it, never all - the skin under
+                    // an eye is thinner and a trace of shadow is natural.
+                    ((0.5 + found.drop * 1.2).clamp(0.5, 0.72) * circles.min(1.25)).min(0.85),
+                    px,
+                    [eye[0], eye[1] + 0.2 * d, 0.34 * d, 0.3 * d],
+                ),
+                px,
+                &band,
+            );
+            let (w, h) = (px.width as f32, px.height as f32);
+            edit.source = Some([
+                (found.cheek[0] / w).clamp(0.0, 1.0),
+                (found.cheek[1] / h).clamp(0.0, 1.0),
+            ]);
+            // Low-band size: larger than a pore, smaller than the shadow.
+            edit.radius = (0.03 * d / short).clamp(0.0005, 0.05);
+            // Match the cast of a dark circle (purple, brown) to the cheek.
+            edit.tone = 0.75;
+            edit.feather = 0.85;
+            out.eyes.push(edit);
+            lifted += 1;
+            deepest = deepest.max(found.drop);
+        }
+    }
     let mut parts = Vec::new();
     if detailed > 0 {
         parts.push(format!(
@@ -1571,8 +1582,9 @@ fn eyes(
     }
     if lifted > 0 {
         parts.push(format!(
-            "lifted {lifted} under-eye shadow{} that measured darker than the cheek",
-            plural(lifted)
+            "corrected {lifted} dark circle{} toward the cheek below (up to {:.0}% darker than it), matching its colour and keeping the pores",
+            plural(lifted),
+            deepest * 100.0
         ));
     }
     if closed > 0 {
@@ -1586,6 +1598,154 @@ fn eyes(
             .findings
             .push(format!("Eyes: {}.", parts.join("; ")));
     }
+}
+
+/// The skin between the lower lashes and the cheek: a crescent that follows the lower lid,
+/// dipping toward the nose along the tear trough, and a wider band below it into the cheek so
+/// the correction fades out on skin that is already as light as the cheek. The eye itself is
+/// kept out by the lid guard (`eye_guard::lid`), not by this shape.
+fn under_eye_band(g: &Geometry, eye: [f32; 2]) -> [Capsule; 2] {
+    let d = g.d;
+    let inner = if (g.mid[0] - eye[0]) * g.u[0] + (g.mid[1] - eye[1]) * g.u[1] >= 0.0 {
+        1.0
+    } else {
+        -1.0
+    };
+    let at = |across: f32, down: f32| add(add(eye, g.u, inner * across * d), g.v, down * d);
+    [
+        Capsule {
+            a: at(0.15, 0.16),
+            b: at(-0.18, 0.14),
+            r: 0.08 * d,
+        },
+        Capsule {
+            a: at(0.10, 0.27),
+            b: at(-0.17, 0.25),
+            r: 0.09 * d,
+        },
+    ]
+}
+
+/// One eye's dark circle, measured against the cheek below it.
+#[derive(Debug, Clone, Copy)]
+struct DarkCircle {
+    /// How much darker the crescent is than the cheek, 0..1 of the cheek's luminance.
+    drop: f32,
+    /// How far its colour is from the cheek's, in chromaticity.
+    cast: f32,
+    /// Where the cheek was measured, in pixels.
+    cheek: [f32; 2],
+}
+
+/// Measure the crescent under `eye` against the cheek below it, both on this person's skin
+/// only - lashes, brow hair, spectacle rims and glints left out - and by the same statistics
+/// (median and lower quartile), so pores darken both alike. `None` when either is too small
+/// to measure, or the cheek below is not mostly this person's skin.
+fn dark_circle(g: &Geometry, eye: [f32; 2], px: &Pixels<'_>) -> Option<DarkCircle> {
+    let d = g.d;
+    let band = under_eye_band(g, eye);
+    // The skin under this eye, in display values: the colour the cheek must share.
+    let mut crescent = Vec::new();
+    band[0].each(px, |x, y| {
+        let point = [x as f32 + 0.5, y as f32 + 0.5];
+        if eye_guard::lid(g, point) >= 0.99 {
+            crescent.push((px.encoded(x, y), px.linear(x, y)));
+        }
+    });
+    let hue: Vec<[f32; 3]> = crescent.iter().map(|(e, _)| chroma(*e)).collect();
+    let colour = median_chroma(&hue)?;
+    // On a turned face the far cheek can leave the face, onto hair or the background; a
+    // cheek that is mostly not the colour of the skin right above it is no reference. Read in
+    // display values, where the shadow side of a side-lit face has the same colour as the lit
+    // side - linear light exaggerates the warmth of a shadow.
+    let cheek = add(eye, g.v, 0.5 * d);
+    let mut cheek_px = Vec::new();
+    let mut total = 0_usize;
+    Capsule::disk(cheek, 0.09 * d).each(px, |x, y| {
+        total += 1;
+        let e = px.encoded(x, y);
+        let c = chroma(e);
+        let spread = (0..3)
+            .map(|i| (c[i] - colour[i]).powi(2))
+            .sum::<f32>()
+            .sqrt();
+        if spread < 0.08 && e.iter().all(|v| *v < 0.98) && luma(e) > 0.02 {
+            cheek_px.push(px.linear(x, y));
+        }
+    });
+    if cheek_px.len() * 5 < total * 3 {
+        return None;
+    }
+    let reference = robust(&cheek_px)?;
+    let mut under_px = Vec::new();
+    for (_, p) in crescent {
+        let l = luma(p);
+        // Lashes, hair and rims, or a glint: not the shadow's skin.
+        if l > reference.median * 0.3 && l < reference.median * 1.6 && p.iter().all(|v| *v < 0.95) {
+            under_px.push(p);
+        }
+    }
+    let under = robust(&under_px)?;
+    let drop = (1.0 - under.median / reference.median.max(1e-6))
+        .min(1.0 - under.quartile / reference.quartile.max(1e-6))
+        .clamp(0.0, 1.0);
+    let cast = (0..3)
+        .map(|c| (under.chroma[c] - reference.chroma[c]).powi(2))
+        .sum::<f32>()
+        .sqrt();
+    Some(DarkCircle { drop, cast, cheek })
+}
+
+/// The per-channel median of a set of chromaticities. `None` for too few to measure.
+fn median_chroma(samples: &[[f32; 3]]) -> Option<[f32; 3]> {
+    if samples.len() < 12 {
+        return None;
+    }
+    let mut out = [0.0; 3];
+    for (c, value) in out.iter_mut().enumerate() {
+        let mut channel: Vec<f32> = samples.iter().map(|p| p[c]).collect();
+        channel.sort_by(f32::total_cmp);
+        *value = *channel.get(channel.len() / 2)?;
+    }
+    Some(out)
+}
+
+/// Median and lower-quartile luminance and the mean chromaticity of the middle of the tones.
+struct Robust {
+    median: f32,
+    quartile: f32,
+    chroma: [f32; 3],
+}
+
+fn robust(samples: &[[f32; 3]]) -> Option<Robust> {
+    if samples.len() < 12 {
+        return None;
+    }
+    let mut lumas: Vec<f32> = samples.iter().map(|p| luma(*p)).collect();
+    lumas.sort_by(f32::total_cmp);
+    let at = |share: f32| {
+        lumas
+            .get(((lumas.len() - 1) as f32 * share) as usize)
+            .copied()
+    };
+    let (quartile, median, upper) = (at(0.25)?, at(0.5)?, at(0.75)?);
+    let mut sum = [0.0_f32; 3];
+    let mut n = 0.0_f32;
+    for p in samples
+        .iter()
+        .filter(|p| (quartile..=upper).contains(&luma(**p)))
+    {
+        let c = chroma(*p);
+        for k in 0..3 {
+            sum[k] += c[k];
+        }
+        n += 1.0;
+    }
+    (n > 0.0 && median > 1e-6).then(|| Robust {
+        median,
+        quartile: quartile.max(1e-6),
+        chroma: sum.map(|v| v / n),
+    })
 }
 
 fn plural(n: usize) -> &'static str {
@@ -2008,6 +2168,130 @@ mod tests {
         assert_eq!(cleaned.len(), 1, "{tools:?}");
         assert!(cleaned[0].0.ends_with("-b-clean"));
         retouch_tools::validate(&plan.eyes).unwrap();
+    }
+
+    #[test]
+    fn a_dark_circle_is_corrected_toward_the_cheek_and_an_even_one_is_left_alone() {
+        let size = 400;
+        let d = 96.0;
+        let mut rgb = canvas(size, [170, 120, 95]);
+        for x in [0.38 * 400.0, 0.62 * 400.0] {
+            let c = [x, 160.0];
+            for dx in [-0.1, -0.05, 0.05, 0.1] {
+                paint(
+                    &mut rgb,
+                    size,
+                    [c[0] + dx * d, c[1]],
+                    0.05 * d,
+                    [235, 232, 228],
+                );
+            }
+            paint(&mut rgb, size, c, 0.035 * d, [40, 30, 25]);
+        }
+        // Under eye a only: a darker, purple-brown crescent between the lashes and the cheek.
+        for k in 0..=12 {
+            let across = -0.16 + 0.32 * k as f32 / 12.0;
+            for down in [0.13, 0.17, 0.21] {
+                paint(
+                    &mut rgb,
+                    size,
+                    [0.38 * 400.0 + across * d, 160.0 + down * d],
+                    0.035 * d,
+                    [128, 92, 90],
+                );
+            }
+        }
+        let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
+        let plan = plan(&face(), 0, &px, 0.0, "p-", &Options::default(), None);
+        let lifted: Vec<_> = plan
+            .eyes
+            .iter()
+            .filter(|e| e.tool == Tool::UnderEye)
+            .collect();
+        assert_eq!(lifted.len(), 1, "{:?}", plan.report);
+        let edit = lifted[0];
+        assert!(edit.id.ends_with("-undereye-a"), "{}", edit.id);
+        assert!(super::eye_guard::is_dark_circle(edit));
+        // Measured against the cheek straight below the eye.
+        let cheek = edit.source.unwrap();
+        assert!(
+            (cheek[0] - 0.38).abs() < 0.01 && (cheek[1] - (160.0 + 0.5 * d) / 400.0).abs() < 0.01
+        );
+        assert!((0.5..=0.85).contains(&edit.amount), "{}", edit.amount);
+        retouch_tools::validate(&plan.eyes).unwrap();
+        assert!(plan
+            .report
+            .findings
+            .iter()
+            .any(|f| f.contains("dark circle")));
+        // Switched off, nothing is planned.
+        let mut off = Options::default();
+        off.settings.dark_circles = 0.0;
+        let none = plan_eyes_only(&px, &off);
+        assert!(none.iter().all(|e| e.tool != Tool::UnderEye));
+    }
+
+    #[test]
+    fn both_eyes_are_corrected_when_one_circle_is_clear_and_the_other_milder() {
+        let size = 400;
+        let d = 96.0;
+        let mut rgb = canvas(size, [170, 120, 95]);
+        for (x, shadow) in [
+            (0.38 * 400.0, [128, 92, 90]),
+            (0.62 * 400.0, [158, 112, 92]),
+        ] {
+            let c = [x, 160.0];
+            for dx in [-0.1, -0.05, 0.05, 0.1] {
+                paint(
+                    &mut rgb,
+                    size,
+                    [c[0] + dx * d, c[1]],
+                    0.05 * d,
+                    [235, 232, 228],
+                );
+            }
+            paint(&mut rgb, size, c, 0.035 * d, [40, 30, 25]);
+            for k in 0..=12 {
+                let across = -0.16 + 0.32 * k as f32 / 12.0;
+                for down in [0.13, 0.17, 0.21] {
+                    paint(
+                        &mut rgb,
+                        size,
+                        [x + across * d, 160.0 + down * d],
+                        0.035 * d,
+                        shadow,
+                    );
+                }
+            }
+        }
+        let px = Pixels::new(&rgb, size as u32, size as u32).unwrap();
+        let eyes = plan_eyes_only(&px, &Options::default());
+        let lifted: Vec<_> = eyes.iter().filter(|e| e.tool == Tool::UnderEye).collect();
+        assert_eq!(lifted.len(), 2, "{lifted:?}");
+        retouch_tools::validate(&eyes).unwrap();
+    }
+
+    fn plan_eyes_only(px: &Pixels<'_>, options: &Options) -> Vec<Edit> {
+        plan(&face(), 0, px, 0.0, "p-", options, None).eyes
+    }
+
+    #[test]
+    fn the_lid_guard_keeps_the_eye_and_lashes_and_frees_the_tear_trough() {
+        let rgb = canvas(400, [170, 120, 95]);
+        let px = Pixels::new(&rgb, 400, 400).unwrap();
+        let g = Geometry::new(&face(), &px).unwrap();
+        let d = g.d;
+        let eye = g.eyes[0];
+        let below = |down: f32| add(eye, g.v, down * d);
+        assert_eq!(eye_guard::lid(&g, eye), 0.0);
+        assert_eq!(eye_guard::lid(&g, below(0.05)), 0.0, "the lower lashes");
+        assert!(eye_guard::lid(&g, below(0.15)) > 0.99, "the tear trough");
+        assert!(eye_guard::lid(&g, below(0.3)) > 0.99, "the cheek top");
+        assert_eq!(
+            eye_guard::lid(&g, add(eye, g.v, -0.1 * d)),
+            0.0,
+            "the upper lid"
+        );
     }
 
     #[test]

@@ -201,7 +201,11 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         n if n.starts_with("spot") => Some(Stage::SkinCleanup),
         n if n.starts_with("lines-") => Some(Stage::FrequencySeparation),
         n if n.starts_with("fold-") => Some(Stage::MicroDodgeBurn),
-        n if n.starts_with("undereye") => Some(Stage::MediumDodgeBurn),
+        // Puffiness is evened with the medium transitions; the dark circle itself is corrected
+        // with the eyes, after every face-wide light change, so it is matched to the cheek as
+        // that cheek finally looks.
+        n if n.starts_with("undereye-bag") => Some(Stage::MediumDodgeBurn),
+        n if n.starts_with("undereye") => Some(Stage::EyesLipsTeeth),
         n if n.starts_with("sculpt-") => Some(Stage::GlobalDodgeBurn),
         n if n.starts_with("redness-") || n.starts_with("makeup-") => Some(Stage::SkinColour),
         n if n.starts_with("eye-") || n.starts_with("lips-") => Some(Stage::EyesLipsTeeth),
@@ -220,11 +224,13 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         Tool::SkinUniformity | Tool::ColorMatch | Tool::SkinColor | Tool::Makeup => {
             Stage::SkinColour
         }
-        Tool::Teeth | Tool::EyeClean | Tool::EyeDetail | Tool::RedEye => Stage::EyesLipsTeeth,
+        Tool::Teeth | Tool::EyeClean | Tool::EyeDetail | Tool::RedEye | Tool::UnderEye => {
+            Stage::EyesLipsTeeth
+        }
         Tool::Fabric => Stage::Clothing,
         Tool::Glare => Stage::Jewellery,
         Tool::Backdrop | Tool::Heal | Tool::Clone => Stage::Background,
-        Tool::PortraitDodgeBurn | Tool::UnderEye | Tool::Mattify | Tool::Dodge | Tool::Burn => {
+        Tool::PortraitDodgeBurn | Tool::Mattify | Tool::Dodge | Tool::Burn => {
             Stage::MediumDodgeBurn
         }
     }))
@@ -1055,8 +1061,8 @@ pub fn plan(
         ),
         (
             Stage::MediumDodgeBurn,
-            "Larger transitions checked: cheeks, forehead, under the eyes, jaw, and hot spots of shine.".into(),
-            "Patchy light evened across larger areas; under-eye shadows lifted toward the cheek beside them; shine softened.".into(),
+            "Larger transitions checked: cheeks, forehead, puffiness under the eyes, jaw, and hot spots of shine.".into(),
+            "Patchy light evened across larger areas; puffiness under the eyes evened; shine softened.".into(),
         ),
         (
             Stage::GlobalDodgeBurn,
@@ -1070,8 +1076,8 @@ pub fn plan(
         ),
         (
             Stage::EyesLipsTeeth,
-            "Eyes: whites cleaned of redness rather than painted white, natural eye shadow kept; teeth lose yellow rather than going white; lips keep their vertical texture; brows and lashes are not filled.".into(),
-            "Eye redness reduced, iris and catchlight lifted slightly, teeth less yellow, lip detail kept.".into(),
+            "Eyes: dark circles measured against the cheek below them, after every light change on the face; whites cleaned of redness rather than painted white; teeth lose yellow rather than going white; lips keep their vertical texture; brows and lashes are not filled.".into(),
+            "Dark circles, where measured, lifted toward the cheek below - brightness and colour cast, never lighter than that cheek, pores and lashes untouched; eye redness reduced, iris and catchlight lifted slightly, teeth less yellow, lip detail kept.".into(),
         ),
     ];
     for (stage, check, change) in describe {
@@ -1120,6 +1126,17 @@ pub fn plan(
                 .filter(|a| a.status == "skipped")
                 .map(|a| format!("Face {}: {}", a.face, a.reason)),
         );
+    }
+    // What was measured at each face's eyes: dark circles against the cheek, redness, closed
+    // eyes left alone.
+    if let Some(r) = report_mut(&mut reports, Stage::EyesLipsTeeth) {
+        r.checks
+            .extend(portrait.report.assessments.iter().flat_map(|a| {
+                a.findings
+                    .iter()
+                    .filter(|f| f.starts_with("Eyes:"))
+                    .map(move |f| format!("Face {}: {f}", a.face))
+            }));
     }
 
     // ---- 15 to 17: grade, grain, sharpening -------------------------------------------------
@@ -1868,6 +1885,11 @@ mod tests {
             (
                 "auto-portrait-v1-0-undereye-a",
                 Tool::UnderEye,
+                Stage::EyesLipsTeeth,
+            ),
+            (
+                "auto-portrait-v1-0-undereye-bag-a",
+                Tool::MicroDodgeBurn,
                 Stage::MediumDodgeBurn,
             ),
             (

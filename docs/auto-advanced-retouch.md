@@ -19,10 +19,10 @@ computer.
 | 5 | Skin cleanup | Every mark against the clean skin around it | Pimples, redness and flakes cleared with the pores kept. Moles, beauty marks and freckles are kept |
 | 6 | Selective frequency separation | Uneven tone versus fine texture, at a size measured from each face | Uneven tone corrected, never a blur; lines softened, not removed; the person's own pores restored where healing flattened them |
 | 7 | Micro dodge & burn | The skin in black and white with exaggerated contrast (the retoucher's visual aid) | Small dark and bright irregularities evened, colour untouched |
-| 8 | Medium dodge & burn | Cheeks, forehead, under the eyes, jaw, shiny hot spots | Patchy light evened, under-eye shadows lifted toward the cheek, shine softened |
+| 8 | Medium dodge & burn | Cheeks, forehead, puffiness under the eyes, jaw, shiny hot spots | Patchy light evened, puffiness under the eyes evened, shine softened |
 | 9 | Global dodge & burn | The light that was there | Faint cheekbone light and jaw shadow along that light. No make-up is painted with light |
 | 10 | Skin colour | Redness, blotches and casts against this person's own skin - never an ideal tone | Colour evened with brightness untouched; body skin matched to the face |
-| 11 | Eyes, lips & teeth | Red eye whites, iris, teeth colour, lips | Redness out of the whites (not painted white), iris and catchlight lifted a little, teeth less yellow (not white), lip texture kept. Brows and lashes are not filled |
+| 11 | Eyes, lips & teeth | Dark circles against the cheek just below them, red eye whites, iris, teeth colour, lips | Dark circles lifted most of the way toward that cheek - their purple or brown cast too - never lighter than the cheek, with the pores and lashes untouched. Redness out of the whites (not painted white), iris and catchlight lifted a little, teeth less yellow (not white), lip texture kept. Brows and lashes are not filled |
 | 12 | Clothing | Creases, lint, threads and small stains on the clothes | Creases softened, small marks healed from the fabric beside them. Patterned fabric and hair ends lying on it are left alone |
 | 13 | Jewellery & reflections | Burnt-out reflections on the outfit and in the necklace and earring area | Tamed so the metal or stone shows again; sparkle and sequins are kept |
 | 14 | Background toning | Whether the background is brighter than the person's face; a bright sky | A background that pulls the eye away is lowered gently; a bright sky balanced. A white backdrop stays white |

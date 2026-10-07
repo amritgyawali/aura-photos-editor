@@ -2,6 +2,18 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Dark circles corrected where they are - 2026-10-07
+
+- Fix dark circles under the eyes staying dark while the skin below them turned pale or
+  white. The correction is now measured on the crescent just below the lower lashes against
+  the same person's cheek below it, and lifts most of the shadow toward that cheek - its
+  purple or brown cast too - without ever making the area lighter than the cheek, and with
+  the pores, fine lines and lashes left as they were. It is kept off the eye, the lids and the
+  lashes by its own lid guard instead of being switched off by the whole eye-socket guard. In
+  Auto advanced retouch it runs with the eyes, after every light change on the face, so it
+  matches the cheek as that cheek finally looks. Saved older corrections render as before.
+  See ADR-0094.
+
 ## Auto advanced retouch - 2026-10-07
 
 - Add **Auto advanced retouch** in Retouch: the whole professional workflow, run

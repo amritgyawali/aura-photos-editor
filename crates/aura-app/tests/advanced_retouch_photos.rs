@@ -72,7 +72,12 @@ fn every_stage_runs_in_order_on_real_photographs() {
     if let Some(dir) = &out {
         std::fs::create_dir_all(dir).expect("output folder");
     }
-    for path in list.split(';').filter(|p| !p.trim().is_empty()) {
+    let paths: Vec<&str> = list.split(';').filter(|p| !p.trim().is_empty()).collect();
+    assert!(
+        !paths.is_empty(),
+        "AURA_ADVANCED_PHOTOS names no photograph"
+    );
+    for path in paths {
         let path = std::path::PathBuf::from(path.trim());
         let name = path
             .file_stem()

@@ -212,6 +212,10 @@ fn apply_observed(
             );
         } else if edit.tool == Tool::AutoBlemish {
             auto_spots(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::UnderEye && edit.source.is_some() {
+            // Measured against the cheek at `source`. Without one, the original local lift
+            // below keeps saved hand-painted corrections exactly as they were. ADR-0094.
+            crate::retouch_undereye::apply(rgb, width, height, edit, &coverage);
         } else {
             let refine_edges = edit
                 .matte

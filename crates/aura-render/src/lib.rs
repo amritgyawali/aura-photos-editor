@@ -125,6 +125,7 @@ mod retouch_planes;
 mod retouch_skin;
 mod retouch_texture;
 pub mod retouch_tools;
+mod retouch_undereye;
 pub mod shaders;
 pub mod spatial;
 pub mod tiles;

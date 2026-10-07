@@ -49,10 +49,10 @@ for anything unrecognised, by its tool:
 | Skin cleanup | acne clear, frequency healing, spot repairs, body spots |
 | Selective frequency separation | skin smoothing (low band only, pores kept), pore refine, surface finish, texture restore, line softening |
 | Micro dodge and burn | micro dodge and burn, smile-line folds |
-| Medium dodge and burn | skin dodge and burn (light evenness), under-eye lift, shine, skin brightness |
+| Medium dodge and burn | skin dodge and burn (light evenness), eye-bag evening, shine, skin brightness |
 | Global dodge and burn | contour and highlight sculpting, face light, glow |
 | Skin colour | tone evenness (chroma only), redness colour match, skin colour, body tone and match |
-| Eyes, lips and teeth | eye whites, vessels, iris, red-eye, lashes and brows, lips, teeth |
+| Eyes, lips and teeth | dark circles (ADR-0094: after every face-wide light change, so they are matched to the cheek as it finally looks), eye whites, vessels, iris, red-eye, lashes and brows, lips, teeth |
 
 `staged` writes the retouch stack in stage order, a person's own operations first, and only
 the stage being saved changes - so the stack after step *n* is exactly "every stage up to
