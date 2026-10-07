@@ -384,7 +384,9 @@ export function App(): JSX.Element {
               <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
                 automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference}
                 profile={profile} profileName={profileName} />
-              {workspace === 'edit' && focusedPhoto && <>
+              {/* Stays mounted while another section is open, so the photograph, its full-quality
+                  preview and an open retouch are exactly where they were on return. ADR-0097. */}
+              {focusedPhoto && <>
                 <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
                 <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} disabled={editing || workflowBusy} revision={revision} onBusyChange={setSaving} />
                 <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>

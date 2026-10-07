@@ -18,7 +18,10 @@ export function useRetouchDraftPreview(projectId: string, photoId: string,
       queue.current = queue.current.catch(() => undefined).then(async () => {
         if (!current) return;
         try {
-          const image = await (selection ? nativeRetouch.selectionPreview : nativeRetouch.draftPreview)(projectId, photoId, draft, replaceId);
+          // A live draft follows the brush, so it is the quick screen-sized render; once
+          // applied, the saved photograph is shown at full quality (ADR-0097).
+          const image = selection ? await nativeRetouch.selectionPreview(projectId, photoId, draft, replaceId)
+            : await nativeRetouch.draftPreview(projectId, photoId, draft, replaceId, 'fast');
           if (current) setState({ image, pending: false, error: null, selection });
         } catch (error) {
           if (current) setState({ image: null, pending: false, error: asIpcError(error).message, selection });

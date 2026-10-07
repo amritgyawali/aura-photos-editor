@@ -3481,10 +3481,38 @@ async fn native_retouch_preview(
     project_id: String,
     photo_id: String,
     before: bool,
+    quality: Option<String>,
 ) -> IpcResult<RenderDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        aura_app::native_retouch::preview(&app, &project_id, &photo_id, before)
+        aura_app::native_retouch::preview_at(
+            &app,
+            &project_id,
+            &photo_id,
+            before,
+            aura_app::native_retouch::Quality::parse(quality.as_deref()),
+        )
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// The photograph as taken, at full or fast quality, for Original and Compare. ADR-0097.
+#[tauri::command]
+async fn photo_original(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+    quality: Option<String>,
+) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::original_at(
+            &app,
+            &project_id,
+            &photo_id,
+            aura_app::native_retouch::Quality::parse(quality.as_deref()),
+        )
     })
     .await
     .map_err(|_| background_request_failed())?
@@ -3604,6 +3632,7 @@ fn main() {
             native_retouch_selection_preview,
             native_retouch_saved_selection,
             native_retouch_preview,
+            photo_original,
             native_retouch_draft_preview,
             list_edit_profiles,
             apply_edit_profile,

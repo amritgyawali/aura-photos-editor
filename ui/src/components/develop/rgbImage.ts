@@ -4,15 +4,24 @@ import type { RenderDto } from '../../ipc/types';
  * displayed RGB exactly; strength controls visibility only and never changes the recipe. */
 export function coverageDataUrl(photo: Pick<RenderDto, 'width'|'height'|'rgbBase64'>,
   mask: Pick<RenderDto, 'width'|'height'|'rgbBase64'>, opacity: number): string | null {
-  if (photo.width !== mask.width || photo.height !== mask.height || !Number.isFinite(opacity)) return null;
+  if (!Number.isFinite(opacity) || mask.width < 1 || mask.height < 1) return null;
   let rgb: string, coverage: string;
   try { rgb = atob(photo.rgbBase64); coverage = atob(mask.rgbBase64); } catch { return null; }
-  if (rgb.length !== photo.width * photo.height * 3 || coverage.length !== rgb.length) return null;
+  if (rgb.length !== photo.width * photo.height * 3 || coverage.length !== mask.width * mask.height * 3) return null;
   const bytes = new Uint8Array(rgb.length);
   const tint = [40, 220, 190];
-  for (let i = 0; i < bytes.length; i++) {
-    const alpha = coverage.charCodeAt(i - i % 3) / 255 * Math.max(0, Math.min(1, opacity));
-    bytes[i] = Math.round(rgb.charCodeAt(i) * (1 - alpha) + (tint[i % 3] ?? 0) * alpha);
+  const strength = Math.max(0, Math.min(1, opacity));
+  // Coverage may be measured at a smaller size than the full-quality photograph; each pixel
+  // reads the coverage cell it falls in, so the tint lines up at any size. ADR-0097.
+  const sx = mask.width / photo.width, sy = mask.height / photo.height;
+  for (let y = 0; y < photo.height; y++) {
+    const row = Math.min(mask.height - 1, Math.floor((y + .5) * sy)) * mask.width;
+    for (let x = 0; x < photo.width; x++) {
+      const cell = (row + Math.min(mask.width - 1, Math.floor((x + .5) * sx))) * 3;
+      const alpha = coverage.charCodeAt(cell) / 255 * strength;
+      const at = (y * photo.width + x) * 3;
+      for (let c = 0; c < 3; c++) bytes[at + c] = Math.round(rgb.charCodeAt(at + c) * (1 - alpha) + (tint[c] ?? 0) * alpha);
+    }
   }
   const chunks: string[] = [];
   for (let i = 0; i < bytes.length; i += 8192) chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));

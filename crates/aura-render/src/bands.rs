@@ -191,63 +191,149 @@ pub fn radius(side: f32, fraction: f32) -> usize {
 
 /// Separable box blur, run [`BOX_PASSES`] times.
 ///
-/// Three passes of a box filter is a very good approximation of a Gaussian and is `O(n)` in the
-/// radius rather than `O(r)`. Deterministic: the accumulation order is fixed and there is no
-/// parallelism inside it, so invariant 4 holds without a seed.
+/// Three passes of a box filter is a very good approximation of a Gaussian. Each pass keeps a
+/// running sum, so its cost does not grow with the radius - which matters at full resolution,
+/// where the radii are several times larger than on a proxy - and rows are shared out across
+/// the processor's cores. Windows are clipped at the frame edge and averaged over the samples
+/// they hold.
+///
+/// Deterministic on every machine: each output sample is computed by one task, in a fixed
+/// order, and the way the rows are divided depends only on the frame and the radius - never on
+/// how many cores there are - so invariant 4 holds without a seed.
 #[must_use]
 pub fn blur(values: &[f32], width: usize, height: usize, radius: usize) -> Vec<f32> {
     let mut buffer = values.to_vec();
     buffer.resize(width * height, 0.0);
+    if width == 0 || height == 0 || radius == 0 {
+        return buffer;
+    }
     let mut scratch = vec![0.0f32; width * height];
     for _ in 0..BOX_PASSES {
-        box_pass_h(&buffer, &mut scratch, width, height, radius);
+        box_pass_h(&buffer, &mut scratch, width, radius);
         box_pass_v(&scratch, &mut buffer, width, height, radius);
     }
     buffer
 }
 
-fn box_pass_h(src: &[f32], dst: &mut [f32], width: usize, height: usize, radius: usize) {
-    if width == 0 {
-        return;
+/// One box pass each way: the mean of the `(2r+1)` square window around every sample,
+/// clipped at the frame edge. The same running sums and the same sharing of rows across cores
+/// as [`blur`], which is three of these.
+#[must_use]
+pub(crate) fn box_mean(values: &[f32], width: usize, height: usize, radius: usize) -> Vec<f32> {
+    let mut out = values.to_vec();
+    out.resize(width * height, 0.0);
+    if width == 0 || height == 0 || radius == 0 {
+        return out;
     }
-    for y in 0..height {
-        let row = y * width;
-        for x in 0..width {
-            let lo = x.saturating_sub(radius);
-            let hi = (x + radius).min(width - 1);
-            let mut sum = 0.0f32;
-            for i in lo..=hi {
-                sum += src.get(row + i).copied().unwrap_or(0.0);
-            }
-            if let Some(slot) = dst.get_mut(row + x) {
-                *slot = sum / (hi - lo + 1) as f32;
-            }
-        }
-    }
+    let mut scratch = vec![0.0f32; width * height];
+    box_pass_h(&out, &mut scratch, width, radius);
+    box_pass_v(&scratch, &mut out, width, height, radius);
+    out
 }
 
+/// One horizontal pass: every row's window mean, from a running sum in `f64`.
+fn box_pass_h(src: &[f32], dst: &mut [f32], width: usize, radius: usize) {
+    use rayon::prelude::*;
+    dst.par_chunks_exact_mut(width)
+        .zip(src.par_chunks_exact(width))
+        .for_each(|(out, row)| {
+            let mut sum: f64 = row.iter().take(radius + 1).map(|v| f64::from(*v)).sum();
+            for (x, slot) in out.iter_mut().enumerate() {
+                let lo = x.saturating_sub(radius);
+                let hi = (x + radius).min(width - 1);
+                *slot = (sum / (hi - lo + 1) as f64) as f32;
+                // Slide the window one sample to the right.
+                if x >= radius {
+                    sum -= row.get(x - radius).map_or(0.0, |v| f64::from(*v));
+                }
+                if let Some(v) = row.get(x + radius + 1) {
+                    sum += f64::from(*v);
+                }
+            }
+        });
+}
+
+/// One vertical pass. The frame is cut into bands of rows whose height depends only on the
+/// radius; each band starts its running column sums afresh and slides them down, so memory is
+/// read in order and the bands run in parallel.
 fn box_pass_v(src: &[f32], dst: &mut [f32], width: usize, height: usize, radius: usize) {
-    if height == 0 {
-        return;
-    }
-    for x in 0..width {
-        for y in 0..height {
-            let lo = y.saturating_sub(radius);
-            let hi = (y + radius).min(height - 1);
-            let mut sum = 0.0f32;
-            for i in lo..=hi {
-                sum += src.get(i * width + x).copied().unwrap_or(0.0);
+    use rayon::prelude::*;
+    let band = (radius * 4).max(64);
+    let rows: Vec<&[f32]> = src.chunks_exact(width).collect();
+    dst.par_chunks_mut(width * band)
+        .enumerate()
+        .for_each(|(index, out)| {
+            let first = index * band;
+            let mut sums = vec![0.0f64; width];
+            for row in rows
+                .iter()
+                .take((first + radius + 1).min(height))
+                .skip(first.saturating_sub(radius))
+            {
+                for (sum, v) in sums.iter_mut().zip(row.iter()) {
+                    *sum += f64::from(*v);
+                }
             }
-            if let Some(slot) = dst.get_mut(y * width + x) {
-                *slot = sum / (hi - lo + 1) as f32;
+            for (offset, line) in out.chunks_exact_mut(width).enumerate() {
+                let y = first + offset;
+                let lo = y.saturating_sub(radius);
+                let hi = (y + radius).min(height - 1);
+                let count = (hi - lo + 1) as f64;
+                for (slot, sum) in line.iter_mut().zip(sums.iter()) {
+                    *slot = (sum / count) as f32;
+                }
+                if y >= radius {
+                    if let Some(leaving) = rows.get(y - radius) {
+                        for (sum, v) in sums.iter_mut().zip(leaving.iter()) {
+                            *sum -= f64::from(*v);
+                        }
+                    }
+                }
+                if let Some(entering) = rows.get(y + radius + 1) {
+                    for (sum, v) in sums.iter_mut().zip(entering.iter()) {
+                        *sum += f64::from(*v);
+                    }
+                }
             }
-        }
-    }
+        });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The running-sum passes give the same windows as summing every sample of each one.
+    #[test]
+    fn running_sums_match_the_window_means_they_replace() {
+        let (w, h) = (37, 23);
+        let values: Vec<f32> = (0..w * h)
+            .map(|i| ((i * 7919) % 101) as f32 / 101.0)
+            .collect();
+        for radius in [0, 1, 4, 30] {
+            let mut naive = values.clone();
+            for _ in 0..BOX_PASSES {
+                let mut next = vec![0.0f32; w * h];
+                for y in 0..h {
+                    for x in 0..w {
+                        let (lo, hi) = (x.saturating_sub(radius), (x + radius).min(w - 1));
+                        next[y * w + x] =
+                            (lo..=hi).map(|i| naive[y * w + i]).sum::<f32>() / (hi - lo + 1) as f32;
+                    }
+                }
+                for x in 0..w {
+                    for y in 0..h {
+                        let (lo, hi) = (y.saturating_sub(radius), (y + radius).min(h - 1));
+                        naive[y * w + x] =
+                            (lo..=hi).map(|i| next[i * w + x]).sum::<f32>() / (hi - lo + 1) as f32;
+                    }
+                }
+            }
+            let fast = blur(&values, w, h, radius);
+            for (a, b) in fast.iter().zip(&naive) {
+                assert!((a - b).abs() < 1e-5, "radius {radius}: {a} vs {b}");
+            }
+        }
+    }
 
     fn plane(width: usize, height: usize, f: impl Fn(usize, usize) -> f32) -> Vec<f32> {
         let mut values = Vec::with_capacity(width * height);

@@ -123,12 +123,17 @@ export const blemishBrush = (region: NativeRetouchEdit['region']): NativeRetouch
   preserveMicrotexture: true, mask: { strokes: [] }, matte: null, selection: null, skin: null,
 });
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
+/** How sharp a preview is: the original's own resolution, or a screen-sized first look. */
+export type PreviewQuality = 'full' | 'fast';
 export const nativeRetouch = {
   autoPortrait: (photoId: string) => invoke<RecipeDto>('enhance_portrait', { input: { photoId } }),
   autoRetouch: (projectId: string, photoId: string, options: AutoRetouchOptions, global = false) => invoke<RecipeDto>('auto_retouch', { input: { projectId, photoId, global, options } }),
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
-  preview: (projectId: string, photoId: string, before = false) => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before}),
-  draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId}}),
+  /** The retouch view's photograph: `full` is the original's own resolution (ADR-0097), `fast` the first look. */
+  preview: (projectId: string, photoId: string, before = false, quality: PreviewQuality = 'full') => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before,quality}),
+  /** The photograph as taken, with no edits: what Original and Compare show. */
+  original: (projectId: string, photoId: string, quality: PreviewQuality = 'full') => invoke<RenderDto>('photo_original',{projectId,photoId,quality}),
+  draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null, quality: PreviewQuality = 'full') => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId,quality}}),
   selectionPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<SelectionPreview>('native_retouch_selection_preview',{input:{projectId,photoId,edit,replaceId}}),
   savedSelection: (projectId: string, photoId: string, operationId: string|null) => invoke<SelectionPreview>('native_retouch_saved_selection',{input:{projectId,photoId,operationId}}),
 };

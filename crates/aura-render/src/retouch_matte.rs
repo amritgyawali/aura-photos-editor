@@ -159,14 +159,21 @@ fn box_mean(values: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
         }
     }
     let mut out = vec![0.0_f32; w * h];
-    for y in 0..h {
-        let (y0, y1) = (y.saturating_sub(r), (y + r + 1).min(h));
-        for x in 0..w {
-            let (x0, x1) = (x.saturating_sub(r), (x + r + 1).min(w));
-            let total = sum[y1 * stride + x1] - sum[y0 * stride + x1] - sum[y1 * stride + x0]
-                + sum[y0 * stride + x0];
-            out[y * w + x] = (total / ((y1 - y0) * (x1 - x0)) as f64) as f32;
-        }
+    // Each output row reads the finished integral image only, so rows run in parallel.
+    {
+        use rayon::prelude::*;
+        out.par_chunks_exact_mut(w)
+            .enumerate()
+            .for_each(|(y, line)| {
+                let (y0, y1) = (y.saturating_sub(r), (y + r + 1).min(h));
+                for (x, slot) in line.iter_mut().enumerate() {
+                    let (x0, x1) = (x.saturating_sub(r), (x + r + 1).min(w));
+                    let total =
+                        sum[y1 * stride + x1] - sum[y0 * stride + x1] - sum[y1 * stride + x0]
+                            + sum[y0 * stride + x0];
+                    *slot = (total / ((y1 - y0) * (x1 - x0)) as f64) as f32;
+                }
+            });
     }
     out
 }

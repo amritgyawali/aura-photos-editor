@@ -2,6 +2,21 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Full-quality previews that stay loaded - 2026-10-07
+
+- The editor now shows the photograph at its own resolution, rendered from the original file,
+  instead of an optimised 2048-pixel proxy - edited, original, before and after alike - with
+  every stage run as an export runs them. A quick look appears within seconds and the
+  full-quality picture replaces it when ready; the status line says which is on screen.
+- Every finished preview is kept in the window, in the app and on disk, so a photograph opens
+  instantly when you return to it - after another section, another photo or a restart - and the
+  editor stays where you left it while you visit other sections. A changed edit is always
+  rendered fresh. **Clear cache** removes the saved previews too.
+- Retouch rendering is several times faster: the frequency-separation blur no longer slows down
+  with its radius, and the heavy steps use every processor core while giving the same result on
+  every machine. A retouched 6 MP portrait renders at full quality in about 17 s instead of 91 s.
+  See ADR-0097.
+
 ## Dark circles corrected where they are - 2026-10-07
 
 - Fix dark circles under the eyes staying dark while the skin below them turned pale or

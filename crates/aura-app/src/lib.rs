@@ -94,6 +94,7 @@ pub mod portrait_auto;
 pub mod portrait_commands;
 pub mod portrait_features;
 pub mod preview_commands;
+pub mod preview_render;
 pub mod qc_commands;
 pub mod reference_style;
 pub mod restore_commands;

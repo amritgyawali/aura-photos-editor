@@ -20,6 +20,29 @@ photo row -> primary file -> tier 1 embedded JPEG   -> cache/<hh>/<hash>.p1.thum
 - The `preview` table records that an entry exists. A missing file is healed on
   the next request, not repaired by hand.
 
+## Editing previews (ADR-0097)
+
+The Studio and Retouch views show the photograph at its own resolution, decoded from the
+original file - not the 2048 px proxy above. The first time a version of an edit is shown, a
+quick screen-sized look arrives in seconds and the full-quality picture replaces it when it is
+ready; the status line says which one is on screen. Finished editing previews are kept:
+
+```text
+in the window   -> the last ~640 MB of previews, for the session (moving between sections is instant)
+in the app      -> the last 384 MB of finished previews, for the session
+on disk         -> cache/edited-previews-v1/<key>.bin, up to 3 GB, oldest removed first
+```
+
+The key is the photograph, the original's content hash, the size, and the renderer's hash of
+the recipe, engine and output, so a changed edit is always rendered again and a stale picture is
+never shown. **Clear cache** in Settings removes the disk copies too. Nothing here is used for
+export or analysis, which always render the original directly.
+
+Expected on the reference laptop (8 threads, development build): a 6 MP retouched portrait in
+about 17 s the first time and 0.1 s after; a 28 MP camera JPEG in about 60 s and 0.3 s after.
+If every visit is slow, check that `cache/edited-previews-v1` is being written (free space,
+permissions); a missing folder means each preview is rendered from scratch.
+
 ## Symptom: no thumbnails at all
 
 1. Does the Problems list have rows? If so, open the runbook for the code shown.

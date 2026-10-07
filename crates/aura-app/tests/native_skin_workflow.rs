@@ -115,6 +115,7 @@ fn manual_skin_selection_survives_repeated_native_retouch() {
         photo_id: photo.clone(),
         edit: manual.clone(),
         replace_id: Some(manual.id.clone()),
+        quality: None,
     };
     selection.edit.enabled = true;
     let mask_before =

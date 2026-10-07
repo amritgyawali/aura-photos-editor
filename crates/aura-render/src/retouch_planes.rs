@@ -8,6 +8,8 @@
 // Every plane is `width * height` long and every coordinate is bounded before it is used.
 #![allow(clippy::indexing_slicing)]
 
+use rayon::prelude::*;
+
 /// Linear Rec.2020 luminance, the weights every retouch operator in this crate uses.
 pub(crate) fn luma(p: [f32; 3]) -> f32 {
     p[0] * 0.2627 + p[1] * 0.6780 + p[2] * 0.0593
@@ -53,59 +55,15 @@ impl Rect {
     }
 }
 
-/// One box pass along rows with a running sum, so the cost is the same at every radius.
-fn box_rows(src: &[f32], dst: &mut [f32], w: usize, h: usize, radius: usize) {
-    for y in 0..h {
-        let row = &src[y * w..(y + 1) * w];
-        let out = &mut dst[y * w..(y + 1) * w];
-        let mut sum: f64 = row.iter().take(radius + 1).map(|v| f64::from(*v)).sum();
-        for x in 0..w {
-            let lo = x.saturating_sub(radius);
-            let hi = (x + radius + 1).min(w);
-            out[x] = (sum / (hi - lo) as f64) as f32;
-            if x >= radius {
-                sum -= f64::from(row[x - radius]);
-            }
-            if x + radius + 1 < w {
-                sum += f64::from(row[x + radius + 1]);
-            }
-        }
-    }
-}
-
-/// The same pass along columns.
-fn box_columns(src: &[f32], dst: &mut [f32], w: usize, h: usize, radius: usize) {
-    for x in 0..w {
-        let mut sum: f64 = (0..(radius + 1).min(h))
-            .map(|y| f64::from(src[y * w + x]))
-            .sum();
-        for y in 0..h {
-            let lo = y.saturating_sub(radius);
-            let hi = (y + radius + 1).min(h);
-            dst[y * w + x] = (sum / (hi - lo) as f64) as f32;
-            if y >= radius {
-                sum -= f64::from(src[(y - radius) * w + x]);
-            }
-            if y + radius + 1 < h {
-                sum += f64::from(src[(y + radius + 1) * w + x]);
-            }
-        }
-    }
-}
-
 /// Three box passes: a close approximation of a Gaussian whose standard deviation is about
-/// the radius. Fixed order and no parallelism, so the result is the same on every machine.
+/// the radius. The one implementation is [`crate::bands::blur`]: a running sum per pass, so the
+/// cost is the same at every radius, rows shared across cores, and the same result on every
+/// machine.
 pub(crate) fn blur(values: &[f32], w: usize, h: usize, radius: usize) -> Vec<f32> {
-    let mut buffer = values.to_vec();
-    if w == 0 || h == 0 || radius == 0 || buffer.len() != w * h {
-        return buffer;
+    if w == 0 || h == 0 || radius == 0 || values.len() != w * h {
+        return values.to_vec();
     }
-    let mut scratch = vec![0.0_f32; w * h];
-    for _ in 0..3 {
-        box_rows(&buffer, &mut scratch, w, h, radius);
-        box_columns(&scratch, &mut buffer, w, h, radius);
-    }
-    buffer
+    crate::bands::blur(values, w, h, radius)
 }
 
 /// A blur that averages weighted samples only: `blur(v * weight) / blur(weight)`.
@@ -381,9 +339,30 @@ impl Grid {
     /// Bilinear interpolation of the grid's levels and supports to every cell. A cell whose
     /// four samples counted nothing keeps `own`.
     fn spread(self, levels: &[f32], supports: &[f32], own: &[f32]) -> Percentile {
+        // Rows are independent, so they are interpolated in parallel and joined in order.
+        let rows: Vec<(Vec<f32>, Vec<f32>)> = (0..self.h)
+            .into_par_iter()
+            .map(|y| self.spread_row(y, levels, supports, own))
+            .collect();
         let mut level = Vec::with_capacity(self.w * self.h);
         let mut support = Vec::with_capacity(self.w * self.h);
-        for y in 0..self.h {
+        for (l, s) in rows {
+            level.extend(l);
+            support.extend(s);
+        }
+        Percentile { level, support }
+    }
+
+    fn spread_row(
+        self,
+        y: usize,
+        levels: &[f32],
+        supports: &[f32],
+        own: &[f32],
+    ) -> (Vec<f32>, Vec<f32>) {
+        let mut level = Vec::with_capacity(self.w);
+        let mut support = Vec::with_capacity(self.w);
+        {
             let (ky, ny, ty) = self.locate(y, self.h, self.rows);
             for x in 0..self.w {
                 let (kx, nx, tx) = self.locate(x, self.w, self.cols);
@@ -407,7 +386,7 @@ impl Grid {
                 support.push(held);
             }
         }
-        Percentile { level, support }
+        (level, support)
     }
 }
 
@@ -441,53 +420,65 @@ pub(crate) fn local_percentile(
     };
     let grid = Grid::new(w, h, step);
     let top = (PERCENTILE_BINS - 1) as f32;
-    let mut levels = vec![f32::NAN; grid.cols * grid.rows];
-    let mut supports = vec![0.0_f32; grid.cols * grid.rows];
-    let mut hist = vec![0_u32; PERCENTILE_BINS];
     let share = share.clamp(0.0, 1.0);
-    for gy in 0..grid.rows {
-        let y = grid.at(gy, h);
-        let rows = y.saturating_sub(radius)..(y + radius + 1).min(h);
-        hist.fill(0);
-        let mut total = 0_u32;
-        let mut columns = 0..0;
-        for gx in 0..grid.cols {
-            let x = grid.at(gx, w);
-            let wanted = x.saturating_sub(radius)..(x + radius + 1).min(w);
-            // Columns that left the window on the left, then columns that entered on the right.
-            let leaving = (columns.start..wanted.start.min(columns.end)).map(|c| (c, false));
-            let entering = (columns.end.max(wanted.start)..wanted.end).map(|c| (c, true));
-            for (column, enter) in leaving.chain(entering) {
-                for row in rows.clone() {
-                    let b = bins[row * w + column];
-                    if b == u16::MAX {
-                        continue;
+    // Each grid row slides its own histogram, so the rows run in parallel and are joined in
+    // order: the same answer on every machine.
+    let rows: Vec<(Vec<f32>, Vec<f32>)> = (0..grid.rows)
+        .into_par_iter()
+        .map(|gy| {
+            let mut levels = vec![f32::NAN; grid.cols];
+            let mut supports = vec![0.0_f32; grid.cols];
+            let mut hist = vec![0_u32; PERCENTILE_BINS];
+            let y = grid.at(gy, h);
+            let rows = y.saturating_sub(radius)..(y + radius + 1).min(h);
+            hist.fill(0);
+            let mut total = 0_u32;
+            let mut columns = 0..0;
+            for gx in 0..grid.cols {
+                let x = grid.at(gx, w);
+                let wanted = x.saturating_sub(radius)..(x + radius + 1).min(w);
+                // Columns that left the window on the left, then columns that entered on the right.
+                let leaving = (columns.start..wanted.start.min(columns.end)).map(|c| (c, false));
+                let entering = (columns.end.max(wanted.start)..wanted.end).map(|c| (c, true));
+                for (column, enter) in leaving.chain(entering) {
+                    for row in rows.clone() {
+                        let b = bins[row * w + column];
+                        if b == u16::MAX {
+                            continue;
+                        }
+                        if enter {
+                            hist[usize::from(b)] += 1;
+                            total += 1;
+                        } else {
+                            hist[usize::from(b)] -= 1;
+                            total -= 1;
+                        }
                     }
-                    if enter {
-                        hist[usize::from(b)] += 1;
-                        total += 1;
-                    } else {
-                        hist[usize::from(b)] -= 1;
-                        total -= 1;
+                }
+                columns = wanted;
+                let g = gx;
+                supports[g] = total as f32 / (rows.len() * columns.len()) as f32;
+                if total == 0 {
+                    continue;
+                }
+                let target = (share * total as f32).max(0.5);
+                let mut seen = 0_u32;
+                for (bin, count) in hist.iter().enumerate() {
+                    seen += count;
+                    if seen as f32 >= target {
+                        levels[g] = lo + bin as f32 / top * span;
+                        break;
                     }
                 }
             }
-            columns = wanted;
-            let g = gy * grid.cols + gx;
-            supports[g] = total as f32 / (rows.len() * columns.len()) as f32;
-            if total == 0 {
-                continue;
-            }
-            let target = (share * total as f32).max(0.5);
-            let mut seen = 0_u32;
-            for (bin, count) in hist.iter().enumerate() {
-                seen += count;
-                if seen as f32 >= target {
-                    levels[g] = lo + bin as f32 / top * span;
-                    break;
-                }
-            }
-        }
+            (levels, supports)
+        })
+        .collect();
+    let mut levels = Vec::with_capacity(grid.cols * grid.rows);
+    let mut supports = Vec::with_capacity(grid.cols * grid.rows);
+    for (l, s) in rows {
+        levels.extend(l);
+        supports.extend(s);
     }
     grid.spread(&levels, &supports, values)
 }
