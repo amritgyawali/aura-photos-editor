@@ -62,10 +62,11 @@ Two passes. Nothing is generated: every value written is this photograph's own s
 
 Without a matte the operation is a **brush**: the reference also reads the skin around the
 stroke, the threshold is 15 % lower, dark-only spots need no enclosure, and a compact bump
-brighter than the skin on every side counts. Hair under a brush - a group more than 45 %
-darker than the skin the brush was painted on - must be the size of a mark and enclosed by
-skin: the first build of the brush, dabbed beside a brow in the application, faded the end of
-the brow.
+brighter than the skin on every side counts. Hair the brush crosses - a region well over
+40 % darker than the brighter skin around it, textured like strands, and reaching past the
+stroke - is kept out of detection and out of the rebuild: the first build of the brush,
+dabbed beside a brow in the application, faded the end of the brow. A dark mark at the edge of
+a shadow is smooth and lies inside the stroke, and is still cleared.
 
 ### Where the automatic pass uses it
 
