@@ -930,18 +930,9 @@ fn face_exposure_cap(
     if faces.is_empty() {
         return (exposure, None);
     }
-    // The histogram correction keeps uniformly dark frames within 0.25 EV because it cannot
-    // tell a silhouette from underexposure. A detected face says it is not a silhouette.
+    // A detected face identifies the subject, not its intended brightness. Dark complexion
+    // and low-key lighting must not be treated as proof of underexposure. ADR-0096.
     let requested = exposure;
-    let (w, h) = (px.width, px.height);
-    let mut all: Vec<f32> = (0..h)
-        .flat_map(|y| (0..w).map(move |x| (x, y)))
-        .map(|(x, y)| luma(px.linear(x, y)))
-        .collect();
-    let median = percentile(&mut all, 0.5);
-    let high = aura_raw::colour::curve::srgb_encode(percentile(&mut all, 0.95));
-    let raised =
-        (high < 0.6 && exposure >= 0.0).then(|| (0.18 / median.max(0.002)).log2().clamp(0.0, 1.5));
     let (w, h) = (px.width, px.height);
     let mut face = Vec::new();
     let mut frame = Vec::new();
@@ -982,22 +973,19 @@ fn face_exposure_cap(
             );
         }
     }
-    // A dark frame around a face is evidence of underexposure only when the face itself is
-    // dark. Dark hair, dark clothes and a grey wall around a well-lit face are not, and
-    // brightening them would lighten somebody's skin for no photographic reason.
-    let exposure = match raised {
-        Some(raised) if face_median < 0.3 => exposure.max(raised),
-        _ => exposure,
-    };
     // And when the people are not darker than the frame around them, the frame's darkness is
     // not theirs: at most a small lift, however far the median sits from middle grey.
-    let surroundings = exposure > 0.25 && face_median >= frame_median;
-    let exposure = if surroundings { 0.25 } else { exposure };
+    let surroundings = face_median >= frame_median;
+    let exposure = if surroundings {
+        exposure.min(0.25)
+    } else {
+        exposure
+    };
     // The surroundings rule answers a histogram that wants middle grey. Highlights are a
     // different witness: when nothing in the frame, the people included, comes near white, the
     // whole frame is low, and a night scene is the one exception.
     let night = intent(&measure(px, faces)) == Some(SceneKind::Night);
-    let anchor = highlight_lift(px).filter(|(lift, _)| !night && *lift > exposure);
+    let anchor = highlight_lift(px).filter(|(lift, _)| !night && !surroundings && *lift > exposure);
     let exposure = anchor.map_or(exposure, |(lift, _)| lift);
     // Nor is a white wall evidence that the people in front of it are overexposed.
     if exposure < 0.0 && face_median < 0.6 {
@@ -1460,6 +1448,37 @@ mod tests {
 
     fn pixels(rgb: &[u8], w: u32, h: u32) -> Pixels<'_> {
         Pixels::new(rgb, w, h).unwrap()
+    }
+
+    #[test]
+    fn dark_complexions_on_dark_backdrops_do_not_trigger_a_white_anchor_lift() {
+        let face = PortraitFace {
+            bounds: [0.2, 0.2, 0.8, 0.8],
+            landmarks: [
+                [0.35, 0.4],
+                [0.65, 0.4],
+                [0.5, 0.5],
+                [0.4, 0.65],
+                [0.6, 0.65],
+            ],
+            confidence: 0.95,
+        };
+        for skin in [60_u8, 90, 140, 180] {
+            let mut rgb = vec![skin / 3; 100 * 100 * 3];
+            for y in 20..80 {
+                for x in 20..80 {
+                    rgb[(y * 100 + x) * 3..(y * 100 + x + 1) * 3].fill(skin);
+                }
+            }
+            let px = pixels(&rgb, 100, 100);
+            for asked in [0.0, 0.15, 0.75] {
+                let (used, _) = face_exposure_cap(asked, &px, std::slice::from_ref(&face));
+                assert!(
+                    used <= asked.min(0.25) + 1e-5,
+                    "skin {skin}, asked {asked}, used {used}"
+                );
+            }
+        }
     }
 
     #[test]

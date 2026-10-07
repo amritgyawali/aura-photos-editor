@@ -20,6 +20,15 @@ photo row -> primary file -> tier 1 embedded JPEG   -> cache/<hh>/<hash>.p1.thum
 - The `preview` table records that an entry exists. A missing file is healed on
   the next request, not repaired by hand.
 
+## Editing view previews
+
+Editing views use a disposable 768-pixel preview and keep up to 16 recently rendered
+results within a 32 MiB memory budget (ADR-0095). Changing edits, photograph, output
+space or requested size selects a different result; Undo/Redo can reuse a recent one.
+These pixels never become the export input. Export still renders the full-resolution
+original, writes a separate file and may take substantially longer than a preview.
+The edited cache resets on restart; first opening can still build the source proxy.
+
 ## Symptom: no thumbnails at all
 
 1. Does the Problems list have rows? If so, open the runbook for the code shown.

@@ -317,18 +317,20 @@ pub fn render_image(state: &AppState, input: &RenderImageInput) -> IpcResult<Ren
         _ => RenderPurpose::Interactive,
     };
 
-    let engine = state.render()?;
-    let rendered = engine.render(aura_render::contract::render::RenderRequest {
-        image_id: photo,
-        recipe,
-        level,
-        output: OutputSpec {
-            colour_space,
-            bit_depth: 8,
-            icc: None,
+    let rendered = crate::preview_render::render(
+        state,
+        aura_render::contract::render::RenderRequest {
+            image_id: photo,
+            recipe,
+            level,
+            output: OutputSpec {
+                colour_space,
+                bit_depth: 8,
+                icc: None,
+            },
+            purpose,
         },
-        purpose,
-    })?;
+    )?;
 
     let bytes = match &rendered.data {
         RenderedData::Eight(bytes) => bytes.clone(),

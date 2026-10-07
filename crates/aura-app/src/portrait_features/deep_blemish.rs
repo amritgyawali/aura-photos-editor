@@ -16,6 +16,19 @@ struct Spot {
     red: f32,
 }
 
+/// A dense pattern is ambiguous; retain its weak colour departures while still allowing
+/// distinctly red, compact candidates to be reviewed as repairs. Darkness never grants this
+/// exception, and redness is a departure from the same person's surrounding skin. ADR-0096.
+fn protect_dense_pattern(spots: &mut Vec<&Spot>, settings: &Settings) -> usize {
+    if !settings.keep_freckles || settings.remove_dark_marks || spots.len() <= super::FRECKLE_FIELD
+    {
+        return 0;
+    }
+    let before = spots.len();
+    spots.retain(|s| s.red >= 0.025);
+    before - spots.len()
+}
+
 // Deterministic four-connected components, including zero-valued mask holes.
 pub(super) fn components(mask: &[bool], w: usize, h: usize) -> Vec<Vec<usize>> {
     let mut seen = vec![false; mask.len()];
@@ -373,7 +386,7 @@ pub(crate) fn plan(
     let inside = clearance(&mask, w, h);
     let mut no_donor = 0;
     let red_threshold = 0.012 - settings.blemish_sensitivity * 0.006;
-    let eligible: Vec<_> = spots
+    let mut eligible: Vec<_> = spots
         .iter()
         .filter(|s| {
             let keep = !settings.remove_dark_marks && s.red < red_threshold;
@@ -383,15 +396,13 @@ pub(crate) fn plan(
             !keep
         })
         .collect();
-    // Keep-freckles means a dense field is opt-out unless dark-mark removal was requested.
-    if settings.keep_freckles
-        && !settings.remove_dark_marks
-        && eligible.len() > super::FRECKLE_FIELD
-    {
-        out.report.findings.push(
-            "Deep cleanup: dense mark pattern kept; turn off Keep freckles to repair it.".into(),
-        );
-        return out;
+    let protected = protect_dense_pattern(&mut eligible, settings);
+    if protected > 0 {
+        out.report.marks_kept += protected;
+        out.report.findings.push(format!(
+            "Deep cleanup: kept {protected} ambiguous marks in a dense pattern; only {} distinctly red compact candidates remain for repair. Natural dark marks stay protected; review the proposed repairs.",
+            eligible.len()
+        ));
     }
     for spot in eligible {
         if out.blemishes.len() >= usize::from(settings.max_spots).min(220) {
@@ -959,6 +970,39 @@ pub(crate) fn texture_graft(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_dense_pattern_keeps_freckles_but_does_not_hide_distinct_red_spots() {
+        let weak = Spot {
+            x: 20.0,
+            y: 20.0,
+            radius: 3.0,
+            score: 1.0,
+            red: 0.012,
+        };
+        let red = Spot {
+            red: 0.05,
+            ..weak.clone()
+        };
+        let mut pattern = vec![&weak; 30];
+        pattern.extend([&red; 4]);
+        assert_eq!(
+            protect_dense_pattern(&mut pattern, &Settings::default()),
+            30
+        );
+        assert_eq!(pattern.len(), 4);
+        assert!(pattern.iter().all(|s| s.red == red.red));
+        let mut freckles = vec![&weak; 30];
+        protect_dense_pattern(&mut freckles, &Settings::default());
+        assert!(freckles.is_empty());
+        let mut explicit = vec![&weak; 30];
+        let asked = Settings {
+            remove_dark_marks: true,
+            ..Settings::default()
+        };
+        assert_eq!(protect_dense_pattern(&mut explicit, &asked), 0);
+        assert_eq!(explicit.len(), 30);
+    }
     #[test]
     fn only_small_enclosed_holes_are_filled() {
         let mut mask = vec![true; 40 * 40];

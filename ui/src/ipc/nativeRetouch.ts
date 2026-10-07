@@ -68,7 +68,7 @@ export type RetouchSettings = {
 };
 export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
-  smoothing: .5, texture: .5, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
+  smoothing: .5, texture: .85, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
   blemishSensitivity: .5, maxSpots: 12, keepFreckles: true,
   deepBlemishCleanup: false, removeDarkMarks: false,
@@ -78,7 +78,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   eyeWhitening: .2, eyeVessels: .5, irisDetail: .5, irisBrightness: 0, redEye: true, lashDefinition: 0, browDefinition: 0,
   teethWhitening: .5, lipColour: 0, lipDefinition: 0,
   contour: 0, highlight: 0, blush: 0, faceLight: 0,
-  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: .25, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
+  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
   hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0,
 };
 /** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */

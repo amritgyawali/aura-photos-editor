@@ -149,6 +149,7 @@ pub struct AppState {
     /// separate keeps each wedding's cache accounting - and its budget - its
     /// own, which is what a photographer expects when they archive one job.
     previews: Arc<Mutex<BTreeMap<String, Arc<Previews>>>>,
+    pub(crate) preview_renders: Arc<Mutex<crate::preview_render::PreviewRenders>>,
     cache_root: PathBuf,
     /// Where `models.lock`, its signature and the model files live.
     ///
@@ -276,6 +277,7 @@ impl AppState {
             imports: Arc::new(Mutex::new(BTreeMap::new())),
             runs: Arc::new(Mutex::new(BTreeMap::new())),
             previews: Arc::new(Mutex::new(BTreeMap::new())),
+            preview_renders: Arc::default(),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -298,6 +300,7 @@ impl AppState {
             imports: Arc::new(Mutex::new(BTreeMap::new())),
             runs: Arc::new(Mutex::new(BTreeMap::new())),
             previews: Arc::new(Mutex::new(BTreeMap::new())),
+            preview_renders: Arc::default(),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -1425,6 +1428,7 @@ impl AppState {
     pub fn with_cache_root(mut self, root: &Path) -> Self {
         self.cache_root = root.to_path_buf();
         self.previews.lock().clear();
+        self.preview_renders.lock().clear();
         self
     }
 

@@ -325,7 +325,7 @@ pub fn plan_with_faces(
         message: String::new(),
         faces: Vec::new(),
         assessments: Vec::new(),
-        planner_version: format!("sample-consensus-v3+{}", portrait_features::VERSION),
+        planner_version: format!("sample-consensus-v5+{}", portrait_features::VERSION),
         steps: Vec::new(),
         scene: None,
         options: Some(options),
@@ -490,6 +490,9 @@ pub fn plan_with_faces(
         } else {
             FacePlan::skip("")
         };
+        // Hands beside a face can be labelled body skin over an eyelid or lip. Body work
+        // must never double-retouch any detected face, including another person in a group.
+        exclude_body_faces(&mut body.edits, &report.faces, &mut mattes)?;
         // Hair and clothes are finished whatever skin was chosen, when asked for.
         let mut garments = Vec::new();
         if let Some(p) = person {
@@ -880,7 +883,9 @@ fn representative_sample(samples: &[Sample]) -> Option<(Sample, [f32; 3])> {
         .filter(|s| color_distance(s.chroma, chroma) <= 0.12)
         .collect();
     let score = |s: &&Sample| {
-        s.variation + color_distance(s.chroma, chroma) * 0.4 + (s.mean - luminance).abs() * 0.04
+        s.variation / s.mean.max(0.02) * 0.1
+            + color_distance(s.chroma, chroma)
+            + (s.mean / luminance.max(0.02)).ln().abs() * 0.04
     };
     let sample = **candidates
         .iter()
@@ -888,15 +893,14 @@ fn representative_sample(samples: &[Sample]) -> Option<(Sample, [f32; 3])> {
     let texture = median(candidates.iter().map(|s| s.variation));
     let color_spread = median(candidates.iter().map(|s| color_distance(s.chroma, chroma)));
     let light_spread = median(candidates.iter().map(|s| (s.mean - luminance).abs()));
-    // Low signal gets a gentler correction regardless of complexion. Variations
-    // are relative to each face's own signal rather than to a desired skin tone.
-    let signal = if luminance < 0.15 { 0.65 } else { 1.0 };
+    // Relative variation, not absolute skin brightness, decides the correction. Multiplying
+    // all samples by the same exposure must not classify a darker complexion as poor skin.
     Some((
         sample,
         [
-            (0.5 + texture / luminance.max(0.08) * 0.4).clamp(0.5, 0.8) * signal,
-            (0.25 + color_spread * 1.5).clamp(0.25, 0.5) * signal,
-            (0.2 + light_spread / luminance.max(0.08) * 0.5).clamp(0.2, 0.4) * signal,
+            (0.5 + texture / luminance.max(0.02) * 0.4).clamp(0.5, 0.8),
+            (0.25 + color_spread * 1.5).clamp(0.25, 0.5),
+            (0.2 + light_spread / luminance.max(0.02) * 0.5).clamp(0.2, 0.4),
         ],
     ))
 }
@@ -1042,7 +1046,7 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
     FacePlan {
         edits,
         sample: Some(sample),
-        reason: format!("Compared {} cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.{}", candidates.len(), if sample.mean < 0.15 { " Low skin signal reduces correction strength." } else { "" }),
+        reason: format!("Compared {} cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's relative texture, color variation and lighting, without a target complexion. Eyes and mouth remain excluded.", candidates.len()),
     }
 }
 
@@ -1826,6 +1830,57 @@ fn use_matte(edit: &mut Edit, matte: &MatteUse, size: [f32; 2]) {
     edit.skin = None;
 }
 
+/// Intersect body selections with the exterior of every detected face. Keep the original
+/// selection and sample; even a body-only pass or a colour-sampling fallback cannot change
+/// facial features. Vision already refined the body edges; further upsampling must not fill
+/// the protected face holes back in. ADR-0096.
+fn exclude_body_faces(
+    edits: &mut [Edit],
+    faces: &[PortraitFace],
+    mattes: &mut BTreeMap<String, Matte>,
+) -> AuraResult<()> {
+    let invalid = || {
+        aura_core::errors::render::recipe_invalid(
+            "body skin",
+            "Cannot validate the facial exclusions",
+        )
+    };
+    let mut created = BTreeMap::new();
+    for edit in edits {
+        let id = format!("{}-outside-faces", edit.matte.as_ref().unwrap_or(&edit.id));
+        if !created.contains_key(&id) {
+            let full;
+            let original = if let Some(existing) = &edit.matte {
+                mattes.get(existing).ok_or_else(invalid)?
+            } else {
+                full = Matte::encode([0.0, 0.0, 1.0, 1.0], 256, 256, &vec![255; 256 * 256]);
+                &full
+            };
+            let mut alpha = original.decode().ok_or_else(invalid)?;
+            let [l, t, r, b] = original.bounds;
+            let w = original.width as usize;
+            let dx = (r - l) / original.width as f32;
+            let dy = (b - t) / original.height as f32;
+            for (i, value) in alpha.iter_mut().enumerate() {
+                let x = l + (i % w) as f32 * dx + dx * 0.5;
+                let y = t + (i / w) as f32 * dy + dy * 0.5;
+                if faces.iter().any(|f| {
+                    let [left, top, right, bottom] = f.bounds;
+                    x >= left - dx && x <= right + dx && y >= top - dy && y <= bottom + dy
+                }) {
+                    *value = 0;
+                }
+            }
+            let mut matte = Matte::encode(original.bounds, original.width, original.height, &alpha);
+            matte.refine_edges = false;
+            created.insert(id.clone(), matte);
+        }
+        edit.matte = Some(id);
+    }
+    mattes.extend(created);
+    Ok(())
+}
+
 /// Scale the measured face-skin strengths by the photographer's settings.
 fn tune_face(edits: Vec<Edit>, settings: &Settings) -> Vec<Edit> {
     edits
@@ -2413,6 +2468,62 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overlapping_body_selections_never_change_any_detected_face() {
+        let (rgb, face) = person(None);
+        let mut edit = plan_face(&face, 0, &rgb, 200, 300).edits.remove(0);
+        edit.tool = Tool::Dodge;
+        edit.amount = 1.0;
+        edit.region = [0.5, 0.5, 1.0, 1.0];
+        edit.mask = None;
+        edit.skin = None;
+        edit.feather = 0.0;
+        let mut neighbour = face.clone();
+        neighbour.bounds = [0.65, 0.65, 0.85, 0.85];
+        let faces = [face, neighbour];
+        for has_matte in [false, true] {
+            let mut edit = edit.clone();
+            let mut mattes = BTreeMap::new();
+            if has_matte {
+                mattes.insert(
+                    "body".into(),
+                    Matte::encode([0., 0., 1., 1.], 32, 48, &vec![255; 32 * 48]),
+                );
+                edit.matte = Some("body".into());
+            }
+            let mut edits = [edit];
+            exclude_body_faces(&mut edits, &faces, &mut mattes).unwrap();
+            retouch_tools::validate(&edits).unwrap();
+            for (w, h) in [(100, 150), (400, 600)] {
+                let mut pixels = [0.3_f32, 0.2, 0.1].repeat(w * h);
+                let original = pixels.clone();
+                aura_render::retouch_tools::apply_with_mattes(&mut pixels, w, h, &edits, &mattes);
+                assert_ne!(
+                    pixels, original,
+                    "body correction still works outside faces"
+                );
+                for y in 0..h {
+                    for x in 0..w {
+                        let (fx, fy) = (x as f32 / w as f32, y as f32 / h as f32);
+                        if faces.iter().any(|f| {
+                            fx >= f.bounds[0]
+                                && fx <= f.bounds[2]
+                                && fy >= f.bounds[1]
+                                && fy <= f.bounds[3]
+                        }) {
+                            let i = (y * w + x) * 3;
+                            assert_eq!(
+                                &pixels[i..i + 3],
+                                &original[i..i + 3],
+                                "body changed face at {x},{y}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn body_shine_is_not_duplicated_during_a_repeat_pass() {
         let (rgb, face) = person(None);
@@ -2455,7 +2566,7 @@ mod tests {
         )
         .unwrap();
         assert!(textured[0] > gentle[0]);
-        let (_, low_signal) = representative_sample(
+        let (_, darker) = representative_sample(
             &[Sample {
                 mean: 0.1,
                 variation: 0.001,
@@ -2463,7 +2574,12 @@ mod tests {
             }; 3],
         )
         .unwrap();
-        assert!(low_signal[0] < gentle[0]);
+        for (a, b) in gentle.into_iter().zip(darker) {
+            assert!(
+                (a - b).abs() < 1e-6,
+                "relative texture must not depend on complexion"
+            );
+        }
         let (_, uneven) = representative_sample(&[
             Sample { mean: 0.3, ..calm },
             calm,
@@ -2796,6 +2912,7 @@ mod tests {
         let settings = Settings {
             body_redness: 0.5,
             body_blemishes: 0.5,
+            match_body_to_face: 0.25,
             neck_lines: 0.5,
             ..Settings::default()
         };

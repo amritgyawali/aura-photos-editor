@@ -131,7 +131,8 @@ pub struct Settings {
     // -- Body ------------------------------------------------------------------------------
     pub body_smoothing: f32,
     pub body_tone: f32,
-    /// Body skin colour moved toward the same person's face colour.
+    /// Opt-in body skin colour matching to the same person's face. Neutral by default:
+    /// tanning and differences between face and body are part of the original complexion.
     pub match_body_to_face: f32,
     pub body_shine: f32,
     /// Red hands, knuckles and elbows evened.
@@ -159,7 +160,7 @@ impl Default for Settings {
             protect_eye_area: true,
             protect_nose_detail: true,
             smoothing: 0.5,
-            texture: 0.5,
+            texture: 0.85,
             smoothing_size: 0.5,
             tone_evenness: 0.5,
             light_evenness: 0.5,
@@ -201,7 +202,7 @@ impl Default for Settings {
             face_light: 0.0,
             body_smoothing: 0.5,
             body_tone: 0.5,
-            match_body_to_face: 0.25,
+            match_body_to_face: 0.0,
             body_shine: 0.25,
             body_redness: 0.0,
             body_blemishes: 0.0,

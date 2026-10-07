@@ -7,7 +7,6 @@ use crate::{
 use aura_core::{PhotoId, ProjectId};
 pub use aura_recipe::retouch_tools::Edit;
 use aura_recipe::{retouch_tools, schema, EditSource};
-use aura_render::RenderService;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -258,17 +257,23 @@ fn render_preview(
     recipe.geometry = aura_recipe::Geometry::default();
     // Post-crop decoration is reviewed in Develop, not baked into a full-frame retouch view.
     recipe.global.effects = aura_recipe::Effects::default();
-    let result = state.render()?.render(aura_render::RenderRequest {
-        image_id,
-        recipe,
-        level: aura_render::RenderLevel::Screen(1600, 1200),
-        purpose: aura_render::RenderPurpose::Interactive,
-        output: aura_render::OutputSpec {
-            colour_space: aura_render::OutputColour::Srgb,
-            bit_depth: 8,
-            icc: None,
+    let result = crate::preview_render::render(
+        state,
+        aura_render::RenderRequest {
+            image_id,
+            recipe,
+            level: aura_render::RenderLevel::Screen(
+                aura_render::cpu::INTERACTIVE_PREVIEW_EDGE,
+                aura_render::cpu::INTERACTIVE_PREVIEW_EDGE,
+            ),
+            purpose: aura_render::RenderPurpose::Interactive,
+            output: aura_render::OutputSpec {
+                colour_space: aura_render::OutputColour::Srgb,
+                bit_depth: 8,
+                icc: None,
+            },
         },
-    })?;
+    )?;
     let bytes = match &result.data {
         aura_render::RenderedData::Eight(v) => v.clone(),
         aura_render::RenderedData::Sixteen(v) => v.iter().map(|x| (x >> 8) as u8).collect(),

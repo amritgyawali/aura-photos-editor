@@ -39,6 +39,10 @@ use crate::tonemap::{self, Tone};
 /// The working buffer's bytes per pixel: three `f32`.
 pub const BYTES_PER_PIXEL: u64 = 12;
 
+/// Longest edge of the disposable editing preview and its selection overlays. ADR-0095.
+/// Full rendering never uses this limit.
+pub const INTERACTIVE_PREVIEW_EDGE: u32 = 768;
+
 /// The default working-buffer ceiling before a render is streamed in tiles.
 ///
 /// 1 GB. A 45 MP frame is 537 MB of interleaved `f32` and fits with room for the two
@@ -147,7 +151,7 @@ impl CpuEngine {
         prepared.global.effects = aura_recipe::Effects::default();
         prepared.global.sharpen.amount = 0;
         let prepared = prepared.clamped();
-        let level = RenderLevel::Screen(1600, 1200);
+        let level = RenderLevel::Screen(INTERACTIVE_PREVIEW_EDGE, INTERACTIVE_PREVIEW_EDGE);
         let frame = self.source.frame(image, level)?;
         let plan = graph::plan(&prepared, RenderPurpose::Interactive, frame.kind, self.caps);
         let (rgb, width, height, _) = self.working_buffer(&frame, &prepared, &plan, level, None);
@@ -198,7 +202,7 @@ impl CpuEngine {
         // These stages follow retouching and must not influence the range decision.
         prepared.global.sharpen.amount = 0;
         let prepared = prepared.clamped();
-        let level = RenderLevel::Screen(1600, 1200);
+        let level = RenderLevel::Screen(INTERACTIVE_PREVIEW_EDGE, INTERACTIVE_PREVIEW_EDGE);
         let frame = self.source.frame(image, level)?;
         let plan = graph::plan(&prepared, RenderPurpose::Interactive, frame.kind, self.caps);
         let (rgb, width, height, _) = self.working_buffer(&frame, &prepared, &plan, level, None);
