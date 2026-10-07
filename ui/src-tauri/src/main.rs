@@ -3373,6 +3373,28 @@ async fn auto_retouch(
         .map_err(|_| background_request_failed())?
 }
 
+/// Auto advanced retouch: all eighteen stages of a professional retouch in order, each saved
+/// as its own history step. Streams an `advanced-retouch` event before and after every stage
+/// so the window can show the run step by step. ADR-0093.
+#[tauri::command]
+async fn auto_advanced_retouch(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    input: aura_app::advanced_retouch::AdvancedRetouchInput,
+) -> IpcResult<aura_app::advanced_retouch::AdvancedRetouchDto> {
+    use tauri::Emitter;
+    let shared = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::advanced_retouch::run(&shared, &input, &|progress| {
+            if let Err(error) = app.emit("advanced-retouch", progress) {
+                tracing::error!(target: "retouch", %error, "could not deliver retouch progress");
+            }
+        })
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn sync_settings(
     state: State<'_, AppState>,
@@ -3592,6 +3614,7 @@ fn main() {
             enhance_photo,
             enhance_portrait,
             auto_retouch,
+            auto_advanced_retouch,
             create_project,
             list_projects,
             start_ingest,

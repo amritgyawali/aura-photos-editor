@@ -2,6 +2,22 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Auto advanced retouch - 2026-10-07
+
+- Add **Auto advanced retouch** in Retouch: the whole professional workflow, run
+  automatically and in order - RAW foundation, lens and perspective, background, hair, skin
+  cleanup, selective frequency separation, micro, medium and global dodge and burn, skin
+  colour, eyes/lips/teeth, clothing, jewellery, background toning, colour grade, grain,
+  output sharpening, quality control - with the window showing each step as it runs. Every
+  step is inspected and reported; each one that changes the photo is its own history step.
+- New measured steps: horizon levelling from straight background lines (people excluded),
+  backdrop dust and clothing marks healed from a clean donor beside them, clear stray hairs
+  faded, burnt-out jewellery reflections tamed, a background brighter than the face lowered
+  gently, fine grain on clean retouched files, and quality control that measures texture
+  kept, skin colour drift, clipping and both halves of each face - softening a step and
+  measuring again when needed. Textured backgrounds and fabric, soft hair edges and white
+  backdrops are left alone. Nothing is reshaped; moles and freckles are kept. See ADR-0093.
+
 ## Acne clear and the blemish brush - 2026-10-07
 
 - Add **acne clear**: every pimple, red mark and brown mark is measured against a robust

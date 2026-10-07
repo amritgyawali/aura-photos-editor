@@ -49,6 +49,7 @@
 //! No command may take longer than 50 ms. Anything heavier returns a job handle
 //! and streams progress events.
 
+pub mod advanced_retouch;
 pub mod ai_settings;
 pub mod autopilot_commands;
 pub mod biometric_keys;

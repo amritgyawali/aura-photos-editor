@@ -164,6 +164,9 @@ Never load two phase files into one session.
 | Frequency healing and texture graft decisions | `docs/adr/ADR-0090-frequency-healing-and-the-texture-graft.md`, `crates/aura-render/src/retouch_clear.rs`, `crates/aura-render/src/retouch_texture.rs` |
 | Skin finish checks (painted fixtures, then real pixels by hand) | `crates/aura-render/tests/skin_finish.rs`, `crates/aura-render/tests/skin_finish_photos.rs`, `crates/aura-app/tests/auto_retouch_photos.rs` (preset `pro`) |
 | What the Professional retouch preset was run on, and what it did | `docs/professional-retouch-validation.md`, `scripts/verify-professional-retouch.py` |
+| Auto advanced retouch: the eighteen-stage professional workflow, one history step per stage | `docs/adr/ADR-0093-auto-advanced-retouch.md`, `crates/aura-app/src/advanced_retouch.rs`, `crates/aura-app/src/advanced_retouch/measure.rs`, `ui/src/components/develop/AdvancedRetouch.tsx` |
+| What Auto advanced retouch does, in the product's own words | `docs/auto-advanced-retouch.md` |
+| Auto advanced retouch on real photographs (ignored, `AURA_ADVANCED_PHOTOS`) | `crates/aura-app/tests/advanced_retouch_photos.rs` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 | One studio, the unattended run and the measured cull | `docs/adr/ADR-0088-one-studio-and-the-unattended-wedding-run.md`, `crates/aura-app/src/one_click_commands.rs`, `crates/aura-app/src/measured_cull.rs`, `ui/src/components/workflow/FinishFolder.tsx` |
 | Finishing a folder in the real app, scored against ground truth | `scripts/test-wedding-run.py`, results in `docs/unified-studio-validation.md` |

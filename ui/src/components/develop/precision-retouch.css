@@ -43,3 +43,22 @@
 .auto-retouch-settings .retouch-presets { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .auto-retouch-settings .retouch-presets .retouch-toggle { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .auto-retouch-settings .retouch-setting-group label { display: block; }
+/* ADR-0093: Auto advanced retouch - the eighteen steps, one per row. */
+.advanced-retouch { padding: 14px 16px; margin: 16px 0; border: 1px solid var(--accent); border-radius: 10px; }
+.advanced-retouch-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 20px; }
+.advanced-retouch-head > div { flex: 1; min-width: 240px; }
+.advanced-retouch-head h3 { margin: 4px 0 8px; font-size: 16px; }
+.advanced-retouch-head button { min-height: 44px; max-width: 100%; white-space: normal; }
+.advanced-retouch-steps { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 2px; }
+.advanced-retouch-steps > li { display: grid; grid-template-columns: 24px 1fr; gap: 8px; padding: 6px 8px; border-radius: 8px; }
+.advanced-retouch-steps > li > div { min-width: 0; }
+.advanced-retouch-steps > li p { margin: 0; overflow-wrap: anywhere; }
+.advanced-retouch-steps > li[data-state='running'] { background: var(--panel); outline: 1px solid var(--accent); }
+.advanced-retouch-steps > li[data-state='applied'] .advanced-step-mark { color: var(--accent); }
+.advanced-step-mark { font-weight: 700; text-align: center; line-height: 1.5; }
+.advanced-step-status { color: var(--muted); font-size: 12px; }
+.advanced-retouch-steps details { margin-top: 4px; font-size: 12px; line-height: 1.5; }
+.advanced-retouch-steps details summary { cursor: pointer; overflow-wrap: anywhere; }
+.advanced-retouch-steps h4 { margin: 8px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.advanced-retouch-steps ul { margin: 0; padding-left: 18px; }
+.advanced-retouch-quality { margin-top: 12px; font-size: 13px; line-height: 1.5; }

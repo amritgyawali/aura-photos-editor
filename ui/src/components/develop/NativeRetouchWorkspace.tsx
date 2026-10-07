@@ -4,6 +4,7 @@ import { blemishBrush, freshRetouch, nativeRetouch, RETOUCH_TOOLS, type NativeRe
 import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { AutoRetouchSettings } from './AutoRetouchSettings';
+import { AdvancedRetouch } from './AdvancedRetouch';
 import { changesDataUrl, coverageDataUrl, rgbDataUrl } from './rgbImage';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
 import { RetouchCanvas, type RetouchMode } from './RetouchCanvas';
@@ -16,9 +17,13 @@ export function automaticLabel(id: string): string {
   const scene = /^auto-scene-v\d+-/.exec(id);
   if (scene) return ' · Auto (scene)';
   if (/^auto-portrait-v\d+-backdrop$/.test(id)) return ' · Auto (backdrop)';
-  const face = /^auto-portrait-v\d+-(\d+)-(body-|lines-neck|hair-|fabric)?/.exec(id);
+  if (/^auto-portrait-v\d+-dust-\d+$/.test(id)) return ' · Auto (backdrop dust)';
+  if (/^auto-portrait-v\d+-background-tone$/.test(id)) return ' · Auto (background tone)';
+  if (/^auto-portrait-v\d+-stray-\d+$/.test(id)) return ' · Auto (stray hair)';
+  if (/^auto-portrait-v\d+-jewel-\d+$/.test(id)) return ' · Auto (reflection)';
+  const face = /^auto-portrait-v\d+-(\d+)-(body-|lines-neck|hair-|fabric|cloth-)?/.exec(id);
   if (!face) return '';
-  const kind = face[2] === 'hair-' ? 'hair' : face[2] === 'fabric' ? 'clothes' : face[2] ? 'body' : 'face';
+  const kind = face[2] === 'hair-' ? 'hair' : face[2] === 'fabric' || face[2] === 'cloth-' ? 'clothes' : face[2] ? 'body' : 'face';
   return ` · Auto (${kind} ${Number(face[1]) + 1})`;
 }
 
@@ -201,6 +206,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           </>}
         </div>}
         <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}</p>
+        <AdvancedRetouch projectId={projectId} photoId={photoId} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} onRun={task=>void save(task)}/>
         <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>
         <AutoRetouchSettings key={`${photoId}:${retouchRecipe?.recipeHash ?? 'loading'}`} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} busy={analysing} onRun={options=>void save(async()=>{
           setAnalysing(true);

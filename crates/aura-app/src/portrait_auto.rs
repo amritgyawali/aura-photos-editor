@@ -152,6 +152,11 @@ pub fn group_of(id: &str) -> Option<Group> {
             Group::Eyes
         } else if rest.ends_with("-teeth")
             || rest.ends_with("-shine")
+            || rest.starts_with("dust-")
+            || rest.starts_with("stray-")
+            || rest.starts_with("jewel-")
+            || rest.contains("-cloth-")
+            || rest == "background-tone"
             || rest.contains("-lips-")
             || rest.contains("-sculpt-")
             || rest.contains("-makeup-")
@@ -220,6 +225,11 @@ pub struct Plan {
     pub groups: BTreeMap<Group, Vec<Edit>>,
     /// Segmentation mattes the planned operations refer to, by id. ADR-0082.
     pub mattes: BTreeMap<String, Matte>,
+    /// What the segmenter found for each detected face, in face order, for later passes that
+    /// finish hair, clothes and the background without segmenting the photograph again.
+    pub people: Vec<skin::Person>,
+    /// The segmented background, when the segmenter ran.
+    pub background: Option<skin::Matte>,
 }
 
 /// The mattes a stack written from `plan` needs: the recipe's own (for operations a person
@@ -340,6 +350,8 @@ pub fn plan_with_faces(
             report,
             groups,
             mattes,
+            people: Vec::new(),
+            background: None,
         });
     }
     let settings = options.settings;
@@ -821,6 +833,8 @@ pub fn plan_with_faces(
         report,
         groups,
         mattes,
+        people: segmentation.people,
+        background: segmentation.background,
     })
 }
 
@@ -1674,14 +1688,14 @@ fn segment(
 
 /// Mean local detail of a matte's fully covered area, in encoded luminance: about 0.01 on
 /// studio paper, several times that on brick, foliage or a room.
-const PLAIN_BACKDROP: f32 = 0.025;
+pub(crate) const PLAIN_BACKDROP: f32 = 0.025;
 
 #[allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
-fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
+pub(crate) fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
     let (w, h) = (width as usize, height as usize);
     let luma = |x: usize, y: usize| -> f32 {
         let i = (y.min(h - 1) * w + x.min(w - 1)) * 3;
@@ -1714,7 +1728,7 @@ fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
 
 /// The matte shrunk by `cells` on every side (a minimum filter), so an operation that reads
 /// pixels around itself never reaches what lies outside the matte.
-fn erode(m: &skin::Matte, cells: usize) -> skin::Matte {
+pub(crate) fn erode(m: &skin::Matte, cells: usize) -> skin::Matte {
     let (w, h) = (m.width, m.height);
     let mut rows = vec![0_u8; w * h];
     for y in 0..h {
