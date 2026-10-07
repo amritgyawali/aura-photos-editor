@@ -283,8 +283,8 @@ fn binned(values: &[f32], counted: &[bool]) -> Option<(Vec<u16>, f32, f32)> {
     let span = (hi - lo).max(1e-6);
     let top = (PERCENTILE_BINS - 1) as f32;
     let bins = values
-        .iter()
-        .zip(counted)
+        .par_iter()
+        .zip(counted.par_iter())
         .map(|(v, on)| {
             if *on && v.is_finite() {
                 ((v - lo) / span * top).round().clamp(0.0, top) as u16
@@ -339,54 +339,51 @@ impl Grid {
     /// Bilinear interpolation of the grid's levels and supports to every cell. A cell whose
     /// four samples counted nothing keeps `own`.
     fn spread(self, levels: &[f32], supports: &[f32], own: &[f32]) -> Percentile {
-        // Rows are independent, so they are interpolated in parallel and joined in order.
-        let rows: Vec<(Vec<f32>, Vec<f32>)> = (0..self.h)
-            .into_par_iter()
-            .map(|y| self.spread_row(y, levels, supports, own))
-            .collect();
-        let mut level = Vec::with_capacity(self.w * self.h);
-        let mut support = Vec::with_capacity(self.w * self.h);
-        for (l, s) in rows {
-            level.extend(l);
-            support.extend(s);
-        }
+        // Where every column falls between grid samples is the same on every row, so it is
+        // worked out once; rows are independent and are written in place in parallel.
+        let columns: Vec<(usize, usize, f32)> =
+            (0..self.w).map(|x| self.locate(x, self.w, self.cols)).collect();
+        let mut level = vec![0.0_f32; self.w * self.h];
+        let mut support = vec![0.0_f32; self.w * self.h];
+        level
+            .par_chunks_mut(self.w)
+            .zip(support.par_chunks_mut(self.w))
+            .enumerate()
+            .for_each(|(y, (level, support))| {
+                let own = &own[y * self.w..(y + 1) * self.w];
+                self.spread_row(y, &columns, levels, supports, own, level, support);
+            });
         Percentile { level, support }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn spread_row(
         self,
         y: usize,
+        columns: &[(usize, usize, f32)],
         levels: &[f32],
         supports: &[f32],
         own: &[f32],
-    ) -> (Vec<f32>, Vec<f32>) {
-        let mut level = Vec::with_capacity(self.w);
-        let mut support = Vec::with_capacity(self.w);
-        {
-            let (ky, ny, ty) = self.locate(y, self.h, self.rows);
-            for x in 0..self.w {
-                let (kx, nx, tx) = self.locate(x, self.w, self.cols);
-                let (mut sum, mut weight, mut held) = (0.0_f32, 0.0_f32, 0.0_f32);
-                for (gy, wy) in [(ky, 1.0 - ty), (ny, ty)] {
-                    for (gx, wx) in [(kx, 1.0 - tx), (nx, tx)] {
-                        let g = gy * self.cols + gx;
-                        let k = wy * wx;
-                        held += supports[g] * k;
-                        if levels[g].is_finite() && k > 0.0 {
-                            sum += levels[g] * k;
-                            weight += k;
-                        }
+        level: &mut [f32],
+        support: &mut [f32],
+    ) {
+        let (ky, ny, ty) = self.locate(y, self.h, self.rows);
+        for (x, &(kx, nx, tx)) in columns.iter().enumerate() {
+            let (mut sum, mut weight, mut held) = (0.0_f32, 0.0_f32, 0.0_f32);
+            for (gy, wy) in [(ky, 1.0 - ty), (ny, ty)] {
+                for (gx, wx) in [(kx, 1.0 - tx), (nx, tx)] {
+                    let g = gy * self.cols + gx;
+                    let k = wy * wx;
+                    held += supports[g] * k;
+                    if levels[g].is_finite() && k > 0.0 {
+                        sum += levels[g] * k;
+                        weight += k;
                     }
                 }
-                level.push(if weight > 1e-6 {
-                    sum / weight
-                } else {
-                    own[y * self.w + x]
-                });
-                support.push(held);
             }
+            level[x] = if weight > 1e-6 { sum / weight } else { own[x] };
+            support[x] = held;
         }
-        (level, support)
     }
 }
 
@@ -419,8 +416,24 @@ pub(crate) fn local_percentile(
         return unchanged();
     };
     let grid = Grid::new(w, h, step);
-    let top = (PERCENTILE_BINS - 1) as f32;
     let share = share.clamp(0.0, 1.0);
+    let (levels, supports) = cpu_grid(&bins, w, h, radius, grid, share, lo, span);
+    grid.spread(&levels, &supports, values)
+}
+
+/// The percentile grid on the processor: each grid row slides its own histogram.
+#[allow(clippy::too_many_arguments)]
+fn cpu_grid(
+    bins: &[u16],
+    w: usize,
+    h: usize,
+    radius: usize,
+    grid: Grid,
+    share: f32,
+    lo: f32,
+    span: f32,
+) -> (Vec<f32>, Vec<f32>) {
+    let top = (PERCENTILE_BINS - 1) as f32;
     // Each grid row slides its own histogram, so the rows run in parallel and are joined in
     // order: the same answer on every machine.
     let rows: Vec<(Vec<f32>, Vec<f32>)> = (0..grid.rows)
@@ -480,7 +493,7 @@ pub(crate) fn local_percentile(
         levels.extend(l);
         supports.extend(s);
     }
-    grid.spread(&levels, &supports, values)
+    (levels, supports)
 }
 
 /// 0 below `low`, 1 above `high`, smooth in between.

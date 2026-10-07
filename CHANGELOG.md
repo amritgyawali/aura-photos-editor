@@ -2,6 +2,14 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Graphics card measured - 2026-10-07
+
+- Tried running the retouch stack's blurs and percentiles on the graphics card. On the
+  reference laptop's GTX 1650 it saved about 3 %: copying each image to the card and back
+  costs as much as the processor's calculation. It is not enabled. Two processor
+  improvements found while profiling are kept and give the same pixels; a full render of a
+  retouched portrait is about 7 % faster. See ADR-0100.
+
 ## Live preview while you adjust - 2026-10-07
 
 - Moving a slider or applying a profile on a retouched photo now shows a live preview in about
