@@ -450,6 +450,34 @@ fn pores_under_a_rebuilt_mark_stay_and_redness_evening_moves_colour_only() {
 }
 
 #[test]
+fn redness_evening_leaves_a_brown_contour_alone() {
+    // Contour make-up, a tan line or the shaded side of a nose: darker and browner (less blue),
+    // no redder, and as broad as a blotch. ADR-0101: evening it is what flattens a face.
+    let mut contour = skin([0.42, 0.30, 0.22], 1.0);
+    mark(&mut contour, [90, 90], 18.0, [0.84, 0.84, 0.70]);
+    let mut even = operation();
+    even.preserve_microtexture = true;
+    let evened = render(&contour, &even);
+    let brown = |rgb: &[f32]| {
+        let i = (90 * W + 90) * 3;
+        (
+            (rgb[i + 1] / rgb[i + 2]).ln(),
+            rgb[i] * 0.2627 + rgb[i + 1] * 0.678 + rgb[i + 2] * 0.0593,
+        )
+    };
+    let (b0, l0) = brown(&contour);
+    let (b1, l1) = brown(&evened);
+    assert!(
+        (b1 - b0).abs() < 2e-3,
+        "the contour's brown moved: {b0} -> {b1}"
+    );
+    assert!(
+        (l1 / l0 - 1.0).abs() < 5e-3,
+        "the contour was lifted: {l0} -> {l1}"
+    );
+}
+
+#[test]
 fn the_mark_plane_shows_exactly_where_marks_were_rebuilt() {
     let before = marked([0.42, 0.30, 0.22], 1.0);
     let marks = frequency_heal_marks(&before, W, W, &operation(), &full_matte());

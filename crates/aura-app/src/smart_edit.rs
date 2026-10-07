@@ -586,14 +586,19 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
             reason: "a strong colour with no people in frame reads as the light's mood (sunset, blue hour or stage light)",
         };
     }
+    // The gray-pixel and gray-edge estimates agree with each other on any frame dominated by
+    // one colour: a pink studio backdrop, a painted wall, golden-hour light. Only the whites
+    // tell a cast on everything from a colourful scene, so without them the colour is kept -
+    // a finished photograph's white balance was somebody's choice, and moving it on two
+    // estimates that one coloured surface can fool turns a pink portrait grey.
+    if !confirmed {
+        return Neutral::Unsure {
+            reason: "the frame's whites do not show the same cast, so the colour is the scene's (a coloured backdrop or wall, or the light's mood) rather than a cast",
+        };
+    }
     // Keep part of the light's character: correct mild casts more than strong ones, so a
     // tungsten reception still reads as warm evening light rather than a studio.
-    let strength = match (confirmed, cast > 0.25) {
-        (true, true) => 0.7,
-        (true, false) => 0.85,
-        (false, true) => 0.5,
-        (false, false) => 0.65,
-    };
+    let strength = if cast > 0.25 { 0.7 } else { 0.85 };
     let virtual_gray = [
         0.18 * (estimate.0 * strength).exp(),
         0.18,
@@ -1448,6 +1453,57 @@ mod tests {
 
     fn pixels(rgb: &[u8], w: u32, h: u32) -> Pixels<'_> {
         Pixels::new(rgb, w, h).unwrap()
+    }
+
+    /// A textured frame: `base` everywhere, `white` over the top tenth when given, each sample
+    /// varied by a fixed pattern so the frame has edges, all multiplied by `light`.
+    fn lit_frame(base: [f32; 3], white: Option<f32>, light: [f32; 3]) -> aura_render::Frame {
+        let (w, h) = (96_usize, 96_usize);
+        let mut rgb = Vec::with_capacity(w * h * 3);
+        for y in 0..h {
+            for x in 0..w {
+                let texture = 0.85 + 0.3 * (((x * 7 + y * 13) % 11) as f32 / 10.0);
+                let surface = match white {
+                    Some(v) if y < h / 10 => [v; 3],
+                    _ => base,
+                };
+                for c in 0..3 {
+                    rgb.push(surface[c] * texture * light[c]);
+                }
+            }
+        }
+        aura_render::Frame::working(rgb, w as u32, h as u32, "test")
+    }
+
+    #[test]
+    fn a_cast_the_whites_confirm_is_corrected() {
+        let frame = lit_frame([0.3, 0.3, 0.3], Some(0.6), [0.9, 1.0, 1.1]);
+        assert!(
+            matches!(
+                white_balance(&frame, &[]),
+                Neutral::Correct {
+                    confirmed: true,
+                    ..
+                }
+            ),
+            "{:?}",
+            white_balance(&frame, &[])
+        );
+    }
+
+    #[test]
+    fn a_colour_the_whites_do_not_confirm_is_the_scenes_and_is_kept() {
+        // A dim rose backdrop and nothing white: both estimates read rose, mildly enough that
+        // the no-people mood rule does not decide it, and nothing says the light is.
+        let frame = lit_frame([0.24, 0.2, 0.21], None, [1.0, 1.0, 1.0]);
+        assert!(
+            matches!(
+                white_balance(&frame, &[]),
+                Neutral::Unsure { reason } if reason.contains("whites do not show")
+            ),
+            "{:?}",
+            white_balance(&frame, &[])
+        );
     }
 
     #[test]

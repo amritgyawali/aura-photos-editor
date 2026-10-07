@@ -573,6 +573,8 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte, nose: bool) -
     };
     let skin_luma = confident(&super::luma)?;
     let skin_warmth = confident(&warmth)?;
+    let value = |p: [f32; 3]| p[0].max(p[1]).max(p[2]);
+    let skin_value = confident(&value)?;
     close_holes(&mut selected, w, h, g.d * 0.30 / cell);
     // A mark on the shadow side of a face can be a tenth as bright as the lit skin, so
     // brightness alone cannot tell it from hair. Warmth can: measured on a dark-skinned
@@ -645,18 +647,19 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte, nose: bool) -
     // Hair is darker than the skin right around it - not than this face's typical skin: on
     // the shadowed side of a face the whole forehead is darker than that, and is still skin.
     let reach = (g.d * 0.2 / cell).max(2.0) as usize;
-    let local_skin = |i: usize| {
+    let local = |i: usize, f: &dyn Fn([f32; 3]) -> f32, fallback: f32| {
         let (x, y) = (i % w, i / w);
         let mut around = Vec::with_capacity((2 * reach + 1).pow(2));
         for row in y.saturating_sub(reach)..(y + reach + 1).min(h) {
             for j in row * w + x.saturating_sub(reach)..row * w + (x + reach + 1).min(w) {
                 if skin_like[j] {
-                    around.push(super::luma(colours[j]));
+                    around.push(f(colours[j]));
                 }
             }
         }
-        quantile(around, 0.6).unwrap_or(skin_luma)
+        quantile(around, 0.6).unwrap_or(fallback)
     };
+    let local_skin = |i: usize| local(i, &super::luma, skin_luma);
     let not_brow: Vec<bool> = (0..w * h)
         .map(|i| {
             !(brow_areas.iter().any(|area| area.contains(centre(i)))
@@ -665,10 +668,35 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte, nose: bool) -
         .collect();
     let to_brow = clearance(&not_brow, w, h);
     let brow_margin = (g.d * 0.04 / cell).max(2.0);
+    // The nostrils wherever they actually are. The shapes above sit where the landmarks put the
+    // nose, and on a turned or tilted face a nostril can lie outside them; a smoothing finish
+    // that reaches one fills the opening with skin tone. An opening is a shadow, so every
+    // channel is far below the nose skin right around it. An inflamed mark can be as dark in
+    // luminance - it loses its green - but keeps its red, so the test is on the brightest
+    // channel: under a fifth of the local skin's, in linear light, is an opening (about half
+    // its sRGB code value), and is left out with a margin.
+    // Only across the base of the nose, where nostrils are, however far to the side the face
+    // has turned them: the side of the nose above it can be as deep in shadow, and its marks
+    // are acne clear's to repair.
+    let base = super::add(g.nose, g.v, g.d * 0.12);
+    let nose_area = super::Capsule {
+        a: super::add(base, g.u, -g.d * 0.35),
+        b: super::add(base, g.u, g.d * 0.35),
+        r: g.d * 0.15,
+    };
+    let not_nostril: Vec<bool> = (0..w * h)
+        .map(|i| {
+            !(nose_area.contains(centre(i))
+                && value(colours[i]) < local(i, &value, skin_value) * 0.2)
+        })
+        .collect();
+    let to_nostril = clearance(&not_nostril, w, h);
+    let nostril_margin = (g.d * 0.05 / cell).max(2.0);
     for i in 0..w * h {
         let point = centre(i);
         let on_brow = to_brow[i] <= brow_margin && brow_areas.iter().any(|a| a.contains(point));
-        if on_brow || exclusions.iter().any(|e| e.contains(point)) {
+        let on_nostril = to_nostril[i] <= nostril_margin;
+        if on_brow || on_nostril || exclusions.iter().any(|e| e.contains(point)) {
             selected[i] = false;
         }
     }
@@ -1513,6 +1541,49 @@ mod tests {
             heal[cell(195.0, 166.0)] > 150,
             "skin under a missing brow is out"
         );
+    }
+
+    #[test]
+    fn a_nostril_away_from_where_the_landmarks_put_it_is_still_left_out() {
+        // A turned face: one nostril lies well to the side of the nose landmark, outside every
+        // landmark shape. A red mark beside the nose stays in for acne clear.
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        fill(&mut rgb, [286, 290, 300, 302], [35, 22, 16]);
+        fill(&mut rgb, [300, 268, 306, 274], [135, 75, 60]);
+        // An inflamed mark across the base of the nose: under half the skin's luminance, and
+        // still red. And a mark on the shadowed side of the nose above it, darker still.
+        fill(&mut rgb, [216, 298, 224, 306], [95, 28, 28]);
+        fill(&mut rgb, [231, 258, 239, 266], [55, 20, 20]);
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let cell = |x: f32, y: f32| ((y - 51.2) / 3.4) as usize * 96 + ((x - 102.4) / 3.2) as usize;
+        let heal = heal_matte(&face, &px, &matte).unwrap().decode().unwrap();
+        let surface = surface_matte(&face, &px, &matte).unwrap().decode().unwrap();
+        for [x, y] in [[288.0, 292.0], [293.0, 296.0], [298.0, 300.0]] {
+            assert_eq!(
+                surface[cell(x, y)],
+                0,
+                "the finish reaches the nostril at {x},{y}"
+            );
+            assert_eq!(
+                heal[cell(x, y)],
+                0,
+                "acne clear reaches the nostril at {x},{y}"
+            );
+        }
+        for [x, y] in [[303.0, 271.0], [220.0, 302.0], [235.0, 262.0]] {
+            assert!(
+                heal[cell(x, y)] > 150,
+                "the red mark at {x},{y} beside the nose is out: {}",
+                heal[cell(x, y)]
+            );
+        }
     }
 
     #[test]

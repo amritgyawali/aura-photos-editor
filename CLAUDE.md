@@ -171,6 +171,7 @@ Never load two phase files into one session.
 | Retouch checkpoints, preview request order, per-operation profiling | `docs/adr/ADR-0098-retouch-checkpoints-and-preview-order.md`, `crates/aura-render/src/retouch_cache.rs`, `crates/aura-render/tests/retouch_checkpoints.rs`, `crates/aura-render/tests/retouch_profile.rs` (ignored, `AURA_PROFILE_*`) |
 | Live preview while a setting changes (retouch carried over) | `docs/adr/ADR-0099-live-preview-while-settings-change.md`, `CpuEngine::render_live` in `crates/aura-render/src/cpu.rs`, `native_retouch::live_preview` |
 | The graphics card: measured, not enabled, and what would pay | `docs/adr/ADR-0100-graphics-card-measured-and-not-enabled.md`, local branch `experiment/gpu-compute` |
+| Keeping a face's colour and depth (redness-only evening, whites-confirmed white balance, nostril guard) | `docs/adr/ADR-0101-keep-the-colour-and-depth-of-a-face.md`, `crates/aura-render/src/retouch_acne.rs`, `crates/aura-app/src/smart_edit.rs` |
 | Auto advanced retouch on real photographs (ignored, `AURA_ADVANCED_PHOTOS`) | `crates/aura-app/tests/advanced_retouch_photos.rs` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 | One studio, the unattended run and the measured cull | `docs/adr/ADR-0088-one-studio-and-the-unattended-wedding-run.md`, `crates/aura-app/src/one_click_commands.rs`, `crates/aura-app/src/measured_cull.rs`, `ui/src/components/workflow/FinishFolder.tsx` |

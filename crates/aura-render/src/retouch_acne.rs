@@ -28,11 +28,13 @@
 //!    skin's ordinary pore range. A coloured mark is never made darker than it is; only the
 //!    white head of a pimple, inside its red ring, is brought down. A pixel no mark reached
 //!    keeps its exact value.
-//! 4. **Even the redness** (optional, `preserve_microtexture`). Red or brown blotches too broad
-//!    to be marks have the colour beyond this skin's ordinary variation moved most of the way
-//!    toward the same person's clean skin, in proportion, so no patch outline is drawn; a blotch
-//!    that is also darker is lifted by the same share, and skin that is only darker is not.
-//!    Bands along the edge of the face - skin warms where it turns from the light - are left.
+//! 4. **Even the redness** (optional, `preserve_microtexture`). Red blotches too broad to be
+//!    marks have the redness beyond this skin's ordinary variation moved most of the way
+//!    toward the same person's clean skin, in proportion, so no patch outline is drawn; a
+//!    blotch that is also darker is lifted by the same share, and skin that is only darker is
+//!    not. Brown is never evened: it is shading, contour make-up or a tan, and evening it
+//!    flattens a face (ADR-0101). Bands along the edge of the face - skin warms where it turns
+//!    from the light - are left.
 //!
 //! Nothing is generated: every value written is this photograph's own skin, averaged. With no
 //! segmentation matte the operation is a brush: the reference also reads the skin just
@@ -827,12 +829,13 @@ fn pass(
     true
 }
 
-/// Flat red or brown blotches moved part of the way toward the clean skin around them.
+/// Flat red blotches moved part of the way toward the clean skin around them.
 ///
-/// The colour is what is measured: a blotch is redder or browner than the skin around it, and a
-/// shadow is not. A blotch that is also darker is lifted by the same share as its colour is
-/// moved - only the colour of a dark red mark would leave a grey one - and nothing that is
-/// only darker is touched at all.
+/// Redness is what is measured: a blotch is redder than the skin around it, and a shadow, a
+/// contour or a tan is not. Red and brown are both used to find the clean skin, so a brown
+/// patch is never somebody's reference. A blotch that is also darker is lifted by the same
+/// share as its redness is moved - only the colour of a dark red mark would leave a grey one -
+/// and nothing that is only darker or browner is touched at all.
 fn even_redness(rgb: &mut [f32], w: usize, edit: &Edit, field: &Field) {
     let rect = field.rect;
     let r = field.radius;
@@ -897,9 +900,13 @@ fn even_redness(rgb: &mut [f32], w: usize, edit: &Edit, field: &Field) {
         .map(|i| selected[i] && (da[i] / sa).hypot(db[i] / sb) < 1.5)
         .collect();
     let base = level(&clean, [0.5, 0.5, 0.5]);
-    let (da, db) = excess(&base);
+    // Only redness is evened. Brown is what skin turns where it is shaded, what contour and
+    // bronzer are, and what a tan is; evening it takes the depth out of a face - a contoured nose
+    // goes flat, the edge of the face goes pale. A brown mark small enough to be a mark is the
+    // rebuild's, not this. ADR-0101.
+    let (da, _) = excess(&base);
     let weights: Vec<f32> = clean.iter().map(|on| f32::from(u8::from(*on))).collect();
-    let (sa, sb) = (spread(&da, &weights, 0.002), spread(&db, &weights, 0.002));
+    let sa = spread(&da, &weights, 0.002);
     // Only what lies beyond a robust spread of this skin's own colour variation is evened, in
     // proportion to how far beyond it is: the correction is as smooth as the colour it
     // corrects, so it cannot draw the outline of a patch. Skin warms where it turns away from
@@ -921,23 +928,17 @@ fn even_redness(rgb: &mut [f32], w: usize, edit: &Edit, field: &Field) {
                     return None;
                 }
                 let cut_a = (da[i] - sa).max(0.0);
-                let cut_b = (db[i] - sb).max(0.0);
-                if cut_a <= 0.0 && cut_b <= 0.0 {
+                if cut_a <= 0.0 {
                     return None;
                 }
-                // A blotch that is also darker is lifted by the share of its colour that goes,
+                // A blotch that is also darker is lifted by the share of its redness that goes,
                 // so a dark red mark the rebuild left does not turn grey. Only-darker skin is
                 // never lifted.
-                let share = (cut_a / da[i].max(1e-6))
-                    .max(cut_b / db[i].max(1e-6))
-                    .min(1.0);
+                let share = (cut_a / da[i].max(1e-6)).min(1.0);
                 let lift = (base.l[i] - fine.l[i]).clamp(0.0, 0.3) * share;
                 let at = (y * w + x) * 3;
                 let [l, a, b] = to_lab([frame[at], frame[at + 1], frame[at + 2]]);
-                Some((
-                    at,
-                    from_lab([l + weight * lift, a - weight * cut_a, b - weight * cut_b]),
-                ))
+                Some((at, from_lab([l + weight * lift, a - weight * cut_a, b])))
             })
             .collect()
     };

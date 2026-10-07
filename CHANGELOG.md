@@ -2,6 +2,16 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Natural colour and depth in automatic retouch - 2026-10-08
+
+- Auto advanced retouch no longer makes faces paler, greyer or flatter. Clearing blemishes now
+  evens only redness: contour make-up, blush, a tan and the shading that gives a face its
+  shape are kept.
+- Automatic white balance only removes a colour cast that the photo's whites also show. A pink
+  backdrop, a painted wall or a sunset keeps its colour.
+- The skin smoothing finish never reaches the nostrils, even on a turned face.
+  See ADR-0101.
+
 ## Graphics card measured - 2026-10-07
 
 - Tried running the retouch stack's blurs and percentiles on the graphics card. On the
