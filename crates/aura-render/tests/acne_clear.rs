@@ -336,11 +336,17 @@ fn a_brush_clears_what_it_is_painted_over_bumps_included() {
 #[test]
 fn a_brush_over_a_spot_beside_a_brow_leaves_the_brow() {
     let mut before = skin([0.42, 0.30, 0.22], 1.0);
-    // A brow: a band of dark brown hair, far darker than the skin.
+    // A brow: a band of dark brown hairs, slanted strands with skin showing between them.
     for y in 96..108 {
         for x in 60..200 {
             let i = (y * W + x) * 3;
-            for (c, k) in [0.32_f32, 0.28, 0.24].into_iter().enumerate() {
+            let strand = (x + y / 2) % 3 != 0;
+            let k = if strand {
+                [0.22_f32, 0.19, 0.16]
+            } else {
+                [0.62, 0.58, 0.54]
+            };
+            for (c, k) in k.into_iter().enumerate() {
                 before[i + c] *= k;
             }
         }
@@ -369,6 +375,35 @@ fn a_brush_over_a_spot_beside_a_brow_leaves_the_brow() {
     }
     let (red, _) = departure(&painted, [190, 116], 4.0);
     assert!(red < 0.05, "the spot beside the brow keeps {red}");
+}
+
+#[test]
+fn a_brush_clears_a_dark_mark_on_the_edge_of_a_shadow() {
+    let mut before = skin([0.42, 0.30, 0.22], 1.0);
+    mark(&mut before, [188, 60], 4.0, BROWN);
+    let mut brush = operation();
+    brush.matte = None;
+    brush.feather = 0.35;
+    brush.mask = Some(BrushMask {
+        strokes: vec![BrushStroke {
+            erase: false,
+            radius: 12.0 / W as f32,
+            opacity: 1.0,
+            points: vec![[188.5 / W as f32, 60.5 / W as f32, 1.0]],
+        }],
+    });
+    let mut painted = before.clone();
+    apply(&mut painted, W, W, std::slice::from_ref(&brush));
+    let i = (60 * W + 188) * 3;
+    let ratio = |rgb: &[f32]| (rgb[i] / before[(60 * W + 182) * 3]).ln();
+    // The mark moves most of the way to the shadowed skin around it.
+    let mark_before = (before[i + 1] / skin([0.42, 0.30, 0.22], 1.0)[i + 1]).ln();
+    let mark_after = (painted[i + 1] / skin([0.42, 0.30, 0.22], 1.0)[i + 1]).ln();
+    assert!(
+        mark_after.abs() < mark_before.abs() * 0.3,
+        "the mark at the shadow's edge went from {mark_before} to {mark_after} ({})",
+        ratio(&painted)
+    );
 }
 
 #[test]

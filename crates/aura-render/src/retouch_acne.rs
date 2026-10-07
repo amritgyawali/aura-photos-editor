@@ -386,16 +386,52 @@ struct Marks {
     bright: Vec<bool>,
 }
 
-/// The skin a brush was painted on: the brighter part of what it and its surroundings hold.
-fn skin_level(field: &Field, fine: &Lab) -> f32 {
-    let mut samples: Vec<f32> = fine
+/// Hair a brush was painted across: a brow, a lash line, a strand at the hairline.
+///
+/// Hair is far darker than the skin around it and, unlike a shadow or a mark, it is textured -
+/// strand, gap, strand - and it carries on past the stroke, where a spot the stroke was painted
+/// over does not. Cells of every dark, textured region that reaches well outside the brush,
+/// widened by half a mark radius; empty for the automatic pass, whose selection holds no brow.
+fn hair(field: &Field, fine: &Lab) -> Vec<bool> {
+    let Rect { w, h, .. } = field.rect;
+    let n = field.rect.len();
+    if !field.brush {
+        return vec![false; n];
+    }
+    let r = field.radius;
+    let counted: Vec<bool> = field.reference.iter().map(|a| *a > 0.5).collect();
+    let light = local_percentile(&fine.l, &counted, w, h, px(r, 5.0), px(r, 1.0), 0.8).level;
+    let detail: Vec<f32> = field
+        .lab
         .l
         .iter()
-        .zip(&field.reference)
-        .filter(|(_, a)| **a > 0.5)
-        .map(|(v, _)| *v)
+        .zip(&fine.l)
+        .map(|(v, f)| v - f)
         .collect();
-    crate::retouch_planes::quantile(&mut samples, 0.7).unwrap_or(0.0)
+    let weights: Vec<f32> = counted.iter().map(|on| f32::from(u8::from(*on))).collect();
+    let ordinary = spread(&detail, &weights, 0.004);
+    let squared: Vec<f32> = detail.iter().map(|d| d * d).collect();
+    let texture = blur(&squared, w, h, px(r, 1.0));
+    let candidate: Vec<bool> = (0..n)
+        .map(|i| counted[i] && fine.l[i] < light[i] - 0.5 && texture[i].sqrt() > 2.0 * ordinary)
+        .collect();
+    let mut found = vec![false; n];
+    for group in groups(&candidate, w, h) {
+        let outside = group
+            .cells
+            .iter()
+            .filter(|i| field.alpha[**i] < 0.2)
+            .count();
+        if outside as f32 >= group.cells.len() as f32 * 0.15 {
+            for i in group.cells {
+                found[i] = true;
+            }
+        }
+    }
+    distance_to(&found, w, h)
+        .iter()
+        .map(|d| *d <= r * 0.5 + 1.0)
+        .collect()
 }
 
 /// Bright groups that join the marks, added to `marked`; returns which cells they are.
@@ -408,6 +444,7 @@ fn heads(
     field: &Field,
     fine: &Lab,
     departure: &Departure,
+    hair: &[bool],
     threshold: f32,
     marked: &mut [bool],
 ) -> Vec<bool> {
@@ -415,7 +452,7 @@ fn heads(
     let r = field.radius;
     let smallest = (0.35 * r * r).max(3.0);
     let raised: Vec<bool> = (0..field.rect.len())
-        .map(|i| field.alpha[i] > 0.2 && departure.bright[i] > threshold)
+        .map(|i| field.alpha[i] > 0.2 && !hair[i] && departure.bright[i] > threshold)
         .collect();
     let mut bright = vec![false; field.rect.len()];
     for group in groups(&raised, w, h) {
@@ -440,6 +477,7 @@ fn marks(
     field: &Field,
     fine: &Lab,
     departure: &Departure,
+    hair: &[bool],
     threshold: f32,
     keep_dark: bool,
 ) -> Option<Marks> {
@@ -449,7 +487,6 @@ fn marks(
     let score: Vec<f32> = (0..n).map(|i| departure.score(i)).collect();
     let selected: Vec<bool> = field.alpha.iter().map(|a| *a > 0.2).collect();
     let smallest = (0.35 * r * r).max(3.0);
-    let skin_level = skin_level(field, fine);
     let rim = rim_distance(&field.alpha, w, h);
     let mut marked = vec![false; n];
     let mut lines = vec![false; n];
@@ -458,7 +495,8 @@ fn marks(
         let flagged: Vec<bool> = score
             .iter()
             .zip(&selected)
-            .map(|(s, on)| *on && *s > level)
+            .zip(hair)
+            .map(|((s, on), hair)| *on && !*hair && *s > level)
             .collect();
         for group in groups(&flagged, w, h) {
             let area = group.cells.len() as f32;
@@ -517,18 +555,10 @@ fn marks(
             if area > largest {
                 continue;
             }
-            // Hair under a brush - a brow, a lash line, a strand - is far darker than the skin
-            // the brush was painted on, and brown hair is browner too, so it can read as a
-            // coloured mark. A mark is rarely below 55 % of that skin: anything that dark must
-            // be the size of a mark and have skin on every side. (The automatic pass never
-            // selects a brow, and its strands are lines.)
-            let depth = skin_level - group.cells.iter().map(|i| fine.l[*i]).sum::<f32>() / area;
-            let very_dark = field.brush && depth > 0.6;
-            if very_dark && area > 8.0 * r * r {
-                continue;
-            }
-            let needs_ring = (dark_only && !field.brush) || very_dark;
-            if needs_ring && !enclosed(&group, fine, &field.reference, field.rect, r, false) {
+            if dark_only
+                && !field.brush
+                && !enclosed(&group, fine, &field.reference, field.rect, r, false)
+            {
                 continue;
             }
             for &i in &group.cells {
@@ -536,7 +566,7 @@ fn marks(
             }
         }
     }
-    let bright = heads(field, fine, departure, threshold, &mut marked);
+    let bright = heads(field, fine, departure, hair, threshold, &mut marked);
     marked.iter().any(|on| *on).then_some(Marks {
         cells: marked,
         bright,
@@ -602,6 +632,44 @@ fn nearby_skin(
     out
 }
 
+/// What each mark becomes, and how low a bright head may go.
+///
+/// The robust reference finds marks; what a mark becomes is the unmarked skin right around it,
+/// so a mark in a shadow is rebuilt as shadowed skin and the light across a nose keeps its
+/// gradient. Never brighter or less coloured than the brighter, calmer quarter of the skin right
+/// there: where marks are dense in a shadow, the nearest clean skin can be a lit cheek away, and
+/// rebuilding from it paints a pale patch into the shadow. A bright head is brought down to the
+/// skin around it, never below its ordinary level (the second value).
+fn bounded_skin(field: &Field, fine: &Lab, reach: &[f32], reference: &Lab) -> (Lab, Vec<f32>) {
+    let rect = field.rect;
+    let r = field.radius;
+    let mut rebuilt = nearby_skin(fine, &field.alpha, reach, reference, rect, r);
+    let selected: Vec<bool> = field.alpha.iter().map(|a| *a > 0.5).collect();
+    let local = |values: &[f32], share: f32| {
+        let level = local_percentile(
+            values,
+            &selected,
+            rect.w,
+            rect.h,
+            px(r, 2.0),
+            px(r, 0.5),
+            share,
+        );
+        blur(&level.level, rect.w, rect.h, px(r, 0.5))
+    };
+    let (ceiling, floor_a, floor_b) = (
+        local(&fine.l, 0.75),
+        local(&fine.a, 0.25),
+        local(&fine.b, 0.25),
+    );
+    for i in 0..rect.len() {
+        rebuilt.l[i] = rebuilt.l[i].min(ceiling[i]);
+        rebuilt.a[i] = rebuilt.a[i].max(floor_a[i]);
+        rebuilt.b[i] = rebuilt.b[i].max(floor_b[i]);
+    }
+    (rebuilt, local(&fine.l, 0.45))
+}
+
 /// One find-and-rebuild pass. Returns whether anything was found. `touched`, when given, is a
 /// frame-sized plane that receives the largest weight each pixel was rebuilt with.
 fn pass(
@@ -618,10 +686,18 @@ fn pass(
     let fine = field.lab.mean(&pores);
     let threshold = threshold(edit.sensitivity.unwrap_or(0.5), field.brush);
     let (reference, departure) = robust(field, &fine, threshold);
+    let hair = hair(field, &fine);
     let Some(Marks {
         cells: core,
         bright,
-    }) = marks(field, &fine, &departure, threshold, edit.keep_dark_marks)
+    }) = marks(
+        field,
+        &fine,
+        &departure,
+        &hair,
+        threshold,
+        edit.keep_dark_marks,
+    )
     else {
         return false;
     };
@@ -639,10 +715,12 @@ fn pass(
         .map(|(d, a)| (1.0 - smoothstep(grow, grow + feather, *d)) * a)
         .collect();
     // Softened by a pixel, and never past the selection: an unselected pixel keeps its bytes.
+    // Hair the brush crossed keeps its bytes too.
     let reach: Vec<f32> = blur(&reach, rect.w, rect.h, 1)
         .into_iter()
         .zip(&field.alpha)
-        .map(|(v, a)| if *a > 0.0 { v } else { 0.0 })
+        .zip(&hair)
+        .map(|((v, a), hair)| if *a > 0.0 && !*hair { v } else { 0.0 })
         .collect();
     // Ordinary pore contrast on unmarked skin; relief far beyond it under a mark is the
     // mark's own lit rim and dark core.
@@ -666,38 +744,7 @@ fn pass(
     ];
     let keep = edit.texture.clamp(0.0, 1.0);
     let strength = edit.tone.clamp(0.0, 1.0) * edit.amount.clamp(0.0, 1.0);
-    // The robust reference finds marks; what a mark becomes is the unmarked skin right
-    // around it, so a mark in a shadow is rebuilt as shadowed skin and the light across a
-    // nose keeps its gradient.
-    let mut rebuilt = nearby_skin(&fine, &field.alpha, &reach, &reference, rect, r);
-    // Never brighter or less coloured than the brighter, calmer quarter of the skin right
-    // there: where marks are dense in a shadow, the nearest clean skin can be a lit cheek away,
-    // and rebuilding from it paints a pale patch into the shadow.
-    let selected: Vec<bool> = field.alpha.iter().map(|a| *a > 0.5).collect();
-    let local = |values: &[f32], share: f32| {
-        let level = local_percentile(
-            values,
-            &selected,
-            rect.w,
-            rect.h,
-            px(r, 2.0),
-            px(r, 0.5),
-            share,
-        );
-        blur(&level.level, rect.w, rect.h, px(r, 0.5))
-    };
-    let (ceiling, floor_a, floor_b) = (
-        local(&fine.l, 0.75),
-        local(&fine.a, 0.25),
-        local(&fine.b, 0.25),
-    );
-    // A bright head is brought down to the skin around it, never below its ordinary level.
-    let floor_l = local(&fine.l, 0.45);
-    for i in 0..rect.len() {
-        rebuilt.l[i] = rebuilt.l[i].min(ceiling[i]);
-        rebuilt.a[i] = rebuilt.a[i].max(floor_a[i]);
-        rebuilt.b[i] = rebuilt.b[i].max(floor_b[i]);
-    }
+    let (rebuilt, floor_l) = bounded_skin(field, &fine, &reach, &reference);
     let refs = rebuilt.planes();
     let own = field.lab.planes();
     for (i, (x, y)) in rect.cells().enumerate() {
