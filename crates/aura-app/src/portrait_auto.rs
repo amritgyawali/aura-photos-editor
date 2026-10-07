@@ -528,12 +528,14 @@ pub fn plan_with_faces(
         let mut clear: Option<Edit> = None;
         if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
-                // The surface selection frequency healing, the finish and the graft share.
+                // The heal selection acne clear works in: the surface selection the finish
+                // uses, with the nose and without the nostrils. ADR-0092. The texture restore
+                // runs over it too.
                 let surface = face_matte
                     .as_ref()
                     .filter(|_| settings.frequency_heal > 0.0 || settings.texture_graft > 0.0)
                     .and_then(|m| {
-                        portrait_features::deep_blemish::surface_matte(face, px, &m.matte)
+                        portrait_features::deep_blemish::heal_matte(face, px, &m.matte)
                             .map(|surface| (m, surface))
                     });
                 if let Some((m, surface)) = &surface {
@@ -543,26 +545,17 @@ pub fn plan_with_faces(
                     .filter(|_| options.blemishes);
                     if clear.is_some() {
                         mattes.insert(
-                            portrait_features::deep_blemish::surface_matte_id(PREFIX, index),
+                            portrait_features::deep_blemish::heal_matte_id(PREFIX, index),
                             surface.clone(),
                         );
                     }
                 }
-                // What is left after frequency healing is what the spot repairs are for.
-                let healed = clear
-                    .as_ref()
-                    .zip(surface.as_ref())
-                    .and_then(|(edit, (_, s))| {
-                        portrait_features::deep_blemish::after_frequency_heal(px, edit, s)
-                    });
-                let healed_px = healed.as_deref().and_then(|bytes| {
-                    portrait_features::Pixels::new(bytes, px.width as u32, px.height as u32)
-                });
-                let spot_px = healed_px.as_ref().unwrap_or(px);
                 let mut feature_options = options;
                 // Deep cleanup replaces the sparse four-patch search; never stack both. When the
                 // adaptive pass chose it, the sparse search still runs so the two can be compared.
-                if settings.deep_blemish_cleanup && chosen_deep {
+                // Acne clear replaces both: it measured every mark already, and a donor patch on
+                // skin it has evened shows as a disk. ADR-0092.
+                if (settings.deep_blemish_cleanup && chosen_deep) || clear.is_some() {
                     feature_options.blemishes = false;
                 }
                 features = portrait_features::plan(
@@ -574,11 +567,12 @@ pub fn plan_with_faces(
                     &feature_options,
                     face_matte.as_ref().map(|m| m.id.as_str()),
                 );
-                if options.blemishes && settings.deep_blemish_cleanup {
+                let mut finish_deep = false;
+                if options.blemishes && settings.deep_blemish_cleanup && clear.is_none() {
                     let deep = portrait_features::deep_blemish::plan(
                         face,
                         index,
-                        spot_px,
+                        px,
                         PREFIX,
                         &settings,
                         face_matte.as_ref().map(|m| &m.matte),
@@ -598,26 +592,25 @@ pub fn plan_with_faces(
                             features.blemishes.len()
                         ));
                     }
-                    if use_deep && (!features.blemishes.is_empty() || clear.is_some()) {
-                        if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
-                            portrait_features::deep_blemish::surface_finish(
-                                face, index, px, PREFIX, &settings, &m.matte,
-                            )
-                        }) {
-                            if let Some(id) = &finish.matte {
-                                mattes.insert(id.clone(), matte);
-                            }
-                            features.finishing.push(finish);
-                            features.report.findings.push("Deep cleanup: blended repaired skin with a continuous, feature-protected surface finish; strength follows Skin smoothing and texture follows Keep pore texture.".into());
+                    finish_deep = use_deep && !features.blemishes.is_empty();
+                }
+                if finish_deep || (clear.is_some() && settings.deep_blemish_cleanup) {
+                    if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
+                        portrait_features::deep_blemish::surface_finish(
+                            face, index, px, PREFIX, &settings, &m.matte,
+                        )
+                    }) {
+                        if let Some(id) = &finish.matte {
+                            mattes.insert(id.clone(), matte);
                         }
+                        features.finishing.push(finish);
+                        features.report.findings.push("Deep cleanup: blended repaired skin with a continuous, feature-protected surface finish; strength follows Skin smoothing and texture follows Keep pore texture.".into());
                     }
                 }
                 if clear.is_some() {
                     features.report.findings.push(format!(
-                        "Frequency healing: rebuilt the tone under compact marks across this face from the clean skin around each one, keeping the pores in place; {} spot{} it left were then repaired with donor texture. {}",
-                        features.blemishes.len(),
-                        if features.blemishes.len() == 1 { "" } else { "s" },
-                        if settings.remove_dark_marks { "Dark marks are included; review freckles and beauty marks." } else { "Dark marks that are not redder than the skin around them are kept." },
+                        "Acne clear: measured every mark on this face - in clusters, on the nose and between the brows too - against the clean skin around it and rebuilt its tone and colour from that skin, keeping the pores in place, then evened leftover redness. No donor patches are copied over skin it evened. {}",
+                        if settings.remove_dark_marks { "Dark marks are included; review freckles and beauty marks." } else { "Dark marks that are not redder or browner than the skin around them are kept." },
                     ));
                 }
                 // The restore goes last: it puts back the pores everything before it cost,
@@ -646,6 +639,10 @@ pub fn plan_with_faces(
                         if let Some((id, matte)) = restore {
                             mattes.insert(id, matte);
                         }
+                        let mut graft = graft;
+                        // Acne clear kept each healed mark's own pores; borrowed tiles over a
+                        // face it evened read as cracked skin.
+                        graft.preserve_microtexture = clear.is_some();
                         features.finishing.push(graft);
                         features.report.findings.push("Texture restore: put this face's own pore detail back where healing and smoothing had removed it, in the same place it was photographed, with glints and deep pits limited to this skin's own range; only healed blemishes borrowed pores from clean skin nearby. Nothing is generated.".into());
                     }
@@ -671,7 +668,7 @@ pub fn plan_with_faces(
                     &format!("{PREFIX}{index}-feature-guard"),
                     &settings,
                 )?;
-                features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Protected regions are excluded from every automatic face step, including healing and texture restoration. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected" } else { "adjustable" }));
+                features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Protected eyes are excluded from every automatic face step, healing and texture restoration included. A protected nose keeps its pores, shape and shading out of smoothing and toning; marks on it are still repaired, and the nostrils are never touched. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected" } else { "adjustable" }));
             }
         }
         features.finishing.extend(garments);

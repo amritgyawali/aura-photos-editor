@@ -116,6 +116,7 @@ pub mod portrait;
 pub mod profiles;
 pub mod restore;
 pub mod retouch;
+mod retouch_acne;
 mod retouch_clear;
 mod retouch_heal;
 mod retouch_mask;

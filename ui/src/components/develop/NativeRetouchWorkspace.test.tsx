@@ -295,6 +295,30 @@ it('authors a brush mask using keyboard coordinates and saves one operation',asy
     expect.objectContaining({mask:{strokes:[expect.objectContaining({erase:false,points:[[.3,.45,1]]})]}})
   ]));
 });
+it('the blemish brush paints acne clear over what is left and saves it as one operation',async()=>{
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button',{name:'Blemish brush'}));
+  expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('acne_clear');
+  expect(screen.getByText('Brush (B)').getAttribute('aria-pressed')).toBe('true');
+  // Nothing painted yet: nothing to apply.
+  expect((screen.getByText('Apply retouch') as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Center X (%)'),{target:{value:'40'}});
+  fireEvent.click(screen.getByText('Dab at target coordinates'));
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'acne_clear',matte:null,keepDarkMarks:false,preserveMicrotexture:true,
+      mask:{strokes:[expect.objectContaining({erase:false,points:[[.4,.45,1]]})]}})
+  ]));
+});
+it('shows the pixels the saved retouch changed without asking the backend',async()=>{
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button',{name:'Show retouched areas'}));
+  fireEvent.change(screen.getByLabelText('Show'),{target:{value:'changes'}});
+  await screen.findByAltText('Saved retouch coverage');
+  expect(screen.getByText(/Orange marks every pixel the saved retouch changed/)).toBeTruthy();
+  expect(screen.queryByLabelText('Show selection for')).toBeNull();
+});
 it('duplicates and reorders saved operations through native history actions',async()=>{
   vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'one'},{...freshRetouch(),id:'two'}]);
   open();await screen.findByAltText('Retouched photograph');

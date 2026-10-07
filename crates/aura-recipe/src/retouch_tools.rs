@@ -115,6 +115,11 @@ pub enum Tool {
     /// Brings fine texture back up to the selection's own typical level by borrowing real
     /// pore detail from clean skin in the same selection. ADR-0090.
     TextureGraft,
+    /// Finds every blemish against a robust estimate of the clean skin around it - marks in a
+    /// dense cluster included - and rebuilds the tone and colour under each one, keeping the
+    /// pores. With `preserve_microtexture` it also evens flat redness. Without a matte it is
+    /// a brush: paint over what is left. ADR-0092.
+    AcneClear,
 }
 
 // Each flag is an independent opt-in that old recipes read as off; none of them is a state
@@ -142,14 +147,16 @@ pub struct Edit {
     /// High-band gain. 1 preserves the original high band.
     pub texture: f32,
     /// Separate fine pores from larger uneven texture during frequency separation.
-    /// Off for old recipes; on for the automatic deep skin finish.
+    /// Off for old recipes; on for the automatic deep skin finish. On [`Tool::AcneClear`] it
+    /// also evens flat redness; on [`Tool::TextureGraft`] it borrows no donor texture and leaves
+    /// healed marks as they were healed.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub preserve_microtexture: bool,
     /// Transfer real donor texture over a robust local lighting fit. Old heals stay unchanged.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub texture_heal: bool,
     /// How readily frequency healing calls a compact deviation a mark, 0..=1. Absent means
-    /// 0.5. Only read by [`Tool::FrequencyHeal`].
+    /// 0.5. Only read by [`Tool::FrequencyHeal`] and [`Tool::AcneClear`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensitivity: Option<f32>,
     /// Frequency healing leaves marks that are darker but not redder than the skin around

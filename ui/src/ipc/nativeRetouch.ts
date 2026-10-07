@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { RecipeDto, RenderDto } from './types';
 
 export const RETOUCH_TOOLS = [
+  ['acne_clear', 'Acne & blemish clear · brush', 'Repair', 'Paint over pimples, red or brown marks and bumps that are left. Each one is measured against the clean skin around it and rebuilt from that skin, keeping the pores. Works on the nose and between the brows too; creases, hair and nostrils are left alone.'],
   ['heal', 'Heal blemish / flyaway / lint', 'Repair', 'Samples nearby pixels; choose a source for precise repairs.'],
   ['patch_heal', 'Texture-aware patch heal', 'Repair', 'Matches nearby texture and blends surrounding light. Auto source works on small ellipses; choose a source for painted or larger repairs.'],
   ['frequency_heal', 'Frequency healing · marks', 'Repair', 'Finds compact marks in the selection and rebuilds the tone under each one from the clean skin around it. Pores stay where they are; creases and hair are left alone.'],
@@ -91,9 +92,9 @@ export type NativeRetouchEdit = {
   sourceScale?: number;
   preserveMicrotexture?: boolean;
   textureHeal?: boolean;
-  /** Frequency healing only: how readily a compact deviation counts as a mark (default 0.5). */
+  /** Frequency healing and acne clear: how readily a deviation counts as a mark (default 0.5). */
   sensitivity?: number | null;
-  /** Frequency healing only: leave marks that are darker but not redder than the skin around them. */
+  /** Frequency healing and acne clear: leave marks that are darker but not redder or browner. */
   keepDarkMarks?: boolean;
   texture: number; tone: number; warmth: number; tint: number;
   mask?: BrushMask | null;
@@ -114,6 +115,13 @@ export function validRetouchSelection(edit: NativeRetouchEdit): boolean {
   return !luminance || ([luminance.low,luminance.high,luminance.softness].every(Number.isFinite)
     && luminance.low >= -16 && luminance.high <= 16 && luminance.low <= luminance.high && luminance.softness >= 0 && luminance.softness <= 4);
 }
+/** The blemish brush: acne clear limited to what a person paints. Paint over what is left after
+ * the automatic retouch; the marks inside are rebuilt from the clean skin around them. */
+export const blemishBrush = (region: NativeRetouchEdit['region']): NativeRetouchEdit => ({
+  id: 'draft', tool: 'acne_clear', enabled: true, region, source: null, amount: 1, feather: .35,
+  radius: .005, texture: .25, tone: 1, warmth: 0, tint: 0, sensitivity: .75, keepDarkMarks: false,
+  preserveMicrotexture: true, mask: { strokes: [] }, matte: null, selection: null, skin: null,
+});
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
 export const nativeRetouch = {
   autoPortrait: (photoId: string) => invoke<RecipeDto>('enhance_portrait', { input: { photoId } }),

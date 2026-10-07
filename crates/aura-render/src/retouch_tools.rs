@@ -137,15 +137,26 @@ fn apply_observed(
     let planes = matte_planes(rgb, width, height, edits, mattes);
     // A texture graft measures the texture the skin had from the frame as it is now, before
     // any operation has run - not from whatever the operations before it left behind.
-    let references: BTreeMap<&str, crate::retouch_texture::Reference> = edits
-        .iter()
-        .filter(|e| e.enabled && e.amount > 0.0 && e.tool == Tool::TextureGraft)
-        .filter_map(|edit| {
-            let coverage = coverage_of(edit, width, height, rgb, &planes)?;
-            crate::retouch_texture::Reference::capture(rgb, width, height, edit, coverage.bounds)
-                .map(|reference| (edit.id.as_str(), reference))
-        })
-        .collect();
+    let capture =
+        |rgb: &[f32], keep_healed: bool| -> BTreeMap<&str, crate::retouch_texture::Reference> {
+            edits
+                .iter()
+                .filter(|e| e.enabled && e.amount > 0.0 && e.tool == Tool::TextureGraft)
+                .filter(|e| !keep_healed || e.preserve_microtexture)
+                .filter_map(|edit| {
+                    let coverage = coverage_of(edit, width, height, rgb, &planes)?;
+                    crate::retouch_texture::Reference::capture(
+                        rgb,
+                        width,
+                        height,
+                        edit,
+                        coverage.bounds,
+                    )
+                    .map(|reference| (edit.id.as_str(), reference))
+                })
+                .collect()
+        };
+    let mut references = capture(rgb, false);
     for edit in edits.iter().filter(|e| e.enabled && e.amount > 0.0) {
         let Some(coverage) = coverage_of(edit, width, height, rgb, &planes) else {
             continue;
@@ -184,6 +195,12 @@ fn apply_observed(
             crate::retouch_heal::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::FrequencyHeal {
             crate::retouch_clear::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::AcneClear {
+            crate::retouch_acne::apply(rgb, width, height, edit, &coverage);
+            // A restore that leaves healed marks alone measures "the texture this skin had" on
+            // the skin acne clear left: the photograph's own crusts and scabs are not texture
+            // to put back. ADR-0092.
+            references.extend(capture(rgb, true));
         } else if edit.tool == Tool::TextureGraft {
             crate::retouch_texture::apply(
                 rgb,
@@ -264,13 +281,19 @@ pub fn frequency_heal_marks(
     if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
         return Vec::new();
     }
-    if edit.tool != Tool::FrequencyHeal {
+    if !matches!(edit.tool, Tool::FrequencyHeal | Tool::AcneClear) {
         return vec![0.0; width * height];
     }
     let planes = matte_planes(rgb, width, height, std::slice::from_ref(edit), mattes);
     coverage_of(edit, width, height, rgb, &planes).map_or_else(
         || vec![0.0; width * height],
-        |coverage| crate::retouch_clear::mark_plane(rgb, width, height, edit, &coverage),
+        |coverage| {
+            if edit.tool == Tool::AcneClear {
+                crate::retouch_acne::mark_plane(rgb, width, height, edit, &coverage)
+            } else {
+                crate::retouch_clear::mark_plane(rgb, width, height, edit, &coverage)
+            }
+        },
     )
 }
 
@@ -531,6 +554,7 @@ fn apply_one(
                 }
                 Tool::PatchHeal
                 | Tool::FrequencyHeal
+                | Tool::AcneClear
                 | Tool::TextureGraft
                 | Tool::AutoBlemish
                 | Tool::SkinSmooth

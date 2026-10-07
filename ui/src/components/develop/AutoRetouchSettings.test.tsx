@@ -118,14 +118,14 @@ it('returns the spot limit to the ordinary range when deep cleanup is disabled',
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ deepBlemishCleanup: false, maxSpots: 24 }) }));
 });
 
-it('offers a professional preset: frequency healing first, real texture back last', () => {
+it('offers a professional preset: acne clear first, real texture back last', () => {
   const run = vi.fn();
   render(<AutoRetouchSettings disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Professional retouch' }));
-  expect(screen.getByText(/Frequency healing rebuilds the tone under each mark first/)).toBeTruthy();
+  expect(screen.getByText(/Acne clear rebuilds every mark from the clean skin around it first/)).toBeTruthy();
   expect(screen.getByText(/restores the original pores within the selected skin/)).toBeTruthy();
   fireEvent.click(screen.getByText('Blemishes'));
-  expect(screen.getByText('Frequency healing: 100%')).toBeTruthy();
+  expect(screen.getByText('Acne clear: 100%')).toBeTruthy();
   fireEvent.click(screen.getByText('Skin'));
   expect(screen.getByText('Restore skin texture: 80%')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
@@ -134,19 +134,19 @@ it('offers a professional preset: frequency healing first, real texture back las
   }) }));
 });
 
-it('keeps frequency healing and the texture graft off unless a preset or a person turns them on', () => {
+it('keeps acne clear and the texture graft off unless a preset or a person turns them on', () => {
   expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
   expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
   for (const [id, , values] of PRESETS) {
-    if (id === 'pro' || id === 'acne_only') continue;
+    if (id === 'pro' || id === 'acne_only' || id === 'acne') continue;
     expect(values.frequencyHeal ?? 0).toBe(0);
     expect(values.textureGraft ?? 0).toBe(0);
   }
   const run = vi.fn();
   render(<AutoRetouchSettings disabled={false} onRun={run} />);
-  expect(screen.queryByText(/Frequency healing rebuilds the tone/)).toBeNull();
+  expect(screen.queryByText(/Acne clear rebuilds every mark/)).toBeNull();
   fireEvent.click(screen.getByText('Blemishes'));
-  fireEvent.change(screen.getByLabelText('Frequency healing'), { target: { value: '60' } });
+  fireEvent.change(screen.getByLabelText('Acne clear'), { target: { value: '60' } });
   expect(screen.getByText('Custom')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ frequencyHeal: .6, textureGraft: 0 }) }));

@@ -297,6 +297,201 @@ pub(crate) fn distance_to(flagged: &[bool], w: usize, h: usize) -> Vec<f32> {
     d
 }
 
+/// Bins a [`local_percentile`] resolves a plane's range into.
+const PERCENTILE_BINS: usize = 384;
+
+/// A robust local level and how much of its window it was measured from.
+#[derive(Debug)]
+pub(crate) struct Percentile {
+    /// The value `share` of the counted cells in the window around each cell lie below; a
+    /// cell whose window counted nothing keeps its own value.
+    pub level: Vec<f32>,
+    /// The share of each window that was counted, 0..=1.
+    pub support: Vec<f32>,
+}
+
+/// The bin of every counted cell (`u16::MAX` for the rest), and the value range the bins span.
+fn binned(values: &[f32], counted: &[bool]) -> Option<(Vec<u16>, f32, f32)> {
+    let sampling = (values.len() / 60_000).max(1);
+    let mut samples: Vec<f32> = values
+        .iter()
+        .zip(counted)
+        .step_by(sampling)
+        .filter(|(v, on)| **on && v.is_finite())
+        .map(|(v, _)| *v)
+        .collect();
+    let lo = quantile(&mut samples, 0.001)?;
+    let hi = quantile(&mut samples, 0.999)?;
+    let span = (hi - lo).max(1e-6);
+    let top = (PERCENTILE_BINS - 1) as f32;
+    let bins = values
+        .iter()
+        .zip(counted)
+        .map(|(v, on)| {
+            if *on && v.is_finite() {
+                ((v - lo) / span * top).round().clamp(0.0, top) as u16
+            } else {
+                u16::MAX
+            }
+        })
+        .collect();
+    Some((bins, lo, span))
+}
+
+/// A regular grid of samples, `step` cells apart, with the last row and column on the edge.
+#[derive(Debug, Clone, Copy)]
+struct Grid {
+    w: usize,
+    h: usize,
+    step: usize,
+    cols: usize,
+    rows: usize,
+}
+
+impl Grid {
+    fn new(w: usize, h: usize, step: usize) -> Self {
+        let step = step.max(1);
+        Self {
+            w,
+            h,
+            step,
+            cols: (w - 1).div_ceil(step) + 1,
+            rows: (h - 1).div_ceil(step) + 1,
+        }
+    }
+
+    fn at(self, k: usize, size: usize) -> usize {
+        (k * self.step).min(size - 1)
+    }
+
+    /// The two samples around `v` along an axis of `size` cells and `cells` samples, and how
+    /// far toward the second it is.
+    fn locate(self, v: usize, size: usize, cells: usize) -> (usize, usize, f32) {
+        let k = (v / self.step).min(cells - 1);
+        let next = (k + 1).min(cells - 1);
+        let (p0, p1) = (self.at(k, size), self.at(next, size));
+        let t = if p1 > p0 {
+            (v - p0) as f32 / (p1 - p0) as f32
+        } else {
+            0.0
+        };
+        (k, next, t)
+    }
+
+    /// Bilinear interpolation of the grid's levels and supports to every cell. A cell whose
+    /// four samples counted nothing keeps `own`.
+    fn spread(self, levels: &[f32], supports: &[f32], own: &[f32]) -> Percentile {
+        let mut level = Vec::with_capacity(self.w * self.h);
+        let mut support = Vec::with_capacity(self.w * self.h);
+        for y in 0..self.h {
+            let (ky, ny, ty) = self.locate(y, self.h, self.rows);
+            for x in 0..self.w {
+                let (kx, nx, tx) = self.locate(x, self.w, self.cols);
+                let (mut sum, mut weight, mut held) = (0.0_f32, 0.0_f32, 0.0_f32);
+                for (gy, wy) in [(ky, 1.0 - ty), (ny, ty)] {
+                    for (gx, wx) in [(kx, 1.0 - tx), (nx, tx)] {
+                        let g = gy * self.cols + gx;
+                        let k = wy * wx;
+                        held += supports[g] * k;
+                        if levels[g].is_finite() && k > 0.0 {
+                            sum += levels[g] * k;
+                            weight += k;
+                        }
+                    }
+                }
+                level.push(if weight > 1e-6 {
+                    sum / weight
+                } else {
+                    own[y * self.w + x]
+                });
+                support.push(held);
+            }
+        }
+        Percentile { level, support }
+    }
+}
+
+/// A local percentile of `values` over the `counted` cells of a square window of half-width
+/// `radius` around every cell.
+///
+/// Unlike a mean, a percentile keeps an edge: next to a shadow it reports the side of the edge
+/// the cell is on, while anything covering less than the share of the window that lies beyond
+/// the percentile - a blemish - is ignored. It is measured on a grid of `step` cells by sliding
+/// one histogram along each grid row, and interpolated bilinearly in between, so its cost
+/// grows with the window's width rather than its area. Deterministic: integer counts, fixed
+/// order.
+pub(crate) fn local_percentile(
+    values: &[f32],
+    counted: &[bool],
+    w: usize,
+    h: usize,
+    radius: usize,
+    step: usize,
+    share: f32,
+) -> Percentile {
+    let unchanged = || Percentile {
+        level: values.to_vec(),
+        support: vec![0.0; values.len()],
+    };
+    if w == 0 || h == 0 || values.len() != w * h || counted.len() != w * h {
+        return unchanged();
+    }
+    let Some((bins, lo, span)) = binned(values, counted) else {
+        return unchanged();
+    };
+    let grid = Grid::new(w, h, step);
+    let top = (PERCENTILE_BINS - 1) as f32;
+    let mut levels = vec![f32::NAN; grid.cols * grid.rows];
+    let mut supports = vec![0.0_f32; grid.cols * grid.rows];
+    let mut hist = vec![0_u32; PERCENTILE_BINS];
+    let share = share.clamp(0.0, 1.0);
+    for gy in 0..grid.rows {
+        let y = grid.at(gy, h);
+        let rows = y.saturating_sub(radius)..(y + radius + 1).min(h);
+        hist.fill(0);
+        let mut total = 0_u32;
+        let mut columns = 0..0;
+        for gx in 0..grid.cols {
+            let x = grid.at(gx, w);
+            let wanted = x.saturating_sub(radius)..(x + radius + 1).min(w);
+            // Columns that left the window on the left, then columns that entered on the right.
+            let leaving = (columns.start..wanted.start.min(columns.end)).map(|c| (c, false));
+            let entering = (columns.end.max(wanted.start)..wanted.end).map(|c| (c, true));
+            for (column, enter) in leaving.chain(entering) {
+                for row in rows.clone() {
+                    let b = bins[row * w + column];
+                    if b == u16::MAX {
+                        continue;
+                    }
+                    if enter {
+                        hist[usize::from(b)] += 1;
+                        total += 1;
+                    } else {
+                        hist[usize::from(b)] -= 1;
+                        total -= 1;
+                    }
+                }
+            }
+            columns = wanted;
+            let g = gy * grid.cols + gx;
+            supports[g] = total as f32 / (rows.len() * columns.len()) as f32;
+            if total == 0 {
+                continue;
+            }
+            let target = (share * total as f32).max(0.5);
+            let mut seen = 0_u32;
+            for (bin, count) in hist.iter().enumerate() {
+                seen += count;
+                if seen as f32 >= target {
+                    levels[g] = lo + bin as f32 / top * span;
+                    break;
+                }
+            }
+        }
+    }
+    grid.spread(&levels, &supports, values)
+}
+
 /// 0 below `low`, 1 above `high`, smooth in between.
 pub(crate) fn smoothstep(low: f32, high: f32, v: f32) -> f32 {
     if high <= low {
@@ -309,6 +504,46 @@ pub(crate) fn smoothstep(low: f32, high: f32, v: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_local_percentile_keeps_an_edge_and_ignores_a_spot() {
+        let (w, h) = (60, 40);
+        // A step from 1.0 to 0.5 at x = 30, and a small dark spot on the bright side.
+        let mut values: Vec<f32> = (0..w * h)
+            .map(|i| if i % w < 30 { 1.0 } else { 0.5 })
+            .collect();
+        for y in 18..22 {
+            for x in 10..14 {
+                values[y * w + x] = 0.1;
+            }
+        }
+        let counted = vec![true; w * h];
+        let p = local_percentile(&values, &counted, w, h, 8, 2, 0.5);
+        // Either side of the edge keeps its own level, three cells from it.
+        assert!(
+            (p.level[20 * w + 26] - 1.0).abs() < 0.01,
+            "{}",
+            p.level[20 * w + 26]
+        );
+        assert!(
+            (p.level[20 * w + 34] - 0.5).abs() < 0.01,
+            "{}",
+            p.level[20 * w + 34]
+        );
+        // The spot is not its own level.
+        assert!(
+            (p.level[20 * w + 12] - 1.0).abs() < 0.01,
+            "{}",
+            p.level[20 * w + 12]
+        );
+        assert!((p.support[20 * w + 12] - 1.0).abs() < 1e-6);
+        // Cells that are not counted are not read, and a window with none keeps its own value.
+        let left_only: Vec<bool> = (0..w * h).map(|i| i % w < 30).collect();
+        let q = local_percentile(&values, &left_only, w, h, 4, 2, 0.5);
+        assert!((q.level[20 * w + 31] - 1.0).abs() < 0.01);
+        assert!((q.level[20 * w + 50] - 0.5).abs() < 1e-6);
+        assert!(q.support[20 * w + 50] < 1e-6);
+    }
 
     #[test]
     fn the_running_blur_matches_the_reference_blur_and_keeps_a_constant() {

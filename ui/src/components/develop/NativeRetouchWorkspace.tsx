@@ -1,10 +1,10 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { asIpcError, develop } from '../../ipc/client';
-import { freshRetouch, nativeRetouch, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool, type BrushStroke } from '../../ipc/nativeRetouch';
+import { blemishBrush, freshRetouch, nativeRetouch, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool, type BrushStroke } from '../../ipc/nativeRetouch';
 import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { AutoRetouchSettings } from './AutoRetouchSettings';
-import { coverageDataUrl, rgbDataUrl } from './rgbImage';
+import { changesDataUrl, coverageDataUrl, rgbDataUrl } from './rgbImage';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
 import { RetouchCanvas, type RetouchMode } from './RetouchCanvas';
 import { RetouchControls, validRetouch } from './RetouchControls';
@@ -38,6 +38,8 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const [coverageView,setCoverageView] = useState(false);
   const [coverageOperation,setCoverageOperation] = useState<string|null>(null);
   const [coverageOpacity,setCoverageOpacity] = useState(.5);
+  /** What Show retouched areas draws: the saved selections, or the pixels the retouch changed. */
+  const [coverageMode,setCoverageMode] = useState<'selection'|'changes'>('selection');
   const displayedCoverageOpacity = useDeferredValue(coverageOpacity);
   const [overlay,setOverlay] = useState(true);
   const [sourceMode,setSourceMode] = useState(false);
@@ -65,9 +67,11 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   },[projectId,photoId,refresh,revision]);
   const blocked = busy || disabled;
   const coverage = useSavedRetouchCoverage(projectId, photoId, `${recipe?.recipeHash}:${refresh}:${revision}`,
-    coverageOperation, coverageView && !blocked);
-  const coverageSrc = useMemo(() => coverage.image && preview
-    ? coverageDataUrl(preview, coverage.image, displayedCoverageOpacity) : null, [coverage.image, preview, displayedCoverageOpacity]);
+    coverageOperation, coverageView && coverageMode === 'selection' && !blocked);
+  const coverageSrc = useMemo(() => {
+    if (coverageMode === 'changes') return before && preview ? changesDataUrl(before, preview, displayedCoverageOpacity) : null;
+    return coverage.image && preview ? coverageDataUrl(preview, coverage.image, displayedCoverageOpacity) : null;
+  }, [coverageMode, coverage.image, before, preview, displayedCoverageOpacity]);
   useEffect(() => { setCoverageOperation(null); setCoverageView(false); }, [photoId, projectId]);
   useEffect(() => { if (coverageOperation && !edits.some(e => e.id === coverageOperation)) setCoverageOperation(null); }, [edits, coverageOperation]);
   const rendered=maskView?draftState.image:compare?before:draftState.image??preview;
@@ -112,6 +116,14 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const undoStroke=()=>{if(!blocked&&draft.mask?.strokes.length)change({mask:{strokes:draft.mask.strokes.slice(0,-1)}});};
   const apply=()=>{if(validRetouch(draft)&&(selected||edits.length<256)){setCompare(false);void save(()=>nativeRetouch.edit(projectId,photoId,selected?'update':'append',[draft]),true);}};
   const discard=()=>{const saved=edits.find(edit=>edit.id===selected);setDraft(saved??freshRetouch());setMode(saved?.selection?.gradient?'gradient':saved?.mask?'paint':'ellipse');setDirty(false);setError(null);};
+  /** The blemish brush: paint over what the automatic retouch left; Apply keeps it. */
+  const startBlemishBrush=()=>{
+    if(dirty&&draft.tool!=='acne_clear'){setError(draftNotice);return;}
+    setSelected(null);setMode('paint');setSourceMode(false);setMaskView(false);setCoverageView(false);setCompare(false);setSplit(false);setError(null);
+    setBrushRadius(value=>Math.min(value,.03));
+    setDraft(value=>value.tool==='acne_clear'&&value.mask?value:blemishBrush([value.region[0],value.region[1],.035,.035]));
+    setDirty(true);setLive(true);
+  };
   const preset=(polished:boolean)=>{
     if(selected&&dirty){setError(draftNotice);return;}
     const base={...draft,id:'draft',enabled:true,texture:1,source:null};
@@ -138,6 +150,10 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     <div className="studio-toolbar"><div><span className="eyebrow">NATIVE RETOUCH</span><h2>Precision, at your pace.</h2></div><button type="button" disabled={blocked} onClick={()=>{if(dirty)setError('Apply your changes or choose Discard draft before leaving Retouch.');else onClose();}}>Back to Develop</button></div>
     <p className="lr-hint">Paint a selection, preview your changes, then apply. Alt-click to sample a source. This view shows the full photo; your crop and perspective are applied in Develop and export.</p>
     {(error||draftState.error)&&<p role="alert">{error||draftState.error} <button type="button" disabled={blocked} onClick={()=>setRefresh(v=>v+1)}>Reload retouch</button></p>}
+    <div className="retouch-blemish-brush">
+      <button type="button" className="retouch-primary" disabled={blocked} aria-pressed={draft.tool==='acne_clear'&&mode==='paint'} onClick={startBlemishBrush}>Blemish brush</button>
+      <p className="lr-hint">Something left? Choose Blemish brush, paint over the spots, pimples or marks you still see - on the nose and between the brows too - then Apply retouch. Each one is rebuilt from the clean skin around it and the pores stay. Use Show retouched areas to see what was changed.</p>
+    </div>
     <div className="retouch-selection-toolbar" aria-label="Selection tools">
       {([['ellipse','Ellipse (V)'],['paint','Brush (B)'],['erase','Eraser (E)'],['gradient','Gradient (G)'],['pan','Hand (H)']] as const).map(([value,label])=><button type="button" key={value} disabled={blocked} aria-pressed={mode===value} onClick={()=>chooseMode(value)}>{label}</button>)}
       <button type="button" disabled={blocked||!draft.mask?.strokes.length} onClick={undoStroke}>Undo brush stroke</button>
@@ -165,15 +181,24 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           <button type="button" disabled={stackBlocked||!history?.canRedo} onClick={()=>void save(()=>develop.historyStep({projectId,photoId,action:'redo'}))}>Redo</button>
         </div>
         {coverageView && <div className="retouch-coverage-controls" aria-label="Saved retouch coverage">
-          <label>Show selection for<select value={coverageOperation??''} disabled={blocked} onChange={event=>setCoverageOperation(event.target.value||null)}>
+          <label>Show<select aria-label="Show" value={coverageMode} disabled={blocked} onChange={event=>setCoverageMode(event.target.value==='changes'?'changes':'selection')}>
+            <option value="selection">Skin selected for retouch (teal)</option>
+            <option value="changes">Pixels the retouch changed (orange)</option>
+          </select></label>
+          {coverageMode==='selection'&&<label>Show selection for<select value={coverageOperation??''} disabled={blocked} onChange={event=>setCoverageOperation(event.target.value||null)}>
             <option value="">All enabled saved retouch</option>
             {edits.map((edit,index)=><option key={edit.id} value={edit.id}>{index+1}. {RETOUCH_TOOLS.find(t=>t[0]===edit.tool)?.[1]}{automaticLabel(edit.id)}{edit.enabled?'':' (disabled)'}</option>)}
-          </select></label>
+          </select></label>}
           <label>Overlay visibility<input type="range" min=".15" max=".85" step=".05" value={coverageOpacity} onChange={event=>setCoverageOpacity(Number(event.target.value))}/></label>
-          <p><span className="retouch-coverage-swatch"/> Teal shows the saved retouch selections, including their soft edges. Clear areas are excluded. A selected pixel may stay unchanged when the tool finds nothing to correct. Disabled steps and unsaved drafts are excluded.</p>
-          {coverage.pending && <p role="status">Reading saved retouch selections…</p>}
-          {coverage.error && <p role="alert">Could not show retouch coverage: {coverage.error}</p>}
-          {coverage.image && !coverageSrc && <p role="alert">Coverage does not match this preview. Reload retouch to try again.</p>}
+          {coverageMode==='selection'?<>
+            <p><span className="retouch-coverage-swatch"/> Teal shows the saved retouch selections, including their soft edges. Clear areas are excluded. A selected pixel may stay unchanged when the tool finds nothing to correct. Disabled steps and unsaved drafts are excluded.</p>
+            {coverage.pending && <p role="status">Reading saved retouch selections…</p>}
+            {coverage.error && <p role="alert">Could not show retouch coverage: {coverage.error}</p>}
+            {coverage.image && !coverageSrc && <p role="alert">Coverage does not match this preview. Reload retouch to try again.</p>}
+          </>:<>
+            <p><span className="retouch-coverage-swatch retouch-changes-swatch"/> Orange marks every pixel the saved retouch changed, compared with the photo before retouch: each healed spot shows as a dot. Anything you still see that is not orange was left as photographed; paint it with the Blemish brush.</p>
+            {!coverageSrc && <p role="alert">The before and after previews do not match. Reload retouch to try again.</p>}
+          </>}
         </div>}
         <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}</p>
         <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>

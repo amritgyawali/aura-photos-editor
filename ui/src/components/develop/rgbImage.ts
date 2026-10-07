@@ -19,6 +19,29 @@ export function coverageDataUrl(photo: Pick<RenderDto, 'width'|'height'|'rgbBase
   return rgbDataUrl({...photo, rgbBase64: btoa(chunks.join(''))});
 }
 
+/** Tint every pixel the saved retouch actually changed: `after` against `before` (both the
+ * backend's full-frame previews). Unchanged pixels keep their displayed RGB exactly; a change
+ * of a few code values or more shows at full tint, so a healed pimple is a visible dot. */
+export function changesDataUrl(before: Pick<RenderDto, 'width'|'height'|'rgbBase64'>,
+  after: Pick<RenderDto, 'width'|'height'|'rgbBase64'>, opacity: number): string | null {
+  if (before.width !== after.width || before.height !== after.height || !Number.isFinite(opacity)) return null;
+  let a: string, b: string;
+  try { a = atob(after.rgbBase64); b = atob(before.rgbBase64); } catch { return null; }
+  if (a.length !== after.width * after.height * 3 || b.length !== a.length) return null;
+  const bytes = new Uint8Array(a.length);
+  const tint = [255, 120, 40];
+  const strength = Math.max(0, Math.min(1, opacity));
+  for (let p = 0; p < a.length; p += 3) {
+    let diff = 0;
+    for (let c = 0; c < 3; c++) diff = Math.max(diff, Math.abs(a.charCodeAt(p + c) - b.charCodeAt(p + c)));
+    const alpha = Math.max(0, Math.min(1, (diff - 1) / 8)) * strength;
+    for (let c = 0; c < 3; c++) bytes[p + c] = Math.round(a.charCodeAt(p + c) * (1 - alpha) + (tint[c] ?? 0) * alpha);
+  }
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += 8192) chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
+  return rgbDataUrl({...after, rgbBase64: btoa(chunks.join(''))});
+}
+
 /** Wrap the backend's interleaved RGB in a lossless browser-readable BMP container. */
 export function rgbDataUrl(render: Pick<RenderDto, 'width'|'height'|'rgbBase64'>): string | null {
   const { width, height } = render;

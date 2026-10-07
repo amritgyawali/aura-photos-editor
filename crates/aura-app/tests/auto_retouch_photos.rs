@@ -78,6 +78,40 @@ fn preset(name: &str) -> portrait_features::Options {
             s.hair_detail = 0.4;
             s.hair_shine = 0.2;
         }
+        // The UI's "Acne only - preserve detail": acne clear and residual spot repairs, no
+        // smoothing, toning, lines, eyes or teeth. ADR-0091, ADR-0092.
+        "acne_only" => {
+            options.eyes = false;
+            options.teeth = false;
+            options.refine = false;
+            options.scope = portrait_features::Scope::Face;
+            *s = Settings {
+                deep_blemish_cleanup: true,
+                remove_dark_marks: true,
+                keep_freckles: false,
+                max_spots: 80,
+                blemish_sensitivity: 0.7,
+                frequency_heal: 1.0,
+                smoothing: 0.0,
+                tone_evenness: 0.0,
+                light_evenness: 0.0,
+                micro_dodge_burn: 0.0,
+                shine: 0.0,
+                redness: 0.0,
+                forehead_lines: 0.0,
+                crows_feet: 0.0,
+                smile_lines: 0.0,
+                under_eye_lines: 0.0,
+                dark_circles: 0.0,
+                eye_bags: 0.0,
+                eye_whitening: 0.0,
+                eye_vessels: 0.0,
+                iris_detail: 0.0,
+                red_eye: false,
+                teeth_whitening: 0.0,
+                ..Settings::default()
+            };
+        }
         "soft" => {
             s.smoothing = 0.75;
             s.texture = 0.4;
@@ -115,6 +149,9 @@ fn preset(name: &str) -> portrait_features::Options {
             };
         }
         _ => {}
+    }
+    if let Ok(v) = std::env::var("AURA_RETOUCH_SENSITIVITY") {
+        options.settings.blemish_sensitivity = v.parse().expect("a number");
     }
     options
 }
@@ -179,6 +216,10 @@ fn retouches_real_photographs() {
             if let Ok(only) = std::env::var("AURA_RETOUCH_ONLY") {
                 stack.retain(|e| only.split(',').any(|w| e.id.contains(w)));
             }
+            // `AURA_RETOUCH_SKIP=graft` drops operations whose id contains one of the words.
+            if let Ok(skip) = std::env::var("AURA_RETOUCH_SKIP") {
+                stack.retain(|e| !skip.split(',').any(|w| e.id.contains(w)));
+            }
             retouch_tools::validate(&stack).unwrap();
             assert!(stack.len() <= retouch_tools::MAX_EDITS);
             let mut with = recipe.clone();
@@ -205,6 +246,30 @@ fn retouches_real_photographs() {
                 for (selected, alpha) in selected.iter_mut().zip(mask) {
                     *selected |= alpha > 0.0;
                 }
+            }
+            // Where acne clear works (blue) and what it rebuilds (yellow), on the photograph.
+            if let Some(clear) = stack.iter().find(|e| e.id.ends_with("-clear")) {
+                let selection = aura_render::retouch_tools::selection_mask_with_mattes(
+                    &source, w as usize, h as usize, clear, &mattes,
+                );
+                let marks = aura_render::retouch_tools::frequency_heal_marks(
+                    &source, w as usize, h as usize, clear, &mattes,
+                );
+                let mut overlay = rgb.clone();
+                for (i, (s, m)) in selection.iter().zip(&marks).enumerate() {
+                    for (c, tint) in [(0, [40.0, 120.0, 255.0]), (1, [255.0, 230.0, 0.0])] {
+                        let a = if c == 0 { s * 0.35 } else { m * 0.7 };
+                        for k in 0..3 {
+                            let v = &mut overlay[i * 3 + k];
+                            *v = (f32::from(*v) * (1.0 - a) + tint[k] * a).round() as u8;
+                        }
+                    }
+                }
+                std::fs::write(
+                    path.with_file_name(format!("{stem}.{name}.clear.rgb")),
+                    &overlay,
+                )
+                .unwrap();
             }
             let started = std::time::Instant::now();
             aura_render::retouch_tools::apply_with_mattes(
