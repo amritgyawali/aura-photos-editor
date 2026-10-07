@@ -65,7 +65,8 @@ export function previewSource(image: Pixels | null | undefined): string | null {
 
 export type ProgressivePreview = {
   image: RenderDto | null;
-  quality: PreviewQuality | null;
+  /** `live` is the instant estimate shown while the exact quick look is made (ADR-0099). */
+  quality: PreviewQuality | 'live' | null;
   /** True while the full-quality preview is still being made. */
   upgrading: boolean;
   /** True when `image` belongs to the current key; false while the last one is kept on screen. */
@@ -83,9 +84,12 @@ export type ProgressivePreview = {
  * edit never flashes an empty canvas - but nothing from another photograph is ever shown.
  */
 export function useProgressivePreview(key: string | null, scope: string,
-  load: (quality: PreviewQuality) => Promise<RenderDto>, attempt = 0): ProgressivePreview {
+  load: (quality: PreviewQuality) => Promise<RenderDto>, attempt = 0,
+  live?: () => Promise<RenderDto | null>): ProgressivePreview {
   const loader = useRef(load);
   loader.current = load;
+  const liveLoader = useRef(live);
+  liveLoader.current = live;
   const initial = (): ProgressivePreview => {
     const hit = key ? cachedPreview(key) : undefined;
     return { image: hit?.image ?? null, quality: hit?.quality ?? null, upgrading: Boolean(key) && hit?.quality !== 'full', current: Boolean(hit), error: null };
@@ -120,13 +124,24 @@ export function useProgressivePreview(key: string | null, scope: string,
         if (active) setState(previous => ({ ...previous, upgrading: false, error: asIpcError(cause).message }));
       });
     };
-    if (hit) full();
-    else {
+    const fast = () => {
+      if (!active) return;
       loader.current('fast').then(image => {
         rememberPreview(key, image, 'fast');
         if (active) setState(previous => ({ ...previous, image, quality: 'fast', current: true }));
       }).catch(() => undefined).finally(full);
-    }
+    };
+    if (hit) full();
+    else if (liveLoader.current) {
+      // First an instant estimate - the last render's retouch carried over to the new settings
+      // - so a slider answers at once; then the exact quick look; then full quality. Never kept.
+      const estimate = liveLoader.current;
+      // Started inside a promise, so an estimate that cannot even be asked for is skipped
+      // like one that failed.
+      Promise.resolve().then(() => estimate()).then(image => {
+        if (active && image) setState(previous => ({ ...previous, image, quality: 'live', current: true }));
+      }).catch(() => undefined).finally(fast);
+    } else fast();
     return () => { active = false; };
   }, [key, scope, attempt]);
   return state;

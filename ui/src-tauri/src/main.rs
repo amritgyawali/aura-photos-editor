@@ -3497,6 +3497,23 @@ async fn native_retouch_preview(
     .map_err(|_| background_request_failed())?
 }
 
+/// A live preview while a setting changes: the retouch carried over from the last render.
+/// `None` until there is one to carry. ADR-0099.
+#[tauri::command]
+async fn live_preview(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+    view: String,
+) -> IpcResult<Option<RenderDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::live_preview(&app, &project_id, &photo_id, &view)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 /// The photograph as taken, at full or fast quality, for Original and Compare. ADR-0097.
 #[tauri::command]
 async fn photo_original(
@@ -3633,6 +3650,7 @@ fn main() {
             native_retouch_saved_selection,
             native_retouch_preview,
             photo_original,
+            live_preview,
             native_retouch_draft_preview,
             list_edit_profiles,
             apply_edit_profile,

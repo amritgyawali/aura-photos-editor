@@ -750,7 +750,7 @@ impl CpuEngine {
         image: &str,
         checkpoints: &crate::retouch_cache::Checkpoints,
     ) -> AuraResult<(Vec<f32>, u32, u32, Vec<RenderNote>)> {
-        use crate::retouch_cache::{may_resume, prefix_keys, Checkpoint};
+        use crate::retouch_cache::{may_resume, prefix_keys, stack_key, Checkpoint, Latest};
         let edits = aura_recipe::retouch_tools::read(recipe).unwrap_or_default();
         let mattes = aura_recipe::retouch_tools::read_mattes(recipe).unwrap_or_default();
         // Everything that reaches the buffer before the stack: the photograph, the size, the
@@ -795,7 +795,7 @@ impl CpuEngine {
                     height: u32,
                     notes: &[RenderNote],
                     stats: spatial::Stats| {
-            if let Some(key) = key {
+            key.map(|key| {
                 checkpoints.put(
                     key.clone(),
                     Checkpoint {
@@ -805,7 +805,20 @@ impl CpuEngine {
                         notes: notes.to_vec(),
                         stats,
                     },
-                );
+                )
+            })
+        };
+        // The newest pair either side of this stack, for the next live preview.
+        let scope = live_scope(image, level, purpose);
+        let stack = stack_key(&edits, &mattes);
+        let remember = |before: Option<Arc<Checkpoint>>, after: Option<Arc<Checkpoint>>| {
+            if let (Some(before), Some(after)) = (before, after) {
+                checkpoints.remember(Latest {
+                    scope: scope.clone(),
+                    stack: stack.clone(),
+                    before,
+                    after,
+                });
             }
         };
         let (rgb, width, height, notes, stats) = if let Some((k, found, base)) = start {
@@ -820,13 +833,19 @@ impl CpuEngine {
                     k,
                     &base.rgb,
                 );
-                keep(
+                let after = keep(
                     keys.get(last),
                     &rgb,
                     found.width,
                     found.height,
                     &found.notes,
                     found.stats,
+                );
+                remember(Some(base), after);
+            } else {
+                remember(
+                    keys.first().and_then(|key| checkpoints.get(key)),
+                    Some(Arc::clone(&found)),
                 );
             }
             (
@@ -839,8 +858,8 @@ impl CpuEngine {
         } else {
             let (mut rgb, width, height, notes, stats) =
                 Self::before_retouch(frame, recipe, plan, level, None);
-            keep(keys.first(), &rgb, width, height, &notes, stats);
-            if last > 0 {
+            let before = keep(keys.first(), &rgb, width, height, &notes, stats);
+            let after = if last > 0 {
                 crate::retouch_tools::apply_with_mattes(
                     &mut rgb,
                     width as usize,
@@ -848,12 +867,75 @@ impl CpuEngine {
                     &edits,
                     &mattes,
                 );
-                keep(keys.get(last), &rgb, width, height, &notes, stats);
-            }
+                keep(keys.get(last), &rgb, width, height, &notes, stats)
+            } else {
+                before.clone()
+            };
+            remember(before, after);
             (rgb, width, height, notes, stats)
         };
         let (rgb, width, height) = Self::after_retouch(rgb, width, height, recipe, plan, stats);
         Ok((rgb, width, height, notes))
+    }
+
+    /// A live preview: every stage before the retouch stack run now, the stack's effect carried
+    /// over from this photograph's last render at this size, then every stage after it. It
+    /// takes the time of the stages around the stack rather than the stack itself, and is
+    /// shown only until the exact render arrives. `None` when there is no earlier render of
+    /// the same stack to carry over, or the frame is too large to render whole. ADR-0099.
+    ///
+    /// # Errors
+    ///
+    /// An invalid recipe, or pixels the frame source cannot provide.
+    pub fn render_live(&self, req: &RenderRequest) -> AuraResult<Option<RenderedImage>> {
+        aura_recipe::schema::Validation::check(&req.recipe)?;
+        let Some(checkpoints) = &self.checkpoints else {
+            return Ok(None);
+        };
+        let image = req.image_id.to_db();
+        let clamped = req.recipe.clamped();
+        let edits = aura_recipe::retouch_tools::read(&clamped).unwrap_or_default();
+        let mattes = aura_recipe::retouch_tools::read_mattes(&clamped).unwrap_or_default();
+        let Some(last) = checkpoints.latest(
+            &live_scope(&image, req.level, req.purpose),
+            &crate::retouch_cache::stack_key(&edits, &mattes),
+        ) else {
+            return Ok(None);
+        };
+        let started = self.clock.monotonic_us();
+        let frame = self.source.frame(&req.image_id, req.level)?;
+        if self.budget_warning(frame.pixels()).is_some() {
+            return Ok(None);
+        }
+        let plan = graph::plan(&clamped, req.purpose, frame.kind, self.caps);
+        let (mut rgb, width, height, notes, stats) =
+            Self::before_retouch(&frame, &clamped, &plan, req.level, None);
+        if (width, height) != (last.before.width, last.before.height) {
+            return Ok(None);
+        }
+        crate::retouch_cache::carry_over(&mut rgb, &last);
+        let (rgb, width, height) = Self::after_retouch(rgb, width, height, &clamped, &plan, stats);
+        let pixels = crate::output::transform(
+            &rgb,
+            width,
+            height,
+            req.output.colour_space,
+            req.output.bit_depth,
+            (0, 0),
+        );
+        let elapsed = self.clock.monotonic_us().saturating_sub(started);
+        Ok(Some(RenderedImage {
+            width,
+            height,
+            data: pixels,
+            colour_space: req.output.colour_space,
+            render_hash: graph::render_hash(&clamped.image.content_hash, &clamped, &req.output)?,
+            backend: Backend::Cpu.as_str().to_string(),
+            notes,
+            stages_run: plan.slugs(),
+            ms: u32::try_from(elapsed / 1_000).unwrap_or(u32::MAX),
+            cache_hit: false,
+        }))
     }
 
     /// The warning a render that had to be streamed raises.
@@ -1076,6 +1158,16 @@ impl RenderService for CpuEngine {
             "this build links no wgpu backend; see ADR-0029 section 4",
         ))
     }
+}
+
+/// Which photograph, size and purpose a live preview's before-and-after pair belongs to.
+fn live_scope(image: &str, level: RenderLevel, purpose: RenderPurpose) -> String {
+    format!(
+        "{image}|{}|{:?}|{}",
+        level.as_str(),
+        level.long_edge(),
+        purpose.as_str()
+    )
 }
 
 #[cfg(test)]

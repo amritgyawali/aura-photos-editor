@@ -309,11 +309,49 @@ fn render_preview(
         aura_render::OutputColour::Srgb,
         persist,
     )?;
+    Ok(to_dto(result))
+}
+
+/// A live preview of one of the editor's views: the edited photograph (`"edited"`, as the
+/// Studio shows it) or the retouch view (`"retouch"`, crop and effects left off), at the
+/// quick look's size, with the retouch carried over from the last render of the same stack.
+/// `None` when there is nothing to carry over yet. Shown only until the exact quick look
+/// arrives. ADR-0099.
+/// # Errors
+/// Missing photograph, invalid recipe or failed rendering.
+pub fn live_preview(
+    state: &AppState,
+    project: &str,
+    photo: &str,
+    view: &str,
+) -> IpcResult<Option<RenderDto>> {
+    crate::studio_tools::require_member(state, project, photo)?;
+    let image_id = PhotoId::from_db(photo).map_err(|_| invalid("Invalid photo"))?;
+    let mut recipe = crate::develop_commands::load_or_neutral(state, image_id)?;
+    if view == "retouch" {
+        recipe.geometry = aura_recipe::Geometry::default();
+        recipe.global.effects = aura_recipe::Effects::default();
+    }
+    let request = aura_render::RenderRequest {
+        image_id,
+        recipe,
+        level: Quality::Fast.level(),
+        output: aura_render::OutputSpec {
+            colour_space: aura_render::OutputColour::Srgb,
+            bit_depth: 8,
+            icc: None,
+        },
+        purpose: aura_render::RenderPurpose::Interactive,
+    };
+    Ok(state.render()?.render_live(&request)?.map(to_dto))
+}
+
+fn to_dto(result: aura_render::RenderedImage) -> RenderDto {
     let bytes = match &result.data {
         aura_render::RenderedData::Eight(v) => v.clone(),
         aura_render::RenderedData::Sixteen(v) => v.iter().map(|x| (x >> 8) as u8).collect(),
     };
-    Ok(RenderDto {
+    RenderDto {
         width: result.width,
         height: result.height,
         rgb_base64: crate::develop_commands::base64(&bytes),
@@ -333,7 +371,7 @@ fn render_preview(
             })
             .collect(),
         ms: result.ms,
-    })
+    }
 }
 
 #[cfg(test)]

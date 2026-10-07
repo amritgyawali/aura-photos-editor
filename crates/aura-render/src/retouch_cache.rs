@@ -18,6 +18,7 @@
 //! reads in a full render. Where that cannot be made true - a texture restore that measures the
 //! skin acne clear left, with the acne clear already inside the checkpoint - the render starts
 //! from the before-the-stack checkpoint instead.
+use rayon::prelude::*;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -48,7 +49,24 @@ const ENTRIES: usize = 16;
 struct Store {
     entries: VecDeque<(String, Arc<Checkpoint>)>,
     bytes: usize,
+    /// The newest before-and-after pair per photograph and size, for a live preview.
+    latest: VecDeque<Latest>,
 }
+
+/// The buffers either side of one photograph's retouch stack, from its most recent render.
+#[derive(Debug, Clone)]
+pub(crate) struct Latest {
+    /// The photograph, the size and the purpose.
+    pub scope: String,
+    /// The stack and its mattes, independent of the settings before it.
+    pub stack: String,
+    pub before: Arc<Checkpoint>,
+    pub after: Arc<Checkpoint>,
+}
+
+/// How many stacks keep a pair for a live preview: a photograph's saved stack and the draft on
+/// top of it each have their own, for a few photographs.
+const LATEST: usize = 6;
 
 /// Checkpoints shared by every engine built over one catalog. Cheap to clone.
 #[derive(Debug, Clone, Default)]
@@ -68,6 +86,30 @@ impl Checkpoints {
         let mut store = self.store.lock().unwrap_or_else(PoisonError::into_inner);
         store.entries.clear();
         store.bytes = 0;
+        store.latest.clear();
+    }
+
+    /// Remember the newest pair either side of a photograph's stack.
+    pub(crate) fn remember(&self, latest: Latest) {
+        let mut store = self.store.lock().unwrap_or_else(PoisonError::into_inner);
+        store
+            .latest
+            .retain(|saved| saved.scope != latest.scope || saved.stack != latest.stack);
+        if store.latest.len() >= LATEST {
+            store.latest.pop_front();
+        }
+        store.latest.push_back(latest);
+    }
+
+    /// The newest pair for `scope` and `stack`, when there is one.
+    pub(crate) fn latest(&self, scope: &str, stack: &str) -> Option<Latest> {
+        let store = self.store.lock().unwrap_or_else(PoisonError::into_inner);
+        store
+            .latest
+            .iter()
+            .rev()
+            .find(|saved| saved.scope == scope && saved.stack == stack)
+            .cloned()
     }
 
     pub(crate) fn get(&self, key: &str) -> Option<Arc<Checkpoint>> {
@@ -79,10 +121,11 @@ impl Checkpoints {
         Some(found)
     }
 
-    pub(crate) fn put(&self, key: String, checkpoint: Checkpoint) {
+    pub(crate) fn put(&self, key: String, checkpoint: Checkpoint) -> Arc<Checkpoint> {
         let bytes = checkpoint.bytes();
+        let checkpoint = Arc::new(checkpoint);
         if bytes > BUDGET {
-            return;
+            return checkpoint;
         }
         let mut store = self.store.lock().unwrap_or_else(PoisonError::into_inner);
         if let Some(index) = store.entries.iter().position(|(saved, _)| *saved == key) {
@@ -97,7 +140,8 @@ impl Checkpoints {
             store.bytes = store.bytes.saturating_sub(previous.bytes());
         }
         store.bytes += bytes;
-        store.entries.push_back((key, Arc::new(checkpoint)));
+        store.entries.push_back((key, Arc::clone(&checkpoint)));
+        checkpoint
     }
 }
 
@@ -123,6 +167,33 @@ pub(crate) fn prefix_keys(
         keys.push(next.finalize().to_hex().to_string());
     }
     keys
+}
+
+/// A key for the stack and its mattes alone - the same whatever the settings before it.
+pub(crate) fn stack_key(
+    edits: &[aura_recipe::retouch_tools::Edit],
+    mattes: &std::collections::BTreeMap<String, aura_recipe::retouch_tools::Matte>,
+) -> String {
+    prefix_keys("", edits, mattes).pop().unwrap_or_default()
+}
+
+/// The live preview's estimate of the stack's effect on a new frame: each channel of the frame
+/// before the stack is scaled by how much the stack scaled it last time. Exact for any change
+/// that scales the frame before the stack (exposure, white balance); close for the rest. It is
+/// only ever shown until the exact render arrives. ADR-0099.
+pub(crate) fn carry_over(before: &mut [f32], last: &Latest) {
+    const FLOOR: f32 = 1e-3;
+    if last.before.rgb.len() != before.len() || last.after.rgb.len() != before.len() {
+        return;
+    }
+    before
+        .par_iter_mut()
+        .zip(last.before.rgb.par_iter())
+        .zip(last.after.rgb.par_iter())
+        .for_each(|((value, was), became)| {
+            let ratio = ((became.max(0.0) + FLOOR) / (was.max(0.0) + FLOOR)).clamp(0.0, 8.0);
+            *value = (value.max(0.0) + FLOOR) * ratio - FLOOR;
+        });
 }
 
 /// Whether operations from `start` on may resume from a checkpoint taken after the first

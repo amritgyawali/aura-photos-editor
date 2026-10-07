@@ -47,7 +47,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const version = recipe?.photoId === photoId && recipe.recipeHash ? recipe.recipeHash : loaded ? `load-${loaded}` : null;
   const editedPreview = useProgressivePreview(version && !retouchOpen ? `${projectId}:${photoId}:edited:${version}` : null, photoId,
     quality => develop.renderImage(quality === 'full' ? { photoId, level: 'full', purpose: 'interactive' }
-      : { photoId, level: 'screen', screen: [1600, 1600], purpose: 'interactive' }), refresh);
+      : { photoId, level: 'screen', screen: [1600, 1600], purpose: 'interactive' }), refresh,
+    () => nativeRetouch.live(projectId, photoId, 'edited'));
   const originalPreview = useProgressivePreview(version && !retouchOpen ? `${projectId}:${photoId}:original` : null, photoId,
     quality => nativeRetouch.original(projectId, photoId, quality), refresh);
   // Edits wait for the first look at a new version; the full-quality one follows unblocked.
@@ -128,7 +129,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <option value="off">Off</option><option value="shadows">Shadows</option><option value="highlights">Highlights</option><option value="both">Both</option>
         </select></label>
         {clipping !== 'off' && <p className="lr-hint">Edited preview only: blue/black hatching marks near-black pixels; red/white marks a near-clipped channel. Exports are unaffected.</p>}
-        <p className="studio-footnote" role="status">{busy ? 'Saving your edit…' : loading ? 'Rendering your photograph…' : problem ? 'Preview needs attention.' : 'Edits saved. Your original stays untouched.'}{render && (editedPreview.upgrading ? ' · Quick preview - rendering full quality…' : ` · Full quality ${render.width} × ${render.height}`)}</p>
+        <p className="studio-footnote" role="status">{busy ? 'Saving your edit…' : loading ? 'Rendering your photograph…' : problem ? 'Preview needs attention.' : 'Edits saved. Your original stays untouched.'}{render && (editedPreview.quality === 'live' ? ' · Live preview - finishing the retouch…' : editedPreview.upgrading ? ' · Quick preview - rendering full quality…' : ` · Full quality ${render.width} × ${render.height}`)}</p>
         {render?.notes.filter(note => note.isCaveat).map(note => <p className="studio-footnote" key={`${note.stage}:${note.reason}`}>{note.detail ?? note.reason}</p>)}
       </div>
       <fieldset className="studio-adjustments lr-adjustments" disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}>

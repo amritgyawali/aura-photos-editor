@@ -76,7 +76,8 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   // Keyed by the recipe hash, so a saved change is a new picture and an unchanged one is reused.
   const version = recipe?.photoId===photoId&&recipe.recipeHash ? recipe.recipeHash : loaded ? `load-${loaded}` : null;
   const after = useProgressivePreview(version?`${projectId}:${photoId}:retouched:${version}`:null, photoId,
-    quality=>nativeRetouch.preview(projectId,photoId,false,quality),refresh+revision);
+    quality=>nativeRetouch.preview(projectId,photoId,false,quality),refresh+revision,
+    ()=>nativeRetouch.live(projectId,photoId,'retouch'));
   const original = useProgressivePreview(version?`${projectId}:${photoId}:before-retouch:${version}`:null, photoId,
     quality=>nativeRetouch.preview(projectId,photoId,true,quality),refresh+revision);
   const preview: RenderDto|null = after.image;
@@ -218,7 +219,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           </>}
         </div>}
         <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}
-          {preview && !draftState.image && <> · {after.upgrading ? 'Quick preview - rendering full quality…' : `Full quality ${preview.width} × ${preview.height}`}</>}</p>
+          {preview && !draftState.image && <> · {after.quality==='live' ? 'Live preview - finishing the retouch…' : after.upgrading ? 'Quick preview - rendering full quality…' : `Full quality ${preview.width} × ${preview.height}`}</>}</p>
         <AdvancedRetouch projectId={projectId} photoId={photoId} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} onRun={task=>void save(task)}/>
         <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>
         <AutoRetouchSettings key={`${photoId}:${retouchRecipe?.recipeHash ?? 'loading'}`} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} busy={analysing} onRun={options=>void save(async()=>{

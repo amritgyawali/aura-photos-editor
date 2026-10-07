@@ -68,3 +68,19 @@ it('asks for full quality only after the quick look, and not at all for a versio
   // Only v2's full-quality picture is asked for.
   expect(load.mock.calls.map(call => call[0])).toEqual(['fast', 'fast', 'full']);
 });
+
+it('shows the live estimate first, then the exact quick look, then full quality, and never keeps the estimate', async () => {
+  const order: string[] = [];
+  const load = vi.fn(async (quality: PreviewQuality) => { order.push(quality); return image(quality === 'full' ? 4 : 2, 9); });
+  const live = vi.fn(async () => { order.push('live'); return image(1, 9); });
+  const view = renderHook(() => useProgressivePreview('p:live', 'p', load, 0, live));
+  await waitFor(() => expect(view.result.current.quality).toBe('full'));
+  expect(order).toEqual(['live', 'fast', 'full']);
+  expect(cachedPreview('p:live')?.quality).toBe('full');
+  // No estimate available yet: the quick look is asked for anyway.
+  forgetPreviews();
+  const none = vi.fn(async () => null);
+  const second = renderHook(() => useProgressivePreview('p:none', 'p', load, 0, none));
+  await waitFor(() => expect(second.result.current.quality).toBe('full'));
+  expect(none).toHaveBeenCalledTimes(1);
+});

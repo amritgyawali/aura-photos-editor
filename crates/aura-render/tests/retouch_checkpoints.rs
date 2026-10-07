@@ -121,3 +121,52 @@ fn every_way_a_render_can_start_gives_the_same_pixels() {
         }
     }
 }
+
+#[test]
+fn a_live_preview_carries_the_last_retouch_over_and_is_close_to_the_exact_render() {
+    let (plain, cached) = engines();
+    let image = aura_core::PhotoId::new();
+    let stack = vec![
+        edit("smooth", Tool::Frequency, [0.4, 0.5, 0.3, 0.3]),
+        edit("light", Tool::MicroDodgeBurn, [0.6, 0.4, 0.3, 0.3]),
+        edit("dodge", Tool::Dodge, [0.3, 0.3, 0.1, 0.1]),
+    ];
+    let request = |exposure: f32, edits: &[Edit]| {
+        let mut recipe =
+            aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "Bench-01");
+        recipe.global.exposure = exposure;
+        retouch_tools::write(&mut recipe, edits).unwrap();
+        RenderRequest {
+            image_id: image,
+            recipe,
+            level: RenderLevel::Full,
+            output: OutputSpec::default(),
+            purpose: RenderPurpose::Interactive,
+        }
+    };
+    // Nothing rendered yet: there is nothing to carry over.
+    assert!(cached.render_live(&request(0.3, &stack)).unwrap().is_none());
+    cached.render(request(0.3, &stack)).unwrap();
+    // A different stack is not carried over.
+    assert!(cached
+        .render_live(&request(0.6, &stack[..2]))
+        .unwrap()
+        .is_none());
+    let live = cached.render_live(&request(0.6, &stack)).unwrap().unwrap();
+    let exact = plain.render(request(0.6, &stack)).unwrap();
+    assert_eq!((live.width, live.height), (exact.width, exact.height));
+    let (aura_render::RenderedData::Eight(a), aura_render::RenderedData::Eight(b)) =
+        (&live.data, &exact.data)
+    else {
+        panic!("eight-bit output");
+    };
+    let mean = a
+        .iter()
+        .zip(b)
+        .map(|(x, y)| f64::from(x.abs_diff(*y)))
+        .sum::<f64>()
+        / a.len() as f64;
+    // An exposure change scales the frame before the stack, so the carried-over effect is
+    // nearly exact.
+    assert!(mean < 1.5, "mean difference {mean}");
+}

@@ -131,6 +131,9 @@ export const nativeRetouch = {
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
   /** The retouch view's photograph: `full` is the original's own resolution (ADR-0097), `fast` the first look. */
   preview: (projectId: string, photoId: string, before = false, quality: PreviewQuality = 'full') => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before,quality}),
+  /** A live look while a setting changes: the retouch carried over from the last render, or
+   * null until there is one (ADR-0099). Replaced by the exact quick look when it arrives. */
+  live: (projectId: string, photoId: string, view: 'edited' | 'retouch') => invoke<RenderDto | null>('live_preview', { projectId, photoId, view }),
   /** The photograph as taken, with no edits: what Original and Compare show. */
   original: (projectId: string, photoId: string, quality: PreviewQuality = 'full') => invoke<RenderDto>('photo_original',{projectId,photoId,quality}),
   draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null, quality: PreviewQuality = 'full') => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId,quality}}),

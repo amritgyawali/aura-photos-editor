@@ -2,6 +2,13 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Live preview while you adjust - 2026-10-07
+
+- Moving a slider or applying a profile on a retouched photo now shows a live preview in about
+  half a second: the new settings with the retouch carried over from the last render. The exact
+  preview replaces it a few seconds later, then the full-quality picture. The status line says
+  "Live preview" while the estimate is on screen. See ADR-0099.
+
 ## Faster retouching - 2026-10-07
 
 - A brush stroke or an applied retouch step now re-renders only that step: the photo before

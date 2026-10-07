@@ -163,4 +163,40 @@ fn the_full_quality_preview_is_the_original_size_and_cached() {
     if disk_ms >= 4_000 {
         println!("disk cache not used: the cache folder's disk has under 2 GB free");
     }
+    // A slider moves twice: after the first exact quick look, the second move is answered by
+    // the live estimate at once, then the exact quick look follows.
+    let exposure = |value: f64| {
+        aura_app::set_param(
+            &restarted,
+            &aura_app::contract::ipc::SetParamInput {
+                project_id: project.id.clone(),
+                photo_id: photo.clone(),
+                path: "global.exposure".into(),
+                value: serde_json::json!(value),
+                label: Some("Exposure".into()),
+            },
+        )
+        .expect("set exposure");
+    };
+    exposure(1.1);
+    time("slider moved, exact quick look", &|| {
+        native_retouch::preview_at(&restarted, &project.id, &photo, false, Quality::Fast)
+            .expect("fast")
+    });
+    exposure(1.37);
+    let live_started = Instant::now();
+    let live = native_retouch::live_preview(&restarted, &project.id, &photo, "retouch")
+        .expect("live")
+        .expect("an estimate after a render of the same stack");
+    println!(
+        "{:<34} {:>5} x {:<5} {:>7} ms",
+        "slider moved again, live estimate",
+        live.width,
+        live.height,
+        live_started.elapsed().as_millis()
+    );
+    time("slider moved again, exact", &|| {
+        native_retouch::preview_at(&restarted, &project.id, &photo, false, Quality::Fast)
+            .expect("fast")
+    });
 }

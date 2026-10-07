@@ -90,11 +90,12 @@ impl Lab {
     }
 
     fn mean(&self, weighted: &Weighted<'_>) -> Self {
-        Self {
-            l: weighted.mean(&self.l),
-            a: weighted.mean(&self.a),
-            b: weighted.mean(&self.b),
-        }
+        // The three planes are independent and are averaged at the same time.
+        let (l, (a, b)) = rayon::join(
+            || weighted.mean(&self.l),
+            || rayon::join(|| weighted.mean(&self.a), || weighted.mean(&self.b)),
+        );
+        Self { l, a, b }
     }
 }
 
@@ -671,7 +672,6 @@ fn nearby_skin(
 fn bounded_skin(field: &Field, fine: &Lab, reach: &[f32], reference: &Lab) -> (Lab, Vec<f32>) {
     let rect = field.rect;
     let r = field.radius;
-    let mut rebuilt = nearby_skin(fine, &field.alpha, reach, reference, rect, r);
     let selected: Vec<bool> = field.alpha.iter().map(|a| *a > 0.5).collect();
     let local = |values: &[f32], share: f32| {
         let level = local_percentile(
@@ -685,17 +685,27 @@ fn bounded_skin(field: &Field, fine: &Lab, reach: &[f32], reference: &Lab) -> (L
         );
         blur(&level.level, rect.w, rect.h, px(r, 0.5))
     };
-    let (ceiling, floor_a, floor_b) = (
-        local(&fine.l, 0.75),
-        local(&fine.a, 0.25),
-        local(&fine.b, 0.25),
+    // Five independent measurements, made at the same time.
+    let ((mut rebuilt, floor_l), (ceiling, (floor_a, floor_b))) = rayon::join(
+        || {
+            rayon::join(
+                || nearby_skin(fine, &field.alpha, reach, reference, rect, r),
+                || local(&fine.l, 0.45),
+            )
+        },
+        || {
+            rayon::join(
+                || local(&fine.l, 0.75),
+                || rayon::join(|| local(&fine.a, 0.25), || local(&fine.b, 0.25)),
+            )
+        },
     );
     for i in 0..rect.len() {
         rebuilt.l[i] = rebuilt.l[i].min(ceiling[i]);
         rebuilt.a[i] = rebuilt.a[i].max(floor_a[i]);
         rebuilt.b[i] = rebuilt.b[i].max(floor_b[i]);
     }
-    (rebuilt, local(&fine.l, 0.45))
+    (rebuilt, floor_l)
 }
 
 /// One find-and-rebuild pass. Returns whether anything was found. `touched`, when given, is a
@@ -832,11 +842,7 @@ fn even_redness(rgb: &mut [f32], w: usize, edit: &Edit, field: &Field) {
     // Clean skin a blotch's width away, on the same side of any shadow edge as the blotch.
     let level = |counted: &[bool], shares: [f32; 3]| {
         let mut out = Lab::zeros(rect.len());
-        for ((plane, values), share) in [&mut out.l, &mut out.a, &mut out.b]
-            .into_iter()
-            .zip(fine.planes())
-            .zip(shares)
-        {
+        let one = |values: &[f32], share: f32| -> Vec<f32> {
             // Four mark radii where that holds clean skin; inside a blotch wider than that,
             // nine, so its middle is compared with the skin around it rather than with itself.
             let near = local_percentile(
@@ -857,8 +863,7 @@ fn even_redness(rgb: &mut [f32], w: usize, edit: &Edit, field: &Field) {
                 px(r, 2.0),
                 share,
             );
-            *plane = near
-                .level
+            near.level
                 .iter()
                 .zip(&near.support)
                 .zip(&far.level)
@@ -866,8 +871,16 @@ fn even_redness(rgb: &mut [f32], w: usize, edit: &Edit, field: &Field) {
                     let trust = smoothstep(0.1, 0.3, *support);
                     n * trust + f * (1.0 - trust)
                 })
-                .collect();
-        }
+                .collect()
+        };
+        // The three channels are independent and are measured at the same time.
+        let (l, (a, b)) = rayon::join(
+            || one(&fine.l, shares[0]),
+            || rayon::join(|| one(&fine.a, shares[1]), || one(&fine.b, shares[2])),
+        );
+        out.l = l;
+        out.a = a;
+        out.b = b;
         soften(&out, counted, rect, r)
     };
     let excess = |base: &Lab| -> (Vec<f32>, Vec<f32>) {
@@ -893,25 +906,42 @@ fn even_redness(rgb: &mut [f32], w: usize, edit: &Edit, field: &Field) {
     // the light at the edge of the face, so the evening fades out near the selection's edge.
     let rim = rim_distance(&field.alpha, rect.w, rect.h);
     let strength = 0.7 * edit.tone.clamp(0.0, 1.0) * edit.amount.clamp(0.0, 1.0);
-    for (i, (x, y)) in rect.cells().enumerate() {
-        let weight = field.alpha[i] * smoothstep(r * 1.5, r * 4.0, rim[i]) * strength;
-        if weight <= 0.0 {
-            continue;
-        }
-        let cut_a = (da[i] - sa).max(0.0);
-        let cut_b = (db[i] - sb).max(0.0);
-        if cut_a <= 0.0 && cut_b <= 0.0 {
-            continue;
-        }
-        // A blotch that is also darker is lifted by the share of its colour that goes, so a
-        // dark red mark the rebuild left does not turn grey. Only-darker skin is never lifted.
-        let share = (cut_a / da[i].max(1e-6))
-            .max(cut_b / db[i].max(1e-6))
-            .min(1.0);
-        let lift = (base.l[i] - fine.l[i]).clamp(0.0, 0.3) * share;
-        let at = (y * w + x) * 3;
-        let [l, a, b] = to_lab([rgb[at], rgb[at + 1], rgb[at + 2]]);
-        let value = from_lab([l + weight * lift, a - weight * cut_a, b - weight * cut_b]);
+    // Each cell depends on the planes and its own pixel only: computed in parallel, written
+    // in order.
+    let frame: &[f32] = rgb;
+    let changes: Vec<Option<(usize, [f32; 3])>> = {
+        use rayon::prelude::*;
+        let cells: Vec<(usize, usize)> = rect.cells().collect();
+        cells
+            .par_iter()
+            .enumerate()
+            .map(|(i, &(x, y))| {
+                let weight = field.alpha[i] * smoothstep(r * 1.5, r * 4.0, rim[i]) * strength;
+                if weight <= 0.0 {
+                    return None;
+                }
+                let cut_a = (da[i] - sa).max(0.0);
+                let cut_b = (db[i] - sb).max(0.0);
+                if cut_a <= 0.0 && cut_b <= 0.0 {
+                    return None;
+                }
+                // A blotch that is also darker is lifted by the share of its colour that goes,
+                // so a dark red mark the rebuild left does not turn grey. Only-darker skin is
+                // never lifted.
+                let share = (cut_a / da[i].max(1e-6))
+                    .max(cut_b / db[i].max(1e-6))
+                    .min(1.0);
+                let lift = (base.l[i] - fine.l[i]).clamp(0.0, 0.3) * share;
+                let at = (y * w + x) * 3;
+                let [l, a, b] = to_lab([frame[at], frame[at + 1], frame[at + 2]]);
+                Some((
+                    at,
+                    from_lab([l + weight * lift, a - weight * cut_a, b - weight * cut_b]),
+                ))
+            })
+            .collect()
+    };
+    for (at, value) in changes.into_iter().flatten() {
         rgb[at..at + 3].copy_from_slice(&value);
     }
 }
