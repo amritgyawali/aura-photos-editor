@@ -95,7 +95,7 @@ def main():
         retouch.click()
         preset = 'Acne only \u00b7 preserve detail' if args.acne_only else 'Professional retouch'
         page.get_by_role('radio', name=preset, exact=True).check()
-        expect(page.get_by_text('Frequency healing rebuilds the tone under each mark first')).to_be_visible()
+        expect(page.get_by_text('Acne clear rebuilds every mark from the clean skin around it first', exact=False).first).to_be_visible()
         run = page.get_by_role('button', name='Auto retouch: Face', exact=True)
         started = time.monotonic()
         run.click()
@@ -113,33 +113,33 @@ def main():
         edits = body['studio_retouch_v1']
         tools = [edit['tool'] for edit in edits]
         automatic = [edit for edit in edits if edit['id'].startswith('auto-portrait-v1-0-')]
-        heal = [edit for edit in edits if edit['tool'] == 'frequency_heal']
+        heal = [edit for edit in edits if edit['tool'] == 'acne_clear']
         graft = [edit for edit in edits if edit['tool'] == 'texture_graft']
         finish = [edit for edit in edits if edit['id'].endswith('-surface-finish')]
         if args.acne_only:
+            # Acne clear alone: no donor patches over skin it evened, no smoothing.
             assert len(heal) == 1 and not graft and not finish, tools
-            assert set(tools) <= {'frequency_heal', 'patch_heal'}, tools
-            assert all(edit['matte'].endswith(('-feature-safe', '-feature-guard')) for edit in edits)
+            assert set(tools) == {'acne_clear'}, tools
+            assert heal[0]['matte'].endswith('-heal-repair-safe'), heal[0]['matte']
             assert body['studio_portrait_auto_v1']['options']['settings']['protectEyeArea']
             assert body['studio_portrait_auto_v1']['options']['settings']['protectNoseDetail']
         else:
             assert len(heal) == 1 and len(graft) == 1 and len(finish) == 1, tools
             # The order a retoucher works in: marks first, texture back last.
-            assert automatic[0]['tool'] == 'frequency_heal', automatic[0]['id']
+            assert automatic[0]['tool'] == 'acne_clear', automatic[0]['id']
             order = [edit['id'] for edit in edits]
             assert order.index(heal[0]['id']) < order.index(finish[0]['id']) < order.index(graft[0]['id'])
-            # Healing and the finish share the feature-protected surface selection; the texture
-            # restore runs over the segmented face skin joined with that selection, so the nose
-            # and the shadowed skin the segmenter missed both get their pores back.
+            # Acne clear works in the heal selection - the surface selection with the nose -
+            # and the finish in the surface selection; the restore borrows no donor texture.
             mattes = body['studio_retouch_mattes_v1']
-            assert heal[0]['matte'] == finish[0]['matte'] and heal[0]['matte'] in mattes
+            assert heal[0]['matte'] in mattes and finish[0]['matte'] in mattes
+            assert '-heal' in heal[0]['matte'] and '-surface' in finish[0]['matte']
+            assert graft[0].get('preserveMicrotexture'), graft[0]
             assert graft[0]['matte'].endswith(('-skin', '-skin-feature-safe')) and graft[0]['matte'] in mattes
             for wanted in ('micro_dodge_burn', 'portrait_dodge_burn', 'skin_smooth', 'skin_uniformity'):
                 assert wanted in tools, f'{wanted} is missing from the pass'
         repairs = [edit for edit in edits if edit['tool'] == 'patch_heal']
-        assert all(edit.get('textureHeal') for edit in repairs)
-        if args.acne_only:
-            assert all(abs(edit['amount'] - .65) < 1e-5 and abs(edit['feather'] - .65) < 1e-5 for edit in repairs)
+        assert not repairs, 'donor spot repairs were planned over skin acne clear evened'
         if args.retouch_only:
             assert not body['global']['exposure'], body['global']
             assert body['global'] == reset_global, 'Retouch changed the global photo adjustments'

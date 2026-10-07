@@ -2,6 +2,23 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Acne clear and the blemish brush - 2026-10-07
+
+- Add **acne clear**: every pimple, red mark and brown mark is measured against a robust
+  estimate of the clean skin around it - a local percentile, so a shadow is compared with the
+  shadow and a mark in a cluster with the clean skin between the marks - and rebuilt from the
+  skin right around it, keeping its pores and never made darker than it was. Leftover redness
+  is evened in proportion, colour first. The automatic pass uses it in place of frequency
+  healing, over a selection that now includes the nose (never the nostrils) and the brow bone.
+- Mark repair is no longer kept off the nose by *Preserve nose detail*, which still keeps
+  smoothing and toning off it; the upper lid stays protected while the skin just above and
+  between the brows can be repaired.
+- No donor spot repairs over skin acne clear evened (they showed as disks), and the texture
+  restore after it borrows nothing and does not put the marks' crusts back.
+- Add the **Blemish brush**: paint over anything left and apply. Without a skin matte, acne
+  clear works on what is painted, small bumps included.
+- **Show retouched areas** can also show the pixels the retouch changed. See ADR-0092.
+
 ## Eye and nose protection, saved retouch coverage - 2026-10-06
 
 - Protect eyelids, inner corners, orbital shadows and nose detail throughout automatic

@@ -334,6 +334,44 @@ fn a_brush_clears_what_it_is_painted_over_bumps_included() {
 }
 
 #[test]
+fn a_brush_over_a_spot_beside_a_brow_leaves_the_brow() {
+    let mut before = skin([0.42, 0.30, 0.22], 1.0);
+    // A brow: a band of dark brown hair, far darker than the skin.
+    for y in 96..108 {
+        for x in 60..200 {
+            let i = (y * W + x) * 3;
+            for (c, k) in [0.32_f32, 0.28, 0.24].into_iter().enumerate() {
+                before[i + c] *= k;
+            }
+        }
+    }
+    mark(&mut before, [190, 116], 4.0, RED);
+    let mut brush = operation();
+    brush.matte = None;
+    brush.feather = 0.35;
+    brush.mask = Some(BrushMask {
+        strokes: vec![BrushStroke {
+            erase: false,
+            radius: 16.0 / W as f32,
+            opacity: 1.0,
+            points: vec![[190.5 / W as f32, 110.5 / W as f32, 1.0]],
+        }],
+    });
+    let mut painted = before.clone();
+    apply(&mut painted, W, W, std::slice::from_ref(&brush));
+    // The brow hair under the brush keeps its value; the red spot below it is cleared.
+    for x in 180..200 {
+        for y in 98..106 {
+            let i = (y * W + x) * 3;
+            let moved = (painted[i] / before[i]).ln().abs();
+            assert!(moved < 0.1, "brow pixel {x},{y} moved by {moved}");
+        }
+    }
+    let (red, _) = departure(&painted, [190, 116], 4.0);
+    assert!(red < 0.05, "the spot beside the brow keeps {red}");
+}
+
+#[test]
 fn pores_under_a_rebuilt_mark_stay_and_redness_evening_moves_colour_only() {
     let before = marked([0.42, 0.30, 0.22], 1.0);
     let after = render(&before, &operation());

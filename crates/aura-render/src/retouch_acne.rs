@@ -301,7 +301,16 @@ fn robust(field: &Field, fine: &Lab, threshold: f32) -> (Lab, Departure) {
 /// Whether a group is darker than the selected skin on every side of it. A shadow beside an
 /// eye, a nose or a jaw is darker on one side only, and a group that is only darker - not
 /// redder or browner - must pass this to be a mark.
-fn enclosed(group: &Group, fine: &Lab, alpha: &[f32], rect: Rect, radius: f32) -> bool {
+/// With `brighter`, the opposite: whether a bright bump is brighter than the skin on every
+/// side, which the skin along the edge of a brow or a lash line is not.
+fn enclosed(
+    group: &Group,
+    fine: &Lab,
+    alpha: &[f32],
+    rect: Rect,
+    radius: f32,
+    brighter: bool,
+) -> bool {
     let area = group.cells.len() as f32;
     let own = group.cells.iter().map(|i| fine.l[*i]).sum::<f32>() / area;
     let mut valid = 0;
@@ -328,15 +337,15 @@ fn enclosed(group: &Group, fine: &Lab, alpha: &[f32], rect: Rect, radius: f32) -
             continue;
         }
         valid += 1;
-        // Log luminance: 0.03 is three per cent darker than the ring.
-        if sum / count - own > 0.03 {
+        // Log luminance: 0.03 is three per cent darker (or brighter) than the ring.
+        let step = sum / count - own;
+        if (if brighter { -step } else { step }) > 0.03 {
             darker += 1;
         }
     }
     valid >= SECTORS - 2 && darker >= valid - 1
 }
 
-/// Cells that belong to a mark. `None` when there are none.
 /// Whether a bright group sits inside a mark: the head of a pimple is ringed by its red base,
 /// and a brighter patch of skin beside a mark is not.
 fn ringed(group: &Group, marked: &[bool], w: usize, h: usize, r: f32) -> bool {
@@ -377,6 +386,56 @@ struct Marks {
     bright: Vec<bool>,
 }
 
+/// The skin a brush was painted on: the brighter part of what it and its surroundings hold.
+fn skin_level(field: &Field, fine: &Lab) -> f32 {
+    let mut samples: Vec<f32> = fine
+        .l
+        .iter()
+        .zip(&field.reference)
+        .filter(|(_, a)| **a > 0.5)
+        .map(|(v, _)| *v)
+        .collect();
+    crate::retouch_planes::quantile(&mut samples, 0.7).unwrap_or(0.0)
+}
+
+/// Bright groups that join the marks, added to `marked`; returns which cells they are.
+///
+/// The white head of a pimple is brighter than the skin, not darker or redder, and sits inside
+/// the red ring just found: a small bright group ringed by a mark goes with it. A glint or a
+/// bright pore anywhere else is left alone. Under a brush, a compact bump brighter than the skin
+/// on every side counts too.
+fn heads(
+    field: &Field,
+    fine: &Lab,
+    departure: &Departure,
+    threshold: f32,
+    marked: &mut [bool],
+) -> Vec<bool> {
+    let Rect { w, h, .. } = field.rect;
+    let r = field.radius;
+    let smallest = (0.35 * r * r).max(3.0);
+    let raised: Vec<bool> = (0..field.rect.len())
+        .map(|i| field.alpha[i] > 0.2 && departure.bright[i] > threshold)
+        .collect();
+    let mut bright = vec![false; field.rect.len()];
+    for group in groups(&raised, w, h) {
+        let area = group.cells.len() as f32;
+        if area > 20.0 * r * r || group.elongation() > 3.0 || area < smallest {
+            continue;
+        }
+        let painted_bump =
+            field.brush && enclosed(&group, fine, &field.reference, field.rect, r, true);
+        if painted_bump || ringed(&group, marked, w, h, r) {
+            for &i in &group.cells {
+                marked[i] = true;
+                bright[i] = true;
+            }
+        }
+    }
+    bright
+}
+
+/// Cells that belong to a mark. `None` when there are none.
 fn marks(
     field: &Field,
     fine: &Lab,
@@ -390,6 +449,7 @@ fn marks(
     let score: Vec<f32> = (0..n).map(|i| departure.score(i)).collect();
     let selected: Vec<bool> = field.alpha.iter().map(|a| *a > 0.2).collect();
     let smallest = (0.35 * r * r).max(3.0);
+    let skin_level = skin_level(field, fine);
     let rim = rim_distance(&field.alpha, w, h);
     let mut marked = vec![false; n];
     let mut lines = vec![false; n];
@@ -457,7 +517,18 @@ fn marks(
             if area > largest {
                 continue;
             }
-            if dark_only && !field.brush && !enclosed(&group, fine, &field.alpha, field.rect, r) {
+            // Hair under a brush - a brow, a lash line, a strand - is far darker than the skin
+            // the brush was painted on, and brown hair is browner too, so it can read as a
+            // coloured mark. A mark is rarely below 55 % of that skin: anything that dark must
+            // be the size of a mark and have skin on every side. (The automatic pass never
+            // selects a brow, and its strands are lines.)
+            let depth = skin_level - group.cells.iter().map(|i| fine.l[*i]).sum::<f32>() / area;
+            let very_dark = field.brush && depth > 0.6;
+            if very_dark && area > 8.0 * r * r {
+                continue;
+            }
+            let needs_ring = (dark_only && !field.brush) || very_dark;
+            if needs_ring && !enclosed(&group, fine, &field.reference, field.rect, r, false) {
                 continue;
             }
             for &i in &group.cells {
@@ -465,25 +536,7 @@ fn marks(
             }
         }
     }
-    // The white head of a pimple is brighter than the skin, not darker or redder, and sits
-    // inside the red ring just found. A small bright group touching a mark goes with it; a glint
-    // or a bright pore anywhere else is left alone. A brush counts every compact bright bump.
-    let raised: Vec<bool> = (0..n)
-        .map(|i| selected[i] && departure.bright[i] > threshold)
-        .collect();
-    let mut bright = vec![false; n];
-    for group in groups(&raised, w, h) {
-        let area = group.cells.len() as f32;
-        if area > 20.0 * r * r || group.elongation() > 3.0 || area < smallest {
-            continue;
-        }
-        if field.brush || ringed(&group, &marked, w, h, r) {
-            for &i in &group.cells {
-                marked[i] = true;
-                bright[i] = true;
-            }
-        }
-    }
+    let bright = heads(field, fine, departure, threshold, &mut marked);
     marked.iter().any(|on| *on).then_some(Marks {
         cells: marked,
         bright,

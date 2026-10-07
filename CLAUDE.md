@@ -160,6 +160,7 @@ Never load two phase files into one session.
 | Per-face adaptive retouch and scene intent | `docs/adr/ADR-0086-adaptive-retouch-and-scene-intent.md`, `crates/aura-app/src/portrait_features/expert.rs`, `scripts/test-adaptive-batch.py` |
 | The skin segmenter (model, card, converter) | `assets/models/selfie_multiclass/`, `crates/aura-vision/src/skin.rs`, `ml/models/skin/` |
 | Automatic retouch settings, in the product's own words | `docs/automatic-retouch-settings.md` |
+| Acne clear, the heal selection and the blemish brush | `docs/adr/ADR-0092-acne-clear-and-the-blemish-brush.md`, `crates/aura-render/src/retouch_acne.rs`, `crates/aura-render/tests/acne_clear.rs` |
 | Frequency healing and texture graft decisions | `docs/adr/ADR-0090-frequency-healing-and-the-texture-graft.md`, `crates/aura-render/src/retouch_clear.rs`, `crates/aura-render/src/retouch_texture.rs` |
 | Skin finish checks (painted fixtures, then real pixels by hand) | `crates/aura-render/tests/skin_finish.rs`, `crates/aura-render/tests/skin_finish_photos.rs`, `crates/aura-app/tests/auto_retouch_photos.rs` (preset `pro`) |
 | What the Professional retouch preset was run on, and what it did | `docs/professional-retouch-validation.md`, `scripts/verify-professional-retouch.py` |
