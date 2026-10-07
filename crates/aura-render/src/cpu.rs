@@ -39,9 +39,10 @@ use crate::tonemap::{self, Tone};
 /// The working buffer's bytes per pixel: three `f32`.
 pub const BYTES_PER_PIXEL: u64 = 12;
 
-/// Longest edge of the disposable editing preview and its selection overlays. ADR-0095.
-/// Full rendering never uses this limit.
-pub const INTERACTIVE_PREVIEW_EDGE: u32 = 768;
+/// Longest edge of the quick editing look and of the selection overlays measured for it; the
+/// window draws an overlay over the full-quality picture by sampling it. ADR-0097. Full
+/// rendering never uses this limit.
+pub const INTERACTIVE_PREVIEW_EDGE: u32 = 1600;
 
 /// The default working-buffer ceiling before a render is streamed in tiles.
 ///

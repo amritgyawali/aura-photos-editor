@@ -3,6 +3,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { PhotoStudio } from './PhotoStudio';
 import { api, develop, editProfiles, pickWhiteBalance } from '../../ipc/client';
 import type { RenderDto } from '../../ipc/types';
+import { nativeRetouch } from '../../ipc/nativeRetouch';
+import { forgetPreviews } from '../../state/previewCache';
 
 vi.mock('../../ipc/client', () => ({
   inTauri: () => true,
@@ -12,10 +14,14 @@ vi.mock('../../ipc/client', () => ({
   editProfiles: { list: vi.fn() }, syncSettings: vi.fn(), pickWhiteBalance: vi.fn(),
 }));
 
+vi.mock('../../ipc/nativeRetouch', async () => ({ ...await vi.importActual('../../ipc/nativeRetouch'), nativeRetouch: { original: vi.fn() } }));
+
 const pixels = { width: 1, height: 1, rgbBase64: btoa(String.fromCharCode(80, 100, 120)), notes: [] } as unknown as RenderDto;
 
 beforeEach(() => {
   vi.resetAllMocks();
+  forgetPreviews();
+  vi.mocked(nativeRetouch.original).mockResolvedValue({ width: 1, height: 1, rgbBase64: btoa(String.fromCharCode(70, 90, 110)), notes: [] } as never);
   vi.mocked(api.getPreview).mockResolvedValue({ dataUrl: 'data:image/png;base64,original' } as never);
   vi.mocked(develop.imageRecipe).mockResolvedValue({ photoId: 'portrait', params: [] } as never);
   vi.mocked(develop.imageHistory).mockResolvedValue({ entries: [], canUndo: false, canRedo: false } as never);
@@ -49,17 +55,20 @@ it('provides a keyboard-accessible neutral picker with normalized original coord
 
 it('keeps the last photo visible and blocks edits until the updated preview arrives', async () => {
   const busy = vi.fn();
-  let complete: (value: RenderDto) => void = () => { throw new Error('No pending render'); };
+  const pending: ((value: RenderDto) => void)[] = [];
   render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={busy} />);
   const preview = await screen.findByAltText('Edited photograph');
   await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
   const before = preview.getAttribute('src');
-  vi.mocked(develop.renderImage).mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+  const calls = vi.mocked(develop.renderImage).mock.calls.length;
+  vi.mocked(develop.renderImage).mockImplementation(() => new Promise(resolve => { pending.push(resolve); }));
   fireEvent.click(screen.getByRole('button', { name: 'Auto enhance photo' }));
-  await waitFor(() => expect(develop.renderImage).toHaveBeenCalledTimes(2));
+  // The quick first look and the full-quality preview of the new version are both asked for.
+  await waitFor(() => expect(develop.renderImage).toHaveBeenCalledTimes(calls + 2));
+  expect(vi.mocked(develop.renderImage).mock.calls.slice(calls).map(([input]) => input.level).sort()).toEqual(['full', 'screen']);
   expect(screen.getByAltText('Edited photograph').getAttribute('src')).toBe(before);
   expect((screen.getByRole('button', { name: 'Auto enhance photo' }) as HTMLButtonElement).disabled).toBe(true);
-  await act(async () => complete({ ...pixels, rgbBase64: btoa(String.fromCharCode(140, 160, 180)) }));
+  await act(async () => { for (const complete of pending) complete({ ...pixels, rgbBase64: btoa(String.fromCharCode(140, 160, 180)) }); });
   expect(screen.getByAltText('Edited photograph').getAttribute('src')).not.toBe(before);
   await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
 });
@@ -78,9 +87,10 @@ it('surfaces a failed save and releases the parent lock on unmount', async () =>
 });
 
 it('offers recovery when a renderer payload cannot be displayed', async () => {
-  vi.mocked(develop.renderImage).mockResolvedValueOnce({ ...pixels, rgbBase64: 'broken!' });
+  vi.mocked(develop.renderImage).mockResolvedValue({ ...pixels, rgbBase64: 'broken!' });
   render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={vi.fn()} />);
   expect((await screen.findByRole('alert')).textContent).toContain('incomplete image data');
+  vi.mocked(develop.renderImage).mockResolvedValue(pixels);
   fireEvent.click(screen.getByRole('button', { name: 'Retry preview' }));
   expect(await screen.findByAltText('Edited photograph')).toBeTruthy();
 });

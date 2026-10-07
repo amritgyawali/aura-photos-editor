@@ -152,6 +152,11 @@ pub fn group_of(id: &str) -> Option<Group> {
             Group::Eyes
         } else if rest.ends_with("-teeth")
             || rest.ends_with("-shine")
+            || rest.starts_with("dust-")
+            || rest.starts_with("stray-")
+            || rest.starts_with("jewel-")
+            || rest.contains("-cloth-")
+            || rest == "background-tone"
             || rest.contains("-lips-")
             || rest.contains("-sculpt-")
             || rest.contains("-makeup-")
@@ -220,6 +225,11 @@ pub struct Plan {
     pub groups: BTreeMap<Group, Vec<Edit>>,
     /// Segmentation mattes the planned operations refer to, by id. ADR-0082.
     pub mattes: BTreeMap<String, Matte>,
+    /// What the segmenter found for each detected face, in face order, for later passes that
+    /// finish hair, clothes and the background without segmenting the photograph again.
+    pub people: Vec<skin::Person>,
+    /// The segmented background, when the segmenter ran.
+    pub background: Option<skin::Matte>,
 }
 
 /// The mattes a stack written from `plan` needs: the recipe's own (for operations a person
@@ -340,6 +350,8 @@ pub fn plan_with_faces(
             report,
             groups,
             mattes,
+            people: Vec::new(),
+            background: None,
         });
     }
     let settings = options.settings;
@@ -671,7 +683,23 @@ pub fn plan_with_faces(
                     &format!("{PREFIX}{index}-feature-guard"),
                     &settings,
                 )?;
-                features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Protected eyes are excluded from every automatic face step, healing and texture restoration included. A protected nose keeps its pores, shape and shading out of smoothing and toning; marks on it are still repaired, and the nostrils are never touched. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected" } else { "adjustable" }));
+                features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Protected eyes are excluded from every automatic face step, healing and texture restoration included; the dark-circle correction works only below the lower lashes. A protected nose keeps its pores, shape and shading out of smoothing and toning; marks on it are still repaired, and the nostrils are never touched. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected" } else { "adjustable" }));
+            }
+        } else if options.scope.face() {
+            // Without detail protection the dark-circle correction still never reaches the
+            // eye itself, its lids or its lashes.
+            if let Some(px) = &detail_pixels {
+                portrait_features::eye_guard::protect(
+                    face,
+                    px,
+                    features
+                        .eyes
+                        .iter_mut()
+                        .filter(|e| portrait_features::eye_guard::is_dark_circle(e)),
+                    &mut mattes,
+                    &format!("{PREFIX}{index}-feature-guard"),
+                    &settings,
+                )?;
             }
         }
         features.finishing.extend(garments);
@@ -824,6 +852,8 @@ pub fn plan_with_faces(
         report,
         groups,
         mattes,
+        people: segmentation.people,
+        background: segmentation.background,
     })
 }
 
@@ -1678,14 +1708,14 @@ fn segment(
 
 /// Mean local detail of a matte's fully covered area, in encoded luminance: about 0.01 on
 /// studio paper, several times that on brick, foliage or a room.
-const PLAIN_BACKDROP: f32 = 0.025;
+pub(crate) const PLAIN_BACKDROP: f32 = 0.025;
 
 #[allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
-fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
+pub(crate) fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
     let (w, h) = (width as usize, height as usize);
     let luma = |x: usize, y: usize| -> f32 {
         let i = (y.min(h - 1) * w + x.min(w - 1)) * 3;
@@ -1718,7 +1748,7 @@ fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
 
 /// The matte shrunk by `cells` on every side (a minimum filter), so an operation that reads
 /// pixels around itself never reaches what lies outside the matte.
-fn erode(m: &skin::Matte, cells: usize) -> skin::Matte {
+pub(crate) fn erode(m: &skin::Matte, cells: usize) -> skin::Matte {
     let (w, h) = (m.width, m.height);
     let mut rows = vec![0_u8; w * h];
     for y in 0..h {
@@ -2505,7 +2535,9 @@ mod tests {
                 );
                 for y in 0..h {
                     for x in 0..w {
-                        let (fx, fy) = (x as f32 / w as f32, y as f32 / h as f32);
+                        // The pixel's centre: a pixel that only touches a face box with its
+                        // edge lies outside the face.
+                        let (fx, fy) = ((x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32);
                         if faces.iter().any(|f| {
                             fx >= f.bounds[0]
                                 && fx <= f.bounds[2]

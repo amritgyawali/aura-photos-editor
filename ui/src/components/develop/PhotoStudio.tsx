@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, asIpcError, develop, editProfiles, inTauri, syncSettings, pickWhiteBalance, type EditProfile } from '../../ipc/client';
+import { asIpcError, develop, editProfiles, inTauri, syncSettings, pickWhiteBalance, type EditProfile } from '../../ipc/client';
 import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
-import { rgbDataUrl } from './rgbImage';
+import { nativeRetouch } from '../../ipc/nativeRetouch';
+import { previewSource, useProgressivePreview } from '../../state/previewCache';
 import { LightroomPanel } from './LightroomPanel';
 import { Histogram } from './Histogram';
 import { clippingPreview, imagePoint, type ClippingMode } from './previewTools';
@@ -15,8 +16,6 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
 }): JSX.Element {
   const [recipe, setRecipe] = useState<RecipeDto | null>(null);
   const [history, setHistory] = useState<HistoryDto | null>(null);
-  const [render, setRender] = useState<RenderDto | null>(null);
-  const [original, setOriginal] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [retouchOpen, setRetouchOpen] = useState(false);
@@ -41,14 +40,27 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
       .catch(cause => { if (active) setNotice(`Presets unavailable: ${asIpcError(cause).message}`); });
     return () => { active = false; };
   }, []);
-  useEffect(() => { if (!retouchOpen) onBusyChange(busy || loading); }, [busy, loading, onBusyChange, retouchOpen]);
   useEffect(() => () => onBusyChange(false), [onBusyChange]);
-  const edited = useMemo(() => render ? rgbDataUrl(render) : null, [render]);
+  // The photograph at its own resolution, edited and as taken, cached for the session and on
+  // disk (ADR-0097): a fast first look while the full-quality preview is made.
+  const [loaded, setLoaded] = useState(0);
+  const version = recipe?.photoId === photoId && recipe.recipeHash ? recipe.recipeHash : loaded ? `load-${loaded}` : null;
+  const editedPreview = useProgressivePreview(version && !retouchOpen ? `${projectId}:${photoId}:edited:${version}` : null, photoId,
+    quality => develop.renderImage(quality === 'full' ? { photoId, level: 'full', purpose: 'interactive' }
+      : { photoId, level: 'screen', screen: [1600, 1600], purpose: 'interactive' }), refresh);
+  const originalPreview = useProgressivePreview(version && !retouchOpen ? `${projectId}:${photoId}:original` : null, photoId,
+    quality => nativeRetouch.original(projectId, photoId, quality), refresh);
+  // Edits wait for the first look at a new version; the full-quality one follows unblocked.
+  const waiting = Boolean(version) && !retouchOpen && !editedPreview.current && !editedPreview.error;
+  useEffect(() => { if (!retouchOpen) onBusyChange(busy || loading || waiting); }, [busy, loading, waiting, onBusyChange, retouchOpen]);
+  const render: RenderDto | null = editedPreview.image;
+  const edited = useMemo(() => previewSource(render), [render]);
+  const original = useMemo(() => previewSource(originalPreview.image), [originalPreview.image]);
   const proof = useMemo(() => render && clipping !== 'off' ? clippingPreview(render, clipping) : edited, [render, edited, clipping]);
-  const problem = error ?? (render && !edited ? 'The renderer returned incomplete image data. Retry the preview.' : null);
+  const problem = error ?? editedPreview.error ?? (render && !edited ? 'The renderer returned incomplete image data. Retry the preview.' : null);
   // Clear only when changing photographs; keep the last preview during a save.
   useEffect(() => {
-    setRender(null); setRecipe(null); setHistory(null); setOriginal(null); setAspect(null); setNotice(null);
+    setRecipe(null); setHistory(null); setAspect(null); setNotice(null);
     setPicking(false); setPosition(null);
   }, [photoId, projectId]);
   useEffect(() => {
@@ -58,13 +70,9 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
     if (!inTauri()) {
       setError('Open the AURA desktop app to edit this photograph.'); setLoading(false); return;
     }
-    void Promise.all([
-      develop.imageRecipe({ photoId }), develop.imageHistory({ photoId }),
-      develop.renderImage({ photoId, level: 'screen', screen: [1400, 1000], purpose: 'interactive' }),
-      api.getPreview({ projectId, photoId, level: 'proxy', priority: 'interactive' }),
-    ]).then(([nextRecipe, nextHistory, nextRender, preview]) => {
+    void Promise.all([develop.imageRecipe({ photoId }), develop.imageHistory({ photoId })]).then(([nextRecipe, nextHistory]) => {
       if (!active) return;
-      setRecipe(nextRecipe); setHistory(nextHistory); setRender(nextRender); setOriginal(preview.dataUrl);
+      setRecipe(nextRecipe); setHistory(nextHistory); setLoaded(value => value + 1);
     }).catch(cause => { if (active) setError(asIpcError(cause).message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -80,7 +88,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   }, []);
 
   const pick = (x: number, y: number) => {
-    if (disabled || busy || loading || !recipe || problem) return;
+    if (disabled || busy || loading || waiting || !recipe || problem) return;
     void write(async () => {
       await pickWhiteBalance(projectId, photoId, x, y);
       setPicking(false); setView('edited'); setNotice('White balance saved as one manual edit. Use Undo to compare.');
@@ -99,7 +107,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
     {problem && <p role="alert">{problem} <button type="button" onClick={() => setRefresh(value => value + 1)}>Retry preview</button></p>}
     <div className="studio-layout">
       <div>
-        <div className={`studio-canvas${picking ? ' studio-picking' : ''}`} aria-busy={busy || loading}
+        <div className={`studio-canvas${picking ? ' studio-picking' : ''}`} aria-busy={busy || loading || waiting}
           onClick={event => {
             if (!picking || !aspect) return;
             const box = event.currentTarget.getBoundingClientRect();
@@ -112,7 +120,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             {view === 'split' && <img className="studio-original-overlay" src={original} alt="Original side of comparison" style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }} />}
             {view === 'split' && <div className="studio-divider" style={{ left: `${split}%` }} aria-hidden="true" />}
             <span className="studio-caption">{view === 'split' ? 'Original / Edited' : view === 'original' ? 'Original' : 'Edited'}</span>
-            {(busy || loading) && <span className="studio-updating" role="status">Updating preview…</span>}
+            {(busy || loading || waiting) && <span className="studio-updating" role="status">Updating preview…</span>}
           </> : <p>{problem ? 'Photo preview unavailable' : 'Loading your photograph…'}</p>}
         </div>
         {view === 'split' && <label className="compare-control">Before / after<input type="range" min={0} max={100} value={split} onChange={event => setSplit(Number(event.target.value))} aria-label="Before and after divider" /></label>}
@@ -120,10 +128,10 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <option value="off">Off</option><option value="shadows">Shadows</option><option value="highlights">Highlights</option><option value="both">Both</option>
         </select></label>
         {clipping !== 'off' && <p className="lr-hint">Edited preview only: blue/black hatching marks near-black pixels; red/white marks a near-clipped channel. Exports are unaffected.</p>}
-        <p className="studio-footnote" role="status">{busy ? 'Saving your edit…' : loading ? 'Rendering your photograph…' : problem ? 'Preview needs attention.' : 'Edits saved. Your original stays untouched.'}{render && ` · Preview ${render.width} × ${render.height}`}</p>
+        <p className="studio-footnote" role="status">{busy ? 'Saving your edit…' : loading ? 'Rendering your photograph…' : problem ? 'Preview needs attention.' : 'Edits saved. Your original stays untouched.'}{render && (editedPreview.upgrading ? ' · Quick preview - rendering full quality…' : ` · Full quality ${render.width} × ${render.height}`)}</p>
         {render?.notes.filter(note => note.isCaveat).map(note => <p className="studio-footnote" key={`${note.stage}:${note.reason}`}>{note.detail ?? note.reason}</p>)}
       </div>
-      <fieldset className="studio-adjustments lr-adjustments" disabled={disabled || busy || loading || !recipe || Boolean(problem)}>
+      <fieldset className="studio-adjustments lr-adjustments" disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}>
         <legend>Develop</legend>
         <div className="studio-edit-modes" aria-label="Editing controls">
           <button type="button" onClick={() => { setRetouchOpen(true); setPicking(false); }}>Retouch</button>
@@ -140,8 +148,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <label>Vertical position (%)<input type="number" min={0} max={100} value={pickY} onChange={event => setPickY(Number(event.target.value))} /></label>
           <button type="button" disabled={![pickX, pickY].every(value => Number.isFinite(value) && value >= 0 && value <= 100)} onClick={() => pick(pickX / 100, pickY / 100)}>Sample this position</button>
         </div></details>
-        <LightroomPanel recipe={recipe} disabled={disabled || busy || loading || !recipe || Boolean(problem)} aspect={aspect} profiles={profiles} mode={mode}
-          syncControls={<SyncSettingsPanel key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId} disabled={disabled || busy || loading}
+        <LightroomPanel recipe={recipe} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} aspect={aspect} profiles={profiles} mode={mode}
+          syncControls={<SyncSettingsPanel key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId} disabled={disabled || busy || loading || waiting}
             onSync={(targets, groups) => void write(async () => {
               const report = await syncSettings(projectId, photoId, targets, false, groups);
               setNotice(`Settings synced to ${report.synced} photos.${report.failed.length ? ` Failed: ${report.failed.join('; ')}` : ''}`);
@@ -161,7 +169,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <button type="button" disabled={!history?.canRedo} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'redo' }); setPosition(null); })}>Redo</button>
           <button type="button" onClick={() => void write(() => develop.historyStep({ projectId, photoId, action: 'reset_original' }))}>Reset photo</button>
         </div>
-        <SnapshotPanel key={photoId} names={history?.snapshots ?? []} disabled={disabled || busy || loading}
+        <SnapshotPanel key={photoId} names={history?.snapshots ?? []} disabled={disabled || busy || loading || waiting}
           onTake={name => void write(() => develop.snapshot({ projectId, photoId, action: 'take', name }))}
           onRestore={name => void write(() => develop.snapshot({ projectId, photoId, action: 'restore', name }))} />
       </fieldset>
@@ -169,11 +177,11 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
     {history && <details className="advanced-tools" open={history.entries.some(entry => entry.source !== 'user')}><summary>Review every edit on this photo ({history.entries.length})</summary>
       {history.entries.length === 0 ? <p>No edits have been saved yet.</p> : <ol className="photo-edit-history">
         <li key="original" aria-current={position === 0 ? 'step' : undefined}><strong>Original photograph</strong>
-          <button type="button" disabled={disabled || busy || loading} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'goto:0' }); setPosition(0); })}>Go back to here</button></li>
+          <button type="button" disabled={disabled || busy || loading || waiting} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'goto:0' }); setPosition(0); })}>Go back to here</button></li>
         {history.entries.map(entry => <li key={entry.seq} aria-current={(position ?? (history.canRedo ? null : history.entries[history.entries.length - 1]?.seq)) === entry.seq ? 'step' : undefined}>
         <strong>{entry.label}</strong><p>{new Date(entry.atMs).toLocaleString()} · {entry.source === 'user' ? 'Your edit' : 'Automatic edit'}</p>
         <p>Changed: {entry.changed.join(', ') || 'No parameter changes'}</p>
-        <button type="button" disabled={disabled || busy || loading} aria-label={`Go back to step ${entry.seq}: ${entry.label}`}
+        <button type="button" disabled={disabled || busy || loading || waiting} aria-label={`Go back to step ${entry.seq}: ${entry.label}`}
           onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: `goto:${entry.seq}` }); setPosition(entry.seq); })}>Go back to here</button>
       </li>)}</ol>}
       <p>Use Undo and Redo, or “Go back to here”, to move through saved edits. Going back discards nothing: Redo still moves forward, and a new edit continues from the step you chose.</p>

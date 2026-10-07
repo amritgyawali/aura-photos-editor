@@ -922,7 +922,7 @@ pub fn analyse(
 /// Two relative checks, never a target brightness for skin: a subject that is already
 /// clearly brighter than the rest of the scene is a low-key portrait and keeps its mood, and
 /// no face may be pushed into clipping.
-fn face_exposure_cap(
+pub(crate) fn face_exposure_cap(
     exposure: f32,
     px: &Pixels<'_>,
     faces: &[PortraitFace],
@@ -1077,7 +1077,7 @@ fn apply_global(recipe: &mut Recipe, tone: (f32, i16, i16, i16), plan: &GlobalPl
 }
 
 /// Selections must use the exposure that survives the recipe merge.
-fn effective_exposure(base: &Recipe, proposed: f32, global: bool) -> f32 {
+pub(crate) fn effective_exposure(base: &Recipe, proposed: f32, global: bool) -> f32 {
     if global
         && !base
             .provenance

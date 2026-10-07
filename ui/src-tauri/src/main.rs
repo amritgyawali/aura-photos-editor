@@ -3373,6 +3373,28 @@ async fn auto_retouch(
         .map_err(|_| background_request_failed())?
 }
 
+/// Auto advanced retouch: all eighteen stages of a professional retouch in order, each saved
+/// as its own history step. Streams an `advanced-retouch` event before and after every stage
+/// so the window can show the run step by step. ADR-0093.
+#[tauri::command]
+async fn auto_advanced_retouch(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    input: aura_app::advanced_retouch::AdvancedRetouchInput,
+) -> IpcResult<aura_app::advanced_retouch::AdvancedRetouchDto> {
+    use tauri::Emitter;
+    let shared = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::advanced_retouch::run(&shared, &input, &|progress| {
+            if let Err(error) = app.emit("advanced-retouch", progress) {
+                tracing::error!(target: "retouch", %error, "could not deliver retouch progress");
+            }
+        })
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn sync_settings(
     state: State<'_, AppState>,
@@ -3459,10 +3481,38 @@ async fn native_retouch_preview(
     project_id: String,
     photo_id: String,
     before: bool,
+    quality: Option<String>,
 ) -> IpcResult<RenderDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        aura_app::native_retouch::preview(&app, &project_id, &photo_id, before)
+        aura_app::native_retouch::preview_at(
+            &app,
+            &project_id,
+            &photo_id,
+            before,
+            aura_app::native_retouch::Quality::parse(quality.as_deref()),
+        )
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// The photograph as taken, at full or fast quality, for Original and Compare. ADR-0097.
+#[tauri::command]
+async fn photo_original(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+    quality: Option<String>,
+) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::original_at(
+            &app,
+            &project_id,
+            &photo_id,
+            aura_app::native_retouch::Quality::parse(quality.as_deref()),
+        )
     })
     .await
     .map_err(|_| background_request_failed())?
@@ -3582,6 +3632,7 @@ fn main() {
             native_retouch_selection_preview,
             native_retouch_saved_selection,
             native_retouch_preview,
+            photo_original,
             native_retouch_draft_preview,
             list_edit_profiles,
             apply_edit_profile,
@@ -3592,6 +3643,7 @@ fn main() {
             enhance_photo,
             enhance_portrait,
             auto_retouch,
+            auto_advanced_retouch,
             create_project,
             list_projects,
             start_ingest,

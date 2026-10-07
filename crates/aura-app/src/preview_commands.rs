@@ -169,7 +169,7 @@ pub fn set_cache_budget(state: &AppState, input: &SetCacheBudgetInput) -> IpcRes
 pub fn purge_cache(state: &AppState, project_id: &str) -> IpcResult<CacheStatsDto> {
     let service = state.previews(project_id)?;
     service.purge_cache()?;
-    state.preview_renders.lock().clear();
+    crate::preview_render::clear(state);
     preview_stats(state, project_id)
 }
 

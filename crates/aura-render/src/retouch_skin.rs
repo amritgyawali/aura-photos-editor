@@ -36,42 +36,7 @@ fn affinity(p: [f32; 3], reference: [f32; 3], tolerance: f32) -> f32 {
 
 /// Radius-independent box mean, clipped at boundaries, with f64 running sums.
 fn mean(values: &[f32], w: usize, h: usize, radius: usize) -> Vec<f32> {
-    let mut horizontal = vec![0.0; values.len()];
-    let mut out = vec![0.0; values.len()];
-    for y in 0..h {
-        let mut sum: f64 = values[y * w..y * w + (radius + 1).min(w)]
-            .iter()
-            .map(|v| f64::from(*v))
-            .sum();
-        for x in 0..w {
-            let lo = x.saturating_sub(radius);
-            let hi = (x + radius + 1).min(w);
-            horizontal[y * w + x] = (sum / (hi - lo) as f64) as f32;
-            if x >= radius {
-                sum -= f64::from(values[y * w + x - radius]);
-            }
-            if x + radius + 1 < w {
-                sum += f64::from(values[y * w + x + radius + 1]);
-            }
-        }
-    }
-    for x in 0..w {
-        let mut sum: f64 = (0..(radius + 1).min(h))
-            .map(|y| f64::from(horizontal[y * w + x]))
-            .sum();
-        for y in 0..h {
-            let lo = y.saturating_sub(radius);
-            let hi = (y + radius + 1).min(h);
-            out[y * w + x] = (sum / (hi - lo) as f64) as f32;
-            if y >= radius {
-                sum -= f64::from(horizontal[(y - radius) * w + x]);
-            }
-            if y + radius + 1 < h {
-                sum += f64::from(horizontal[(y + radius + 1) * w + x]);
-            }
-        }
-    }
-    out
+    crate::bands::box_mean(values, w, h, radius)
 }
 
 /// Scalar self-guided filter (He et al.), with local signal-relative regularization.

@@ -61,6 +61,7 @@ fn every_tool_preserves_pixels_outside_the_selected_region() {
         Tool::SkinUniformity,
         Tool::PortraitDodgeBurn,
         Tool::PatchHeal,
+        Tool::UnderEye,
     ] {
         let mut operation = edit(tool);
         operation.source = Some([0.15, 0.15]);
@@ -303,6 +304,7 @@ fn every_tool_respects_painted_and_erased_pixels() {
         Tool::SkinUniformity,
         Tool::PortraitDodgeBurn,
         Tool::PatchHeal,
+        Tool::UnderEye,
     ] {
         let mut op = edit(tool);
         op.source = Some([0.1, 0.1]);
@@ -419,6 +421,7 @@ fn advanced_masks_protect_excluded_pixels_for_every_tool() {
         Tool::SkinUniformity,
         Tool::PortraitDodgeBurn,
         Tool::PatchHeal,
+        Tool::UnderEye,
     ] {
         for inverted in [false, true] {
             let mut op = edit(tool);

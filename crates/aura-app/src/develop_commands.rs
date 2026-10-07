@@ -317,20 +317,25 @@ pub fn render_image(state: &AppState, input: &RenderImageInput) -> IpcResult<Ren
         _ => RenderPurpose::Interactive,
     };
 
-    let rendered = crate::preview_render::render(
-        state,
-        aura_render::contract::render::RenderRequest {
-            image_id: photo,
-            recipe,
-            level,
-            output: OutputSpec {
-                colour_space,
-                bit_depth: 8,
-                icc: None,
-            },
-            purpose,
-        },
-    )?;
+    // A view: rendered once and cached, at full quality when the full level is asked for.
+    // ADR-0097. Exports and analysis render the original directly, every time.
+    let rendered = if purpose == RenderPurpose::Interactive {
+        crate::preview_render::render(state, photo, recipe, level, colour_space, true)?
+    } else {
+        state
+            .render()?
+            .render(aura_render::contract::render::RenderRequest {
+                image_id: photo,
+                recipe,
+                level,
+                output: OutputSpec {
+                    colour_space,
+                    bit_depth: 8,
+                    icc: None,
+                },
+                purpose,
+            })?
+    };
 
     let bytes = match &rendered.data {
         RenderedData::Eight(bytes) => bytes.clone(),
@@ -718,13 +723,19 @@ fn control_label(path: &str) -> String {
 pub fn load_or_neutral(state: &AppState, photo: PhotoId) -> Result<Recipe, AuraError> {
     match state.recipe_store().load(&photo)? {
         Some(recipe) => Ok(recipe),
-        None => Ok(recipe_fixtures::neutral(
-            &state
-                .photo_content_hash(photo)
-                .unwrap_or_else(|| "0".repeat(64)),
-            &state.photo_camera(photo).unwrap_or_default(),
-        )),
+        None => Ok(neutral_recipe(state, photo)),
     }
+}
+
+/// The recipe that changes nothing: the photograph as it was taken.
+#[must_use]
+pub fn neutral_recipe(state: &AppState, photo: PhotoId) -> Recipe {
+    recipe_fixtures::neutral(
+        &state
+            .photo_content_hash(photo)
+            .unwrap_or_else(|| "0".repeat(64)),
+        &state.photo_camera(photo).unwrap_or_default(),
+    )
 }
 
 fn load_history(state: &AppState, photo: PhotoId) -> Result<History, AuraError> {

@@ -28,6 +28,28 @@ fn socket(g: &Geometry, point: [f32; 2], up: f32) -> f32 {
     })
 }
 
+/// The eye opening, its lids and lashes only - without the tear trough and the skin below,
+/// which a dark-circle correction exists to reach. The opening is centred a little above the
+/// landmark; the zero core reaches just below the lower lashes and the transition ends a
+/// tenth of the eye distance below the landmark.
+pub(super) fn lid(g: &Geometry, point: [f32; 2]) -> f32 {
+    g.eyes.iter().fold(1.0_f32, |weight, eye| {
+        let dx = point[0] - eye[0];
+        let dy = point[1] - eye[1];
+        let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
+        let down = (dx * g.v[0] + dy * g.v[1]) / g.d + 0.03;
+        let distance = (across / 0.26).hypot(down / if down < 0.0 { 0.24 } else { 0.095 });
+        let t = ((distance - 1.0) / 0.4).clamp(0.0, 1.0);
+        weight.min(t * t * (3.0 - 2.0 * t))
+    })
+}
+
+/// A measured dark-circle correction: it works on the skin under the eye, so it is kept off
+/// the eye itself by [`lid`] rather than out of the whole socket.
+pub(crate) fn is_dark_circle(edit: &Edit) -> bool {
+    edit.tool == Tool::UnderEye && edit.source.is_some()
+}
+
 pub(super) fn feature_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
     weight_for(g, point, settings, settings.protect_nose_detail, false)
 }
@@ -69,13 +91,39 @@ fn weight_for(
     eyes.min(t * t * (3.0 - 2.0 * t))
 }
 
+/// Which exclusion a guarded selection gets.
+#[derive(Debug, Clone, Copy)]
+enum Guard {
+    /// The whole socket, and the nose when asked; `repair` uses the lower brow-side socket.
+    Face { nose: bool, repair: bool },
+    /// The eye opening, lids and lashes only.
+    Lid,
+}
+
+impl Guard {
+    fn weight(self, g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
+        match self {
+            Self::Face { nose, repair } => weight_for(g, point, settings, nose, repair),
+            Self::Lid => lid(g, point),
+        }
+    }
+
+    fn suffix(self) -> &'static str {
+        match self {
+            Self::Face { nose: true, .. } => "feature-safe",
+            Self::Face { repair: false, .. } => "eye-safe",
+            Self::Face { repair: true, .. } => "repair-safe",
+            Self::Lid => "lid-safe",
+        }
+    }
+}
+
 fn guarded(
     g: &Geometry,
     px: &Pixels<'_>,
     original: &Matte,
     settings: &super::Settings,
-    nose: bool,
-    repair: bool,
+    guard: Guard,
 ) -> Option<Matte> {
     let mut alpha = original.decode()?;
     let [l, t, r, b] = original.bounds;
@@ -93,9 +141,9 @@ fn guarded(
         let safe = [-margin, 0.0, margin]
             .into_iter()
             .flat_map(|dy| {
-                [-margin, 0.0, margin].into_iter().map(move |dx| {
-                    weight_for(g, [point[0] + dx, point[1] + dy], settings, nose, repair)
-                })
+                [-margin, 0.0, margin]
+                    .into_iter()
+                    .map(move |dx| guard.weight(g, [point[0] + dx, point[1] + dy], settings))
             })
             .fold(1.0_f32, f32::min);
         *value = (f32::from(*value) * safe).round() as u8;
@@ -126,15 +174,17 @@ pub(crate) fn protect<'a>(
     let g = Geometry::new(face, px).ok_or_else(invalid)?;
     let mut created = BTreeMap::new();
     for edit in edits {
-        // Only acne clear and frequency healing tell a mark from a lid crease or a brow hair;
-        // a patch heal copies whatever its donor holds, so it keeps the full socket.
-        let repair = matches!(edit.tool, Tool::AcneClear | Tool::FrequencyHeal);
-        let nose = settings.protect_nose_detail && !repairs(edit.tool);
-        let suffix = match (nose, repair) {
-            (true, _) => "feature-safe",
-            (false, false) => "eye-safe",
-            (false, true) => "repair-safe",
+        let guard = if is_dark_circle(edit) {
+            Guard::Lid
+        } else {
+            // Only acne clear and frequency healing tell a mark from a lid crease or a brow
+            // hair; a patch heal copies whatever its donor holds, so it keeps the full socket.
+            Guard::Face {
+                nose: settings.protect_nose_detail && !repairs(edit.tool),
+                repair: matches!(edit.tool, Tool::AcneClear | Tool::FrequencyHeal),
+            }
         };
+        let suffix = guard.suffix();
         let id = edit.matte.as_ref().map_or_else(
             || format!("{guard_id}-{suffix}"),
             |id| format!("{id}-{suffix}"),
@@ -149,7 +199,7 @@ pub(crate) fn protect<'a>(
             };
             created.insert(
                 id.clone(),
-                guarded(&g, px, source, settings, nose, repair).ok_or_else(invalid)?,
+                guarded(&g, px, source, settings, guard).ok_or_else(invalid)?,
             );
         }
         edit.matte = Some(id);

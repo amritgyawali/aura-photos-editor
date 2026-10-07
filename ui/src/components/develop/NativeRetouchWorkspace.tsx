@@ -4,7 +4,9 @@ import { blemishBrush, freshRetouch, nativeRetouch, RETOUCH_TOOLS, type NativeRe
 import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { AutoRetouchSettings } from './AutoRetouchSettings';
-import { changesDataUrl, coverageDataUrl, rgbDataUrl } from './rgbImage';
+import { AdvancedRetouch } from './AdvancedRetouch';
+import { changesDataUrl, coverageDataUrl } from './rgbImage';
+import { previewSource, useProgressivePreview } from '../../state/previewCache';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
 import { RetouchCanvas, type RetouchMode } from './RetouchCanvas';
 import { RetouchControls, validRetouch } from './RetouchControls';
@@ -16,9 +18,13 @@ export function automaticLabel(id: string): string {
   const scene = /^auto-scene-v\d+-/.exec(id);
   if (scene) return ' · Auto (scene)';
   if (/^auto-portrait-v\d+-backdrop$/.test(id)) return ' · Auto (backdrop)';
-  const face = /^auto-portrait-v\d+-(\d+)-(body-|lines-neck|hair-|fabric)?/.exec(id);
+  if (/^auto-portrait-v\d+-dust-\d+$/.test(id)) return ' · Auto (backdrop dust)';
+  if (/^auto-portrait-v\d+-background-tone$/.test(id)) return ' · Auto (background tone)';
+  if (/^auto-portrait-v\d+-stray-\d+$/.test(id)) return ' · Auto (stray hair)';
+  if (/^auto-portrait-v\d+-jewel-\d+$/.test(id)) return ' · Auto (reflection)';
+  const face = /^auto-portrait-v\d+-(\d+)-(body-|lines-neck|hair-|fabric|cloth-)?/.exec(id);
   if (!face) return '';
-  const kind = face[2] === 'hair-' ? 'hair' : face[2] === 'fabric' ? 'clothes' : face[2] ? 'body' : 'face';
+  const kind = face[2] === 'hair-' ? 'hair' : face[2] === 'fabric' || face[2] === 'cloth-' ? 'clothes' : face[2] ? 'body' : 'face';
   return ` · Auto (${kind} ${Number(face[1]) + 1})`;
 }
 
@@ -30,8 +36,6 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const [analysing,setAnalysing] = useState(false);
   const [draft,setDraft] = useState(freshRetouch);
   const [selected,setSelected] = useState<string|null>(null);
-  const [preview,setPreview] = useState<RenderDto|null>(null);
-  const [before,setBefore] = useState<RenderDto|null>(null);
   const [compare,setCompare] = useState(false);
   const [split,setSplit] = useState(false);
   const [maskView,setMaskView] = useState(false);
@@ -57,14 +61,27 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const mounted = useRef(true);
   useEffect(()=>{mounted.current=true;return ()=>{mounted.current=false;onBusyChange(false);};},[onBusyChange]);
   useEffect(()=>{onBusyChange(busy||draftState.pending||dirty);},[busy,draftState.pending,dirty,onBusyChange]);
+  // Which load of the saved stack this is; a preview is asked for once it has arrived.
+  const [loaded,setLoaded] = useState(0);
   useEffect(()=>{
     let active=true; setBusy(true); setError(null);
-    void Promise.all([nativeRetouch.edit(projectId,photoId,'list'),nativeRetouch.preview(projectId,photoId),nativeRetouch.preview(projectId,photoId,true),develop.imageHistory({photoId}),develop.imageRecipe({photoId})])
-      .then(([next,image,original,h,r])=>{if(active){setEdits(next);setPreview(image);setBefore(original);setHistory(h);setRecipe(r);}})
+    void Promise.all([nativeRetouch.edit(projectId,photoId,'list'),develop.imageHistory({photoId}),develop.imageRecipe({photoId})])
+      .then(([next,h,r])=>{if(active){setEdits(next);setHistory(h);setRecipe(r);setLoaded(v=>v+1);}})
       .catch(cause=>{if(active)setError(asIpcError(cause).message);})
       .finally(()=>{if(active)setBusy(false);});
     return ()=>{active=false;};
   },[projectId,photoId,refresh,revision]);
+  // The photograph at its own resolution, cached for the session and on disk (ADR-0097): a
+  // fast first look while the full-quality preview is made, then the full-quality one.
+  // Keyed by the recipe hash, so a saved change is a new picture and an unchanged one is reused.
+  const version = recipe?.photoId===photoId&&recipe.recipeHash ? recipe.recipeHash : loaded ? `load-${loaded}` : null;
+  const after = useProgressivePreview(version?`${projectId}:${photoId}:retouched:${version}`:null, photoId,
+    quality=>nativeRetouch.preview(projectId,photoId,false,quality),refresh+revision);
+  const original = useProgressivePreview(version?`${projectId}:${photoId}:before-retouch:${version}`:null, photoId,
+    quality=>nativeRetouch.preview(projectId,photoId,true,quality),refresh+revision);
+  const preview: RenderDto|null = after.image;
+  const before: RenderDto|null = original.image;
+  const previewError = after.error ?? original.error;
   const blocked = busy || disabled;
   const coverage = useSavedRetouchCoverage(projectId, photoId, `${recipe?.recipeHash}:${refresh}:${revision}`,
     coverageOperation, coverageView && coverageMode === 'selection' && !blocked);
@@ -75,8 +92,8 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   useEffect(() => { setCoverageOperation(null); setCoverageView(false); }, [photoId, projectId]);
   useEffect(() => { if (coverageOperation && !edits.some(e => e.id === coverageOperation)) setCoverageOperation(null); }, [edits, coverageOperation]);
   const rendered=maskView?draftState.image:compare?before:draftState.image??preview;
-  const src=useMemo(()=>rendered?rgbDataUrl(rendered):null,[rendered]);
-  const beforeSrc=useMemo(()=>before?rgbDataUrl(before):null,[before]);
+  const src=useMemo(()=>previewSource(rendered),[rendered]);
+  const beforeSrc=useMemo(()=>previewSource(before),[before]);
   const comparisonReady=Boolean(!maskView&&beforeSrc&&src&&before&&rendered&&before.width===rendered.width&&before.height===rendered.height);
   const stackBlocked=blocked||dirty;
   const retouchRecipe=recipe?.photoId===photoId?recipe:null;
@@ -149,7 +166,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   }}>
     <div className="studio-toolbar"><div><span className="eyebrow">NATIVE RETOUCH</span><h2>Precision, at your pace.</h2></div><button type="button" disabled={blocked} onClick={()=>{if(dirty)setError('Apply your changes or choose Discard draft before leaving Retouch.');else onClose();}}>Back to Develop</button></div>
     <p className="lr-hint">Paint a selection, preview your changes, then apply. Alt-click to sample a source. This view shows the full photo; your crop and perspective are applied in Develop and export.</p>
-    {(error||draftState.error)&&<p role="alert">{error||draftState.error} <button type="button" disabled={blocked} onClick={()=>setRefresh(v=>v+1)}>Reload retouch</button></p>}
+    {(error||draftState.error||previewError)&&<p role="alert">{error||draftState.error||previewError} <button type="button" disabled={blocked} onClick={()=>setRefresh(v=>v+1)}>Reload retouch</button></p>}
     <div className="retouch-blemish-brush">
       <button type="button" className="retouch-primary" disabled={blocked} aria-pressed={draft.tool==='acne_clear'&&mode==='paint'} onClick={startBlemishBrush}>Blemish brush</button>
       <p className="lr-hint">Something left? Choose Blemish brush, paint over the spots, pimples or marks you still see - on the nose and between the brows too - then Apply retouch. Each one is rebuilt from the clean skin around it and the pores stay. Use Show retouched areas to see what was changed.</p>
@@ -197,10 +214,12 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
             {coverage.image && !coverageSrc && <p role="alert">Coverage does not match this preview. Reload retouch to try again.</p>}
           </>:<>
             <p><span className="retouch-coverage-swatch retouch-changes-swatch"/> Orange marks every pixel the saved retouch changed, compared with the photo before retouch: each healed spot shows as a dot. Anything you still see that is not orange was left as photographed; paint it with the Blemish brush.</p>
-            {!coverageSrc && <p role="alert">The before and after previews do not match. Reload retouch to try again.</p>}
+            {!coverageSrc && (after.upgrading || original.upgrading ? <p role="status">Finishing the full-quality before and after…</p> : <p role="alert">The before and after previews do not match. Reload retouch to try again.</p>)}
           </>}
         </div>}
-        <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}</p>
+        <p role="status">{blocked?'Rendering your retouch…':draftState.pending?'Rendering unsaved preview…':draftState.image?maskView?'Selection preview only. White is selected; black is protected.':'Unsaved preview. Apply to keep this change.':dirty?'Unsaved changes. Preview or apply when ready.':`${edits.length} saved operation${edits.length===1?'':'s'}. Originals stay untouched.`}
+          {preview && !draftState.image && <> · {after.upgrading ? 'Quick preview - rendering full quality…' : `Full quality ${preview.width} × ${preview.height}`}</>}</p>
+        <AdvancedRetouch projectId={projectId} photoId={photoId} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} onRun={task=>void save(task)}/>
         <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>
         <AutoRetouchSettings key={`${photoId}:${retouchRecipe?.recipeHash ?? 'loading'}`} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} busy={analysing} onRun={options=>void save(async()=>{
           setAnalysing(true);

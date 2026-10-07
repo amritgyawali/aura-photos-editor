@@ -9,6 +9,8 @@ pub use aura_recipe::retouch_tools::Edit;
 use aura_recipe::{retouch_tools, schema, EditSource};
 use serde::{Deserialize, Serialize};
 
+pub use crate::preview_render::Quality;
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RetouchInput {
@@ -141,17 +143,48 @@ fn preserve_manual_matte(
     Ok(())
 }
 
-/// Full-frame editing preview. Final crop/perspective is applied in Develop and export.
+/// Full-frame editing preview at the original's own resolution. Final crop/perspective is
+/// applied in Develop and export.
 /// # Errors
 /// Missing photograph, invalid recipe or failed rendering.
 pub fn preview(state: &AppState, project: &str, photo: &str, before: bool) -> IpcResult<RenderDto> {
+    preview_at(state, project, photo, before, Quality::Full)
+}
+
+/// [`preview`] at a chosen quality: the full-resolution preview, or the fast first look shown
+/// until it is ready. Both are cached (ADR-0097).
+/// # Errors
+/// Missing photograph, invalid recipe or failed rendering.
+pub fn preview_at(
+    state: &AppState,
+    project: &str,
+    photo: &str,
+    before: bool,
+    quality: Quality,
+) -> IpcResult<RenderDto> {
     crate::studio_tools::require_member(state, project, photo)?;
     let image_id = PhotoId::from_db(photo).map_err(|_| invalid("Invalid photo"))?;
     let mut recipe = crate::develop_commands::load_or_neutral(state, image_id)?;
     if before {
         recipe.extra.remove(retouch_tools::KEY);
     }
-    render_preview(state, image_id, recipe)
+    render_preview(state, image_id, recipe, quality, true)
+}
+
+/// The photograph as it was taken - no edits at all - at a chosen quality: what the editor's
+/// Original and Compare views show. Cached like every editing preview (ADR-0097).
+/// # Errors
+/// Missing photograph or failed rendering.
+pub fn original_at(
+    state: &AppState,
+    project: &str,
+    photo: &str,
+    quality: Quality,
+) -> IpcResult<RenderDto> {
+    crate::studio_tools::require_member(state, project, photo)?;
+    let image_id = PhotoId::from_db(photo).map_err(|_| invalid("Invalid photo"))?;
+    let recipe = crate::develop_commands::neutral_recipe(state, image_id);
+    render_preview(state, image_id, recipe, quality, true)
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -161,6 +194,9 @@ pub struct DraftInput {
     pub photo_id: String,
     pub edit: Edit,
     pub replace_id: Option<String>,
+    /// `"fast"` for a live draft while a brush moves; full quality otherwise. ADR-0097.
+    #[serde(default)]
+    pub quality: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -246,33 +282,32 @@ pub fn draft_preview(state: &AppState, input: &DraftInput) -> IpcResult<RenderDt
         edits.push(draft);
     }
     retouch_tools::write(&mut recipe, &edits)?;
-    render_preview(state, image_id, recipe)
+    render_preview(
+        state,
+        image_id,
+        recipe,
+        Quality::parse(input.quality.as_deref()),
+        false,
+    )
 }
 
 fn render_preview(
     state: &AppState,
     image_id: PhotoId,
     mut recipe: aura_recipe::Recipe,
+    quality: Quality,
+    persist: bool,
 ) -> IpcResult<RenderDto> {
     recipe.geometry = aura_recipe::Geometry::default();
     // Post-crop decoration is reviewed in Develop, not baked into a full-frame retouch view.
     recipe.global.effects = aura_recipe::Effects::default();
     let result = crate::preview_render::render(
         state,
-        aura_render::RenderRequest {
-            image_id,
-            recipe,
-            level: aura_render::RenderLevel::Screen(
-                aura_render::cpu::INTERACTIVE_PREVIEW_EDGE,
-                aura_render::cpu::INTERACTIVE_PREVIEW_EDGE,
-            ),
-            purpose: aura_render::RenderPurpose::Interactive,
-            output: aura_render::OutputSpec {
-                colour_space: aura_render::OutputColour::Srgb,
-                bit_depth: 8,
-                icc: None,
-            },
-        },
+        image_id,
+        recipe,
+        quality.level(),
+        aura_render::OutputColour::Srgb,
+        persist,
     )?;
     let bytes = match &result.data {
         aura_render::RenderedData::Eight(v) => v.clone(),

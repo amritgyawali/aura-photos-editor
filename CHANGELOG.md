@@ -2,6 +2,49 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Full-quality previews that stay loaded - 2026-10-07
+
+- The editor now shows the photograph at its own resolution, rendered from the original file,
+  instead of an optimised 2048-pixel proxy - edited, original, before and after alike - with
+  every stage run as an export runs them. A quick look appears within seconds and the
+  full-quality picture replaces it when ready; the status line says which is on screen.
+- Every finished preview is kept in the window, in the app and on disk, so a photograph opens
+  instantly when you return to it - after another section, another photo or a restart - and the
+  editor stays where you left it while you visit other sections. A changed edit is always
+  rendered fresh. **Clear cache** removes the saved previews too.
+- Retouch rendering is several times faster: the frequency-separation blur no longer slows down
+  with its radius, and the heavy steps use every processor core while giving the same result on
+  every machine. A retouched 6 MP portrait renders at full quality in about 17 s instead of 91 s.
+  See ADR-0097.
+
+## Dark circles corrected where they are - 2026-10-07
+
+- Fix dark circles under the eyes staying dark while the skin below them turned pale or
+  white. The correction is now measured on the crescent just below the lower lashes against
+  the same person's cheek below it, and lifts most of the shadow toward that cheek - its
+  purple or brown cast too - without ever making the area lighter than the cheek, and with
+  the pores, fine lines and lashes left as they were. It is kept off the eye, the lids and the
+  lashes by its own lid guard instead of being switched off by the whole eye-socket guard. In
+  Auto advanced retouch it runs with the eyes, after every light change on the face, so it
+  matches the cheek as that cheek finally looks. Saved older corrections render as before.
+  See ADR-0094.
+
+## Auto advanced retouch - 2026-10-07
+
+- Add **Auto advanced retouch** in Retouch: the whole professional workflow, run
+  automatically and in order - RAW foundation, lens and perspective, background, hair, skin
+  cleanup, selective frequency separation, micro, medium and global dodge and burn, skin
+  colour, eyes/lips/teeth, clothing, jewellery, background toning, colour grade, grain,
+  output sharpening, quality control - with the window showing each step as it runs. Every
+  step is inspected and reported; each one that changes the photo is its own history step.
+- New measured steps: horizon levelling from straight background lines (people excluded),
+  backdrop dust and clothing marks healed from a clean donor beside them, clear stray hairs
+  faded, burnt-out jewellery reflections tamed, a background brighter than the face lowered
+  gently, fine grain on clean retouched files, and quality control that measures texture
+  kept, skin colour drift, clipping and both halves of each face - softening a step and
+  measuring again when needed. Textured backgrounds and fabric, soft hair edges and white
+  backdrops are left alone. Nothing is reshaped; moles and freckles are kept. See ADR-0093.
+
 ## Acne clear and the blemish brush - 2026-10-07
 
 - Add **acne clear**: every pimple, red mark and brown mark is measured against a robust

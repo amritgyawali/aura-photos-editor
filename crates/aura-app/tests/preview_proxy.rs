@@ -1,4 +1,5 @@
-//! Display proxies must never become the input to full-resolution delivery.
+//! Editing previews are full resolution and cached, and never become the input to delivery.
+//! ADR-0097 (superseding ADR-0095's 768-pixel preview).
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -82,7 +83,8 @@ fn preview_recipe_history_and_full_export_stay_independent() {
         purpose: Some("interactive".into()),
     };
     let preview = aura_app::render_image(&state, &request).unwrap();
-    assert_eq!((preview.width, preview.height), (768, 576));
+    // Full quality: the original's own size, not a proxy.
+    assert_eq!((preview.width, preview.height), (1200, 900));
     let repeated = aura_app::render_image(&state.clone(), &request).unwrap();
     assert_eq!(preview.rgb_base64, repeated.rgb_base64);
     assert_eq!(
@@ -148,6 +150,16 @@ fn preview_recipe_history_and_full_export_stay_independent() {
         aura_app::image_recipe(&state, &recipe_input).unwrap()
     );
     let retouch = aura_app::native_retouch::preview(&state, &project.id, &photo, false).unwrap();
+    assert_eq!((retouch.width, retouch.height), (1200, 900));
+    // Selection overlays are measured at the quick look's size.
+    let quick = aura_app::native_retouch::preview_at(
+        &state,
+        &project.id,
+        &photo,
+        false,
+        aura_app::native_retouch::Quality::Fast,
+    )
+    .unwrap();
     let selection = aura_app::native_retouch::saved_selection(
         &state,
         &aura_app::native_retouch::CoverageInput {
@@ -158,7 +170,7 @@ fn preview_recipe_history_and_full_export_stay_independent() {
     )
     .unwrap();
     assert_eq!(
-        (retouch.width, retouch.height),
+        (quick.width, quick.height),
         (selection.width, selection.height)
     );
     for purpose in ["analysis", "export"] {

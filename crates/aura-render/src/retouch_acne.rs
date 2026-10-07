@@ -127,16 +127,30 @@ impl Field {
     fn new(rgb: &[f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) -> Option<Self> {
         let radius = (edit.radius * w.min(h) as f32).max(1.0);
         let rect = Rect::around(coverage.bounds, px(radius, 22.0) + 2, w, h)?;
+        // Converted row by row in parallel, then joined in order.
+        let cells: Vec<(f32, [f32; 3])> = {
+            use rayon::prelude::*;
+            (rect.y0..rect.y0 + rect.h)
+                .into_par_iter()
+                .flat_map_iter(|y| {
+                    (rect.x0..rect.x0 + rect.w).map(move |x| {
+                        let i = (y * w + x) * 3;
+                        (
+                            smoothstep(0.0, FULLY_SELECTED, coverage.at(x, y, w, h)),
+                            to_lab([rgb[i], rgb[i + 1], rgb[i + 2]]),
+                        )
+                    })
+                })
+                .collect()
+        };
         let mut alpha = Vec::with_capacity(rect.len());
         let mut lab = Lab {
             l: Vec::with_capacity(rect.len()),
             a: Vec::with_capacity(rect.len()),
             b: Vec::with_capacity(rect.len()),
         };
-        for (x, y) in rect.cells() {
-            let i = (y * w + x) * 3;
-            alpha.push(smoothstep(0.0, FULLY_SELECTED, coverage.at(x, y, w, h)));
-            let [l, a, b] = to_lab([rgb[i], rgb[i + 1], rgb[i + 2]]);
+        for (selected, [l, a, b]) in cells {
+            alpha.push(selected);
             lab.l.push(l);
             lab.a.push(a);
             lab.b.push(b);
@@ -189,17 +203,31 @@ fn reference(fine: &Lab, counted: &[bool], rect: Rect, radius: f32, shares: [f32
     let near = (px(radius, 3.0), px(radius, 0.75));
     let far = (px(radius, 7.0), px(radius, 2.0));
     let mut out = Lab::zeros(rect.len());
-    for ((plane, values), share) in [&mut out.l, &mut out.a, &mut out.b]
-        .into_iter()
-        .zip(fine.planes())
-        .zip(shares)
-    {
-        let small = local_percentile(values, counted, rect.w, rect.h, near.0, near.1, share);
-        let large = local_percentile(values, counted, rect.w, rect.h, far.0, far.1, share);
-        for (i, value) in plane.iter_mut().enumerate() {
-            let trust = smoothstep(0.1, 0.3, small.support[i]);
-            *value = small.level[i] * trust + large.level[i] * (1.0 - trust);
-        }
+    // The three channels are independent and are measured at the same time.
+    let levels: Vec<Vec<f32>> = {
+        use rayon::prelude::*;
+        fine.planes()
+            .into_par_iter()
+            .zip(shares)
+            .map(|(values, share)| {
+                let small =
+                    local_percentile(values, counted, rect.w, rect.h, near.0, near.1, share);
+                let large = local_percentile(values, counted, rect.w, rect.h, far.0, far.1, share);
+                small
+                    .level
+                    .iter()
+                    .zip(&small.support)
+                    .zip(&large.level)
+                    .map(|((s, support), l)| {
+                        let trust = smoothstep(0.1, 0.3, *support);
+                        s * trust + l * (1.0 - trust)
+                    })
+                    .collect()
+            })
+            .collect()
+    };
+    for (plane, level) in [&mut out.l, &mut out.a, &mut out.b].into_iter().zip(levels) {
+        *plane = level;
     }
     soften(&out, counted, rect, radius)
 }
@@ -672,6 +700,7 @@ fn bounded_skin(field: &Field, fine: &Lab, reach: &[f32], reference: &Lab) -> (L
 
 /// One find-and-rebuild pass. Returns whether anything was found. `touched`, when given, is a
 /// frame-sized plane that receives the largest weight each pixel was rebuilt with.
+#[allow(clippy::too_many_lines)]
 fn pass(
     rgb: &mut [f32],
     w: usize,
@@ -747,29 +776,43 @@ fn pass(
     let (rebuilt, floor_l) = bounded_skin(field, &fine, &reach, &reference);
     let refs = rebuilt.planes();
     let own = field.lab.planes();
-    for (i, (x, y)) in rect.cells().enumerate() {
-        let weight = reach[i].min(1.0) * strength;
-        if weight <= 0.0 {
+    // Each cell's result depends on the planes only, so they are computed in parallel and
+    // written in order afterwards.
+    let results: Vec<Option<[f32; 3]>> = {
+        use rayon::prelude::*;
+        (0..rect.len())
+            .into_par_iter()
+            .map(|i| {
+                let weight = reach[i].min(1.0) * strength;
+                if weight <= 0.0 {
+                    return None;
+                }
+                let healed: [f32; 3] = std::array::from_fn(|c| {
+                    // A red mark is not made darker than it is: its colour is the blemish, and a mark
+                    // that is no darker than the skin keeps its own light.
+                    let level = match (c, lower[i]) {
+                        (0, false) => refs[0][i].max(fine.l[i]),
+                        (0, true) => refs[0][i].max(floor_l[i].min(fine.l[i])),
+                        _ => refs[c][i],
+                    };
+                    let d = detail[c][i];
+                    level + keep * d + (1.0 - keep) * soft_limit(d, normal[c])
+                });
+                let old: [f32; 3] = std::array::from_fn(|c| own[c][i]);
+                let lab: [f32; 3] = std::array::from_fn(|c| old[c] + weight * (healed[c] - old[c]));
+                Some(from_lab(lab))
+            })
+            .collect()
+    };
+    for (i, ((x, y), value)) in rect.cells().zip(results).enumerate() {
+        let Some(value) = value else {
             continue;
-        }
+        };
         if let Some(plane) = touched.as_deref_mut() {
             plane[y * w + x] = plane[y * w + x].max(reach[i].min(1.0));
         }
-        let healed: [f32; 3] = std::array::from_fn(|c| {
-            // A red mark is not made darker than it is: its colour is the blemish, and a mark
-            // that is no darker than the skin keeps its own light.
-            let level = match (c, lower[i]) {
-                (0, false) => refs[0][i].max(fine.l[i]),
-                (0, true) => refs[0][i].max(floor_l[i].min(fine.l[i])),
-                _ => refs[c][i],
-            };
-            let d = detail[c][i];
-            level + keep * d + (1.0 - keep) * soft_limit(d, normal[c])
-        });
-        let old: [f32; 3] = std::array::from_fn(|c| own[c][i]);
-        let lab: [f32; 3] = std::array::from_fn(|c| old[c] + weight * (healed[c] - old[c]));
         let at = (y * w + x) * 3;
-        rgb[at..at + 3].copy_from_slice(&from_lab(lab));
+        rgb[at..at + 3].copy_from_slice(&value);
     }
     true
 }
