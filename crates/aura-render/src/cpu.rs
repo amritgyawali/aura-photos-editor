@@ -124,6 +124,8 @@ pub struct CpuEngine {
     clock: Arc<dyn Clock>,
     caps: Capabilities,
     working_bytes: u64,
+    /// Buffers before and after the retouch stack, shared across renders. ADR-0098.
+    checkpoints: Option<crate::retouch_cache::Checkpoints>,
 }
 
 impl CpuEngine {
@@ -241,7 +243,17 @@ impl CpuEngine {
                 ..Capabilities::default()
             },
             working_bytes: DEFAULT_WORKING_BYTES,
+            checkpoints: None,
         }
+    }
+
+    /// Keep retouch checkpoints in `checkpoints`, so a render that repeats the start of the
+    /// last one - the same edit before a new retouch operation, a before view - starts where
+    /// that one left off. The result is identical. ADR-0098.
+    #[must_use]
+    pub fn with_checkpoints(mut self, checkpoints: crate::retouch_cache::Checkpoints) -> Self {
+        self.checkpoints = Some(checkpoints);
+        self
     }
 
     /// Override the working-buffer ceiling. Used by the tiling tests and by the phase 03
@@ -275,13 +287,37 @@ impl CpuEngine {
         purpose: RenderPurpose,
         output: &crate::contract::render::OutputSpec,
     ) -> AuraResult<RenderedImage> {
+        self.render_frame_keyed(frame, recipe, level, purpose, output, None)
+    }
+
+    /// [`Self::render_frame`], starting from a retouch checkpoint when `image` names the
+    /// photograph and the engine keeps checkpoints.
+    fn render_frame_keyed(
+        &self,
+        frame: &Frame,
+        recipe: &Recipe,
+        level: RenderLevel,
+        purpose: RenderPurpose,
+        output: &crate::contract::render::OutputSpec,
+        image: Option<&str>,
+    ) -> AuraResult<RenderedImage> {
         let started = self.clock.monotonic_us();
         let retouch = aura_recipe::retouch_tools::read(recipe)?;
         let clamped = recipe.clamped();
         let plan = graph::plan(&clamped, purpose, frame.kind, self.caps);
 
-        let (rgb, width, height, mut notes) =
-            self.working_buffer(frame, &clamped, &plan, level, None);
+        let (rgb, width, height, mut notes) = match (image, &self.checkpoints) {
+            (Some(image), Some(checkpoints)) => Self::checkpointed_buffer(
+                frame,
+                &clamped,
+                &plan,
+                level,
+                purpose,
+                image,
+                checkpoints,
+            )?,
+            _ => self.working_buffer(frame, &clamped, &plan, level, None),
+        };
 
         let quantised = crate::output::transform(
             &rgb,
@@ -342,7 +378,6 @@ impl CpuEngine {
     /// Public because the tiler, the parity harness and the golden suite all need the
     /// working buffer without an output transform on the end of it.
     #[must_use]
-    #[allow(clippy::too_many_lines)]
     pub fn working_buffer(
         &self,
         frame: &Frame,
@@ -351,13 +386,40 @@ impl CpuEngine {
         level: RenderLevel,
         stats: Option<spatial::Stats>,
     ) -> (Vec<f32>, u32, u32, Vec<RenderNote>) {
+        let (mut rgb, width, height, notes, stats) =
+            Self::before_retouch(frame, recipe, plan, level, stats);
+        // Explicit authoring runs in interactive previews and exports, before final geometry.
+        if let Ok(edits) = aura_recipe::retouch_tools::read(recipe) {
+            let mattes = aura_recipe::retouch_tools::read_mattes(recipe).unwrap_or_default();
+            crate::retouch_tools::apply_with_mattes(
+                &mut rgb,
+                width as usize,
+                height as usize,
+                &edits,
+                &mattes,
+            );
+        }
+        let (rgb, width, height) = Self::after_retouch(rgb, width, height, recipe, plan, stats);
+        (rgb, width, height, notes)
+    }
+
+    /// Every stage before the explicit retouch stack, and the frame-wide statistics the
+    /// stages after it need.
+    #[allow(clippy::too_many_lines)]
+    fn before_retouch(
+        frame: &Frame,
+        recipe: &Recipe,
+        plan: &Plan,
+        level: RenderLevel,
+        stats: Option<spatial::Stats>,
+    ) -> (Vec<f32>, u32, u32, Vec<RenderNote>, spatial::Stats) {
         let mut notes = Vec::new();
         let g = &recipe.global;
 
         // Resample first when the caller asked for a smaller rung. Everything downstream is
         // then cheaper, and the two spatial radii are expressed in output pixels - which is
         // what makes a clarity setting look the same on a proxy and on an export.
-        let (mut rgb, mut width, mut height) = fit(frame, level);
+        let (mut rgb, width, height) = fit(frame, level);
         // Where this buffer sits in the whole photograph, after any resample. The two
         // position-dependent stages read it; every other stage is either point-wise or
         // protected by the tiler's halo.
@@ -611,18 +673,19 @@ impl CpuEngine {
             }
         }
 
-        // Explicit authoring runs in interactive previews and exports, before final geometry.
-        if let Ok(edits) = aura_recipe::retouch_tools::read(recipe) {
-            let mattes = aura_recipe::retouch_tools::read_mattes(recipe).unwrap_or_default();
-            crate::retouch_tools::apply_with_mattes(
-                &mut rgb,
-                width as usize,
-                height as usize,
-                &edits,
-                &mattes,
-            );
-        }
+        (rgb, width, height, notes, stats)
+    }
 
+    /// The stages after the retouch stack: sharpening, geometry and the post-crop effects.
+    fn after_retouch(
+        mut rgb: Vec<f32>,
+        mut width: u32,
+        mut height: u32,
+        recipe: &Recipe,
+        plan: &Plan,
+        stats: spatial::Stats,
+    ) -> (Vec<f32>, u32, u32) {
+        let g = &recipe.global;
         // ---- sharpening ----------------------------------------------------------------
         if plan.stages.contains(&Stage::Sharpen) {
             spatial::unsharp(
@@ -672,7 +735,125 @@ impl CpuEngine {
             spatial::Position::whole(width, height),
         );
 
-        (rgb, width, height, notes)
+        (rgb, width, height)
+    }
+
+    /// Run the plan over a frame, starting from the newest retouch checkpoint that matches
+    /// and leaving checkpoints for the next render. Identical to [`Self::working_buffer`].
+    #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+    fn checkpointed_buffer(
+        frame: &Frame,
+        recipe: &Recipe,
+        plan: &Plan,
+        level: RenderLevel,
+        purpose: RenderPurpose,
+        image: &str,
+        checkpoints: &crate::retouch_cache::Checkpoints,
+    ) -> AuraResult<(Vec<f32>, u32, u32, Vec<RenderNote>)> {
+        use crate::retouch_cache::{may_resume, prefix_keys, Checkpoint};
+        let edits = aura_recipe::retouch_tools::read(recipe).unwrap_or_default();
+        let mattes = aura_recipe::retouch_tools::read_mattes(recipe).unwrap_or_default();
+        // Everything that reaches the buffer before the stack: the photograph, the size, the
+        // purpose, and the recipe without the stack and without the stages after it.
+        let mut before = recipe.clone();
+        before.extra.remove(aura_recipe::retouch_tools::KEY);
+        before.extra.remove(aura_recipe::retouch_tools::MATTE_KEY);
+        before.global.sharpen.amount = 0;
+        before.global.effects = aura_recipe::Effects::default();
+        before.geometry = aura_recipe::Geometry::default();
+        let before_hash = graph::render_hash(
+            &before.image.content_hash,
+            &before,
+            &crate::contract::render::OutputSpec::default(),
+        )?;
+        let before_key = format!(
+            "{image}|{}|{:?}|{}|{before_hash}",
+            level.as_str(),
+            level.long_edge(),
+            purpose.as_str()
+        );
+        let keys = prefix_keys(&before_key, &edits, &mattes);
+        let last = edits.len();
+        let start = (0..=last).rev().find_map(|k| {
+            let found = checkpoints.get(keys.get(k)?)?;
+            if k == last {
+                return Some((k, found, None));
+            }
+            if !may_resume(&edits, k) {
+                return None;
+            }
+            let base = if k == 0 {
+                Arc::clone(&found)
+            } else {
+                checkpoints.get(keys.first()?)?
+            };
+            Some((k, found, Some(base)))
+        });
+        let keep = |key: Option<&String>,
+                    rgb: &[f32],
+                    width: u32,
+                    height: u32,
+                    notes: &[RenderNote],
+                    stats: spatial::Stats| {
+            if let Some(key) = key {
+                checkpoints.put(
+                    key.clone(),
+                    Checkpoint {
+                        rgb: rgb.to_vec(),
+                        width,
+                        height,
+                        notes: notes.to_vec(),
+                        stats,
+                    },
+                );
+            }
+        };
+        let (rgb, width, height, notes, stats) = if let Some((k, found, base)) = start {
+            let mut rgb = found.rgb.clone();
+            if let Some(base) = base {
+                crate::retouch_tools::apply_resumed(
+                    &mut rgb,
+                    found.width as usize,
+                    found.height as usize,
+                    &edits,
+                    &mattes,
+                    k,
+                    &base.rgb,
+                );
+                keep(
+                    keys.get(last),
+                    &rgb,
+                    found.width,
+                    found.height,
+                    &found.notes,
+                    found.stats,
+                );
+            }
+            (
+                rgb,
+                found.width,
+                found.height,
+                found.notes.clone(),
+                found.stats,
+            )
+        } else {
+            let (mut rgb, width, height, notes, stats) =
+                Self::before_retouch(frame, recipe, plan, level, None);
+            keep(keys.first(), &rgb, width, height, &notes, stats);
+            if last > 0 {
+                crate::retouch_tools::apply_with_mattes(
+                    &mut rgb,
+                    width as usize,
+                    height as usize,
+                    &edits,
+                    &mattes,
+                );
+                keep(keys.get(last), &rgb, width, height, &notes, stats);
+            }
+            (rgb, width, height, notes, stats)
+        };
+        let (rgb, width, height) = Self::after_retouch(rgb, width, height, recipe, plan, stats);
+        Ok((rgb, width, height, notes))
     }
 
     /// The warning a render that had to be streamed raises.
@@ -858,7 +1039,14 @@ impl RenderService for CpuEngine {
             });
             rendered
         } else {
-            self.render_frame(&frame, &req.recipe, req.level, req.purpose, &req.output)?
+            self.render_frame_keyed(
+                &frame,
+                &req.recipe,
+                req.level,
+                req.purpose,
+                &req.output,
+                Some(&req.image_id.to_db()),
+            )?
         };
 
         image.notes.dedup();

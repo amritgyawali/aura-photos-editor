@@ -50,20 +50,21 @@ fn matte_planes(
     edits: &[Edit],
     mattes: &BTreeMap<String, Matte>,
 ) -> BTreeMap<String, Option<MattePlane>> {
-    let mut planes = BTreeMap::new();
-    for id in edits
+    let ids: std::collections::BTreeSet<&String> = edits
         .iter()
         .filter(|e| e.enabled && e.amount > 0.0)
         .filter_map(|e| e.matte.as_ref())
-    {
-        if !planes.contains_key(id) {
+        .collect();
+    // Each matte is rendered from the same frame and independently, so they are rendered at
+    // the same time.
+    ids.into_par_iter()
+        .map(|id| {
             let plane = mattes
                 .get(id)
                 .and_then(|m| MattePlane::render(m, rgb, width, height));
-            planes.insert(id.clone(), plane);
-        }
-    }
-    planes
+            (id.clone(), plane)
+        })
+        .collect()
 }
 
 /// The operation's selection on the current frame, limited by its matte. `None` when the
@@ -124,18 +125,54 @@ pub fn saved_selection(
     mask
 }
 
+/// [`apply_with_mattes`] for the operations from `start` on, over a buffer that already holds
+/// the first `start` applied. `before` is the frame as it was before any operation ran: the
+/// mattes and texture references are measured on it, exactly as a whole-stack render measures
+/// them, so the result is the same pixel for pixel. ADR-0098.
+pub(crate) fn apply_resumed(
+    rgb: &mut [f32],
+    width: usize,
+    height: usize,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
+    start: usize,
+    before: &[f32],
+) {
+    if before.len() != rgb.len() {
+        return;
+    }
+    apply_from(rgb, width, height, edits, mattes, None, start, Some(before));
+}
+
 fn apply_observed(
     rgb: &mut [f32],
     width: usize,
     height: usize,
     edits: &[Edit],
     mattes: &BTreeMap<String, Matte>,
+    observe: Option<(&mut [f32], Option<&str>)>,
+) {
+    apply_from(rgb, width, height, edits, mattes, observe, 0, None);
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+fn apply_from(
+    rgb: &mut [f32],
+    width: usize,
+    height: usize,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
     mut observe: Option<(&mut [f32], Option<&str>)>,
+    start: usize,
+    before: Option<&[f32]>,
 ) {
     if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
         return;
     }
-    let planes = matte_planes(rgb, width, height, edits, mattes);
+    // The frame before any operation ran: the given one when resuming, else this buffer as
+    // it is now. Only read here, before the first operation writes.
+    let before: &[f32] = before.unwrap_or(&*rgb);
+    let planes = matte_planes(before, width, height, edits, mattes);
     // A texture graft measures the texture the skin had from the frame as it is now, before
     // any operation has run - not from whatever the operations before it left behind.
     let capture =
@@ -157,11 +194,40 @@ fn apply_observed(
                 })
                 .collect()
         };
-    let mut references = capture(rgb, false);
-    for edit in edits.iter().filter(|e| e.enabled && e.amount > 0.0) {
-        let Some(coverage) = coverage_of(edit, width, height, rgb, &planes) else {
+    let mut references = capture(before, false);
+    let mut selections: BTreeMap<String, Coverage> = BTreeMap::new();
+    for edit in edits
+        .iter()
+        .skip(start)
+        .filter(|e| e.enabled && e.amount > 0.0)
+    {
+        // Several operations often share one selection - the face's evening, light and
+        // smoothing all use the same strokes and matte - so it is made once per render. A
+        // brightness limit reads the pixels as they are at that point and is never shared.
+        let shareable = edit
+            .selection
+            .as_ref()
+            .is_none_or(|selection| selection.luminance.is_none());
+        let memo_key = shareable.then(|| {
+            serde_json::to_string(&(
+                &edit.region,
+                edit.feather,
+                &edit.mask,
+                &edit.selection,
+                &edit.matte,
+            ))
+            .unwrap_or_default()
+        });
+        let Some(coverage) = memo_key
+            .as_ref()
+            .and_then(|key| selections.get(key).cloned())
+            .or_else(|| coverage_of(edit, width, height, rgb, &planes))
+        else {
             continue;
         };
+        if let Some(key) = memo_key {
+            selections.entry(key).or_insert_with(|| coverage.clone());
+        }
         if let Some((mask, only)) = &mut observe {
             if only.is_none_or(|id| id == edit.id) {
                 let skin = if matches!(

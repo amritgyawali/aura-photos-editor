@@ -63,13 +63,16 @@ it('keeps the last photo visible and blocks edits until the updated preview arri
   const calls = vi.mocked(develop.renderImage).mock.calls.length;
   vi.mocked(develop.renderImage).mockImplementation(() => new Promise(resolve => { pending.push(resolve); }));
   fireEvent.click(screen.getByRole('button', { name: 'Auto enhance photo' }));
-  // The quick first look and the full-quality preview of the new version are both asked for.
-  await waitFor(() => expect(develop.renderImage).toHaveBeenCalledTimes(calls + 2));
-  expect(vi.mocked(develop.renderImage).mock.calls.slice(calls).map(([input]) => input.level).sort()).toEqual(['full', 'screen']);
+  // The quick first look of the new version is asked for first, the full-quality one after it.
+  await waitFor(() => expect(develop.renderImage).toHaveBeenCalledTimes(calls + 1));
+  expect(vi.mocked(develop.renderImage).mock.calls[calls]?.[0].level).toBe('screen');
   expect(screen.getByAltText('Edited photograph').getAttribute('src')).toBe(before);
   expect((screen.getByRole('button', { name: 'Auto enhance photo' }) as HTMLButtonElement).disabled).toBe(true);
-  await act(async () => { for (const complete of pending) complete({ ...pixels, rgbBase64: btoa(String.fromCharCode(140, 160, 180)) }); });
+  await act(async () => { pending.shift()?.({ ...pixels, rgbBase64: btoa(String.fromCharCode(140, 160, 180)) }); });
   expect(screen.getByAltText('Edited photograph').getAttribute('src')).not.toBe(before);
+  await waitFor(() => expect(develop.renderImage).toHaveBeenCalledTimes(calls + 2));
+  expect(vi.mocked(develop.renderImage).mock.calls[calls + 1]?.[0].level).toBe('full');
+  await act(async () => { pending.shift()?.({ ...pixels, rgbBase64: btoa(String.fromCharCode(150, 170, 190)) }); });
   await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
 });
 

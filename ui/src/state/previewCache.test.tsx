@@ -54,3 +54,17 @@ it('reports a failed render and asks again on retry', async () => {
   await waitFor(() => expect(view.result.current.quality).toBe('full'));
   expect(view.result.current.error).toBeNull();
 });
+
+it('asks for full quality only after the quick look, and not at all for a version already left', async () => {
+  const pending: ((value: RenderDto) => void)[] = [];
+  const load = vi.fn((_quality: PreviewQuality) => new Promise<RenderDto>(resolve => { pending.push(resolve); }));
+  const view = renderHook(({ key }) => useProgressivePreview(key, 'p', load), { initialProps: { key: 'p:v1' } });
+  expect(load.mock.calls.map(call => call[0])).toEqual(['fast']);
+  // The slider moves on before the quick look of v1 arrives.
+  view.rerender({ key: 'p:v2' });
+  await act(async () => pending[0]?.(image(1, 1)));
+  expect(load.mock.calls.map(call => call[0])).toEqual(['fast', 'fast']);
+  await act(async () => pending[1]?.(image(1, 2)));
+  // Only v2's full-quality picture is asked for.
+  expect(load.mock.calls.map(call => call[0])).toEqual(['fast', 'fast', 'full']);
+});

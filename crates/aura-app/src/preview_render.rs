@@ -219,6 +219,11 @@ const DISK_RESERVE: u64 = 2 * 1024 * 1024 * 1024;
 /// [`DISK_RESERVE`] free on its disk, removing the least recently used files first. False when
 /// there is no room even with the cache empty, and the preview is then kept in memory only.
 fn make_room(dir: &Path, incoming: u64) -> bool {
+    make_room_with(dir, incoming, fs4::available_space(dir).unwrap_or(0))
+}
+
+/// [`make_room`] with the disk's free space given.
+fn make_room_with(dir: &Path, incoming: u64, free: u64) -> bool {
     let mut files: Vec<(std::time::SystemTime, u64, PathBuf)> = std::fs::read_dir(dir)
         .map(|entries| {
             entries
@@ -234,7 +239,6 @@ fn make_room(dir: &Path, incoming: u64) -> bool {
         })
         .unwrap_or_default();
     let mut total: u64 = files.iter().map(|(_, len, _)| len).sum();
-    let free = fs4::available_space(dir).unwrap_or(0);
     let limit = DISK_BYTES.min((total + free).saturating_sub(DISK_RESERVE));
     if incoming > limit {
         return false;
@@ -254,6 +258,7 @@ fn make_room(dir: &Path, incoming: u64) -> bool {
 /// Remove every cached editing preview, in memory and on disk.
 pub(crate) fn clear(state: &crate::AppState) {
     state.edited_previews().lock().clear();
+    state.clear_retouch_checkpoints();
     let _ = std::fs::remove_dir_all(disk_dir(state));
 }
 
@@ -411,15 +416,22 @@ mod tests {
     fn the_disk_cache_never_takes_more_than_its_budget_or_the_reserve() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("old.bin"), [0_u8; 16]).unwrap();
-        assert!(make_room(dir.path(), 16), "a small preview fits");
+        let plenty = 100 * 1024 * 1024 * 1024;
         assert!(
-            !make_room(dir.path(), DISK_BYTES + 1),
+            make_room_with(dir.path(), 16, plenty),
+            "a small preview fits"
+        );
+        assert!(
+            !make_room_with(dir.path(), DISK_BYTES + 1, plenty),
             "nothing above the budget is written"
         );
-        let free = fs4::available_space(dir.path()).unwrap();
+        // A nearly full disk: the reserve stays free, and what the cache already holds is
+        // given up first.
+        assert!(!make_room_with(dir.path(), 64, DISK_RESERVE));
+        assert!(make_room_with(dir.path(), 16, DISK_RESERVE));
         assert!(
-            !make_room(dir.path(), free.saturating_sub(DISK_RESERVE) + 1 + 16),
-            "the reserve stays free"
+            !dir.path().join("old.bin").exists(),
+            "the oldest preview made room"
         );
     }
 

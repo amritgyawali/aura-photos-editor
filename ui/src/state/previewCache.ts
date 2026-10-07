@@ -77,8 +77,8 @@ export type ProgressivePreview = {
  * Show a preview at once, then at full quality.
  *
  * A full-quality preview already in the cache is shown immediately and nothing is asked for.
- * Otherwise the fast first look and the full-quality preview are both requested; the fast one
- * is shown when it arrives (unless the full one won), and the full one replaces it. While a new
+ * Otherwise the fast first look is requested, shown, and then replaced by the full-quality
+ * preview, which is requested once the fast one has arrived. While a new
  * key loads, the last picture of the same `scope` (the photograph) stays on screen, so saving an
  * edit never flashes an empty canvas - but nothing from another photograph is ever shown.
  */
@@ -107,21 +107,26 @@ export function useProgressivePreview(key: string | null, scope: string,
     }
     setState(previous => hit ? { image: hit.image, quality: hit.quality, upgrading: true, current: true, error: null }
       : sameScope ? { ...previous, upgrading: true, current: false, error: null } : { image: null, quality: null, upgrading: true, current: false, error: null });
-    let finished = false;
-    if (!hit) {
+    // The full-quality render is asked for once the quick look is on screen - not beside it,
+    // where the two would share the processor and the quick look would arrive later - and
+    // only while this is still the version being shown: a slider dragged on through several
+    // versions renders a full-quality picture for none but the last.
+    const full = () => {
+      if (!active) return;
+      loader.current('full').then(image => {
+        rememberPreview(key, image, 'full');
+        if (active) setState({ image, quality: 'full', upgrading: false, current: true, error: null });
+      }).catch(cause => {
+        if (active) setState(previous => ({ ...previous, upgrading: false, error: asIpcError(cause).message }));
+      });
+    };
+    if (hit) full();
+    else {
       loader.current('fast').then(image => {
         rememberPreview(key, image, 'fast');
-        if (active && !finished) setState(previous => ({ ...previous, image, quality: 'fast', current: true }));
-      }).catch(() => undefined);
+        if (active) setState(previous => ({ ...previous, image, quality: 'fast', current: true }));
+      }).catch(() => undefined).finally(full);
     }
-    loader.current('full').then(image => {
-      finished = true;
-      rememberPreview(key, image, 'full');
-      if (active) setState({ image, quality: 'full', upgrading: false, current: true, error: null });
-    }).catch(cause => {
-      finished = true;
-      if (active) setState(previous => ({ ...previous, upgrading: false, error: asIpcError(cause).message }));
-    });
     return () => { active = false; };
   }, [key, scope, attempt]);
   return state;

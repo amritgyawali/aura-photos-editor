@@ -151,6 +151,9 @@ pub struct AppState {
     previews: Arc<Mutex<BTreeMap<String, Arc<Previews>>>>,
     /// Finished editing previews kept for the session, shared by every view. ADR-0097.
     edited_previews: Arc<Mutex<crate::preview_render::Memory>>,
+    /// Buffers before and after each photograph's retouch stack, shared by every render this
+    /// process makes. ADR-0098.
+    retouch_checkpoints: aura_render::retouch_cache::Checkpoints,
     cache_root: PathBuf,
     /// Where `models.lock`, its signature and the model files live.
     ///
@@ -279,6 +282,7 @@ impl AppState {
             runs: Arc::new(Mutex::new(BTreeMap::new())),
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
+            retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -302,6 +306,7 @@ impl AppState {
             runs: Arc::new(Mutex::new(BTreeMap::new())),
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
+            retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -1430,7 +1435,13 @@ impl AppState {
         self.cache_root = root.to_path_buf();
         self.previews.lock().clear();
         self.edited_previews.lock().clear();
+        self.retouch_checkpoints.clear();
         self
+    }
+
+    /// Forget every retouch checkpoint, with the other cached renders. ADR-0098.
+    pub(crate) fn clear_retouch_checkpoints(&self) {
+        self.retouch_checkpoints.clear();
     }
 
     /// Finished editing previews held in memory. ADR-0097.
@@ -2973,10 +2984,10 @@ impl AppState {
     pub fn render(&self) -> AuraResult<Arc<aura_render::CpuEngine>> {
         let source: Arc<dyn aura_render::FrameSource> =
             Arc::new(crate::photo_frames::CatalogFrames::new(self.clone()));
-        Ok(Arc::new(aura_render::CpuEngine::new(
-            source,
-            Arc::clone(&self.clock),
-        )))
+        Ok(Arc::new(
+            aura_render::CpuEngine::new(source, Arc::clone(&self.clock))
+                .with_checkpoints(self.retouch_checkpoints.clone()),
+        ))
     }
 
     /// A photograph's content address, for the recipe that belongs to it.

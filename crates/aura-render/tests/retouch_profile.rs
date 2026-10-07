@@ -27,6 +27,12 @@ fn time_every_retouch_operation() {
         .collect();
     let mut rows = Vec::new();
     let total = std::time::Instant::now();
+    let whole = std::time::Instant::now();
+    aura_render::retouch_tools::apply_with_mattes(&mut pixels.clone(), w, h, &edits, &mattes);
+    println!(
+        "whole stack in one pass: {} ms",
+        whole.elapsed().as_millis()
+    );
     for edit in &edits {
         let started = std::time::Instant::now();
         aura_render::retouch_tools::apply_with_mattes(

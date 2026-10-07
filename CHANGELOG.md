@@ -2,6 +2,19 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Faster retouching - 2026-10-07
+
+- A brush stroke or an applied retouch step now re-renders only that step: the photo before
+  and after the saved retouch is kept, so a stroke on a retouched 6 MP portrait shows in 0.7 s
+  (was 4.6 s) and at full quality in 1.9 s (was 16.5 s). Before/after views reuse it too.
+- Rendering a retouched photo from scratch is about 25-50 % faster: brush selections, mattes
+  and their edges are computed on every processor core, and operations that share a selection
+  compute it once. Results are pixel-for-pixel the same.
+- The quick look is shown first and the full-quality picture is made after it, so the quick
+  look arrives sooner, and dragging a slider no longer renders full quality for every
+  in-between setting. A resting brush stroke is upgraded to full quality automatically.
+  See ADR-0098.
+
 ## Full-quality previews that stay loaded - 2026-10-07
 
 - The editor now shows the photograph at its own resolution, rendered from the original file,
