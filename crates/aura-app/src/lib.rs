@@ -82,6 +82,7 @@ pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
 pub mod local_commands;
+pub mod local_mask_commands;
 pub mod look_commands;
 pub mod mask_commands;
 pub mod measured_cull;

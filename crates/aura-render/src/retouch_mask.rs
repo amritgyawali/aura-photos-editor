@@ -199,7 +199,7 @@ impl Coverage {
     }
 }
 
-fn paint_stroke(
+pub(crate) fn paint_stroke(
     out: &mut [f32],
     bounds: [usize; 4],
     stroke: &BrushStroke,

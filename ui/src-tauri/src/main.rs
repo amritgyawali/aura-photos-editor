@@ -3574,6 +3574,60 @@ async fn native_retouch_saved_selection(
     .map_err(|_| background_request_failed())?
 }
 
+/// The masks of one photograph. ADR-0102.
+#[tauri::command]
+async fn local_masks(
+    state: State<'_, AppState>,
+    input: aura_app::local_mask_commands::LocalMasksInput,
+) -> IpcResult<aura_app::local_mask_commands::LocalMasksDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::local_mask_commands::list(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+/// Create a mask from an AI selection, a gradient or a brush, or add one to a mask. ADR-0102.
+#[tauri::command]
+async fn create_local_mask(
+    state: State<'_, AppState>,
+    input: aura_app::local_mask_commands::CreateMaskInput,
+) -> IpcResult<aura_app::local_mask_commands::LocalMasksDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::local_mask_commands::create(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// Store a photograph's masks as the panel has them. ADR-0102.
+#[tauri::command]
+async fn save_local_masks(
+    state: State<'_, AppState>,
+    input: aura_app::local_mask_commands::SaveMasksInput,
+) -> IpcResult<aura_app::local_mask_commands::LocalMasksDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::local_mask_commands::save_all(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// Where one mask is, for the overlay. ADR-0102.
+#[tauri::command]
+async fn local_mask_coverage(
+    state: State<'_, AppState>,
+    input: aura_app::local_mask_commands::MaskCoverageInput,
+) -> IpcResult<aura_app::local_mask_commands::MaskCoverageDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::local_mask_commands::coverage(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 // `tauri::generate_context!` expands to an `unwrap` and a `HashMap` inside Tauri's own
 // generated code, which this workspace's disallowed lists cannot see past. Allowed here and
 // nowhere else: every other line of the shell is held to both rules.
@@ -3648,6 +3702,10 @@ fn main() {
             native_retouch_edit,
             native_retouch_selection_preview,
             native_retouch_saved_selection,
+            local_masks,
+            create_local_mask,
+            save_local_masks,
+            local_mask_coverage,
             native_retouch_preview,
             photo_original,
             live_preview,

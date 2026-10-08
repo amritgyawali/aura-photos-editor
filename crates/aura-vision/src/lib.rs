@@ -88,6 +88,7 @@ pub mod face;
 pub mod mask;
 pub mod portrait;
 pub mod skin;
+pub mod sky;
 
 pub use embed::batch::{EmbedProgress, EmbedReport, EmbeddingRunner};
 pub use embed::model::{EmbeddingModel, EMBED_INPUT_SIDE, MODEL_VER, PREPROCESS_VER};

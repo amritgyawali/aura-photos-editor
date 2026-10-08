@@ -3,21 +3,24 @@ import type { RenderDto } from '../../ipc/types';
 /** Tint the backend's saved coverage on the displayed photo. Zero coverage preserves the
  * displayed RGB exactly; strength controls visibility only and never changes the recipe. */
 export function coverageDataUrl(photo: Pick<RenderDto, 'width'|'height'|'rgbBase64'>,
-  mask: Pick<RenderDto, 'width'|'height'|'rgbBase64'>, opacity: number): string | null {
+  mask: Pick<RenderDto, 'width'|'height'|'rgbBase64'>, opacity: number,
+  tint: [number, number, number] = [40, 220, 190], crop: [number, number, number, number] = [0, 0, 1, 1]): string | null {
   if (!Number.isFinite(opacity) || mask.width < 1 || mask.height < 1) return null;
   let rgb: string, coverage: string;
   try { rgb = atob(photo.rgbBase64); coverage = atob(mask.rgbBase64); } catch { return null; }
   if (rgb.length !== photo.width * photo.height * 3 || coverage.length !== mask.width * mask.height * 3) return null;
   const bytes = new Uint8Array(rgb.length);
-  const tint = [40, 220, 190];
   const strength = Math.max(0, Math.min(1, opacity));
-  // Coverage may be measured at a smaller size than the full-quality photograph; each pixel
-  // reads the coverage cell it falls in, so the tint lines up at any size. ADR-0097.
-  const sx = mask.width / photo.width, sy = mask.height / photo.height;
+  // Coverage may be measured at a smaller size than the full-quality photograph, and over the
+  // whole frame when the photograph shown is cropped; each pixel reads the coverage cell it
+  // falls in, so the tint lines up at any size. ADR-0097, ADR-0102.
+  const [cl, ct, cr, cb] = crop;
+  const sx = mask.width * (cr - cl) / photo.width, sy = mask.height * (cb - ct) / photo.height;
+  const ox = mask.width * cl, oy = mask.height * ct;
   for (let y = 0; y < photo.height; y++) {
-    const row = Math.min(mask.height - 1, Math.floor((y + .5) * sy)) * mask.width;
+    const row = Math.max(0, Math.min(mask.height - 1, Math.floor(oy + (y + .5) * sy))) * mask.width;
     for (let x = 0; x < photo.width; x++) {
-      const cell = (row + Math.min(mask.width - 1, Math.floor((x + .5) * sx))) * 3;
+      const cell = (row + Math.max(0, Math.min(mask.width - 1, Math.floor(ox + (x + .5) * sx)))) * 3;
       const alpha = coverage.charCodeAt(cell) / 255 * strength;
       const at = (y * photo.width + x) * 3;
       for (let c = 0; c < 3; c++) bytes[at + c] = Math.round(rgb.charCodeAt(at + c) * (1 - alpha) + (tint[c] ?? 0) * alpha);

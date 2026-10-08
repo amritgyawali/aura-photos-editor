@@ -109,6 +109,7 @@ pub mod golden;
 pub mod gpu;
 pub mod graph;
 pub mod local;
+pub mod local_masks;
 pub mod micro;
 pub mod output;
 pub mod parity;

@@ -2,6 +2,17 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Masking in the Studio - 2026-10-08
+
+- New **Masking** section in the photo editor: select the Subject, the Sky or the Background in
+  one click, or a person's face skin, body skin, hair, clothes, eyes, lips or teeth. You can
+  also draw a linear gradient, a radial gradient or a brush mask.
+- Each mask has its own Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature,
+  Tint, Saturation, Clarity and Texture, plus an Amount.
+- Masks can be combined: add, subtract or intersect any selection, invert it, or keep only its
+  bright or dark parts. A red overlay shows exactly where a mask applies.
+- Mask sliders respond without re-running the skin retouch. See ADR-0102.
+
 ## Natural colour and depth in automatic retouch - 2026-10-08
 
 - Auto advanced retouch no longer makes faces paler, greyer or flatter. Clearing blemishes now

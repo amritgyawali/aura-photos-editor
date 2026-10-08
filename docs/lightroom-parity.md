@@ -35,7 +35,7 @@ your setting and no automatic pass changes it again.
 | History, snapshots, reset | History panel, Undo / Redo / Reset | Every automatic edit is a history entry with its reason |
 | Copy / paste, **Sync Settings** | Develop → Sync settings to all photos (crop optional) | - |
 | Match Total Exposures | Gallery consistency (phase 25) | Yes, in the advanced workflow |
-| Masking: sky, subject, background, people, linear, radial, brush | Masks (phase 18) and local light (phase 19) | **Partly**: the mask generators ship untrained, so AI masks are not produced on real photos yet |
+| Masking: sky, subject, background, people, linear, radial, brush | Studio → Masking (ADR-0102) | **Yes**, except Objects: subject and people parts from the bundled person segmenter, sky from a measured detector (clear skies; declines cloudy and night skies), face parts from the portrait parse; add, subtract, intersect, invert, brightness range; eleven sliders per mask |
 | Healing, content-aware remove | Cleanup (phase 24) and micro-retouch (phase 21) | **Refuses** unclassified removals on real photos until its detector is trained |
 | Red eye | Micro-retouch eyes | Advanced workflow |
 | Match a look / reference | Instagram style matching (start screen, step 2) | Yes |
@@ -57,8 +57,9 @@ Stated plainly rather than implied:
 
 - **HDR merge and panorama merge.** Not implemented.
 - **Soft proofing.** Not implemented.
-- **AI masks on real photographs.** The segmentation heads are untrained placeholders; linear and
-  radial masks render, generated ones are reported as skipped.
+- **Objects masks and a learned sky.** Masking ships (ADR-0102), but Lightroom's draw-around-an-object
+  tool and a sky model for cloudy skies need segmentation networks the bundled interpreter runs too
+  slowly; see ADR-0102's last section.
 - **Content-aware remove on real photographs.** Implemented and deliberately refused until its
   distraction detector is trained.
 - **GPU rendering.** The shaders exist and are checked against the reference; no GPU backend is

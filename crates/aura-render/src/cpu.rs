@@ -175,6 +175,44 @@ impl CpuEngine {
         ))
     }
 
+    /// One local mask's coverage over the interactive preview, before crop, as grey RGB bytes
+    /// (coverage, not colour-managed pixels). Measured on the photograph with the global
+    /// settings but without the retouch stack, so it is quick to show while painting.
+    /// ADR-0102.
+    /// # Errors
+    /// Invalid recipe, a mask that no longer exists, or unavailable source pixels.
+    pub fn local_mask_coverage(
+        &self,
+        image: &PhotoId,
+        recipe: &Recipe,
+        mask: &str,
+    ) -> AuraResult<(Vec<u8>, u32, u32)> {
+        aura_recipe::schema::Validation::check(recipe)?;
+        let mut prepared = recipe.clone();
+        aura_recipe::retouch_tools::write(&mut prepared, &[])?;
+        prepared.extra.remove(aura_recipe::local_masks::KEY);
+        prepared.geometry = aura_recipe::Geometry::default();
+        prepared.global.effects = aura_recipe::Effects::default();
+        prepared.global.sharpen.amount = 0;
+        let prepared = prepared.clamped();
+        let level = RenderLevel::Screen(INTERACTIVE_PREVIEW_EDGE, INTERACTIVE_PREVIEW_EDGE);
+        let frame = self.source.frame(image, level)?;
+        let plan = graph::plan(&prepared, RenderPurpose::Interactive, frame.kind, self.caps);
+        let (rgb, width, height, _) = self.working_buffer(&frame, &prepared, &plan, level, None);
+        let plane = crate::local_masks::coverage(&rgb, width, height, recipe, Some(&frame), mask)
+            .ok_or_else(|| {
+            aura_core::errors::render::recipe_invalid("local mask", "mask no longer exists")
+        })?;
+        Ok((
+            plane
+                .into_iter()
+                .flat_map(|v| [(v.clamp(0.0, 1.0) * 255.0).round() as u8; 3])
+                .collect(),
+            width,
+            height,
+        ))
+    }
+
     /// Render the authored selection at the draft's actual position in the stack.
     /// The RGB bytes encode coverage directly; they are not color-managed photo pixels.
     /// # Errors
@@ -345,7 +383,9 @@ impl CpuEngine {
             notes,
             stages_run: {
                 let mut stages = plan.slugs();
-                if retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0) {
+                let masked = aura_recipe::local_masks::any_active(&clamped);
+                let retouched = retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0);
+                if retouched || masked {
                     let index = plan
                         .stages
                         .iter()
@@ -360,7 +400,12 @@ impl CpuEngine {
                             )
                         })
                         .unwrap_or(stages.len());
-                    stages.insert(index, "studio_retouch".to_string());
+                    if masked {
+                        stages.insert(index, "studio_masks".to_string());
+                    }
+                    if retouched {
+                        stages.insert(index, "studio_retouch".to_string());
+                    }
                 }
                 stages
             },
@@ -399,7 +444,10 @@ impl CpuEngine {
                 &mattes,
             );
         }
-        let (rgb, width, height) = Self::after_retouch(rgb, width, height, recipe, plan, stats);
+        let whole =
+            (frame.origin == (0, 0) && frame.full == (frame.width, frame.height)).then_some(frame);
+        let (rgb, width, height) =
+            Self::after_retouch(rgb, width, height, recipe, plan, stats, whole);
         (rgb, width, height, notes)
     }
 
@@ -684,8 +732,11 @@ impl CpuEngine {
         recipe: &Recipe,
         plan: &Plan,
         stats: spatial::Stats,
+        frame: Option<&Frame>,
     ) -> (Vec<f32>, u32, u32) {
         let g = &recipe.global;
+        // ---- the Studio's local adjustments (ADR-0102) -----------------------------------
+        crate::local_masks::apply(&mut rgb, width, height, recipe, frame);
         // ---- sharpening ----------------------------------------------------------------
         if plan.stages.contains(&Stage::Sharpen) {
             spatial::unsharp(
@@ -758,6 +809,8 @@ impl CpuEngine {
         let mut before = recipe.clone();
         before.extra.remove(aura_recipe::retouch_tools::KEY);
         before.extra.remove(aura_recipe::retouch_tools::MATTE_KEY);
+        before.extra.remove(aura_recipe::local_masks::KEY);
+        before.extra.remove(aura_recipe::local_masks::MATTE_KEY);
         before.global.sharpen.amount = 0;
         before.global.effects = aura_recipe::Effects::default();
         before.geometry = aura_recipe::Geometry::default();
@@ -874,7 +927,8 @@ impl CpuEngine {
             remember(before, after);
             (rgb, width, height, notes, stats)
         };
-        let (rgb, width, height) = Self::after_retouch(rgb, width, height, recipe, plan, stats);
+        let (rgb, width, height) =
+            Self::after_retouch(rgb, width, height, recipe, plan, stats, Some(frame));
         Ok((rgb, width, height, notes))
     }
 
@@ -914,7 +968,8 @@ impl CpuEngine {
             return Ok(None);
         }
         crate::retouch_cache::carry_over(&mut rgb, &last);
-        let (rgb, width, height) = Self::after_retouch(rgb, width, height, &clamped, &plan, stats);
+        let (rgb, width, height) =
+            Self::after_retouch(rgb, width, height, &clamped, &plan, stats, Some(&frame));
         let pixels = crate::output::transform(
             &rgb,
             width,

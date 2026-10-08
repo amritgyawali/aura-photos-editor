@@ -318,3 +318,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   --radius-1: 4px; --radius-2: 8px; --radius-3: 12px;
   --shadow-2: 0 4px 18px #0007;
 }
+/* Masking (ADR-0102). */
+.studio-canvas.studio-masking { cursor: crosshair; outline: 2px solid #f07a7a; outline-offset: 2px; touch-action: none; }
+.studio-sketch { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.masks-panel { display: grid; gap: 10px; }
+.masks-create, .masks-combine, .masks-brush { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.masks-create button, .masks-combine button { font-size: 12px; padding: 6px 9px; }
+.masks-brush label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.masks-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.masks-list li { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; }
+.masks-list li[aria-current] { border-color: #f07a7a; }
+.masks-name { flex: 1; text-align: left; background: none; border: 0; padding: 4px; }
+.masks-toggle, .masks-overlay, .masks-rename { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.masks-components { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12px; }
+.masks-components li { display: flex; gap: 6px; align-items: center; }
+.masks-components li span { flex: 1; }
+.masks-current { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
