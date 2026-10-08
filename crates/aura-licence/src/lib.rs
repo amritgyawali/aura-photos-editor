@@ -323,6 +323,23 @@ mod tests {
         assert!(decode(&text).is_err());
     }
 
+    /// The shop's licence server (`shop/lib/licence.js`) signs the same licence with the same seed
+    /// and asserts the same string, so the two implementations cannot drift apart.
+    #[test]
+    fn the_shop_and_the_application_write_the_same_key() {
+        let licence = Licence {
+            id: "sub_01crosscheck".into(),
+            name: "Asha Studio".into(),
+            email: "asha@example.com".into(),
+            edition: "pro".into(),
+            issued: "2026-10-08".into(),
+            expires: Some("2026-11-15".into()),
+        };
+        let shop = "AURA1.eyJpZCI6InN1Yl8wMWNyb3NzY2hlY2siLCJuYW1lIjoiQXNoYSBTdHVkaW8iLCJlbWFpbCI6ImFzaGFAZXhhbXBsZS5jb20iLCJlZGl0aW9uIjoicHJvIiwiaXNzdWVkIjoiMjAyNi0xMC0wOCIsImV4cGlyZXMiOiIyMDI2LTExLTE1In0.wQQ-xPBkezUha17sAt21Mp5KUrOYLXH09shvgG4jowttQU_KsPaG3kO_VY5w8Clvk9hjZiCsujEpAc0f3bUlAA";
+        assert_eq!(encode(&licence, &key()).unwrap(), shop);
+        assert_eq!(decode_with(shop, &key().verifying_key()).unwrap(), licence);
+    }
+
     #[test]
     fn base64_round_trips_every_length() {
         for n in 0..70_u8 {

@@ -13,6 +13,8 @@
 //! licence-issue issue --key vendor-licence.key --name "Asha Studio" --email asha@example.com
 //!     [--edition pro] [--id order-1001] [--expires 2027-10-07] [--issued 2026-10-08]
 //!     prints the key to send to the customer
+//! licence-issue verify <key>
+//!     checks a key against the public key AURA ships and prints what it grants (for support)
 //! ```
 //!
 //! A key is checked against the shipped public key before it is printed, so a key signed with the
@@ -32,7 +34,8 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("public") => public(&args[1..]),
         Some("issue") => issue(&args[1..]),
-        _ => Err("usage:\n  licence-issue public --key <file>\n  licence-issue issue --key <file> --name <name> --email <email> [--edition pro] [--id <ref>] [--expires YYYY-MM-DD] [--issued YYYY-MM-DD]".to_string()),
+        Some("verify") => verify(&args[1..]),
+        _ => Err("usage:\n  licence-issue public --key <file>\n  licence-issue verify <key>\n  licence-issue issue --key <file> --name <name> --email <email> [--edition pro] [--id <ref>] [--expires YYYY-MM-DD] [--issued YYYY-MM-DD]".to_string()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -106,5 +109,21 @@ fn issue(args: &[String]) -> Result<(), String> {
     }
     aura_licence::decode(&text).map_err(|e| e.to_string())?;
     println!("{text}");
+    Ok(())
+}
+
+fn verify(args: &[String]) -> Result<(), String> {
+    let key = args.first().ok_or("verify needs the key")?;
+    let licence = aura_licence::decode(key).map_err(|e| e.to_string())?;
+    println!("valid AURA key");
+    println!("  id:      {}", licence.id);
+    println!("  name:    {}", licence.name);
+    println!("  email:   {}", licence.email);
+    println!("  edition: {}", licence.edition);
+    println!("  issued:  {}", licence.issued);
+    println!(
+        "  expires: {}",
+        licence.expires.as_deref().unwrap_or("never")
+    );
     Ok(())
 }

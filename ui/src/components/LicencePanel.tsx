@@ -36,17 +36,18 @@ export function LicencePanel({ onChange }: Props): JSX.Element {
       <dt>Licensed to</dt><dd>{status.name}</dd>
       <dt>Email</dt><dd>{status.email}</dd>
       <dt>Edition</dt><dd>{status.edition}</dd>
-      <dt>Valid until</dt><dd>{status.expires ?? 'Perpetual'}</dd>
+      <dt>{status.renews ? 'Paid through' : 'Valid until'}</dt><dd>{status.expires ?? 'Perpetual'}{status.renews ? ' · renews automatically' : ''}</dd>
     </dl>}
     <label className="licence-key">Licence key
       <textarea value={key} rows={3} spellCheck={false} placeholder="AURA1.…" disabled={busy} onChange={event => setKey(event.target.value)} />
     </label>
     <div className="licence-actions">
       <button type="button" className="is-primary" disabled={busy || key.trim().length === 0} onClick={() => void run(() => licence.activate(key))}>Activate</button>
+      {status?.renews && <button type="button" disabled={busy} onClick={() => void run(licence.refresh)}>Renew now</button>}
       {licensed && <button type="button" disabled={busy} onClick={() => void run(licence.deactivate)}>Remove from this computer</button>}
     </div>
     {error && <p role="alert" className="reference-error">{error}</p>}
-    <p className="studio-footnote">Your key is checked on this computer; nothing is sent anywhere. Editing always works - a licence is needed only to export finished photographs once the 14-day trial ends.</p>
+    <p className="studio-footnote">Your key is checked on this computer. Editing always works - a licence is needed only to export finished photographs once the 14-day trial ends. A subscription renews itself: a few days before each period ends, AURA asks the shop for your new key, sending only your subscription number and email - never your photographs.</p>
   </section>;
 }
 

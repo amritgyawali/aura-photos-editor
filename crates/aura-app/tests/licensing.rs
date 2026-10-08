@@ -80,3 +80,103 @@ fn a_valid_key_unlocks_export_and_a_bad_one_changes_nothing() {
     let removed = deactivate_licence(&state).unwrap();
     assert_eq!(removed.state, "trial_ended");
 }
+
+/// Subscription keys, valid only in 2020: the first period, the renewed one, and a key for the same
+/// subscription id in somebody else's name.
+const SUB_JULY: &str = "AURA1.eyJpZCI6InN1Yl8wMXRlc3QiLCJuYW1lIjoiQVVSQSB0ZXN0IHN1YnNjcmliZXIiLCJlbWFpbCI6InN1YkBleGFtcGxlLmludmFsaWQiLCJlZGl0aW9uIjoicHJvIiwiaXNzdWVkIjoiMjAyMC0wNi0wMSIsImV4cGlyZXMiOiIyMDIwLTA3LTA1In0.nC5N5IDCd8F3zRVxHKlIderNmfFb4dy8FLMoATDXMNiYSzkYmxVCvtDDr0ykkv-6gz3vyXwQ9YnNFKBytj_GBg";
+const SUB_AUGUST: &str = "AURA1.eyJpZCI6InN1Yl8wMXRlc3QiLCJuYW1lIjoiQVVSQSB0ZXN0IHN1YnNjcmliZXIiLCJlbWFpbCI6InN1YkBleGFtcGxlLmludmFsaWQiLCJlZGl0aW9uIjoicHJvIiwiaXNzdWVkIjoiMjAyMC0wNi0wMSIsImV4cGlyZXMiOiIyMDIwLTA4LTA1In0.kKTSTpCWpkBuxAYu_bqfZhwBFm9pNh8HJ_RKV_LHGcUbW_69-5OREzl3beAGbCrKpzeYIVtKAVfY83u4m_fzDg";
+const SUB_STRANGER: &str = "AURA1.eyJpZCI6InN1Yl8wMXRlc3QiLCJuYW1lIjoiU29tZWJvZHkgZWxzZSIsImVtYWlsIjoib3RoZXJAZXhhbXBsZS5pbnZhbGlkIiwiZWRpdGlvbiI6InBybyIsImlzc3VlZCI6IjIwMjAtMDYtMDEiLCJleHBpcmVzIjoiMjAyMC0wOS0wNSJ9.tt85Q-vfxKdrZ2P64UomtLZApzoUXjQ92OapF9wizUBcyMey_MO_uJJnBPf7jcvMspsxObcxrSdhszoRJAwUDg";
+
+/// A licence server that answers with a fixed status and body, and remembers what it was asked.
+#[derive(Debug)]
+struct Server {
+    status: u16,
+    body: String,
+    asked: std::sync::Mutex<Vec<String>>,
+}
+
+impl aura_cloud::provider::Transport for Server {
+    fn send(
+        &self,
+        request: &aura_cloud::provider::HttpRequest,
+        _timeout: std::time::Duration,
+    ) -> aura_core::AuraResult<aura_cloud::provider::HttpResponse> {
+        self.asked
+            .lock()
+            .unwrap()
+            .push(format!("{} {}", request.method, request.url));
+        Ok(aura_cloud::provider::HttpResponse {
+            status: self.status,
+            headers: Vec::new(),
+            body: self.body.clone().into_bytes(),
+        })
+    }
+
+    fn name(&self) -> &'static str {
+        "test"
+    }
+}
+
+fn server(status: u16, body: String) -> Server {
+    Server {
+        status,
+        body,
+        asked: std::sync::Mutex::new(Vec::new()),
+    }
+}
+
+#[test]
+fn a_subscription_renews_from_the_licence_server_and_only_to_a_genuine_later_key() {
+    use aura_app::licensing::refresh_with;
+    let dir = tempfile::tempdir().unwrap();
+    let clock = FixedClock::at(datetime!(2020-06-20 10:00 UTC));
+    let state = state(dir.path(), &clock);
+    let first = activate_licence(&state, SUB_JULY).unwrap();
+    assert!(first.renews);
+    assert!(!first.renewal_due, "fifteen days left is not yet due");
+    assert!(first.message.contains("renews automatically"));
+
+    clock.set_wall_clock(datetime!(2020-06-28 10:00 UTC));
+    assert!(licence_status(&state).unwrap().renewal_due);
+
+    // A server that is down, refuses, or answers with something that is not a better key for
+    // this subscription and this person changes nothing.
+    let down = server(502, "<html>bad gateway</html>".into());
+    assert_eq!(
+        refresh_with(&state, &down, "https://shop.test")
+            .unwrap_err()
+            .code,
+        "AURA-REL-12007"
+    );
+    let cancelled = server(
+        402,
+        r#"{"error":"This subscription was cancelled."}"#.into(),
+    );
+    let refused = refresh_with(&state, &cancelled, "https://shop.test").unwrap_err();
+    assert!(refused.message.contains("cancelled"));
+    let stranger = server(200, format!(r#"{{"key":"{SUB_STRANGER}"}}"#));
+    assert!(refresh_with(&state, &stranger, "https://shop.test").is_err());
+    let same = server(200, format!(r#"{{"key":"{SUB_JULY}"}}"#));
+    assert!(refresh_with(&state, &same, "https://shop.test").is_err());
+    let forged = server(200, r#"{"key":"AURA1.e30.AAAA"}"#.into());
+    assert!(refresh_with(&state, &forged, "https://shop.test").is_err());
+    assert_eq!(
+        licence_status(&state).unwrap().expires.as_deref(),
+        Some("2020-07-05")
+    );
+
+    // The renewed key is kept; the request carried only the subscription and the email.
+    let renewed = server(200, format!(r#"{{"key":"{SUB_AUGUST}"}}"#));
+    let status = refresh_with(&state, &renewed, "https://shop.test").unwrap();
+    assert_eq!(status.expires.as_deref(), Some("2020-08-05"));
+    assert!(!status.renewal_due);
+    assert_eq!(
+        renewed.asked.lock().unwrap().as_slice(),
+        ["GET https://shop.test/api/licence?subscription=sub_01test&email=sub%40example.invalid"]
+    );
+
+    // Lapsed and not renewed: export stops, editing does not depend on it.
+    clock.set_wall_clock(datetime!(2020-08-06 10:00 UTC));
+    assert_eq!(licence_status(&state).unwrap().state, "expired");
+    assert!(require_export(&state).is_err());
+}

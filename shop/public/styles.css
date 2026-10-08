@@ -1,0 +1,43 @@
+:root {
+  --bg: #121016; --panel: #1c1922; --line: #2f2a38; --text: #f1ecf6; --muted: #b3aac0;
+  --accent: #c4adf5; --accent-ink: #21162e; --warn: #f2d38a; --error: #f3b0b0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); }
+header.site, footer.site { max-width: 1080px; margin: 0 auto; padding: 20px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+header.site .brand { font-weight: 700; letter-spacing: .12em; text-decoration: none; color: var(--text); }
+header.site nav a { margin-left: 18px; color: var(--muted); text-decoration: none; }
+header.site nav a:hover { color: var(--text); }
+main { max-width: 1080px; margin: 0 auto; padding: 0 16px 64px; }
+.hero { padding: 56px 0 32px; }
+.eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.08; letter-spacing: -.03em; margin: 10px 0 16px; font-weight: 600; }
+h1 em { font-style: normal; color: var(--accent); }
+h2 { font-size: 28px; letter-spacing: -.02em; margin: 48px 0 12px; }
+.lead { font-size: 19px; color: var(--muted); max-width: 680px; }
+.features { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-top: 24px; }
+.features div { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.features strong { display: block; margin-bottom: 6px; }
+.features span { color: var(--muted); font-size: 14px; }
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 20px; }
+.plan { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; display: grid; gap: 10px; }
+.plan.best { border-color: var(--accent); }
+.plan .price { font-size: 40px; font-weight: 700; }
+.plan .price small { font-size: 16px; color: var(--muted); font-weight: 400; }
+.plan ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+button, .button { font: inherit; border: 1px solid var(--line); background: #2a2533; color: var(--text); padding: 11px 18px; border-radius: 10px; cursor: pointer; text-decoration: none; display: inline-block; text-align: center; }
+button.primary, .button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.note { color: var(--muted); font-size: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; max-width: 720px; }
+label { display: grid; gap: 6px; margin-bottom: 14px; font-size: 14px; color: var(--muted); }
+input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.key { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.error { color: var(--error); }
+.legal { max-width: 760px; }
+.legal h2 { font-size: 20px; margin-top: 28px; }
+footer.site { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+footer.site a { color: var(--muted); margin-left: 16px; }
+@media (max-width: 640px) { header.site nav a { margin: 0 12px 0 0; } }

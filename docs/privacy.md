@@ -20,6 +20,11 @@ switch them on:
 3. **Crash reporting** — off. When on, sends a stack trace and no filenames.
 4. **Dataset contribution** — off. When on, shares corrections and needs its own consent record.
 
+One more, and only if you buy a subscription: **licence renewal**. A few days before a paid period
+ends, AURA asks the shop for your renewed key, sending your subscription number and the email
+already in your key - nothing else, and never anything about your photographs (ADR-0107). A
+licence key itself is checked on your computer with no network at all.
+
 ## Faces
 
 AURA recognises people so it can tell you who is in a photograph and make sure the bride's father is

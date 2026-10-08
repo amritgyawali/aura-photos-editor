@@ -2,6 +2,16 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## 1.0.0 - ready to sell - 2026-10-08
+
+- AURA is version 1.0.0.
+- Subscriptions: US$15 a month or US$129 a year, sold through Paddle, which handles tax and
+  refunds worldwide. After paying, the website shows your licence key straight away; you can see
+  it again any time with your subscription number and email.
+- Your subscription renews itself inside AURA a few days before each period ends - no new key to
+  paste. **Renew now** in Settings -> Licence does it on demand.
+- The licence agreement names the seller and covers the subscription. See ADR-0107.
+
 ## Licences and the licence agreement - 2026-10-08
 
 - The installer now shows AURA's licence agreement and installs the notices for every third-party

@@ -180,11 +180,15 @@ export type LicenceStatus = {
   state: 'licensed' | 'expired' | 'trial' | 'trial_ended'; mayExport: boolean;
   name: string | null; email: string | null; edition: string | null; expires: string | null;
   daysLeft: number | null; trialEnds: string | null; message: string;
+  /** A subscription: renews from the licence server rather than by pasting a key. */
+  renews: boolean; renewalDue: boolean;
 };
 export const licence = {
   status: () => invoke<LicenceStatus>('licence_status'),
   activate: (key: string) => invoke<LicenceStatus>('activate_licence', { key }),
   deactivate: () => invoke<LicenceStatus>('deactivate_licence'),
+  /** Fetch the current key for this machine's subscription. */
+  refresh: () => invoke<LicenceStatus>('refresh_licence'),
 };
 
 /** Ask the desktop for a Lightroom Classic catalogue (.lrcat); cancel returns null. */

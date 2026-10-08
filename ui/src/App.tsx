@@ -116,7 +116,12 @@ export function App(): JSX.Element {
 
   const [licenceState, setLicenceState] = useState<LicenceStatus | null>(null);
   useEffect(() => {
-    if (inTauri()) licence.status().then(setLicenceState).catch(() => undefined);
+    if (!inTauri()) return;
+    // A subscription near its end renews quietly; a failure leaves the current key in place.
+    licence.status().then(status => {
+      setLicenceState(status);
+      if (status.renewalDue) licence.refresh().then(setLicenceState).catch(() => undefined);
+    }).catch(() => undefined);
   }, []);
   useEffect(() => {
     void refreshProjects();

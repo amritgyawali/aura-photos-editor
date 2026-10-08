@@ -6,10 +6,10 @@ import { licence, type LicenceStatus } from '../ipc/client';
 vi.mock('../ipc/client', () => ({
   inTauri: () => true,
   asIpcError: (e: Error) => ({ message: e.message }),
-  licence: { status: vi.fn(), activate: vi.fn(), deactivate: vi.fn() },
+  licence: { status: vi.fn(), activate: vi.fn(), deactivate: vi.fn(), refresh: vi.fn() },
 }));
 
-const ended: LicenceStatus = { state: 'trial_ended', mayExport: false, name: null, email: null, edition: null, expires: null, daysLeft: null, trialEnds: '2026-10-21',
+const ended: LicenceStatus = { state: 'trial_ended', mayExport: false, name: null, email: null, edition: null, expires: null, daysLeft: null, trialEnds: '2026-10-21', renews: false, renewalDue: false,
   message: 'Your free trial has ended. Editing still works; enter a licence key to export finished photographs.' };
 const licensed: LicenceStatus = { ...ended, state: 'licensed', mayExport: true, name: 'Asha Studio', email: 'asha@example.com', edition: 'pro', message: 'Licensed to Asha Studio.' };
 
@@ -41,4 +41,14 @@ it('badges the trial and its end, and nothing once licensed', () => {
   expect(licenceBadge({ ...ended, state: 'trial', mayExport: true, daysLeft: 3 })).toBe('Trial · 3 days left');
   expect(licenceBadge(ended)).toContain('activate');
   expect(licenceBadge(licensed)).toBeNull();
+});
+
+it('offers Renew now for a subscription and shows the paid-through date', async () => {
+  const subscribed: LicenceStatus = { ...licensed, renews: true, expires: '2026-11-20', message: 'Licensed to Asha Studio. Your subscription renews automatically.' };
+  vi.mocked(licence.status).mockResolvedValue(subscribed);
+  vi.mocked(licence.refresh).mockResolvedValue({ ...subscribed, expires: '2026-12-20' });
+  render(<LicencePanel />);
+  expect(await screen.findByText(/2026-11-20 · renews automatically/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Renew now' }));
+  expect(await screen.findByText(/2026-12-20/)).toBeTruthy();
 });

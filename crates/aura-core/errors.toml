@@ -2334,6 +2334,15 @@ runbook      = "docs/runbooks/AURA-REL-12006.md"
 introduced   = "ADR-0105"
 
 [[error]]
+code         = "AURA-REL-12007"
+severity     = "warning"
+recovery     = "retry"
+summary      = "A subscription could not be renewed from the licence server"
+user_message = "AURA could not renew your subscription just now. Nothing has changed; it will try again, or paste your current key from the shop."
+runbook      = "docs/runbooks/AURA-REL-12007.md"
+introduced   = "ADR-0107"
+
+[[error]]
 code         = "AURA-ML-5146"
 severity     = "run_blocking"
 recovery     = "ask_user"

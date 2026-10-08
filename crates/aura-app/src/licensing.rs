@@ -10,6 +10,13 @@
 //! trial's start is also written into each catalogue opened, and the earliest date anywhere wins,
 //! so deleting one file does not restart the trial. It is not copy protection and does not
 //! pretend to be; `aura_licence` says why.
+//!
+//! **Subscriptions renew themselves.** A subscription key's `id` is the shop's subscription id
+//! (`sub_...`) and it ends a little after the paid period. Within [`RENEW_WITHIN_DAYS`] of that, the
+//! panel asks the licence server for the current key ([`refresh_licence`]): one HTTPS GET carrying
+//! the subscription id and the email already in the key, nothing about the photographs. The answer
+//! is an ordinary signed key, checked here exactly like a pasted one, so a server that is down or
+//! wrong can delay a renewal but cannot grant one. ADR-0107.
 use aura_core::contract::error::{ErrorCode, Recovery, Severity};
 use aura_core::{AuraError, AuraResult};
 use aura_licence::{Licence, Standing};
@@ -23,6 +30,11 @@ use crate::AppState;
 pub const EXPORT_NEEDS_LICENCE: ErrorCode = ErrorCode("AURA-REL-12005");
 /// A pasted licence key was refused.
 pub const KEY_REFUSED: ErrorCode = ErrorCode("AURA-REL-12006");
+/// A subscription could not be renewed from the licence server.
+pub const RENEWAL_FAILED: ErrorCode = ErrorCode("AURA-REL-12007");
+
+/// A subscription key is renewed this many days before it ends.
+pub const RENEW_WITHIN_DAYS: i64 = 10;
 
 const FILE: &str = "licence.json";
 const TRIAL_SETTING: &str = "trial_started_v1";
@@ -56,6 +68,10 @@ pub struct LicenceStatus {
     pub trial_ends: Option<String>,
     /// One sentence for the panel and the title bar.
     pub message: String,
+    /// A subscription, which renews from the licence server rather than by pasting a new key.
+    pub renews: bool,
+    /// The subscription key ends soon (or has ended) and a renewal should be fetched.
+    pub renewal_due: bool,
 }
 
 fn ymd(d: Date) -> String {
@@ -144,7 +160,10 @@ fn trial_started(state: &AppState, stored: &mut Stored, today: Date) -> Date {
 }
 
 fn standing(state: &AppState) -> Standing {
-    let today = state.clock().now_utc().date();
+    standing_on(state, state.clock().now_utc().date())
+}
+
+fn standing_on(state: &AppState, today: Date) -> Standing {
     let mut stored = read(state);
     let start = trial_started(state, &mut stored, today);
     let licence = stored
@@ -154,7 +173,11 @@ fn standing(state: &AppState) -> Standing {
     Standing::of(licence, start, today)
 }
 
-fn describe(standing: &Standing) -> LicenceStatus {
+fn is_subscription(licence: &Licence) -> bool {
+    licence.id.starts_with("sub_")
+}
+
+fn describe(standing: &Standing, today: Date) -> LicenceStatus {
     let base = LicenceStatus {
         state: String::new(),
         may_export: standing.may_export(),
@@ -165,6 +188,8 @@ fn describe(standing: &Standing) -> LicenceStatus {
         days_left: None,
         trial_ends: None,
         message: String::new(),
+        renews: false,
+        renewal_due: false,
     };
     let with = |l: &Licence, state: &str, message: String| LicenceStatus {
         state: state.into(),
@@ -173,6 +198,10 @@ fn describe(standing: &Standing) -> LicenceStatus {
         edition: Some(l.edition.clone()),
         expires: l.expires.clone(),
         message,
+        renews: is_subscription(l),
+        renewal_due: is_subscription(l)
+            && l.expiry()
+                .is_some_and(|last| (last - today).whole_days() < RENEW_WITHIN_DAYS),
         ..base.clone()
     };
     match standing {
@@ -180,6 +209,9 @@ fn describe(standing: &Standing) -> LicenceStatus {
             l,
             "licensed",
             match &l.expires {
+                Some(_) if is_subscription(l) => {
+                    format!("Licensed to {}. Your subscription renews automatically.", l.name)
+                }
                 Some(last) => format!("Licensed to {} until {last}.", l.name),
                 None => format!("Licensed to {}.", l.name),
             },
@@ -217,7 +249,8 @@ fn describe(standing: &Standing) -> LicenceStatus {
 /// # Errors
 /// None in practice; a missing or unreadable licence file is a new trial.
 pub fn licence_status(state: &AppState) -> IpcResult<LicenceStatus> {
-    Ok(describe(&standing(state)))
+    let today = state.clock().now_utc().date();
+    Ok(describe(&standing_on(state, today), today))
 }
 
 /// Check and keep a licence key.
@@ -260,7 +293,7 @@ pub fn require_export(state: &AppState) -> AuraResult<()> {
     if standing.may_export() {
         Ok(())
     } else {
-        let message = describe(&standing).message;
+        let message = describe(&standing, state.clock().now_utc().date()).message;
         Err(AuraError::new(
             EXPORT_NEEDS_LICENCE,
             Severity::RunBlocking,
@@ -269,4 +302,116 @@ pub fn require_export(state: &AppState) -> AuraResult<()> {
             message,
         ))
     }
+}
+
+/// The licence server: `AURA_LICENCE_SERVER` at run time, else the address this build was made
+/// with, else none (renewal then needs a pasted key).
+fn server() -> Option<String> {
+    std::env::var("AURA_LICENCE_SERVER")
+        .ok()
+        .or_else(|| option_env!("AURA_LICENCE_SERVER").map(str::to_string))
+        .map(|s| s.trim_end_matches('/').to_string())
+        .filter(|s| s.starts_with("https://") || s.starts_with("http://"))
+}
+
+fn percent(text: &str) -> String {
+    text.bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                char::from(b).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect()
+}
+
+fn renewal_failed(message: &str) -> AuraError {
+    AuraError::new(
+        RENEWAL_FAILED,
+        Severity::Warning,
+        Recovery::Retry,
+        message,
+        message,
+    )
+}
+
+/// Fetch the current key for this machine's subscription and keep it when it is a genuine,
+/// later key for the same subscription and the same person.
+///
+/// # Errors
+/// `AURA-REL-12007` when there is no subscription, no licence server, no answer, or an answer
+/// that is not a better key. The key already on the machine is never touched on failure.
+pub fn refresh_licence(state: &AppState) -> IpcResult<LicenceStatus> {
+    let server = server().ok_or_else(|| {
+        renewal_failed(
+            "This copy of AURA has no licence server to renew from. Paste your new key from the shop instead.",
+        )
+    })?;
+    refresh_with(state, &aura_cloud::http::HttpTransport::new(), &server)
+}
+
+/// [`refresh_licence`] over a given transport and server, for tests.
+///
+/// # Errors
+/// As [`refresh_licence`].
+pub fn refresh_with(
+    state: &AppState,
+    transport: &dyn aura_cloud::provider::Transport,
+    server: &str,
+) -> IpcResult<LicenceStatus> {
+    let stored = read(state);
+    let current = stored
+        .key
+        .as_deref()
+        .and_then(|k| aura_licence::decode(k).ok())
+        .filter(is_subscription)
+        .ok_or_else(|| renewal_failed("There is no subscription on this computer to renew."))?;
+    let request = aura_cloud::provider::HttpRequest {
+        method: "GET".into(),
+        url: format!(
+            "{server}/api/licence?subscription={}&email={}",
+            percent(&current.id),
+            percent(&current.email)
+        ),
+        headers: vec![("accept".into(), "application/json".into())],
+        body: Vec::new(),
+    };
+    let unreachable = || {
+        renewal_failed(
+            "AURA could not reach the licence server to renew your subscription. It will try again next time; nothing has changed.",
+        )
+    };
+    let response = transport
+        .send(&request, std::time::Duration::from_secs(15))
+        .map_err(|_| unreachable())?;
+    let body: serde_json::Value =
+        serde_json::from_slice(&response.body).map_err(|_| unreachable())?;
+    if response.status != 200 {
+        let why = body
+            .get("error")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("The licence server refused the renewal.");
+        return Err(renewal_failed(why).into());
+    }
+    let key = body
+        .get("key")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(unreachable)?;
+    let renewed = aura_licence::decode(key).map_err(|e| renewal_failed(&e.to_string()))?;
+    let later = match (renewed.expiry(), current.expiry()) {
+        (Some(new), Some(old)) => new > old,
+        (None, _) => true,
+        (Some(_), None) => false,
+    };
+    if renewed.id != current.id || !renewed.email.eq_ignore_ascii_case(&current.email) || !later {
+        return Err(renewal_failed(
+            "The licence server has no newer key for this subscription yet. If you have just paid, try again in a minute.",
+        )
+        .into());
+    }
+    let mut stored = stored;
+    stored.key = Some(key.to_string());
+    write(state, &stored)?;
+    licence_status(state)
 }

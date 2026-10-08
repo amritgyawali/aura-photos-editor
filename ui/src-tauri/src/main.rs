@@ -3442,6 +3442,16 @@ async fn activate_licence(
 }
 
 #[tauri::command]
+async fn refresh_licence(
+    state: State<'_, AppState>,
+) -> IpcResult<aura_app::licensing::LicenceStatus> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::licensing::refresh_licence(&state))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn deactivate_licence(
     state: State<'_, AppState>,
 ) -> IpcResult<aura_app::licensing::LicenceStatus> {
@@ -3765,6 +3775,7 @@ fn main() {
             licence_status,
             activate_licence,
             deactivate_licence,
+            refresh_licence,
             delete_personal_style,
             apply_edit_profile,
             preview_edit_profile,

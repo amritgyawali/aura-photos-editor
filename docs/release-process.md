@@ -50,9 +50,9 @@ any machine, and a slow runner is not a reason to store more.
 ## Building the Windows installer
 
 ```bash
-# 1. The shell, with the frontend embedded.
+# 1. The shell, with the frontend embedded, and the licence server subscriptions renew from.
 (cd ui && npm run build)
-cargo build --manifest-path ui/src-tauri/Cargo.toml --features custom-protocol   # CARGO_TARGET_DIR set
+AURA_LICENCE_SERVER=https://<shop-domain>   cargo build --manifest-path ui/src-tauri/Cargo.toml --features custom-protocol   # CARGO_TARGET_DIR set
 # 2. The runtime and models, once (scripts/fetch-ai-models.sh <dir>), then the installer.
 AURA_SIGN_COMMAND='signtool sign /sha1 <thumbprint> /fd sha256 /tr <timestamp-url> /td sha256 %1'   scripts/build-installer.sh <dir>
 ```
@@ -138,7 +138,9 @@ after that editing keeps working and exporting finished photographs needs a key.
 stopped you seeing what the product does to your photographs would be a trial that tells you
 nothing.
 
-Issuing a key when an order arrives:
+Subscriptions are sold through Paddle and keys are issued by the shop's licence server without
+anybody running a command (`shop/README.md`, ADR-0107). Issuing a key by hand - a gift, a press copy,
+a support case:
 
 ```bash
 cargo run -p licence-issue -- issue --key <vendor-licence.key>   --name "Customer or studio name" --email customer@example.com --id <order-ref>   [--edition pro] [--expires YYYY-MM-DD]
