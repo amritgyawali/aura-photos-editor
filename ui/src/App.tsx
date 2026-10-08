@@ -4,7 +4,8 @@ import { FinishFolder } from './components/workflow/FinishFolder';
 import { automaticBusy, useAutomatic } from './state/automaticStore';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, asIpcError, editProfiles, inTauri, pickPhotoFolder, pickPhotos, type ProfileSelection } from './ipc/client';
+import { api, asIpcError, editProfiles, inTauri, licence, pickPhotoFolder, pickPhotos, type LicenceStatus, type ProfileSelection } from './ipc/client';
+import { LicencePanel, licenceBadge } from './components/LicencePanel';
 import { ProfileGallery } from './components/profiles/ProfileGallery';
 import { readProfileSelection, saveProfileSelection } from './components/profiles/profileSelection';
 import { InstagramStyle } from './components/look/InstagramStyle';
@@ -113,6 +114,10 @@ export function App(): JSX.Element {
     [appendRows, replaceRows, setError],
   );
 
+  const [licenceState, setLicenceState] = useState<LicenceStatus | null>(null);
+  useEffect(() => {
+    if (inTauri()) licence.status().then(setLicenceState).catch(() => undefined);
+  }, []);
   useEffect(() => {
     void refreshProjects();
   }, [refreshProjects]);
@@ -332,6 +337,7 @@ export function App(): JSX.Element {
         <header className="studio-topbar">
           <span>{projects.find(project => project.id === activeProjectId)?.name ?? 'Your creative workspace'}</span>
           <span>{activeProjectId ? `${projects.find(project => project.id === activeProjectId)?.photoCount ?? rows.length} photos` : 'Welcome to AURA'}</span>
+          {licenceBadge(licenceState) && <button type="button" className={`licence-badge is-${licenceState?.state ?? ''}`} onClick={() => setWorkspace('advanced')}>{licenceBadge(licenceState)}</button>}
         </header>
         {lastError && <div className="banner" role="alert"><span>{lastError.message}</span><button type="button" onClick={() => setError(null)}>Dismiss</button></div>}
         <div className="studio-content">
@@ -398,6 +404,7 @@ export function App(): JSX.Element {
               <AdvancedTools onBusyChange={setSaving} projectId={activeProjectId} photoId={focusedPhoto?.id ?? null} onError={setError}
                 onRefresh={() => { void refreshProjects(); void loadPage(activeProjectId, 0, true); }}
                 onOpen={id => { const index = rows.findIndex(row => row.id === id); if (index >= 0) { useStore.getState().focusIndex(index); useStore.getState().selectOnly(id); setWorkspace('edit'); } }} />
+              <details className="advanced-tools" open={licenceState !== null && !licenceState.mayExport}><summary>Licence</summary><LicencePanel onChange={setLicenceState} /></details>
               <details className="advanced-tools"><summary>Quality review</summary><QcPanel projectId={activeProjectId} onError={setError} /></details>
               <details className="advanced-tools"><summary>Gallery consistency</summary><GalleryPanel projectId={activeProjectId} onError={setError} /></details>
               <details className="advanced-tools"><summary>Albums & curation</summary><CuratePanel projectId={activeProjectId} onError={setError} /></details>

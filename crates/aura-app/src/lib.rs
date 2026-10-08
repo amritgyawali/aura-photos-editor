@@ -66,6 +66,7 @@ pub mod develop_commands;
 pub mod edit_profiles;
 pub mod gallery_commands;
 pub mod learn_commands;
+pub mod licensing;
 pub mod lightroom;
 pub mod native_retouch;
 pub mod personal_style;

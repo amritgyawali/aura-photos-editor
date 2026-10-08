@@ -1,0 +1,14 @@
+[package]
+name         = "licence-issue"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+description  = "Offline tool that signs AURA licence keys. The vendor key never enters this repository."
+publish      = false
+
+[dependencies]
+aura-licence  = { path = "../../crates/aura-licence" }
+ed25519-dalek = { workspace = true }
+time          = { workspace = true }

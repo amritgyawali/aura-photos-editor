@@ -176,6 +176,18 @@ export const editProfiles = {
   deletePersonal: (id: string) => invoke<void>('delete_personal_style', { id }),
 };
 
+/** Where this installation stands: trial, licensed, ended. Editing never depends on it. */
+export type LicenceStatus = {
+  state: 'licensed' | 'expired' | 'trial' | 'trial_ended'; mayExport: boolean;
+  name: string | null; email: string | null; edition: string | null; expires: string | null;
+  daysLeft: number | null; trialEnds: string | null; message: string;
+};
+export const licence = {
+  status: () => invoke<LicenceStatus>('licence_status'),
+  activate: (key: string) => invoke<LicenceStatus>('activate_licence', { key }),
+  deactivate: () => invoke<LicenceStatus>('deactivate_licence'),
+};
+
 /** Ask the desktop for a Lightroom Classic catalogue (.lrcat); cancel returns null. */
 export async function pickLightroomCatalog(): Promise<string | null> {
   const result: string | string[] | null = await invoke('plugin:dialog|open', {

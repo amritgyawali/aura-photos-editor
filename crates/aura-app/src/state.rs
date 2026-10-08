@@ -167,6 +167,9 @@ pub struct AppState {
     /// Where the operating system's credential store keeps its blob, on the one
     /// platform that needs a file. Per installation, never per project.
     key_dir: PathBuf,
+    /// Where the licence and the trial's start are kept: the data directory for a real
+    /// installation, beside the catalog for a test, so no test can touch the machine's trial.
+    licence_dir: PathBuf,
     /// One similarity index per project, built or loaded from a snapshot on first
     /// use. Per project for the same reason the preview services are: one
     /// wedding's vectors are never compared with another's, and the memory is
@@ -288,6 +291,7 @@ impl AppState {
             infer: Arc::new(Mutex::new(InferSlot::default())),
             cloud: Arc::new(Mutex::new(CloudSlot::default())),
             key_dir: default_key_dir(),
+            licence_dir: default_licence_dir(),
             indexes: Arc::new(Mutex::new(BTreeMap::new())),
             people: Arc::new(Mutex::new(PeopleSlot::default())),
             composition_enabled: composition_enabled_from_env(),
@@ -298,6 +302,7 @@ impl AppState {
     #[must_use]
     pub fn with_catalog(catalog: Arc<Catalog>, clock: Arc<dyn Clock>) -> Self {
         let cache_root = default_cache_root(catalog.path());
+        let licence_dir = catalog_side_licence_dir(&catalog);
         Self {
             catalog,
             clock,
@@ -312,10 +317,25 @@ impl AppState {
             infer: Arc::new(Mutex::new(InferSlot::default())),
             cloud: Arc::new(Mutex::new(CloudSlot::default())),
             key_dir: default_key_dir(),
+            licence_dir,
             indexes: Arc::new(Mutex::new(BTreeMap::new())),
             people: Arc::new(Mutex::new(PeopleSlot::default())),
             composition_enabled: composition_enabled_from_env(),
         }
+    }
+
+    /// Where the licence and the trial's start are kept.
+    #[must_use]
+    pub fn licence_dir(&self) -> &Path {
+        &self.licence_dir
+    }
+
+    /// Keep the licence somewhere else, e.g. the data directory when a shell builds its state
+    /// around an already open catalog.
+    #[must_use]
+    pub fn with_licence_dir(mut self, dir: PathBuf) -> Self {
+        self.licence_dir = dir;
+        self
     }
 
     /// Whether new phase 11 composition analysis is allowed in this process.
@@ -3152,6 +3172,23 @@ pub fn config_at(mut config: ProviderConfig, endpoint: &str) -> ProviderConfig {
 /// on a directory it may not write to failed outright with `AURA-CLOUD-6012`. The
 /// relative path survives only as the fallback for a platform that exposes no data
 /// directory at all, which is the same condition `AppPaths::resolve` already refuses on.
+fn default_licence_dir() -> PathBuf {
+    std::env::var_os("AURA_LICENCE_DIR").map_or_else(
+        || {
+            aura_core::paths::AppPaths::resolve()
+                .map_or_else(|_| PathBuf::from("licence"), |paths| paths.data_dir)
+        },
+        PathBuf::from,
+    )
+}
+
+fn catalog_side_licence_dir(catalog: &Catalog) -> PathBuf {
+    catalog
+        .path()
+        .parent()
+        .map_or_else(|| PathBuf::from("licence"), |p| p.join("licence"))
+}
+
 fn default_key_dir() -> PathBuf {
     aura_core::paths::AppPaths::resolve().map_or_else(
         |_| PathBuf::from("credentials"),

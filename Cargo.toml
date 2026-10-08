@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "crates/aura-core",
+  "crates/aura-licence",
   "crates/aura-catalog",
   "crates/aura-ingest",
   "crates/aura-raw",
@@ -37,6 +38,7 @@ members = [
   "crates/aura-app",
   "crates/aura-cli",
   "tools/model-sign",
+  "tools/licence-issue",
   "xtask",
 ]
 exclude = ["ui/src-tauri"]

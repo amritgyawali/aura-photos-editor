@@ -3432,6 +3432,39 @@ async fn list_edit_profiles(
 }
 
 #[tauri::command]
+async fn licence_status(
+    state: State<'_, AppState>,
+) -> IpcResult<aura_app::licensing::LicenceStatus> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::licensing::licence_status(&state))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn activate_licence(
+    state: State<'_, AppState>,
+    key: String,
+) -> IpcResult<aura_app::licensing::LicenceStatus> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::licensing::activate_licence(&state, &key)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn deactivate_licence(
+    state: State<'_, AppState>,
+) -> IpcResult<aura_app::licensing::LicenceStatus> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::licensing::deactivate_licence(&state))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn learn_lightroom_style(
     state: State<'_, AppState>,
     input: aura_app::personal_style::LearnInput,
@@ -3742,6 +3775,9 @@ fn main() {
             native_retouch_draft_preview,
             list_edit_profiles,
             learn_lightroom_style,
+            licence_status,
+            activate_licence,
+            deactivate_licence,
             delete_personal_style,
             apply_edit_profile,
             preview_edit_profile,

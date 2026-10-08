@@ -2316,6 +2316,24 @@ runbook      = "docs/runbooks/AURA-REL-12004.md"
 introduced   = "PHASE-30"
 
 [[error]]
+code         = "AURA-REL-12005"
+severity     = "run_blocking"
+recovery     = "ask_user"
+summary      = "An export was refused because there is no active licence and the trial has ended"
+user_message = "Your free trial has ended. Editing still works; enter a licence key to export finished photographs."
+runbook      = "docs/runbooks/AURA-REL-12005.md"
+introduced   = "ADR-0105"
+
+[[error]]
+code         = "AURA-REL-12006"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "A licence key was refused"
+user_message = "That licence key could not be used. Paste the whole key from your receipt, or contact support with it."
+runbook      = "docs/runbooks/AURA-REL-12006.md"
+introduced   = "ADR-0105"
+
+[[error]]
 code         = "AURA-ML-5146"
 severity     = "run_blocking"
 recovery     = "ask_user"

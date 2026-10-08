@@ -342,3 +342,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .masks-components li { display: flex; gap: 6px; align-items: center; }
 .masks-components li span { flex: 1; }
 .masks-current { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+/* Licence (ADR-0105). */
+.licence-badge { margin-left: auto; padding: 4px 12px; border-radius: 14px; border: 1px solid #6b5a33; background: #2a2416; color: #f2d38a; font-size: 12px; cursor: pointer; }
+.licence-badge.is-trial_ended, .licence-badge.is-expired { border-color: #8a3b3b; background: #2c1818; color: #f3b0b0; }
+.licence-panel { display: grid; gap: 12px; max-width: 640px; }
+.licence-state { margin: 0; font-size: 14px; }
+.licence-state.is-trial_ended, .licence-state.is-expired { color: var(--warn); }
+.licence-details { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; font-size: 13px; }
+.licence-details dt { color: var(--muted); }
+.licence-details dd { margin: 0; }
+.licence-key { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+.licence-key textarea { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
+.licence-actions { display: flex; gap: 10px; flex-wrap: wrap; }

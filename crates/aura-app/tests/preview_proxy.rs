@@ -18,6 +18,7 @@ fn preview_recipe_history_and_full_export_stay_independent() {
     let dir = tempfile::tempdir().unwrap();
     let state = aura_app::AppState::open(&dir.path().join("catalog.aura"))
         .unwrap()
+        .with_licence_dir(dir.path().join("licence"))
         .with_cache_root(&dir.path().join("cache"));
     let project = aura_app::create_project(
         &state,

@@ -672,6 +672,7 @@ impl AppRunner {
                 if images.is_empty() {
                     return Ok(StageOutcome::Skipped(SkipCause::NoInput));
                 }
+                lift(crate::licensing::require_export(&self.state).map_err(IpcError::from))?;
                 let field = lift(ExportField::new(&self.state, project))?;
                 let source = ExportSource::new(&self.state);
                 let pass = ExportPass::new(&store, &field, &source, crate::state::APP_VERSION);

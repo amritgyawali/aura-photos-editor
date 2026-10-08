@@ -111,6 +111,7 @@ dependencies = [
  "aura-ingest",
  "aura-jobs",
  "aura-learn",
+ "aura-licence",
  "aura-look",
  "aura-models",
  "aura-people",
@@ -537,6 +538,16 @@ dependencies = [
  "toml",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aura-licence"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "serde",
+ "serde_json",
+ "time",
 ]
 
 [[package]]
@@ -1673,6 +1684,15 @@ dependencies = [
  "cc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "licence-issue"
+version = "0.1.0"
+dependencies = [
+ "aura-licence",
+ "ed25519-dalek",
+ "time",
 ]
 
 [[package]]
