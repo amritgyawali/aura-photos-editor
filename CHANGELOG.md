@@ -2,6 +2,16 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Installer and licence - 2026-10-08
+
+- AURA now installs from a single Windows setup file, with the graphics-card runtime and the
+  masking models included. No administrator rights are needed.
+- 14-day free trial. After it, editing keeps working; exporting finished photographs needs a
+  licence key.
+- **Settings -> Licence** (under Advanced): paste your key to activate. It is checked on your own
+  computer and nothing is sent anywhere. A badge in the top bar shows the trial's days left.
+- See ADR-0105.
+
 ## Your own style, learned from Lightroom - 2026-10-08
 
 - New **Teach AURA your style** on the start screen: choose your Lightroom Classic catalogue and

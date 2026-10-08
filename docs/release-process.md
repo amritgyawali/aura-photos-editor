@@ -47,15 +47,31 @@ what a slower host sets: the budget file keeps the developer-machine numbers, th
 real on both, and a genuine regression still fails. It applies to timings only. A byte is a byte on
 any machine, and a slow runner is not a reason to store more.
 
+## Building the Windows installer
+
+```bash
+# 1. The shell, with the frontend embedded.
+(cd ui && npm run build)
+cargo build --manifest-path ui/src-tauri/Cargo.toml --features custom-protocol   # CARGO_TARGET_DIR set
+# 2. The runtime and models, once (scripts/fetch-ai-models.sh <dir>), then the installer.
+AURA_SIGN_COMMAND='signtool sign /sha1 <thumbprint> /fd sha256 /tr <timestamp-url> /td sha256 %1'   scripts/build-installer.sh <dir>
+```
+
+The script checks every bundled DLL and model against its pinned SHA-256, then writes
+`AURA_<version>_x64-setup.exe` under `$CARGO_TARGET_DIR/debug/bundle/nsis/`. It installs per user,
+with no administrator prompt, and fetches WebView2 if the machine lacks it.
+
 ## Signing
 
-Windows builds are Authenticode-signed with a hardware-token certificate. macOS builds are signed
-with a Developer ID and submitted to Apple for notarisation, then stapled.
+Windows builds are Authenticode-signed; macOS builds are signed with a Developer ID and submitted
+to Apple for notarisation, then stapled. The certificate has to be bought in the seller's legal name
+- an OV or EV code-signing certificate from a certificate authority, or Microsoft Trusted Signing -
+and **without it SmartScreen warns every customer** that the publisher is unknown.
+`scripts/build-installer.sh` takes the signing command in `AURA_SIGN_COMMAND` and says plainly
+when it built an unsigned installer.
 
-`ops/sign/` and `ops/notarise/` hold the scripts and what they need. **Neither has been run in this
-repository**: there is no certificate and no Apple account here, so what ships is the procedure and
-not evidence that it works. That is written down in the exit report rather than implied by the
-scripts existing.
+`ops/sign/` and `ops/notarise/` hold the rules. **No certificate exists here yet**, so no installer
+built in this repository has been signed.
 
 ## Rollout
 
@@ -113,12 +129,23 @@ it that could hold image bytes.
 
 ## Licensing
 
-Licence checks tolerate being offline, because a wedding is often edited on a laptop in a hotel with
-bad wifi. A machine that cannot reach the licence server keeps working for a grace period rather
-than locking somebody out of their own catalog mid-edit.
+Keys are checked **offline**: a licence is a statement signed with the vendor's ed25519 key and the
+application carries only the public half (ADR-0105), so there is no server to reach and no grace
+period to run out in a hotel with bad wifi.
 
-Trial mode limits what can be *delivered*, not what can be edited. A trial that stopped you seeing
-what the product does to your photographs would be a trial that tells you nothing.
+Trial mode limits what can be *delivered*, not what can be edited. For 14 days everything works;
+after that editing keeps working and exporting finished photographs needs a key. A trial that
+stopped you seeing what the product does to your photographs would be a trial that tells you
+nothing.
+
+Issuing a key when an order arrives:
+
+```bash
+cargo run -p licence-issue -- issue --key <vendor-licence.key>   --name "Customer or studio name" --email customer@example.com --id <order-ref>   [--edition pro] [--expires YYYY-MM-DD]
+```
+
+The vendor key file never enters this repository. Back it up offline: without it no new key can
+be issued that existing installations accept.
 
 ## What this release has not done
 
