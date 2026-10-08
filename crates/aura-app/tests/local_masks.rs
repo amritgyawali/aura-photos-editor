@@ -143,6 +143,7 @@ fn a_gradient_mask_brightens_only_its_side_and_can_be_combined_and_removed() {
             into: None,
             mode: None,
             invert: false,
+            bounds: None,
         },
     )
     .expect("create");
@@ -181,6 +182,7 @@ fn a_gradient_mask_brightens_only_its_side_and_can_be_combined_and_removed() {
             into: Some(id.clone()),
             mode: Some(Mode::Subtract),
             invert: false,
+            bounds: None,
         },
     )
     .expect("subtract");
@@ -234,7 +236,15 @@ fn ai_selections_on_real_photographs() {
         let path = std::path::PathBuf::from(path);
         let name = path.file_stem().unwrap().to_string_lossy().to_string();
         let f = import(&path, tempfile::tempdir().expect("temp"));
-        for what in ["subject", "sky", "hair", "face_skin", "clothes", "lips"] {
+        for what in [
+            "subject",
+            "sky",
+            "object",
+            "hair",
+            "face_skin",
+            "clothes",
+            "lips",
+        ] {
             let started = std::time::Instant::now();
             let made = local_mask_commands::create(
                 &f.state,
@@ -246,6 +256,7 @@ fn ai_selections_on_real_photographs() {
                     into: None,
                     mode: None,
                     invert: false,
+                    bounds: (what == "object").then_some([0.3, 0.2, 0.7, 0.9]),
                 },
             )
             .expect("create");

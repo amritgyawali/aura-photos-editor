@@ -144,6 +144,18 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
     if (!started || !maskTool || !end) return;
     const [sx, sy] = started.start;
     let source: MaskSource | null = null;
+    if (maskTool.kind === 'object') {
+      const bounds: [number, number, number, number] = [Math.min(sx, end[0]), Math.min(sy, end[1]), Math.max(sx, end[0]), Math.max(sy, end[1])];
+      if (bounds[2] - bounds[0] < 0.01 || bounds[3] - bounds[1] < 0.01) return;
+      const tool = maskTool;
+      void write(async () => {
+        const made = await localMasks.create(projectId, photoId, { what: 'object', bounds, into: tool.into, mode: tool.into ? tool.mode : 'add', invert: tool.invert });
+        setMaskMessage(made.message);
+        if (made.maskId) setSelectedMask(made.maskId);
+        setMaskTool(null);
+      });
+      return;
+    }
     if (maskTool.kind === 'linear') {
       if (Math.hypot(end[0] - sx, end[1] - sy) < 0.01) return;
       source = { type: 'linear', start: [sx, sy], end };
@@ -218,6 +230,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             <img src={view === 'original' ? original : (view === 'edited' && overlaid) || (proof ?? edited)} alt={view === 'original' ? 'Original photograph' : 'Edited photograph'} />
             {sketch && maskTool && <svg className="studio-sketch" aria-hidden="true">
               {maskTool.kind === 'brush' ? <polyline points={sketch.map(p => p.join(',')).join(' ')} fill="none" stroke={drag.current?.erase ? '#6cf' : '#f55'} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
+                : maskTool.kind === 'object' && sketch.length === 2 ? <rect x={Math.min(sketch[0]?.[0] ?? 0, sketch[1]?.[0] ?? 0)} y={Math.min(sketch[0]?.[1] ?? 0, sketch[1]?.[1] ?? 0)} width={Math.abs((sketch[1]?.[0] ?? 0) - (sketch[0]?.[0] ?? 0))} height={Math.abs((sketch[1]?.[1] ?? 0) - (sketch[0]?.[1] ?? 0))} fill="none" stroke="#5f5" strokeWidth={2} strokeDasharray="6 4" />
                 : maskTool.kind === 'linear' && sketch.length === 2 ? <line x1={sketch[0]?.[0]} y1={sketch[0]?.[1]} x2={sketch[1]?.[0]} y2={sketch[1]?.[1]} stroke="#f55" strokeWidth={2} />
                   : sketch.length === 2 ? <ellipse cx={sketch[0]?.[0]} cy={sketch[0]?.[1]} rx={Math.abs((sketch[1]?.[0] ?? 0) - (sketch[0]?.[0] ?? 0))} ry={Math.abs((sketch[1]?.[1] ?? 0) - (sketch[0]?.[1] ?? 0))} fill="none" stroke="#f55" strokeWidth={2} /> : null}
             </svg>}

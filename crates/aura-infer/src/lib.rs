@@ -49,6 +49,7 @@
 //! on how many cores answered - so two machines return bit-identical tensors, and
 //! invariant 4 survives contact with the hardware.
 
+pub mod accelerated;
 pub mod backend;
 pub mod batch;
 pub mod ep;

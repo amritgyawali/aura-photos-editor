@@ -83,6 +83,15 @@ stage was running. Not which photograph, not which wedding, not which client, no
 `ops/crash/telemetry.toml` lists every field that can be sent. It is short, and it is meant to be
 read rather than trusted.
 
+### The graphics-card runtime
+
+When ONNX Runtime and DirectML are installed beside AURA (ADR-0103) for the Subject, Sky and
+Objects masks, all of the work happens on your computer. **Your photographs never leave it.**
+Microsoft's licence for DirectML, the component that lets ONNX Runtime use the graphics card,
+says the component may send Microsoft information about how it is used. AURA itself sends
+nothing. If that matters to you, leave the DirectML files out: masking still works, with the
+person segmenter for the subject and the measured detector for the sky, and without Objects.
+
 ## Support bundles
 
 When you ask for help, AURA can produce a bundle of what it decided and why: reasons, confidences,

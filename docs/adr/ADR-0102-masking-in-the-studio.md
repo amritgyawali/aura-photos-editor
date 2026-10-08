@@ -98,6 +98,9 @@ A selection that finds nothing adds no mask and says why.
 
 ## What this does not do yet
 
+*Superseded in part by ADR-0103: Objects, a learned sky and a learned subject now run on ONNX
+Runtime. The first item below is kept as it was written.*
+
 - **Lightroom's Objects tool** (draw around a car and get the car), **a learned sky model** and
   **a subject model trained for "the main subject" rather than "people"**. Each needs a
   segmentation network of a size the bundled pure-Rust interpreter (ADR-0007) runs too slowly:

@@ -3683,6 +3683,8 @@ fn main() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_title("AURA");
             }
+            // The learned masking models load while the window opens. ADR-0103.
+            aura_app::local_mask_commands::warm_up();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

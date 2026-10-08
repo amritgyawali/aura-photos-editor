@@ -2,6 +2,16 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## AI masks on the graphics card: Subject, Sky, Objects - 2026-10-08
+
+- **Subject** now selects whatever the photograph is of (a couple, a bouquet, a car) with a
+  learned model, in about a third of a second on the graphics card.
+- **Sky** selects cloudy and sunset skies correctly, and never a studio backdrop.
+- New **Objects** tool: drag a box around anything and it is selected.
+- These use Microsoft's ONNX Runtime with DirectML, loaded from beside the application. Without
+  it, masking works as before. Run `scripts/fetch-ai-models.sh` to install the runtime and the
+  models. See ADR-0103.
+
 ## Masking in the Studio - 2026-10-08
 
 - New **Masking** section in the photo editor: select the Subject, the Sky or the Background in

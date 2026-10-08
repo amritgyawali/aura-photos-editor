@@ -10,7 +10,9 @@ pub const MATTE_KEY: &str = "studio_retouch_mattes_v1";
 pub const MAX_EDITS: usize = 256;
 pub const MAX_MATTES: usize = 64;
 /// At most this many cells per matte; the renderer refines its edges at full resolution.
-pub const MAX_MATTE_CELLS: usize = 256 * 256;
+/// 512 a side, for the learned masking selections (ADR-0103); the segmenter's own mattes stay
+/// at 256.
+pub const MAX_MATTE_CELLS: usize = 512 * 512;
 pub const MAX_STROKES: usize = 128;
 pub const MAX_POINTS: usize = 8192;
 

@@ -53,12 +53,12 @@ export const MASK_SLIDERS: ReadonlyArray<readonly [keyof MaskParams, string, num
   ['texture', 'Texture', -100, 100, 1],
 ] as const;
 
-export type CreateMask = { what: string; source?: MaskSource | null; into?: string | null; mode?: MaskMode | null; invert?: boolean };
+export type CreateMask = { what: string; source?: MaskSource | null; into?: string | null; mode?: MaskMode | null; invert?: boolean; bounds?: [number, number, number, number] | null };
 
 export const localMasks = {
   list: (projectId: string, photoId: string) => invoke<LocalMasksDto>('local_masks', { input: { projectId, photoId } }),
   create: (projectId: string, photoId: string, request: CreateMask) =>
-    invoke<LocalMasksDto>('create_local_mask', { input: { projectId, photoId, what: request.what, source: request.source ?? null, into: request.into ?? null, mode: request.mode ?? null, invert: request.invert ?? false } }),
+    invoke<LocalMasksDto>('create_local_mask', { input: { projectId, photoId, what: request.what, source: request.source ?? null, into: request.into ?? null, mode: request.mode ?? null, invert: request.invert ?? false, bounds: request.bounds ?? null } }),
   save: (projectId: string, photoId: string, masks: LocalMask[], label: string | null = null) =>
     invoke<LocalMasksDto>('save_local_masks', { input: { projectId, photoId, masks, label } }),
   coverage: (projectId: string, photoId: string, maskId: string) =>
@@ -79,7 +79,7 @@ export function masksOf(recipe: RecipeDto | null): LocalMask[] {
 export function describe(component: MaskComponent): string {
   const verb = component.mode === 'add' ? '+' : component.mode === 'subtract' ? '−' : '∩';
   const source = component.source;
-  const name = source.type === 'matte' ? AI_SELECTIONS.find(([id]) => id === source.what)?.[1] ?? source.what
+  const name = source.type === 'matte' ? AI_SELECTIONS.find(([id]) => id === source.what)?.[1] ?? (source.what === 'object' ? 'Object' : source.what)
     : source.type === 'region' ? AI_SELECTIONS.find(([id]) => id === source.region)?.[1] ?? source.region
       : source.type === 'linear' ? 'Linear gradient' : source.type === 'radial' ? 'Radial gradient'
         : source.type === 'brush' ? 'Brush' : 'Brightness range';

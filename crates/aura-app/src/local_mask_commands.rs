@@ -41,6 +41,17 @@ fn invalid(message: &str) -> AuraError {
     error
 }
 
+/// Start loading the learned masking models in the background. ADR-0103.
+pub fn warm_up() {
+    aura_vision::ai::warm_up();
+}
+
+/// Which learned selections this machine can make: `subject`, `sky`, `objects`.
+#[must_use]
+pub fn installed() -> Vec<(&'static str, bool)> {
+    aura_vision::ai::installed()
+}
+
 /// What every mask command returns: the masks as stored, and the recipe they are in.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,6 +84,10 @@ pub struct CreateMaskInput {
     /// The gradient, ellipse, brush or range, when `what` is `geometry`.
     #[serde(default)]
     pub source: Option<Source>,
+    /// The box drawn around an object, normalised left, top, right, bottom, when `what` is
+    /// `object`.
+    #[serde(default)]
+    pub bounds: Option<[f32; 4]>,
     /// Add to this mask rather than creating one.
     #[serde(default)]
     pub into: Option<String>,
@@ -139,6 +154,7 @@ fn label(what: &str) -> &'static str {
         "radial" => "Radial gradient",
         "brush" => "Brush",
         "luminance" => "Brightness range",
+        "object" => "Object",
         _ => "Mask",
     }
 }
@@ -250,47 +266,104 @@ fn encode(m: &skin::Matte) -> Option<Matte> {
     Some(out)
 }
 
+/// `m` with `other` taken out of it.
+fn without(m: &skin::Matte, other: &skin::Matte) -> skin::Matte {
+    let alpha = (0..m.alpha.len())
+        .map(|i| {
+            let (x, y) = (i % m.width, i / m.width);
+            let (u, v) = (
+                m.bounds[0] + (m.bounds[2] - m.bounds[0]) * (x as f32 + 0.5) / m.width as f32,
+                m.bounds[1] + (m.bounds[3] - m.bounds[1]) * (y as f32 + 0.5) / m.height as f32,
+            );
+            let s = f32::from(m.alpha[i]) / 255.0;
+            ((s * (1.0 - other.at(u, v))).clamp(0.0, 1.0) * 255.0).round() as u8
+        })
+        .collect();
+    skin::Matte { alpha, ..m.clone() }
+}
+
+fn inverse(m: &skin::Matte) -> skin::Matte {
+    skin::Matte {
+        alpha: m.alpha.iter().map(|a| 255 - a).collect(),
+        ..m.clone()
+    }
+}
+
 /// Measure an AI selection. `Err(reason)` when it finds nothing.
+///
+/// The learned models (ADR-0103) are used when they are installed: the subject network for
+/// subject and background, the sky network for sky, the object network for a drawn box. Without
+/// them, subject and background come from the person segmenter and sky from the measured
+/// horizon detector, as before; objects need their model.
 fn measure(
     state: &AppState,
     project: &str,
     photo: PhotoId,
     what: &str,
+    bounds: Option<[f32; 4]>,
 ) -> IpcResult<Result<Matte, String>> {
     let (rgb, width, height) = pixels(state, project, photo)?;
-    let analysis = segmentation(photo, &rgb, width, height)?;
-    let Some(background) = analysis.background.as_ref() else {
-        return Ok(Err(
-            "The person segmenter could not run on this photograph.".into(),
-        ));
+    let people = || -> IpcResult<Result<Arc<skin::Analysis>, String>> {
+        let analysis = segmentation(photo, &rgb, width, height)?;
+        Ok(if analysis.background.is_some() {
+            Ok(analysis)
+        } else {
+            Err("The person segmenter could not run on this photograph.".into())
+        })
     };
-    let person = skin::Matte {
-        alpha: background.alpha.iter().map(|a| 255 - a).collect(),
-        ..background.clone()
+    let person_of = |analysis: &skin::Analysis| analysis.background.as_ref().map(inverse);
+    // The subject: the learned network, or the people when it is not installed.
+    let subject = || -> IpcResult<Result<skin::Matte, String>> {
+        if let Ok(found) = aura_vision::ai::subject(&rgb, width, height) {
+            return Ok(Ok(found));
+        }
+        Ok(people()?.and_then(|a| person_of(&a).ok_or_else(|| "No subject found.".into())))
     };
     let found = match what {
-        "subject" | "person" => person,
-        "background" => background.clone(),
-        "sky" => match aura_vision::sky::find(&rgb, width, height) {
-            aura_vision::sky::Finding::Sky(sky) => {
-                // Never the sky through somebody: a person in front of it is not sky.
-                let alpha = (0..sky.alpha.len())
-                    .map(|i| {
-                        let (x, y) = (i % sky.width, i / sky.width);
-                        let (u, v) = (
-                            (x as f32 + 0.5) / sky.width as f32,
-                            (y as f32 + 0.5) / sky.height as f32,
-                        );
-                        let s = f32::from(sky.alpha[i]) / 255.0;
-                        ((s * (1.0 - person.at(u, v))).clamp(0.0, 1.0) * 255.0).round() as u8
-                    })
-                    .collect();
-                skin::Matte { alpha, ..sky }
-            }
-            aura_vision::sky::Finding::None(why) => {
-                return Ok(Err(format!("No sky found: {why}.")));
-            }
+        "subject" => match subject()? {
+            Ok(m) => m,
+            Err(why) => return Ok(Err(why)),
         },
+        "background" => match subject()? {
+            Ok(m) => inverse(&m),
+            Err(why) => return Ok(Err(why)),
+        },
+        "person" => match people()?.map(|a| person_of(&a)) {
+            Ok(Some(m)) => m,
+            Ok(None) => return Ok(Err("No people found.".into())),
+            Err(why) => return Ok(Err(why)),
+        },
+        "object" => {
+            let Some(bounds) = bounds else {
+                return Ok(Err("Draw a box around the object.".into()));
+            };
+            match aura_vision::ai::object(&rgb, width, height, bounds) {
+                Ok(m) => m,
+                Err(why) => return Ok(Err(format!("Objects are not available: {why}."))),
+            }
+        }
+        "sky" => {
+            let sky = match aura_vision::ai::sky(&rgb, width, height) {
+                Ok(Some(m)) => m,
+                Ok(None) => {
+                    return Ok(Err(
+                        "No sky found: no open sky above a horizon in this photograph.".into(),
+                    ))
+                }
+                // No sky model on this machine: the measured detector.
+                Err(_) => match aura_vision::sky::find(&rgb, width, height) {
+                    aura_vision::sky::Finding::Sky(m) => m,
+                    aura_vision::sky::Finding::None(why) => {
+                        return Ok(Err(format!("No sky found: {why}.")));
+                    }
+                },
+            };
+            // Never the sky through somebody: whatever is in front of it is not sky.
+            match subject()? {
+                Ok(front) => without(&sky, &front),
+                Err(_) => sky,
+            }
+        }
         part => {
             fn pick<'a>(p: &'a skin::Person, part: &str) -> Option<&'a skin::Matte> {
                 match part {
@@ -301,18 +374,22 @@ fn measure(
                     _ => None,
                 }
             }
+            let analysis = match people()? {
+                Ok(a) => a,
+                Err(why) => return Ok(Err(why)),
+            };
             let found: Vec<&skin::Matte> = analysis
                 .people
                 .iter()
                 .filter_map(|p| pick(p, part))
                 .collect();
-            if found.is_empty() {
+            let (Some(like), false) = (analysis.background.as_ref(), found.is_empty()) else {
                 return Ok(Err(format!(
                     "No {} found: it needs a face the detector can see.",
                     label(part).to_lowercase()
                 )));
-            }
-            union(&found, background)
+            };
+            union(&found, like)
         }
     };
     if found.area() < 0.001 {
@@ -401,7 +478,7 @@ fn selection(
         return Err(invalid("Unknown selection").into());
     }
     Ok(
-        match measure(state, &input.project_id, photo, &input.what)? {
+        match measure(state, &input.project_id, photo, &input.what, input.bounds)? {
             Ok(matte) => {
                 let bytes = serde_json::to_vec(&matte).map_err(|_| invalid("Bad selection"))?;
                 let id = format!("{}-{}", input.what, &blake3::hash(&bytes).to_hex()[..12]);

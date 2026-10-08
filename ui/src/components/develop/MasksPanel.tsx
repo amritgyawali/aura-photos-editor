@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AI_SELECTIONS, MASK_SLIDERS, describe, type CreateMask, type LocalMask, type MaskMode, type MaskParams } from '../../ipc/localMasks';
 
 /** What the photograph does when it is clicked or dragged while the panel is open. */
-export type MaskTool = { kind: 'linear' | 'radial' | 'brush'; into: string | null; mode: MaskMode; invert: boolean } | null;
+export type MaskTool = { kind: 'object' | 'linear' | 'radial' | 'brush'; into: string | null; mode: MaskMode; invert: boolean } | null;
 export type BrushSettings = { size: number; feather: number; flow: number; erase: boolean };
 
 export type MasksPanelProps = {
@@ -22,6 +22,7 @@ export type MasksPanelProps = {
 };
 
 const DRAWN: ReadonlyArray<readonly [NonNullable<MaskTool>['kind'], string, string]> = [
+  ['object', 'Objects', 'Drag a box around a thing - a car, a bouquet, a dress, a building - and it is selected.'],
   ['linear', 'Linear gradient', 'Drag across the photograph: full effect where you start, none where you let go.'],
   ['radial', 'Radial gradient', 'Drag from the centre outwards: full effect inside the ellipse, fading at its edge.'],
   ['brush', 'Brush', 'Paint over the photograph. Hold Alt, or switch on Erase, to take away.'],
