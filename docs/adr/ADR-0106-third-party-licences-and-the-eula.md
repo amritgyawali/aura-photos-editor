@@ -41,6 +41,16 @@ money that ships numbers derived from those images is the use the licence rules 
    seller's jurisdiction before sale**; it is a starting point, not legal advice.
 5. The audit is release gate `licences` in `ops/release/release.toml`.
 
+## The Instagram downloader is removed
+
+"Instagram style" fetched a public profile's photos by running Python with Instaloader. That cannot
+ship: a customer's computer has no Python, so the button failed for everybody but the developer,
+and Instagram's terms forbid collecting its content by automated means - a risk a paid product
+carries for every copy sold. The command, `aura_cloud::instagram` and its helper script are gone.
+The look matching itself is unchanged and now takes what the photographer already has: a folder of
+reference photos, or their own Instagram data export, read by its layout
+(`MediaSource::InstagramExport`). The tab is now **Match a look**.
+
 ## Result on 2026-10-08
 
 362 crates, 164 npm packages and 9 bundled components; no forbidden licence; 333 distinct licence

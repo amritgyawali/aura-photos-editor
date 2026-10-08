@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use aura_core::contract::look::{LookAggregate, ReferenceOrigin, MIN_REFERENCES};
+use aura_core::contract::look::{LookAggregate, MIN_REFERENCES};
 use aura_core::contract::style::{LightingBucket, StyleDelta};
 use aura_core::progress::CancelToken;
 use aura_core::{PhotoId, ProjectId};
@@ -15,7 +15,6 @@ use aura_render::{FrameSource, RenderLevel};
 use serde::{Deserialize, Serialize};
 
 use crate::{commands::IpcResult, AppState};
-pub use aura_cloud::instagram::FetchReport;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,17 +41,15 @@ struct StoredReference {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyseReferenceInput {
+    /// Whose look this is, for the label: a name, an @handle or a profile address. Optional and
+    /// never fetched - AURA reads only the folder the photographer chose.
     pub address: String,
     pub folder: String,
     pub cancel_id: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FetchInstagramInput {
-    pub address: String,
-    pub limit: u32,
-    pub cancel_id: String,
+    /// The folder is an Instagram "Download your information" export, so its posted media is
+    /// found where Instagram puts it rather than by walking the whole tree.
+    #[serde(default)]
+    pub export: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,31 +91,6 @@ fn profile_path(state: &AppState, id: &str) -> aura_core::AuraResult<PathBuf> {
         .join(format!("{id}.json")))
 }
 
-/// Retrieve publicly accessible images, reporting actual coverage.
-/// # Errors
-/// Invalid profile links, unavailable Python, cancellation, and network failures.
-pub fn fetch_instagram(
-    state: &AppState,
-    input: &FetchInstagramInput,
-) -> IpcResult<aura_cloud::instagram::FetchReport> {
-    let ReferenceOrigin::Instagram { handle } = ReferenceOrigin::parse(&input.address)? else {
-        return Err(refused(
-            "Paste an Instagram profile link, such as https://www.instagram.com/chrisburkard/",
-        )
-        .into());
-    };
-    let root = state
-        .cache_root()
-        .join("instagram-references")
-        .join(uuid::Uuid::new_v4().to_string());
-    let cancel = CancelToken::new();
-    state.register_job(&input.cancel_id, cancel.clone());
-    let result =
-        aura_cloud::instagram::fetch(&handle, &root, input.limit, &cancel, state.clock().as_ref());
-    state.finish_job(&input.cancel_id);
-    Ok(result?)
-}
-
 /// Analyse saved reference pixels before the user imports any target photographs.
 /// # Errors
 /// Missing/insufficient reference images, cancellation, or cache write failure.
@@ -140,7 +112,11 @@ fn analyse(
 ) -> aura_core::AuraResult<ReferenceAnalysis> {
     let reference = aura_look::source::resolve(
         &input.address,
-        aura_core::contract::look::MediaSource::Folder,
+        if input.export {
+            aura_core::contract::look::MediaSource::InstagramExport
+        } else {
+            aura_core::contract::look::MediaSource::Folder
+        },
         Some(Path::new(&input.folder)),
     )?;
     let mut readings = Vec::new();

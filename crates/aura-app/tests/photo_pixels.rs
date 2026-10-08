@@ -175,6 +175,7 @@ fn photo_roundtrip(is_png: bool) {
             address: "https://www.instagram.com/example_photographer/".into(),
             folder: reference_folder.to_string_lossy().into(),
             cancel_id: "analyse-test".into(),
+            export: false,
         },
     )
     .expect("valid photo fixture and successful operation");

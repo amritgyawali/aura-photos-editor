@@ -128,7 +128,6 @@ export type ReferenceAnalysis = {
   brightness: number; contrast: number; warmth: number; saturation: number;
 };
 export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
-export type FetchReport = { folder: string; fetched: number; skipped: number; complete: boolean; message: string };
 export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
 
 export type HslShift = { h: number; s: number; l: number };
@@ -198,8 +197,8 @@ export async function pickLightroomCatalog(): Promise<string | null> {
 }
 
 export const referenceStyle = {
-  fetch: (address: string, limit: number, cancelId: string) => invoke<FetchReport>('fetch_instagram_references', { input: { address, limit, cancelId } }),
-  analyse: (address: string, folder: string, cancelId: string) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId } }),
+  /** Measure a folder of reference photos, or an Instagram data export when `fromExport`. Nothing is downloaded. */
+  analyse: (address: string, folder: string, cancelId: string, fromExport = false) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId, export: fromExport } }),
   apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null) => invoke<ApplyReport>('apply_reference_style', {
     input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null } }),
 };

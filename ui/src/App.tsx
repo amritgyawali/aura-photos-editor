@@ -315,7 +315,7 @@ export function App(): JSX.Element {
     ['start', 'Start', 'Look, reference, photos'],
     ['library', 'Photos', 'Browse your collection'],
     ['edit', 'Auto edit', 'One click, start to finish'],
-    ['look', 'Instagram style', 'Your reference, your photos'],
+    ['look', 'Match a look', 'Your reference, your photos'],
     ['export', 'Export', 'Ready to share'],
     ['advanced', 'Advanced', 'Quality, curation & settings'],
   ];
@@ -351,8 +351,8 @@ export function App(): JSX.Element {
           <div hidden={workspace !== 'start' && workspace !== 'look'} className={workspace === 'start' ? 'start-reference' : undefined}>
             <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}
               onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
-              heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a photographer’s Instagram</h2>
-                <p>Paste a public profile link to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
+              heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a look you love</h2>
+                <p>Choose a folder of reference photos, or your own Instagram data export, to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
           </div>
           {workspace === 'start' && <section className="start-step start-upload" aria-label="Add photos">
             <header className="step-heading"><span className="step-number">3</span><div><span className="eyebrow">YOUR PHOTOS</span><h2>Finish a whole folder, or upload to review first</h2>

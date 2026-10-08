@@ -3259,19 +3259,6 @@ async fn enhance_photo(
 }
 
 #[tauri::command]
-async fn fetch_instagram_references(
-    state: State<'_, AppState>,
-    input: aura_app::reference_style::FetchInstagramInput,
-) -> IpcResult<aura_app::reference_style::FetchReport> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        aura_app::reference_style::fetch_instagram(&app, &input)
-    })
-    .await
-    .map_err(|_| background_request_failed())?
-}
-
-#[tauri::command]
 async fn analyse_reference_style(
     state: State<'_, AppState>,
     input: aura_app::reference_style::AnalyseReferenceInput,
@@ -3781,7 +3768,6 @@ fn main() {
             delete_personal_style,
             apply_edit_profile,
             preview_edit_profile,
-            fetch_instagram_references,
             analyse_reference_style,
             apply_reference_style,
             enhance_photo,

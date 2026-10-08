@@ -9,6 +9,9 @@ All notable changes to AURA. One entry per phase, newest first.
 - The five "Pro Retoucher" profiles are no longer included. They were learned from a data set
   licensed for research only, which a paid product may not use. Your own learned style and the
   sixteen other profiles are unchanged. See ADR-0106.
+- **Instagram style is now Match a look.** Choose a folder of reference photos, or your own
+  Instagram data export. AURA no longer downloads from Instagram: it needed Python on your computer
+  and Instagram's terms do not allow it.
 
 ## Installer and licence - 2026-10-08
 
