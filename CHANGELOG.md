@@ -2,6 +2,18 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Your own style, learned from Lightroom - 2026-10-08
+
+- New **Teach AURA your style** on the start screen: choose your Lightroom Classic catalogue and
+  AURA builds a profile from how you edited every photograph in it - tones, colour, HSL, curves,
+  colour grading, grain, sharpening, vignette and black and white. It appears as **Yours** in the
+  profile gallery, the Studio presets and the whole-folder edit.
+- AURA still measures each photograph's exposure and white balance itself; your profile adds
+  what you consistently do on top.
+- With the original photographs connected, your highlights, shadows, contrast, whites, blacks and
+  exposure adapt to each photograph the way you adjusted them, wherever that predicts your
+  settings better than one fixed value. See ADR-0104.
+
 ## AI masks on the graphics card: Subject, Sky, Objects - 2026-10-08
 
 - **Subject** now selects whatever the photograph is of (a couple, a bouquet, a car) with a

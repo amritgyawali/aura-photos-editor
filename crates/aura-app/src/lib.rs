@@ -66,7 +66,9 @@ pub mod develop_commands;
 pub mod edit_profiles;
 pub mod gallery_commands;
 pub mod learn_commands;
+pub mod lightroom;
 pub mod native_retouch;
+pub mod personal_style;
 pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching

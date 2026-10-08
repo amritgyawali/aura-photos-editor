@@ -17,6 +17,7 @@ aura-jobs    = { path = "../aura-jobs" }
 aura-cache   = { path = "../aura-cache" }
 aura-preview = { path = "../aura-preview" }
 aura-raw     = { path = "../aura-raw" }
+rayon        = { workspace = true }
 aura-infer   = { path = "../aura-infer" }
 aura-models  = { path = "../aura-models" }
 aura-cloud   = { path = "../aura-cloud" }

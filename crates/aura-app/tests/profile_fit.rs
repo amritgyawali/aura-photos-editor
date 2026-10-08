@@ -289,6 +289,7 @@ fn learn_a_profile_from_raw_and_retoucher_pairs() {
         evidence: None,
         swatch: vec!["#000000".into()],
         adjust: adjust.clone(),
+        adaptive: None,
     };
 
     let (mut auto_sum, mut profile_sum, mut neutral_sum, mut oracle_sum) = (0.0, 0.0, 0.0, 0.0);

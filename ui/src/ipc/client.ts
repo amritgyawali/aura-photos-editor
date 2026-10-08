@@ -140,11 +140,15 @@ export type ProfileAdjust = {
 };
 export type EditProfile = {
   id: string; name: string; category: string; tagline: string; description: string; bestFor: string[];
-  technique: string[]; origin: 'researched' | 'learned'; sources: { title: string; url: string }[];
+  technique: string[]; origin: 'researched' | 'learned' | 'personal'; sources: { title: string; url: string }[];
   evidence: { dataset: string; trainingPairs: number; heldOutPairs: number; autoDe00: number; profileDe00: number } | null;
+  /** A personal profile's per-photograph model, when it was learned with the originals at hand. */
+  adaptive?: { photos: number; heldOutGain: Record<string, number> } & Record<string, unknown>;
   swatch: string[]; adjust: ProfileAdjust;
 };
 export type ProfileSelection = { profileId: string; strength: number };
+/** A personal style learned from a photographer's own Lightroom catalogue. */
+export type LearnedStyle = { profile: EditProfile; photos: number; edited: number; findings: string[] };
 export type ApplyProfileReport = { profileId: string; changed: number; protectedFields: string[]; adaptations: string[] };
 export type ProfilePreview = { profileId: string; before: string; after: string; adaptations: string[] };
 
@@ -166,7 +170,20 @@ export const editProfiles = {
     invoke<ApplyProfileReport>('apply_edit_profile', { input: { photoId, profileId, strength } }),
   preview: (profileId: string, strength: number, photoId?: string | null, size?: number) =>
     invoke<ProfilePreview>('preview_edit_profile', { input: { profileId, strength, photoId: photoId ?? null, size: size ?? null } }),
+  /** Learn the photographer's own look from the develop settings in a Lightroom Classic catalogue. */
+  learnLightroom: (catalog: string, name: string) =>
+    invoke<LearnedStyle>('learn_lightroom_style', { input: { catalog, name } }),
+  deletePersonal: (id: string) => invoke<void>('delete_personal_style', { id }),
 };
+
+/** Ask the desktop for a Lightroom Classic catalogue (.lrcat); cancel returns null. */
+export async function pickLightroomCatalog(): Promise<string | null> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: false, multiple: false, title: 'Choose your Lightroom Classic catalogue',
+      filters: [{ name: 'Lightroom catalogue', extensions: ['lrcat'] }] },
+  });
+  return Array.isArray(result) ? result[0] ?? null : result;
+}
 
 export const referenceStyle = {
   fetch: (address: string, limit: number, cancelId: string) => invoke<FetchReport>('fetch_instagram_references', { input: { address, limit, cancelId } }),

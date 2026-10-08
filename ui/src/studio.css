@@ -213,6 +213,14 @@ summary { cursor: pointer; padding: 12px 0; color: var(--muted); }
 .profile-evidence { border-left: 3px solid var(--accent); padding: 8px 12px; background: #2b2533; font-size: 12px !important; }
 .profile-technique ol { margin: 4px 0 8px; padding-left: 20px; font-size: 12px; color: #d7c9e3; line-height: 1.7; }
 .profile-technique a { color: var(--accent); }
+.profile-origin.is-personal { background: #f2d38a; color: #2a1f08; font-weight: 700; }
+.profile-forget { margin-top: 10px; }
+.personal-style { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #1d1924; }
+.personal-style > div:first-child { flex: 1 1 320px; }
+.personal-style p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.personal-style label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); }
+.personal-style-result { flex: 1 1 100%; font-size: 12px; }
+.personal-style-result ul { margin: 6px 0 0; padding-left: 18px; color: #d7c9e3; line-height: 1.6; }
 .start-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 .start-summary span { padding: 7px 13px; border: 1px solid #554760; border-radius: 20px; font-size: 12px; color: var(--muted); }
 .start-summary strong { color: var(--text); font-weight: 600; }

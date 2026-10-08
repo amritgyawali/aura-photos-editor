@@ -129,6 +129,7 @@ dependencies = [
  "fs4",
  "parking_lot",
  "png",
+ "rayon",
  "rusqlite",
  "serde",
  "serde_json",

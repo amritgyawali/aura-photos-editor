@@ -135,6 +135,32 @@ Limits, stated plainly:
   [licence](https://data.csail.mit.edu/graphics/fivek/legal/) before relying on a learned profile
   commercially.
 
+## Your own style, learned from your Lightroom catalogue
+
+On the start screen, **Teach AURA your style** asks for a Lightroom Classic catalogue (`.lrcat`)
+and a name. AURA copies the catalogue, reads how you developed every photograph in it, and builds
+a profile of your own, badged **Yours**, listed first wherever profiles are offered.
+
+What it learns is what you consistently do: your contrast, highlight, shadow, white and black
+handling, texture, clarity and dehaze, vibrance and saturation, HSL, tone curves, colour grading,
+calibration, grain, sharpening, noise reduction, vignette, and black and white. Each is reported
+as a sentence with how often you use it.
+
+What it does not learn is the light. White balance and most of the exposure are measured on every
+new photograph, as they always are, because a value you set for one wedding's light says nothing
+about the next one's.
+
+**Connect the original photographs before learning, if you can.** With the originals where the
+catalogue expects them, AURA measures up to 400 of them and learns how your tonal sliders follow
+the photograph - harder highlight recovery on a bright sky, more shadow lift in a dark church -
+and keeps that only where it predicts your own settings better than one fixed value, on
+photographs it never trained on. On FiveK that took the result from 10.2 to 8.2 ΔE00 from the
+retoucher's final, where one fixed value per slider managed 10.6 to 10.2. Without the originals
+you get one consistent look, which is still yours.
+
+Nothing is written to the catalogue or next to your photographs. Learning again with the same name
+replaces the old profile. Decisions and measurements: ADR-0104.
+
 ## Adding or changing a profile
 
 Profiles live in `crates/aura-app/config/edit_profiles.json`. The table is validated when it loads

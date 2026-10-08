@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { asIpcError, inTauri } from '../../ipc/client';
-import { editProfiles, swatchGradient, type EditProfile, type ProfilePreview, type ProfileSelection } from './profileSelection';
+import { editProfiles, pickLightroomCatalog, swatchGradient, type EditProfile, type LearnedStyle, type ProfilePreview, type ProfileSelection } from './profileSelection';
+import { PersonalStyle } from './PersonalStyle';
 
 type Props = {
   selection: ProfileSelection | null;
@@ -28,10 +29,21 @@ export function ProfileGallery({ selection, disabled, onChange, previewPhotoId }
   const [strength, setStrength] = useState(selection?.strength ?? 1);
   const generation = useRef(0);
 
+  const reload = (): Promise<void> => editProfiles.list().then(setProfiles).catch(cause => setError(asIpcError(cause).message));
   useEffect(() => {
     if (!inTauri()) return;
-    editProfiles.list().then(setProfiles).catch(cause => setError(asIpcError(cause).message));
+    void reload();
   }, []);
+  const learned = (style: LearnedStyle): void => {
+    void reload().then(() => onChange({ profileId: style.profile.id, strength }));
+  };
+  const forget = async (profile: EditProfile): Promise<void> => {
+    try {
+      await editProfiles.deletePersonal(profile.id);
+      if (selection?.profileId === profile.id) onChange(null);
+      await reload();
+    } catch (cause) { setError(asIpcError(cause).message); }
+  };
 
   // Card previews, one at a time so the gallery never competes with an import for the renderer.
   useEffect(() => {
@@ -76,6 +88,7 @@ export function ProfileGallery({ selection, disabled, onChange, previewPhotoId }
       <p>{profiles.length ? `${profiles.length} profiles` : 'Profiles'} built from professional before-and-after edits. Each one adapts to every photo: AURA measures the light first, then adds the look, and softens it where a frame cannot take it.</p>
     </div></header>
     {!inTauri() && <p className="reference-note">Open the AURA desktop app to browse and apply edit profiles.</p>}
+    {inTauri() && <PersonalStyle disabled={disabled} pick={pickLightroomCatalog} learn={editProfiles.learnLightroom} onLearned={learned} />}
     {error && <p role="alert" className="reference-error">{error}</p>}
     {categories.length > 1 && <div className="profile-filters" role="group" aria-label="Profile categories">
       {categories.map(name => <button key={name} type="button" aria-pressed={category === name} onClick={() => setCategory(name)}>{name}</button>)}
@@ -89,7 +102,7 @@ export function ProfileGallery({ selection, disabled, onChange, previewPhotoId }
         className="profile-card" disabled={disabled} onClick={() => onChange({ profileId: profile.id, strength })}>
         <span className="profile-thumb" style={thumbs[profile.id] ? undefined : { background: swatchGradient(profile.swatch) }}>
           {thumbs[profile.id] && <img src={thumbs[profile.id]} alt="" />}
-          <em className={`profile-origin is-${profile.origin}`}>{profile.origin === 'learned' ? 'Learned' : profile.category}</em>
+          <em className={`profile-origin is-${profile.origin}`}>{profile.origin === 'learned' ? 'Learned' : profile.origin === 'personal' ? 'Yours' : profile.category}</em>
         </span>
         <strong>{profile.name}</strong><span>{profile.tagline}</span>
       </button>)}
@@ -105,7 +118,7 @@ export function ProfileGallery({ selection, disabled, onChange, previewPhotoId }
         <label className="compare-control profile-split">Compare<input type="range" min={0} max={100} value={split} onChange={event => setSplit(Number(event.target.value))} aria-label="Before and after divider" /></label>
       </div>
       <div className="profile-about">
-        <span className="eyebrow">{chosen.origin === 'learned' ? 'LEARNED FROM REAL EDITS' : chosen.category.toUpperCase()}</span>
+        <span className="eyebrow">{chosen.origin === 'learned' ? 'LEARNED FROM REAL EDITS' : chosen.origin === 'personal' ? 'YOUR OWN STYLE' : chosen.category.toUpperCase()}</span>
         <h3>{chosen.name}</h3>
         <p>{chosen.description}</p>
         <p className="profile-best">Best for: {chosen.bestFor.join(' · ')}</p>
@@ -118,8 +131,9 @@ export function ProfileGallery({ selection, disabled, onChange, previewPhotoId }
         {chosen.evidence && <p className="profile-evidence">Measured on {chosen.evidence.heldOutPairs} held-out RAW photos it never saw: difference from the retoucher’s final {chosen.evidence.autoDe00.toFixed(1)} → {chosen.evidence.profileDe00.toFixed(1)} ΔE00 (lower is closer). Learned from {chosen.evidence.trainingPairs} pairs · {chosen.evidence.dataset}.</p>}
         <details className="profile-technique"><summary>How this look is built</summary>
           <ol>{chosen.technique.map(step => <li key={step}>{step}</li>)}</ol>
-          {chosen.sources.length > 0 && <p className="reference-note">Sources: {chosen.sources.map((source, index) => <span key={source.url}>{index > 0 && ' · '}<a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></span>)}</p>}
+          {chosen.sources.length > 0 && <p className="reference-note">Sources: {chosen.sources.map((source, index) => <span key={source.url || source.title}>{index > 0 && ' · '}{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a> : source.title}</span>)}</p>}
         </details>
+        {chosen.origin === 'personal' && <button type="button" className="profile-forget" disabled={disabled} onClick={() => void forget(chosen)}>Delete this style</button>}
       </div>
     </div>}
   </section>;

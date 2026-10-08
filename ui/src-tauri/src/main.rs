@@ -3420,8 +3420,36 @@ async fn pick_white_balance(
 }
 
 #[tauri::command]
-async fn list_edit_profiles() -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
-    aura_app::edit_profiles::list_edit_profiles()
+async fn list_edit_profiles(
+    state: State<'_, AppState>,
+) -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::edit_profiles::list_edit_profiles(&state)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_lightroom_style(
+    state: State<'_, AppState>,
+    input: aura_app::personal_style::LearnInput,
+) -> IpcResult<aura_app::personal_style::LearnedStyle> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::personal_style::learn_from_lightroom(&state, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn delete_personal_style(state: State<'_, AppState>, id: String) -> IpcResult<()> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::personal_style::delete(&state, &id))
+        .await
+        .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -3713,6 +3741,8 @@ fn main() {
             live_preview,
             native_retouch_draft_preview,
             list_edit_profiles,
+            learn_lightroom_style,
+            delete_personal_style,
             apply_edit_profile,
             preview_edit_profile,
             fetch_instagram_references,

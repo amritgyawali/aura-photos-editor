@@ -258,12 +258,12 @@ pub fn apply_reference(
     // The baseline is the measured correction, or an edit profile over it: either way it is
     // rebuilt from a neutral develop, so a repeated application never compounds.
     let chosen = match input.profile_id.as_deref() {
-        None | Some("auto") => None,
-        Some(id) => Some(crate::edit_profiles::profile(id)?),
+        None => None,
+        Some(id) => crate::edit_profiles::resolve(state, id)?,
     };
     let baseline = crate::edit_profiles::build(
         &current,
-        chosen,
+        chosen.as_ref(),
         input.profile_strength.unwrap_or(1.0),
         crate::edit_profiles::AutoCorrection::measure(preview)?,
         crate::edit_profiles::SceneStats::measure(preview)?,
