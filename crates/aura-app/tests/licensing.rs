@@ -1,9 +1,5 @@
 //! The trial, the licence key and the one thing they gate: exporting. ADR-0105.
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::disallowed_methods
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::disallowed_methods)]
 
 use std::sync::Arc;
 

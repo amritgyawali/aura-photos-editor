@@ -2,6 +2,14 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Licences and the licence agreement - 2026-10-08
+
+- The installer now shows AURA's licence agreement and installs the notices for every third-party
+  component AURA uses.
+- The five "Pro Retoucher" profiles are no longer included. They were learned from a data set
+  licensed for research only, which a paid product may not use. Your own learned style and the
+  sixteen other profiles are unchanged. See ADR-0106.
+
 ## Installer and licence - 2026-10-08
 
 - AURA now installs from a single Windows setup file, with the graphics-card runtime and the

@@ -46,7 +46,24 @@ for f in ONNXRUNTIME-LICENSE.txt ONNXRUNTIME-ThirdPartyNotices.txt DIRECTML-LICE
 done
 
 win() { cygpath -m "$1" 2>/dev/null || echo "$1"; }
-conf="$(mktemp -d)/tauri.installer.conf.json"
+work="$(mktemp -d)"
+conf="$work/tauri.installer.conf.json"
+
+# Third-party notices: generated from what is actually compiled in, and a licence a paid,
+# closed-source product cannot ship stops the build here (ADR-0106).
+notices="$work/THIRD-PARTY-NOTICES.txt"
+python "$root/scripts/third-party-notices.py" --runtime "$runtime" --out "$notices"   || { echo "build-installer: the licence audit failed - see above" >&2; exit 1; }
+
+# The licence agreement the installer shows. Its bracketed placeholders are the seller's legal name,
+# address, governing law and support address; a release build refuses to ship them unfilled.
+eula="$root/legal/EULA.txt"
+if grep -q '\[[A-Z][A-Z /]*\]' "$eula"; then
+  if [ "${AURA_RELEASE:-0}" = "1" ]; then
+    echo "build-installer: legal/EULA.txt still has [PLACEHOLDERS]; fill them before a release" >&2
+    exit 1
+  fi
+  echo "warn  legal/EULA.txt still has [PLACEHOLDERS] - fine for a test build, not for sale" >&2
+fi
 sign_json=""
 if [ -n "${AURA_SIGN_COMMAND:-}" ]; then
   sign_json=",\"signCommand\": $(printf '%s' "$AURA_SIGN_COMMAND" | python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
@@ -64,11 +81,14 @@ cat > "$conf" <<EOF
       "$(win "$runtime/ONNXRUNTIME-LICENSE.txt")": "licences/ONNXRUNTIME-LICENSE.txt",
       "$(win "$runtime/ONNXRUNTIME-ThirdPartyNotices.txt")": "licences/ONNXRUNTIME-ThirdPartyNotices.txt",
       "$(win "$runtime/DIRECTML-LICENSE.txt")": "licences/DIRECTML-LICENSE.txt",
+      "$(win "$notices")": "licences/THIRD-PARTY-NOTICES.txt",
+      "$(win "$eula")": "licences/EULA.txt",
       "$(win "$runtime/models/isnet_general.onnx")": "models/isnet_general.onnx",
       "$(win "$runtime/models/skyseg.onnx")": "models/skyseg.onnx",
       "$(win "$runtime/models/sam21_tiny_encoder.onnx")": "models/sam21_tiny_encoder.onnx",
       "$(win "$runtime/models/sam21_tiny_decoder.onnx")": "models/sam21_tiny_decoder.onnx"
     },
+    "licenseFile": "$(win "$eula")",
     "windows": { "nsis": { "installMode": "currentUser" }$sign_json }
   }
 }

@@ -85,7 +85,7 @@ export function ProfileGallery({ selection, disabled, onChange, previewPhotoId }
     <header className="step-heading"><span className="step-number">1</span><div>
       <span className="eyebrow">CHOOSE YOUR LOOK</span>
       <h2>Pick an edit profile</h2>
-      <p>{profiles.length ? `${profiles.length} profiles` : 'Profiles'} built from professional before-and-after edits. Each one adapts to every photo: AURA measures the light first, then adds the look, and softens it where a frame cannot take it.</p>
+      <p>{profiles.length ? `${profiles.length} profiles` : 'Profiles'} built from published professional editing techniques. Each one adapts to every photo: AURA measures the light first, then adds the look, and softens it where a frame cannot take it.</p>
     </div></header>
     {!inTauri() && <p className="reference-note">Open the AURA desktop app to browse and apply edit profiles.</p>}
     {inTauri() && <PersonalStyle disabled={disabled} pick={pickLightroomCatalog} learn={editProfiles.learnLightroom} onLearned={learned} />}

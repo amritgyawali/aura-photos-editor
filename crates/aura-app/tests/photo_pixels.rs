@@ -218,30 +218,20 @@ fn photo_roundtrip(is_png: bool) {
         serde_json::Value::from(1.0)
     );
     // An edit profile on the same imported photo: saved, never compounding, the manual exposure
-    // untouched, and gentler because a JPEG or PNG is already developed.
+    // untouched. (How a RAW-learned look is softened on a developed photo is a unit test in
+    // `edit_profiles`; no shipped profile carries one since ADR-0106.)
     let profile = aura_app::edit_profiles::ApplyProfileInput {
         photo_id: photo.clone(),
-        profile_id: "fivek-expert-c".into(),
+        profile_id: "vivid-landscape".into(),
         strength: 1.0,
     };
     let applied = aura_app::edit_profiles::apply_edit_profile(&state, &profile)
         .expect("profile applies to an imported photo");
-    assert!(
-        applied.changed > 0,
-        "a learned profile must change the edit"
-    );
+    assert!(applied.changed > 0, "a profile must change the edit");
     assert!(applied
         .protected_fields
         .iter()
         .any(|f| f == "global.exposure"));
-    assert!(
-        applied
-            .adaptations
-            .iter()
-            .any(|n| n.contains("learned from RAW")),
-        "a developed photo gets the RAW-learned look at reduced strength: {:?}",
-        applied.adaptations
-    );
     let once = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
     aura_app::edit_profiles::apply_edit_profile(&state, &profile).expect("profile again");
     let twice = aura_app::image_recipe(&state, &recipe_input).expect("recipe");
