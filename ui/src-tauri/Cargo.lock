@@ -137,7 +137,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "aura-app"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-brain-gallery",
  "aura-brain-photo",
@@ -187,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "aura-brain-gallery"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -204,7 +204,7 @@ dependencies = [
 
 [[package]]
 name = "aura-brain-photo"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "aura-brain-wedding"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-cloud",
@@ -246,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "aura-cache"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "blake3",
@@ -258,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "aura-catalog"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "blake3",
@@ -274,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "aura-cloud"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -294,7 +294,7 @@ dependencies = [
 
 [[package]]
 name = "aura-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "dirs 5.0.1",
  "parking_lot",
@@ -309,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "aura-cull"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "aura-curate"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-cloud",
@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "aura-delivery"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -354,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "aura-desktop"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-app",
  "aura-core",
@@ -371,7 +371,7 @@ dependencies = [
 
 [[package]]
 name = "aura-explain"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "aura-export"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "aura-generative"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -423,7 +423,7 @@ dependencies = [
 
 [[package]]
 name = "aura-geometry"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "aura-index"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -454,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "aura-infer"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "ort",
@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "aura-ingest"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -490,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "aura-jobs"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -507,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "aura-learn"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "aura-licence"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "ed25519-dalek",
  "serde",
@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "aura-look"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "aura-models"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "aura-infer",
@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "aura-people"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "aura-portrait"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-raw",
  "rayon",
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "aura-preview"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-cache",
  "aura-catalog",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "aura-qc"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-cloud",
@@ -626,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "aura-raw"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "jpeg-encoder",
@@ -640,7 +640,7 @@ dependencies = [
 
 [[package]]
 name = "aura-recipe"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -654,7 +654,7 @@ dependencies = [
 
 [[package]]
 name = "aura-render"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "aura-portrait",
@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "aura-restore"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "aura-retouch"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -704,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "aura-style"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "aura-vision"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
