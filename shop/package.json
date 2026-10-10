@@ -1,0 +1,8 @@
+{
+  "name": "aura-shop",
+  "private": true,
+  "type": "module",
+  "description": "AURA's website and licence server: Paddle checkout, and keys signed with the vendor key. ADR-0107.",
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test" }
+}

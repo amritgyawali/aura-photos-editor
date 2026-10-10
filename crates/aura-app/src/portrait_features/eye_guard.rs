@@ -120,6 +120,7 @@ fn is_blemish(tool: super::Tool) -> bool {
     matches!(
         tool,
         super::Tool::FrequencyHeal
+            | super::Tool::AcneClear
             | super::Tool::PatchHeal
             | super::Tool::Heal
             | super::Tool::AutoBlemish
@@ -133,6 +134,7 @@ fn guarded(
     settings: &super::Settings,
     blemish: bool,
     precise: bool,
+    dark_circle: bool,
 ) -> Option<Matte> {
     let mut alpha = original.decode()?;
     let [l, t, r, b] = original.bounds;
@@ -152,7 +154,9 @@ fn guarded(
             .flat_map(|dy| {
                 [-margin, 0.0, margin].into_iter().map(move |dx| {
                     let at = [point[0] + dx, point[1] + dy];
-                    if precise {
+                    if dark_circle {
+                        lid(g, at)
+                    } else if precise {
                         spot_weight(g, at, settings)
                     } else if blemish {
                         blemish_weight(g, at, settings)
@@ -190,12 +194,15 @@ pub(crate) fn protect<'a>(
     let g = Geometry::new(face, px).ok_or_else(invalid)?;
     let mut created = BTreeMap::new();
     for edit in edits {
+        let dark_circle = is_dark_circle(edit);
         let blemish = is_blemish(edit.tool);
         let precise = matches!(edit.tool, super::Tool::PatchHeal | super::Tool::Heal)
             || (edit.tool == super::Tool::SkinUniformity && edit.id.contains("-spot-deep-"));
         let id = edit.matte.as_ref().map_or_else(
             || {
-                if precise {
+                if dark_circle {
+                    format!("{guard_id}-lid-safe")
+                } else if precise {
                     format!("{guard_id}-spot-feature-guard")
                 } else if blemish {
                     format!("{guard_id}-blemish-feature-guard")
@@ -204,7 +211,9 @@ pub(crate) fn protect<'a>(
                 }
             },
             |id| {
-                if precise {
+                if dark_circle {
+                    format!("{id}-lid-safe")
+                } else if precise {
                     format!("{id}-spot-feature-safe")
                 } else if blemish {
                     format!("{id}-blemish-feature-safe")
@@ -223,13 +232,32 @@ pub(crate) fn protect<'a>(
             };
             created.insert(
                 id.clone(),
-                guarded(&g, px, source, settings, blemish, precise).ok_or_else(invalid)?,
+                guarded(&g, px, source, settings, blemish, precise, dark_circle)
+                    .ok_or_else(invalid)?,
             );
         }
         edit.matte = Some(id);
     }
     mattes.extend(created);
     Ok(())
+}
+
+pub(super) fn lid(g: &Geometry, point: [f32; 2]) -> f32 {
+    g.eyes.iter().fold(1.0_f32, |weight, eye| {
+        let dx = point[0] - eye[0];
+        let dy = point[1] - eye[1];
+        let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
+        let down = (dx * g.v[0] + dy * g.v[1]) / g.d + 0.03;
+        let distance = (across / 0.26).hypot(down / if down < 0.0 { 0.24 } else { 0.095 });
+        let t = ((distance - 1.0) / 0.4).clamp(0.0, 1.0);
+        weight.min(t * t * (3.0 - 2.0 * t))
+    })
+}
+
+/// A measured dark-circle correction: it works on the skin under the eye, so it is kept off
+/// the eye itself by [`lid`] rather than out of the whole socket.
+pub(crate) fn is_dark_circle(edit: &Edit) -> bool {
+    edit.tool == super::Tool::UnderEye && edit.source.is_some()
 }
 
 #[cfg(test)]
@@ -295,6 +323,48 @@ mod tests {
                 [0.6, 0.72],
             ],
         }
+    }
+
+    #[test]
+    fn measured_dark_circle_mask_keeps_lids_safe_with_detail_switches_off() {
+        let photo = [150_u8, 100, 75].repeat(256 * 256);
+        let px = Pixels::new(&photo, 256, 256).unwrap();
+        let mut edits = [super::super::base_edit(
+            "dark-circle".into(),
+            Tool::UnderEye,
+            1.0,
+            &px,
+            [128., 128., 256., 256.],
+        )];
+        edits[0].source = Some([0.3, 0.7]);
+        let settings = super::super::Settings {
+            protect_eye_area: false,
+            protect_nose_detail: false,
+            ..Default::default()
+        };
+        let mut mattes = BTreeMap::new();
+        protect(
+            &face(),
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "safe",
+            &settings,
+        )
+        .unwrap();
+        let matte = &mattes[edits[0].matte.as_ref().unwrap()];
+        let alpha = matte.decode().unwrap();
+        for x in [0.35, 0.65] {
+            for y in [0.38, 0.40, 0.415] {
+                let index = (y * 256.) as usize * 256 + (x * 256.) as usize;
+                assert_eq!(alpha[index], 0, "lid or lashes were selected");
+            }
+            assert!(
+                alpha[(0.46 * 256.) as usize * 256 + (x * 256.) as usize] > 0,
+                "safe under-eye skin must remain available"
+            );
+        }
+        assert!(!matte.refine_edges);
     }
 
     #[test]

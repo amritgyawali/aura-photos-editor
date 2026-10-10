@@ -29,6 +29,13 @@ blocking = true
 why     = "unwrap, panic, a socket outside aura-cloud, a key written anywhere it can be read back. Every one of these is a shortcut a hurried change makes."
 
 [[gate]]
+id      = "licences"
+command = "python scripts/third-party-notices.py --out target/THIRD-PARTY-NOTICES.txt"
+owner   = "CTO"
+blocking = true
+why     = "A GPL dependency, an unlicensed package or a research-only data set in a paid product is a legal problem that no later fix undoes for the copies already sold. ADR-0106."
+
+[[gate]]
 id      = "clippy"
 command = "cargo clippy --workspace --all-targets -- -D warnings"
 owner   = "DEVOPS"

@@ -30,7 +30,7 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['edgeSoftness', 'Mask edge softness', 'unit', 'How gradually the retouch fades out at the edge of the skin.'],
     ['protectFacialHair', 'Protect beard and stubble', 'toggle', 'Never smooth facial hair.'],
     ['protectNoseDetail', 'Preserve nose detail', 'toggle', 'Protects nose shape and shading from broad finishing. Measured local spot repair treats nose skin while excluding nostril openings and the underside crease.'],
-    ['protectEyeArea', 'Protect eyes and surrounding skin', 'toggle', 'Keeps eyelids, inner corners and natural eye shadows unchanged by automatic retouch. Turn off only when you want the eye controls to work there. Manual retouch is always available.'],
+    ['protectEyeArea', 'Protect eyes and surrounding skin', 'toggle', 'Protects eyelids and inner corners from automatic retouch. Measured dark-circle correction can treat skin below the lashes; other automatic tools avoid the surrounding eye area. Manual retouch is available.'],
   ]],
   ['Skin', [
     ['smoothing', 'Skin smoothing', 'unit', 'Mid-scale unevenness between pores and facial form. 50% is the measured amount.'],
@@ -51,7 +51,7 @@ export const SETTING_GROUPS: [string, Control[]][] = [
   ['Blemishes', [
     ['deepBlemishCleanup', 'Deep blemish cleanup', 'toggle', 'Search the complete segmented face at multiple spot sizes. Eyes, brows, lips and creases remain protected.'],
     ['removeDarkMarks', 'Remove dark marks', 'toggle', 'Include compact dark spots in deep cleanup. This may also remove freckles or beauty marks; review the result.'],
-    ['frequencyHeal', 'Frequency healing', 'unit', 'Rebuilds the tone under every compact mark from the clean skin around it and keeps the pores. Runs first; spot repairs then handle what it left. Off at 0%.'],
+    ['frequencyHeal', 'Frequency healing', 'unit', 'Runs first: rebuilds the tone under measured compact marks from nearby clean skin while retaining pore texture. Local donor repairs follow for remaining detected spots. Off at 0%.'],
     ['blemishSensitivity', 'Blemish sensitivity', 'unit', 'How small a departure still counts as a spot.'],
     ['maxSpots', 'Most spots per face', 'count', 'Raise this for dense acne. Larger passes take longer; remaining measured candidates are reported for review.'],
     ['keepFreckles', 'Keep freckles', 'toggle', 'A field of many small marks is treated as freckles and kept.'],
@@ -125,7 +125,7 @@ export const PRESETS: Preset[] = [
 const percent = (v: number) => `${Math.round(v * 100)}%`;
 
 /** Choose what the automatic retouch works on and how strongly, then run it. */
-export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: { disabled: boolean; busy?: boolean; onRun: (options: AutoRetouchOptions) => void; recipe?: RecipeDto | null }) {
+export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollection, recipe }: { disabled: boolean; busy?: boolean; onRun: (options: AutoRetouchOptions) => void; onRunCollection?: (options: AutoRetouchOptions) => void; recipe?: RecipeDto | null }) {
   const [options, setOptions] = useState<AutoRetouchOptions>(() => readRetouchPreferences(recipe));
   const [preset, setPreset] = useState(() => options.intensity === 1 &&
     (Object.keys(DEFAULT_RETOUCH_SETTINGS) as (keyof RetouchSettings)[]).every(key =>
@@ -167,9 +167,11 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
     <p className="lr-hint">{scope?.[2]} Skin is found by AI segmentation and measured against the same person's own skin; every result becomes an ordinary operation you can adjust, disable or remove below.</p>
     {settings.deepBlemishCleanup && <p className="lr-hint">Deep cleanup searches the full detected face. {settings.removeDarkMarks ? 'Dark-mark removal is on and can also remove freckles or beauty marks. Review the before/after.' : 'Dark marks are protected.'}</p>}
     {(settings.frequencyHeal > 0 || settings.textureGraft > 0) && <p className="lr-hint">{settings.frequencyHeal > 0 ? 'Frequency healing rebuilds the tone under each mark first and keeps the pores. ' : ''}{settings.textureGraft > 0 ? 'Texture restore runs last and restores the original pores within the selected skin. Protected details stay unchanged.' : ''}</p>}
-    {settings.protectEyeArea && options.scope !== 'body' && <p className="lr-hint">Eye protection is on. Automatic face retouch leaves eyelids, inner corners and natural eye shadows alone, including when eye controls are enabled. Use Show retouched areas to inspect the saved selection. You can change this under Skin detection.</p>}
+    {settings.protectEyeArea && options.scope !== 'body' && <p className="lr-hint">Eye protection is on. Eyelids and inner corners stay protected. Measured dark-circle correction can treat skin below the lashes; other automatic tools avoid the surrounding eye area. Use Show retouched areas to inspect the saved selection.</p>}
     {settings.protectNoseDetail && options.scope !== 'body' && <p className="lr-hint">Local spot repair includes nose skin. Nostril openings and the underside crease stay protected; broad healing and finishing preserve the wings and nose shading.</p>}
     <button type="button" className="retouch-primary" disabled={disabled || busy} onClick={() => onRun(options)}>{busy ? 'Detecting and retouching…' : `Auto retouch: ${scope?.[1] ?? 'Face'}`}</button>
+    {onRunCollection && <><button type="button" disabled={disabled || busy} onClick={()=>onRunCollection(options)}>Apply cleanup settings to this collection</button>
+      <p className="lr-hint">Uses these settings on each photo, with a fresh skin selection and repairs for that photo. Manual edits and exposure remain saved.</p></>}
     <details>
       <summary>Strength and details</summary>
       <label>Strength: {label} ({Math.round(options.intensity * 100)}%)

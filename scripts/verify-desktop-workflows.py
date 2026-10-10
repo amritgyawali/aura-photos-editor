@@ -62,7 +62,7 @@ def main():
             expect(page.get_by_role('button', name='Retouch', exact=True)).to_be_enabled(timeout=180000)
 
         def navigation():
-            expected = ['Start', 'Photos', 'Auto edit', 'Instagram style', 'Export', 'Advanced']
+            expected = ['Start', 'Photos', 'Auto edit', 'Match a look', 'Export', 'Advanced']
             assert page.locator('.studio-nav strong').all_text_contents() == expected
             for name in expected:
                 nav(name)

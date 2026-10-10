@@ -1,0 +1,63 @@
+AURA PHOTO STUDIO - END USER LICENCE AGREEMENT
+
+Amrit Gyawali, Kathmandu, Nepal ("we", "us") licenses AURA Photo Studio (the "Software") to you on
+the terms below. By installing or using the Software you agree to them. If you do not agree, do not
+install or use it.
+
+1. TRIAL
+You may use the Software free of charge for 14 days from the first time it runs on your computer.
+During the trial every feature is available. After the trial you may keep using the Software to view
+and edit your photographs, but exporting finished photographs requires an active subscription.
+
+2. SUBSCRIPTION AND LICENCE
+Subscriptions are sold by our reseller, Paddle.com, which is the merchant of record for every order
+and whose buyer terms apply to the purchase. While your subscription is active and paid, we grant
+you a non-exclusive, non-transferable licence to install and use the Software, for your own
+photographic work and that of your business, on computers that you personally use. You receive a
+licence key in your name; the Software renews it automatically over the internet before each paid
+period ends, sending only your subscription number and email address. If you cancel, the licence
+continues to the end of the period you have paid for and then ends; you can keep editing, but
+exporting finished photographs stops until you subscribe again.
+
+3. RESTRICTIONS
+You may not: (a) share, publish, sell or give away your licence key, or let other people use the
+Software under it; (b) remove or alter the licence check, or help anybody else to do so; (c) rent,
+lease or sublicense the Software; (d) reverse engineer, decompile or disassemble the Software, except
+to the extent the law where you live allows this despite this restriction.
+
+4. YOUR PHOTOGRAPHS AND YOUR DATA
+Your photographs, edits, catalogues and exported files belong to you. The Software works on your own
+computer. It does not upload your photographs or your edits to us. The licence check happens on your
+computer; the only thing the Software sends us is the renewal request described in section 2. If you
+choose to connect a third-party AI service using your own account and key, what you send to that
+service is governed by your agreement with it, and the Software tells you before anything is sent.
+
+5. THIRD-PARTY COMPONENTS
+The Software includes components owned by others, used under their own licences. Those licences and
+notices are in the "licences" folder where the Software is installed, and they apply to those
+components in place of these terms where they say so.
+
+6. UPDATES AND SUPPORT
+Updates released while your subscription is active are included. Support is by email at the
+address below.
+
+7. WARRANTY AND LIABILITY
+The Software uses automated analysis that can be wrong; you remain responsible for checking the
+photographs you deliver to your clients. To the extent the law allows, the Software is provided
+"as is", without warranties of any kind, and we are not liable for any indirect, incidental, special
+or consequential loss, or for loss of data, revenue or business. To the extent the law allows, our
+total liability under this agreement is limited to the amount you paid for the Software in the
+twelve months before the claim. Nothing in this agreement limits liability that cannot be limited by
+law, or your statutory rights as a consumer.
+
+8. TERMINATION
+This licence ends automatically if you break these terms. When it ends you must stop using the
+Software; your photographs and edits remain yours.
+
+9. GENERAL
+This agreement is governed by the laws of Nepal, and the courts of Kathmandu have jurisdiction,
+unless the law where you live as a consumer gives you the right to bring a claim where you live. If
+any part of it is unenforceable, the rest still applies. It is the whole agreement between us about
+the Software.
+
+Contact: amritgyawali999@gmail.com

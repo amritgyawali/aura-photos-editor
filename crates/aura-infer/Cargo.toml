@@ -16,6 +16,11 @@ serde       = { workspace = true }
 serde_json  = { workspace = true }
 time        = { workspace = true }
 tracing     = { workspace = true }
+# ONNX Runtime, loaded from the DLL shipped beside the application (never linked, never
+# downloaded at build time), with the DirectML execution provider for the graphics card.
+# ADR-0103.
+ort         = { version = "=2.0.0-rc.12", default-features = false, features = ["std", "load-dynamic", "directml", "api-24"] }
+sha2        = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

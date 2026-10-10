@@ -222,6 +222,9 @@ pub struct Plan {
     pub groups: BTreeMap<Group, Vec<Edit>>,
     /// Segmentation mattes the planned operations refer to, by id. ADR-0082.
     pub mattes: BTreeMap<String, Matte>,
+    /// Segmented people and background reused by the advanced retouch stages.
+    pub people: Vec<skin::Person>,
+    pub background: Option<skin::Matte>,
 }
 
 /// The mattes a stack written from `plan` needs: the recipe's own (for operations a person
@@ -327,7 +330,7 @@ pub fn plan_with_faces(
         message: String::new(),
         faces: Vec::new(),
         assessments: Vec::new(),
-        planner_version: format!("sample-consensus-v3+{}", portrait_features::VERSION),
+        planner_version: format!("sample-consensus-v6+{}", portrait_features::VERSION),
         steps: Vec::new(),
         scene: None,
         options: Some(options),
@@ -342,6 +345,8 @@ pub fn plan_with_faces(
             report,
             groups,
             mattes,
+            people: Vec::new(),
+            background: None,
         });
     }
     let settings = options.settings;
@@ -400,6 +405,8 @@ pub fn plan_with_faces(
             report,
             groups,
             mattes,
+            people: segmentation.people,
+            background: segmentation.background,
         });
     }
     let main = settings
@@ -749,6 +756,23 @@ pub fn plan_with_faces(
                 features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Blemish repair includes nose skin while protecting nostrils and the underside crease. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected from broad smoothing and tone changes" } else { "adjustable" }));
             }
         }
+        if !settings.protect_eye_area && !settings.protect_nose_detail && options.scope.face() {
+            // Measured dark-circle correction must always stay off lids and lashes,
+            // even when the optional broad detail exclusions are disabled.
+            if let Some(px) = &detail_pixels {
+                portrait_features::eye_guard::protect(
+                    face,
+                    px,
+                    features
+                        .eyes
+                        .iter_mut()
+                        .filter(|edit| portrait_features::eye_guard::is_dark_circle(edit)),
+                    &mut mattes,
+                    &format!("{PREFIX}{index}-feature-guard"),
+                    &settings,
+                )?;
+            }
+        }
         features.finishing.extend(garments);
         // A manually adjusted automatic step occupies its original slot. Do not add a
         // second automatic correction on top, including when the user disabled that step.
@@ -899,6 +923,8 @@ pub fn plan_with_faces(
         report,
         groups,
         mattes,
+        people: segmentation.people,
+        background: segmentation.background,
     })
 }
 
@@ -1833,7 +1859,7 @@ fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
 
 /// The matte shrunk by `cells` on every side (a minimum filter), so an operation that reads
 /// pixels around itself never reaches what lies outside the matte.
-fn erode(m: &skin::Matte, cells: usize) -> skin::Matte {
+pub(crate) fn erode(m: &skin::Matte, cells: usize) -> skin::Matte {
     let (w, h) = (m.width, m.height);
     let mut rows = vec![0_u8; w * h];
     for y in 0..h {
@@ -3065,6 +3091,7 @@ mod tests {
             .all(|e| !e.id.ends_with("body-match")));
         let sample = sample_quality(&rgb, 200, 300, [100.0, 60.0]).unwrap();
         let settings = Settings {
+            match_body_to_face: 0.5,
             body_redness: 0.5,
             body_blemishes: 0.5,
             neck_lines: 0.5,

@@ -55,7 +55,7 @@ providers and Instagram network retrieval were not exercised.
 
 Original nose-exclusion result: 41,547 eye/nose preview pixels were unchanged.
 Visual inspection found remaining circular repair boundaries on the lower cheek/chin
-and untreated nose acne. The user then requested nose coverage. ADR-0092 supersedes
+and untreated nose acne. The user then requested nose coverage. ADR-0108 supersedes
 the old whole-nose exclusion for blemish tools; results above describe the earlier
 build and do not establish the newer nose-inclusive behavior.
 
@@ -277,7 +277,7 @@ versions. The protected nose-regression rectangles also remained unchanged
 
 The user requests healing all visible skin, including nose, forehead, cheeks,
 neck, hands, body and legs, with spot-healing quality comparable to Retouch4me.
-ADR-0094 records the local algorithm changes and the required evidence.
+ADR-0110 records the local algorithm changes and the required evidence.
 
 Two baseline regressions failed: a red spot on a smooth illumination gradient
 produced no repair, and the residual patch left a red-channel value of 0.5196
@@ -538,3 +538,109 @@ No 100% removal, professional-quality equivalence, Evoto-equivalence or
 Retouch4me-equivalence claim is supported. Real legs and varied group portraits
 were not exercised. The tested app is left open on the full-edit collection's
 first photo in original color, with split comparison and coverage off.
+
+
+## Current studio integration and collection cleanup - 2026-10-11
+
+The working checkout is `C:\Users\amrit\aura-eye-protection`, branch
+`fix/eye-protection-and-retouch-coverage`. Snapshot `9793c6e` was committed,
+pushed and published as [PR #52](https://github.com/amritgyawali/aura-photos-editor/pull/52)
+before continuing implementation. The subsequent integration merges main
+`4276486f7c3c1ed51b1f6897f9635f56a58f7f2c`, including its current native
+advanced-retouch, blemish-brush, local-mask and full-quality preview workspace.
+
+Collection cleanup synchronizes settings, with fresh independent native analysis
+for each photo and an explicit stop-after-current-photo control (ADR-0111).
+The automatic planner remains frequency healing followed by checked local repairs;
+manual Acne Clear remains available. Current planner identity is
+`sample-consensus-v6+measured-features-v20`. Legacy saved operations retain their
+rendering semantics. Measured under-eye corrections always protect lids and lashes,
+even with optional broad detail guards switched off.
+
+The initial integrated native build (`4cf71387c6b9499d4f83c195de435645d724acd3e264840606426f34a4a20c0e`)
+launched and passed six-workspace navigation, import, individual cleanup, initial
+collection editing and manual-exposure preservation. Its repeat-edit test did not
+complete: the app reported a fatal 8 MiB allocation failure while development
+tools were also running. This run is a failed stability result, not export or
+quality validation. Inspection found strong references in the latest-preview-pair
+list outside the checkpoint cache budget. ADR-0112 bounds these separately and
+reduces finished-preview retention without changing resolution or pixels. A new
+executable and native retest are required for acceptance.
+
+Feature scope and remaining commercial-workflow gaps are documented in
+[Evoto-style workflows](evoto-style-workflows.md). This integration does not
+establish 100% removal, complete commercial-tool parity or Evoto-equivalent quality.
+
+### Final retest after the memory fix
+
+The native runtime executable SHA-256 is
+`20bf4544c174c97ea2f7b3b1b470aeb1e02260229dd36321c7ed22865b1a321d`.
+Only a Rust documentation backtick correction followed this build; no runtime
+code changed. The desktop was launched in the isolated catalog and WebView profile
+under `output/spot-healing-2026-10-10`. Trial status permitted exports without an
+activation bypass. Final evidence is `output/evoto-workflow-2026-10-11/final-validation.json`.
+
+- All 443 affected Rust library tests and 732 interface tests passed. Strict
+  workspace/all-target Clippy, formatting, banned-pattern checking, 83 locked
+  contracts, signed model/card checks (26 manifests, 58 files), frontend build
+  and native desktop build passed locally. The captured real-photo spot regression
+  passed with its absolute input path, including healthy-context and multiple
+  clean-texture-donor checks.
+- `verify-desktop-workflows.py --skin-cleanup` passed all eleven checks in
+  **Desktop workflows 022011 verification**: navigation, three-photo import,
+  individual cleanup, collection editing, restored settings, manual exposure,
+  repeat editing, undo/redo, comparison, verified export, and advanced panels.
+  Export readback dimensions were 2048×3072, 1333×2000 and 1333×1050, and all three
+  source copies retained their original hashes.
+- `verify-collection-retouch.py` exercised the new cleanup-sync button. Stopping
+  after the current photo saved one and left the other two recipes unchanged.
+  A complete run retouched all three, with zero failures/skips and each original
+  grade preserved. Saved counts were 480, 204 and 1 operations, each with planner
+  identity `sample-consensus-v6+measured-features-v20`.
+- `verify-full-retouch-integrity.py` passed on both collection portraits at full
+  resolution against otherwise identically graded baselines. First-portrait eye
+  regions (93,916 pixels) and independently inspected nostril openings (2,490
+  pixels) had zero RGB change. Its named shadow region changed only within saved
+  compact repairs: 162 of 9,353 pixels, maximum channel delta 12, maximum coarse
+  relative change 0.6622%, and no broad-operation change. Second-portrait eyes
+  (12,140 pixels), nostril cores (645 pixels) and the prior nose-wing regression
+  region (720 pixels) all had zero RGB change. Diagnostic recipe changes were
+  reversed and the exact hashes restored.
+- `verify-body-only-retouch.py` confirmed 114,602 selected pixels, 20,384 changed
+  selected pixels, no required face detection, and zero changes to unselected
+  pixels. This exercises the visible neck and arm skin in the supplied crop;
+  it is not a real-leg or varied-body dataset.
+- `verify-advanced-retouch-ui.py` ran all eighteen reported stages on the second
+  portrait and exported a verified 1333×2000 JPEG. Internal checks passed:
+  texture retention 1.014211, skin shift 0.001655, mirror balance 1.062878 and no
+  measured clipping. These averaged checks do not establish commercial-quality
+  equivalence. The exported full photo and face detail were inspected visually.
+- Manual brush save/removal, operation coverage, read-only zoom/opacity, split
+  comparison, all four diagnostic views and failed-preview recovery passed.
+  Grayscale used `grayscale(1)`, high contrast additionally `contrast(4)`, and low
+  contrast `contrast(0.25)` on both comparison sides; coverage stayed unfiltered,
+  and recipes and native pixel hashes remained unchanged.
+- The dedicated blemish brush saved three actual UI dabs as one Acne Clear
+  operation. `verify-blemish-brush-integrity.py` measured 2,143 changed pixels,
+  maximum RGB channel delta 26, and zero changes outside the painted footprints.
+  Undo/redo restored its exact recipe. Its full-resolution JPEG export was verified
+  and the original hash retained. The inspected dabs still leave some target marks.
+- A normal WM_CLOSE restart changed owned process 18780 to 22256.
+  `verify-retouch-restart.py --verify` matched all six saved recipes and their
+  full-resolution RGB hashes across the restart, including the new three-photo
+  collection, the manual blemish brush and the advanced portrait result. The harness
+  now waits for the debug endpoint and native bridge during startup.
+
+During the retest the sampled native peak working set was about 1.3 GiB and peak
+private memory about 1.9 GiB. The initial allocation failure remains recorded above;
+the successful retest ran without a compiler alongside it. These measurements are
+not a universal memory/stability guarantee. Optional model/provider flows and the
+complete cross-platform CI matrix were not run in this local native audit.
+
+The final visual verdict remains **quality_target_met = false**. Whole-photo and
+face-detail review shows substantial cleanup with preserved tested eye/nose
+structure, but residual nose, forehead, cheek and chin marks and visible pores
+remain in the heavy-acne portrait. Even the additional brush dabs did not remove
+every target mark. Dedicated arbitrary hair-color selection, background replacement
+with transparency/contact shadows, face/body reshaping and the entire commercial
+tool catalogue remain gaps; general sliders are not represented as those features.

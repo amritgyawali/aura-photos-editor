@@ -468,6 +468,7 @@ pub fn export_run_with_watermark(
     input: ExportJobInput,
     watermark: Option<Watermark>,
 ) -> IpcResult<ExportStatusDto> {
+    crate::licensing::require_export(state)?;
     let project = parse_project(&input.project_id)?;
     let job = build_job(&input)?;
     let field = ExportField::new(state, project)?;

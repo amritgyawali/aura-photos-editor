@@ -1,7 +1,8 @@
 """Exercise preview failure/retry and undo/redo in an isolated native test catalog.
 
-Run after verify-professional-retouch.py. The one simulated failure affects only a
-read-only preview request. Undo is reversed by Redo and the recipe hash is checked.
+Run after verify-professional-retouch.py. A simulated unavailable preview affects
+both progressive qualities until the hook is restored. Only read-only requests
+are intercepted. Undo is reversed by Redo and the recipe hash is checked.
 """
 import argparse
 import json
@@ -42,12 +43,10 @@ def main():
             // Tauri freezes invoke; intercept only its read-only preview transport.
             window.__auraRecoveryOriginalFetch = window.fetch;
             window.__auraRecoveryOriginalPost = window.chrome.webview.postMessage;
-            let failed = false;
             window.chrome.webview.postMessage = function(message) {
                 let data;
                 try { data = typeof message === 'string' ? JSON.parse(message) : message; } catch { /* Non-IPC message. */ }
-                if (!failed && data?.cmd === 'native_retouch_preview') {
-                    failed = true;
+                if (data?.cmd === 'native_retouch_preview') {
                     window.__TAURI_INTERNALS__.runCallback(data.error,
                         {code: 'TEST-PREVIEW', message: 'Simulated preview unavailable', runbookUrl: '', retryable: true});
                     return;
@@ -56,8 +55,7 @@ def main():
             };
             window.fetch = (input, ...args) => {
                 const url = typeof input === 'string' ? input : input.url;
-                if (!failed && url.endsWith('/native_retouch_preview')) {
-                    failed = true;
+                if (url.endsWith('/native_retouch_preview')) {
                     return Promise.resolve(new Response(JSON.stringify({code: 'TEST-PREVIEW', message: 'Simulated preview unavailable', runbookUrl: '', retryable: true}),
                         {headers: {'Content-Type': 'application/json', 'Tauri-Response': 'error'}}));
                 }

@@ -8,7 +8,7 @@ back through. Nothing leaves your computer and your original file is never chang
 
 | Step | What AURA measures | What it changes |
 |---|---|---|
-| 1. Light & colour | Brightness spread, neutral areas (faces ignored), how colourful the frame already is, haze, noise, whether it is a portrait, landscape, low-light or general scene | Exposure, highlights, shadows, contrast, white balance (only part of a cast is removed, so warm rooms stay warm), vibrance, clarity (never on portraits), dehaze, noise reduction, sharpening (skin masked on portraits) |
+| 1. Light & colour | Brightness spread, neutral areas (faces ignored), how colourful the frame already is, haze, noise, whether it is a portrait, landscape, low-light or general scene | Exposure, highlights, shadows, contrast, white balance (only a cast the whites confirm, and only part of it, so warm rooms stay warm), vibrance, clarity (never on portraits), dehaze, noise reduction, sharpening (skin masked on portraits) |
 | 2. Sky balance | A bright sky above a measured horizon | A soft gradient that darkens only the bright sky pixels |
 | 3. Skin | Each face's own skin, sampled from its cheeks and forehead | Texture smoothing that keeps fine detail, tone evening, gentle local light |
 | 4. Blemishes | Small spots that are **redder** than the skin around them | Each spot healed separately with nearby skin. Darker marks that are not redder — moles, freckles, beauty marks — are kept and counted |
@@ -74,13 +74,16 @@ and each body operation has an ordinary brush mask you can erase.
 
 **White balance** is corrected only when independent readings agree: the near-neutral areas,
 the average colour of edges, and the brightest unclipped tones. If the brightest tones are
-neutral, the light is neutral and the colour elsewhere belongs to the scene. If all three
-show the same cast, most of it is removed; if only two do, about half to two thirds. A strong
+neutral, the light is neutral and the colour elsewhere belongs to the scene. A cast is removed
+only when all three show it - most of it, and a little less of a strong one, so warm rooms
+stay warm. When only the first two agree, the colour is kept: one large coloured surface - a
+pink backdrop, a painted wall, golden-hour light - moves both of them the same way. A strong
 colour with no people in frame is kept as the light's mood, and so is a toned monochrome.
 
 What this cannot know: a blouse that is pale pink rather than white, a wall that is cream
-rather than lit warm, or a matte look that keeps its whites low on purpose. Each of those is
-read as light, and corrected. Check coloured backdrops and deliberate looks before delivery.
+rather than lit warm, or a matte look that keeps its whites low on purpose. When such a
+surface is the brightest neutral thing in the frame, it is read as light and corrected. Check
+coloured backdrops and deliberate looks before delivery.
 
 ## Going back and editing by hand
 

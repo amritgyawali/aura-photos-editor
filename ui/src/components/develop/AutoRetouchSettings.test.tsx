@@ -132,7 +132,7 @@ it('returns the spot limit to the ordinary range when deep cleanup is disabled',
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ deepBlemishCleanup: false, maxSpots: 24 }) }));
 });
 
-it('offers a professional preset: frequency healing first, real texture back last', () => {
+it('offers a professional preset: acne clear first, real texture back last', () => {
   const run = vi.fn();
   render(<AutoRetouchSettings disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Professional retouch' }));

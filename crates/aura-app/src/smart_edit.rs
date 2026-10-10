@@ -586,14 +586,19 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace]) -> Neutral 
             reason: "a strong colour with no people in frame reads as the light's mood (sunset, blue hour or stage light)",
         };
     }
+    // The gray-pixel and gray-edge estimates agree with each other on any frame dominated by
+    // one colour: a pink studio backdrop, a painted wall, golden-hour light. Only the whites
+    // tell a cast on everything from a colourful scene, so without them the colour is kept -
+    // a finished photograph's white balance was somebody's choice, and moving it on two
+    // estimates that one coloured surface can fool turns a pink portrait grey.
+    if !confirmed {
+        return Neutral::Unsure {
+            reason: "the frame's whites do not show the same cast, so the colour is the scene's (a coloured backdrop or wall, or the light's mood) rather than a cast",
+        };
+    }
     // Keep part of the light's character: correct mild casts more than strong ones, so a
     // tungsten reception still reads as warm evening light rather than a studio.
-    let strength = match (confirmed, cast > 0.25) {
-        (true, true) => 0.7,
-        (true, false) => 0.85,
-        (false, true) => 0.5,
-        (false, false) => 0.65,
-    };
+    let strength = if cast > 0.25 { 0.7 } else { 0.85 };
     let virtual_gray = [
         0.18 * (estimate.0 * strength).exp(),
         0.18,
@@ -926,7 +931,7 @@ pub fn analyse(
 /// Two relative checks, never a target brightness for skin: a subject that is already
 /// clearly brighter than the rest of the scene is a low-key portrait and keeps its mood, and
 /// no face may be pushed into clipping.
-fn face_exposure_cap(
+pub(crate) fn face_exposure_cap(
     exposure: f32,
     px: &Pixels<'_>,
     faces: &[PortraitFace],
@@ -934,18 +939,9 @@ fn face_exposure_cap(
     if faces.is_empty() {
         return (exposure, None);
     }
-    // The histogram correction keeps uniformly dark frames within 0.25 EV because it cannot
-    // tell a silhouette from underexposure. A detected face says it is not a silhouette.
+    // A detected face identifies the subject, not its intended brightness. Dark complexion
+    // and low-key lighting must not be treated as proof of underexposure. ADR-0096.
     let requested = exposure;
-    let (w, h) = (px.width, px.height);
-    let mut all: Vec<f32> = (0..h)
-        .flat_map(|y| (0..w).map(move |x| (x, y)))
-        .map(|(x, y)| luma(px.linear(x, y)))
-        .collect();
-    let median = percentile(&mut all, 0.5);
-    let high = aura_raw::colour::curve::srgb_encode(percentile(&mut all, 0.95));
-    let raised =
-        (high < 0.6 && exposure >= 0.0).then(|| (0.18 / median.max(0.002)).log2().clamp(0.0, 1.5));
     let (w, h) = (px.width, px.height);
     let mut face = Vec::new();
     let mut frame = Vec::new();
@@ -986,22 +982,19 @@ fn face_exposure_cap(
             );
         }
     }
-    // A dark frame around a face is evidence of underexposure only when the face itself is
-    // dark. Dark hair, dark clothes and a grey wall around a well-lit face are not, and
-    // brightening them would lighten somebody's skin for no photographic reason.
-    let exposure = match raised {
-        Some(raised) if face_median < 0.3 => exposure.max(raised),
-        _ => exposure,
-    };
     // And when the people are not darker than the frame around them, the frame's darkness is
     // not theirs: at most a small lift, however far the median sits from middle grey.
-    let surroundings = exposure > 0.25 && face_median >= frame_median;
-    let exposure = if surroundings { 0.25 } else { exposure };
+    let surroundings = face_median >= frame_median;
+    let exposure = if surroundings {
+        exposure.min(0.25)
+    } else {
+        exposure
+    };
     // The surroundings rule answers a histogram that wants middle grey. Highlights are a
     // different witness: when nothing in the frame, the people included, comes near white, the
     // whole frame is low, and a night scene is the one exception.
     let night = intent(&measure(px, faces)) == Some(SceneKind::Night);
-    let anchor = highlight_lift(px).filter(|(lift, _)| !night && *lift > exposure);
+    let anchor = highlight_lift(px).filter(|(lift, _)| !night && !surroundings && *lift > exposure);
     let exposure = anchor.map_or(exposure, |(lift, _)| lift);
     // Nor is a white wall evidence that the people in front of it are overexposed.
     if exposure < 0.0 && face_median < 0.6 {
@@ -1093,7 +1086,7 @@ fn apply_global(recipe: &mut Recipe, tone: (f32, i16, i16, i16), plan: &GlobalPl
 }
 
 /// Selections must use the exposure that survives the recipe merge.
-fn effective_exposure(base: &Recipe, proposed: f32, global: bool) -> f32 {
+pub(crate) fn effective_exposure(base: &Recipe, proposed: f32, global: bool) -> f32 {
     if global
         && !base
             .provenance
@@ -1464,6 +1457,88 @@ mod tests {
 
     fn pixels(rgb: &[u8], w: u32, h: u32) -> Pixels<'_> {
         Pixels::new(rgb, w, h).unwrap()
+    }
+
+    /// A textured frame: `base` everywhere, `white` over the top tenth when given, each sample
+    /// varied by a fixed pattern so the frame has edges, all multiplied by `light`.
+    fn lit_frame(base: [f32; 3], white: Option<f32>, light: [f32; 3]) -> aura_render::Frame {
+        let (w, h) = (96_usize, 96_usize);
+        let mut rgb = Vec::with_capacity(w * h * 3);
+        for y in 0..h {
+            for x in 0..w {
+                let texture = 0.85 + 0.3 * (((x * 7 + y * 13) % 11) as f32 / 10.0);
+                let surface = match white {
+                    Some(v) if y < h / 10 => [v; 3],
+                    _ => base,
+                };
+                for c in 0..3 {
+                    rgb.push(surface[c] * texture * light[c]);
+                }
+            }
+        }
+        aura_render::Frame::working(rgb, w as u32, h as u32, "test")
+    }
+
+    #[test]
+    fn a_cast_the_whites_confirm_is_corrected() {
+        let frame = lit_frame([0.3, 0.3, 0.3], Some(0.6), [0.9, 1.0, 1.1]);
+        assert!(
+            matches!(
+                white_balance(&frame, &[]),
+                Neutral::Correct {
+                    confirmed: true,
+                    ..
+                }
+            ),
+            "{:?}",
+            white_balance(&frame, &[])
+        );
+    }
+
+    #[test]
+    fn a_colour_the_whites_do_not_confirm_is_the_scenes_and_is_kept() {
+        // A dim rose backdrop and nothing white: both estimates read rose, mildly enough that
+        // the no-people mood rule does not decide it, and nothing says the light is.
+        let frame = lit_frame([0.24, 0.2, 0.21], None, [1.0, 1.0, 1.0]);
+        assert!(
+            matches!(
+                white_balance(&frame, &[]),
+                Neutral::Unsure { reason } if reason.contains("whites do not show")
+            ),
+            "{:?}",
+            white_balance(&frame, &[])
+        );
+    }
+
+    #[test]
+    fn dark_complexions_on_dark_backdrops_do_not_trigger_a_white_anchor_lift() {
+        let face = PortraitFace {
+            bounds: [0.2, 0.2, 0.8, 0.8],
+            landmarks: [
+                [0.35, 0.4],
+                [0.65, 0.4],
+                [0.5, 0.5],
+                [0.4, 0.65],
+                [0.6, 0.65],
+            ],
+            confidence: 0.95,
+        };
+        for skin in [60_u8, 90, 140, 180] {
+            let mut rgb = vec![skin / 3; 100 * 100 * 3];
+            for y in 20..80 {
+                for x in 20..80 {
+                    rgb[(y * 100 + x) * 3..(y * 100 + x + 1) * 3].fill(skin);
+                }
+            }
+            let px = pixels(&rgb, 100, 100);
+            for asked in [0.0, 0.15, 0.75] {
+                let (used, _) = face_exposure_cap(asked, &px, std::slice::from_ref(&face));
+                assert!(
+                    used <= asked.min(0.25) + 1e-5,
+                    "skin {skin}, asked {asked}, used {used}"
+                );
+            }
+        }
     }
 
     #[test]

@@ -6,6 +6,7 @@
 )]
 use super::*;
 
+#[cfg(test)]
 #[test]
 #[ignore = "needs AURA_SPOT_INPUT JSON and matching .rgb; prints native proposals for review"]
 fn inspect_real_photo_spot_proposals() {

@@ -1,4 +1,4 @@
-# ADR-0092: Include nose skin in blemish repair
+# ADR-0108: Include nose skin in blemish repair
 
 Accepted 2026-10-08. Supersedes ADR-0091's exclusion of the entire nose from
 blemish correction. The user requested repair of the nose and small missed skin areas.

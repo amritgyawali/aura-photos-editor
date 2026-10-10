@@ -8,6 +8,7 @@
 use crate::retouch_mask::Coverage;
 use crate::retouch_matte::MattePlane;
 use aura_recipe::retouch_tools::{Edit, Matte, Tool};
+use rayon::prelude::*;
 use std::collections::BTreeMap;
 
 fn luma(v: [f32; 3]) -> f32 {
@@ -49,20 +50,21 @@ fn matte_planes(
     edits: &[Edit],
     mattes: &BTreeMap<String, Matte>,
 ) -> BTreeMap<String, Option<MattePlane>> {
-    let mut planes = BTreeMap::new();
-    for id in edits
+    let ids: std::collections::BTreeSet<&String> = edits
         .iter()
         .filter(|e| e.enabled && e.amount > 0.0)
         .filter_map(|e| e.matte.as_ref())
-    {
-        if !planes.contains_key(id) {
+        .collect();
+    // Each matte is rendered from the same frame and independently, so they are rendered at
+    // the same time.
+    ids.into_par_iter()
+        .map(|id| {
             let plane = mattes
                 .get(id)
                 .and_then(|m| MattePlane::render(m, rgb, width, height));
-            planes.insert(id.clone(), plane);
-        }
-    }
-    planes
+            (id.clone(), plane)
+        })
+        .collect()
 }
 
 /// The operation's selection on the current frame, limited by its matte. `None` when the
@@ -123,33 +125,109 @@ pub fn saved_selection(
     mask
 }
 
+/// [`apply_with_mattes`] for the operations from `start` on, over a buffer that already holds
+/// the first `start` applied. `before` is the frame as it was before any operation ran: the
+/// mattes and texture references are measured on it, exactly as a whole-stack render measures
+/// them, so the result is the same pixel for pixel. ADR-0098.
+pub(crate) fn apply_resumed(
+    rgb: &mut [f32],
+    width: usize,
+    height: usize,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
+    start: usize,
+    before: &[f32],
+) {
+    if before.len() != rgb.len() {
+        return;
+    }
+    apply_from(rgb, width, height, edits, mattes, None, start, Some(before));
+}
+
 fn apply_observed(
     rgb: &mut [f32],
     width: usize,
     height: usize,
     edits: &[Edit],
     mattes: &BTreeMap<String, Matte>,
+    observe: Option<(&mut [f32], Option<&str>)>,
+) {
+    apply_from(rgb, width, height, edits, mattes, observe, 0, None);
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+fn apply_from(
+    rgb: &mut [f32],
+    width: usize,
+    height: usize,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
     mut observe: Option<(&mut [f32], Option<&str>)>,
+    start: usize,
+    before: Option<&[f32]>,
 ) {
     if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
         return;
     }
-    let planes = matte_planes(rgb, width, height, edits, mattes);
+    // The frame before any operation ran: the given one when resuming, else this buffer as
+    // it is now. Only read here, before the first operation writes.
+    let before: &[f32] = before.unwrap_or(&*rgb);
+    let planes = matte_planes(before, width, height, edits, mattes);
     // A texture graft measures the texture the skin had from the frame as it is now, before
     // any operation has run - not from whatever the operations before it left behind.
-    let references: BTreeMap<&str, crate::retouch_texture::Reference> = edits
+    let capture =
+        |rgb: &[f32], keep_healed: bool| -> BTreeMap<&str, crate::retouch_texture::Reference> {
+            edits
+                .iter()
+                .filter(|e| e.enabled && e.amount > 0.0 && e.tool == Tool::TextureGraft)
+                .filter(|e| !keep_healed || e.preserve_microtexture)
+                .filter_map(|edit| {
+                    let coverage = coverage_of(edit, width, height, rgb, &planes)?;
+                    crate::retouch_texture::Reference::capture(
+                        rgb,
+                        width,
+                        height,
+                        edit,
+                        coverage.bounds,
+                    )
+                    .map(|reference| (edit.id.as_str(), reference))
+                })
+                .collect()
+        };
+    let mut references = capture(before, false);
+    let mut selections: BTreeMap<String, Coverage> = BTreeMap::new();
+    for edit in edits
         .iter()
-        .filter(|e| e.enabled && e.amount > 0.0 && e.tool == Tool::TextureGraft)
-        .filter_map(|edit| {
-            let coverage = coverage_of(edit, width, height, rgb, &planes)?;
-            crate::retouch_texture::Reference::capture(rgb, width, height, edit, coverage.bounds)
-                .map(|reference| (edit.id.as_str(), reference))
-        })
-        .collect();
-    for edit in edits.iter().filter(|e| e.enabled && e.amount > 0.0) {
-        let Some(coverage) = coverage_of(edit, width, height, rgb, &planes) else {
+        .skip(start)
+        .filter(|e| e.enabled && e.amount > 0.0)
+    {
+        // Several operations often share one selection - the face's evening, light and
+        // smoothing all use the same strokes and matte - so it is made once per render. A
+        // brightness limit reads the pixels as they are at that point and is never shared.
+        let shareable = edit
+            .selection
+            .as_ref()
+            .is_none_or(|selection| selection.luminance.is_none());
+        let memo_key = shareable.then(|| {
+            serde_json::to_string(&(
+                &edit.region,
+                edit.feather,
+                &edit.mask,
+                &edit.selection,
+                &edit.matte,
+            ))
+            .unwrap_or_default()
+        });
+        let Some(coverage) = memo_key
+            .as_ref()
+            .and_then(|key| selections.get(key).cloned())
+            .or_else(|| coverage_of(edit, width, height, rgb, &planes))
+        else {
             continue;
         };
+        if let Some(key) = memo_key {
+            selections.entry(key).or_insert_with(|| coverage.clone());
+        }
         if let Some((mask, only)) = &mut observe {
             if only.is_none_or(|id| id == edit.id) {
                 let skin = if matches!(
@@ -184,6 +262,12 @@ fn apply_observed(
             crate::retouch_heal::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::FrequencyHeal {
             crate::retouch_clear::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::AcneClear {
+            crate::retouch_acne::apply(rgb, width, height, edit, &coverage);
+            // A restore that leaves healed marks alone measures "the texture this skin had" on
+            // the skin acne clear left: the photograph's own crusts and scabs are not texture
+            // to put back. ADR-0092.
+            references.extend(capture(rgb, true));
         } else if edit.tool == Tool::TextureGraft {
             crate::retouch_texture::apply(
                 rgb,
@@ -195,6 +279,10 @@ fn apply_observed(
             );
         } else if edit.tool == Tool::AutoBlemish {
             auto_spots(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::UnderEye && edit.source.is_some() {
+            // Measured against the cheek at `source`. Without one, the original local lift
+            // below keeps saved hand-painted corrections exactly as they were. ADR-0094.
+            crate::retouch_undereye::apply(rgb, width, height, edit, &coverage);
         } else {
             let refine_edges = edit
                 .matte
@@ -264,13 +352,19 @@ pub fn frequency_heal_marks(
     if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
         return Vec::new();
     }
-    if edit.tool != Tool::FrequencyHeal {
+    if !matches!(edit.tool, Tool::FrequencyHeal | Tool::AcneClear) {
         return vec![0.0; width * height];
     }
     let planes = matte_planes(rgb, width, height, std::slice::from_ref(edit), mattes);
     coverage_of(edit, width, height, rgb, &planes).map_or_else(
         || vec![0.0; width * height],
-        |coverage| crate::retouch_clear::mark_plane(rgb, width, height, edit, &coverage),
+        |coverage| {
+            if edit.tool == Tool::AcneClear {
+                crate::retouch_acne::mark_plane(rgb, width, height, edit, &coverage)
+            } else {
+                crate::retouch_clear::mark_plane(rgb, width, height, edit, &coverage)
+            }
+        },
     )
 }
 
@@ -396,152 +490,161 @@ fn apply_one(
         ring_n += 1.0;
     }
     let ring = ring.map(|v| v / ring_n);
-    let mut patches = Vec::with_capacity((x1 - x0) * (y1 - y0));
-    for y in y0..y1 {
-        for x in x0..x1 {
-            let mut a = coverage.at(x, y, w, h)
-                * clip.map_or(1.0, |mask| mask.at(x, y, w, h))
-                * edit.amount;
-            if a <= 0.0 {
-                continue;
-            }
-            if let Some(reference) = guard_reference {
-                // A matte is coarser than a lash or a beard hair; never work on pixels far
-                // darker than the region's own reference.
-                let ratio = luma(pixel(rgb, w, x, y)) / luma(reference).max(1e-6);
-                let t = ((ratio - 0.3) / 0.2).clamp(0.0, 1.0);
-                a *= t * t * (3.0 - 2.0 * t);
-            }
-            if a <= 0.0 {
-                continue;
-            }
-            let old = pixel(rgb, w, x, y);
-            let lum = luma(old).max(0.00001);
-            let i = (y - by) * bw + x - bx;
-            let low = if needs_bands {
-                [narrow[0][i], narrow[1][i], narrow[2][i]]
-            } else {
-                old
-            };
-            let broad = if needs_bands {
-                [wide[0][i], wide[1][i], wide[2][i]]
-            } else {
-                old
-            };
-            let mut value = old;
-            match edit.tool {
-                Tool::Heal | Tool::Clone => {
-                    let Some(p) = source else {
-                        continue;
-                    };
-                    let sx = x as f32 + (p[0] - cx) * w as f32;
-                    let sy = y as f32 + (p[1] - cy) * h as f32;
-                    if sx < 0.0 || sy < 0.0 || sx >= w as f32 || sy >= h as f32 {
-                        continue;
-                    }
-                    value = pixel(rgb, w, sx as usize, sy as usize);
-                    if edit.tool == Tool::Heal {
-                        for c in 0..3 {
-                            value[c] += (ring[c] - donor_mean[c]).clamp(-0.15, 0.15);
+    // Every pixel reads the frame as it was before this operation and is written afterwards,
+    // so the rows are computed in parallel and applied in order: the same result everywhere.
+    let frame: &[f32] = rgb;
+    let rows: Vec<Vec<(usize, [f32; 3])>> = (y0..y1)
+        .into_par_iter()
+        .map(|y| {
+            let rgb = frame;
+            let mut patches = Vec::with_capacity(x1 - x0);
+            for x in x0..x1 {
+                let mut a = coverage.at(x, y, w, h)
+                    * clip.map_or(1.0, |mask| mask.at(x, y, w, h))
+                    * edit.amount;
+                if a <= 0.0 {
+                    continue;
+                }
+                if let Some(reference) = guard_reference {
+                    // A matte is coarser than a lash or a beard hair; never work on pixels far
+                    // darker than the region's own reference.
+                    let ratio = luma(pixel(rgb, w, x, y)) / luma(reference).max(1e-6);
+                    let t = ((ratio - 0.3) / 0.2).clamp(0.0, 1.0);
+                    a *= t * t * (3.0 - 2.0 * t);
+                }
+                if a <= 0.0 {
+                    continue;
+                }
+                let old = pixel(rgb, w, x, y);
+                let lum = luma(old).max(0.00001);
+                let i = (y - by) * bw + x - bx;
+                let low = if needs_bands {
+                    [narrow[0][i], narrow[1][i], narrow[2][i]]
+                } else {
+                    old
+                };
+                let broad = if needs_bands {
+                    [wide[0][i], wide[1][i], wide[2][i]]
+                } else {
+                    old
+                };
+                let mut value = old;
+                match edit.tool {
+                    Tool::Heal | Tool::Clone => {
+                        let Some(p) = source else {
+                            continue;
+                        };
+                        let sx = x as f32 + (p[0] - cx) * w as f32;
+                        let sy = y as f32 + (p[1] - cy) * h as f32;
+                        if sx < 0.0 || sy < 0.0 || sx >= w as f32 || sy >= h as f32 {
+                            continue;
+                        }
+                        value = pixel(rgb, w, sx as usize, sy as usize);
+                        if edit.tool == Tool::Heal {
+                            for c in 0..3 {
+                                value[c] += (ring[c] - donor_mean[c]).clamp(-0.15, 0.15);
+                            }
                         }
                     }
-                }
-                Tool::Frequency | Tool::Wrinkle | Tool::Fabric => {
-                    let amount = if edit.tool == Tool::Wrinkle { 0.5 } else { 1.0 };
-                    for c in 0..3 {
-                        value[c] = if separate_pores {
-                            // Keep the real fine-detail band while attenuating larger
-                            // irregularities. Both corrections have zero response to
-                            // constant colour and preserve broad face illumination.
-                            old[c] + edit.tone * (broad[c] - low[c])
-                                - edit.tone * 0.8 * (fine[c][i] - low[c])
-                                + (edit.texture - 1.0) * (old[c] - fine[c][i])
-                        } else {
-                            old[c]
-                                + edit.tone * amount * (broad[c] - low[c])
-                                + (edit.texture - 1.0) * (old[c] - low[c])
-                        };
+                    Tool::Frequency | Tool::Wrinkle | Tool::Fabric => {
+                        let amount = if edit.tool == Tool::Wrinkle { 0.5 } else { 1.0 };
+                        for c in 0..3 {
+                            value[c] = if separate_pores {
+                                // Keep the real fine-detail band while attenuating larger
+                                // irregularities. Both corrections have zero response to
+                                // constant colour and preserve broad face illumination.
+                                old[c] + edit.tone * (broad[c] - low[c])
+                                    - edit.tone * 0.8 * (fine[c][i] - low[c])
+                                    + (edit.texture - 1.0) * (old[c] - fine[c][i])
+                            } else {
+                                old[c]
+                                    + edit.tone * amount * (broad[c] - low[c])
+                                    + (edit.texture - 1.0) * (old[c] - low[c])
+                            };
+                        }
                     }
-                }
-                Tool::Backdrop => {
-                    value = broad;
-                }
-                Tool::MicroDodgeBurn => {
-                    let delta = (luma(broad) - luma(low)).clamp(-0.08, 0.08);
-                    value = old.map(|v| v * ((lum + delta).max(0.0) / lum));
-                }
-                Tool::Dodge => {
-                    value = old.map(|v| v * 2.0_f32.powf(0.75));
-                }
-                Tool::Burn => {
-                    value = old.map(|v| v * 2.0_f32.powf(-0.75));
-                }
-                Tool::UnderEye => {
-                    let lift = (luma(broad) - lum).clamp(0.0, 0.12);
-                    value = old.map(|v| v * (lum + lift) / lum);
-                }
-                Tool::SkinColor | Tool::Makeup => {
-                    value = [
-                        old[0] * (1.0 + edit.warmth * 0.25 + edit.tint * 0.12),
-                        old[1] * (1.0 - edit.tint * 0.12),
-                        old[2] * (1.0 - edit.warmth * 0.25 + edit.tint * 0.12),
-                    ];
-                    let new_luma = luma(value).max(0.00001);
-                    value = value.map(|v| v * lum / new_luma);
-                }
-                Tool::ColorMatch => {
-                    let src_l = luma(donor_mean).max(0.00001);
-                    let dst_l = luma(center).max(0.00001);
-                    for c in 0..3 {
-                        value[c] = old[c] + lum * (donor_mean[c] / src_l - center[c] / dst_l);
+                    Tool::Backdrop => {
+                        value = broad;
                     }
-                }
-                Tool::Mattify | Tool::Glare => {
-                    let threshold = (luma(center) * 0.8).max(0.12);
-                    let highlight =
-                        ((lum - threshold) / (1.0 - threshold).max(0.1)).clamp(0.0, 1.0);
-                    value = old.map(|v| v * (1.0 - highlight * 0.35));
-                }
-                Tool::Teeth => {
-                    // Reduce yellow chroma rather than replacing teeth with flat white.
-                    let yellow = ((old[0] + old[1]) * 0.5 - old[2]).max(0.0);
-                    value = [
-                        old[0] - yellow * 0.15,
-                        old[1] - yellow * 0.15,
-                        old[2] + yellow * 0.7,
-                    ];
-                    value = value.map(|v| v * 1.06);
-                }
-                Tool::EyeClean => {
-                    value[0] -= (old[0] - (old[1] + old[2]) * 0.5).max(0.0) * 0.7;
-                    let new_luma = luma(value).max(0.00001);
-                    value = value.map(|v| v * lum / new_luma);
-                }
-                Tool::EyeDetail => {
-                    for c in 0..3 {
-                        value[c] += (old[c] - low[c]) * 0.65;
+                    Tool::MicroDodgeBurn => {
+                        let delta = (luma(broad) - luma(low)).clamp(-0.08, 0.08);
+                        value = old.map(|v| v * ((lum + delta).max(0.0) / lum));
                     }
-                }
-                Tool::RedEye => {
-                    // Red-eye red has green and blue about equal. Brown irises, skin and lips
-                    // have much less blue than green and are left alone.
-                    if old[0] > old[1].max(old[2]) * 1.5 && old[2] >= old[1] * 0.5 {
-                        value[0] = (old[1] + old[2]) * 0.5;
+                    Tool::Dodge => {
+                        value = old.map(|v| v * 2.0_f32.powf(0.75));
                     }
+                    Tool::Burn => {
+                        value = old.map(|v| v * 2.0_f32.powf(-0.75));
+                    }
+                    Tool::UnderEye => {
+                        let lift = (luma(broad) - lum).clamp(0.0, 0.12);
+                        value = old.map(|v| v * (lum + lift) / lum);
+                    }
+                    Tool::SkinColor | Tool::Makeup => {
+                        value = [
+                            old[0] * (1.0 + edit.warmth * 0.25 + edit.tint * 0.12),
+                            old[1] * (1.0 - edit.tint * 0.12),
+                            old[2] * (1.0 - edit.warmth * 0.25 + edit.tint * 0.12),
+                        ];
+                        let new_luma = luma(value).max(0.00001);
+                        value = value.map(|v| v * lum / new_luma);
+                    }
+                    Tool::ColorMatch => {
+                        let src_l = luma(donor_mean).max(0.00001);
+                        let dst_l = luma(center).max(0.00001);
+                        for c in 0..3 {
+                            value[c] = old[c] + lum * (donor_mean[c] / src_l - center[c] / dst_l);
+                        }
+                    }
+                    Tool::Mattify | Tool::Glare => {
+                        let threshold = (luma(center) * 0.8).max(0.12);
+                        let highlight =
+                            ((lum - threshold) / (1.0 - threshold).max(0.1)).clamp(0.0, 1.0);
+                        value = old.map(|v| v * (1.0 - highlight * 0.35));
+                    }
+                    Tool::Teeth => {
+                        // Reduce yellow chroma rather than replacing teeth with flat white.
+                        let yellow = ((old[0] + old[1]) * 0.5 - old[2]).max(0.0);
+                        value = [
+                            old[0] - yellow * 0.15,
+                            old[1] - yellow * 0.15,
+                            old[2] + yellow * 0.7,
+                        ];
+                        value = value.map(|v| v * 1.06);
+                    }
+                    Tool::EyeClean => {
+                        value[0] -= (old[0] - (old[1] + old[2]) * 0.5).max(0.0) * 0.7;
+                        let new_luma = luma(value).max(0.00001);
+                        value = value.map(|v| v * lum / new_luma);
+                    }
+                    Tool::EyeDetail => {
+                        for c in 0..3 {
+                            value[c] += (old[c] - low[c]) * 0.65;
+                        }
+                    }
+                    Tool::RedEye => {
+                        // Red-eye red has green and blue about equal. Brown irises, skin and lips
+                        // have much less blue than green and are left alone.
+                        if old[0] > old[1].max(old[2]) * 1.5 && old[2] >= old[1] * 0.5 {
+                            value[0] = (old[1] + old[2]) * 0.5;
+                        }
+                    }
+                    Tool::PatchHeal
+                    | Tool::FrequencyHeal
+                    | Tool::AcneClear
+                    | Tool::TextureGraft
+                    | Tool::AutoBlemish
+                    | Tool::SkinSmooth
+                    | Tool::SkinUniformity
+                    | Tool::PortraitDodgeBurn => {}
                 }
-                Tool::PatchHeal
-                | Tool::FrequencyHeal
-                | Tool::TextureGraft
-                | Tool::AutoBlemish
-                | Tool::SkinSmooth
-                | Tool::SkinUniformity
-                | Tool::PortraitDodgeBurn => {}
+                let out = std::array::from_fn::<_, 3, _>(|c| old[c] + a * (value[c] - old[c]));
+                patches.push(((y * w + x) * 3, out));
             }
-            let out = std::array::from_fn::<_, 3, _>(|c| old[c] + a * (value[c] - old[c]));
-            patches.push(((y * w + x) * 3, out));
-        }
-    }
-    for (i, value) in patches {
+            patches
+        })
+        .collect();
+    for (i, value) in rows.into_iter().flatten() {
         rgb[i..i + 3].copy_from_slice(&value);
     }
 }

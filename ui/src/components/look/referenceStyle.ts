@@ -1,6 +1,6 @@
 import type { ReferenceSelection } from '../../ipc/client';
 export { referenceStyle } from '../../ipc/client';
-export type { ReferenceAnalysis, ReferenceSelection, FetchReport, ApplyReport } from '../../ipc/client';
+export type { ReferenceAnalysis, ReferenceSelection, ApplyReport } from '../../ipc/client';
 
 const STORAGE = 'aura.reference-style.v1';
 export function readReferenceSelection(): ReferenceSelection | null {

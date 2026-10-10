@@ -3,6 +3,7 @@ import argparse
 import base64
 import hashlib
 import json
+import time
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -16,7 +17,17 @@ parser.add_argument('--collections', nargs='+', default=['Professional retouch v
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
 with sync_playwright() as p:
-    page = p.chromium.connect_over_cdp(f'http://127.0.0.1:{args.port}').contexts[0].pages[0]
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            browser = p.chromium.connect_over_cdp(f'http://127.0.0.1:{args.port}')
+            page = browser.contexts[0].pages[0]
+            page.wait_for_function('Boolean(window.__TAURI_INTERNALS__?.invoke)')
+            break
+        except Exception:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(.25)
     results = {}
     for name in args.collections:
         rows = page.evaluate('''async name => {

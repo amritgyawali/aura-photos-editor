@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your AURA licence key</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="/">AURA</a>
+    <nav><a href="/#pricing">Pricing</a><a href="/terms">Terms</a></nav>
+  </header>
+  <main>
+    <section class="hero">
+      <span class="eyebrow">Licence</span>
+      <h1>Your licence key</h1>
+      <p class="lead">Enter your subscription number (it starts with <code>sub_</code>) or order number (<code>txn_</code>) from your Paddle receipt, and the email address you paid with.</p>
+    </section>
+    <div class="card">
+      <form id="find">
+        <label>Subscription or order number<input id="number" required autocomplete="off" placeholder="sub_01… or txn_01…"></label>
+        <label>Email address<input id="email" type="email" required autocomplete="email"></label>
+        <button class="primary" type="submit">Show my key</button>
+      </form>
+      <p id="status" class="note" role="status"></p>
+      <div id="result" hidden>
+        <p>Licensed to <strong id="name"></strong>, paid through <strong id="expires"></strong>.</p>
+        <div class="key" id="key"></div>
+        <p><button type="button" id="copy">Copy key</button></p>
+        <ol class="note">
+          <li>Open AURA and go to <strong>Advanced → Licence</strong>.</li>
+          <li>Paste the key and choose <strong>Activate</strong>.</li>
+          <li>That is all: AURA renews it by itself before each period ends.</li>
+        </ol>
+        <p class="note">Keep your subscription number <strong id="sub"></strong> - with your email it shows this key again any time.</p>
+      </div>
+    </div>
+  </main>
+  <footer class="site">
+    <span>AURA Photo Studio</span>
+    <span><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refunds">Refunds</a><a href="mailto:amritgyawali999@gmail.com">Support</a></span>
+  </footer>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const query = new URLSearchParams(location.search);
+    async function show(number, email, attempt = 0) {
+      $('status').textContent = attempt ? 'Your payment is being confirmed…' : 'Looking up your subscription…';
+      $('status').className = 'note';
+      const field = number.startsWith('txn_') ? 'transaction' : 'subscription';
+      const response = await fetch(`/api/licence?${field}=${encodeURIComponent(number)}&email=${encodeURIComponent(email)}`);
+      const body = await response.json().catch(() => ({ error: 'The licence server did not answer. Please try again.' }));
+      if (response.status === 409 && attempt < 20) return setTimeout(() => show(number, email, attempt + 1), 3000);
+      if (!response.ok) { $('status').textContent = body.error; $('status').className = 'error'; return; }
+      $('status').textContent = '';
+      $('name').textContent = body.name; $('expires').textContent = body.expires; $('key').textContent = body.key; $('sub').textContent = body.subscription;
+      $('result').hidden = false;
+    }
+    $('find').addEventListener('submit', (event) => { event.preventDefault(); show($('number').value.trim(), $('email').value.trim()); });
+    $('copy').addEventListener('click', async () => { await navigator.clipboard.writeText($('key').textContent); $('copy').textContent = 'Copied'; });
+    const number = query.get('transaction') || query.get('subscription');
+    if (number && query.get('email')) { $('number').value = number; $('email').value = query.get('email'); show(number, query.get('email')); }
+  </script>
+</body>
+</html>

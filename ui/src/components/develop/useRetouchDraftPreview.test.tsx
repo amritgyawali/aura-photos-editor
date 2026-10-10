@@ -56,3 +56,22 @@ it('surfaces a render error and cancels work before the debounce expires', async
   expect(result.current.error).toBe('Preview unavailable');
   expect(result.current.pending).toBe(false);
 });
+it('shows a resting draft at full quality after the quick look, and never a superseded one', async () => {
+  vi.mocked(nativeRetouch.draftPreview).mockImplementation(async (_p, _i, _e, _r, quality) => ({ width: quality === 'full' ? 400 : 100 }) as RenderDto);
+  const { result, rerender } = renderHook(({ amount }) => {
+    const draft = useMemo(() => ({ ...freshRetouch(), amount }), [amount]);
+    return useRetouchDraftPreview('project', 'photo', draft, null, true, 0);
+  }, { initialProps: { amount: .2 } });
+  await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+  expect(result.current.image?.width).toBe(100);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1300); });
+  expect(vi.mocked(nativeRetouch.draftPreview).mock.calls.map(call => call[4])).toEqual(['fast', 'full']);
+  expect(result.current.image?.width).toBe(400);
+  // A new stroke before the rest is over: no full-quality render of the old one.
+  rerender({ amount: .5 });
+  await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+  rerender({ amount: .6 });
+  await act(async () => { await vi.advanceTimersByTimeAsync(400 + 1300); });
+  const qualities = vi.mocked(nativeRetouch.draftPreview).mock.calls.slice(2).map(call => [call[2].amount, call[4]]);
+  expect(qualities).toEqual([[.5, 'fast'], [.6, 'fast'], [.6, 'full']]);
+});

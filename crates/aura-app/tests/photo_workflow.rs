@@ -13,6 +13,7 @@ fn imported_pixels_are_edited_protected_and_exported_without_changing_originals(
     let dir = tempfile::tempdir().expect("temp");
     let state = AppState::open(&dir.path().join("catalog.aura"))
         .expect("state")
+        .with_licence_dir(dir.path().join("licence"))
         .with_key_store(Arc::new(aura_cloud::keys::MemoryKeyStore::default()));
     let project = aura_app::create_project(
         &state,

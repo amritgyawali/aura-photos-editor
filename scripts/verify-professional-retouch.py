@@ -94,6 +94,7 @@ def main():
             while True:
                 body = json.loads(page.evaluate(READ_RECIPE, collection)['body'])
                 if not body['global']['exposure'] and not body.get('studio_retouch_v1'):
+                    reset_global = body['global']
                     break
                 assert time.monotonic() < deadline, 'Reset photo did not clear the automatic edit'
                 time.sleep(0.5)
@@ -124,7 +125,7 @@ def main():
         edits = body['studio_retouch_v1']
         tools = [edit['tool'] for edit in edits]
         automatic = [edit for edit in edits if edit['id'].startswith('auto-portrait-v1-0-')]
-        heal = [edit for edit in edits if edit['tool'] == 'frequency_heal']
+        heal = [edit for edit in edits if edit['tool'] == 'acne_clear']
         graft = [edit for edit in edits if edit['tool'] == 'texture_graft']
         finish = [edit for edit in edits if edit['id'].endswith('-surface-finish')]
         if args.body_only_photo:

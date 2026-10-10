@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Bump on any change to a reading or a rule.
-pub const VERSION: &str = "expert-adaptive-v1";
+pub const VERSION: &str = "expert-adaptive-v2-skin-fidelity";
 
 /// What was measured about one face before deciding its settings.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -38,7 +38,8 @@ pub struct Condition {
     pub marks: f32,
     /// Line texture beside the eyes relative to the same person's cheek.
     pub lines: f32,
-    /// Linear luminance of this person's skin, used only to recognise a face in deep shadow.
+    /// Linear luminance of this person's skin, recorded for review, never a complexion target
+    /// or evidence by itself that the photograph is underexposed.
     pub skin_luma: f32,
 }
 
@@ -321,7 +322,13 @@ pub fn tune(chosen: &Settings, c: &Condition, ctx: &Context) -> Tuned {
     }
 
     // 2. Colour evenness follows how blotchy this face's own colour is.
-    let blotch = ramp(c.blotch, 0.02, 0.06, 0.85, 1.3);
+    // Below the normal range, an even complexion needs no colour replacement. A minimum
+    // correction on every face slowly pulls perfectly healthy skin toward one sampled patch.
+    let blotch = if c.blotch < 0.02 {
+        ramp(c.blotch, 0.004, 0.02, 0.0, 0.85)
+    } else {
+        ramp(c.blotch, 0.02, 0.06, 0.85, 1.3)
+    };
     scale(&mut s.tone_evenness, blotch);
     scale(&mut s.redness, ramp(c.blotch, 0.02, 0.06, 0.9, 1.25));
     if blotch > 1.12 {
@@ -343,8 +350,11 @@ pub fn tune(chosen: &Settings, c: &Condition, ctx: &Context) -> Tuned {
     if light < 0.9 {
         scale(&mut s.light_evenness, light);
         scale(&mut s.face_light, light);
+        scale(&mut s.tone_evenness, light);
+        scale(&mut s.redness, light);
+        scale(&mut s.body_tone, light);
         notes.push(format!(
-            "Directional light ({:.1} stops across the skin): light evening reduced to {:.0}% to keep the face's shape.",
+            "Directional light ({:.1} stops across the skin): light evening reduced to {:.0}%; colour evening also reduced to preserve the skin's own colour in light and shadow.",
             c.light_stops,
             s.light_evenness * 100.0
         ));
@@ -440,15 +450,8 @@ pub fn tune(chosen: &Settings, c: &Condition, ctx: &Context) -> Tuned {
         ));
     }
 
-    // 9. A face in deep shadow carries the frame's noise; evening it lifts that noise.
-    if c.skin_luma < 0.045 {
-        scale(&mut s.micro_dodge_burn, 0.6);
-        scale(&mut s.smoothing, 0.85);
-        notes.push(
-            "Face in deep shadow: micro dodge and burn reduced so shadow noise is not lifted."
-                .into(),
-        );
-    }
+    // Skin brightness cannot distinguish a dark complexion from an underexposed face.
+    // Noise and directional light above provide the actual evidence for restraint instead.
 
     // 10. Groups are retouched lighter than a portrait: everyone must still match everyone.
     if ctx.faces >= 3 {
@@ -527,6 +530,66 @@ mod tests {
         faces: 1,
         noise: 0.004,
     };
+
+    #[test]
+    fn complexion_alone_never_changes_the_decision() {
+        let chosen = Settings::default();
+        let base = tune(&chosen, &typical(), &CALM);
+        for skin_luma in [0.006, 0.02, 0.04, 0.15, 0.3, 0.65] {
+            let actual = tune(
+                &chosen,
+                &Condition {
+                    skin_luma,
+                    ..typical()
+                },
+                &CALM,
+            );
+            assert_eq!(
+                actual, base,
+                "complexion is not evidence of shadow or noise"
+            );
+        }
+    }
+
+    #[test]
+    fn even_skin_needs_no_colour_replacement_and_hard_light_keeps_its_colour() {
+        let chosen = Settings::default();
+        let even = tune(
+            &chosen,
+            &Condition {
+                blotch: 0.002,
+                ..typical()
+            },
+            &CALM,
+        );
+        assert_eq!(even.settings.tone_evenness, 0.0);
+        let normal = tune(&chosen, &typical(), &CALM);
+        let hard = tune(
+            &chosen,
+            &Condition {
+                light_stops: 2.0,
+                ..typical()
+            },
+            &CALM,
+        );
+        assert!(hard.settings.tone_evenness < normal.settings.tone_evenness * 0.6);
+        assert!(hard.settings.redness < normal.settings.redness * 0.6);
+        assert_eq!(hard.settings.skin_brightness, 0.0);
+        assert_eq!(hard.settings.skin_warmth, 0.0);
+        assert_eq!(hard.settings.skin_tint, 0.0);
+        assert_eq!(hard.settings.match_body_to_face, 0.0);
+        // Explicit style choices survive; only measured correction strengths are adapted.
+        let manual = Settings {
+            skin_warmth: 0.2,
+            skin_tint: -0.1,
+            match_body_to_face: 0.3,
+            ..chosen
+        };
+        let styled = tune(&manual, &typical(), &CALM).settings;
+        assert_eq!(styled.skin_warmth, manual.skin_warmth);
+        assert_eq!(styled.skin_tint, manual.skin_tint);
+        assert_eq!(styled.match_body_to_face, manual.match_body_to_face);
+    }
 
     #[test]
     fn a_typical_face_keeps_the_chosen_settings_within_a_small_margin() {

@@ -35,7 +35,7 @@ your setting and no automatic pass changes it again.
 | History, snapshots, reset | History panel, Undo / Redo / Reset | Every automatic edit is a history entry with its reason |
 | Copy / paste, **Sync Settings** | Develop → Sync settings to all photos (crop optional) | - |
 | Match Total Exposures | Gallery consistency (phase 25) | Yes, in the advanced workflow |
-| Masking: sky, subject, background, people, linear, radial, brush | Masks (phase 18) and local light (phase 19) | **Partly**: the mask generators ship untrained, so AI masks are not produced on real photos yet |
+| Masking: sky, subject, background, people, linear, radial, brush | Studio → Masking (ADR-0102) | **Yes**: subject (IS-Net), sky (SkySeg) and Objects (SAM 2.1) on the graphics card through ONNX Runtime (ADR-0103), with the person segmenter and a measured sky detector as fallbacks; people and face parts; add, subtract, intersect, invert, brightness range; eleven sliders per mask |
 | Healing, content-aware remove | Cleanup (phase 24) and micro-retouch (phase 21) | **Refuses** unclassified removals on real photos until its detector is trained |
 | Red eye | Micro-retouch eyes | Advanced workflow |
 | Match a look / reference | Instagram style matching (start screen, step 2) | Yes |
@@ -57,8 +57,8 @@ Stated plainly rather than implied:
 
 - **HDR merge and panorama merge.** Not implemented.
 - **Soft proofing.** Not implemented.
-- **AI masks on real photographs.** The segmentation heads are untrained placeholders; linear and
-  radial masks render, generated ones are reported as skipped.
+- **Per-person masks and the remaining mask sliders** (dehaze, sharpness, noise). Objects, a
+  learned sky and a learned subject ship with ADR-0103.
 - **Content-aware remove on real photographs.** Implemented and deliberately refused until its
   distraction detector is trained.
 - **GPU rendering.** The shaders exist and are checked against the reference; no GPU backend is

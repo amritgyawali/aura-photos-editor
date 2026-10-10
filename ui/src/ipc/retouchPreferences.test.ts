@@ -5,6 +5,13 @@ import type { RecipeDto } from './types';
 
 const recipe = (options: unknown) => ({ body: JSON.stringify({ studio_portrait_auto_v1: { options } }) }) as RecipeDto;
 
+it('starts new photos with pore retention and natural body colour, while retaining saved choices', () => {
+  expect(readRetouchPreferences().settings).toMatchObject({ texture: .85, matchBodyToFace: 0,
+    skinBrightness: 0, skinWarmth: 0, skinTint: 0 });
+  expect(readRetouchPreferences(recipe({ settings: { texture: .5, matchBodyToFace: .25 } })).settings)
+    .toMatchObject({ texture: .5, matchBodyToFace: .25 });
+});
+
 it('restores all fine controls and per-photo scope without sharing mutable defaults', () => {
   const settings = Object.fromEntries(Object.entries(DEFAULT_RETOUCH_SETTINGS).map(([key, value]) =>
     [key, typeof value === 'boolean' ? !value : key === 'maxSpots' ? 7 : .23]));

@@ -2,6 +2,18 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Collection cleanup settings and current studio integration - 2026-10-11
+
+- Apply cleanup settings to every photo in a collection with fresh native skin
+  analysis, individual saved outcomes, and a stop-after-current-photo control.
+  Preserve each photo's grade and manual operations instead of transferring masks.
+- Integrate the current advanced retouch, blemish brush, local masks and progressive
+  full-quality preview workspace with detail protection and diagnostic views.
+- Keep measured dark-circle corrections off eyelids and lashes when the optional
+  broad detail switches are disabled. Keep manual tools available past 256 repairs.
+- Document the automatic frequency/donor route separately from manual Acne Clear,
+  and distinguish delivered workflows from unimplemented Evoto-style capabilities.
+
 ## Confined pigment correction and saved batch preferences - 2026-10-11
 
 - Correct strongly supported residual redness with a saved, confined skin-tone
@@ -88,6 +100,167 @@ All notable changes to AURA. One entry per phase, newest first.
 - Clear old previews, saved steps and coverage when reloading a photo or recipe.
   If loading fails, disable edits and history actions until a successful reload.
   Reload retouch and Back to Develop remain available so the editor can recover.
+## 1.0.0 - ready to sell - 2026-10-08
+
+- AURA is version 1.0.0.
+- Subscriptions: US$15 a month or US$129 a year, sold through Paddle, which handles tax and
+  refunds worldwide. After paying, the website shows your licence key straight away; you can see
+  it again any time with your subscription number and email.
+- Your subscription renews itself inside AURA a few days before each period ends - no new key to
+  paste. **Renew now** in Settings -> Licence does it on demand.
+- The licence agreement names the seller and covers the subscription. See ADR-0107.
+
+## Licences and the licence agreement - 2026-10-08
+
+- The installer now shows AURA's licence agreement and installs the notices for every third-party
+  component AURA uses.
+- The five "Pro Retoucher" profiles are no longer included. They were learned from a data set
+  licensed for research only, which a paid product may not use. Your own learned style and the
+  sixteen other profiles are unchanged. See ADR-0106.
+- **Instagram style is now Match a look.** Choose a folder of reference photos, or your own
+  Instagram data export. AURA no longer downloads from Instagram: it needed Python on your computer
+  and Instagram's terms do not allow it.
+
+## Installer and licence - 2026-10-08
+
+- AURA now installs from a single Windows setup file, with the graphics-card runtime and the
+  masking models included. No administrator rights are needed.
+- 14-day free trial. After it, editing keeps working; exporting finished photographs needs a
+  licence key.
+- **Settings -> Licence** (under Advanced): paste your key to activate. It is checked on your own
+  computer and nothing is sent anywhere. A badge in the top bar shows the trial's days left.
+- See ADR-0105.
+
+## Your own style, learned from Lightroom - 2026-10-08
+
+- New **Teach AURA your style** on the start screen: choose your Lightroom Classic catalogue and
+  AURA builds a profile from how you edited every photograph in it - tones, colour, HSL, curves,
+  colour grading, grain, sharpening, vignette and black and white. It appears as **Yours** in the
+  profile gallery, the Studio presets and the whole-folder edit.
+- AURA still measures each photograph's exposure and white balance itself; your profile adds
+  what you consistently do on top.
+- With the original photographs connected, your highlights, shadows, contrast, whites, blacks and
+  exposure adapt to each photograph the way you adjusted them, wherever that predicts your
+  settings better than one fixed value. See ADR-0104.
+
+## AI masks on the graphics card: Subject, Sky, Objects - 2026-10-08
+
+- **Subject** now selects whatever the photograph is of (a couple, a bouquet, a car) with a
+  learned model, in about a third of a second on the graphics card.
+- **Sky** selects cloudy and sunset skies correctly, and never a studio backdrop.
+- New **Objects** tool: drag a box around anything and it is selected.
+- These use Microsoft's ONNX Runtime with DirectML, loaded from beside the application. Without
+  it, masking works as before. Run `scripts/fetch-ai-models.sh` to install the runtime and the
+  models. See ADR-0103.
+
+## Masking in the Studio - 2026-10-08
+
+- New **Masking** section in the photo editor: select the Subject, the Sky or the Background in
+  one click, or a person's face skin, body skin, hair, clothes, eyes, lips or teeth. You can
+  also draw a linear gradient, a radial gradient or a brush mask.
+- Each mask has its own Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Temperature,
+  Tint, Saturation, Clarity and Texture, plus an Amount.
+- Masks can be combined: add, subtract or intersect any selection, invert it, or keep only its
+  bright or dark parts. A red overlay shows exactly where a mask applies.
+- Mask sliders respond without re-running the skin retouch. See ADR-0102.
+
+## Natural colour and depth in automatic retouch - 2026-10-08
+
+- Auto advanced retouch no longer makes faces paler, greyer or flatter. Clearing blemishes now
+  evens only redness: contour make-up, blush, a tan and the shading that gives a face its
+  shape are kept.
+- Automatic white balance only removes a colour cast that the photo's whites also show. A pink
+  backdrop, a painted wall or a sunset keeps its colour.
+- The skin smoothing finish never reaches the nostrils, even on a turned face.
+  See ADR-0101.
+
+## Graphics card measured - 2026-10-07
+
+- Tried running the retouch stack's blurs and percentiles on the graphics card. On the
+  reference laptop's GTX 1650 it saved about 3 %: copying each image to the card and back
+  costs as much as the processor's calculation. It is not enabled. Two processor
+  improvements found while profiling are kept and give the same pixels; a full render of a
+  retouched portrait is about 7 % faster. See ADR-0100.
+
+## Live preview while you adjust - 2026-10-07
+
+- Moving a slider or applying a profile on a retouched photo now shows a live preview in about
+  half a second: the new settings with the retouch carried over from the last render. The exact
+  preview replaces it a few seconds later, then the full-quality picture. The status line says
+  "Live preview" while the estimate is on screen. See ADR-0099.
+
+## Faster retouching - 2026-10-07
+
+- A brush stroke or an applied retouch step now re-renders only that step: the photo before
+  and after the saved retouch is kept, so a stroke on a retouched 6 MP portrait shows in 0.7 s
+  (was 4.6 s) and at full quality in 1.9 s (was 16.5 s). Before/after views reuse it too.
+- Rendering a retouched photo from scratch is about 25-50 % faster: brush selections, mattes
+  and their edges are computed on every processor core, and operations that share a selection
+  compute it once. Results are pixel-for-pixel the same.
+- The quick look is shown first and the full-quality picture is made after it, so the quick
+  look arrives sooner, and dragging a slider no longer renders full quality for every
+  in-between setting. A resting brush stroke is upgraded to full quality automatically.
+  See ADR-0098.
+
+## Full-quality previews that stay loaded - 2026-10-07
+
+- The editor now shows the photograph at its own resolution, rendered from the original file,
+  instead of an optimised 2048-pixel proxy - edited, original, before and after alike - with
+  every stage run as an export runs them. A quick look appears within seconds and the
+  full-quality picture replaces it when ready; the status line says which is on screen.
+- Every finished preview is kept in the window, in the app and on disk, so a photograph opens
+  instantly when you return to it - after another section, another photo or a restart - and the
+  editor stays where you left it while you visit other sections. A changed edit is always
+  rendered fresh. **Clear cache** removes the saved previews too.
+- Retouch rendering is several times faster: the frequency-separation blur no longer slows down
+  with its radius, and the heavy steps use every processor core while giving the same result on
+  every machine. A retouched 6 MP portrait renders at full quality in about 17 s instead of 91 s.
+  See ADR-0097.
+
+## Dark circles corrected where they are - 2026-10-07
+
+- Fix dark circles under the eyes staying dark while the skin below them turned pale or
+  white. The correction is now measured on the crescent just below the lower lashes against
+  the same person's cheek below it, and lifts most of the shadow toward that cheek - its
+  purple or brown cast too - without ever making the area lighter than the cheek, and with
+  the pores, fine lines and lashes left as they were. It is kept off the eye, the lids and the
+  lashes by its own lid guard instead of being switched off by the whole eye-socket guard. In
+  Auto advanced retouch it runs with the eyes, after every light change on the face, so it
+  matches the cheek as that cheek finally looks. Saved older corrections render as before.
+  See ADR-0094.
+
+## Auto advanced retouch - 2026-10-07
+
+- Add **Auto advanced retouch** in Retouch: the whole professional workflow, run
+  automatically and in order - RAW foundation, lens and perspective, background, hair, skin
+  cleanup, selective frequency separation, micro, medium and global dodge and burn, skin
+  colour, eyes/lips/teeth, clothing, jewellery, background toning, colour grade, grain,
+  output sharpening, quality control - with the window showing each step as it runs. Every
+  step is inspected and reported; each one that changes the photo is its own history step.
+- New measured steps: horizon levelling from straight background lines (people excluded),
+  backdrop dust and clothing marks healed from a clean donor beside them, clear stray hairs
+  faded, burnt-out jewellery reflections tamed, a background brighter than the face lowered
+  gently, fine grain on clean retouched files, and quality control that measures texture
+  kept, skin colour drift, clipping and both halves of each face - softening a step and
+  measuring again when needed. Textured backgrounds and fabric, soft hair edges and white
+  backdrops are left alone. Nothing is reshaped; moles and freckles are kept. See ADR-0093.
+
+## Acne clear and the blemish brush - 2026-10-07
+
+- Add **acne clear**: every pimple, red mark and brown mark is measured against a robust
+  estimate of the clean skin around it - a local percentile, so a shadow is compared with the
+  shadow and a mark in a cluster with the clean skin between the marks - and rebuilt from the
+  skin right around it, keeping its pores and never made darker than it was. Leftover redness
+  is evened in proportion, colour first. The automatic pass uses it in place of frequency
+  healing, over a selection that now includes the nose (never the nostrils) and the brow bone.
+- Mark repair is no longer kept off the nose by *Preserve nose detail*, which still keeps
+  smoothing and toning off it; the upper lid stays protected while the skin just above and
+  between the brows can be repaired.
+- No donor spot repairs over skin acne clear evened (they showed as disks), and the texture
+  restore after it borrows nothing and does not put the marks' crusts back.
+- Add the **Blemish brush**: paint over anything left and apply. Without a skin matte, acne
+  clear works on what is painted, small bumps included.
+- **Show retouched areas** can also show the pixels the retouch changed. See ADR-0092.
 
 ## Eye and nose protection, saved retouch coverage - 2026-10-06
 

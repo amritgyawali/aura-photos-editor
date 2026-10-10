@@ -1,4 +1,4 @@
-# ADR-0094: Healing all detected visible skin and confirmed residual spots
+# ADR-0110: Healing all detected visible skin and confirmed residual spots
 
 Date: 2026-10-10
 

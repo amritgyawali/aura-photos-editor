@@ -381,7 +381,11 @@ fn plan(
         .zip(&found)
         .map(|(around, own)| own.max((around * 2.0).min(1.0)))
         .collect();
-    let donors = healed.iter().any(|v| *v > 0.0).then(|| {
+    // After acne clear (ADR-0092) a healed mark already kept this skin's own pores, so nothing
+    // is borrowed: the mark is left as it was healed and only skin that smoothing flattened
+    // gets its own detail back.
+    let keep_healed = edit.preserve_microtexture;
+    let donors = (!keep_healed && healed.iter().any(|v| *v > 0.0)).then(|| {
         borrowed(
             &fine_original,
             original,
@@ -401,6 +405,7 @@ fn plan(
                     let lent = limit(grafted[i] * regional[i]) * wanted;
                     own + healed[i] * (lent - own)
                 }
+                None if keep_healed => own + healed[i] * (fine_now[i] - own),
                 _ => own,
             };
             (target - fine_now[i]).clamp(-MAX_CHANGE, MAX_CHANGE)

@@ -54,20 +54,19 @@ AURA opens on **Start**, three steps on one page:
 How profiles adapt to each photo, and how the learned ones were measured, is in
 [edit-profiles.md](edit-profiles.md).
 
-## Start with an Instagram reference
+## Start with a reference look
 
-The second step on the start screen is **Instagram style matching**. Paste a
-public photographer profile and choose **Analyze Instagram style**, or use
-**Use saved reference photos** for a folder of at least 8 distinct JPEG/PNG images.
-Reference analysis works before a target collection exists. It shows the measured
-palette, tonal character, color lean, actual photo count and skipped files.
+The second step on the start screen is **Match a look**. Choose **Choose reference photos** for a
+folder of at least 8 distinct JPEG/PNG images, or **Use my Instagram data export** for the unzipped
+folder Instagram sends when you request your own data (Settings -> Your activity -> Download your
+information); AURA finds the posted photos inside it. An optional name labels the look.
+Reference analysis works before a target collection exists. It shows the measured palette, tonal
+character, color lean, actual photo count and skipped files.
 
-Instagram retrieval uses Python + Instaloader (`python -m pip install instaloader`).
-It makes anonymous requests; it does not read browser cookies or credentials.
-Choose 60, 240, or all accessible photos up to 2,000. Retrieval also stops at
-512 MB or ten minutes. Private profiles, login requirements and rate limits are
-reported; the app does not claim full-profile coverage when only a sample arrived.
-Instagram can block even public profiles. Saved references remain available offline.
+AURA downloads nothing. Earlier builds could fetch a public Instagram profile through Python and
+Instaloader; that was removed (ADR-0106) because customers do not have Python installed and
+automated collection from Instagram is against its terms of use. Use photos you have the right to
+use - your own work, or images saved for personal reference.
 
 When a reference is ready, **Choose your photos** creates a collection if needed,
 imports the selection, and automatically fits the style to each image. **Apply to

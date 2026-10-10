@@ -1,4 +1,4 @@
-# ADR-0093: Adjustable skin cleanup and pore refinement
+# ADR-0109: Adjustable skin cleanup and pore refinement
 
 Date: 2026-10-10
 

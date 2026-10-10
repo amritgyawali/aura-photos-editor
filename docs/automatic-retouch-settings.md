@@ -20,15 +20,23 @@ below; change any of them and it becomes *Custom*.
 
 The order a retoucher works in, as one press:
 
-1. **Frequency healing** rebuilds the tone under every compact mark from the clean skin
-   around it and leaves the pores where they are. It runs first, on the photograph as taken.
+1. **Frequency healing** rebuilds the tone under measured compact marks from nearby clean
+   skin while retaining pore texture. It runs first on the original photograph, with
+   eye and nose exclusions applied before planning residual repairs.
 2. **Skin smoothing, tone and light evening, micro dodge & burn** - gentle: 35 % smoothing
-   and no pore refinement, because the healing has already removed the blemishes.
-3. **Spot repairs** with real donor texture, planned on what frequency healing left.
+   and no pore refinement. Healing does not guarantee every blemish was removed.
+3. **Local donor spot repairs** address remaining supported marks. Donors, lighting fits,
+   full skin clearance and protected structures are checked before a repair is saved.
 4. **The frequency-separation finish**, which evens mid-scale unevenness and keeps the
    fine band.
-5. **Restore skin texture** last: this face's own pores put back where the steps above
-   removed them, nose included, with oily glints and deep pits limited.
+5. **Restore skin texture** last: original pore detail is restored where smoothing removed
+   it, with glints and deep pits limited. Healed blemishes can borrow clean donor texture.
+
+The manual **Blemish brush** uses the newer Acne Clear renderer for painted selections.
+The automatic planner currently retains the independently validated frequency-healing and
+local-donor route. Historical Acne Clear automatic benchmark results describe a different
+planner revision. See [current workflow status](evoto-style-workflows.md) and the
+[native validation record](retouch-recovery-validation.md).
 
 Steps 1, 4 and 5 work on the whole face, including the side in shadow. A segmenter is often
 unsure of skin in deep shadow - most often on darker skin - so where it left skin out, any
@@ -81,12 +89,12 @@ main subject only, skin mask precision, mask edge softness, protect beard and st
 micro dodge & burn, refine pores, reduce shine, reduce redness, skin glow, skin brightness,
 skin warmth, skin tint, restore skin texture.
 
-**Blemishes** - deep blemish cleanup, remove dark marks, frequency healing, blemish
+**Blemishes** - deep blemish cleanup, remove dark marks, acne clear, blemish
 sensitivity, most spots per face, keep freckles.
 
-*Frequency healing* and *Restore skin texture* are off at 0% and off in every preset except
-Professional retouch. Frequency healing's strength is how completely the tone under a mark is
-rebuilt; restore skin texture runs from 60% of the detail the photograph had (at the lowest
+*Acne clear* is on in Acne only, Deep acne cleanup and Professional retouch, and off at 0%
+elsewhere; *Restore skin texture* is on only in Professional retouch. Acne clear's strength is
+how completely the tone under a mark is rebuilt; restore skin texture runs from 60% of the detail the photograph had (at the lowest
 setting) to all of it.
 
 **Lines & wrinkles** - forehead lines, crow's feet, smile lines, under-eye lines, neck lines.
