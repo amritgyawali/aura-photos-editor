@@ -6,7 +6,8 @@ import { editProfiles, readProfileSelection, saveProfileSelection, swatchGradien
 vi.mock('../../ipc/client', () => ({
   inTauri: () => true,
   asIpcError: (e: Error) => ({ message: e.message }),
-  editProfiles: { list: vi.fn(), preview: vi.fn(), apply: vi.fn() },
+  editProfiles: { list: vi.fn(), preview: vi.fn(), apply: vi.fn(), learnLightroom: vi.fn(), deletePersonal: vi.fn() },
+  pickLightroomCatalog: vi.fn(),
 }));
 
 const profile = (id: string, name: string, category: string, origin: 'researched' | 'learned' = 'researched'): EditProfile => ({

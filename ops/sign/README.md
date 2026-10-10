@@ -12,6 +12,33 @@ The timestamp is not optional. Without it, every copy of the application stops v
 certificate expires — which for a photographer who installed it two years ago is an operating system
 refusing to launch software that has not changed.
 
+### The certificate AURA uses (ADR-0107)
+
+The seller is an individual in Nepal, which rules out Microsoft Trusted Signing (organisations and
+individuals in a few countries only). The choice is an **individual code-signing certificate held
+in a certificate authority's cloud HSM**, which satisfies the CA/Browser Forum rule that code-signing
+keys live in hardware without a USB token to lose:
+
+- **Certum Standard Code Signing in the Cloud** (shop.certum.eu), from about EUR 209. Individuals
+  qualify with an identity document (automatic online verification) and a utility bill in their
+  name. Signing goes through the *SimplySign Desktop* app, which presents the cloud key to Windows
+  as a smart card, and `signtool`.
+- Alternative: SSL.com IV code signing (US$129/yr) plus eSigner (from US$15/month), also via
+  `signtool`.
+
+Since February 2026 a code-signing certificate is valid for at most 459 days, so a multi-year
+purchase means a free re-issue each year. An individual certificate shows the seller's legal name
+as the publisher. SmartScreen reputation builds with downloads for OV and EV certificates alike;
+the first few hundred installs may still see a "not commonly downloaded" notice.
+
+**On this machine:** install the *Windows SDK* "Signing Tools for Desktop Apps" (for `signtool`)
+and *SimplySign Desktop*, log in to SimplySign, find the certificate's SHA-1 thumbprint
+(`certutil -user -store My`), then:
+
+```bash
+AURA_SIGN_COMMAND='signtool sign /sha1 <thumbprint> /fd sha256 /tr http://time.certum.pl /td sha256 /d "AURA Photo Studio" %1'   scripts/build-installer.sh <runtime-dir>
+```
+
 ## macOS
 
 `codesign --options runtime --timestamp` with a Developer ID Application certificate, hardened

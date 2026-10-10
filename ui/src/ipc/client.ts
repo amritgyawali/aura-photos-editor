@@ -128,7 +128,6 @@ export type ReferenceAnalysis = {
   brightness: number; contrast: number; warmth: number; saturation: number;
 };
 export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
-export type FetchReport = { folder: string; fetched: number; skipped: number; complete: boolean; message: string };
 export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
 
 export type HslShift = { h: number; s: number; l: number };
@@ -140,11 +139,15 @@ export type ProfileAdjust = {
 };
 export type EditProfile = {
   id: string; name: string; category: string; tagline: string; description: string; bestFor: string[];
-  technique: string[]; origin: 'researched' | 'learned'; sources: { title: string; url: string }[];
+  technique: string[]; origin: 'researched' | 'learned' | 'personal'; sources: { title: string; url: string }[];
   evidence: { dataset: string; trainingPairs: number; heldOutPairs: number; autoDe00: number; profileDe00: number } | null;
+  /** A personal profile's per-photograph model, when it was learned with the originals at hand. */
+  adaptive?: { photos: number; heldOutGain: Record<string, number> } & Record<string, unknown>;
   swatch: string[]; adjust: ProfileAdjust;
 };
 export type ProfileSelection = { profileId: string; strength: number };
+/** A personal style learned from a photographer's own Lightroom catalogue. */
+export type LearnedStyle = { profile: EditProfile; photos: number; edited: number; findings: string[] };
 export type ApplyProfileReport = { profileId: string; changed: number; protectedFields: string[]; adaptations: string[] };
 export type ProfilePreview = { profileId: string; before: string; after: string; adaptations: string[] };
 
@@ -166,11 +169,40 @@ export const editProfiles = {
     invoke<ApplyProfileReport>('apply_edit_profile', { input: { photoId, profileId, strength } }),
   preview: (profileId: string, strength: number, photoId?: string | null, size?: number) =>
     invoke<ProfilePreview>('preview_edit_profile', { input: { profileId, strength, photoId: photoId ?? null, size: size ?? null } }),
+  /** Learn the photographer's own look from the develop settings in a Lightroom Classic catalogue. */
+  learnLightroom: (catalog: string, name: string) =>
+    invoke<LearnedStyle>('learn_lightroom_style', { input: { catalog, name } }),
+  deletePersonal: (id: string) => invoke<void>('delete_personal_style', { id }),
 };
 
+/** Where this installation stands: trial, licensed, ended. Editing never depends on it. */
+export type LicenceStatus = {
+  state: 'licensed' | 'expired' | 'trial' | 'trial_ended'; mayExport: boolean;
+  name: string | null; email: string | null; edition: string | null; expires: string | null;
+  daysLeft: number | null; trialEnds: string | null; message: string;
+  /** A subscription: renews from the licence server rather than by pasting a key. */
+  renews: boolean; renewalDue: boolean;
+};
+export const licence = {
+  status: () => invoke<LicenceStatus>('licence_status'),
+  activate: (key: string) => invoke<LicenceStatus>('activate_licence', { key }),
+  deactivate: () => invoke<LicenceStatus>('deactivate_licence'),
+  /** Fetch the current key for this machine's subscription. */
+  refresh: () => invoke<LicenceStatus>('refresh_licence'),
+};
+
+/** Ask the desktop for a Lightroom Classic catalogue (.lrcat); cancel returns null. */
+export async function pickLightroomCatalog(): Promise<string | null> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: false, multiple: false, title: 'Choose your Lightroom Classic catalogue',
+      filters: [{ name: 'Lightroom catalogue', extensions: ['lrcat'] }] },
+  });
+  return Array.isArray(result) ? result[0] ?? null : result;
+}
+
 export const referenceStyle = {
-  fetch: (address: string, limit: number, cancelId: string) => invoke<FetchReport>('fetch_instagram_references', { input: { address, limit, cancelId } }),
-  analyse: (address: string, folder: string, cancelId: string) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId } }),
+  /** Measure a folder of reference photos, or an Instagram data export when `fromExport`. Nothing is downloaded. */
+  analyse: (address: string, folder: string, cancelId: string, fromExport = false) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId, export: fromExport } }),
   apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null) => invoke<ApplyReport>('apply_reference_style', {
     input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null } }),
 };

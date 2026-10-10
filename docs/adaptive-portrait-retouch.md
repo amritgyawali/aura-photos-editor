@@ -9,9 +9,16 @@ the fallback stops at the first orientation with confident faces.
 For each suitable face, AURA compares cheek/forehead patches and chooses a
 representative low-variation color sample. Color outliers, clipped samples and
 very dark/noisy patches are rejected. Texture, tone and local-light strengths
-are bounded and depend on measured variation within that face. Low signal gets
-gentler correction. Eye/mouth exclusions and fine-detail preservation remain.
-This is geometric and sampled-color targeting, not learned semantic segmentation.
+are bounded and depend on relative variation within that face. Skin brightness
+alone is never classified as shadow or used as a complexion target. The bundled
+person segmenter selects face/body skin; landmark and sampled-colour targeting
+provide its fallback. Eye/mouth exclusions and fine-detail preservation remain.
+
+New **Natural** settings keep more original pore detail and leave body-to-face
+colour matching off. Even skin receives no unnecessary colour replacement;
+directional light reduces colour evening as well as light evening. Saved choices
+remain intact. Dense patterns keep ambiguous marks while the whole-face search
+can propose distinctly red compact spots. See [ADR-0096](adr/ADR-0096-complexion-faithful-automatic-retouch.md).
 
 In Develop or Retouch, expand **Automatic decisions by face** to see the reason,
 detection confidence and three applied strengths for each face. Detection
@@ -24,7 +31,7 @@ Undo restores the prior version. Manual merges and snapshot restoration carry
 user provenance rather than inheriting the preceding automatic pass's label.
 
 The pinned YuNet weights are unchanged. Detection policy is
-`yunet-2023mar-aura320-rotation-v2`; planner policy is `sample-consensus-v3`.
+`yunet-2023mar-aura320-rotation-v2`; planner policy is `sample-consensus-v5`.
 No cloud service, account or model download is needed. No-face images can take
 longer because of bounded orientation fallbacks. `AURA_DISABLE_AUTO_PORTRAIT=1`
 still disables automatic portrait analysis.

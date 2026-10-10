@@ -20,6 +20,11 @@ switch them on:
 3. **Crash reporting** — off. When on, sends a stack trace and no filenames.
 4. **Dataset contribution** — off. When on, shares corrections and needs its own consent record.
 
+One more, and only if you buy a subscription: **licence renewal**. A few days before a paid period
+ends, AURA asks the shop for your renewed key, sending your subscription number and the email
+already in your key - nothing else, and never anything about your photographs (ADR-0107). A
+licence key itself is checked on your computer with no network at all.
+
 ## Faces
 
 AURA recognises people so it can tell you who is in a photograph and make sure the bride's father is
@@ -82,6 +87,15 @@ stage was running. Not which photograph, not which wedding, not which client, no
 
 `ops/crash/telemetry.toml` lists every field that can be sent. It is short, and it is meant to be
 read rather than trusted.
+
+### The graphics-card runtime
+
+When ONNX Runtime and DirectML are installed beside AURA (ADR-0103) for the Subject, Sky and
+Objects masks, all of the work happens on your computer. **Your photographs never leave it.**
+Microsoft's licence for DirectML, the component that lets ONNX Runtime use the graphics card,
+says the component may send Microsoft information about how it is used. AURA itself sends
+nothing. If that matters to you, leave the DirectML files out: masking still works, with the
+person segmenter for the subject and the measured detector for the sky, and without Objects.
 
 ## Support bundles
 

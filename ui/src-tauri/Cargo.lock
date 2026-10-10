@@ -137,7 +137,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "aura-app"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-brain-gallery",
  "aura-brain-photo",
@@ -158,6 +158,7 @@ dependencies = [
  "aura-ingest",
  "aura-jobs",
  "aura-learn",
+ "aura-licence",
  "aura-look",
  "aura-models",
  "aura-people",
@@ -175,6 +176,7 @@ dependencies = [
  "dirs 5.0.1",
  "fs4",
  "parking_lot",
+ "rayon",
  "rusqlite",
  "serde",
  "serde_json",
@@ -185,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "aura-brain-gallery"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -202,7 +204,7 @@ dependencies = [
 
 [[package]]
 name = "aura-brain-photo"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -223,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "aura-brain-wedding"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-cloud",
@@ -244,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "aura-cache"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "blake3",
@@ -256,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "aura-catalog"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "blake3",
@@ -272,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "aura-cloud"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -292,7 +294,7 @@ dependencies = [
 
 [[package]]
 name = "aura-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "dirs 5.0.1",
  "parking_lot",
@@ -307,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "aura-cull"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -323,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "aura-curate"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-cloud",
@@ -338,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "aura-delivery"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -352,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "aura-desktop"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-app",
  "aura-core",
@@ -369,7 +371,7 @@ dependencies = [
 
 [[package]]
 name = "aura-explain"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -384,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "aura-export"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -403,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "aura-generative"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -421,7 +423,7 @@ dependencies = [
 
 [[package]]
 name = "aura-geometry"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -436,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "aura-index"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -452,20 +454,22 @@ dependencies = [
 
 [[package]]
 name = "aura-infer"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
+ "ort",
  "parking_lot",
  "rayon",
  "serde",
  "serde_json",
+ "sha2",
  "time",
  "tracing",
 ]
 
 [[package]]
 name = "aura-ingest"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -486,7 +490,7 @@ dependencies = [
 
 [[package]]
 name = "aura-jobs"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -503,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "aura-learn"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -518,8 +522,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aura-licence"
+version = "1.0.0"
+dependencies = [
+ "ed25519-dalek",
+ "serde",
+ "serde_json",
+ "time",
+]
+
+[[package]]
 name = "aura-look"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -539,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "aura-models"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "aura-infer",
@@ -554,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "aura-people"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -574,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "aura-portrait"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-raw",
  "rayon",
@@ -583,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "aura-preview"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-cache",
  "aura-catalog",
@@ -597,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "aura-qc"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-cloud",
@@ -612,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "aura-raw"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "jpeg-encoder",
@@ -626,7 +640,7 @@ dependencies = [
 
 [[package]]
 name = "aura-recipe"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -640,7 +654,7 @@ dependencies = [
 
 [[package]]
 name = "aura-render"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-core",
  "aura-portrait",
@@ -657,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "aura-restore"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -673,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "aura-retouch"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -690,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "aura-style"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -711,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "aura-vision"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "aura-catalog",
  "aura-core",
@@ -2736,7 +2750,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e9ec52138abedcc58dc17a7c6c0c00a2bdb4f3427c7f63fa97fd0d859155caf"
 dependencies = [
  "gtk-sys",
- "libloading",
+ "libloading 0.7.4",
  "once_cell",
 ]
 
@@ -2763,6 +2777,16 @@ checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
 dependencies = [
  "cfg-if",
  "winapi",
+]
+
+[[package]]
+name = "libloading"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "754ca22de805bb5744484a5b151a9e1a8e837d5dc232c2d7d8c2e3492edc8b60"
+dependencies = [
+ "cfg-if",
+ "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -2839,6 +2863,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "matrixmultiply"
+version = "0.3.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f607c237553f086e7043417a51df26b2eb899d3caff94e6a67592ff992fedc7"
+dependencies = [
+ "autocfg",
+ "rawpointer",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2908,6 +2942,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13d2233c9842d08cfe13f9eac96e207ca6a2ea10b80259ebe8ad0268be27d2af"
 
 [[package]]
+name = "ndarray"
+version = "0.17.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520080814a7a6b4a6e9070823bb24b4531daac8c4627e08ba5de8c5ef2f2752d"
+dependencies = [
+ "matrixmultiply",
+ "num-complex",
+ "num-integer",
+ "num-traits",
+ "portable-atomic",
+ "portable-atomic-util",
+ "rawpointer",
+]
+
+[[package]]
 name = "ndk"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2960,6 +3009,15 @@ dependencies = [
  "rand",
  "smallvec",
  "zeroize",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73f88a1307638156682bada9d7604135552957b7818057dcef22705b4d509495"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -3232,6 +3290,25 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
+name = "ort"
+version = "2.0.0-rc.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7de3af33d24a745ffb8fab904b13478438d1cd52868e6f17735ef6e1f8bf133"
+dependencies = [
+ "libloading 0.9.0",
+ "ndarray",
+ "ort-sys",
+ "smallvec",
+ "tracing",
+]
+
+[[package]]
+name = "ort-sys"
+version = "2.0.0-rc.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7b497d21a8b6fbb4b5a544f8fadb77e801a09ae0add9e411d31c6f89e3c1e90"
 
 [[package]]
 name = "p256"
@@ -3665,6 +3742,12 @@ name = "raw-window-handle"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
+
+[[package]]
+name = "rawpointer"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
 
 [[package]]
 name = "rayon"

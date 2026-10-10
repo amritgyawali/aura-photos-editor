@@ -3,17 +3,36 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { nativeRetouch, freshRetouch } from '../../ipc/nativeRetouch';
 import { develop } from '../../ipc/client';
+import { forgetPreviews } from '../../state/previewCache';
 
-vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn()}}));
+vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
 vi.mock('../../ipc/client',()=>({asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
 beforeEach(()=>{
-  vi.resetAllMocks();vi.mocked(nativeRetouch.edit).mockResolvedValue([]);
+  vi.resetAllMocks();forgetPreviews();vi.mocked(nativeRetouch.edit).mockResolvedValue([]);
   vi.mocked(nativeRetouch.preview).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(120,100,90)),notes:[]} as never);
   vi.mocked(nativeRetouch.selectionPreview).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(255,255,255))});
+  vi.mocked(nativeRetouch.savedSelection).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(255,255,255))});
   vi.mocked(develop.imageHistory).mockResolvedValue({canUndo:true,canRedo:false} as never);
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('shows saved coverage for the whole stack or one step without creating a draft or writing edits',async()=>{
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button',{name:'Show retouched areas'}));
+  await screen.findByAltText('Saved retouch coverage');
+  expect(nativeRetouch.savedSelection).toHaveBeenCalledWith('project','photo',null);
+  fireEvent.change(screen.getByLabelText('Show selection for'),{target:{value:'saved'}});
+  await waitFor(()=>expect(nativeRetouch.savedSelection).toHaveBeenLastCalledWith('project','photo','saved'));
+  await screen.findByAltText('Saved retouch coverage');
+  fireEvent.change(screen.getByLabelText('Overlay visibility'),{target:{value:'.8'}});
+  expect(nativeRetouch.savedSelection).toHaveBeenCalledTimes(2);
+  expect(nativeRetouch.draftPreview).not.toHaveBeenCalled();
+  fireEvent.keyDown(screen.getByRole('region',{name:'Native retouch workspace'}),{key:'Enter'});
+  expect(vi.mocked(nativeRetouch.edit).mock.calls.every(call=>call[2]==='list')).toBe(true);
+  fireEvent.click(screen.getByRole('button',{name:'Show before retouch'}));
+  expect(screen.queryByAltText('Saved retouch coverage')).toBeNull();
+});
 it('restores distinct saved retouch choices after switching photos and undoing', async () => {
   const saved = (photoId: string, recipeHash: string, scope: string, smoothing: number) => ({ photoId, recipeHash,
     body: JSON.stringify({ studio_portrait_auto_v1: { options: { scope, intensity: .6, teeth: false, settings: { smoothing } } } }) }) as never;
@@ -277,6 +296,30 @@ it('authors a brush mask using keyboard coordinates and saves one operation',asy
     expect.objectContaining({mask:{strokes:[expect.objectContaining({erase:false,points:[[.3,.45,1]]})]}})
   ]));
 });
+it('the blemish brush paints acne clear over what is left and saves it as one operation',async()=>{
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button',{name:'Blemish brush'}));
+  expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('acne_clear');
+  expect(screen.getByText('Brush (B)').getAttribute('aria-pressed')).toBe('true');
+  // Nothing painted yet: nothing to apply.
+  expect((screen.getByText('Apply retouch') as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Center X (%)'),{target:{value:'40'}});
+  fireEvent.click(screen.getByText('Dab at target coordinates'));
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'acne_clear',matte:null,keepDarkMarks:false,preserveMicrotexture:true,
+      mask:{strokes:[expect.objectContaining({erase:false,points:[[.4,.45,1]]})]}})
+  ]));
+});
+it('shows the pixels the saved retouch changed without asking the backend',async()=>{
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button',{name:'Show retouched areas'}));
+  fireEvent.change(screen.getByLabelText('Show'),{target:{value:'changes'}});
+  await screen.findByAltText('Saved retouch coverage');
+  expect(screen.getByText(/Orange marks every pixel the saved retouch changed/)).toBeTruthy();
+  expect(screen.queryByLabelText('Show selection for')).toBeNull();
+});
 it('duplicates and reorders saved operations through native history actions',async()=>{
   vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'one'},{...freshRetouch(),id:'two'}]);
   open();await screen.findByAltText('Retouched photograph');
@@ -301,4 +344,18 @@ it('requires a skin sample and saves range, detail and edge controls with full-f
   await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
     expect.objectContaining({tool:'skin_smooth',source:[.45,.4],region:[.5,.5,1,1],mask:null,texture:1.1,skin:{tolerance:.12,edgeProtection:.9,connected:true}})
   ]));
+});
+it('runs Auto advanced retouch through the workspace and reloads the stack afterwards', async () => {
+  const { advancedRetouch } = await import('../../ipc/advancedRetouch');
+  const run = vi.spyOn(advancedRetouch, 'run').mockResolvedValue({ recipe: {} as never, report: { version: '', faces: 0, stages: [], historySteps: 0, summary: 'All 18 stages ran in order.',
+    quality: { textureRetention: null, skinShift: null, clippedOriginal: null, clippedFinal: null, mirrorBalance: null, passed: true, corrected: false } } });
+  vi.spyOn(advancedRetouch, 'onProgress').mockResolvedValue(() => {});
+  vi.mocked(develop.imageRecipe).mockResolvedValue({ photoId: 'photo', recipeHash: 'h', body: '{}' } as never);
+  open();
+  const button = await screen.findByRole('button', { name: 'Auto advanced retouch' });
+  await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+  const loads = vi.mocked(nativeRetouch.edit).mock.calls.length;
+  fireEvent.click(button);
+  await waitFor(() => expect(run).toHaveBeenCalledWith('project', 'photo'));
+  await waitFor(() => expect(vi.mocked(nativeRetouch.edit).mock.calls.length).toBeGreaterThan(loads));
 });

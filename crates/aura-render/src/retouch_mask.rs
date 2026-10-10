@@ -2,7 +2,9 @@
 // Buffers come from dimension-checked input; all coordinates are bounded before indexing.
 #![allow(clippy::indexing_slicing)]
 use aura_recipe::retouch_tools::{BrushStroke, Edit};
+use rayon::prelude::*;
 
+#[derive(Clone)]
 pub(crate) struct Coverage {
     pub bounds: [usize; 4],
     pixels: Option<Vec<f32>>,
@@ -53,12 +55,12 @@ impl Coverage {
                 ..self
             };
         }
-        let mut pixels = Vec::with_capacity((bounds[2] - bounds[0]) * (bounds[3] - bounds[1]));
-        for y in bounds[1]..bounds[3] {
-            for x in bounds[0]..bounds[2] {
-                pixels.push(self.at(x, y, w, h) * matte.at(x, y));
-            }
-        }
+        // Rows in parallel, joined in order: the same coverage on every machine.
+        let pixels: Vec<f32> = (bounds[1]..bounds[3])
+            .into_par_iter()
+            .flat_map_iter(|y| (bounds[0]..bounds[2]).map(move |x| (x, y)))
+            .map(|(x, y)| self.at(x, y, w, h) * matte.at(x, y))
+            .collect();
         Self {
             bounds,
             pixels: Some(pixels),
@@ -80,9 +82,10 @@ impl Coverage {
             base.bounds
         };
         let [x0, y0, x1, y1] = bounds;
-        let mut pixels = Vec::with_capacity((x1 - x0) * (y1 - y0));
-        for y in y0..y1 {
-            for x in x0..x1 {
+        let pixels: Vec<f32> = (y0..y1)
+            .into_par_iter()
+            .flat_map_iter(|y| (x0..x1).map(move |x| (x, y)))
+            .map(|(x, y)| {
                 let mut weight = selection.gradient.as_ref().map_or_else(
                     || base.at(x, y, w, h),
                     |g| {
@@ -119,9 +122,9 @@ impl Coverage {
                     };
                     weight *= t * t * (3.0 - 2.0 * t);
                 }
-                pixels.push(weight);
-            }
-        }
+                weight
+            })
+            .collect();
         Self {
             bounds,
             pixels: Some(pixels),
@@ -163,16 +166,19 @@ impl Coverage {
         let mut pixels = vec![0.0; len];
         let mut stroke_pixels = vec![0.0; len];
         for stroke in &mask.strokes {
-            stroke_pixels.fill(0.0);
+            stroke_pixels.par_iter_mut().for_each(|v| *v = 0.0);
             paint_stroke(&mut stroke_pixels, bounds, stroke, edit.feather, w, h);
-            for (value, coverage) in pixels.iter_mut().zip(&stroke_pixels) {
-                let alpha = coverage * stroke.opacity;
-                *value = if stroke.erase {
-                    *value * (1.0 - alpha)
-                } else {
-                    f32::max(*value, alpha)
-                };
-            }
+            pixels
+                .par_iter_mut()
+                .zip(stroke_pixels.par_iter())
+                .for_each(|(value, coverage)| {
+                    let alpha = coverage * stroke.opacity;
+                    *value = if stroke.erase {
+                        *value * (1.0 - alpha)
+                    } else {
+                        f32::max(*value, alpha)
+                    };
+                });
         }
         result.pixels = Some(pixels);
         result
@@ -193,7 +199,7 @@ impl Coverage {
     }
 }
 
-fn paint_stroke(
+pub(crate) fn paint_stroke(
     out: &mut [f32],
     bounds: [usize; 4],
     stroke: &BrushStroke,
@@ -233,19 +239,29 @@ fn paint_segment(out: &mut [f32], bounds: [usize; 4], a: [f32; 3], b: [f32; 3], 
     let dx = b[0] - a[0];
     let dy = b[1] - a[1];
     let length2 = dx * dx + dy * dy;
-    for y in y0..y1 {
-        for x in x0..x1 {
-            let px = x as f32 + 0.5 - a[0];
-            let py = y as f32 + 0.5 - a[1];
-            let t = if length2 > 0.00001 {
-                ((px * dx + py * dy) / length2).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            let distance =
-                (px - t * dx).hypot(py - t * dy) / (a[2] + t * (b[2] - a[2])).max(0.00001);
-            let i = (y - by) * (ex - bx) + x - bx;
-            out[i] = out[i].max(smooth(distance, feather));
-        }
+    if y1 <= y0 || x1 <= x0 {
+        return;
     }
+    // Each row of the segment's box is painted by one task; rows never overlap.
+    let stride = ex - bx;
+    out.par_chunks_mut(stride)
+        .enumerate()
+        .skip(y0 - by)
+        .take(y1 - y0)
+        .for_each(|(row, line)| {
+            let y = by + row;
+            for x in x0..x1 {
+                let px = x as f32 + 0.5 - a[0];
+                let py = y as f32 + 0.5 - a[1];
+                let t = if length2 > 0.00001 {
+                    ((px * dx + py * dy) / length2).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                let distance =
+                    (px - t * dx).hypot(py - t * dy) / (a[2] + t * (b[2] - a[2])).max(0.00001);
+                let i = x - bx;
+                line[i] = line[i].max(smooth(distance, feather));
+            }
+        });
 }

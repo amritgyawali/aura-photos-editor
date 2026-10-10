@@ -3259,19 +3259,6 @@ async fn enhance_photo(
 }
 
 #[tauri::command]
-async fn fetch_instagram_references(
-    state: State<'_, AppState>,
-    input: aura_app::reference_style::FetchInstagramInput,
-) -> IpcResult<aura_app::reference_style::FetchReport> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        aura_app::reference_style::fetch_instagram(&app, &input)
-    })
-    .await
-    .map_err(|_| background_request_failed())?
-}
-
-#[tauri::command]
 async fn analyse_reference_style(
     state: State<'_, AppState>,
     input: aura_app::reference_style::AnalyseReferenceInput,
@@ -3373,6 +3360,28 @@ async fn auto_retouch(
         .map_err(|_| background_request_failed())?
 }
 
+/// Auto advanced retouch: all eighteen stages of a professional retouch in order, each saved
+/// as its own history step. Streams an `advanced-retouch` event before and after every stage
+/// so the window can show the run step by step. ADR-0093.
+#[tauri::command]
+async fn auto_advanced_retouch(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    input: aura_app::advanced_retouch::AdvancedRetouchInput,
+) -> IpcResult<aura_app::advanced_retouch::AdvancedRetouchDto> {
+    use tauri::Emitter;
+    let shared = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::advanced_retouch::run(&shared, &input, &|progress| {
+            if let Err(error) = app.emit("advanced-retouch", progress) {
+                tracing::error!(target: "retouch", %error, "could not deliver retouch progress");
+            }
+        })
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn sync_settings(
     state: State<'_, AppState>,
@@ -3398,8 +3407,79 @@ async fn pick_white_balance(
 }
 
 #[tauri::command]
-async fn list_edit_profiles() -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
-    aura_app::edit_profiles::list_edit_profiles()
+async fn list_edit_profiles(
+    state: State<'_, AppState>,
+) -> IpcResult<Vec<aura_app::edit_profiles::EditProfile>> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::edit_profiles::list_edit_profiles(&state)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn licence_status(
+    state: State<'_, AppState>,
+) -> IpcResult<aura_app::licensing::LicenceStatus> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::licensing::licence_status(&state))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn activate_licence(
+    state: State<'_, AppState>,
+    key: String,
+) -> IpcResult<aura_app::licensing::LicenceStatus> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::licensing::activate_licence(&state, &key)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn refresh_licence(
+    state: State<'_, AppState>,
+) -> IpcResult<aura_app::licensing::LicenceStatus> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::licensing::refresh_licence(&state))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn deactivate_licence(
+    state: State<'_, AppState>,
+) -> IpcResult<aura_app::licensing::LicenceStatus> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::licensing::deactivate_licence(&state))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn learn_lightroom_style(
+    state: State<'_, AppState>,
+    input: aura_app::personal_style::LearnInput,
+) -> IpcResult<aura_app::personal_style::LearnedStyle> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::personal_style::learn_from_lightroom(&state, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn delete_personal_style(state: State<'_, AppState>, id: String) -> IpcResult<()> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::personal_style::delete(&state, &id))
+        .await
+        .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
@@ -3459,10 +3539,55 @@ async fn native_retouch_preview(
     project_id: String,
     photo_id: String,
     before: bool,
+    quality: Option<String>,
 ) -> IpcResult<RenderDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        aura_app::native_retouch::preview(&app, &project_id, &photo_id, before)
+        aura_app::native_retouch::preview_at(
+            &app,
+            &project_id,
+            &photo_id,
+            before,
+            aura_app::native_retouch::Quality::parse(quality.as_deref()),
+        )
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// A live preview while a setting changes: the retouch carried over from the last render.
+/// `None` until there is one to carry. ADR-0099.
+#[tauri::command]
+async fn live_preview(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+    view: String,
+) -> IpcResult<Option<RenderDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::live_preview(&app, &project_id, &photo_id, &view)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// The photograph as taken, at full or fast quality, for Original and Compare. ADR-0097.
+#[tauri::command]
+async fn photo_original(
+    state: State<'_, AppState>,
+    project_id: String,
+    photo_id: String,
+    quality: Option<String>,
+) -> IpcResult<RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::original_at(
+            &app,
+            &project_id,
+            &photo_id,
+            aura_app::native_retouch::Quality::parse(quality.as_deref()),
+        )
     })
     .await
     .map_err(|_| background_request_failed())?
@@ -3489,6 +3614,73 @@ async fn native_retouch_selection_preview(
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         aura_app::native_retouch::selection_preview(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn native_retouch_saved_selection(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::CoverageInput,
+) -> IpcResult<aura_app::native_retouch::SelectionPreview> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::saved_selection(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// The masks of one photograph. ADR-0102.
+#[tauri::command]
+async fn local_masks(
+    state: State<'_, AppState>,
+    input: aura_app::local_mask_commands::LocalMasksInput,
+) -> IpcResult<aura_app::local_mask_commands::LocalMasksDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::local_mask_commands::list(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+/// Create a mask from an AI selection, a gradient or a brush, or add one to a mask. ADR-0102.
+#[tauri::command]
+async fn create_local_mask(
+    state: State<'_, AppState>,
+    input: aura_app::local_mask_commands::CreateMaskInput,
+) -> IpcResult<aura_app::local_mask_commands::LocalMasksDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::local_mask_commands::create(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// Store a photograph's masks as the panel has them. ADR-0102.
+#[tauri::command]
+async fn save_local_masks(
+    state: State<'_, AppState>,
+    input: aura_app::local_mask_commands::SaveMasksInput,
+) -> IpcResult<aura_app::local_mask_commands::LocalMasksDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::local_mask_commands::save_all(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// Where one mask is, for the overlay. ADR-0102.
+#[tauri::command]
+async fn local_mask_coverage(
+    state: State<'_, AppState>,
+    input: aura_app::local_mask_commands::MaskCoverageInput,
+) -> IpcResult<aura_app::local_mask_commands::MaskCoverageDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::local_mask_commands::coverage(&app, &input)
     })
     .await
     .map_err(|_| background_request_failed())?
@@ -3549,6 +3741,8 @@ fn main() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_title("AURA");
             }
+            // The learned masking models load while the window opens. ADR-0103.
+            aura_app::local_mask_commands::warm_up();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -3567,17 +3761,30 @@ fn main() {
             pick_white_balance,
             native_retouch_edit,
             native_retouch_selection_preview,
+            native_retouch_saved_selection,
+            local_masks,
+            create_local_mask,
+            save_local_masks,
+            local_mask_coverage,
             native_retouch_preview,
+            photo_original,
+            live_preview,
             native_retouch_draft_preview,
             list_edit_profiles,
+            learn_lightroom_style,
+            licence_status,
+            activate_licence,
+            deactivate_licence,
+            refresh_licence,
+            delete_personal_style,
             apply_edit_profile,
             preview_edit_profile,
-            fetch_instagram_references,
             analyse_reference_style,
             apply_reference_style,
             enhance_photo,
             enhance_portrait,
             auto_retouch,
+            auto_advanced_retouch,
             create_project,
             list_projects,
             start_ingest,

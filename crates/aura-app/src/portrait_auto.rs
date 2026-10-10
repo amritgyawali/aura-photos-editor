@@ -152,6 +152,11 @@ pub fn group_of(id: &str) -> Option<Group> {
             Group::Eyes
         } else if rest.ends_with("-teeth")
             || rest.ends_with("-shine")
+            || rest.starts_with("dust-")
+            || rest.starts_with("stray-")
+            || rest.starts_with("jewel-")
+            || rest.contains("-cloth-")
+            || rest == "background-tone"
             || rest.contains("-lips-")
             || rest.contains("-sculpt-")
             || rest.contains("-makeup-")
@@ -220,6 +225,11 @@ pub struct Plan {
     pub groups: BTreeMap<Group, Vec<Edit>>,
     /// Segmentation mattes the planned operations refer to, by id. ADR-0082.
     pub mattes: BTreeMap<String, Matte>,
+    /// What the segmenter found for each detected face, in face order, for later passes that
+    /// finish hair, clothes and the background without segmenting the photograph again.
+    pub people: Vec<skin::Person>,
+    /// The segmented background, when the segmenter ran.
+    pub background: Option<skin::Matte>,
 }
 
 /// The mattes a stack written from `plan` needs: the recipe's own (for operations a person
@@ -325,7 +335,7 @@ pub fn plan_with_faces(
         message: String::new(),
         faces: Vec::new(),
         assessments: Vec::new(),
-        planner_version: format!("sample-consensus-v3+{}", portrait_features::VERSION),
+        planner_version: format!("sample-consensus-v5+{}", portrait_features::VERSION),
         steps: Vec::new(),
         scene: None,
         options: Some(options),
@@ -340,6 +350,8 @@ pub fn plan_with_faces(
             report,
             groups,
             mattes,
+            people: Vec::new(),
+            background: None,
         });
     }
     let settings = options.settings;
@@ -490,6 +502,9 @@ pub fn plan_with_faces(
         } else {
             FacePlan::skip("")
         };
+        // Hands beside a face can be labelled body skin over an eyelid or lip. Body work
+        // must never double-retouch any detected face, including another person in a group.
+        exclude_body_faces(&mut body.edits, &report.faces, &mut mattes)?;
         // Hair and clothes are finished whatever skin was chosen, when asked for.
         let mut garments = Vec::new();
         if let Some(p) = person {
@@ -528,12 +543,14 @@ pub fn plan_with_faces(
         let mut clear: Option<Edit> = None;
         if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
-                // The surface selection frequency healing, the finish and the graft share.
+                // The heal selection acne clear works in: the surface selection the finish
+                // uses, with the nose and without the nostrils. ADR-0092. The texture restore
+                // runs over it too.
                 let surface = face_matte
                     .as_ref()
                     .filter(|_| settings.frequency_heal > 0.0 || settings.texture_graft > 0.0)
                     .and_then(|m| {
-                        portrait_features::deep_blemish::surface_matte(face, px, &m.matte)
+                        portrait_features::deep_blemish::heal_matte(face, px, &m.matte)
                             .map(|surface| (m, surface))
                     });
                 if let Some((m, surface)) = &surface {
@@ -543,26 +560,17 @@ pub fn plan_with_faces(
                     .filter(|_| options.blemishes);
                     if clear.is_some() {
                         mattes.insert(
-                            portrait_features::deep_blemish::surface_matte_id(PREFIX, index),
+                            portrait_features::deep_blemish::heal_matte_id(PREFIX, index),
                             surface.clone(),
                         );
                     }
                 }
-                // What is left after frequency healing is what the spot repairs are for.
-                let healed = clear
-                    .as_ref()
-                    .zip(surface.as_ref())
-                    .and_then(|(edit, (_, s))| {
-                        portrait_features::deep_blemish::after_frequency_heal(px, edit, s)
-                    });
-                let healed_px = healed.as_deref().and_then(|bytes| {
-                    portrait_features::Pixels::new(bytes, px.width as u32, px.height as u32)
-                });
-                let spot_px = healed_px.as_ref().unwrap_or(px);
                 let mut feature_options = options;
                 // Deep cleanup replaces the sparse four-patch search; never stack both. When the
                 // adaptive pass chose it, the sparse search still runs so the two can be compared.
-                if settings.deep_blemish_cleanup && chosen_deep {
+                // Acne clear replaces both: it measured every mark already, and a donor patch on
+                // skin it has evened shows as a disk. ADR-0092.
+                if (settings.deep_blemish_cleanup && chosen_deep) || clear.is_some() {
                     feature_options.blemishes = false;
                 }
                 features = portrait_features::plan(
@@ -574,11 +582,12 @@ pub fn plan_with_faces(
                     &feature_options,
                     face_matte.as_ref().map(|m| m.id.as_str()),
                 );
-                if options.blemishes && settings.deep_blemish_cleanup {
+                let mut finish_deep = false;
+                if options.blemishes && settings.deep_blemish_cleanup && clear.is_none() {
                     let deep = portrait_features::deep_blemish::plan(
                         face,
                         index,
-                        spot_px,
+                        px,
                         PREFIX,
                         &settings,
                         face_matte.as_ref().map(|m| &m.matte),
@@ -598,26 +607,25 @@ pub fn plan_with_faces(
                             features.blemishes.len()
                         ));
                     }
-                    if use_deep && (!features.blemishes.is_empty() || clear.is_some()) {
-                        if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
-                            portrait_features::deep_blemish::surface_finish(
-                                face, index, px, PREFIX, &settings, &m.matte,
-                            )
-                        }) {
-                            if let Some(id) = &finish.matte {
-                                mattes.insert(id.clone(), matte);
-                            }
-                            features.finishing.push(finish);
-                            features.report.findings.push("Deep cleanup: blended repaired skin with a continuous, feature-protected surface finish; strength follows Skin smoothing and texture follows Keep pore texture.".into());
+                    finish_deep = use_deep && !features.blemishes.is_empty();
+                }
+                if finish_deep || (clear.is_some() && settings.deep_blemish_cleanup) {
+                    if let Some((finish, matte)) = face_matte.as_ref().and_then(|m| {
+                        portrait_features::deep_blemish::surface_finish(
+                            face, index, px, PREFIX, &settings, &m.matte,
+                        )
+                    }) {
+                        if let Some(id) = &finish.matte {
+                            mattes.insert(id.clone(), matte);
                         }
+                        features.finishing.push(finish);
+                        features.report.findings.push("Deep cleanup: blended repaired skin with a continuous, feature-protected surface finish; strength follows Skin smoothing and texture follows Keep pore texture.".into());
                     }
                 }
                 if clear.is_some() {
                     features.report.findings.push(format!(
-                        "Frequency healing: rebuilt the tone under compact marks across this face from the clean skin around each one, keeping the pores in place; {} spot{} it left were then repaired with donor texture. {}",
-                        features.blemishes.len(),
-                        if features.blemishes.len() == 1 { "" } else { "s" },
-                        if settings.remove_dark_marks { "Dark marks are included; review freckles and beauty marks." } else { "Dark marks that are not redder than the skin around them are kept." },
+                        "Acne clear: measured every mark on this face - in clusters, on the nose and between the brows too - against the clean skin around it and rebuilt its tone and colour from that skin, keeping the pores in place, then evened leftover redness. No donor patches are copied over skin it evened. {}",
+                        if settings.remove_dark_marks { "Dark marks are included; review freckles and beauty marks." } else { "Dark marks that are not redder or browner than the skin around them are kept." },
                     ));
                 }
                 // The restore goes last: it puts back the pores everything before it cost,
@@ -646,6 +654,10 @@ pub fn plan_with_faces(
                         if let Some((id, matte)) = restore {
                             mattes.insert(id, matte);
                         }
+                        let mut graft = graft;
+                        // Acne clear kept each healed mark's own pores; borrowed tiles over a
+                        // face it evened read as cracked skin.
+                        graft.preserve_microtexture = clear.is_some();
                         features.finishing.push(graft);
                         features.report.findings.push("Texture restore: put this face's own pore detail back where healing and smoothing had removed it, in the same place it was photographed, with glints and deep pits limited to this skin's own range; only healed blemishes borrowed pores from clean skin nearby. Nothing is generated.".into());
                     }
@@ -654,6 +666,41 @@ pub fn plan_with_faces(
         }
         if clear.as_ref().is_some_and(|e| overridden.contains(&e.id)) {
             clear = None;
+        }
+        if (settings.protect_eye_area || settings.protect_nose_detail) && options.scope.face() {
+            if let Some(px) = &detail_pixels {
+                portrait_features::eye_guard::protect(
+                    face,
+                    px,
+                    plan.edits
+                        .iter_mut()
+                        .chain(clear.iter_mut())
+                        .chain(features.blemishes.iter_mut())
+                        .chain(features.refine.iter_mut())
+                        .chain(features.eyes.iter_mut())
+                        .chain(features.finishing.iter_mut()),
+                    &mut mattes,
+                    &format!("{PREFIX}{index}-feature-guard"),
+                    &settings,
+                )?;
+                features.report.findings.push(format!("Detail protection: eyes {}; nose {}. Protected eyes are excluded from every automatic face step, healing and texture restoration included; the dark-circle correction works only below the lower lashes. A protected nose keeps its pores, shape and shading out of smoothing and toning; marks on it are still repaired, and the nostrils are never touched. Manual edits remain available.", if settings.protect_eye_area { "protected" } else { "adjustable" }, if settings.protect_nose_detail { "protected" } else { "adjustable" }));
+            }
+        } else if options.scope.face() {
+            // Without detail protection the dark-circle correction still never reaches the
+            // eye itself, its lids or its lashes.
+            if let Some(px) = &detail_pixels {
+                portrait_features::eye_guard::protect(
+                    face,
+                    px,
+                    features
+                        .eyes
+                        .iter_mut()
+                        .filter(|e| portrait_features::eye_guard::is_dark_circle(e)),
+                    &mut mattes,
+                    &format!("{PREFIX}{index}-feature-guard"),
+                    &settings,
+                )?;
+            }
         }
         features.finishing.extend(garments);
         // A manually adjusted automatic step occupies its original slot. Do not add a
@@ -805,6 +852,8 @@ pub fn plan_with_faces(
         report,
         groups,
         mattes,
+        people: segmentation.people,
+        background: segmentation.background,
     })
 }
 
@@ -864,7 +913,9 @@ fn representative_sample(samples: &[Sample]) -> Option<(Sample, [f32; 3])> {
         .filter(|s| color_distance(s.chroma, chroma) <= 0.12)
         .collect();
     let score = |s: &&Sample| {
-        s.variation + color_distance(s.chroma, chroma) * 0.4 + (s.mean - luminance).abs() * 0.04
+        s.variation / s.mean.max(0.02) * 0.1
+            + color_distance(s.chroma, chroma)
+            + (s.mean / luminance.max(0.02)).ln().abs() * 0.04
     };
     let sample = **candidates
         .iter()
@@ -872,15 +923,14 @@ fn representative_sample(samples: &[Sample]) -> Option<(Sample, [f32; 3])> {
     let texture = median(candidates.iter().map(|s| s.variation));
     let color_spread = median(candidates.iter().map(|s| color_distance(s.chroma, chroma)));
     let light_spread = median(candidates.iter().map(|s| (s.mean - luminance).abs()));
-    // Low signal gets a gentler correction regardless of complexion. Variations
-    // are relative to each face's own signal rather than to a desired skin tone.
-    let signal = if luminance < 0.15 { 0.65 } else { 1.0 };
+    // Relative variation, not absolute skin brightness, decides the correction. Multiplying
+    // all samples by the same exposure must not classify a darker complexion as poor skin.
     Some((
         sample,
         [
-            (0.5 + texture / luminance.max(0.08) * 0.4).clamp(0.5, 0.8) * signal,
-            (0.25 + color_spread * 1.5).clamp(0.25, 0.5) * signal,
-            (0.2 + light_spread / luminance.max(0.08) * 0.5).clamp(0.2, 0.4) * signal,
+            (0.5 + texture / luminance.max(0.02) * 0.4).clamp(0.5, 0.8),
+            (0.25 + color_spread * 1.5).clamp(0.25, 0.5),
+            (0.2 + light_spread / luminance.max(0.02) * 0.5).clamp(0.2, 0.4),
         ],
     ))
 }
@@ -1026,7 +1076,7 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
     FacePlan {
         edits,
         sample: Some(sample),
-        reason: format!("Compared {} cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's texture, color variation and lighting. Eyes and mouth remain excluded.{}", candidates.len(), if sample.mean < 0.15 { " Low skin signal reduces correction strength." } else { "" }),
+        reason: format!("Compared {} cheek/forehead patches. Selected a representative low-variation sample; strengths follow this face's relative texture, color variation and lighting, without a target complexion. Eyes and mouth remain excluded.", candidates.len()),
     }
 }
 
@@ -1658,14 +1708,14 @@ fn segment(
 
 /// Mean local detail of a matte's fully covered area, in encoded luminance: about 0.01 on
 /// studio paper, several times that on brick, foliage or a room.
-const PLAIN_BACKDROP: f32 = 0.025;
+pub(crate) const PLAIN_BACKDROP: f32 = 0.025;
 
 #[allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
-fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
+pub(crate) fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
     let (w, h) = (width as usize, height as usize);
     let luma = |x: usize, y: usize| -> f32 {
         let i = (y.min(h - 1) * w + x.min(w - 1)) * 3;
@@ -1698,7 +1748,7 @@ fn matte_texture(m: &skin::Matte, rgb: &[u8], width: u32, height: u32) -> f32 {
 
 /// The matte shrunk by `cells` on every side (a minimum filter), so an operation that reads
 /// pixels around itself never reaches what lies outside the matte.
-fn erode(m: &skin::Matte, cells: usize) -> skin::Matte {
+pub(crate) fn erode(m: &skin::Matte, cells: usize) -> skin::Matte {
     let (w, h) = (m.width, m.height);
     let mut rows = vec![0_u8; w * h];
     for y in 0..h {
@@ -1808,6 +1858,57 @@ fn use_matte(edit: &mut Edit, matte: &MatteUse, size: [f32; 2]) {
     edit.mask = Some(BrushMask { strokes });
     edit.matte = Some(matte.id.clone());
     edit.skin = None;
+}
+
+/// Intersect body selections with the exterior of every detected face. Keep the original
+/// selection and sample; even a body-only pass or a colour-sampling fallback cannot change
+/// facial features. Vision already refined the body edges; further upsampling must not fill
+/// the protected face holes back in. ADR-0096.
+fn exclude_body_faces(
+    edits: &mut [Edit],
+    faces: &[PortraitFace],
+    mattes: &mut BTreeMap<String, Matte>,
+) -> AuraResult<()> {
+    let invalid = || {
+        aura_core::errors::render::recipe_invalid(
+            "body skin",
+            "Cannot validate the facial exclusions",
+        )
+    };
+    let mut created = BTreeMap::new();
+    for edit in edits {
+        let id = format!("{}-outside-faces", edit.matte.as_ref().unwrap_or(&edit.id));
+        if !created.contains_key(&id) {
+            let full;
+            let original = if let Some(existing) = &edit.matte {
+                mattes.get(existing).ok_or_else(invalid)?
+            } else {
+                full = Matte::encode([0.0, 0.0, 1.0, 1.0], 256, 256, &vec![255; 256 * 256]);
+                &full
+            };
+            let mut alpha = original.decode().ok_or_else(invalid)?;
+            let [l, t, r, b] = original.bounds;
+            let w = original.width as usize;
+            let dx = (r - l) / original.width as f32;
+            let dy = (b - t) / original.height as f32;
+            for (i, value) in alpha.iter_mut().enumerate() {
+                let x = l + (i % w) as f32 * dx + dx * 0.5;
+                let y = t + (i / w) as f32 * dy + dy * 0.5;
+                if faces.iter().any(|f| {
+                    let [left, top, right, bottom] = f.bounds;
+                    x >= left - dx && x <= right + dx && y >= top - dy && y <= bottom + dy
+                }) {
+                    *value = 0;
+                }
+            }
+            let mut matte = Matte::encode(original.bounds, original.width, original.height, &alpha);
+            matte.refine_edges = false;
+            created.insert(id.clone(), matte);
+        }
+        edit.matte = Some(id);
+    }
+    mattes.extend(created);
+    Ok(())
 }
 
 /// Scale the measured face-skin strengths by the photographer's settings.
@@ -2397,6 +2498,64 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overlapping_body_selections_never_change_any_detected_face() {
+        let (rgb, face) = person(None);
+        let mut edit = plan_face(&face, 0, &rgb, 200, 300).edits.remove(0);
+        edit.tool = Tool::Dodge;
+        edit.amount = 1.0;
+        edit.region = [0.5, 0.5, 1.0, 1.0];
+        edit.mask = None;
+        edit.skin = None;
+        edit.feather = 0.0;
+        let mut neighbour = face.clone();
+        neighbour.bounds = [0.65, 0.65, 0.85, 0.85];
+        let faces = [face, neighbour];
+        for has_matte in [false, true] {
+            let mut edit = edit.clone();
+            let mut mattes = BTreeMap::new();
+            if has_matte {
+                mattes.insert(
+                    "body".into(),
+                    Matte::encode([0., 0., 1., 1.], 32, 48, &vec![255; 32 * 48]),
+                );
+                edit.matte = Some("body".into());
+            }
+            let mut edits = [edit];
+            exclude_body_faces(&mut edits, &faces, &mut mattes).unwrap();
+            retouch_tools::validate(&edits).unwrap();
+            for (w, h) in [(100, 150), (400, 600)] {
+                let mut pixels = [0.3_f32, 0.2, 0.1].repeat(w * h);
+                let original = pixels.clone();
+                aura_render::retouch_tools::apply_with_mattes(&mut pixels, w, h, &edits, &mattes);
+                assert_ne!(
+                    pixels, original,
+                    "body correction still works outside faces"
+                );
+                for y in 0..h {
+                    for x in 0..w {
+                        // The pixel's centre: a pixel that only touches a face box with its
+                        // edge lies outside the face.
+                        let (fx, fy) = ((x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32);
+                        if faces.iter().any(|f| {
+                            fx >= f.bounds[0]
+                                && fx <= f.bounds[2]
+                                && fy >= f.bounds[1]
+                                && fy <= f.bounds[3]
+                        }) {
+                            let i = (y * w + x) * 3;
+                            assert_eq!(
+                                &pixels[i..i + 3],
+                                &original[i..i + 3],
+                                "body changed face at {x},{y}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn body_shine_is_not_duplicated_during_a_repeat_pass() {
         let (rgb, face) = person(None);
@@ -2439,7 +2598,7 @@ mod tests {
         )
         .unwrap();
         assert!(textured[0] > gentle[0]);
-        let (_, low_signal) = representative_sample(
+        let (_, darker) = representative_sample(
             &[Sample {
                 mean: 0.1,
                 variation: 0.001,
@@ -2447,7 +2606,12 @@ mod tests {
             }; 3],
         )
         .unwrap();
-        assert!(low_signal[0] < gentle[0]);
+        for (a, b) in gentle.into_iter().zip(darker) {
+            assert!(
+                (a - b).abs() < 1e-6,
+                "relative texture must not depend on complexion"
+            );
+        }
         let (_, uneven) = representative_sample(&[
             Sample { mean: 0.3, ..calm },
             calm,
@@ -2601,7 +2765,7 @@ mod tests {
         edited.id = format!("manual-{original_id}");
         edited.enabled = false;
         let mut recipe = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
-        retouch_tools::write(&mut recipe, &[edited.clone()]).unwrap();
+        retouch_tools::write_with_mattes(&mut recipe, &[edited.clone()], &initial.mattes).unwrap();
         let options = portrait_features::Options {
             settings: Settings {
                 ai_skin_detection: false,
@@ -2780,6 +2944,7 @@ mod tests {
         let settings = Settings {
             body_redness: 0.5,
             body_blemishes: 0.5,
+            match_body_to_face: 0.25,
             neck_lines: 0.5,
             ..Settings::default()
         };

@@ -6,6 +6,7 @@ type Props = {
   src: string | null; width: number; height: number; compare: boolean; disabled: boolean;
   beforeSrc?: string | null; split?: boolean;
   maskView?: boolean;
+  coverageView?: boolean;
   draft: NativeRetouchEdit; mode: RetouchMode; radius: number; opacity: number;
   overlay: boolean; sourceMode: boolean;
   onTarget: (point: [number, number]) => void; onSource: (point: [number, number]) => void;
@@ -32,7 +33,7 @@ export function RetouchCanvas(props: Props) {
     setActive(null);
     setCursor(null);
     setActiveGradient(null);
-  }, [split, props.maskView]);
+  }, [split, props.maskView, props.coverageView]);
   const maskId = useId().replaceAll(':', '');
   useEffect(() => {
     const element = viewport.current;
@@ -63,7 +64,7 @@ export function RetouchCanvas(props: Props) {
   const start = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 && event.button !== 1) return;
     if (gesture.current) return;
-    const pan = mode === 'pan' || event.button === 1 || split || props.maskView;
+    const pan = mode === 'pan' || event.button === 1 || split || props.maskView || props.coverageView;
     if (!pan && (disabled || compare || !src)) return;
     event.preventDefault();
     event.currentTarget.focus({ preventScroll: true });
@@ -104,12 +105,12 @@ export function RetouchCanvas(props: Props) {
     if (!current || current.id !== event.pointerId) return;
     gesture.current = null; setActive(null); setActiveGradient(null);
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    if (!cancel && !disabled && !compare && !split && !props.maskView && current.gradient) {
+    if (!cancel && !disabled && !compare && !split && !props.maskView && !props.coverageView && current.gradient) {
       const [x,y] = position(event);
       if (Math.hypot(current.gradient[0]-x,current.gradient[1]-y)<.001) props.onNotice('Drag a longer gradient, or enter its coordinates.');
       else props.onGradient?.(current.gradient,[x,y]);
     }
-    if (!cancel && !disabled && !compare && !split && !props.maskView && current.stroke) {
+    if (!cancel && !disabled && !compare && !split && !props.maskView && !props.coverageView && current.stroke) {
       const point = position(event);
       const last = current.stroke.points[current.stroke.points.length - 1];
       if (last && current.stroke.points.length < 1024 && (point[0] !== last[0] || point[1] !== last[1])) {
@@ -176,8 +177,8 @@ export function RetouchCanvas(props: Props) {
           onPointerLeave={() => setCursor(null)}
           onLostPointerCapture={event => finish(event, true)}
           style={{ width: imageWidth, height: imageHeight, left: (canvasWidth - imageWidth) / 2, top: (canvasHeight - imageHeight) / 2,
-            cursor: mode === 'pan' || split || props.maskView ? 'grab' : props.sourceMode ? 'copy' : 'crosshair' }}>
-          {src ? <img src={src} draggable={false} alt={props.maskView ? 'Selection mask' : compare ? 'Before native retouch' : 'Retouched photograph'}/> : <p>Loading retouch preview…</p>}
+            cursor: mode === 'pan' || split || props.maskView || props.coverageView ? 'grab' : props.sourceMode ? 'copy' : 'crosshair' }}>
+          {src ? <img src={src} draggable={false} alt={props.coverageView ? 'Saved retouch coverage' : props.maskView ? 'Selection mask' : compare ? 'Before native retouch' : 'Retouched photograph'}/> : <p>Loading retouch preview…</p>}
           {split && <>
             <img className="retouch-before-layer" src={props.beforeSrc ?? undefined} draggable={false} alt="Before native retouch comparison"
               style={{ clipPath: `inset(0 ${100 - splitPosition}% 0 0)` }}/>
@@ -191,7 +192,7 @@ export function RetouchCanvas(props: Props) {
               }} onPointerMove={moveDivider} onPointerUp={releaseDivider} onPointerCancel={releaseDivider}
               onLostPointerCapture={releaseDivider}><span>↔</span></div>
           </>}
-          {src && overlay && !compare && !split && !props.maskView && <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`}>
+          {src && overlay && !compare && !split && !props.maskView && !props.coverageView && <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`}>
             {gradientGuide ? <>
               <line x1={gradientGuide.start[0]*width} y1={gradientGuide.start[1]*height} x2={gradientGuide.end[0]*width} y2={gradientGuide.end[1]*height}
                 stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke"/>
@@ -211,6 +212,6 @@ export function RetouchCanvas(props: Props) {
         </div>
       </div>
     </div>
-    <p className="lr-hint">{props.maskView ? 'White is selected; black is protected. Skin and spot tools may affect a smaller area. Turn off the mask preview to draw.' : split ? 'Comparison only. Turn off Split comparison to paint or choose a source. Both views use the same zoom and pan.' : draft.selection?.gradient ? 'Drag to place a gradient. White selects; black protects. Preview selection mask shows brightness limits too.' : draft.mask ? `${draft.mask.strokes.length} mask strokes. Selection guide shows the painted area; Preview selection mask shows inversion, feathering and brightness limits.` : 'Click to place an ellipse. Preview selection mask shows inversion, feathering and brightness limits.'}</p>
+    <p className="lr-hint">{props.coverageView ? 'Saved retouch only, nothing here is edited. Drag to pan or zoom in to inspect any area.' : props.maskView ? 'White is selected; black is protected. Skin and spot tools may affect a smaller area. Turn off the mask preview to draw.' : split ? 'Comparison only. Turn off Split comparison to paint or choose a source. Both views use the same zoom and pan.' : draft.selection?.gradient ? 'Drag to place a gradient. White selects; black protects. Preview selection mask shows brightness limits too.' : draft.mask ? `${draft.mask.strokes.length} mask strokes. Selection guide shows the painted area; Preview selection mask shows inversion, feathering and brightness limits.` : 'Click to place an ellipse. Preview selection mask shows inversion, feathering and brightness limits.'}</p>
   </div>;
 }

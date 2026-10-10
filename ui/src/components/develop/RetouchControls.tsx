@@ -13,6 +13,8 @@ export function validRetouch(draft: NativeRetouchEdit): boolean {
     && Number.isFinite(draft.sourceScale ?? 1) && (draft.sourceScale ?? 1) >= .2 && (draft.sourceScale ?? 1) <= 1
     && !(draft.tool === 'patch_heal' && (draft.sourceScale ?? 1) !== 1 && !draft.source)
     && validRetouchSelection(draft)
+    // A blemish brush with nothing painted would save an operation that does nothing.
+    && !(draft.tool === 'acne_clear' && draft.mask && draft.mask.strokes.length === 0)
     && (!draft.skin || (Number.isFinite(draft.skin.tolerance) && draft.skin.tolerance >= .015 && draft.skin.tolerance <= .3
       && Number.isFinite(draft.skin.edgeProtection) && draft.skin.edgeProtection >= 0 && draft.skin.edgeProtection <= 1));
 }
@@ -84,7 +86,7 @@ export function RetouchControls(props: Props) {
       <button type="button" onClick={() => onChange({ source: null, sourceScale: 1 })}>Clear source</button>
       {needsRetouchSource(draft) && !draft.source && <p>{sampled ? 'Choose a clean skin sample before applying this tool.' : draft.tool === 'patch_heal' ? 'Pick a source for painted, gradient, inverted or large patch repairs.' : 'Choose a source before applying this tool.'}</p>}
     </details>}
-    {(sampled || bands || ['micro_dodge_burn', 'eye_detail', 'under_eye', 'backdrop', 'frequency_heal', 'texture_graft'].includes(draft.tool)) && <label>{draft.tool === 'texture_graft' ? 'Pore size' : draft.tool === 'frequency_heal' ? 'Smallest mark size' : 'Frequency radius'} (% of short edge)
+    {(sampled || bands || ['micro_dodge_burn', 'eye_detail', 'under_eye', 'backdrop', 'frequency_heal', 'acne_clear', 'texture_graft'].includes(draft.tool)) && <label>{draft.tool === 'texture_graft' ? 'Pore size' : draft.tool === 'frequency_heal' ? 'Smallest mark size' : draft.tool === 'acne_clear' ? 'Spot size' : 'Frequency radius'} (% of short edge)
       <input type="number" min="0.05" max="5" step="0.05" value={Number((draft.radius * 100).toFixed(2))} onChange={event => onChange({ radius: Number(event.target.value) / 100 })}/>
     </label>}
       {draft.tool === 'patch_heal' && <label className="retouch-toggle"><input type="checkbox" checked={draft.textureHeal ?? false} onChange={event => onChange({ textureHeal: event.target.checked })}/>Match local lighting with real skin texture</label>}
@@ -94,6 +96,14 @@ export function RetouchControls(props: Props) {
       <label>Mark sensitivity ({Math.round((draft.sensitivity ?? .5) * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.sensitivity ?? .5} onChange={event => onChange({ sensitivity: Number(event.target.value) })}/></label>
       <label className="retouch-toggle"><input type="checkbox" checked={draft.keepDarkMarks ?? false} onChange={event => onChange({ keepDarkMarks: event.target.checked })}/>Keep dark marks (moles, freckles)</label>
       <p className="lr-hint">Only compact marks are rebuilt, from the clean skin around each one; skin with nothing wrong with it is left exactly as it is. Ordinary pore detail under a mark stays. Bright spots that are not also red are kept. Use Preview unsaved changes to review.</p>
+    </>}
+    {draft.tool === 'acne_clear' && <>
+      <label>Spot sensitivity ({Math.round((draft.sensitivity ?? .5) * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.sensitivity ?? .5} onChange={event => onChange({ sensitivity: Number(event.target.value) })}/></label>
+      <label>How completely spots are rebuilt ({Math.round(draft.tone * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.tone} onChange={event => onChange({ tone: Number(event.target.value) })}/></label>
+      <label>Spot relief kept ({Math.round(Math.min(draft.texture, 1) * 100)}%)<input type="range" min="0" max="1" step="0.01" value={Math.min(draft.texture, 1)} onChange={event => onChange({ texture: Number(event.target.value) })}/></label>
+      <label className="retouch-toggle"><input type="checkbox" checked={draft.preserveMicrotexture ?? false} onChange={event => onChange({ preserveMicrotexture: event.target.checked })}/>Also even leftover redness</label>
+      <label className="retouch-toggle"><input type="checkbox" checked={draft.keepDarkMarks ?? false} onChange={event => onChange({ keepDarkMarks: event.target.checked })}/>Keep dark marks (moles, freckles)</label>
+      <p className="lr-hint">Brush over what is left. Inside your strokes every pimple, red or brown mark and small bump is measured against the clean skin around it and rebuilt from that skin; the pores stay. Raise the spot size for bigger marks.</p>
     </>}
     {draft.tool === 'texture_graft' && <>
       <label>Texture level ({Math.round(draft.texture * 100)}%)<input type="range" min="0" max="2" step="0.01" value={draft.texture} onChange={event => onChange({ texture: Number(event.target.value) })}/></label>

@@ -186,6 +186,148 @@ pub struct EditProfile {
     pub swatch: Vec<String>,
     /// The creative adjustments.
     pub adjust: ProfileAdjust,
+    /// For a personal profile learned with the original photographs at hand, how the
+    /// photographer's tonal sliders follow the photograph. `None` is one look for every frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adaptive: Option<AdaptiveModel>,
+}
+
+/// The tonal sliders an [`AdaptiveModel`] may move, in this order.
+pub const ADAPTIVE_AXES: [&str; 6] = [
+    "exposure",
+    "contrast",
+    "highlights",
+    "shadows",
+    "whites",
+    "blacks",
+];
+
+/// How many numbers describe a photograph to an [`AdaptiveModel`].
+pub const ADAPTIVE_FEATURES: usize = 9;
+
+/// What an adaptive model reads off a photograph: the same measurements the scene guards and
+/// the automatic correction already make, so nothing new is decoded.
+#[must_use]
+pub fn adaptive_features(auto: AutoCorrection, stats: SceneStats) -> [f32; ADAPTIVE_FEATURES] {
+    [
+        stats.low,
+        stats.median,
+        stats.high,
+        stats.warmth,
+        stats.chroma_p90,
+        auto.exposure,
+        f32::from(auto.highlights),
+        f32::from(auto.shadows),
+        f32::from(auto.contrast),
+    ]
+}
+
+/// A ridge regression per tonal slider, from [`adaptive_features`] to how far the photographer
+/// moved that slider from their usual value. Imagen's personal profiles adapt each photograph;
+/// this is the same idea, small enough to read and stored with the profile.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AdaptiveModel {
+    /// Feature means, for standardising.
+    pub mean: Vec<f32>,
+    /// Feature spreads, for standardising.
+    pub spread: Vec<f32>,
+    /// Slopes per slider, on standardised features. A slider that did not predict better than
+    /// its usual value on photographs held out from the fit is absent.
+    pub weights: BTreeMap<String, Vec<f32>>,
+    /// Photographs it was fitted on.
+    pub photos: u32,
+    /// Per slider, how much closer to the photographer's own value it came on held-out
+    /// photographs than one fixed value did, `0..1`.
+    pub held_out_gain: BTreeMap<String, f32>,
+}
+
+impl AdaptiveModel {
+    /// The largest move a model may make away from the profile's usual value.
+    fn bound(axis: &str) -> f32 {
+        if axis == "exposure" {
+            0.75
+        } else {
+            35.0
+        }
+    }
+
+    /// How far this photograph's `axis` should sit from the profile's usual value.
+    #[must_use]
+    pub fn deviation(&self, axis: &str, auto: AutoCorrection, stats: SceneStats) -> f32 {
+        let Some(weights) = self.weights.get(axis) else {
+            return 0.0;
+        };
+        let features = adaptive_features(auto, stats);
+        let sum: f32 = features
+            .iter()
+            .zip(&self.mean)
+            .zip(&self.spread)
+            .zip(weights)
+            .map(|(((x, m), s), w)| w * ((x - m) / s.max(1e-6)).clamp(-3.0, 3.0))
+            .sum();
+        let bound = Self::bound(axis);
+        if sum.is_finite() {
+            sum.clamp(-bound, bound)
+        } else {
+            0.0
+        }
+    }
+
+    fn check(&self) -> Result<(), String> {
+        let finite = |v: &[f32]| v.len() == ADAPTIVE_FEATURES && v.iter().all(|x| x.is_finite());
+        if !finite(&self.mean) || !finite(&self.spread) || self.spread.iter().any(|s| *s <= 0.0) {
+            return Err("adaptive model standardisation is malformed".into());
+        }
+        for (axis, weights) in &self.weights {
+            if !ADAPTIVE_AXES.contains(&axis.as_str()) || !finite(weights) {
+                return Err("adaptive model has an unknown slider or malformed weights".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The profile with its tonal sliders moved for this photograph, and a sentence saying so.
+#[allow(clippy::cast_possible_truncation)]
+fn adapt(
+    profile: &EditProfile,
+    model: &AdaptiveModel,
+    auto: AutoCorrection,
+    stats: SceneStats,
+) -> (EditProfile, Option<String>) {
+    let mut out = profile.clone();
+    let a = &mut out.adjust;
+    let mut moved = Vec::new();
+    for axis in ADAPTIVE_AXES {
+        let d = model.deviation(axis, auto, stats);
+        if axis == "exposure" {
+            a.exposure = (a.exposure + d).clamp(-2.0, 2.0);
+            if d.abs() >= 0.05 {
+                moved.push(format!("exposure {d:+.2}"));
+            }
+            continue;
+        }
+        let slot = match axis {
+            "contrast" => &mut a.contrast,
+            "highlights" => &mut a.highlights,
+            "shadows" => &mut a.shadows,
+            "whites" => &mut a.whites,
+            _ => &mut a.blacks,
+        };
+        let step = d.round() as i16;
+        *slot = slot.saturating_add(step).clamp(-100, 100);
+        if step.abs() >= 3 {
+            moved.push(format!("{axis} {step:+}"));
+        }
+    }
+    let note = (!moved.is_empty()).then(|| {
+        format!(
+            "Your style, adapted to this photograph as you would have: {}.",
+            moved.join(", ")
+        )
+    });
+    (out, note)
 }
 
 #[derive(Debug, Deserialize)]
@@ -295,20 +437,39 @@ pub fn profile(id: &str) -> AuraResult<&'static EditProfile> {
         .ok_or_else(|| refused(format!("There is no edit profile called {id}.")))
 }
 
+/// Check a profile that did not ship with the application, such as a personal one.
+///
+/// # Errors
+/// The first rule the profile breaks, in words.
+pub fn check(profile: &EditProfile) -> Result<(), String> {
+    validate(profile)
+}
+
 fn validate(profile: &EditProfile) -> Result<(), String> {
     let a = &profile.adjust;
     let bad = |what: &str| Err(format!("{}: {what}", profile.id));
     if profile.id.trim().is_empty() || profile.id == "auto" {
         return bad("reserved or empty id");
     }
-    if !matches!(profile.origin.as_str(), "researched" | "learned") {
-        return bad("origin must be researched or learned");
+    if !matches!(
+        profile.origin.as_str(),
+        "researched" | "learned" | "personal"
+    ) {
+        return bad("origin must be researched, learned or personal");
     }
-    if profile.origin == "researched" && profile.sources.is_empty() {
-        return bad("a researched profile must name its sources");
+    if matches!(profile.origin.as_str(), "researched" | "personal") && profile.sources.is_empty() {
+        return bad("a researched or personal profile must name its sources");
     }
     if profile.origin == "learned" && profile.evidence.is_none() {
         return bad("a learned profile must carry its measurement");
+    }
+    if let Some(model) = &profile.adaptive {
+        if profile.origin != "personal" {
+            return bad("only a personal profile adapts per photograph");
+        }
+        model
+            .check()
+            .map_err(|why| format!("{}: {why}", profile.id))?;
     }
     if !(-2.0..=2.0).contains(&a.exposure) || !(0.0..=1.0).contains(&a.vignette) {
         return bad("exposure or vignette out of range");
@@ -568,6 +729,16 @@ pub fn build(
     let mut notes = Vec::new();
 
     if let Some(profile) = profile {
+        let adapted;
+        let profile = match &profile.adaptive {
+            Some(model) => {
+                let (moved, note) = adapt(profile, model, auto, stats);
+                notes.extend(note);
+                adapted = moved;
+                &adapted
+            }
+            None => profile,
+        };
         let a = &profile.adjust;
         let mut s = strength;
 
@@ -845,20 +1016,32 @@ fn measure_photo(
     Ok((AutoCorrection::measure(rgb)?, stats))
 }
 
-fn resolve(id: &str) -> AuraResult<Option<&'static EditProfile>> {
-    if id == "auto" {
-        Ok(None)
-    } else {
-        profile(id).map(Some)
-    }
-}
-
-/// Every profile, for the gallery.
+/// The profile with this id, shipped or personal; `None` for the measured correction alone.
 ///
 /// # Errors
-/// Only if the shipped table is malformed.
-pub fn list_edit_profiles() -> IpcResult<Vec<EditProfile>> {
-    Ok(profiles()?.to_vec())
+/// `AURA-RENDER-8002` when no profile has that id.
+pub fn resolve(state: &AppState, id: &str) -> AuraResult<Option<EditProfile>> {
+    if id == "auto" {
+        return Ok(None);
+    }
+    if id.starts_with("personal-") {
+        return crate::personal_style::list(state)?
+            .into_iter()
+            .find(|p| p.id == id)
+            .map(Some)
+            .ok_or_else(|| refused(format!("There is no personal style called {id}.")));
+    }
+    profile(id).map(|p| Some(p.clone()))
+}
+
+/// Every profile, for the gallery: the photographer's own first.
+///
+/// # Errors
+/// Only if the shipped table is malformed or the catalogue cannot be read.
+pub fn list_edit_profiles(state: &AppState) -> IpcResult<Vec<EditProfile>> {
+    let mut all = crate::personal_style::list(state)?;
+    all.extend(profiles()?.iter().cloned());
+    Ok(all)
 }
 
 /// The recipe a profile produces for one photograph, built but not saved.
@@ -871,11 +1054,11 @@ pub fn profile_recipe(
     profile_id: &str,
     strength: f32,
 ) -> AuraResult<(Recipe, schema::MergeReport, Vec<String>)> {
-    let chosen = resolve(profile_id)?;
+    let chosen = resolve(state, profile_id)?;
     let (photo, project_key, _) = photo_project(state, photo_id)?;
     let (auto, stats) = measure_photo(state, photo, &project_key)?;
     let current = crate::develop_commands::load_or_neutral(state, photo)?;
-    build(&current, chosen, strength, auto, stats)
+    build(&current, chosen.as_ref(), strength, auto, stats)
 }
 
 /// Apply a profile to one photograph and save it, protecting every manual setting.
@@ -889,7 +1072,7 @@ pub fn apply_edit_profile(
     let (photo, _, project) = photo_project(state, &input.photo_id)?;
     let (merged, report, adaptations) =
         profile_recipe(state, &input.photo_id, &input.profile_id, input.strength)?;
-    let name = resolve(&input.profile_id)?.map_or("Auto", |p| p.name.as_str());
+    let name = resolve(state, &input.profile_id)?.map_or_else(|| "Auto".to_string(), |p| p.name);
     let mut message = format!(
         "Edit profile: {name} at {:.0}% over the measured correction.",
         input.strength * 100.0
@@ -942,7 +1125,8 @@ pub fn preview_edit_profile(
     state: &AppState,
     input: &PreviewProfileInput,
 ) -> IpcResult<ProfilePreview> {
-    let chosen = resolve(&input.profile_id)?;
+    let chosen = resolve(state, &input.profile_id)?;
+    let chosen = chosen.as_ref();
     let edge = input.size.unwrap_or(360).clamp(64, 640);
     let engine = state.render()?;
     let output = OutputSpec::default();
@@ -1157,6 +1341,51 @@ mod tests {
         assert_eq!(zero.global.exposure, plain.global.exposure);
         assert_eq!(zero.global.contrast, plain.global.contrast);
         assert_eq!(zero.global.temperature, 5500);
+    }
+
+    #[test]
+    fn a_personal_profile_adapts_its_tonal_sliders_to_each_photograph() {
+        let mut personal = profile("dark-moody").unwrap().clone();
+        personal.id = "personal-test".into();
+        personal.origin = "personal".into();
+        personal.sources = vec![ProfileSource {
+            title: "a catalogue".into(),
+            url: String::new(),
+        }];
+        personal.adjust.highlights = -20;
+        let mut weights = BTreeMap::new();
+        // Harder recovery the higher the frame's top percentile (feature 2).
+        weights.insert(
+            "highlights".to_string(),
+            vec![0.0, 0.0, -15.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        );
+        personal.adaptive = Some(AdaptiveModel {
+            mean: vec![0.1, 0.4, 0.85, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0],
+            spread: vec![0.05, 0.1, 0.08, 0.03, 0.1, 0.3, 10.0, 10.0, 5.0],
+            weights,
+            photos: 60,
+            held_out_gain: BTreeMap::new(),
+        });
+        assert!(check(&personal).is_ok());
+        let auto = AutoCorrection::default();
+        let bright = SceneStats {
+            high: 0.99,
+            ..stats()
+        };
+        let dull = SceneStats {
+            high: 0.72,
+            ..stats()
+        };
+        let (on_bright, _, notes) = build(&neutral(), Some(&personal), 1.0, auto, bright).unwrap();
+        let (on_dull, _, _) = build(&neutral(), Some(&personal), 1.0, auto, dull).unwrap();
+        assert!(on_bright.global.highlights < on_dull.global.highlights - 20);
+        assert!(notes
+            .iter()
+            .any(|n| n.contains("adapted to this photograph")));
+        // Only a personal profile may carry a model.
+        let mut researched = personal.clone();
+        researched.origin = "researched".into();
+        assert!(check(&researched).is_err());
     }
 
     #[test]

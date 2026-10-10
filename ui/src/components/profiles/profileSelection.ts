@@ -1,7 +1,7 @@
 import type { ProfileSelection } from '../../ipc/client';
 
-export type { EditProfile, ProfileSelection, ProfilePreview, ApplyProfileReport } from '../../ipc/client';
-export { editProfiles } from '../../ipc/client';
+export type { EditProfile, ProfileSelection, ProfilePreview, ApplyProfileReport, LearnedStyle } from '../../ipc/client';
+export { editProfiles, pickLightroomCatalog } from '../../ipc/client';
 
 const STORAGE = 'aura.edit-profile.v1';
 

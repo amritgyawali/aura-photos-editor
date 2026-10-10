@@ -4,7 +4,8 @@ import { FinishFolder } from './components/workflow/FinishFolder';
 import { automaticBusy, useAutomatic } from './state/automaticStore';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, asIpcError, editProfiles, inTauri, pickPhotoFolder, pickPhotos, type ProfileSelection } from './ipc/client';
+import { api, asIpcError, editProfiles, inTauri, licence, pickPhotoFolder, pickPhotos, type LicenceStatus, type ProfileSelection } from './ipc/client';
+import { LicencePanel, licenceBadge } from './components/LicencePanel';
 import { ProfileGallery } from './components/profiles/ProfileGallery';
 import { readProfileSelection, saveProfileSelection } from './components/profiles/profileSelection';
 import { InstagramStyle } from './components/look/InstagramStyle';
@@ -113,6 +114,15 @@ export function App(): JSX.Element {
     [appendRows, replaceRows, setError],
   );
 
+  const [licenceState, setLicenceState] = useState<LicenceStatus | null>(null);
+  useEffect(() => {
+    if (!inTauri()) return;
+    // A subscription near its end renews quietly; a failure leaves the current key in place.
+    licence.status().then(status => {
+      setLicenceState(status);
+      if (status.renewalDue) licence.refresh().then(setLicenceState).catch(() => undefined);
+    }).catch(() => undefined);
+  }, []);
   useEffect(() => {
     void refreshProjects();
   }, [refreshProjects]);
@@ -310,7 +320,7 @@ export function App(): JSX.Element {
     ['start', 'Start', 'Look, reference, photos'],
     ['library', 'Photos', 'Browse your collection'],
     ['edit', 'Auto edit', 'One click, start to finish'],
-    ['look', 'Instagram style', 'Your reference, your photos'],
+    ['look', 'Match a look', 'Your reference, your photos'],
     ['export', 'Export', 'Ready to share'],
     ['advanced', 'Advanced', 'Quality, curation & settings'],
   ];
@@ -332,6 +342,7 @@ export function App(): JSX.Element {
         <header className="studio-topbar">
           <span>{projects.find(project => project.id === activeProjectId)?.name ?? 'Your creative workspace'}</span>
           <span>{activeProjectId ? `${projects.find(project => project.id === activeProjectId)?.photoCount ?? rows.length} photos` : 'Welcome to AURA'}</span>
+          {licenceBadge(licenceState) && <button type="button" className={`licence-badge is-${licenceState?.state ?? ''}`} onClick={() => setWorkspace('advanced')}>{licenceBadge(licenceState)}</button>}
         </header>
         {lastError && <div className="banner" role="alert"><span>{lastError.message}</span><button type="button" onClick={() => setError(null)}>Dismiss</button></div>}
         <div className="studio-content">
@@ -345,8 +356,8 @@ export function App(): JSX.Element {
           <div hidden={workspace !== 'start' && workspace !== 'look'} className={workspace === 'start' ? 'start-reference' : undefined}>
             <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}
               onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
-              heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a photographer’s Instagram</h2>
-                <p>Paste a public profile link to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
+              heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a look you love</h2>
+                <p>Choose a folder of reference photos, or your own Instagram data export, to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
           </div>
           {workspace === 'start' && <section className="start-step start-upload" aria-label="Add photos">
             <header className="step-heading"><span className="step-number">3</span><div><span className="eyebrow">YOUR PHOTOS</span><h2>Finish a whole folder, or upload to review first</h2>
@@ -384,7 +395,9 @@ export function App(): JSX.Element {
               <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
                 automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference}
                 profile={profile} profileName={profileName} />
-              {workspace === 'edit' && focusedPhoto && <>
+              {/* Stays mounted while another section is open, so the photograph, its full-quality
+                  preview and an open retouch are exactly where they were on return. ADR-0097. */}
+              {focusedPhoto && <>
                 <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
                 <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} disabled={editing || workflowBusy} revision={revision} onBusyChange={setSaving} />
                 <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
@@ -396,6 +409,7 @@ export function App(): JSX.Element {
               <AdvancedTools onBusyChange={setSaving} projectId={activeProjectId} photoId={focusedPhoto?.id ?? null} onError={setError}
                 onRefresh={() => { void refreshProjects(); void loadPage(activeProjectId, 0, true); }}
                 onOpen={id => { const index = rows.findIndex(row => row.id === id); if (index >= 0) { useStore.getState().focusIndex(index); useStore.getState().selectOnly(id); setWorkspace('edit'); } }} />
+              <details className="advanced-tools" open={licenceState !== null && !licenceState.mayExport}><summary>Licence</summary><LicencePanel onChange={setLicenceState} /></details>
               <details className="advanced-tools"><summary>Quality review</summary><QcPanel projectId={activeProjectId} onError={setError} /></details>
               <details className="advanced-tools"><summary>Gallery consistency</summary><GalleryPanel projectId={activeProjectId} onError={setError} /></details>
               <details className="advanced-tools"><summary>Albums & curation</summary><CuratePanel projectId={activeProjectId} onError={setError} /></details>

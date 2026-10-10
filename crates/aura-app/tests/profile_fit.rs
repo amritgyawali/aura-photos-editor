@@ -1,6 +1,8 @@
 //! Learning an edit profile from real before/after pairs: camera RAW in, a retoucher's final out.
 //!
-//! This is the tool behind every `origin: "learned"` profile in `config/edit_profiles.json`. It
+//! This is a research tool: it produced the FiveK profiles in
+//! `ml/edit-profiles/fivek-research-profiles.json`, which are not shipped because FiveK is licensed
+//! for research only (ADR-0106). Point it at pairs you own the rights to before shipping a result. It
 //! is an ignored test rather than a binary because it needs exactly the renderer, the RAW decoder
 //! and the profile builder the product ships, and nothing else - and a test target is the one
 //! place in this workspace that may read a directory named on the command line.
@@ -289,6 +291,7 @@ fn learn_a_profile_from_raw_and_retoucher_pairs() {
         evidence: None,
         swatch: vec!["#000000".into()],
         adjust: adjust.clone(),
+        adaptive: None,
     };
 
     let (mut auto_sum, mut profile_sum, mut neutral_sum, mut oracle_sum) = (0.0, 0.0, 0.0, 0.0);

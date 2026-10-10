@@ -1,0 +1,15 @@
+[package]
+name         = "aura-licence"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+publish.workspace      = true
+description  = "Offline licence keys: an ed25519-signed statement of who may use AURA, and the trial clock"
+
+[dependencies]
+ed25519-dalek = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+time          = { workspace = true }

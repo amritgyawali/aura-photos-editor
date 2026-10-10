@@ -10,6 +10,7 @@
 #![allow(clippy::indexing_slicing)]
 
 use aura_recipe::retouch_tools::Matte;
+use rayon::prelude::*;
 
 /// A matte rendered over a pixel rectangle of the working buffer.
 #[derive(Debug, Clone)]
@@ -45,34 +46,39 @@ impl MattePlane {
         // Pixel centre to matte-cell coordinates.
         let sx = mw as f32 / ((r - l) * w as f32).max(1e-6);
         let sy = mh as f32 / ((b - t) * h as f32).max(1e-6);
-        let mut plane = Vec::with_capacity(bw * bh);
-        for y in y0..y1 {
-            let fy = (((y as f32 + 0.5) - t * h as f32) * sy - 0.5).clamp(0.0, (mh - 1) as f32);
-            let gy0 = fy as usize;
-            let gy1 = (gy0 + 1).min(mh - 1);
-            let ty = fy - gy0 as f32;
-            for x in x0..x1 {
-                let fx = (((x as f32 + 0.5) - l * w as f32) * sx - 0.5).clamp(0.0, (mw - 1) as f32);
-                let gx0 = fx as usize;
-                let gx1 = (gx0 + 1).min(mw - 1);
-                let tx = fx - gx0 as f32;
-                let top = cell(gy0 * mw + gx0) * (1.0 - tx) + cell(gy0 * mw + gx1) * tx;
-                let bottom = cell(gy1 * mw + gx0) * (1.0 - tx) + cell(gy1 * mw + gx1) * tx;
-                plane.push(top * (1.0 - ty) + bottom * ty);
-            }
-        }
+        // Rows are independent: upsampled in parallel and joined in order.
+        let mut plane: Vec<f32> = (y0..y1)
+            .into_par_iter()
+            .flat_map_iter(|y| {
+                let fy = (((y as f32 + 0.5) - t * h as f32) * sy - 0.5).clamp(0.0, (mh - 1) as f32);
+                let gy0 = fy as usize;
+                let gy1 = (gy0 + 1).min(mh - 1);
+                let ty = fy - gy0 as f32;
+                (x0..x1).map(move |x| {
+                    let fx =
+                        (((x as f32 + 0.5) - l * w as f32) * sx - 0.5).clamp(0.0, (mw - 1) as f32);
+                    let gx0 = fx as usize;
+                    let gx1 = (gx0 + 1).min(mw - 1);
+                    let tx = fx - gx0 as f32;
+                    let top = cell(gy0 * mw + gx0) * (1.0 - tx) + cell(gy0 * mw + gx1) * tx;
+                    let bottom = cell(gy1 * mw + gx0) * (1.0 - tx) + cell(gy1 * mw + gx1) * tx;
+                    top * (1.0 - ty) + bottom * ty
+                })
+            })
+            .collect();
         // Pixels per matte cell; below about one and a half there is no edge to recover.
         let scale = (1.0 / sx).max(1.0 / sy);
         if scale >= 1.5 && matte.refine_edges {
             let guide: Vec<[f32; 3]> = (y0..y1)
-                .flat_map(|y| (x0..x1).map(move |x| (y * w + x) * 3))
+                .into_par_iter()
+                .flat_map_iter(|y| (x0..x1).map(move |x| (y * w + x) * 3))
                 // Perceptual, so an edge in the shadows counts as much as one in the light.
                 .map(|i| [0, 1, 2].map(|c| rgb[i + c].max(0.0).powf(1.0 / 2.2).min(1.5)))
                 .collect();
             let radius = ((scale * 2.0).round() as usize).max(2);
             plane = two_colour(&guide, &plane, bw, bh, radius);
             let luma: Vec<f32> = guide
-                .iter()
+                .par_iter()
                 .map(|p| p[0] * 0.2627 + p[1] * 0.678 + p[2] * 0.0593)
                 .collect();
             plane = guided(&luma, &plane, bw, bh, (radius / 4).max(1), 1e-3);
@@ -96,8 +102,8 @@ impl MattePlane {
 fn two_colour(guide: &[[f32; 3]], plane: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
     let channel = |c: usize, inside: bool| -> Vec<f32> {
         guide
-            .iter()
-            .zip(plane)
+            .par_iter()
+            .zip(plane.par_iter())
             .map(|(p, a)| {
                 let sure = if inside { *a > 0.9 } else { *a < 0.1 };
                 if sure {
@@ -126,6 +132,7 @@ fn two_colour(guide: &[[f32; 3]], plane: &[f32], w: usize, h: usize, r: usize) -
         .map(|c| box_mean(&channel(c, false), w, h, r))
         .collect();
     (0..w * h)
+        .into_par_iter()
         .map(|i| {
             let p = plane[i];
             if p <= 0.0 || p >= 1.0 || n_in[i] < 0.02 || n_out[i] < 0.02 {
@@ -159,14 +166,20 @@ fn box_mean(values: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
         }
     }
     let mut out = vec![0.0_f32; w * h];
-    for y in 0..h {
-        let (y0, y1) = (y.saturating_sub(r), (y + r + 1).min(h));
-        for x in 0..w {
-            let (x0, x1) = (x.saturating_sub(r), (x + r + 1).min(w));
-            let total = sum[y1 * stride + x1] - sum[y0 * stride + x1] - sum[y1 * stride + x0]
-                + sum[y0 * stride + x0];
-            out[y * w + x] = (total / ((y1 - y0) * (x1 - x0)) as f64) as f32;
-        }
+    // Each output row reads the finished integral image only, so rows run in parallel.
+    {
+        out.par_chunks_exact_mut(w)
+            .enumerate()
+            .for_each(|(y, line)| {
+                let (y0, y1) = (y.saturating_sub(r), (y + r + 1).min(h));
+                for (x, slot) in line.iter_mut().enumerate() {
+                    let (x0, x1) = (x.saturating_sub(r), (x + r + 1).min(w));
+                    let total =
+                        sum[y1 * stride + x1] - sum[y0 * stride + x1] - sum[y1 * stride + x0]
+                            + sum[y0 * stride + x0];
+                    *slot = (total / ((y1 - y0) * (x1 - x0)) as f64) as f32;
+                }
+            });
     }
     out
 }
@@ -179,17 +192,19 @@ fn guided(guide: &[f32], src: &[f32], w: usize, h: usize, r: usize, eps: f32) ->
     let ii: Vec<f32> = guide.iter().map(|a| a * a).collect();
     let corr_ip = box_mean(&ip, w, h, r);
     let corr_ii = box_mean(&ii, w, h, r);
-    let mut a = vec![0.0_f32; w * h];
-    let mut b = vec![0.0_f32; w * h];
-    for i in 0..w * h {
-        let var = (corr_ii[i] - mean_i[i] * mean_i[i]).max(0.0);
-        let cov = corr_ip[i] - mean_i[i] * mean_p[i];
-        a[i] = cov / (var + eps);
-        b[i] = mean_p[i] - a[i] * mean_i[i];
-    }
+    let (a, b): (Vec<f32>, Vec<f32>) = (0..w * h)
+        .into_par_iter()
+        .map(|i| {
+            let var = (corr_ii[i] - mean_i[i] * mean_i[i]).max(0.0);
+            let cov = corr_ip[i] - mean_i[i] * mean_p[i];
+            let a = cov / (var + eps);
+            (a, mean_p[i] - a * mean_i[i])
+        })
+        .unzip();
     let mean_a = box_mean(&a, w, h, r);
     let mean_b = box_mean(&b, w, h, r);
     (0..w * h)
+        .into_par_iter()
         .map(|i| (mean_a[i] * guide[i] + mean_b[i]).clamp(0.0, 1.0))
         .collect()
 }

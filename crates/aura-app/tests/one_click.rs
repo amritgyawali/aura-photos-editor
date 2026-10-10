@@ -36,6 +36,7 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
     let dir = tempfile::tempdir().expect("temp");
     let state = AppState::open(&dir.path().join("catalog.aura"))
         .expect("state")
+        .with_licence_dir(dir.path().join("licence"))
         .with_key_store(Arc::new(MemoryKeyStore::default()));
 
     let project = create_project(

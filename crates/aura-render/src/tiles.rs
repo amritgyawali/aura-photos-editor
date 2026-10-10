@@ -95,10 +95,13 @@ pub fn render_streamed(
     // whole frame. Say so and render whole.
     let native_retouch = retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0);
     let portrait = crate::portrait::wants_parse(&clamped);
+    // A mask's AI edge, a gradient and a brush stroke are drawn on the whole photograph.
+    let masked = aura_recipe::local_masks::any_active(&clamped);
     if clamped.geometry.rotate.abs() > f32::EPSILON
         || clamped.geometry.perspective.is_some()
         || native_retouch
         || portrait
+        || masked
     {
         let mut whole = engine.render_frame(frame, &clamped, level, purpose, output)?;
         whole.notes.push(RenderNote {
@@ -107,6 +110,8 @@ pub fn render_streamed(
             detail: Some(
                 if portrait {
                     "a portrait retouch is rendered whole rather than streamed"
+                } else if masked {
+                    "local masks are rendered whole rather than streamed"
                 } else if native_retouch {
                     "a native retouch is rendered whole rather than streamed"
                 } else {

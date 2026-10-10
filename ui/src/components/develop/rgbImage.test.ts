@@ -1,8 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { rgbDataUrl } from './rgbImage';
+import { changesDataUrl, coverageDataUrl, rgbDataUrl } from './rgbImage';
 import type { RenderDto } from '../../ipc/types';
 
 describe('rendered RGB display', () => {
+  it('tints only selected pixels and rejects mismatched coverage',()=>{
+    const photo={width:2,height:1,rgbBase64:btoa(String.fromCharCode(90,100,110,90,100,110))};
+    const mask={...photo,rgbBase64:btoa(String.fromCharCode(0,0,0,255,255,255))};
+    const url=coverageDataUrl(photo,mask,.5);
+    const bytes=Uint8Array.from(atob(url?.split(',')[1]??''),c=>c.charCodeAt(0));
+    expect(Array.from(bytes.slice(54,60))).toEqual([110,100,90,150,160,65]);
+    expect(coverageDataUrl(photo,{...mask,width:1},.5)).toBeNull();
+  });
+  it('lines coverage measured at a smaller size up with a full-quality photograph',()=>{
+    const photo={width:4,height:1,rgbBase64:btoa(String.fromCharCode(...Array(12).fill(100)))};
+    const mask={width:2,height:1,rgbBase64:btoa(String.fromCharCode(0,0,0,255,255,255))};
+    const bytes=Uint8Array.from(atob(coverageDataUrl(photo,mask,1)?.split(',')[1]??''),c=>c.charCodeAt(0));
+    // BGR rows: the left half keeps its bytes, the right half takes the tint.
+    expect(Array.from(bytes.slice(54,66))).toEqual([100,100,100,100,100,100,190,220,40,190,220,40]);
+  });
+  it('tints only the pixels the retouch changed',()=>{
+    const before={width:2,height:1,rgbBase64:btoa(String.fromCharCode(90,100,110,90,100,110))};
+    const after={...before,rgbBase64:btoa(String.fromCharCode(90,100,110,120,100,110))};
+    const url=changesDataUrl(before,after,1);
+    const bytes=Uint8Array.from(atob(url?.split(',')[1]??''),c=>c.charCodeAt(0));
+    // BMP stores BGR: the unchanged pixel keeps its bytes, the changed one is fully tinted.
+    expect(Array.from(bytes.slice(54,60))).toEqual([110,100,90,40,120,255]);
+    expect(changesDataUrl(before,{...after,height:2},1)).toBeNull();
+  });
   it('encodes red and blue pixels with a correct top-down BMP header and row padding', () => {
     const source = { width: 1, height: 2, rgbBase64: btoa(String.fromCharCode(255, 0, 0, 0, 0, 255)) } as RenderDto;
     const url = rgbDataUrl(source);

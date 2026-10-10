@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { RecipeDto, RenderDto } from './types';
 
 export const RETOUCH_TOOLS = [
+  ['acne_clear', 'Acne & blemish clear · brush', 'Repair', 'Paint over pimples, red or brown marks and bumps that are left. Each one is measured against the clean skin around it and rebuilt from that skin, keeping the pores. Works on the nose and between the brows too; creases, hair and nostrils are left alone.'],
   ['heal', 'Heal blemish / flyaway / lint', 'Repair', 'Samples nearby pixels; choose a source for precise repairs.'],
   ['patch_heal', 'Texture-aware patch heal', 'Repair', 'Matches nearby texture and blends surrounding light. Auto source works on small ellipses; choose a source for painted or larger repairs.'],
   ['frequency_heal', 'Frequency healing · marks', 'Repair', 'Finds compact marks in the selection and rebuilds the tone under each one from the clean skin around it. Pores stay where they are; creases and hair are left alone.'],
@@ -50,7 +51,7 @@ export type RetouchScope = 'face' | 'body' | 'face_and_body';
  * measured strength. Signed values are -1..1. Missing keys take the Rust defaults.
  */
 export type RetouchSettings = {
-  aiSkinDetection: boolean; mainSubjectOnly: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean;
+  aiSkinDetection: boolean; mainSubjectOnly: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean; protectEyeArea: boolean; protectNoseDetail: boolean;
   smoothing: number; texture: number; smoothingSize: number; toneEvenness: number; lightEvenness: number; microDodgeBurn: number;
   poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
   blemishSensitivity: number; maxSpots: number; keepFreckles: boolean;
@@ -66,8 +67,8 @@ export type RetouchSettings = {
   hairDetail: number; hairShine: number; fabric: number; backdrop: number;
 };
 export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
-  aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true,
-  smoothing: .5, texture: .5, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
+  aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
+  smoothing: .5, texture: .85, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
   blemishSensitivity: .5, maxSpots: 12, keepFreckles: true,
   deepBlemishCleanup: false, removeDarkMarks: false,
@@ -77,7 +78,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   eyeWhitening: .2, eyeVessels: .5, irisDetail: .5, irisBrightness: 0, redEye: true, lashDefinition: 0, browDefinition: 0,
   teethWhitening: .5, lipColour: 0, lipDefinition: 0,
   contour: 0, highlight: 0, blush: 0, faceLight: 0,
-  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: .25, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
+  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
   hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0,
 };
 /** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */
@@ -91,9 +92,9 @@ export type NativeRetouchEdit = {
   sourceScale?: number;
   preserveMicrotexture?: boolean;
   textureHeal?: boolean;
-  /** Frequency healing only: how readily a compact deviation counts as a mark (default 0.5). */
+  /** Frequency healing and acne clear: how readily a deviation counts as a mark (default 0.5). */
   sensitivity?: number | null;
-  /** Frequency healing only: leave marks that are darker but not redder than the skin around them. */
+  /** Frequency healing and acne clear: leave marks that are darker but not redder or browner. */
   keepDarkMarks?: boolean;
   texture: number; tone: number; warmth: number; tint: number;
   mask?: BrushMask | null;
@@ -114,12 +115,28 @@ export function validRetouchSelection(edit: NativeRetouchEdit): boolean {
   return !luminance || ([luminance.low,luminance.high,luminance.softness].every(Number.isFinite)
     && luminance.low >= -16 && luminance.high <= 16 && luminance.low <= luminance.high && luminance.softness >= 0 && luminance.softness <= 4);
 }
+/** The blemish brush: acne clear limited to what a person paints. Paint over what is left after
+ * the automatic retouch; the marks inside are rebuilt from the clean skin around them. */
+export const blemishBrush = (region: NativeRetouchEdit['region']): NativeRetouchEdit => ({
+  id: 'draft', tool: 'acne_clear', enabled: true, region, source: null, amount: 1, feather: .35,
+  radius: .005, texture: .25, tone: 1, warmth: 0, tint: 0, sensitivity: .75, keepDarkMarks: false,
+  preserveMicrotexture: true, mask: { strokes: [] }, matte: null, selection: null, skin: null,
+});
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
+/** How sharp a preview is: the original's own resolution, or a screen-sized first look. */
+export type PreviewQuality = 'full' | 'fast';
 export const nativeRetouch = {
   autoPortrait: (photoId: string) => invoke<RecipeDto>('enhance_portrait', { input: { photoId } }),
   autoRetouch: (projectId: string, photoId: string, options: AutoRetouchOptions, global = false) => invoke<RecipeDto>('auto_retouch', { input: { projectId, photoId, global, options } }),
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
-  preview: (projectId: string, photoId: string, before = false) => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before}),
-  draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId}}),
+  /** The retouch view's photograph: `full` is the original's own resolution (ADR-0097), `fast` the first look. */
+  preview: (projectId: string, photoId: string, before = false, quality: PreviewQuality = 'full') => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before,quality}),
+  /** A live look while a setting changes: the retouch carried over from the last render, or
+   * null until there is one (ADR-0099). Replaced by the exact quick look when it arrives. */
+  live: (projectId: string, photoId: string, view: 'edited' | 'retouch') => invoke<RenderDto | null>('live_preview', { projectId, photoId, view }),
+  /** The photograph as taken, with no edits: what Original and Compare show. */
+  original: (projectId: string, photoId: string, quality: PreviewQuality = 'full') => invoke<RenderDto>('photo_original',{projectId,photoId,quality}),
+  draftPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null, quality: PreviewQuality = 'full') => invoke<RenderDto>('native_retouch_draft_preview',{input:{projectId,photoId,edit,replaceId,quality}}),
   selectionPreview: (projectId: string, photoId: string, edit: NativeRetouchEdit, replaceId: string|null) => invoke<SelectionPreview>('native_retouch_selection_preview',{input:{projectId,photoId,edit,replaceId}}),
+  savedSelection: (projectId: string, photoId: string, operationId: string|null) => invoke<SelectionPreview>('native_retouch_saved_selection',{input:{projectId,photoId,operationId}}),
 };

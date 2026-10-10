@@ -42,6 +42,7 @@ Clone and color matching require a source: Alt-click the photograph or choose
 | --- | --- |
 | Heal | Blends a sampled or nearby donor with local tone matching |
 | Texture-aware patch heal | Matches nearby texture around a small repair or uses a chosen source; blends the donor with surrounding light |
+| Acne & blemish clear · brush | Every pimple, red or brown mark and small bump in what you paint is rebuilt from the clean skin around it; pores stay |
 | Frequency healing · marks | Finds compact marks in the selection and rebuilds the tone under each one from the clean skin around it; pores stay |
 | Clone | Copies a source patch with a feathered blend |
 | Auto blemish | Detects and repairs small dark local spots; review permanent marks |
@@ -144,6 +145,21 @@ areas and sharp lighting boundaries may need smaller repairs or a different sour
 It does not decide which marks should be removed. Existing Heal operations keep
 their previous behavior. [ADR-0076](adr/ADR-0076-texture-aware-patch-heal.md) records
 the algorithm and its limits.
+
+## The blemish brush and seeing what was retouched
+
+Something left after the automatic retouch? Press **Blemish brush** above the photo, paint
+over the spots, pimples or marks you still see - on the nose and between the brows too - and
+press **Apply retouch** (or Enter). The preview updates as you paint. Inside your strokes
+every mark, and every small skin-coloured bump, is measured against the clean skin around it
+and rebuilt from that skin; the pores stay, and creases, hair and nostrils are left alone.
+The tool is *Acne & blemish clear · brush*: change **Spot size** for bigger marks, **Spot
+sensitivity** for fainter ones, and **Keep dark marks** to spare moles and freckles.
+[ADR-0092](adr/ADR-0092-acne-clear-and-the-blemish-brush.md).
+
+**Show retouched areas** shows either the skin the saved retouch selected (teal) or the
+pixels it actually changed (orange) - every healed spot is an orange dot. Anything you can
+still see that is not orange was left as photographed: paint it with the blemish brush.
 
 ## Frequency healing and restoring texture
 

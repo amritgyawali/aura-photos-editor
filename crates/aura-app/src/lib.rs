@@ -49,6 +49,7 @@
 //! No command may take longer than 50 ms. Anything heavier returns a job handle
 //! and streams progress events.
 
+pub mod advanced_retouch;
 pub mod ai_settings;
 pub mod autopilot_commands;
 pub mod biometric_keys;
@@ -65,7 +66,10 @@ pub mod develop_commands;
 pub mod edit_profiles;
 pub mod gallery_commands;
 pub mod learn_commands;
+pub mod licensing;
+pub mod lightroom;
 pub mod native_retouch;
+pub mod personal_style;
 pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
@@ -81,6 +85,7 @@ pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
 pub mod local_commands;
+pub mod local_mask_commands;
 pub mod look_commands;
 pub mod mask_commands;
 pub mod measured_cull;
@@ -93,6 +98,7 @@ pub mod portrait_auto;
 pub mod portrait_commands;
 pub mod portrait_features;
 pub mod preview_commands;
+pub mod preview_render;
 pub mod qc_commands;
 pub mod reference_style;
 pub mod restore_commands;

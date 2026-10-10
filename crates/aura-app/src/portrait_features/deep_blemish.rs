@@ -16,6 +16,19 @@ struct Spot {
     red: f32,
 }
 
+/// A dense pattern is ambiguous; retain its weak colour departures while still allowing
+/// distinctly red, compact candidates to be reviewed as repairs. Darkness never grants this
+/// exception, and redness is a departure from the same person's surrounding skin. ADR-0096.
+fn protect_dense_pattern(spots: &mut Vec<&Spot>, settings: &Settings) -> usize {
+    if !settings.keep_freckles || settings.remove_dark_marks || spots.len() <= super::FRECKLE_FIELD
+    {
+        return 0;
+    }
+    let before = spots.len();
+    spots.retain(|s| s.red >= 0.025);
+    before - spots.len()
+}
+
 // Deterministic four-connected components, including zero-valued mask holes.
 pub(super) fn components(mask: &[bool], w: usize, h: usize) -> Vec<Vec<usize>> {
     let mut seen = vec![false; mask.len()];
@@ -346,7 +359,9 @@ pub(crate) fn plan(
     for y in 0..h {
         for x in 0..w {
             let point = [(x + x0) as f32 + 0.5, (y + y0) as f32 + 0.5];
-            if exclusions.iter().any(|e| e.contains(point)) {
+            if exclusions.iter().any(|e| e.contains(point))
+                || (super::eye_guard::feature_weight(&g, point, settings) < 1.0)
+            {
                 mask[y * w + x] = false;
             }
         }
@@ -371,7 +386,7 @@ pub(crate) fn plan(
     let inside = clearance(&mask, w, h);
     let mut no_donor = 0;
     let red_threshold = 0.012 - settings.blemish_sensitivity * 0.006;
-    let eligible: Vec<_> = spots
+    let mut eligible: Vec<_> = spots
         .iter()
         .filter(|s| {
             let keep = !settings.remove_dark_marks && s.red < red_threshold;
@@ -381,15 +396,13 @@ pub(crate) fn plan(
             !keep
         })
         .collect();
-    // Keep-freckles means a dense field is opt-out unless dark-mark removal was requested.
-    if settings.keep_freckles
-        && !settings.remove_dark_marks
-        && eligible.len() > super::FRECKLE_FIELD
-    {
-        out.report.findings.push(
-            "Deep cleanup: dense mark pattern kept; turn off Keep freckles to repair it.".into(),
-        );
-        return out;
+    let protected = protect_dense_pattern(&mut eligible, settings);
+    if protected > 0 {
+        out.report.marks_kept += protected;
+        out.report.findings.push(format!(
+            "Deep cleanup: kept {protected} ambiguous marks in a dense pattern; only {} distinctly red compact candidates remain for repair. Natural dark marks stay protected; review the proposed repairs.",
+            eligible.len()
+        ));
     }
     for spot in eligible {
         if out.blemishes.len() >= usize::from(settings.max_spots).min(220) {
@@ -401,10 +414,13 @@ pub(crate) fn plan(
             continue;
         };
         let centre = [spot.x + x0 as f32 + 0.5, spot.y + y0 as f32 + 0.5];
+        // After frequency healing, repair only the remaining defect. A full replacement
+        // here can flatten already-corrected skin and leave a circular texture boundary.
+        let residual = settings.frequency_heal > 0.0;
         let mut edit = base_edit(
             format!("{prefix}{index}-spot-deep-{}", out.blemishes.len()),
             Tool::PatchHeal,
-            1.0,
+            if residual { 0.65 } else { 1.0 },
             px,
             [centre[0], centre[1], spot.radius, spot.radius],
         );
@@ -412,7 +428,7 @@ pub(crate) fn plan(
             (source[0] + x0 as f32 + 0.5) / px.width as f32,
             (source[1] + y0 as f32 + 0.5) / px.height as f32,
         ]);
-        edit.feather = 0.25;
+        edit.feather = if residual { 0.65 } else { 0.25 };
         edit.texture_heal = true;
         edit.source_scale = source_scale;
         // No coarse matte: the entire disk was checked against the repaired skin mask.
@@ -534,7 +550,7 @@ fn quantile(mut values: Vec<f32>, q: f32) -> Option<f32> {
 /// inside the brow area that are clearly darker than the skin around them, plus a narrow band
 /// along the brow line for brows that are no darker than the skin - so a forehead above the
 /// brow, lit or in shadow, is not left as an untreated patch.
-fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec<u8>> {
+fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte, nose: bool) -> Option<Vec<u8>> {
     let [l, t, r, b] = matte.bounds;
     let (w, h) = (matte.width, matte.height);
     if w < 3 || h < 3 {
@@ -557,6 +573,8 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec
     };
     let skin_luma = confident(&super::luma)?;
     let skin_warmth = confident(&warmth)?;
+    let value = |p: [f32; 3]| p[0].max(p[1]).max(p[2]);
+    let skin_value = confident(&value)?;
     close_holes(&mut selected, w, h, g.d * 0.30 / cell);
     // A mark on the shadow side of a face can be a tenth as bright as the lit skin, so
     // brightness alone cannot tell it from hair. Warmth can: measured on a dark-skinned
@@ -601,19 +619,27 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec
     grow(&mut selected, w, h, &in_face, (g.d * 0.35 / cell) as usize);
     // Creases are protected during spot replacement, but a continuous surface
     // finish must span them: otherwise they become conspicuous untreated strips.
-    let mut exclusions = vec![super::Capsule::disk(
-        super::add(g.nose, g.v, g.d * 0.06),
-        g.d * 0.20,
-    )];
+    // A smoothing finish leaves the nose tip alone. Acne clear works on the nose too - its
+    // marks are as visible as anybody's cheek - and leaves only the nostrils out.
+    let mut exclusions = vec![if nose {
+        nostrils(g)
+    } else {
+        super::Capsule::disk(super::add(g.nose, g.v, g.d * 0.06), g.d * 0.20)
+    }];
     let mut brow_areas = Vec::with_capacity(2);
     for eye in g.eyes {
         exclusions.push(super::Capsule::disk(eye, g.d * 0.25));
         let brow = super::add(eye, g.v, -g.d * 0.32);
-        exclusions.push(super::Capsule {
-            a: super::add(brow, g.u, -g.d * 0.28),
-            b: super::add(brow, g.u, g.d * 0.28),
-            r: g.d * 0.085,
-        });
+        // Acne clear tells a mark from a brow hair itself - hair is darker and not redder, and
+        // long and thin - so its selection leaves out only the brow hair actually there, and
+        // the marks just above and between the brows are repaired too.
+        if !nose {
+            exclusions.push(super::Capsule {
+                a: super::add(brow, g.u, -g.d * 0.28),
+                b: super::add(brow, g.u, g.d * 0.28),
+                r: g.d * 0.085,
+            });
+        }
         brow_areas.push(super::Capsule::disk(brow, g.d * 0.24));
     }
     exclusions.push(lip_protection(g));
@@ -621,18 +647,19 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec
     // Hair is darker than the skin right around it - not than this face's typical skin: on
     // the shadowed side of a face the whole forehead is darker than that, and is still skin.
     let reach = (g.d * 0.2 / cell).max(2.0) as usize;
-    let local_skin = |i: usize| {
+    let local = |i: usize, f: &dyn Fn([f32; 3]) -> f32, fallback: f32| {
         let (x, y) = (i % w, i / w);
         let mut around = Vec::with_capacity((2 * reach + 1).pow(2));
         for row in y.saturating_sub(reach)..(y + reach + 1).min(h) {
             for j in row * w + x.saturating_sub(reach)..row * w + (x + reach + 1).min(w) {
                 if skin_like[j] {
-                    around.push(super::luma(colours[j]));
+                    around.push(f(colours[j]));
                 }
             }
         }
-        quantile(around, 0.6).unwrap_or(skin_luma)
+        quantile(around, 0.6).unwrap_or(fallback)
     };
+    let local_skin = |i: usize| local(i, &super::luma, skin_luma);
     let not_brow: Vec<bool> = (0..w * h)
         .map(|i| {
             !(brow_areas.iter().any(|area| area.contains(centre(i)))
@@ -641,10 +668,35 @@ fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec
         .collect();
     let to_brow = clearance(&not_brow, w, h);
     let brow_margin = (g.d * 0.04 / cell).max(2.0);
+    // The nostrils wherever they actually are. The shapes above sit where the landmarks put the
+    // nose, and on a turned or tilted face a nostril can lie outside them; a smoothing finish
+    // that reaches one fills the opening with skin tone. An opening is a shadow, so every
+    // channel is far below the nose skin right around it. An inflamed mark can be as dark in
+    // luminance - it loses its green - but keeps its red, so the test is on the brightest
+    // channel: under a fifth of the local skin's, in linear light, is an opening (about half
+    // its sRGB code value), and is left out with a margin.
+    // Only across the base of the nose, where nostrils are, however far to the side the face
+    // has turned them: the side of the nose above it can be as deep in shadow, and its marks
+    // are acne clear's to repair.
+    let base = super::add(g.nose, g.v, g.d * 0.12);
+    let nose_area = super::Capsule {
+        a: super::add(base, g.u, -g.d * 0.35),
+        b: super::add(base, g.u, g.d * 0.35),
+        r: g.d * 0.15,
+    };
+    let not_nostril: Vec<bool> = (0..w * h)
+        .map(|i| {
+            !(nose_area.contains(centre(i))
+                && value(colours[i]) < local(i, &value, skin_value) * 0.2)
+        })
+        .collect();
+    let to_nostril = clearance(&not_nostril, w, h);
+    let nostril_margin = (g.d * 0.05 / cell).max(2.0);
     for i in 0..w * h {
         let point = centre(i);
         let on_brow = to_brow[i] <= brow_margin && brow_areas.iter().any(|a| a.contains(point));
-        if on_brow || exclusions.iter().any(|e| e.contains(point)) {
+        let on_nostril = to_nostril[i] <= nostril_margin;
+        if on_brow || on_nostril || exclusions.iter().any(|e| e.contains(point)) {
             selected[i] = false;
         }
     }
@@ -672,7 +724,7 @@ pub(crate) fn surface_matte(
     if g.d < 40.0 {
         return None;
     }
-    let alpha = surface_selection(&g, px, matte)?;
+    let alpha = surface_selection(&g, px, matte, false)?;
     let mut mask = aura_recipe::retouch_tools::Matte::encode(
         matte.bounds,
         matte.width as u32,
@@ -687,6 +739,45 @@ pub(crate) fn surface_matte(
 /// The id of the matte [`surface_matte`] is stored under.
 pub(crate) fn surface_matte_id(prefix: &str, index: usize) -> String {
     format!("{prefix}{index}-surface")
+}
+
+/// Both nostrils and the columella between them, below the nose tip: dark, enclosed by skin
+/// and the right size for a mark, so nothing that looks for marks may ever see them.
+fn nostrils(g: &Geometry) -> super::Capsule {
+    let centre = super::add(g.nose, g.v, g.d * 0.11);
+    super::Capsule {
+        a: super::add(centre, g.u, -g.d * 0.15),
+        b: super::add(centre, g.u, g.d * 0.15),
+        r: g.d * 0.075,
+    }
+}
+
+/// What acne clear runs over (ADR-0092): the surface selection with the nose included - its
+/// bridge, sides and tip - and only the nostrils left out.
+pub(crate) fn heal_matte(
+    face: &PortraitFace,
+    px: &Pixels<'_>,
+    matte: &Matte,
+) -> Option<aura_recipe::retouch_tools::Matte> {
+    let g = Geometry::new(face, px)?;
+    if g.d < 40.0 {
+        return None;
+    }
+    let alpha = surface_selection(&g, px, matte, true)?;
+    let mut mask = aura_recipe::retouch_tools::Matte::encode(
+        matte.bounds,
+        matte.width as u32,
+        matte.height as u32,
+        &alpha,
+    );
+    // Already protected and feathered: dark blemishes must not cut holes in their own repair.
+    mask.refine_edges = false;
+    Some(mask)
+}
+
+/// The id of the matte [`heal_matte`] is stored under.
+pub(crate) fn heal_matte_id(prefix: &str, index: usize) -> String {
+    format!("{prefix}{index}-heal")
 }
 
 /// What the texture restore runs over: the segmented face skin - the nose included, which the
@@ -779,13 +870,16 @@ pub(crate) fn surface_finish(
     Some((edit, mask))
 }
 
-/// Frequency healing over the surface selection (ADR-0090): the tone under every compact
-/// mark is rebuilt from the clean skin around it and pore detail stays where it is.
+/// Acne clear over the heal selection (ADR-0092), in the slot frequency healing had
+/// (ADR-0090): every mark across this face - those in a dense cluster, on the nose and between
+/// the brows included - is measured against a robust estimate of the clean skin around it, and
+/// the tone and colour under it are rebuilt from that skin, keeping the pores. Flat redness is
+/// then evened in colour only.
 ///
 /// One operation for the whole face rather than one per spot, so it is not limited by the
 /// operation budget and it reaches the marks no clean donor patch fits beside. Its strength
-/// is how completely the tone is rebuilt; dark marks that are not also redder than the skin
-/// around them are kept unless *Remove dark marks* is on.
+/// is how completely the tone is rebuilt; dark marks that are not also redder or browner than
+/// the skin around them are kept unless *Remove dark marks* is on.
 pub(crate) fn frequency_heal(
     face: &PortraitFace,
     index: usize,
@@ -800,26 +894,29 @@ pub(crate) fn frequency_heal(
     }
     let mut edit = surface_edit(
         format!("{prefix}{index}-clear"),
-        Tool::FrequencyHeal,
+        Tool::AcneClear,
         1.0,
         px,
         matte,
-        surface_matte_id(prefix, index),
+        heal_matte_id(prefix, index),
     );
     // Below a fiftieth of the eye distance is pores; marks are larger.
     edit.radius = (g.d * 0.02 / px.width.min(px.height) as f32).clamp(0.0005, 0.05);
     edit.tone = settings.frequency_heal.clamp(0.0, 1.0);
     // A mark's own relief - its dark core and lit rim - goes with it; ordinary pore contrast
-    // under it stays, and the texture graft restores what the repair cost.
+    // under it stays, and the texture restore puts back what the repair cost.
     edit.texture = 0.25;
     edit.sensitivity = Some(settings.blemish_sensitivity.clamp(0.0, 1.0));
     edit.keep_dark_marks = !settings.remove_dark_marks;
+    // Acne leaves flat redness behind; even its colour, never its brightness.
+    edit.preserve_microtexture = true;
     Some(edit)
 }
 
 /// The analysis pixels as they will be once `edit` (a frequency heal over `surface`) has run,
 /// as packed sRGB: what the spot repairs that follow it are planned on, so they are spent on
 /// what frequency healing left rather than on marks it has already rebuilt.
+#[cfg(test)]
 pub(crate) fn after_frequency_heal(
     px: &Pixels<'_>,
     edit: &aura_recipe::retouch_tools::Edit,
@@ -901,6 +998,39 @@ pub(crate) fn texture_graft(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_dense_pattern_keeps_freckles_but_does_not_hide_distinct_red_spots() {
+        let weak = Spot {
+            x: 20.0,
+            y: 20.0,
+            radius: 3.0,
+            score: 1.0,
+            red: 0.012,
+        };
+        let red = Spot {
+            red: 0.05,
+            ..weak.clone()
+        };
+        let mut pattern = vec![&weak; 30];
+        pattern.extend([&red; 4]);
+        assert_eq!(
+            protect_dense_pattern(&mut pattern, &Settings::default()),
+            30
+        );
+        assert_eq!(pattern.len(), 4);
+        assert!(pattern.iter().all(|s| s.red == red.red));
+        let mut freckles = vec![&weak; 30];
+        protect_dense_pattern(&mut freckles, &Settings::default());
+        assert!(freckles.is_empty());
+        let mut explicit = vec![&weak; 30];
+        let asked = Settings {
+            remove_dark_marks: true,
+            ..Settings::default()
+        };
+        assert_eq!(protect_dense_pattern(&mut explicit, &asked), 0);
+        assert_eq!(explicit.len(), 30);
+    }
     #[test]
     fn only_small_enclosed_holes_are_filled() {
         let mut mask = vec![true; 40 * 40];
@@ -1117,6 +1247,26 @@ mod tests {
         assert_eq!(&rendered[eye..eye + 3], &before[eye..eye + 3]);
         let lip = (380 * 512 + 255) * 3;
         assert_eq!(&rendered[lip..lip + 3], &before[lip..lip + 3]);
+        settings.frequency_heal = 0.9;
+        let residual = plan(
+            &face,
+            0,
+            &pixels,
+            "auto-portrait-v1-",
+            &settings,
+            Some(&matte),
+        );
+        let mut softened = before.clone();
+        aura_render::retouch_tools::apply(&mut softened, 512, 512, &residual.blemishes);
+        assert!(
+            softened[spot] > before[spot],
+            "residual repair still reduces the mark"
+        );
+        assert!(
+            softened[spot] < rendered[spot],
+            "residual repair retains some original detail"
+        );
+        assert_eq!(&softened[eye..eye + 3], &before[eye..eye + 3]);
         let mask =
             aura_render::retouch_tools::selection_mask(&before, 512, 512, &planned.blemishes[0]);
         for (i, alpha) in mask.iter().enumerate() {
@@ -1354,7 +1504,90 @@ mod tests {
     }
 
     #[test]
-    fn frequency_healing_and_the_graft_are_opt_in_share_one_selection_and_spare_features() {
+    fn the_heal_selection_includes_the_nose_and_leaves_out_the_nostrils() {
+        let face = finish_face();
+        let rgb = [150_u8, 100, 75].repeat(512 * 512);
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let cell = |x: f32, y: f32| ((y - 51.2) / 3.4) as usize * 96 + ((x - 102.4) / 3.2) as usize;
+        let heal = heal_matte(&face, &px, &matte).unwrap();
+        assert!(!heal.refine_edges);
+        let heal = heal.decode().unwrap();
+        let surface = surface_matte(&face, &px, &matte).unwrap().decode().unwrap();
+        // The nose tip and the nose beside it: out of the smoothing finish, in acne clear.
+        for [x, y] in [[256.0, 270.0], [248.0, 275.0]] {
+            assert_eq!(
+                surface[cell(x, y)],
+                0,
+                "the finish reaches the nose at {x},{y}"
+            );
+            assert!(
+                heal[cell(x, y)] > 150,
+                "acne clear misses the nose at {x},{y}: {}",
+                heal[cell(x, y)]
+            );
+        }
+        // Both nostrils and the columella between them stay out.
+        for x in [242.0, 256.0, 270.0] {
+            assert_eq!(heal[cell(x, 296.0)], 0, "a nostril at {x} is selected");
+        }
+        // The brow bone: no band along the brow line where there is no dark brow hair.
+        assert!(
+            heal[cell(195.0, 166.0)] > 150,
+            "skin under a missing brow is out"
+        );
+    }
+
+    #[test]
+    fn a_nostril_away_from_where_the_landmarks_put_it_is_still_left_out() {
+        // A turned face: one nostril lies well to the side of the nose landmark, outside every
+        // landmark shape. A red mark beside the nose stays in for acne clear.
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        fill(&mut rgb, [286, 290, 300, 302], [35, 22, 16]);
+        fill(&mut rgb, [300, 268, 306, 274], [135, 75, 60]);
+        // An inflamed mark across the base of the nose: under half the skin's luminance, and
+        // still red. And a mark on the shadowed side of the nose above it, darker still.
+        fill(&mut rgb, [216, 298, 224, 306], [95, 28, 28]);
+        fill(&mut rgb, [231, 258, 239, 266], [55, 20, 20]);
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let cell = |x: f32, y: f32| ((y - 51.2) / 3.4) as usize * 96 + ((x - 102.4) / 3.2) as usize;
+        let heal = heal_matte(&face, &px, &matte).unwrap().decode().unwrap();
+        let surface = surface_matte(&face, &px, &matte).unwrap().decode().unwrap();
+        for [x, y] in [[288.0, 292.0], [293.0, 296.0], [298.0, 300.0]] {
+            assert_eq!(
+                surface[cell(x, y)],
+                0,
+                "the finish reaches the nostril at {x},{y}"
+            );
+            assert_eq!(
+                heal[cell(x, y)],
+                0,
+                "acne clear reaches the nostril at {x},{y}"
+            );
+        }
+        for [x, y] in [[303.0, 271.0], [220.0, 302.0], [235.0, 262.0]] {
+            assert!(
+                heal[cell(x, y)] > 150,
+                "the red mark at {x},{y} beside the nose is out: {}",
+                heal[cell(x, y)]
+            );
+        }
+    }
+
+    #[test]
+    fn acne_clear_and_the_graft_are_opt_in_share_one_selection_and_spare_features() {
         let face = finish_face();
         let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
         // Pores: a fixed pattern of a few codes, so there is texture to keep and to borrow.
@@ -1404,10 +1637,10 @@ mod tests {
             prefix,
             &settings,
             &matte,
-            &surface_matte_id(prefix, 0),
+            &heal_matte_id(prefix, 0),
         )
         .unwrap();
-        let surface = surface_matte(&face, &px, &matte).unwrap();
+        let surface = heal_matte(&face, &px, &matte).unwrap();
         aura_recipe::retouch_tools::validate(&[clear.clone(), graft.clone()]).unwrap();
         // Frequency healing is saved with the skin step, so it runs before everything else
         // on the face; the graft is saved with the finishing step, so it runs last.
@@ -1419,7 +1652,9 @@ mod tests {
             crate::portrait_auto::group_of(&graft.id),
             Some(crate::portrait_auto::Group::Finishing)
         );
-        let id = surface_matte_id(prefix, 0);
+        // Acne clear works in the heal selection - the surface selection with the nose.
+        assert_eq!(clear.tool, Tool::AcneClear);
+        let id = heal_matte_id(prefix, 0);
         assert_eq!(clear.matte.as_deref(), Some(id.as_str()));
         assert_eq!(graft.matte.as_deref(), Some(id.as_str()));
         // Moles are kept unless the photographer asked for dark marks to go.
