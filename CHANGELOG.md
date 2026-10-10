@@ -2,6 +2,107 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Confined pigment correction and saved batch preferences - 2026-10-11
+
+- Correct strongly supported residual redness with a saved, confined skin-tone
+  operation when surrounding brightness cannot safely support texture replacement.
+  Preserve the original luminance and detail; retain clean donor, full skin
+  clearance, eye and nostril checks. Unsupported marks remain explicit skips.
+- Restore the full saved deep-cleanup spot budget, up to 900, after reopening a
+  photo. Previously the interface silently reduced it to the older 220 limit.
+- Extend native workflow verification to face-and-body cleanup across a collection,
+  independent saved preferences, repeated automatic editing, manual exposure
+  preservation and verified delivery of every imported photo.
+
+## Complete visible-skin spot healing - 2026-10-10
+
+- Fit elongated inflamed marks with measured repair ellipses, preserving complete
+  skin clearance and clean donor checks. Protect measured visible nostril openings
+  for precise repairs, with conservative landmark fallback when either is unclear.
+- Split strongly red touching clusters at additional bounded detection thresholds.
+  Exclude confirmed neighboring redness from lighting checks with distributed clean
+  support. Save the cleaner joint RGB tone fit explicitly so old heals retain their
+  original rendering; manual adjustment preserves that saved fit.
+- Match clean donors to measured surrounding skin rather than the dark, red
+  blemish center, retaining the same clearance and contamination checks.
+- Reconstruct curved illumination for measured red lesions that fail flat-light
+  checks. Keep supported affine fits unchanged and perform one bounded residual
+  pass outside earlier repair footprints, with protected rendering and saved flags.
+- Fit contaminated repair boundaries from saved, measured healthy skin samples
+  within a bounded wider context. Search farther for full-size clean donor texture
+  before using smaller sources; existing saved edits retain their rendering.
+- Blend several independently checked small texture donors to avoid mirrored pore
+  repetition. Save their coordinates for replay and clear measured support when a
+  manual edit changes its repair footprint or donor.
+- Add grayscale, very high contrast and very low contrast review views and
+  bounded contrast evidence to face/body spot detection. Review filters do not
+  change saved edits or exports.
+- Increase explicit acne/cleanup presets to 900 spot repairs per face and deep/
+  professional presets to 512; report candidates left by a requested limit. Keep
+  manual controls available in bounded recipes of up to 1,024 operations.
+- Allow compact spot repairs on nose-wing and nearby cheek skin while keeping
+  broad healing and finishing off protected contours and nostril openings.
+  Use a separate eye core for compact repairs so upper-cheek acne is reachable.
+  Require wider original-light support for neutral marks beside contours.
+- Fully repair confirmed residual spots, with blending outside the lesion core.
+  Accept spots on smooth lighting gradients while rejecting contour discontinuities.
+- Include detached body-skin regions regardless of distance from a detected face.
+  Continue blemish healing when no clean sample is available for surface finishing.
+- Heal confidently detected body skin in photos with no visible face. Keep face,
+  clothing, hair, accessory and background classes outside that body-only selection.
+
+## Adjustable skin refinement - 2026-10-10
+
+- Add Skin cleanup with pore refinement for face and body, with adjustable
+  smoothing and redness reduction and retained eye/nose-detail protection.
+- Detect redness around pale pimple centers instead of rejecting the entire
+  lesion because its center resembles a bright pore. Plain highlight pores
+  retain their exclusion.
+- Protect the outer nostril wings in both blemish healing and broad skin
+  finishing; opening-only protection missed contour damage on a turned face.
+- Keep excluded shadows in the healing tool's lighting analysis, preventing a
+  feature mask from hiding the dark side of a contour and causing a false repair.
+
+## Face and body blemish cleanup - 2026-10-09
+
+- Acne only now selects face and body skin, enables body blemish repair, raises
+  the face repair budget to 220, and keeps broad smoothing and colour/light
+  finishing off for both face and body.
+- Search an additional smaller scale for compact skin marks while retaining
+  pore, shadow and feature checks. Deep body cleanup uses frequency healing.
+- Exclude every detected face from body operations, including when body
+  segmentation overlaps an eyelid or another person's face. Reusable body masks
+  retain these exclusions.
+
+## Retouch preview recovery - 2026-10-08
+
+- Include nose skin in blemish repair while retaining eye, nostril and underside
+  crease protection. Broad finishing keeps its separate nose-detail guard.
+- Fill small connected skin-mask gaps for residual blemish detection and plan
+  residual repairs from the actual protected frequency-healing selection.
+- Reject frequency-heal and residual-patch candidates across incompatible lighting,
+  preventing coloured nose shadows from being rebuilt as blemishes.
+- Keep Export disabled until the selected preset has loaded, preventing an early
+  click from silently doing nothing.
+
+- Clear old previews, saved steps and coverage when reloading a photo or recipe.
+  If loading fails, disable edits and history actions until a successful reload.
+  Reload retouch and Back to Develop remain available so the editor can recover.
+
+## Eye and nose protection, saved retouch coverage - 2026-10-06
+
+- Protect eyelids, inner corners, orbital shadows and nose detail throughout automatic
+  face retouch, including smoothing and texture restoration. Controls default to on;
+  manual edits remain available and existing saved recipes are unchanged until rerun.
+- Add **Acne only · preserve detail**, with smoothing, tone/light correction, eye/teeth
+  finishing and hair edits off. It repairs marks without adding a beauty finish.
+- Add **Show retouched areas**: a teal overlay of enabled saved selections, all steps or
+  one selected step, with adjustable visibility. Viewing never creates an edit.
+- Reject stale coverage after changing photos or recipes; protected mask holes stay
+  excluded at preview and export sizes. See ADR-0091.
+- Residual spot repairs after frequency healing use partial strength and softer edges
+  to retain original detail and reduce circular texture patches.
+
 ## Frequency healing, a texture graft and a Professional retouch preset - 2026-10-06
 
 - Add **frequency healing**: one operation that finds compact marks across a skin

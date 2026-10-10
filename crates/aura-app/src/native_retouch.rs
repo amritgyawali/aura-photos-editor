@@ -172,6 +172,34 @@ pub struct SelectionPreview {
     pub rgb_base64: String,
 }
 
+/// Show the saved selections rather than a new draft. The UI keys the response to its
+/// recipe revision so it cannot display stale coverage after a local edit.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CoverageInput {
+    pub project_id: String,
+    pub photo_id: String,
+    pub operation_id: Option<String>,
+}
+
+/// Read-only preview of saved retouch coverage.
+/// # Errors
+/// Invalid membership, recipe, operation id or rendering failure.
+pub fn saved_selection(state: &AppState, input: &CoverageInput) -> IpcResult<SelectionPreview> {
+    crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
+    let photo = PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo"))?;
+    let recipe = crate::develop_commands::load_or_neutral(state, photo)?;
+    let (rgb, width, height) =
+        state
+            .render()?
+            .saved_retouch_selection(&photo, &recipe, input.operation_id.as_deref())?;
+    Ok(SelectionPreview {
+        width,
+        height,
+        rgb_base64: crate::develop_commands::base64(&rgb),
+    })
+}
+
 /// Preview selection coverage without changing the recipe or history.
 /// # Errors
 /// Invalid collection membership, draft, replacement ID, or failed rendering.

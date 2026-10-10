@@ -1,4 +1,4 @@
-import { DEFAULT_SKIN, isSampledSkinTool, needsRetouchSource, validRetouchSelection, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool } from '../../ipc/nativeRetouch';
+import { MAX_NATIVE_RETOUCH_EDITS, DEFAULT_SKIN, isSampledSkinTool, needsRetouchSource, validRetouchSelection, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool } from '../../ipc/nativeRetouch';
 import { RetouchSelectionControls } from './RetouchSelectionControls';
 import { RetouchPresets } from './RetouchPresets';
 import { RetouchSkinSelection } from './RetouchSkinSelection';
@@ -34,7 +34,7 @@ export function RetouchControls(props: Props) {
   const color = draft.tool === 'skin_color' || draft.tool === 'makeup';
   const sampled = isSampledSkinTool(draft.tool);
   const skin = draft.skin ?? DEFAULT_SKIN;
-  const canApply = validRetouch(draft) && (selected !== null || count < 256);
+  const canApply = validRetouch(draft) && (selected !== null || count < MAX_NATIVE_RETOUCH_EDITS);
   return <fieldset className="studio-adjustments lr-adjustments" disabled={disabled}>
     <legend>{selected ? 'Refine saved operation' : 'Create a retouch'}</legend>
     <label>Tool<select aria-label="Tool" value={draft.tool} onChange={event => props.onTool(event.target.value as RetouchTool)}>

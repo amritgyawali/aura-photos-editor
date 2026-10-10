@@ -4,16 +4,83 @@ import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { nativeRetouch, freshRetouch } from '../../ipc/nativeRetouch';
 import { develop } from '../../ipc/client';
 
-vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn()}}));
+vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
 vi.mock('../../ipc/client',()=>({asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
 beforeEach(()=>{
   vi.resetAllMocks();vi.mocked(nativeRetouch.edit).mockResolvedValue([]);
   vi.mocked(nativeRetouch.preview).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(120,100,90)),notes:[]} as never);
   vi.mocked(nativeRetouch.selectionPreview).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(255,255,255))});
+  vi.mocked(nativeRetouch.savedSelection).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(255,255,255))});
   vi.mocked(develop.imageHistory).mockResolvedValue({canUndo:true,canRedo:false} as never);
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('keeps manual repair available after more than 256 saved acne repairs',async()=>{
+  vi.mocked(nativeRetouch.edit).mockResolvedValue(Array.from({length:300},(_,i)=>({...freshRetouch(),id:`saved-${i}`})));
+  open();
+  await screen.findByAltText('Retouched photograph');
+  const duplicate=screen.getByRole('button',{name:'Duplicate retouch 300'});
+  expect((duplicate as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(duplicate);
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','duplicate',[],'saved-299'));
+});
+it('uses grayscale contrast review for both sides without changing the recipe or filtering coverage',async()=>{
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
+  open();
+  const image=await screen.findByAltText('Retouched photograph') as HTMLImageElement;
+  const source=image.src;
+  fireEvent.change(screen.getByLabelText('Skin analysis view'),{target:{value:'high-contrast'}});
+  expect(image.style.filter).toBe('grayscale(1) contrast(4)');
+  fireEvent.click(screen.getByRole('button',{name:'Split comparison'}));
+  expect((screen.getByAltText('Before native retouch comparison') as HTMLImageElement).style.filter).toBe(image.style.filter);
+  fireEvent.change(screen.getByLabelText('Skin analysis view'),{target:{value:'low-contrast'}});
+  expect(image.style.filter).toBe('grayscale(1) contrast(0.25)');
+  fireEvent.click(screen.getByRole('button',{name:'Show retouched areas'}));
+  const coverage=await screen.findByAltText('Saved retouch coverage') as HTMLImageElement;
+  expect(coverage.style.filter).toBe('');
+  fireEvent.click(screen.getByRole('button',{name:'Show retouched areas'}));
+  fireEvent.change(screen.getByLabelText('Skin analysis view'),{target:{value:'color'}});
+  expect((screen.getByAltText('Retouched photograph') as HTMLImageElement).src).toBe(source);
+  expect(nativeRetouch.preview).toHaveBeenCalledTimes(2);
+  expect(nativeRetouch.draftPreview).not.toHaveBeenCalled();
+  expect(vi.mocked(nativeRetouch.edit).mock.calls.every(call=>call[2]==='list')).toBe(true);
+});
+it('clears stale saved coverage after a failed refresh and allows retry without writing edits',async()=>{
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
+  const props={projectId:'project',photoId:'photo',onClose:vi.fn(),onBusyChange:vi.fn()};
+  const view=render(<NativeRetouchWorkspace {...props} revision={0}/>);
+  await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button',{name:'Show retouched areas'}));
+  await screen.findByAltText('Saved retouch coverage');
+  vi.mocked(nativeRetouch.preview).mockRejectedValueOnce(new Error('Preview unavailable'));
+  view.rerender(<NativeRetouchWorkspace {...props} revision={1}/>);
+  await waitFor(()=>expect(screen.getByRole('alert').textContent).toContain('Preview unavailable'));
+  expect(screen.queryByAltText('Saved retouch coverage')).toBeNull();
+  expect(screen.queryByAltText('Retouched photograph')).toBeNull();
+  expect((screen.getByText('Apply retouch') as HTMLButtonElement).matches(':disabled')).toBe(true);
+  expect((screen.getByText('Undo') as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole('button',{name:'Back to Develop'}) as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(screen.getByRole('button',{name:'Reload retouch'}));
+  await screen.findByAltText('Saved retouch coverage');
+  expect(vi.mocked(nativeRetouch.edit).mock.calls.every(call=>call[2]==='list')).toBe(true);
+});
+it('shows saved coverage for the whole stack or one step without creating a draft or writing edits',async()=>{
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button',{name:'Show retouched areas'}));
+  await screen.findByAltText('Saved retouch coverage');
+  expect(nativeRetouch.savedSelection).toHaveBeenCalledWith('project','photo',null);
+  fireEvent.change(screen.getByLabelText('Show selection for'),{target:{value:'saved'}});
+  await waitFor(()=>expect(nativeRetouch.savedSelection).toHaveBeenLastCalledWith('project','photo','saved'));
+  await screen.findByAltText('Saved retouch coverage');
+  fireEvent.change(screen.getByLabelText('Overlay visibility'),{target:{value:'.8'}});
+  expect(nativeRetouch.savedSelection).toHaveBeenCalledTimes(2);
+  expect(nativeRetouch.draftPreview).not.toHaveBeenCalled();
+  fireEvent.keyDown(screen.getByRole('region',{name:'Native retouch workspace'}),{key:'Enter'});
+  expect(vi.mocked(nativeRetouch.edit).mock.calls.every(call=>call[2]==='list')).toBe(true);
+  fireEvent.click(screen.getByRole('button',{name:'Show before retouch'}));
+  expect(screen.queryByAltText('Saved retouch coverage')).toBeNull();
+});
 it('restores distinct saved retouch choices after switching photos and undoing', async () => {
   const saved = (photoId: string, recipeHash: string, scope: string, smoothing: number) => ({ photoId, recipeHash,
     body: JSON.stringify({ studio_portrait_auto_v1: { options: { scope, intensity: .6, teeth: false, settings: { smoothing } } } }) }) as never;
@@ -258,7 +325,38 @@ it('updates an existing operation without adding a duplicate',async()=>{
   fireEvent.click(screen.getByText('Update selected retouch'));
   await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','update',[expect.objectContaining({id:'saved',texture:1.2})]));
 });
-it('surfaces failed saves and keeps before/after available',async()=>{
+it('keeps the versioned clean-ring fit when manually adjusting an automatic heal',async()=>{
+  const saved={...freshRetouch(),id:'saved-heal',tool:'patch_heal' as const,textureHeal:true,cleanRingFit:true,curvedHeal:true,healSamples:[[1.5,0],[0,1.5]] as [number,number][],textureSources:[[.2,.2],[.3,.2],[.4,.2]] as [number,number][],sourceScale:.5,source:[.3,.4] as [number,number]};
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([saved]);
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByText(/1\. Texture-aware patch heal/));
+  fireEvent.change(screen.getByLabelText('Strength (65%)'),{target:{value:'.9'}});
+  fireEvent.click(screen.getByText('Update selected retouch'));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','update',[
+    expect.objectContaining({id:'saved-heal',amount:.9,textureHeal:true,cleanRingFit:true,curvedHeal:true,healSamples:[[1.5,0],[0,1.5]],textureSources:[[.2,.2],[.3,.2],[.4,.2]],sourceScale:.5,source:[.3,.4]}),
+  ]));
+});
+  it('clears additional donors when manually changing an automatic patch size',async()=>{
+    const saved={...freshRetouch(),id:'saved-heal',tool:'patch_heal' as const,textureHeal:true,curvedHeal:true,healSamples:[[1.5,0],[0,1.5]] as [number,number][],textureSources:[[.2,.2],[.3,.2],[.4,.2]] as [number,number][],sourceScale:.5,source:[.3,.4] as [number,number]};
+    vi.mocked(nativeRetouch.edit).mockResolvedValue([saved]);open();await screen.findByAltText('Retouched photograph');
+    fireEvent.click(screen.getByText(/1\. Texture-aware patch heal/));
+    fireEvent.change(screen.getByLabelText('Source patch size'),{target:{value:'1'}});
+    fireEvent.click(screen.getByText('Update selected retouch'));
+    await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','update',[
+      expect.objectContaining({sourceScale:1,textureSources:[],healSamples:saved.healSamples}),
+    ]));
+  });
+  it('clears measured lighting and donor footprints when manually moving an automatic heal',async()=>{
+    const saved={...freshRetouch(),id:'saved-heal',tool:'patch_heal' as const,textureHeal:true,curvedHeal:true,healSamples:[[1.5,0],[0,1.5]] as [number,number][],textureSources:[[.2,.2],[.3,.2],[.4,.2]] as [number,number][],sourceScale:.5,source:[.3,.4] as [number,number]};
+    vi.mocked(nativeRetouch.edit).mockResolvedValue([saved]);open();await screen.findByAltText('Retouched photograph');
+    fireEvent.click(screen.getByText(/1\. Texture-aware patch heal/));
+    fireEvent.change(screen.getByLabelText('Center X (%)'),{target:{value:'60'}});
+    fireEvent.click(screen.getByText('Update selected retouch'));
+    await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','update',[
+      expect.objectContaining({region:[.6,saved.region[1],saved.region[2],saved.region[3]],healSamples:[],textureSources:[]}),
+    ]));
+  });
+  it('surfaces failed saves and keeps before/after available',async()=>{
   open();await screen.findByAltText('Retouched photograph');
   vi.mocked(nativeRetouch.edit).mockRejectedValueOnce(new Error('Cannot save recipe'));
   fireEvent.click(screen.getByText('Apply retouch'));

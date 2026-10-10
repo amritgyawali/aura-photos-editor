@@ -93,6 +93,44 @@ pub fn apply_with_mattes(
     edits: &[Edit],
     mattes: &BTreeMap<String, Matte>,
 ) {
+    apply_observed(rgb, width, height, edits, mattes, None);
+}
+
+/// Union of the enabled saved selections, evaluated at each operation's position in the
+/// actual render pass. Optional id selects one operation; strength-zero steps are excluded.
+/// Coverage is eligibility, not a claim that every selected pixel changes.
+#[must_use]
+pub fn saved_selection(
+    rgb: &[f32],
+    width: usize,
+    height: usize,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
+    only: Option<&str>,
+) -> Vec<f32> {
+    if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
+        return Vec::new();
+    }
+    let mut mask = vec![0.0; width * height];
+    apply_observed(
+        &mut rgb.to_vec(),
+        width,
+        height,
+        edits,
+        mattes,
+        Some((&mut mask, only)),
+    );
+    mask
+}
+
+fn apply_observed(
+    rgb: &mut [f32],
+    width: usize,
+    height: usize,
+    edits: &[Edit],
+    mattes: &BTreeMap<String, Matte>,
+    mut observe: Option<(&mut [f32], Option<&str>)>,
+) {
     if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
         return;
     }
@@ -112,6 +150,31 @@ pub fn apply_with_mattes(
         let Some(coverage) = coverage_of(edit, width, height, rgb, &planes) else {
             continue;
         };
+        if let Some((mask, only)) = &mut observe {
+            if only.is_none_or(|id| id == edit.id) {
+                let skin = if matches!(
+                    edit.tool,
+                    Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
+                ) && edit.source.is_some()
+                {
+                    Some(crate::retouch_skin::selection(
+                        rgb, width, height, edit, &coverage,
+                    ))
+                } else {
+                    None
+                };
+                let [x0, y0, x1, y1] = coverage.bounds;
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        let i = y * width + x;
+                        let value = skin
+                            .as_ref()
+                            .map_or_else(|| coverage.at(x, y, width, height), |s| s[i]);
+                        mask[i] = mask[i].max(value);
+                    }
+                }
+            }
+        }
         if matches!(
             edit.tool,
             Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn

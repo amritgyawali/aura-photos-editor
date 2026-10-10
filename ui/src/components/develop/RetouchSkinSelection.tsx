@@ -7,7 +7,7 @@ export function RetouchSkinSelection({ draft, edits, onChange }: {
   onChange: (patch: Partial<NativeRetouchEdit>) => void;
 }) {
   const choices = edits.filter((edit, index) => edit.matte
-    && /-(face|body)$/.test(edit.matte)
+    && /-(face|body|skin|surface)(-blemish)?(-feature-safe|-outside-faces)?$/.test(edit.matte)
     && edits.findIndex(other => other.matte === edit.matte) === index);
   return <details open><summary>Detected skin selection</summary>
     <label>Use detected skin<select disabled={choices.length === 0} value={choices.some(e => e.matte === draft.matte) ? draft.matte! : ''}
@@ -18,9 +18,9 @@ export function RetouchSkinSelection({ draft, edits, onChange }: {
       }}>
       <option value="" disabled>Choose face or body skin</option>
       {choices.map(edit => {
-        const match = /-(\d+)-(face|body)$/.exec(edit.matte!);
+        const match = /-(\d+)-(?:blemish-)?(face|body|skin|surface)(?:-blemish)?(-feature-safe|-outside-faces)?$/.exec(edit.matte!);
         return <option key={edit.matte} value={edit.matte!}>
-          {match?.[2] === 'body' ? 'Body skin' : 'Face skin'} · Person {Number(match?.[1] ?? 0) + 1}
+          {match?.[2] === 'body' ? 'Body skin' : match?.[2] === 'surface' ? 'Blemish cleanup skin' : 'Face skin'} · Person {Number(match?.[1] ?? 0) + 1}{match?.[3] ? ' · protected details' : ''}
         </option>;
       })}
     </select></label>

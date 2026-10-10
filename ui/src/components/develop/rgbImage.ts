@@ -1,5 +1,24 @@
 import type { RenderDto } from '../../ipc/types';
 
+/** Tint the backend's saved coverage on the displayed photo. Zero coverage preserves the
+ * displayed RGB exactly; strength controls visibility only and never changes the recipe. */
+export function coverageDataUrl(photo: Pick<RenderDto, 'width'|'height'|'rgbBase64'>,
+  mask: Pick<RenderDto, 'width'|'height'|'rgbBase64'>, opacity: number): string | null {
+  if (photo.width !== mask.width || photo.height !== mask.height || !Number.isFinite(opacity)) return null;
+  let rgb: string, coverage: string;
+  try { rgb = atob(photo.rgbBase64); coverage = atob(mask.rgbBase64); } catch { return null; }
+  if (rgb.length !== photo.width * photo.height * 3 || coverage.length !== rgb.length) return null;
+  const bytes = new Uint8Array(rgb.length);
+  const tint = [40, 220, 190];
+  for (let i = 0; i < bytes.length; i++) {
+    const alpha = coverage.charCodeAt(i - i % 3) / 255 * Math.max(0, Math.min(1, opacity));
+    bytes[i] = Math.round(rgb.charCodeAt(i) * (1 - alpha) + (tint[i % 3] ?? 0) * alpha);
+  }
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += 8192) chunks.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
+  return rgbDataUrl({...photo, rgbBase64: btoa(chunks.join(''))});
+}
+
 /** Wrap the backend's interleaved RGB in a lossless browser-readable BMP container. */
 export function rgbDataUrl(render: Pick<RenderDto, 'width'|'height'|'rgbBase64'>): string | null {
   const { width, height } = render;

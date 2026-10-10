@@ -180,7 +180,7 @@ export function ExportView(props: ExportViewProps) {
         <button
           type="button"
           onClick={props.onRun}
-          disabled={running || destination.trim() === ''}
+          disabled={running || !preset || destination.trim() === ''}
           data-testid="run"
         >
           {running ? 'Exporting…' : 'Export'}

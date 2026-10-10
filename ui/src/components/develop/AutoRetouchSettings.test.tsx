@@ -5,12 +5,21 @@ import { DEFAULT_RETOUCH_SETTINGS } from '../../ipc/nativeRetouch';
 import { automaticLabel } from './NativeRetouchWorkspace';
 
 describe('automatic retouch settings', () => {
+  it('limits Acne only to blemishes and preserves eye and nose detail without beauty finishing',()=>{
+    const run=vi.fn();
+    render(<AutoRetouchSettings disabled={false} onRun={run}/>);
+    fireEvent.click(screen.getByRole('radio',{name:'Acne only · preserve detail'}));
+    fireEvent.click(screen.getByRole('button',{name:'Auto retouch: Face + body skin'}));
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({eyes:false,teeth:false,refine:false,blemishes:true,scope:'face_and_body',
+      settings:expect.objectContaining({protectEyeArea:true,protectNoseDetail:true,smoothing:0,toneEvenness:0,lightEvenness:0,shine:0,textureGraft:0,hairDetail:0,bodyBlemishes:1,bodySmoothing:0,bodyTone:0,matchBodyToFace:0,bodyShine:0,maxSpots:900})}));
+  });
   it('offers face, body skin and face + body skin, and runs the chosen one', () => {
     const run = vi.fn();
     render(<AutoRetouchSettings disabled={false} onRun={run} />);
     expect(screen.getByRole('radio', { name: 'Face' })).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: 'Body skin' }));
-    expect(screen.getByText(/The face is left as it is/)).toBeTruthy();
+    expect(screen.getByText(/arms, hands and legs/)).toBeTruthy();
+    expect(screen.getByText(/without a visible face/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Body skin' }));
     expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'body' }));
     fireEvent.click(screen.getByRole('radio', { name: 'Face + body skin' }));
@@ -58,8 +67,8 @@ describe('automatic retouch settings', () => {
   });
   it('offers every fine control exactly once', () => {
     const keys = SETTING_GROUPS.flatMap(([, controls]) => controls.map(([key]) => key));
-    expect(keys.length).toBe(56);
-    expect(new Set(keys).size).toBe(56);
+    expect(keys.length).toBe(58);
+    expect(new Set(keys).size).toBe(58);
     expect([...keys].sort()).toEqual(Object.keys(DEFAULT_RETOUCH_SETTINGS).sort());
   });
   it('runs deep cleanup as one native pass and exposes dark-mark removal', () => {
@@ -68,10 +77,10 @@ describe('automatic retouch settings', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
     expect(screen.getByText(/can also remove freckles or beauty marks/)).toBeTruthy();
     fireEvent.click(screen.getByText('Blemishes'));
-    expect(screen.getByLabelText('Most spots per face').getAttribute('max')).toBe('220');
+    expect(screen.getByLabelText('Most spots per face').getAttribute('max')).toBe('900');
     fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({
-      deepBlemishCleanup: true, removeDarkMarks: true, maxSpots: 220, keepFreckles: false,
+      deepBlemishCleanup: true, removeDarkMarks: true, maxSpots: 512, keepFreckles: false,
     }) }));
   });
   it('applies a preset, then marks a hand change as custom and sends it', () => {
@@ -91,13 +100,26 @@ describe('automatic retouch settings', () => {
   });
 });
 
+it('adds adjustable pore refinement to face and body cleanup without enabling eye edits', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByRole('radio', { name: 'Skin cleanup · refine pores' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ scope: 'face_and_body', eyes: false, teeth: false,
+    settings: expect.objectContaining({ frequencyHeal: 1, bodyBlemishes: 1, smoothing: .3, texture: .85,
+      poreRefine: .3, bodySmoothing: .25, protectEyeArea: true, protectNoseDetail: true }) }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Acne only · preserve detail' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ settings: expect.objectContaining({ smoothing: 0, poreRefine: 0, bodySmoothing: 0 }) }));
+});
+
 it('runs deep cleanup with explicit dark-mark removal and retained fine texture', () => {
   const run = vi.fn();
   render(<AutoRetouchSettings disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({
-    deepBlemishCleanup: true, removeDarkMarks: true, maxSpots: 220, texture: .85,
+    deepBlemishCleanup: true, removeDarkMarks: true, maxSpots: 512, texture: .85,
   }) }));
 });
 
@@ -115,7 +137,7 @@ it('offers a professional preset: frequency healing first, real texture back las
   render(<AutoRetouchSettings disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Professional retouch' }));
   expect(screen.getByText(/Frequency healing rebuilds the tone under each mark first/)).toBeTruthy();
-  expect(screen.getByText(/puts this face’s own pores back, nose included/)).toBeTruthy();
+  expect(screen.getByText(/restores the original pores within the selected skin/)).toBeTruthy();
   fireEvent.click(screen.getByText('Blemishes'));
   expect(screen.getByText('Frequency healing: 100%')).toBeTruthy();
   fireEvent.click(screen.getByText('Skin'));
@@ -130,7 +152,7 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
   expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
   expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
   for (const [id, , values] of PRESETS) {
-    if (id === 'pro') continue;
+    if (id === 'pro' || id === 'acne_only' || id === 'skin_cleanup') continue;
     expect(values.frequencyHeal ?? 0).toBe(0);
     expect(values.textureGraft ?? 0).toBe(0);
   }

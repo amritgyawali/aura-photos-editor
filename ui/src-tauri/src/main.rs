@@ -3494,6 +3494,19 @@ async fn native_retouch_selection_preview(
     .map_err(|_| background_request_failed())?
 }
 
+#[tauri::command]
+async fn native_retouch_saved_selection(
+    state: State<'_, AppState>,
+    input: aura_app::native_retouch::CoverageInput,
+) -> IpcResult<aura_app::native_retouch::SelectionPreview> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::native_retouch::saved_selection(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 // `tauri::generate_context!` expands to an `unwrap` and a `HashMap` inside Tauri's own
 // generated code, which this workspace's disallowed lists cannot see past. Allowed here and
 // nowhere else: every other line of the shell is held to both rules.
@@ -3567,6 +3580,7 @@ fn main() {
             pick_white_balance,
             native_retouch_edit,
             native_retouch_selection_preview,
+            native_retouch_saved_selection,
             native_retouch_preview,
             native_retouch_draft_preview,
             list_edit_profiles,

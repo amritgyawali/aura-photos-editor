@@ -31,6 +31,8 @@ it.each(['bad json', 'null', '[]', '{}', '{"studio_portrait_auto_v1":{"options":
 });
 
 it('restores the adaptive choice and the larger spot limit only with deep cleanup', () => {
+  expect(readRetouchPreferences(recipe({ settings: { maxSpots: 900, deepBlemishCleanup: true } })).settings?.maxSpots).toBe(900);
+  expect(readRetouchPreferences(recipe({ settings: { maxSpots: 1200, deepBlemishCleanup: true } })).settings?.maxSpots).toBe(900);
   expect(readRetouchPreferences(recipe({ settings: { maxSpots: 220, deepBlemishCleanup: true } })).settings?.maxSpots).toBe(220);
   expect(readRetouchPreferences(recipe({ settings: { maxSpots: 220, deepBlemishCleanup: false } })).settings?.maxSpots).toBe(24);
   expect(readRetouchPreferences(recipe({ settings: { maxSpots: 180, deepBlemishCleanup: true } })).settings?.maxSpots).toBe(180);

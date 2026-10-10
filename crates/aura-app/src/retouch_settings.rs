@@ -32,6 +32,11 @@ pub struct Settings {
     pub edge_softness: f32,
     /// Keep beard and stubble out of the smoothing, whatever the precision.
     pub protect_facial_hair: bool,
+    /// Keep eyelids, inner corners and orbital shadows out of every automatic face step.
+    /// Manual edits remain available; disabling this permits the dedicated eye controls.
+    pub protect_eye_area: bool,
+    /// Preserve nose bridge, nostril edges, pores and shading during automatic retouch.
+    pub protect_nose_detail: bool,
 
     // -- Skin ------------------------------------------------------------------------------
     /// Mid-frequency smoothing between pores and facial form.
@@ -74,8 +79,8 @@ pub struct Settings {
     /// Rebuild the tone under every compact mark from the clean skin around it, leaving the
     /// pores where they are (frequency healing). 0 is off. ADR-0090.
     pub frequency_heal: f32,
-    /// At most this many spots healed per face (1..=220 in deep cleanup).
-    pub max_spots: u8,
+    /// At most this many spots healed per face (1..=900 in deep cleanup).
+    pub max_spots: u16,
     /// Treat a field of many small marks as freckles and keep all of them.
     pub keep_freckles: bool,
 
@@ -151,6 +156,8 @@ impl Default for Settings {
             mask_precision: 0.5,
             edge_softness: 0.35,
             protect_facial_hair: true,
+            protect_eye_area: true,
+            protect_nose_detail: true,
             smoothing: 0.5,
             texture: 0.5,
             smoothing_size: 0.5,
@@ -207,7 +214,7 @@ impl Default for Settings {
 }
 
 /// Number of named settings in [`Settings`], for documentation and the UI's own check.
-pub const COUNT: usize = 56;
+pub const COUNT: usize = 58;
 
 fn unit(v: f32, fallback: f32) -> f32 {
     if v.is_finite() {
@@ -236,6 +243,8 @@ impl Settings {
             mask_precision: unit(self.mask_precision, d.mask_precision),
             edge_softness: unit(self.edge_softness, d.edge_softness),
             protect_facial_hair: self.protect_facial_hair,
+            protect_eye_area: self.protect_eye_area,
+            protect_nose_detail: self.protect_nose_detail,
             smoothing: unit(self.smoothing, d.smoothing),
             texture: unit(self.texture, d.texture),
             smoothing_size: unit(self.smoothing_size, d.smoothing_size),
@@ -256,7 +265,7 @@ impl Settings {
             frequency_heal: unit(self.frequency_heal, 0.0),
             max_spots: self
                 .max_spots
-                .clamp(1, if self.deep_blemish_cleanup { 220 } else { 24 }),
+                .clamp(1, if self.deep_blemish_cleanup { 900 } else { 24 }),
             keep_freckles: self.keep_freckles,
             forehead_lines: unit(self.forehead_lines, d.forehead_lines),
             crows_feet: unit(self.crows_feet, d.crows_feet),
@@ -337,6 +346,7 @@ mod tests {
         // existed plan exactly what they planned then.
         assert_eq!(parsed.frequency_heal, 0.0);
         assert_eq!(parsed.texture_graft, 0.0);
+        assert!(parsed.protect_eye_area && parsed.protect_nose_detail);
     }
 
     #[test]
@@ -355,11 +365,11 @@ mod tests {
         assert_eq!(wild.max_spots, 24);
         let deep = Settings {
             deep_blemish_cleanup: true,
-            max_spots: 255,
+            max_spots: 1200,
             ..Settings::default()
         }
         .sanitised();
-        assert_eq!(deep.max_spots, 220);
+        assert_eq!(deep.max_spots, 900);
         assert_eq!(gain(0.5), 1.0);
         assert!(threshold(1.0, 1.0) < threshold(1.0, 0.5));
         assert!(threshold(1.0, 0.0) > 1.0);

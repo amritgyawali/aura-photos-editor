@@ -5,6 +5,8 @@
 use crate::retouch_mask::Coverage;
 use aura_recipe::retouch_tools::Edit;
 
+mod curved;
+mod quilt;
 mod texture;
 
 const RING_SAMPLES: usize = 32;
@@ -153,7 +155,7 @@ impl ToneField {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Donor {
     offset: [f32; 2],
     centre: [f32; 2],
@@ -282,7 +284,16 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
     };
     let texture = edit
         .texture_heal
-        .then(|| texture::TextureHeal::new(image, source))
+        .then(|| {
+            texture::TextureHeal::new(
+                image,
+                source,
+                edit.clean_ring_fit,
+                edit.curved_heal,
+                &edit.heal_samples,
+                &edit.texture_sources,
+            )
+        })
         .flatten();
     let field = texture
         .is_none()
