@@ -160,6 +160,9 @@ Never load two phase files into one session.
 | Per-face adaptive retouch and scene intent | `docs/adr/ADR-0086-adaptive-retouch-and-scene-intent.md`, `crates/aura-app/src/portrait_features/expert.rs`, `scripts/test-adaptive-batch.py` |
 | The skin segmenter (model, card, converter) | `assets/models/selfie_multiclass/`, `crates/aura-vision/src/skin.rs`, `ml/models/skin/` |
 | Automatic retouch settings, in the product's own words | `docs/automatic-retouch-settings.md` |
+| Frequency healing and texture graft decisions | `docs/adr/ADR-0090-frequency-healing-and-the-texture-graft.md`, `crates/aura-render/src/retouch_clear.rs`, `crates/aura-render/src/retouch_texture.rs` |
+| Skin finish checks (painted fixtures, then real pixels by hand) | `crates/aura-render/tests/skin_finish.rs`, `crates/aura-render/tests/skin_finish_photos.rs`, `crates/aura-app/tests/auto_retouch_photos.rs` (preset `pro`) |
+| What the Professional retouch preset was run on, and what it did | `docs/professional-retouch-validation.md`, `scripts/verify-professional-retouch.py` |
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 | One studio, the unattended run and the measured cull | `docs/adr/ADR-0088-one-studio-and-the-unattended-wedding-run.md`, `crates/aura-app/src/one_click_commands.rs`, `crates/aura-app/src/measured_cull.rs`, `ui/src/components/workflow/FinishFolder.tsx` |
 | Finishing a folder in the real app, scored against ground truth | `scripts/test-wedding-run.py`, results in `docs/unified-studio-validation.md` |

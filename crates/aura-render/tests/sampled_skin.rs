@@ -20,6 +20,8 @@ fn operation(tool: Tool) -> Edit {
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        sensitivity: None,
+        keep_dark_marks: false,
         texture: 1.0,
         tone: 1.0,
         warmth: 0.0,

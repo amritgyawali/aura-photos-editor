@@ -2,6 +2,36 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Frequency healing, a texture graft and a Professional retouch preset - 2026-10-06
+
+- Add **frequency healing**: one operation that finds compact marks across a skin
+  selection and rebuilds the tone under each from the clean skin around it, leaving pores
+  where they are. Darkness and redness are ratios against the selection's own variation, so
+  exposure and skin tone do not change what is found; creases and hair are never marks;
+  glinting skin is not read as dark; dark marks that are not redder than their surroundings
+  are kept unless asked for. ADR-0090.
+- Add **texture restore** (*Restore skin texture*): puts the photograph's own pore detail
+  back where healing and smoothing removed it, at the same place, with oily glints and deep
+  pits limited; only healed blemishes borrow pores from clean skin nearby. It moves neither
+  tone nor colour and generates nothing.
+- Frequency healing treats a group as a mark only when it is darker or redder than the skin
+  on every side of it, so the shadow beside an eye or a nose is never rebuilt.
+- Give deep finishing one shared selection that reaches marks and shadowed skin the
+  segmenter left out - including skin it saw nothing of, inside the face detector's oval -
+  and that excludes a brow where it is, judged against the skin around it, instead of the
+  forehead above it. On the test portrait this brought a band of shadowed cheek and jaw and
+  a third of the forehead into the retouch; acne there had been left untouched.
+- Frequency healing heals a mark in the soft edge of its selection as completely as one
+  inside it, and the texture restore borrows across the rim of a healed mark, so the ring
+  of a pustule does not come back with the photograph's own detail.
+- Add the **Professional retouch** preset: frequency healing, gentle smoothing (35 %, no
+  pore refinement), tone and light evening, micro dodge and burn, spot repairs planned on
+  what is left, the frequency-separation finish, and the texture restore last over the
+  whole face skin, nose and shadowed side included. Both new controls are off in
+  every other preset; the only change another preset sees is that *Deep acne cleanup*'s
+  surface finish uses the shared selection, so it reaches the same shadowed skin.
+- Both operations are ordinary tools in the Retouch workspace, with their own controls.
+
 ## Local-light matched acne repair - 2026-10-06
 
 - Deep cleanup transfers clean donor texture over the surrounding skin's measured light

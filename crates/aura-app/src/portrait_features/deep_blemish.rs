@@ -426,6 +426,326 @@ pub(crate) fn plan(
     out
 }
 
+/// Fill notches in the selection's outline that are narrower than `2 * radius`, where the
+/// photograph itself looks like this person's skin.
+///
+/// A segmenter leaves a dark mark at the edge of a face out of the skin, and a mark that is
+/// not in the selection can never be repaired. A morphological closing puts back exactly the
+/// cells a notch removed; `allowed` keeps it from reaching hair or background in a genuine
+/// concavity of the outline.
+fn close_notches(mask: &mut [bool], w: usize, h: usize, radius: f32, allowed: &[bool]) {
+    let outside: Vec<bool> = mask.iter().map(|v| !v).collect();
+    // For an unselected cell: distance to the selection (or the grid's edge).
+    let near = clearance(&outside, w, h);
+    let grown: Vec<bool> = mask
+        .iter()
+        .zip(&near)
+        .map(|(on, d)| *on || *d <= radius)
+        .collect();
+    // For a grown cell: distance back out of the grown region.
+    let depth = clearance(&grown, w, h);
+    for ((cell, depth), allowed) in mask.iter_mut().zip(depth).zip(allowed) {
+        if !*cell && depth > radius && *allowed {
+            *cell = true;
+        }
+    }
+}
+
+/// Extend the selection into `candidates` that touch it, at most `steps` cells outward.
+fn grow(mask: &mut [bool], w: usize, h: usize, candidates: &[bool], steps: usize) {
+    let mut frontier: Vec<usize> = (0..mask.len()).filter(|i| mask[*i]).collect();
+    for _ in 0..steps {
+        let mut next = Vec::new();
+        for i in frontier {
+            let (x, y) = (i % w, i / w);
+            for j in [
+                (x > 0).then(|| i - 1),
+                (x + 1 < w).then_some(i + 1),
+                (y > 0).then(|| i - w),
+                (y + 1 < h).then_some(i + w),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if !mask[j] && candidates[j] {
+                    mask[j] = true;
+                    next.push(j);
+                }
+            }
+        }
+        if next.is_empty() {
+            break;
+        }
+        frontier = next;
+    }
+}
+
+/// Mean linear colour of the photograph under every cell of a matte grid.
+fn cell_colours(px: &Pixels<'_>, bounds: [f32; 4], w: usize, h: usize) -> Vec<[f32; 3]> {
+    let [l, t, r, b] = bounds;
+    let step_x = (r - l) * px.width as f32 / w as f32;
+    let step_y = (b - t) * px.height as f32 / h as f32;
+    (0..w * h)
+        .map(|i| {
+            let cx = l * px.width as f32 + ((i % w) as f32 + 0.5) * step_x;
+            let cy = t * px.height as f32 + ((i / w) as f32 + 0.5) * step_y;
+            let mut sum = [0.0_f32; 3];
+            for (dx, dy) in [
+                (0.0, 0.0),
+                (-0.3, -0.3),
+                (0.3, -0.3),
+                (-0.3, 0.3),
+                (0.3, 0.3),
+            ] {
+                let p = px.linear(
+                    (cx + dx * step_x).max(0.0) as usize,
+                    (cy + dy * step_y).max(0.0) as usize,
+                );
+                for c in 0..3 {
+                    sum[c] += p[c] * 0.2;
+                }
+            }
+            sum
+        })
+        .collect()
+}
+
+fn median(values: Vec<f32>) -> Option<f32> {
+    quantile(values, 0.5)
+}
+
+/// The value a share `q` of `values` lies below.
+fn quantile(mut values: Vec<f32>, q: f32) -> Option<f32> {
+    if values.is_empty() {
+        return None;
+    }
+    let at = ((values.len() - 1) as f32 * q.clamp(0.0, 1.0)).round() as usize;
+    let (_, value, _) = values.select_nth_unstable_by(at, f32::total_cmp);
+    Some(*value)
+}
+
+/// The continuous, feature-protected face-skin selection every deep finishing operation
+/// shares: a feathered alpha per matte cell.
+///
+/// Small enclosed holes and narrow skin-like notches in the segmenter's outline are filled, so
+/// a dark mark the segmenter left out is inside the selection, and skin-coloured cells inside
+/// the face's oval that touch it are added, so shadowed skin the segmenter missed is too. Eyes,
+/// the nose tip and lips are removed by landmark. A brow is removed where it is: the cells
+/// inside the brow area that are clearly darker than the skin around them, plus a narrow band
+/// along the brow line for brows that are no darker than the skin - so a forehead above the
+/// brow, lit or in shadow, is not left as an untreated patch.
+fn surface_selection(g: &Geometry, px: &Pixels<'_>, matte: &Matte) -> Option<Vec<u8>> {
+    let [l, t, r, b] = matte.bounds;
+    let (w, h) = (matte.width, matte.height);
+    if w < 3 || h < 3 {
+        return None;
+    }
+    let cell = (((r - l) * px.width as f32 / w as f32).max((b - t) * px.height as f32 / h as f32))
+        .max(1.0);
+    let mut selected: Vec<_> = matte.alpha.iter().map(|a| *a > 64).collect();
+    let colours = cell_colours(px, matte.bounds, w, h);
+    let warmth = |p: [f32; 3]| (p[0] - p[2]) / (p[0] + p[1] + p[2] + 1e-4);
+    let confident = |f: &dyn Fn([f32; 3]) -> f32| {
+        median(
+            colours
+                .iter()
+                .zip(&selected)
+                .filter(|(_, on)| **on)
+                .map(|(p, _)| f(*p))
+                .collect(),
+        )
+    };
+    let skin_luma = confident(&super::luma)?;
+    let skin_warmth = confident(&warmth)?;
+    close_holes(&mut selected, w, h, g.d * 0.30 / cell);
+    // A mark on the shadow side of a face can be a tenth as bright as the lit skin, so
+    // brightness alone cannot tell it from hair. Warmth can: measured on a dark-skinned
+    // portrait, shadowed marks kept 80 % of the skin's red-over-blue share, black hair a
+    // quarter of it and a grey backdrop none.
+    let skin_like: Vec<bool> = colours
+        .iter()
+        .map(|p| super::luma(*p) > skin_luma * 0.05 && warmth(*p) > skin_warmth * 0.6)
+        .collect();
+    close_notches(&mut selected, w, h, g.d * 0.16 / cell, &skin_like);
+    // The segmenter is unsure of skin in deep shadow. Where it saw some evidence of skin, the
+    // photograph is skin-coloured and the cell touches confident skin, it is the same face.
+    let hinted: Vec<bool> = matte
+        .alpha
+        .iter()
+        .zip(&skin_like)
+        .map(|(a, like)| *a > 12 && *like)
+        .collect();
+    grow(&mut selected, w, h, &hinted, (g.d * 0.35 / cell) as usize);
+    let centre = |i: usize| {
+        [
+            (l + ((i % w) as f32 + 0.5) / w as f32 * (r - l)) * px.width as f32,
+            (t + ((i / w) as f32 + 0.5) / h as f32 * (b - t)) * px.height as f32,
+        ]
+    };
+    // Where the segmenter saw no skin at all - a band of shadowed cheek and jaw, which on
+    // darker skin can be most of one side of a face - only the photograph can say it is skin.
+    // Inside the oval the detector drew around the face, a skin-coloured cell that touches the
+    // selection is the same face; outside it, the same colour is a neck or an ear.
+    let [fl, ft, fr, fb] = g.bounds;
+    let oval_centre = [(fl + fr) * 0.5, (ft + fb) * 0.5];
+    let oval_axes = [((fr - fl) * 0.5).max(1.0), ((fb - ft) * 0.5).max(1.0)];
+    let in_face: Vec<bool> = (0..w * h)
+        .map(|i| {
+            let [x, y] = centre(i);
+            skin_like[i]
+                && ((x - oval_centre[0]) / oval_axes[0]).powi(2)
+                    + ((y - oval_centre[1]) / oval_axes[1]).powi(2)
+                    <= 1.0
+        })
+        .collect();
+    grow(&mut selected, w, h, &in_face, (g.d * 0.35 / cell) as usize);
+    // Creases are protected during spot replacement, but a continuous surface
+    // finish must span them: otherwise they become conspicuous untreated strips.
+    let mut exclusions = vec![super::Capsule::disk(
+        super::add(g.nose, g.v, g.d * 0.06),
+        g.d * 0.20,
+    )];
+    let mut brow_areas = Vec::with_capacity(2);
+    for eye in g.eyes {
+        exclusions.push(super::Capsule::disk(eye, g.d * 0.25));
+        let brow = super::add(eye, g.v, -g.d * 0.32);
+        exclusions.push(super::Capsule {
+            a: super::add(brow, g.u, -g.d * 0.28),
+            b: super::add(brow, g.u, g.d * 0.28),
+            r: g.d * 0.085,
+        });
+        brow_areas.push(super::Capsule::disk(brow, g.d * 0.24));
+    }
+    exclusions.push(lip_protection(g));
+    // Brow hair wherever it actually is, with a margin of two cells or 4 % of the eye distance.
+    // Hair is darker than the skin right around it - not than this face's typical skin: on
+    // the shadowed side of a face the whole forehead is darker than that, and is still skin.
+    let reach = (g.d * 0.2 / cell).max(2.0) as usize;
+    let local_skin = |i: usize| {
+        let (x, y) = (i % w, i / w);
+        let mut around = Vec::with_capacity((2 * reach + 1).pow(2));
+        for row in y.saturating_sub(reach)..(y + reach + 1).min(h) {
+            for j in row * w + x.saturating_sub(reach)..row * w + (x + reach + 1).min(w) {
+                if skin_like[j] {
+                    around.push(super::luma(colours[j]));
+                }
+            }
+        }
+        quantile(around, 0.6).unwrap_or(skin_luma)
+    };
+    let not_brow: Vec<bool> = (0..w * h)
+        .map(|i| {
+            !(brow_areas.iter().any(|area| area.contains(centre(i)))
+                && super::luma(colours[i]) < local_skin(i) * 0.62)
+        })
+        .collect();
+    let to_brow = clearance(&not_brow, w, h);
+    let brow_margin = (g.d * 0.04 / cell).max(2.0);
+    for i in 0..w * h {
+        let point = centre(i);
+        let on_brow = to_brow[i] <= brow_margin && brow_areas.iter().any(|a| a.contains(point));
+        if on_brow || exclusions.iter().any(|e| e.contains(point)) {
+            selected[i] = false;
+        }
+    }
+    let distance = clearance(&selected, w, h);
+    let feather = (g.d * 0.08 / cell).max(2.0);
+    Some(
+        distance
+            .iter()
+            .map(|d| {
+                let v = ((d - 1.0) / feather).clamp(0.0, 1.0);
+                (v * v * (3.0 - 2.0 * v) * 255.0).round() as u8
+            })
+            .collect(),
+    )
+}
+
+/// The recipe matte for [`surface_selection`], stored once per face and shared by the
+/// frequency heal, the surface finish and the texture graft.
+pub(crate) fn surface_matte(
+    face: &PortraitFace,
+    px: &Pixels<'_>,
+    matte: &Matte,
+) -> Option<aura_recipe::retouch_tools::Matte> {
+    let g = Geometry::new(face, px)?;
+    if g.d < 40.0 {
+        return None;
+    }
+    let alpha = surface_selection(&g, px, matte)?;
+    let mut mask = aura_recipe::retouch_tools::Matte::encode(
+        matte.bounds,
+        matte.width as u32,
+        matte.height as u32,
+        &alpha,
+    );
+    // Already protected and feathered: dark blemishes must not cut holes in their own repair.
+    mask.refine_edges = false;
+    Some(mask)
+}
+
+/// The id of the matte [`surface_matte`] is stored under.
+pub(crate) fn surface_matte_id(prefix: &str, index: usize) -> String {
+    format!("{prefix}{index}-surface")
+}
+
+/// What the texture restore runs over: the segmented face skin - the nose included, which the
+/// surface selection leaves out - and wherever the surface selection reached beyond it, so the
+/// shadowed skin the segmenter missed gets its pores back after healing and smoothing too.
+pub(crate) fn restore_matte(
+    face: &Matte,
+    surface: &aura_recipe::retouch_tools::Matte,
+) -> Option<aura_recipe::retouch_tools::Matte> {
+    let reached = surface.decode()?;
+    if reached.len() != face.alpha.len() {
+        return None;
+    }
+    let alpha: Vec<u8> = face
+        .alpha
+        .iter()
+        .zip(&reached)
+        .map(|(a, b)| (*a).max(*b))
+        .collect();
+    Some(aura_recipe::retouch_tools::Matte::encode(
+        face.bounds,
+        u32::try_from(face.width).ok()?,
+        u32::try_from(face.height).ok()?,
+        &alpha,
+    ))
+}
+
+/// The id of the matte [`restore_matte`] is stored under.
+pub(crate) fn restore_matte_id(prefix: &str, index: usize) -> String {
+    format!("{prefix}{index}-skin")
+}
+
+/// An operation over the whole surface selection of one face.
+fn surface_edit(
+    id: String,
+    tool: Tool,
+    amount: f32,
+    px: &Pixels<'_>,
+    matte: &Matte,
+    matte_id: String,
+) -> aura_recipe::retouch_tools::Edit {
+    let [l, t, r, b] = matte.bounds;
+    let mut edit = base_edit(
+        id,
+        tool,
+        amount,
+        px,
+        [
+            (l + r) * 0.5 * px.width as f32,
+            (t + b) * 0.5 * px.height as f32,
+            (r - l) * px.width as f32,
+            (b - t) * px.height as f32,
+        ],
+    );
+    edit.feather = 0.0;
+    edit.matte = Some(matte_id);
+    edit
+}
+
 /// A continuous finishing mask with feature exclusions and a soft inward edge.
 /// It does not reclassify darker blemishes as protected structure at render time.
 pub(crate) fn surface_finish(
@@ -443,71 +763,139 @@ pub(crate) fn surface_finish(
     if g.d < 40.0 || settings.smoothing <= 0.0 {
         return None;
     }
-    let [l, t, r, b] = matte.bounds;
-    let (w, h) = (matte.width, matte.height);
-    if w < 3 || h < 3 {
-        return None;
-    }
-    let cell = (((r - l) * px.width as f32 / w as f32).max((b - t) * px.height as f32 / h as f32))
-        .max(1.0);
-    let mut selected: Vec<_> = matte.alpha.iter().map(|a| *a > 64).collect();
-    close_holes(&mut selected, w, h, g.d * 0.30 / cell);
-    // Creases are protected during spot replacement, but a continuous surface
-    // finish must span them: otherwise they become conspicuous untreated strips.
-    let mut exclusions = vec![super::Capsule::disk(
-        super::add(g.nose, g.v, g.d * 0.06),
-        g.d * 0.20,
-    )];
-    for eye in g.eyes {
-        exclusions.push(super::Capsule::disk(eye, g.d * 0.25));
-        exclusions.push(super::Capsule::disk(
-            super::add(eye, g.v, -g.d * 0.32),
-            g.d * 0.19,
-        ));
-    }
-    exclusions.push(lip_protection(&g));
-    for y in 0..h {
-        for x in 0..w {
-            let point = [
-                (l + (x as f32 + 0.5) / w as f32 * (r - l)) * px.width as f32,
-                (t + (y as f32 + 0.5) / h as f32 * (b - t)) * px.height as f32,
-            ];
-            if exclusions.iter().any(|e| e.contains(point)) {
-                selected[y * w + x] = false;
-            }
-        }
-    }
-    let distance = clearance(&selected, w, h);
-    let feather = (g.d * 0.08 / cell).max(2.0);
-    let alpha: Vec<_> = distance
-        .iter()
-        .map(|d| {
-            let v = ((d - 1.0) / feather).clamp(0.0, 1.0);
-            (v * v * (3.0 - 2.0 * v) * 255.0).round() as u8
-        })
-        .collect();
-    let mut mask =
-        aura_recipe::retouch_tools::Matte::encode(matte.bounds, w as u32, h as u32, &alpha);
-    mask.refine_edges = false;
-    let mut edit = base_edit(
+    let mask = surface_matte(face, px, matte)?;
+    let mut edit = surface_edit(
         format!("{prefix}{index}-surface-finish"),
         Tool::Frequency,
         (settings.smoothing * 1.15).min(1.0),
         px,
-        [
-            (l + r) * 0.5 * px.width as f32,
-            (t + b) * 0.5 * px.height as f32,
-            (r - l) * px.width as f32,
-            (b - t) * px.height as f32,
-        ],
+        matte,
+        surface_matte_id(prefix, index),
     );
-    edit.feather = 0.0;
     edit.radius = (g.d * 0.025 / px.width.min(px.height) as f32).clamp(0.001, 0.02);
     edit.texture = settings.texture.clamp(0.0, 1.0);
     edit.preserve_microtexture = true;
     edit.tone = 0.95;
-    edit.matte = Some(format!("{prefix}{index}-surface"));
     Some((edit, mask))
+}
+
+/// Frequency healing over the surface selection (ADR-0090): the tone under every compact
+/// mark is rebuilt from the clean skin around it and pore detail stays where it is.
+///
+/// One operation for the whole face rather than one per spot, so it is not limited by the
+/// operation budget and it reaches the marks no clean donor patch fits beside. Its strength
+/// is how completely the tone is rebuilt; dark marks that are not also redder than the skin
+/// around them are kept unless *Remove dark marks* is on.
+pub(crate) fn frequency_heal(
+    face: &PortraitFace,
+    index: usize,
+    px: &Pixels<'_>,
+    prefix: &str,
+    settings: &Settings,
+    matte: &Matte,
+) -> Option<aura_recipe::retouch_tools::Edit> {
+    let g = Geometry::new(face, px)?;
+    if g.d < 40.0 || settings.frequency_heal <= 0.0 {
+        return None;
+    }
+    let mut edit = surface_edit(
+        format!("{prefix}{index}-clear"),
+        Tool::FrequencyHeal,
+        1.0,
+        px,
+        matte,
+        surface_matte_id(prefix, index),
+    );
+    // Below a fiftieth of the eye distance is pores; marks are larger.
+    edit.radius = (g.d * 0.02 / px.width.min(px.height) as f32).clamp(0.0005, 0.05);
+    edit.tone = settings.frequency_heal.clamp(0.0, 1.0);
+    // A mark's own relief - its dark core and lit rim - goes with it; ordinary pore contrast
+    // under it stays, and the texture graft restores what the repair cost.
+    edit.texture = 0.25;
+    edit.sensitivity = Some(settings.blemish_sensitivity.clamp(0.0, 1.0));
+    edit.keep_dark_marks = !settings.remove_dark_marks;
+    Some(edit)
+}
+
+/// The analysis pixels as they will be once `edit` (a frequency heal over `surface`) has run,
+/// as packed sRGB: what the spot repairs that follow it are planned on, so they are spent on
+/// what frequency healing left rather than on marks it has already rebuilt.
+pub(crate) fn after_frequency_heal(
+    px: &Pixels<'_>,
+    edit: &aura_recipe::retouch_tools::Edit,
+    surface: &aura_recipe::retouch_tools::Matte,
+) -> Option<Vec<u8>> {
+    use aura_raw::colour::curve::{srgb_decode, srgb_encode};
+    use aura_raw::colour::matrix::{invert, mul, REC2020_TO_XYZ_D65, SRGB_TO_XYZ_D65};
+    let to_working = aura_render::colour::narrow(mul(invert(REC2020_TO_XYZ_D65)?, SRGB_TO_XYZ_D65));
+    let to_display = aura_render::output::working_to_output(aura_render::OutputColour::Srgb);
+    let mut linear: Vec<f32> = px
+        .data
+        .chunks_exact(3)
+        .flat_map(|p| {
+            aura_render::colour::apply_f32(
+                to_working,
+                [p[0], p[1], p[2]].map(|v| srgb_decode(f32::from(v) / 255.0)),
+            )
+        })
+        .collect();
+    let mut mattes = std::collections::BTreeMap::new();
+    mattes.insert(edit.matte.clone()?, surface.clone());
+    aura_render::retouch_tools::apply_with_mattes(
+        &mut linear,
+        px.width,
+        px.height,
+        std::slice::from_ref(edit),
+        &mattes,
+    );
+    Some(
+        linear
+            .chunks_exact(3)
+            .flat_map(|p| {
+                aura_render::colour::apply_f32(to_display, [p[0], p[1], p[2]])
+                    .map(|v| (srgb_encode(v.clamp(0.0, 1.0)) * 255.0).round() as u8)
+            })
+            .collect(),
+    )
+}
+
+/// The texture restore over a face's whole skin (ADR-0090): the photograph's own pore
+/// detail is put back where healing and smoothing removed it, glints and pits limited to this
+/// skin's range, and detail is borrowed from clean skin only where a blemish was rebuilt.
+///
+/// `matte_id` names the stored selection it runs over. The automatic pass gives it the
+/// segmented face skin rather than the surface selection, so the nose - which the surface
+/// finish leaves out - gets its pores back too.
+pub(crate) fn texture_graft(
+    face: &PortraitFace,
+    index: usize,
+    px: &Pixels<'_>,
+    prefix: &str,
+    settings: &Settings,
+    matte: &Matte,
+    matte_id: &str,
+) -> Option<aura_recipe::retouch_tools::Edit> {
+    let g = Geometry::new(face, px)?;
+    if g.d < 40.0 || settings.texture_graft <= 0.0 {
+        return None;
+    }
+    let mut edit = surface_edit(
+        format!("{prefix}{index}-texture-graft"),
+        Tool::TextureGraft,
+        1.0,
+        px,
+        matte,
+        matte_id.to_owned(),
+    );
+    // Pores, and the finest grain of skin around them: about an eightieth of the eye
+    // distance. Smaller misses what smoothing removed; larger brings back blotches.
+    edit.radius = (g.d * 0.012 / px.width.min(px.height) as f32).clamp(0.0005, 0.05);
+    // The level asked for, relative to the clean skin this face had: 60 % at the lowest
+    // setting, all of it at the highest.
+    edit.texture = 0.6 + 0.4 * settings.texture_graft.clamp(0.0, 1.0);
+    // How firmly glints are limited follows the shine control.
+    edit.tone = (settings.shine * 1.2).clamp(0.0, 1.0);
+    Some(edit)
 }
 
 #[cfg(test)]
@@ -839,5 +1227,228 @@ mod tests {
             retained > 0.7 && retained < 1.1,
             "retained pore contrast {retained}"
         );
+    }
+
+    fn finish_face() -> PortraitFace {
+        PortraitFace {
+            bounds: [0.2, 0.1, 0.8, 0.95],
+            confidence: 0.95,
+            landmarks: [
+                [0.38, 0.4],
+                [0.62, 0.4],
+                [0.5, 0.55],
+                [0.41, 0.7],
+                [0.59, 0.7],
+            ],
+        }
+    }
+
+    fn fill(rgb: &mut [u8], [x0, y0, x1, y1]: [usize; 4], colour: [u8; 3]) {
+        for y in y0..y1 {
+            for x in x0..x1 {
+                rgb[(y * 512 + x) * 3..(y * 512 + x) * 3 + 3].copy_from_slice(&colour);
+            }
+        }
+    }
+
+    #[test]
+    fn the_surface_selection_reaches_shadowed_skin_and_follows_the_brow() {
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        // Grid cells are 3.2 px wide and 3.4 px tall, starting at (102.4, 51.2).
+        let cell = |x: usize, y: usize| [102 + x * 16 / 5, 51 + y * 17 / 5];
+        let (w, h) = (96, 128);
+        let mut alpha = vec![255_u8; w * h];
+        // Left of the face: background the segmenter did not select.
+        for y in 0..h {
+            for x in 0..12 {
+                alpha[y * w + x] = 0;
+            }
+        }
+        fill(&mut rgb, [0, 0, 140, 512], [90, 90, 90]);
+        // Two notches the segmenter cut into the cheek. One is a dark mark in shadow...
+        for (rows, colour) in [(70..76, [60_u8, 38, 28]), (40..46, [8, 8, 8])] {
+            for y in rows {
+                for x in 12..20 {
+                    alpha[y * w + x] = 0;
+                    let [px, py] = cell(x, y);
+                    fill(&mut rgb, [px, py, px + 5, py + 5], colour);
+                }
+            }
+        }
+        // Right of the face: skin in deep shadow the segmenter was unsure of, and above it a
+        // grey wall it was equally unsure of.
+        for y in 0..h {
+            for x in 84..w {
+                alpha[y * w + x] = 40;
+                let [px, py] = cell(x, y);
+                let colour = if y < 40 { [90, 90, 90] } else { [70, 45, 33] };
+                fill(&mut rgb, [px, py, px + 5, py + 5], colour);
+            }
+        }
+        // A band of shadowed cheek the segmenter saw nothing of at all, inside the face...
+        for y in 50..95 {
+            for x in 70..84 {
+                alpha[y * w + x] = 0;
+                let [px, py] = cell(x, y);
+                fill(&mut rgb, [px, py, px + 5, py + 5], [70, 45, 33]);
+            }
+        }
+        // ...and skin below the face's outline - a neck - that it equally did not select.
+        fill(&mut rgb, [102, 432, 140, 487], [150, 100, 75]);
+        // Brows: dark hair where a brow is. The forehead above the left one is lit; above the
+        // right one it is in shadow, darker than this face's typical skin and still skin.
+        fill(&mut rgb, [290, 125, 350, 160], [75, 50, 37]);
+        for eye in [195, 317] {
+            fill(&mut rgb, [eye - 35, 160, eye + 35, 171], [40, 28, 22]);
+        }
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: w,
+            height: h,
+            alpha,
+        };
+        let surface = surface_matte(&face, &px, &matte).unwrap();
+        assert!(!surface.refine_edges);
+        let selected = surface.decode().unwrap();
+        let at = |x: usize, y: usize| selected[y * w + x];
+        assert!(
+            at(18, 73) > 200,
+            "the shadowed mark is outside: {}",
+            at(18, 73)
+        );
+        assert_eq!(at(16, 43), 0, "hair in a notch was selected");
+        assert!(at(88, 90) > 200, "hinted shadow skin was not reached");
+        assert!(
+            at(78, 72) > 200,
+            "shadowed cheek inside the face, with no hint, was not reached: {}",
+            at(78, 72)
+        );
+        assert_eq!(
+            at(4, 120),
+            0,
+            "skin outside the face's outline was selected"
+        );
+        assert_eq!(at(90, 20), 0, "a grey wall was selected as skin");
+        assert_eq!(at(4, 60), 0, "background was selected");
+        // The brow itself is out; the forehead a fifth of the eye distance above it is in.
+        let column = (195.0_f32 - 102.4) / 3.2;
+        let row = |y: f32| ((y - 51.2) / 3.4) as usize;
+        assert_eq!(at(column as usize, row(165.0)), 0, "the brow was selected");
+        assert!(
+            at(column as usize, row(138.0)) > 150,
+            "lit forehead above the brow is still left out: {}",
+            at(column as usize, row(138.0))
+        );
+        let right = ((317.0_f32 - 102.4) / 3.2) as usize;
+        assert_eq!(at(right, row(165.0)), 0, "the brow in shadow was selected");
+        assert!(
+            at(right, row(140.0)) > 150,
+            "the shadowed forehead above the brow was taken for brow: {}",
+            at(right, row(140.0))
+        );
+        // Eyes and lips stay out, as before.
+        assert_eq!(at(column as usize, row(205.0)), 0);
+        assert_eq!(at(((255.0_f32 - 102.4) / 3.2) as usize, row(370.0)), 0);
+    }
+
+    #[test]
+    fn frequency_healing_and_the_graft_are_opt_in_share_one_selection_and_spare_features() {
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        // Pores: a fixed pattern of a few codes, so there is texture to keep and to borrow.
+        for (i, pixel) in rgb.chunks_exact_mut(3).enumerate() {
+            let (x, y) = (i % 512, i / 512);
+            let v = [0_u8, 2, 4, 6, 8][(x * 7 + y * 13) % 5];
+            for c in pixel {
+                *c = (*c + v).saturating_sub(4);
+            }
+        }
+        // Three inflamed marks on the cheeks, and features that must not move.
+        let marks = [[170_usize, 290_usize], [340, 300], [200, 330]];
+        for [cx, cy] in marks {
+            for y in cy - 5..=cy + 5 {
+                for x in cx - 5..=cx + 5 {
+                    if (x as f32 - cx as f32).hypot(y as f32 - cy as f32) <= 5.0 {
+                        rgb[(y * 512 + x) * 3..(y * 512 + x) * 3 + 3]
+                            .copy_from_slice(&[128, 62, 50]);
+                    }
+                }
+            }
+        }
+        fill(&mut rgb, [185, 200, 205, 210], [20, 20, 20]);
+        fill(&mut rgb, [245, 365, 265, 375], [120, 50, 55]);
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let prefix = "auto-portrait-v1-";
+        let off = Settings::default();
+        assert!(frequency_heal(&face, 0, &px, prefix, &off, &matte).is_none());
+        assert!(texture_graft(&face, 0, &px, prefix, &off, &matte, "face").is_none());
+        let settings = Settings {
+            frequency_heal: 1.0,
+            texture_graft: 0.75,
+            blemish_sensitivity: 0.8,
+            ..Settings::default()
+        };
+        let clear = frequency_heal(&face, 0, &px, prefix, &settings, &matte).unwrap();
+        let graft = texture_graft(
+            &face,
+            0,
+            &px,
+            prefix,
+            &settings,
+            &matte,
+            &surface_matte_id(prefix, 0),
+        )
+        .unwrap();
+        let surface = surface_matte(&face, &px, &matte).unwrap();
+        aura_recipe::retouch_tools::validate(&[clear.clone(), graft.clone()]).unwrap();
+        // Frequency healing is saved with the skin step, so it runs before everything else
+        // on the face; the graft is saved with the finishing step, so it runs last.
+        assert_eq!(
+            crate::portrait_auto::group_of(&clear.id),
+            Some(crate::portrait_auto::Group::Skin)
+        );
+        assert_eq!(
+            crate::portrait_auto::group_of(&graft.id),
+            Some(crate::portrait_auto::Group::Finishing)
+        );
+        let id = surface_matte_id(prefix, 0);
+        assert_eq!(clear.matte.as_deref(), Some(id.as_str()));
+        assert_eq!(graft.matte.as_deref(), Some(id.as_str()));
+        // Moles are kept unless the photographer asked for dark marks to go.
+        assert!(clear.keep_dark_marks);
+        let asked = Settings {
+            remove_dark_marks: true,
+            ..settings
+        };
+        assert!(
+            !frequency_heal(&face, 0, &px, prefix, &asked, &matte)
+                .unwrap()
+                .keep_dark_marks
+        );
+        let healed = after_frequency_heal(&px, &clear, &surface).unwrap();
+        assert_eq!(healed.len(), rgb.len());
+        for [cx, cy] in marks {
+            let i = (cy * 512 + cx) * 3;
+            assert!(
+                healed[i + 1] > rgb[i + 1] + 25,
+                "mark at {cx},{cy}: green {} -> {}",
+                rgb[i + 1],
+                healed[i + 1]
+            );
+        }
+        // Eye, lips and everything outside the selection: the same bytes.
+        for [x, y] in [[195_usize, 205_usize], [255, 370], [5, 5], [500, 500]] {
+            let i = (y * 512 + x) * 3;
+            assert_eq!(&healed[i..i + 3], &rgb[i..i + 3], "pixel {x},{y} moved");
+        }
+        assert_eq!(healed, after_frequency_heal(&px, &clear, &surface).unwrap());
     }
 }

@@ -60,6 +60,9 @@ pub struct Settings {
     pub skin_warmth: f32,
     /// Magenta (+) or green (-) skin tint. Neutral by default.
     pub skin_tint: f32,
+    /// Real pore texture brought back to an even level after healing and smoothing: glints
+    /// limited, and detail from the same face's clean skin added where it is missing. ADR-0090.
+    pub texture_graft: f32,
 
     // -- Blemishes -------------------------------------------------------------------------
     /// How small a departure from the surrounding skin still counts as a blemish.
@@ -68,6 +71,9 @@ pub struct Settings {
     pub deep_blemish_cleanup: bool,
     /// Include compact dark marks; may also remove freckles or beauty marks.
     pub remove_dark_marks: bool,
+    /// Rebuild the tone under every compact mark from the clean skin around it, leaving the
+    /// pores where they are (frequency healing). 0 is off. ADR-0090.
+    pub frequency_heal: f32,
     /// At most this many spots healed per face (1..=220 in deep cleanup).
     pub max_spots: u8,
     /// Treat a field of many small marks as freckles and keep all of them.
@@ -158,9 +164,11 @@ impl Default for Settings {
             skin_brightness: 0.0,
             skin_warmth: 0.0,
             skin_tint: 0.0,
+            texture_graft: 0.0,
             blemish_sensitivity: 0.5,
             deep_blemish_cleanup: false,
             remove_dark_marks: false,
+            frequency_heal: 0.0,
             max_spots: 12,
             keep_freckles: true,
             forehead_lines: 0.5,
@@ -199,7 +207,7 @@ impl Default for Settings {
 }
 
 /// Number of named settings in [`Settings`], for documentation and the UI's own check.
-pub const COUNT: usize = 54;
+pub const COUNT: usize = 56;
 
 fn unit(v: f32, fallback: f32) -> f32 {
     if v.is_finite() {
@@ -241,9 +249,11 @@ impl Settings {
             skin_brightness: signed(self.skin_brightness),
             skin_warmth: signed(self.skin_warmth),
             skin_tint: signed(self.skin_tint),
+            texture_graft: unit(self.texture_graft, 0.0),
             blemish_sensitivity: unit(self.blemish_sensitivity, d.blemish_sensitivity),
             deep_blemish_cleanup: self.deep_blemish_cleanup,
             remove_dark_marks: self.remove_dark_marks,
+            frequency_heal: unit(self.frequency_heal, 0.0),
             max_spots: self
                 .max_spots
                 .clamp(1, if self.deep_blemish_cleanup { 220 } else { 24 }),
@@ -323,6 +333,10 @@ mod tests {
         assert_eq!(parsed.texture, Settings::default().texture);
         assert_eq!(parsed.skin_warmth, 0.0);
         assert!(!parsed.deep_blemish_cleanup && !parsed.remove_dark_marks);
+        // Frequency healing and the texture graft are opt-in: options saved before they
+        // existed plan exactly what they planned then.
+        assert_eq!(parsed.frequency_heal, 0.0);
+        assert_eq!(parsed.texture_graft, 0.0);
     }
 
     #[test]

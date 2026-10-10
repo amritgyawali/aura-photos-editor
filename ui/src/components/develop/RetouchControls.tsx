@@ -71,7 +71,7 @@ export function RetouchControls(props: Props) {
           onChange={event => { const region = [...draft.region] as NativeRetouchEdit['region']; region[index] = Number(event.target.value) / 100; onChange({ region }); }}/>
       </label>)}
     </details>
-    {(sampled || (['heal', 'patch_heal', 'clone', 'color_match'] as RetouchTool[]).includes(draft.tool)) && <details open><summary>{sampled ? 'Skin reference sample' : 'Source sample'}</summary>
+    {(sampled || (['heal', 'patch_heal', 'clone', 'color_match', 'texture_graft'] as RetouchTool[]).includes(draft.tool)) && <details open><summary>{sampled ? 'Skin reference sample' : 'Source sample'}</summary>
       <button type="button" aria-pressed={props.sourceMode} onClick={props.onSourceMode}>{props.sourceMode ? 'Cancel source picker' : sampled ? 'Pick skin sample on photo' : 'Pick source on photo'}</button>
       {['Source X (%)', 'Source Y (%)'].map((label, index) => <label key={label}>{label}
         <input type="number" min="0" max="100" step="0.1" value={draft.source ? Number(((draft.source[index] ?? 0) * 100).toFixed(2)) : ''}
@@ -84,10 +84,22 @@ export function RetouchControls(props: Props) {
       <button type="button" onClick={() => onChange({ source: null, sourceScale: 1 })}>Clear source</button>
       {needsRetouchSource(draft) && !draft.source && <p>{sampled ? 'Choose a clean skin sample before applying this tool.' : draft.tool === 'patch_heal' ? 'Pick a source for painted, gradient, inverted or large patch repairs.' : 'Choose a source before applying this tool.'}</p>}
     </details>}
-    {(sampled || bands || ['micro_dodge_burn', 'eye_detail', 'under_eye', 'backdrop'].includes(draft.tool)) && <label>Frequency radius (% of short edge)
+    {(sampled || bands || ['micro_dodge_burn', 'eye_detail', 'under_eye', 'backdrop', 'frequency_heal', 'texture_graft'].includes(draft.tool)) && <label>{draft.tool === 'texture_graft' ? 'Pore size' : draft.tool === 'frequency_heal' ? 'Smallest mark size' : 'Frequency radius'} (% of short edge)
       <input type="number" min="0.05" max="5" step="0.05" value={Number((draft.radius * 100).toFixed(2))} onChange={event => onChange({ radius: Number(event.target.value) / 100 })}/>
     </label>}
       {draft.tool === 'patch_heal' && <label className="retouch-toggle"><input type="checkbox" checked={draft.textureHeal ?? false} onChange={event => onChange({ textureHeal: event.target.checked })}/>Match local lighting with real skin texture</label>}
+    {draft.tool === 'frequency_heal' && <>
+      <label>Tone rebuilt under marks ({Math.round(draft.tone * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.tone} onChange={event => onChange({ tone: Number(event.target.value) })}/></label>
+      <label>Mark relief kept ({Math.round(Math.min(draft.texture, 1) * 100)}%)<input type="range" min="0" max="1" step="0.01" value={Math.min(draft.texture, 1)} onChange={event => onChange({ texture: Number(event.target.value) })}/></label>
+      <label>Mark sensitivity ({Math.round((draft.sensitivity ?? .5) * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.sensitivity ?? .5} onChange={event => onChange({ sensitivity: Number(event.target.value) })}/></label>
+      <label className="retouch-toggle"><input type="checkbox" checked={draft.keepDarkMarks ?? false} onChange={event => onChange({ keepDarkMarks: event.target.checked })}/>Keep dark marks (moles, freckles)</label>
+      <p className="lr-hint">Only compact marks are rebuilt, from the clean skin around each one; skin with nothing wrong with it is left exactly as it is. Ordinary pore detail under a mark stays. Bright spots that are not also red are kept. Use Preview unsaved changes to review.</p>
+    </>}
+    {draft.tool === 'texture_graft' && <>
+      <label>Texture level ({Math.round(draft.texture * 100)}%)<input type="range" min="0" max="2" step="0.01" value={draft.texture} onChange={event => onChange({ texture: Number(event.target.value) })}/></label>
+      <label>Limit glints ({Math.round(draft.tone * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.tone} onChange={event => onChange({ tone: Number(event.target.value) })}/></label>
+      <p className="lr-hint">100% is the level this selection’s clean skin had before any retouch step. Texture is borrowed from clean skin in the same selection (or near the source you pick) and follows the light it lands in; colour does not change and nothing is generated.</p>
+    </>}
     {bands && <>
       {draft.tool === 'frequency' && <label className="retouch-toggle"><input type="checkbox" checked={draft.preserveMicrotexture ?? false} onChange={event => onChange({ preserveMicrotexture: event.target.checked })}/>Preserve fine skin texture</label>}
       <label>Tone smoothing ({Math.round(draft.tone * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.tone} onChange={event => onChange({ tone: Number(event.target.value) })}/></label>

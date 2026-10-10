@@ -27,7 +27,7 @@ face-reshaping operations. Set `AURA_DISABLE_AUTO_PORTRAIT=1` before launching A
 this pass while keeping measured global correction and manual tools.
 
 Open **Photo Studio → Develop → Retouch**. Processing runs locally without an
-account or API key. The workspace provides 24 named workflows using AURA's own
+account or API key. The workspace provides 26 named workflows using AURA's own
 image-processing algorithms. It does not contain Retouch4me's proprietary code
 or trained models, and does not claim equivalent automatic results.
 
@@ -42,9 +42,11 @@ Clone and color matching require a source: Alt-click the photograph or choose
 | --- | --- |
 | Heal | Blends a sampled or nearby donor with local tone matching |
 | Texture-aware patch heal | Matches nearby texture around a small repair or uses a chosen source; blends the donor with surrounding light |
+| Frequency healing · marks | Finds compact marks in the selection and rebuilds the tone under each one from the clean skin around it; pores stay |
 | Clone | Copies a source patch with a feathered blend |
 | Auto blemish | Detects and repairs small dark local spots; review permanent marks |
 | Frequency separation | Adjusts low-frequency tone and high-frequency texture independently |
+| Restore skin texture | Puts the photograph's own pore detail back where earlier steps removed it, in the same place; borrows from clean skin only inside healed blemishes |
 | Skin smoothing · protect detail | Reduces middle-scale variation with edge protection; fine detail is retained at 100% |
 | Even sampled skin tone | Moves selected skin chroma toward a clean reference patch without changing luminance |
 | Skin dodge and burn · protect edges | Balances local light within a bounded exposure range and preserves RGB proportions |
@@ -142,6 +144,56 @@ areas and sharp lighting boundaries may need smaller repairs or a different sour
 It does not decide which marks should be removed. Existing Heal operations keep
 their previous behavior. [ADR-0076](adr/ADR-0076-texture-aware-patch-heal.md) records
 the algorithm and its limits.
+
+## Frequency healing and restoring texture
+
+These two tools are the hand workflow of a retoucher - paint clean colour over each mark
+on a tone layer, leave the pores on a texture layer, then make sure the skin still has
+texture - done by measurement. [ADR-0090](adr/ADR-0090-frequency-healing-and-the-texture-graft.md)
+records how and where it stops.
+
+**Frequency healing · marks** (Repair). Select skin - an ellipse, a painted mask, or a
+detected skin selection - and apply. AURA compares every pixel with the selected skin
+around it, at three sizes, for how much darker and how much redder it is. Only compact
+groups count: a crease, a strand of hair or the edge of a shadow is long and thin and
+is never touched, and a group must be darker or redder than the skin on every side of
+it, so the shadow beside an eye or a nose is never healed. The tone under each mark is rebuilt from the clean skin around it.
+Skin with nothing wrong with it is not altered at all.
+
+- **Smallest mark size**: below this is pore detail and stays; set it to the size of
+  the smallest mark you want gone.
+- **Tone rebuilt under marks**: how completely the colour and brightness are replaced.
+- **Mark relief kept**: a mark's own dark core and lit rim. Ordinary pore contrast
+  under the mark stays whatever this is set to.
+- **Mark sensitivity**: how small a departure still counts as a mark. It is measured
+  against the selection's own variation, so rough skin is not all "marks".
+- **Keep dark marks (moles, freckles)**: leaves marks that are darker but not redder
+  than the skin around them.
+
+A selection's soft edge decides where marks are looked for, not how much of one is
+removed: a mark in the outer part of a feathered edge is rebuilt as completely as one in
+the middle. Pixels outside the selection are never touched.
+
+A bright spot that is not also red is kept, because it may be a piercing rather than a
+whitehead. Marks are found on the pixels being rendered, so check a full-size export:
+a small preview and the export can differ in which faint marks are rebuilt.
+
+**Restore skin texture** (Skin). Use it last, after healing and smoothing. For every
+pixel it puts back the fine detail the photograph had **at that pixel before any retouch
+step ran** - the person's own pores, in the place they were photographed. Bright ridges of
+an oily highlight and the deepest pits are limited to this skin's ordinary range first.
+Only where an earlier step rebuilt a blemish, whose own detail was the blemish, is detail
+borrowed from clean skin in the same selection instead.
+
+- **Pore size**: the scale of the detail that is restored.
+- **Texture level**: 100% is the detail the photograph had. Lower keeps some smoothing;
+  above 100% adds more than was there.
+- **Limit glints**: how firmly bright fine relief is compressed.
+- **Source** is optional. Pick one to borrow only from near a patch you trust.
+
+The change multiplies brightness, so it changes no colour. Nothing is generated, and skin
+with no measurable texture is left exactly as it is. It does not sharpen skin that was out
+of focus, and inside a healed blemish it cannot recover the pores the blemish covered.
 
 ## Sampled skin tools
 

@@ -12,9 +12,33 @@ within each tool's limits. Everything else is off until you turn it up.
 
 ## Presets
 
-Natural · Subtle · Soft glow · Polished beauty · Bridal · Groom & men · Editorial ·
-Body focus · Studio clean. A preset only sets the controls below; change any of them and it
-becomes *Custom*.
+Natural · Deep acne cleanup · Professional retouch · Subtle · Soft glow · Polished beauty ·
+Bridal · Groom & men · Editorial · Body focus · Studio clean. A preset only sets the controls
+below; change any of them and it becomes *Custom*.
+
+### Professional retouch
+
+The order a retoucher works in, as one press:
+
+1. **Frequency healing** rebuilds the tone under every compact mark from the clean skin
+   around it and leaves the pores where they are. It runs first, on the photograph as taken.
+2. **Skin smoothing, tone and light evening, micro dodge & burn** - gentle: 35 % smoothing
+   and no pore refinement, because the healing has already removed the blemishes.
+3. **Spot repairs** with real donor texture, planned on what frequency healing left.
+4. **The frequency-separation finish**, which evens mid-scale unevenness and keeps the
+   fine band.
+5. **Restore skin texture** last: this face's own pores put back where the steps above
+   removed them, nose included, with oily glints and deep pits limited.
+
+Steps 1, 4 and 5 work on the whole face, including the side in shadow. A segmenter is often
+unsure of skin in deep shadow - most often on darker skin - so where it left skin out, any
+skin-coloured area inside the outline of the detected face that touches the rest of the
+skin is included as well. A neck or an ear outside that outline is not.
+
+Dark-mark removal is part of this preset and can also remove a freckle or a beauty mark;
+switch *Remove dark marks* off to keep them. Every step is an ordinary operation in the
+list below the photograph: open it to change it, or switch it off.
+[ADR-0090](adr/ADR-0090-frequency-healing-and-the-texture-graft.md).
 
 ## Reuse and refine detected skin
 
@@ -45,7 +69,7 @@ targeted healing/light balancing in [Retouch4me](https://global.retouch4.me/reto
 and restrained finishing styles in [Imagen](https://support.imagen-ai.com/hc/en-us/articles/36160335937949-Retouch-all-faces-in-your-gallery).
 Those products are workflow references; their proprietary code and models are not used.
 
-## The controls (58)
+## The controls (60)
 
 **Always visible:** what to retouch (face / body skin / both), overall strength, heal
 blemishes, soften lines and redness, eyes, teeth.
@@ -55,9 +79,15 @@ main subject only, skin mask precision, mask edge softness, protect beard and st
 
 **Skin** - skin smoothing, keep pore texture, smoothing size, even skin tone, even skin light,
 micro dodge & burn, refine pores, reduce shine, reduce redness, skin glow, skin brightness,
-skin warmth, skin tint.
+skin warmth, skin tint, restore skin texture.
 
-**Blemishes** - blemish sensitivity, most spots per face, keep freckles.
+**Blemishes** - deep blemish cleanup, remove dark marks, frequency healing, blemish
+sensitivity, most spots per face, keep freckles.
+
+*Frequency healing* and *Restore skin texture* are off at 0% and off in every preset except
+Professional retouch. Frequency healing's strength is how completely the tone under a mark is
+rebuilt; restore skin texture runs from 60% of the detail the photograph had (at the lowest
+setting) to all of it.
 
 **Lines & wrinkles** - forehead lines, crow's feet, smile lines, under-eye lines, neck lines.
 
@@ -86,6 +116,8 @@ elbows, body blemishes.
   freckles and kept unless you switch that off.
 - Smooth beard, stubble, brows or lashes: they are outside the skin mask and protected again
   when the photograph is rendered.
+- Invent skin texture. Restore skin texture borrows pore detail from the same face in the
+  same photograph, and does nothing for skin that has none.
 
 ## When the AI cannot see the skin
 
