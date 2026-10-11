@@ -415,3 +415,47 @@ pub fn purge_cloud_cache(state: &AppState, task: &str, task_version: u32) -> Ipc
         .cache()
         .purge_task(task, u16::try_from(task_version).unwrap_or(u16::MAX))?)
 }
+
+/// Which provider's key page to open.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OpenProviderPageInput {
+    /// A catalogue id: `anthropic` for Claude, `openai` for `ChatGPT`.
+    pub provider: String,
+}
+
+/// What happened when a key page was asked for.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderPageDto {
+    /// The address, shown whether or not the browser opened.
+    pub url: Option<String>,
+    pub opened: bool,
+    pub message: String,
+}
+
+/// Open a provider's own key page in the default browser: `Connect Claude` and
+/// `Connect ChatGPT`. The address comes from the catalogue only. ADR-0108 section 5.
+///
+/// # Errors
+///
+/// None in practice; a browser that will not start is reported in the result, with the address
+/// to open by hand.
+pub fn open_provider_page(
+    _state: &AppState,
+    input: &OpenProviderPageInput,
+) -> IpcResult<ProviderPageDto> {
+    let opened =
+        aura_cloud::browser::open_keys_page(&input.provider, &aura_cloud::browser::SystemLauncher);
+    tracing::info!(
+        target: "cloud.key_page",
+        provider = input.provider.as_str(),
+        opened = opened.opened,
+        "a provider's key page was requested"
+    );
+    Ok(ProviderPageDto {
+        url: opened.url.map(str::to_string),
+        opened: opened.opened,
+        message: opened.message,
+    })
+}

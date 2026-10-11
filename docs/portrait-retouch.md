@@ -97,8 +97,9 @@ it says so.
 
 ## What AURA will never change
 
-- **Nobody is reshaped.** There is no slimming, no liquify, no enlarging, no feature moving - not
-  as a setting and not in the code.
+- **Nobody is reshaped automatically.** Portrait retouch never slims, liquifies, enlarges or moves a
+  feature. Those tools exist only in the Studio's *Portrait studio* section, where you move them
+  yourself (ADR-0108), and no automatic pass can apply them.
 - **Nobody's skin tone is changed.** Smoothing, evening and fill light work on blotches, shadows
   and shine, never on the tone of a person's skin.
 - **Nothing is invented.** Every adjustment changes the tone or colour of a pixel that was already

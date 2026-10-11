@@ -90,6 +90,7 @@ pub mod retouch_tools;
 pub mod schema;
 pub mod sidecar;
 pub mod store;
+pub mod studio_finish;
 pub mod xmp;
 
 pub use contract::recipe::{

@@ -105,6 +105,7 @@
 pub mod agent;
 pub mod anthropic;
 pub mod audit;
+pub mod browser;
 pub mod budget;
 pub mod cache;
 pub mod cassette;

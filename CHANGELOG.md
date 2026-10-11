@@ -2,6 +2,18 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Evoto-style finishing and Connect Claude / ChatGPT - 2026-10-11
+
+- New **Portrait studio** section in the Photo editor, with Evoto's finishing tools: face reshaping
+  (slim, jawline, chin, forehead, cheekbones, eye size and distance, nose, mouth, lips, smile, head
+  size), body reshaping (slim, waist, hips, arms, shoulders, legs, neck), a liquify brush (push,
+  enlarge, shrink, restore), background replacement (solid colour, gradient, blur, sky), and hair,
+  eye, lip, blush, eyeshadow and brow colour. Seven one-click presets, including a clean white
+  backdrop for headshots. Every change is one undoable step; none of it is ever automatic. ADR-0108.
+- **Connect Claude** and **Connect ChatGPT** open Anthropic's or OpenAI's key page in your browser;
+  paste the key you create there and AURA keeps it in your computer's secure key store.
+- `docs/evoto-parity.md` lists every Evoto tool and where it is in AURA.
+
 ## 1.0.0 - ready to sell - 2026-10-08
 
 - AURA is version 1.0.0.

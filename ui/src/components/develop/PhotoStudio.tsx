@@ -14,6 +14,8 @@ import { MasksPanel, type BrushSettings, type MaskTool } from './MasksPanel';
 import { coverageDataUrl } from './rgbImage';
 import { localMasks, masksOf, type MaskCoverage, type MaskSource } from '../../ipc/localMasks';
 import type { BrushStroke } from '../../ipc/nativeRetouch';
+import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
+import { finishOf, studioFinish, type StudioFinish } from '../../ipc/studioFinish';
 
 /** The crop a recipe shows, as normalised edges of the whole frame. */
 function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
@@ -56,6 +58,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const [coverage, setCoverage] = useState<MaskCoverage | null>(null);
   const drag = useRef<{ start: [number, number]; box: [number, number]; points: [number, number][]; erase: boolean } | null>(null);
   const [sketch, setSketch] = useState<[number, number][] | null>(null);
+  // Evoto-style finishing (ADR-0108): the liquify brush, when one is chosen.
+  const [liquifyTool, setLiquifyTool] = useState<LiquifyTool>(null);
   useEffect(() => {
     let active = true;
     if (inTauri()) editProfiles.list().then(value => { if (active) setProfiles(value); })
@@ -85,9 +89,11 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   useEffect(() => {
     setRecipe(null); setHistory(null); setAspect(null); setNotice(null);
     setPicking(false); setPosition(null);
-    setSelectedMask(null); setMaskMessage(null); setMaskTool(null); setCoverage(null);
+    setSelectedMask(null); setMaskMessage(null); setMaskTool(null); setCoverage(null); setLiquifyTool(null);
   }, [photoId, projectId]);
   const masks = useMemo(() => masksOf(recipe), [recipe]);
+  const finish = useMemo(() => finishOf(recipe), [recipe]);
+  const saveFinish = (next: StudioFinish, label: string) => void write(() => studioFinish.save(projectId, photoId, next, label));
   const crop = useMemo(() => cropOf(recipe), [recipe]);
   // The selected mask's coverage, for the red overlay, refreshed with every saved change.
   useEffect(() => {
@@ -141,6 +147,12 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const finishDrawing = (end: [number, number] | null) => {
     const started = drag.current;
     drag.current = null; setSketch(null);
+    if (started && liquifyTool && end) {
+      const points = started.points.length > 1 ? started.points : [started.points[0] ?? end, end];
+      const stroke = { mode: liquifyTool.mode, radius: liquifyTool.size, strength: liquifyTool.strength, points };
+      saveFinish({ ...finish, liquify: [...(finish.liquify ?? []), stroke] }, `Liquify: ${liquifyTool.mode}`);
+      return;
+    }
     if (!started || !maskTool || !end) return;
     const [sx, sy] = started.start;
     let source: MaskSource | null = null;
@@ -198,9 +210,9 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
     {problem && <p role="alert">{problem} <button type="button" onClick={() => setRefresh(value => value + 1)}>Retry preview</button></p>}
     <div className="studio-layout">
       <div>
-        <div className={`studio-canvas${picking ? ' studio-picking' : ''}${maskTool ? ' studio-masking' : ''}`} aria-busy={busy || loading || waiting}
+        <div className={`studio-canvas${picking ? ' studio-picking' : ''}${maskTool || liquifyTool ? ' studio-masking' : ''}`} aria-busy={busy || loading || waiting}
           onPointerDown={event => {
-            if (!maskTool || view !== 'edited' || busy) return;
+            if ((!maskTool && !liquifyTool) || view !== 'edited' || busy) return;
             const point = framePoint(event);
             if (!point) return;
             event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -209,10 +221,10 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             setSketch([[event.clientX - box.left, event.clientY - box.top]]);
           }}
           onPointerMove={event => {
-            if (!drag.current || !maskTool) return;
+            if (!drag.current || (!maskTool && !liquifyTool)) return;
             const box = event.currentTarget.getBoundingClientRect();
             const here: [number, number] = [event.clientX - box.left, event.clientY - box.top];
-            if (maskTool.kind === 'brush') {
+            if (liquifyTool || maskTool?.kind === 'brush') {
               const point = framePoint(event);
               if (point) drag.current.points.push(point);
               setSketch(value => [...(value ?? []), here]);
@@ -228,6 +240,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           }}>
           {edited && original ? <>
             <img src={view === 'original' ? original : (view === 'edited' && overlaid) || (proof ?? edited)} alt={view === 'original' ? 'Original photograph' : 'Edited photograph'} />
+            {sketch && liquifyTool && <svg className="studio-sketch" aria-hidden="true"><polyline points={sketch.map(p => p.join(',')).join(' ')} fill="none" stroke="#fc5" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" opacity={0.8} /></svg>}
             {sketch && maskTool && <svg className="studio-sketch" aria-hidden="true">
               {maskTool.kind === 'brush' ? <polyline points={sketch.map(p => p.join(',')).join(' ')} fill="none" stroke={drag.current?.erase ? '#6cf' : '#f55'} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
                 : maskTool.kind === 'object' && sketch.length === 2 ? <rect x={Math.min(sketch[0]?.[0] ?? 0, sketch[1]?.[0] ?? 0)} y={Math.min(sketch[0]?.[1] ?? 0, sketch[1]?.[1] ?? 0)} width={Math.abs((sketch[1]?.[0] ?? 0) - (sketch[0]?.[0] ?? 0))} height={Math.abs((sketch[1]?.[1] ?? 0) - (sketch[0]?.[1] ?? 0))} fill="none" stroke="#5f5" strokeWidth={2} strokeDasharray="6 4" />
@@ -260,7 +273,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
         <details className="lr-section" open={masks.length > 0 || maskTool !== null}><summary>Masking{masks.length ? ` (${masks.length})` : ''}</summary><div className="lr-section-body">
           <MasksPanel masks={masks} selected={selectedMask} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
             message={maskMessage} tool={maskTool} brush={brush} overlay={maskOverlay}
-            onSelect={setSelectedMask} onTool={tool => { setMaskTool(tool); if (tool) { setView('edited'); setPicking(false); } }}
+            onSelect={setSelectedMask} onTool={tool => { setMaskTool(tool); if (tool) { setLiquifyTool(null); setView('edited'); setPicking(false); } }}
             onBrush={setBrush} onOverlay={setMaskOverlay}
             onCreate={request => void write(async () => {
               const made = await localMasks.create(projectId, photoId, request);
@@ -268,6 +281,11 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
               if (made.maskId) setSelectedMask(made.maskId);
             })}
             onSave={(next, label) => void write(() => localMasks.save(projectId, photoId, next, label))} />
+        </div></details>
+        <details className="lr-section" open={liquifyTool !== null}><summary>Portrait studio: face, body, background, makeup</summary><div className="lr-section-body">
+          <PortraitFinishPanel finish={finish} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
+            liquify={liquifyTool} onSave={saveFinish}
+            onLiquify={tool => { setLiquifyTool(tool); if (tool) { setMaskTool(null); setView('edited'); setPicking(false); } }} />
         </div></details>
         {render && edited && <Histogram render={render} />}
         {notice && <p role="status" className="lr-notice">{notice}</p>}

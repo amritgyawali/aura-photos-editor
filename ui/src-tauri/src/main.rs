@@ -3686,6 +3686,47 @@ async fn local_mask_coverage(
     .map_err(|_| background_request_failed())?
 }
 
+/// The Studio's finishing tools on one photograph: shape, liquify, background, colour. ADR-0108.
+#[tauri::command]
+async fn studio_finish(
+    state: State<'_, AppState>,
+    input: aura_app::finish_commands::StudioFinishInput,
+) -> IpcResult<aura_app::finish_commands::StudioFinishDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::finish_commands::studio_finish(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// Store the finishing tools as one manual edit. ADR-0108.
+#[tauri::command]
+async fn save_studio_finish(
+    state: State<'_, AppState>,
+    input: aura_app::finish_commands::SaveStudioFinishInput,
+) -> IpcResult<aura_app::finish_commands::StudioFinishDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::finish_commands::save_studio_finish(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// "Connect Claude" / "Connect ChatGPT": open the provider's own key page in the browser.
+/// The address comes from the catalogue, never from the window. ADR-0108 section 5.
+#[tauri::command]
+async fn open_provider_page(
+    state: State<'_, AppState>,
+    input: aura_app::cloud_commands::OpenProviderPageInput,
+) -> IpcResult<aura_app::cloud_commands::ProviderPageDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::open_provider_page(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 // `tauri::generate_context!` expands to an `unwrap` and a `HashMap` inside Tauri's own
 // generated code, which this workspace's disallowed lists cannot see past. Allowed here and
 // nowhere else: every other line of the shell is held to both rules.
@@ -3766,6 +3807,9 @@ fn main() {
             create_local_mask,
             save_local_masks,
             local_mask_coverage,
+            studio_finish,
+            save_studio_finish,
+            open_provider_page,
             native_retouch_preview,
             photo_original,
             live_preview,

@@ -130,6 +130,7 @@ pub mod retouch_tools;
 mod retouch_undereye;
 pub mod shaders;
 pub mod spatial;
+pub mod studio_finish;
 pub mod tiles;
 pub mod tonemap;
 

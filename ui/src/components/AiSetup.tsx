@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../ipc/client';
+import { ConnectProviders, OpenKeyPageButton } from './ConnectProvider';
 import type { AiModelDto, AiProviderDto, AiSetupStatusDto } from '../ipc/types';
 
 export type AiSetupProps = {
@@ -292,6 +293,15 @@ export function AiSetup({ onDone, onDismiss, onError }: AiSetupProps): JSX.Eleme
 
         {step === 'choose' ? (
           <>
+            <ConnectProviders
+              onError={onError}
+              onConnect={(id) => {
+                const provider = providers.find((entry) => entry.id === id);
+                if (provider) {
+                  choose(provider);
+                }
+              }}
+            />
             <label className="ai-setup-search">
               Search
               <input
@@ -372,6 +382,11 @@ export function AiSetup({ onDone, onDismiss, onError }: AiSetupProps): JSX.Eleme
 
             {selected.requiresKey && selected.keysUrl.length > 0 ? (
               <p className="ai-setup-keys-url">
+                <OpenKeyPageButton
+                  provider={selected.id}
+                  label={`Open ${selected.label} key page`}
+                  onError={onError}
+                />{' '}
                 Keys come from <code>{selected.keysUrl}</code>
               </p>
             ) : null}
