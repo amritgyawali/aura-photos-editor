@@ -65,6 +65,8 @@ export type RetouchSettings = {
   contour: number; highlight: number; blush: number; faceLight: number;
   bodySmoothing: number; bodyTone: number; matchBodyToFace: number; bodyShine: number; bodyRedness: number; bodyBlemishes: number;
   hairDetail: number; hairShine: number; fabric: number; backdrop: number;
+  /** Lift a plain neutral studio backdrop to a clean bright grey, as Evoto does (ADR-0109). */
+  backdropLift: number;
 };
 export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
@@ -79,7 +81,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   teethWhitening: .5, lipColour: 0, lipDefinition: 0,
   contour: 0, highlight: 0, blush: 0, faceLight: 0,
   bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
-  hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0,
+  hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0, backdropLift: 0,
 };
 /** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */
 export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope; settings?: RetouchSettings; adaptive?: boolean };

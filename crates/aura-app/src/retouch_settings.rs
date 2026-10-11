@@ -147,6 +147,10 @@ pub struct Settings {
     pub fabric: f32,
     /// A plain backdrop smoothed (studio paper and walls).
     pub backdrop: f32,
+    /// A plain, neutral studio backdrop lifted toward a clean bright grey, its light fall-off
+    /// kept - the high-key finish Evoto's automatic pass gives a grey seamless (ADR-0109).
+    /// Textured, coloured and low-key backdrops are never lifted.
+    pub backdrop_lift: f32,
 }
 
 impl Default for Settings {
@@ -210,12 +214,13 @@ impl Default for Settings {
             hair_shine: 0.0,
             fabric: 0.0,
             backdrop: 0.0,
+            backdrop_lift: 0.0,
         }
     }
 }
 
 /// Number of named settings in [`Settings`], for documentation and the UI's own check.
-pub const COUNT: usize = 58;
+pub const COUNT: usize = 59;
 
 fn unit(v: f32, fallback: f32) -> f32 {
     if v.is_finite() {
@@ -299,6 +304,7 @@ impl Settings {
             hair_shine: unit(self.hair_shine, 0.0),
             fabric: unit(self.fabric, 0.0),
             backdrop: unit(self.backdrop, 0.0),
+            backdrop_lift: unit(self.backdrop_lift, 0.0),
         }
     }
 }
@@ -334,6 +340,7 @@ mod tests {
             "matchBodyToFace",
             "maxSpots",
             "backdrop",
+            "backdropLift",
         ] {
             assert!(value.get(key).is_some(), "{key}");
         }
@@ -347,6 +354,7 @@ mod tests {
         // existed plan exactly what they planned then.
         assert_eq!(parsed.frequency_heal, 0.0);
         assert_eq!(parsed.texture_graft, 0.0);
+        assert_eq!(parsed.backdrop_lift, 0.0);
         assert!(parsed.protect_eye_area && parsed.protect_nose_detail);
     }
 

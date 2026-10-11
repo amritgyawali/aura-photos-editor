@@ -783,6 +783,103 @@ pub fn background_tone(
     })
 }
 
+/// Where Evoto's automatic portrait pass lands a plain grey studio backdrop, display-encoded.
+///
+/// Measured from Evoto's own "Beauty & Fashion" before/after on its homepage: the seamless grey
+/// behind three people went from about 0.81 to about 0.915 (sRGB code 206 to 234), the same
+/// factor on red, green and blue, with its light fall-off kept and nothing clipped. ADR-0109.
+pub const BACKDROP_TARGET: f32 = 0.915;
+
+/// A plain studio backdrop's reading, and the lift that takes it to [`BACKDROP_TARGET`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BackdropLift {
+    /// Median display luminance of the backdrop as photographed.
+    pub background: f32,
+    /// Fine texture: the 75th percentile of the luminance's departure from its 5-pixel mean.
+    pub texture: f32,
+    /// Spread between the brightest and darkest channel of the median backdrop colour.
+    pub chroma: f32,
+    /// Linear gain the lift applies, `1` when none.
+    pub gain: f32,
+}
+
+/// A backdrop is lifted only when it is plain studio paper or a plain wall: fine texture under
+/// about three code values.
+pub const PLAIN_TEXTURE: f32 = 0.012;
+/// ...and close to neutral, so a coloured backdrop keeps its colour's depth.
+pub const NEUTRAL_CHROMA: f32 = 0.06;
+/// ...and not a deliberate low-key backdrop.
+pub const LOW_KEY: f32 = 0.45;
+
+fn srgb_decode(v: f32) -> f32 {
+    if v <= 0.040_45 {
+        v / 12.92
+    } else {
+        ((v + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+/// Measure a backdrop and solve the lift that brings it to [`BACKDROP_TARGET`].
+///
+/// `exposure_gain` is the linear brightening the foundation stage already applies to the whole
+/// frame, so the lift makes up only what is left. `strength` (`0..1`) scales the way there in
+/// linear light. `None` when there is too little backdrop to read; a reading with `gain == 1`
+/// when the backdrop is textured, coloured, low-key or already bright, so the report can say why.
+#[must_use]
+pub fn backdrop_lift(
+    px: &Pixels<'_>,
+    background: &[f32],
+    exposure_gain: f32,
+    strength: f32,
+) -> Option<BackdropLift> {
+    let (w, h) = (px.width, px.height);
+    if background.len() != w * h || w < 8 || h < 8 {
+        return None;
+    }
+    let luma = encoded_luma(px);
+    let mean = box_mean(&luma, w, h, 2);
+    let inside: Vec<usize> = (0..w * h).filter(|i| background[*i] >= 0.9).collect();
+    if inside.len() < (w * h) / 20 {
+        return None;
+    }
+    let mut level: Vec<f32> = inside.iter().map(|i| luma[*i]).collect();
+    let mut fine: Vec<f32> = inside.iter().map(|i| (luma[*i] - mean[*i]).abs()).collect();
+    let bg = median(&mut level)?;
+    fine.sort_by(f32::total_cmp);
+    let texture = fine.get(fine.len() * 3 / 4).copied().unwrap_or(1.0);
+    let channel = |c: usize| {
+        let mut v: Vec<f32> = inside.iter().map(|i| px.encoded(i % w, i / w)[c]).collect();
+        median(&mut v).unwrap_or(0.0)
+    };
+    let rgb = [channel(0), channel(1), channel(2)];
+    let chroma = rgb.iter().copied().fold(0.0, f32::max) - rgb.iter().copied().fold(1.0, f32::min);
+    let mut reading = BackdropLift {
+        background: bg,
+        texture,
+        chroma,
+        gain: 1.0,
+    };
+    let strength = strength.clamp(0.0, 1.0);
+    if strength <= 0.0 || texture > PLAIN_TEXTURE || chroma > NEUTRAL_CHROMA || bg < LOW_KEY {
+        return Some(reading);
+    }
+    let after = srgb_decode(bg) * exposure_gain.max(0.01);
+    let target = srgb_decode(BACKDROP_TARGET);
+    if after >= target * 0.97 {
+        return Some(reading);
+    }
+    // Interpolated in log space, so half strength is half the stops.
+    let full = target / after;
+    reading.gain = full.powf(strength).min(2.0_f32.powf(0.75));
+    Some(reading)
+}
+
+/// The dodge amount that raises linear brightness by `gain` (the dodge is +0.75 EV at 100 %).
+#[must_use]
+pub fn dodge_amount(gain: f32) -> f32 {
+    ((gain - 1.0) / (2.0_f32.powf(0.75) - 1.0)).clamp(0.0, 0.95)
+}
+
 /// The burn amount that lowers linear brightness by `reduction` (the burn is -0.75 EV at 100 %).
 #[must_use]
 pub fn burn_amount(reduction: f32) -> f32 {
@@ -1173,5 +1270,71 @@ mod tests {
             .collect();
         assert!(skin_shift(&textured, &blue, w, h, &skin).unwrap().0 > 0.02);
         assert!(clipped(&[255, 0, 0, 10, 10, 10]) > 0.49);
+    }
+
+    /// A flat backdrop at one sRGB grey with a code value of noise, and a background plane.
+    fn backdrop(grey: [u8; 3], noise: u8) -> (Vec<u8>, u32, u32, Vec<f32>) {
+        let (w, h) = (64_usize, 48_usize);
+        let mut rgb = Vec::with_capacity(w * h * 3);
+        for i in 0..w * h {
+            let n = if noise == 0 {
+                0
+            } else {
+                (i * 7 % (2 * usize::from(noise) + 1)) as u8
+            };
+            for c in grey {
+                rgb.push(c.saturating_add(n).saturating_sub(noise));
+            }
+        }
+        (rgb, w as u32, h as u32, vec![1.0; w * h])
+    }
+
+    #[test]
+    fn evotos_grey_backdrop_is_lifted_to_where_evoto_lands_it() {
+        // Evoto's homepage "Beauty & Fashion" example: backdrop sRGB 206 -> about 234.
+        let (rgb, w, h, plane) = backdrop([206, 206, 206], 1);
+        let px = pixels(&rgb, w, h);
+        assert_eq!(px.width * px.height, plane.len());
+        let lift = backdrop_lift(&px, &plane, 1.0, 1.0).unwrap();
+        assert!(lift.gain > 1.2, "{lift:?}");
+        let after = srgb_decode(lift.background) * lift.gain;
+        let encoded = if after <= 0.003_130_8 {
+            after * 12.92
+        } else {
+            1.055 * after.powf(1.0 / 2.4) - 0.055
+        };
+        assert!(
+            (encoded * 255.0 - 233.3).abs() < 2.5,
+            "lands at {}",
+            encoded * 255.0
+        );
+        // The same multiplier on every channel, so it cannot tint.
+        assert!(dodge_amount(lift.gain) > 0.0 && dodge_amount(lift.gain) < 0.95);
+        // Half strength is half the stops.
+        let half = backdrop_lift(&px, &plane, 1.0, 0.5).unwrap();
+        assert!((half.gain.log2() * 2.0 - lift.gain.log2()).abs() < 1e-3);
+        // An exposure the foundation already adds is not added twice.
+        let brighter = backdrop_lift(&px, &plane, 1.2, 1.0).unwrap();
+        assert!((brighter.gain * 1.2 - lift.gain).abs() < 1e-3);
+    }
+
+    #[test]
+    fn scenes_colour_dark_and_bright_backdrops_are_not_lifted() {
+        let textured = backdrop([150, 150, 150], 20);
+        let px = pixels(&textured.0, textured.1, textured.2);
+        assert!((backdrop_lift(&px, &textured.3, 1.0, 1.0).unwrap().gain - 1.0).abs() < 1e-6);
+        let coloured = backdrop([200, 150, 120], 0);
+        let px = pixels(&coloured.0, coloured.1, coloured.2);
+        assert!((backdrop_lift(&px, &coloured.3, 1.0, 1.0).unwrap().gain - 1.0).abs() < 1e-6);
+        let dark = backdrop([60, 60, 60], 1);
+        let px = pixels(&dark.0, dark.1, dark.2);
+        assert!((backdrop_lift(&px, &dark.3, 1.0, 1.0).unwrap().gain - 1.0).abs() < 1e-6);
+        let white = backdrop([240, 240, 240], 1);
+        let px = pixels(&white.0, white.1, white.2);
+        assert!((backdrop_lift(&px, &white.3, 1.0, 1.0).unwrap().gain - 1.0).abs() < 1e-6);
+        // Switched off is off.
+        let grey = backdrop([206, 206, 206], 1);
+        let px = pixels(&grey.0, grey.1, grey.2);
+        assert!((backdrop_lift(&px, &grey.3, 1.0, 0.0).unwrap().gain - 1.0).abs() < 1e-6);
     }
 }

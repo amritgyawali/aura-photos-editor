@@ -356,6 +356,6 @@ it('runs Auto advanced retouch through the workspace and reloads the stack after
   await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
   const loads = vi.mocked(nativeRetouch.edit).mock.calls.length;
   fireEvent.click(button);
-  await waitFor(() => expect(run).toHaveBeenCalledWith('project', 'photo'));
+  await waitFor(() => expect(run).toHaveBeenCalledWith('project', 'photo', undefined, 'professional'));
   await waitFor(() => expect(vi.mocked(nativeRetouch.edit).mock.calls.length).toBeGreaterThan(loads));
 });

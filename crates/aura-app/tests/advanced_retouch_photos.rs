@@ -135,6 +135,7 @@ fn every_stage_runs_in_order_on_real_photographs() {
             project_id: project.id.clone(),
             photo_id: photo.clone(),
             options: None,
+            preset: None,
         };
         let events = Mutex::new(Vec::new());
         let started = std::time::Instant::now();

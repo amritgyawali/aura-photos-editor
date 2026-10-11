@@ -106,7 +106,9 @@ definition, brow definition.
 **Body** - body smoothing, even body tone, match body to face, body shine, red hands &
 elbows, body blemishes.
 
-**Hair, clothes & backdrop** - hair detail, hair shine, fabric creases, clean backdrop.
+**Hair, clothes & backdrop** - hair detail, hair shine, fabric creases, clean backdrop, bright
+backdrop (lifts a plain grey studio backdrop to a clean bright grey, as Evoto does; off unless a
+preset such as *Beauty & Fashion (Evoto-style)* or you turn it on - ADR-0109).
 
 ## What AURA will not do
 

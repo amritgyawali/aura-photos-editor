@@ -195,7 +195,7 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         "tone" | "body-tone" | "body-match" | "colour" | "body-redness" => Some(Stage::SkinColour),
         "teeth" => Some(Stage::EyesLipsTeeth),
         "fabric" => Some(Stage::Clothing),
-        "background-tone" => Some(Stage::BackgroundToning),
+        "background-tone" | "background-lift" => Some(Stage::BackgroundToning),
         n if n.starts_with("dust-") => Some(Stage::Background),
         n if n.starts_with("hair-") || n.starts_with("stray-") => Some(Stage::Hair),
         n if n.starts_with("spot") => Some(Stage::SkinCleanup),
@@ -363,6 +363,10 @@ pub struct AdvancedRetouchInput {
     /// The retouch choices; absent uses [`options`], the workflow's own defaults.
     #[serde(default)]
     pub options: Option<Options>,
+    /// A named starting point when `options` is absent: `beauty_fashion` is
+    /// [`beauty_fashion_options`]. Anything else, or nothing, is [`options`].
+    #[serde(default)]
+    pub preset: Option<String>,
 }
 
 /// The finished recipe and the stage-by-stage report.
@@ -426,6 +430,34 @@ pub fn options() -> Options {
             ..Settings::default()
         },
     }
+}
+
+/// Evoto's "Beauty & Fashion" pass, as its homepage before/after shows it (ADR-0109): the
+/// high-end skin work of [`options`], with clothing creases softened, stray hairs faded against
+/// the backdrop, and a plain grey studio backdrop lifted neutrally to a clean bright grey - all in
+/// one automatic run, face and body. Identity rules are unchanged: moles, freckles and skin tone
+/// are kept.
+#[must_use]
+pub fn beauty_fashion_options() -> Options {
+    let mut o = options();
+    o.scope = Scope::FaceAndBody;
+    o.settings.fabric = 0.5;
+    o.settings.backdrop = 0.5;
+    o.settings.backdrop_lift = 1.0;
+    o.settings.hair_detail = 0.3;
+    o.settings.hair_shine = 0.2;
+    o
+}
+
+/// The options a request resolves to.
+#[must_use]
+pub fn resolve_options(input: &AdvancedRetouchInput) -> Options {
+    input
+        .options
+        .unwrap_or_else(|| match input.preset.as_deref() {
+            Some("beauty_fashion") => beauty_fashion_options(),
+            _ => options(),
+        })
 }
 
 /// Everything decided before anything is saved.
@@ -938,7 +970,70 @@ pub fn plan(
             (Some(bg), true) => {
                 let away = portrait_auto::erode(bg, (bg.width.max(bg.height) / 25).max(3));
                 let plane = measure::matte_plane(&away, pw, ph);
+                // A plain studio backdrop lifted to a clean bright grey (ADR-0109). When it is,
+                // the backdrop is a high-key look by choice and is not also lowered.
+                let lift = (options.settings.backdrop_lift > 0.0)
+                    .then(|| {
+                        measure::backdrop_lift(
+                            &px,
+                            &plane,
+                            exposure.exp2(),
+                            options.settings.backdrop_lift,
+                        )
+                    })
+                    .flatten();
+                let lifted = match lift {
+                    Some(l) if l.gain > 1.02 && room(&stages) > 0 => {
+                        let id = format!("{PREFIX}background-lift");
+                        if let Some(m) = encode_matte(&away) {
+                            mattes.insert(id.clone(), m);
+                            let [l0, tp, rt, b] = away.bounds;
+                            let mut e = base_edit(
+                                id.clone(),
+                                Tool::Dodge,
+                                [
+                                    (l0 + rt) * 0.5,
+                                    (tp + b) * 0.5,
+                                    (rt - l0) * 0.71,
+                                    (b - tp) * 0.71,
+                                ],
+                                measure::dodge_amount(l.gain),
+                            );
+                            e.feather = 0.0;
+                            e.matte = Some(id);
+                            stages.entry(Stage::BackgroundToning).or_default().push(e);
+                            r.changes.push(format!(
+                                "Plain studio backdrop lifted from {:.0}% to a clean bright grey (+{:.2} EV, the same on every channel so it stays neutral, its fall-off kept).",
+                                l.background * 100.0,
+                                l.gain.log2()
+                            ));
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Some(l) if l.texture > measure::PLAIN_TEXTURE => {
+                        r.checks.push("Backdrop lift: the background is a scene, not plain studio paper, so its light is kept.".into());
+                        false
+                    }
+                    Some(l) if l.chroma > measure::NEUTRAL_CHROMA => {
+                        r.checks.push("Backdrop lift: a coloured backdrop keeps its depth of colour, so it is not lifted.".into());
+                        false
+                    }
+                    Some(l) if l.background < measure::LOW_KEY => {
+                        r.checks.push(format!("Backdrop lift: a dark ({:.0}%) backdrop is a low-key look, so it is kept.", l.background * 100.0));
+                        false
+                    }
+                    Some(_) => {
+                        r.checks.push(
+                            "Backdrop lift: the backdrop is already bright and clean.".into(),
+                        );
+                        false
+                    }
+                    None => false,
+                };
                 match measure::background_tone(&px, &plane, &face_plane) {
+                    _ if lifted => {}
                     Some(t) if t.reduction > 0.0 && room(&stages) > 0 => {
                         let id = format!("{PREFIX}background-tone");
                         if let Some(m) = encode_matte(&away) {
@@ -1439,7 +1534,7 @@ pub fn run(
         .as_ref()
         .and_then(|p| p.as_srgb8().map(|pixels| (pixels, p.width, p.height)));
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
-    let options = input.options.unwrap_or_else(options);
+    let options = resolve_options(input);
     let faces = if std::env::var_os("AURA_DISABLE_AUTO_PORTRAIT").is_some_and(|v| v == "1") {
         Vec::new()
     } else {
@@ -1948,6 +2043,35 @@ mod tests {
             stage_of(&edit("manual-auto-portrait-v1-0-texture", Tool::SkinSmooth)),
             None
         );
+    }
+
+    #[test]
+    fn beauty_and_fashion_is_the_evoto_pass_and_keeps_identity() {
+        let input = |preset: Option<&str>| AdvancedRetouchInput {
+            project_id: String::new(),
+            photo_id: String::new(),
+            options: None,
+            preset: preset.map(str::to_string),
+        };
+        let o = resolve_options(&input(Some("beauty_fashion")));
+        assert_eq!(o, beauty_fashion_options());
+        assert!((o.settings.backdrop_lift - 1.0).abs() < f32::EPSILON);
+        assert!(
+            o.settings.fabric > options().settings.fabric,
+            "clothing creases are part of it"
+        );
+        assert_eq!(o.scope, Scope::FaceAndBody);
+        // Identity is untouched: the same mark, freckle and skin-colour rules as the default.
+        assert_eq!(o.settings.keep_freckles, options().settings.keep_freckles);
+        assert_eq!(
+            o.settings.remove_dark_marks,
+            options().settings.remove_dark_marks
+        );
+        assert!(o.settings.skin_brightness.abs() < f32::EPSILON);
+        // No preset, or an unknown one, is the workflow's own default with no lift.
+        assert_eq!(resolve_options(&input(None)), options());
+        assert_eq!(resolve_options(&input(Some("nonsense"))), options());
+        assert!(options().settings.backdrop_lift.abs() < f32::EPSILON);
     }
 
     #[test]

@@ -8,6 +8,24 @@ button inside it. *Portrait studio* is the **Portrait studio: face, body, backgr
 section in the Studio's right-hand panel (ADR-0108). *Automatic* means Auto enhance or Auto
 advanced retouch sets it without anybody touching a control.
 
+## Evoto's homepage before/after, measured
+
+Evoto's homepage shows each use case as a before/after slider. The *Beauty & Fashion* card ("High-end
+skin work, clothing wrinkle removal, and hair refinement handled in a single automated pass") was
+measured pixel by pixel across its divider (ADR-0109):
+
+| What changes | Measured | AURA |
+|---|---|---|
+| Grey studio backdrop | sRGB 206 → about 234, the same ×1.13 on R, G and B; fall-off kept; not clipped | **Bright backdrop** lift: 206 → 232.5 on a painted studio portrait, neutral (`crates/aura-app/tests/beauty_fashion.rs`) |
+| Stray hairs over the backdrop | Present before, gone after; soft wisps at the hair's edge kept | Hair stage fades separate strays, keeps the soft outline |
+| Clothing creases | Strongest crease detail about 18 % lower; weave kept | Fabric creases softened (0.5 in the preset) |
+| Skin | Pores kept; each person's own tone kept | Skin stages; skin tone never moved |
+
+Run it with **Retouch → Auto advanced retouch → Beauty & Fashion (Evoto-style)**, or pick the
+*Beauty & Fashion (Evoto-style)* preset in the automatic retouch settings. The other homepage cards
+could not be measured from here (the site is unreachable from the build environment); send
+screenshots of them and each one gets the same treatment.
+
 ## Skin and face retouching
 
 | Evoto | AURA | Automatic |

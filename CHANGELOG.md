@@ -2,6 +2,15 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Beauty & Fashion, the Evoto way - 2026-10-11
+
+- **Auto advanced retouch** now has two styles. **Beauty & Fashion (Evoto-style)** finishes a
+  studio portrait the way Evoto's homepage example does in one pass: high-end skin with pores
+  kept, clothing creases softened, stray hair faded, and a plain grey studio backdrop lifted to a
+  clean bright grey (measured from Evoto's own before/after: about +0.4 EV, neutral, not clipped).
+- New automatic setting **Bright backdrop**; scenes, coloured and dark backdrops are never lifted.
+  ADR-0109.
+
 ## Evoto-style finishing and Connect Claude / ChatGPT - 2026-10-11
 
 - New **Portrait studio** section in the Photo editor, with Evoto's finishing tools: face reshaping

@@ -100,6 +100,7 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['hairShine', 'Hair shine', 'unit', 'Lifts the hair’s own highlights.'],
     ['fabric', 'Fabric creases', 'unit', 'Creases in clothing softened; seams and weave kept.'],
     ['backdrop', 'Clean backdrop', 'unit', 'Smooths a plain studio backdrop; textured backgrounds are left alone.'],
+    ['backdropLift', 'Bright backdrop', 'unit', 'Lifts a plain grey studio backdrop to a clean bright grey with its fall-off kept, as Evoto does; scenes, coloured and dark backdrops are left alone.'],
   ]],
 ];
 
@@ -118,6 +119,7 @@ export const PRESETS: Preset[] = [
   ['editorial', 'Editorial', { smoothing: .6, texture: .6, microDodgeBurn: .6, contour: .6, highlight: .5, browDefinition: .4, lashDefinition: .4, hairDetail: .4 }],
   ['body', 'Body focus', { bodySmoothing: .7, bodyTone: .7, matchBodyToFace: .6, bodyRedness: .5, bodyBlemishes: .5, bodyShine: .5, neckLines: .4 }],
   ['studio', 'Studio clean', { fabric: .6, backdrop: .6, hairShine: .3, shine: .7 }],
+  ['beauty_fashion', 'Beauty & Fashion (Evoto-style)', { deepBlemishCleanup: true, removeDarkMarks: false, keepFreckles: true, maxSpots: 220, blemishSensitivity: .75, frequencyHeal: 1, textureGraft: .8, smoothing: .35, texture: .9, toneEvenness: .6, microDodgeBurn: .5, shine: .6, hairDetail: .3, hairShine: .2, fabric: .5, backdrop: .5, backdropLift: 1, bodySmoothing: .4 }],
 ];
 
 const percent = (v: number) => `${Math.round(v * 100)}%`;
