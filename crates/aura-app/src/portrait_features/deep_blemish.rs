@@ -232,17 +232,17 @@ fn candidates(
                 }
                 let half = (xx + yy) * 0.5 / area;
                 let root = (((xx - yy) * 0.5).powi(2) + xy * xy).sqrt() / area;
+                let mean_red = group.iter().map(|&i| redness[i].max(0.0)).sum::<f32>() / area;
                 #[cfg(test)]
                 let trace = |stage: &str| {
                     if std::env::var_os("AURA_SPOT_TRACE").is_some() {
-                        println!("spot-trace {stage} {x:.2} {y:.2} area={area:.1} reach={reach:.2} aspect={:.2} red={rmax:.4}", (half + root) / (half - root).max(0.2));
+                        println!("spot-trace {stage} {x:.2} {y:.2} area={area:.1} reach={reach:.2} aspect={:.2} red={rmax:.4} mean-red={mean_red:.4}", (half + root) / (half - root).max(0.2));
                     }
                 };
                 // Positive color evidence must cover the component, not just one
                 // red pixel on a neutral crease. Neutral marks keep the strict
                 // compact-shape path; measured inflammation can be elongated.
-                let inflamed = rmax > 0.025
-                    && group.iter().map(|&i| redness[i].max(0.0)).sum::<f32>() / area > 0.012;
+                let inflamed = rmax > 0.025 && mean_red > 0.012;
                 if (half + root) / (half - root).max(0.2) > if inflamed { 25.0 } else { 5.5 }
                     || reach > 18.0 * scale
                 {
@@ -363,19 +363,25 @@ fn candidates(
                         .map(|(r, _)| *r)
                         .collect(),
                 );
-                // Unsupported brightness forbids rebuilding texture. Strong,
-                // independently supported inflammation can instead lose pigment
-                // while retaining the original luminance and fine detail.
+                // Unsupported brightness forbids rebuilding texture. Consistent
+                // local inflammation can instead lose pigment while retaining
+                // original luminance and detail. The peak alone must not reject
+                // moderate redness supported by the whole component and a clean,
+                // enclosing ring; those independent checks remain mandatory.
                 let color_support = surrounded
                     && inflamed
-                    && rmax > 0.06
-                    && group.iter().map(|&i| redness[i].max(0.0)).sum::<f32>() / area > 0.025
+                    && rmax > 0.04
+                    && mean_red > 0.025
                     && clean_ring.iter().filter(|v| **v).count() >= 10
                     && clean_ring
                         .chunks(4)
                         .all(|q| q.iter().filter(|v| **v).count() >= 2)
                     && healthy_red.is_some_and(|r| fine_red[at] > r + 0.025);
                 let chroma_only = chosen_light.is_none() && color_support;
+                #[cfg(test)]
+                if chosen_light.is_none() && std::env::var_os("AURA_SPOT_TRACE").is_some() {
+                    println!("pigment-trace {x:.2} {y:.2} surrounded={surrounded} clean={} red-delta={:.4}", clean_ring.iter().filter(|v| **v).count(), healthy_red.map_or(0.0, |r| fine_red[at] - r));
+                }
                 let reference_luma =
                     if let Some(light) = chosen_light.filter(|_| surrounded || contextual) {
                         light
@@ -1428,6 +1434,83 @@ mod tests {
                 assert!(a == b, "pigment repair changed skin outside its region");
             }
         }
+    }
+    #[test]
+    fn moderate_local_redness_on_a_shadow_edge_uses_colour_only() {
+        let (w, h) = (160, 160);
+        let mask = vec![true; w * h];
+        let mut lum = vec![0.4; w * h];
+        let mut red = vec![0.1; w * h];
+        for y in 0..h {
+            for x in 80..w {
+                lum[y * w + x] = 0.18;
+            }
+        }
+        // A clean shadow with the same skin colour is never a pigment repair.
+        assert!(candidates(&lum, &red, &mask, w, h, 250.0, 1.0)
+            .0
+            .iter()
+            .all(|s| !s.chroma_only));
+        for y in 0..h {
+            for x in 0..w {
+                if (x as f32 - 80.0).hypot(y as f32 - 80.0) < 6.0 {
+                    red[y * w + x] += 0.055;
+                }
+            }
+        }
+        let spots = candidates(&lum, &red, &mask, w, h, 250.0, 1.0).0;
+        let spot = spots
+            .iter()
+            .find(|s| distance([s.x, s.y], [80.0, 80.0]) < 3.0)
+            .expect("supported moderate inflammation should retain its shadow and lose pigment");
+        assert!(
+            spot.chroma_only,
+            "a shadow edge must not receive texture replacement"
+        );
+        assert!(!spot.curved_heal && spot.heal_samples.is_empty());
+        let rgb: Vec<f32> = lum
+            .iter()
+            .zip(&red)
+            .flat_map(|(l, r)| {
+                let difference = r * (3.0 * l + 0.05) / (1.0 - 0.3622 * r);
+                let green = l - 0.2126 * difference;
+                [green + difference, green, green]
+            })
+            .collect();
+        let encoded: Vec<u8> = rgb.iter().map(|v| (v * 255.0).round() as u8).collect();
+        let pixels = Pixels::new(&encoded, w as u32, h as u32).unwrap();
+        let mut edit = base_edit(
+            "test-moderate-pigment".into(),
+            Tool::SkinUniformity,
+            0.8,
+            &pixels,
+            [spot.x, spot.y, spot.radii[0], spot.radii[1]],
+        );
+        edit.source = Some([110.0 / w as f32, 80.0 / h as f32]);
+        configure_pigment_repair(&mut edit, spot.radius, w.min(h));
+        let mut after = rgb.clone();
+        aura_render::retouch_tools::apply(&mut after, w, h, &[edit]);
+        let at = (80 * w + 80) * 3;
+        let redness = |p: &[f32]| (p[0] - (p[1] + p[2]) * 0.5) / (p.iter().sum::<f32>() + 0.05);
+        assert!(redness(&after[at..at + 3]) < redness(&rgb[at..at + 3]) - 0.005);
+        for (i, (a, b)) in rgb.chunks_exact(3).zip(after.chunks_exact(3)).enumerate() {
+            let luminance = |p: &[f32]| p[0] * 0.2627 + p[1] * 0.6780 + p[2] * 0.0593;
+            assert!((luminance(a) - luminance(b)).abs() < 0.000_001);
+            if ((i % w) as f32 - spot.x).abs() > spot.radii[0] + 1.0
+                || ((i / w) as f32 - spot.y).abs() > spot.radii[1] + 1.0
+            {
+                assert_eq!(a, b, "local pigment repair escaped its region");
+            }
+        }
+        // Only the inflamed centre is selected: there is no enclosing selected
+        // healthy skin, even for the detector's smallest allowed repair.
+        let clipped: Vec<_> = (0..w * h)
+            .map(|i| ((i % w) as f32 - 80.0).hypot((i / w) as f32 - 80.0) < 4.0)
+            .collect();
+        assert!(candidates(&lum, &red, &clipped, w, h, 250.0, 1.0)
+            .0
+            .iter()
+            .all(|s| distance([s.x, s.y], [80.0, 80.0]) >= 3.0));
     }
     #[test]
     fn clean_texture_patches_between_polar_search_rays_are_found_by_the_bounded_grid() {

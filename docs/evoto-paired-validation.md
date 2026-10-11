@@ -1,5 +1,76 @@
 # Paired reference validation
 
+## Moderate redness beside uneven light
+
+Planner `measured-features-v23` lets the existing local pigment fallback consider
+a redness peak above 0.04 instead of 0.06. Native traces found moderate nose marks
+with whole-component redness above 0.025 and clean enclosing skin that the old
+peak threshold rejected. The independent requirements remain: component mean
+above 0.025, centre redness exceeding the healthy-ring median by 0.025, a complete
+selected ring with at least ten healthy samples and two in every quadrant, safe
+skin coverage and a clean donor. This path applies only when surrounding light
+does not support texture replacement. It corrects local chroma at unchanged
+working-space luminance; it does not rebuild that shadow's texture.
+
+The regression case fails with the old peak threshold. It now checks an actual
+rendered colour correction, luminance preserved within 0.000001, exact pixels
+outside the repair, a clean shadow that receives no pigment correction, and an
+inflamed centre without enclosing selected healthy skin that is rejected.
+Application library: 184 passed, two optional image diagnostics ignored. Strict
+workspace Clippy, formatting and banned-code checks pass. Existing saved recipes
+are not rewritten; repair budgets and prior-footprint protection remain intact.
+
+Native Windows validation on 2026-10-12 used executable SHA256
+`07169C7C8E6EB4FA57A7B4DFFC3CC648396BD6865469334F2778D614C7471E1B`,
+with offline privacy enabled in an isolated catalogue before import:
+
+| Input and preset | Operations | Texture repairs | Local pigment repairs | Under-eye corrections | Unchanged full-resolution feature regions |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2048 x 3072 heavy acne, Portrait skin finish | 780 | 757 | 7 | 2 | 4 |
+| 2000 x 1200 public beauty, Portrait skin finish | 1024 | 977 | 3 | 4 | 12 |
+| Heavy acne, Acne only | 638 | 635 | 1 | 0 | 4 |
+
+Each verified JPEG was read back. Each additional lossless PNG matched both the
+native full render and native retouch view; all original and reference hashes
+stayed unchanged. All three public face crops, the heavy portrait and unscaled
+eye/nose/cheek crops for both presets were inspected. No new hard repair edges or
+obvious anatomy changes were seen. In the public group, the retained per-face
+spot counts are 279, 499 and 202. The middle face discloses 499 of 581 proposals;
+the recipe remains capped at 1024 operations.
+
+Compared with the same preset in A741, the traced 42 x 32 nose region has a
+4.09% lower mean normalized red signal. The measured forehead and glabella
+regions are unchanged. This is a modest local improvement, not a measurement
+of total acne removal. Blackheads, forehead marks, protected marks and some
+uneven tone remain, and the published Evoto result still differs.
+
+The acne-only native coverage test selected 70.72% of its landmark nose sample.
+Eye regions and nostril openings had zero changed or selected pixels. Nose-wing
+changes were confined to saved compact repairs, with no broad selection there.
+The independently inspected contour rectangle had a maximum coarse relative
+change of 0.4002%, below the existing 1% limit; its broad render stayed unchanged.
+Visible body skin selected 88,192 pixels and changed 22,151 in the 1066 x 1600
+inspection plane, with face holes retained. Diagnostic writes were undone to
+the exact saved recipe. Hands and legs are absent from these photographs.
+
+Native UI Undo/Redo restored the exact recipes and native pixels for both
+finishing photographs, with no observed page errors. The initial history
+harness was interrupted after its CDP client stopped responding; the repeated
+check after a graceful test restart passed. A separate normal restart restored
+the exact saved recipes and full-resolution RGB hashes for all three workflows.
+Evidence: `pigment-history.json` and `pigment-restart/verification.json`.
+
+The validated 07169 executable is installed at `app/aura-desktop.exe`, with the
+previous A741 executable retained for recovery. The working launcher pins its
+tested hash. The working catalogue and C: backup retain all 13 original saved
+recipe hashes and pass integrity checks; installation first checked for an
+unsaved retouch draft and closed the owned sessions normally.
+
+Ignored evidence is in `output/internal-ai-20261011/pigment-acne`,
+`pigment-acne-full`, `pigment-beauty`, `pigment-acne-only`,
+`pigment-acne-only-full` and `pigment-protected`. Reference images and generated
+exports are not bundled or committed.
+
 ## Portrait finishing and group repair allocation
 
 The adjustable `Portrait skin finish` preset combines four-pass face/body
@@ -120,7 +191,7 @@ saved recipe hash. Evidence is in `output/internal-ai-20261011/residual-final-pr
 
 At this earlier validation, the 7FB executable was installed and opened the
 working catalogue with all 13 saved recipe hashes intact, 16 configured AI routes
-and no observed page errors. The prior C0 executable is retained locally. The
+and no observed page errors. The prior 7FB executable is retained locally. The
 working catalogue and its C: backup pass SQLite integrity and saved-recipe checks.
 
 All three corrected face crops were visually inspected. Additional cheek marks
@@ -141,7 +212,7 @@ operations, including 612 compact repairs. Retouch took 18.81 seconds; the JPEG
 export/readback took 12.59 seconds. The additional lossless PNG matched the full
 native view/render. All 12 measured eye/nostril regions remained pixel-identical,
 and both public input hashes stayed unchanged.
-This baseline executable is retained locally for recovery. The working catalogue
+This baseline is historical evidence; the newer 7FB executable is retained for recovery. The working catalogue
 and its C: backup pass integrity checks with all 13 saved recipe hashes unchanged.
 
 All three face crops were inspected at their delivered dimensions beside the
