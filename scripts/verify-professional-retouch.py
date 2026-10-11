@@ -54,6 +54,7 @@ def main():
     parser.add_argument('--retouch-only', action='store_true', help='reset the automatic global edit first')
     parser.add_argument('--acne-only', action='store_true', help='preserve detail and run only blemish repair')
     parser.add_argument('--detailed-skin', action='store_true', help='use the bounded four-pass detailed cleanup and review preset')
+    parser.add_argument('--portrait-finish', action='store_true', help='detailed face/body healing plus measured tone, redness and under-eye finishing')
     parser.add_argument('--skin-cleanup', action='store_true', help='blemish repair plus adjustable pore refinement')
     parser.add_argument('--body-only-photo', action='store_true', help='verify visible body skin on a photo with no detectable face')
     args = parser.parse_args()
@@ -108,10 +109,10 @@ def main():
             (args.output / 'reset-global.json').write_text(json.dumps(reset_global, indent=2), encoding='utf-8')
         page.screenshot(path=str(args.output / 'develop.png'))
         retouch.click()
-        preset = 'Detailed skin repair and review' if args.detailed_skin else ('Skin cleanup \u00b7 refine pores' if args.skin_cleanup else ('Acne only \u00b7 preserve detail' if args.acne_only else 'Professional retouch'))
+        preset = 'Portrait skin finish' if args.portrait_finish else ('Detailed skin repair and review' if args.detailed_skin else ('Skin cleanup \u00b7 refine pores' if args.skin_cleanup else ('Acne only \u00b7 preserve detail' if args.acne_only else 'Professional retouch')))
         page.get_by_role('radio', name=preset, exact=True).check()
         expect(page.get_by_text('Frequency healing rebuilds the tone under each mark first')).to_be_visible()
-        run = page.get_by_role('button', name='Auto retouch: Face + body skin' if args.acne_only or args.skin_cleanup else 'Auto retouch: Face', exact=True)
+        run = page.get_by_role('button', name='Auto retouch: Face + body skin' if args.acne_only or args.skin_cleanup or args.portrait_finish else 'Auto retouch: Face', exact=True)
         started = time.monotonic()
         run.click()
         print(f'Running {preset} inside AURA', flush=True)
@@ -126,7 +127,7 @@ def main():
         (args.output / 'recipe.json').write_text(json.dumps(recipe, indent=2), encoding='utf-8')
         body = json.loads(recipe['body'])
         edits = body['studio_retouch_v1']
-        if args.detailed_skin:
+        if args.detailed_skin or args.portrait_finish:
             repeated = [e for e in edits if e['tool'] in ('frequency_heal', 'acne_clear')]
             assert repeated and all(e.get('repairPasses') == 4 for e in repeated)
         tools = [edit['tool'] for edit in edits]
@@ -140,6 +141,17 @@ def main():
             assert len(edits) == 1 and tools == ['frequency_heal'] and edits[0]['id'].endswith('-body-spots'), tools
             assert edits[0]['matte'] in body['studio_retouch_mattes_v1']
             assert 'without requiring a face' in body['studio_portrait_auto_v1']['message']
+        elif args.portrait_finish:
+            options = body['studio_portrait_auto_v1']['options']
+            assert options['scope'] == 'face_and_body' and options['eyes'] and options['refine'] and not options['teeth']
+            settings = options['settings']
+            assert settings['protectEyeArea'] and settings['protectNoseDetail'] and settings['toneEvenness'] > 0 and settings['darkCircles'] > 0
+            assert settings['irisDetail'] == settings['eyeWhitening'] == settings['teethWhitening'] == 0
+            assert settings['texture'] == .9 and not graft
+            assert all(e['tool'] == 'under_eye' for e in edits if '-undereye-' in e['id'])
+            assert not any(e['tool'] in ('teeth', 'eye_detail', 'eye_whiten', 'reshape') for e in edits)
+            assert len(edits) <= 1024 and all(e.get('matte') for e in edits)
+            assert sum(a['spotsHealed'] for a in body['studio_portrait_auto_v1']['assessments']) == sum('-spot-' in e['id'] for e in edits)
         elif args.skin_cleanup:
             faces = body['studio_portrait_auto_v1']['faces']
             assert faces and len([e for e in heal if e['id'].endswith('-clear')]) == len(faces), tools
@@ -175,7 +187,7 @@ def main():
                 assert wanted in tools, f'{wanted} is missing from the pass'
         repairs = [edit for edit in edits if edit['tool'] == 'patch_heal']
         assert all(edit.get('textureHeal') for edit in repairs)
-        if args.acne_only or args.skin_cleanup:
+        if args.acne_only or args.skin_cleanup or args.portrait_finish:
             assert all(abs(edit['amount'] - 1) < 1e-5 and abs(edit['feather'] - .25) < 1e-5 for edit in repairs)
         if args.retouch_only:
             assert not body['global']['exposure'], body['global']

@@ -1,5 +1,75 @@
 # Paired reference validation
 
+## Portrait finishing and group repair allocation
+
+The adjustable `Portrait skin finish` preset combines four-pass face/body
+healing with measured skin-tone, light, redness, shine and dark-circle correction.
+It retains fine texture, eye/nose guards and neutral global grading. Iris,
+eye-white, teeth, contour and expression changes remain disabled. The under-eye
+correction compares each person's shadow with their own cheek; it does not
+replace any pixels with the published reference.
+
+Compact repairs now share the remaining 1024-operation allowance across faces.
+Required finishing and existing manual/scene operations are reserved first.
+Smaller repair plans receive their full allowance; larger plans share the
+remaining slots equally, with stable face order breaking ties. Detector priority
+within each face is preserved. Retained proposals are trimmed after each person
+to bound memory, and the report counts saved repairs and discloses discarded
+proposals. No recipe limit or feature guard was relaxed. Planner version:
+`measured-features-v22`; previously saved recipes remain unchanged.
+
+The paired harness accepts `--portrait-finish` to exercise the native UI preset.
+This explicit mode checks the asymmetric lid cores separately from deliberately
+corrected under-eye skin. Skin-only comparisons retain the broader eye/socket
+checks. Nostril checks, source hashes, unchanged recipes and exact full-resolution
+export/render/view equality remain required in both modes.
+
+Native Windows build SHA256:
+`A741A74C8FDF7F92CB4F01EED175CD3088F2E98648299E7C5DB11847D3025B03`.
+The same public 2000 x 1200 beauty input produced 1024 operations: 979 compact
+texture repairs, one localized pigment correction and four measured under-eye
+corrections, alongside native skin finishing. The three faces retained 278,
+501 and 201 spot operations. The last face now keeps its full proposed plan;
+the middle face's report explicitly discloses 501 of 581 retained proposals.
+Retouch took 36.28 seconds and verified JPEG export/readback took 28.92 seconds.
+Lossless PNG matched the full native render/view, both public inputs stayed
+unchanged, and all 12 measured lid/nostril regions were pixel-identical.
+Evidence: `output/internal-ai-20261011/portrait-finish-beauty`.
+
+The separate 2048 x 3072 heavy-acne portrait produced 778 operations, including
+759 texture repairs and two under-eye corrections. Retouch took 35.47 seconds;
+verified JPEG export/readback took 33.79 seconds. The original stayed unchanged,
+lossless PNG matched the native full render/view, and all four measured
+lid/nostril regions were pixel-identical. The full portrait and an unscaled
+920 x 700 eye/nose/cheek crop were inspected. Evidence:
+`output/internal-ai-20261011/portrait-finish-acne` and `portrait-finish-acne-full`.
+
+All three paired face crops were inspected at their delivered dimensions.
+Cheek/forehead marks and measured under-eye shadows are reduced, and the last
+face receives additional cleanup without changing its expression, eyes or nose
+shape. No obvious hard repair boundaries were seen in these crops. Protected
+marks, under-eye lines and some uneven tone remain; the heavy-acne photograph
+still has forehead/nose redness. The published Evoto result is different.
+These observations do not establish exact matching, complete removal, universal
+accuracy, full feature parity or superiority.
+
+Application library: 183 passed, two optional diagnostics ignored. UI: 745
+passed across 87 files with one worker; a repair-list test timed out under
+concurrent builds, then passed alone and in the serial suite. UI build, strict
+workspace Clippy, format, Python syntax and banned checks passed.
+
+Native UI Undo/Redo restored exact recipe bodies, recipe hashes and rendered
+pixels for both finishing test photos, with no observed page errors. A normal
+restart restored the same recipe hashes and full-resolution RGB hashes for
+both photos. Evidence: `output/internal-ai-20261011/portrait-finish-history.json`
+and `portrait-finish-restart/verification.json`.
+
+The validated A741 executable is installed as `app/aura-desktop.exe` and opens
+the working catalogue with all 13 original saved recipe hashes intact, 16
+configured AI routes and no observed page errors. The prior 7FB executable is
+retained locally for recovery. The working catalogue and its C: backup pass
+SQLite integrity checks. The launcher pins the validated executable hash.
+
 ## Residual dark-mark correction
 
 The second compact-repair pass previously admitted only inflamed marks and
@@ -48,7 +118,7 @@ there were unchanged. Visible body skin was selected and changed, with no body
 coverage inside detected faces. Diagnostic writes were undone to the exact
 saved recipe hash. Evidence is in `output/internal-ai-20261011/residual-final-protected`.
 
-The corrected executable is installed as `app/aura-desktop.exe` and opens the
+At this earlier validation, the 7FB executable was installed and opened the
 working catalogue with all 13 saved recipe hashes intact, 16 configured AI routes
 and no observed page errors. The prior C0 executable is retained locally. The
 working catalogue and its C: backup pass SQLite integrity and saved-recipe checks.

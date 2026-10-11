@@ -25,6 +25,7 @@ def main():
     parser.add_argument('output', type=Path)
     parser.add_argument('--collection', required=True)
     parser.add_argument('--port', type=int, default=9363)
+    parser.add_argument('--portrait-finish', action='store_true', help='compare the measured portrait finishing preset instead of skin-only repair')
     args = parser.parse_args()
     before_hash, reference_hash = sha(args.before), sha(args.reference)
     before = Image.open(args.before).convert('RGB')
@@ -41,9 +42,9 @@ def main():
     native = args.output / 'native'
     full = args.output / 'native-full'
     subprocess.run([sys.executable, str(scripts / 'verify-professional-retouch.py'),
-                    str(source), str(native), '--retouch-only', '--detailed-skin', *common], check=True)
+                    str(source), str(native), '--retouch-only', '--portrait-finish' if args.portrait_finish else '--detailed-skin', *common], check=True)
     subprocess.run([sys.executable, str(scripts / 'verify-saved-retouch-export.py'),
-                    str(source), str(full), *common], check=True)
+                    str(source), str(full), *common, *(['--under-eye-finishing'] if args.portrait_finish else [])], check=True)
     aura = Image.open(full / 'after-full.png').convert('RGB')
     assert aura.size == before.size
     assert sha(args.before) == before_hash and sha(args.reference) == reference_hash
@@ -52,7 +53,7 @@ def main():
     draw = ImageDraw.Draw(comparison)
     for index, (label, frame) in enumerate([
         ('Public before image', before),
-        ('AURA native detailed skin repair', aura),
+        ('AURA native portrait skin finish' if args.portrait_finish else 'AURA native detailed skin repair', aura),
         ('Published Evoto after image', reference),
     ]):
         draw.text((index * width + 12, 12), label, fill='white')
@@ -75,6 +76,7 @@ def main():
     report = {
         'before_sha256': before_hash, 'reference_sha256': reference_hash,
         'dimensions': list(before.size), 'comparison_ready': True, 'detected_faces': len(faces),
+        'preset': 'portrait_finish' if args.portrait_finish else 'detailed_skin',
         'native_verification': json.loads((full / 'verification.json').read_text(encoding='utf8')),
         'complete_removal_established': False,
         'full_feature_parity_established': False,

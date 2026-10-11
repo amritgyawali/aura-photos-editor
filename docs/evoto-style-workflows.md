@@ -12,6 +12,10 @@ examples. The images do not disclose Evoto's proprietary algorithms.
   blemish repair, pore refinement, texture restoration, skin tone and light controls.
   Available skin can include nose, forehead, cheeks, neck, hands and other body
   regions; segmentation is not a universal skin-coverage guarantee.
+- Portrait skin finish: detailed face/body healing with measured tone, redness,
+  shine and under-eye correction, while preserving iris, teeth and face shape.
+  Compact repair slots are shared across detected faces. See the
+  [paired native validation](evoto-paired-validation.md) for evidence and limits.
 - Manual cleanup: painted Acne Clear blemish brush, patch healing and donor
   controls, cloning, editable selections, and saved before/after coverage.
 - Portrait detail: measured dark-circle correction, eye and teeth controls,

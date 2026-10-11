@@ -152,7 +152,7 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
   expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
   expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
   for (const [id, , values] of PRESETS) {
-    if (id === 'pro' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin') continue;
+    if (id === 'pro' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin' || id === 'portrait_finish') continue;
     expect(values.frequencyHeal ?? 0).toBe(0);
     expect(values.textureGraft ?? 0).toBe(0);
   }
@@ -164,4 +164,21 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
   expect(screen.getByText('Custom')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ frequencyHeal: .6, textureGraft: 0 }) }));
+});
+
+it('restores the complete finishing scope after acne-only without enabling iris, teeth or shape changes', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByRole('radio', { name: 'Acne only · preserve detail' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Portrait skin finish' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  const options = run.mock.calls[0]?.[0];
+  expect(options).toEqual(expect.objectContaining({ scope: 'face_and_body', eyes: true, refine: true, teeth: false,
+    settings: expect.objectContaining({ cleanupPasses: 4, maxSpots: 900, darkCircles: .75, toneEvenness: .6,
+      redness: .5, protectEyeArea: true, protectNoseDetail: true, texture: .9, bodyTone: .35,
+      irisDetail: 0, eyeWhitening: 0, redEye: false, teethWhitening: 0, contour: 0, highlight: 0 }) }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Detailed skin repair and review' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ eyes: false, refine: false,
+    settings: expect.objectContaining({ darkCircles: 0, toneEvenness: 0 }) }));
 });

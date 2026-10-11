@@ -26,6 +26,7 @@ use crate::portrait_features;
 use crate::retouch_settings::{gain, Settings};
 
 mod body_cleanup;
+mod repair_budget;
 
 pub const KEY: &str = "studio_portrait_auto_v1";
 /// Stable ID prefix of every automatic portrait operation.
@@ -441,6 +442,7 @@ pub fn plan_with_faces(
             .map_or(0.0, crate::smart_edit::noise_sigma),
     };
     let mut planned: [Vec<Edit>; 5] = Default::default();
+    let mut compact_repairs = Vec::new();
     let mut bodies = 0_usize;
     for (index, face) in report.faces.iter().enumerate() {
         if main.is_some_and(|m| m != index) {
@@ -798,35 +800,22 @@ pub fn plan_with_faces(
             }
         }
         let used: usize = planned.iter().map(Vec::len).sum();
-        if settings.deep_blemish_cleanup {
-            let non_spots = plan.edits.len()
-                + usize::from(clear.is_some())
-                + body.edits.len()
-                + features.refine.len()
-                + features.eyes.len()
-                + features.finishing.len();
-            let room =
-                retouch_tools::MAX_EDITS.saturating_sub(manual + scene_ops + used + non_spots);
-            if features.blemishes.len() > room {
-                features.blemishes.truncate(room);
-                features.report.spots_healed = features.blemishes.len();
-                features.report.findings.push(format!("Operation budget: retained {room} of this face's proposed spot repairs; existing edits are preserved."));
-            }
-        }
-        let mut wanted = plan.edits.len()
+        let mut non_spots = plan.edits.len()
             + usize::from(clear.is_some())
             + body.edits.len()
-            + features.blemishes.len()
             + features.refine.len()
             + features.eyes.len()
             + features.finishing.len();
-        if manual + scene_ops + used + wanted > retouch_tools::MAX_EDITS {
+        // Reserve each person's required masks/finishing first. Compact repairs share
+        // the remaining allowance across all faces instead of consuming it in scan order.
+        if manual + scene_ops + used + non_spots > retouch_tools::MAX_EDITS {
             plan = FacePlan::skip("The saved retouch stack has reached its operation limit.");
             clear = None;
             body = FacePlan::skip("");
             features = portrait_features::FeatureEdits::default();
-            wanted = 0;
+            non_spots = 0;
         }
+        let wanted = non_spots + features.blemishes.len();
         let mut findings = features.report.findings;
         if options.scope.body() && !body.reason.is_empty() {
             findings.insert(0, body.reason.clone());
@@ -868,11 +857,22 @@ pub fn plan_with_faces(
                 skin.push(edit);
             }
         }
-        spots.extend(features.blemishes);
+        compact_repairs.push(repair_budget::FaceRepairs {
+            assessment: report.assessments.len() - 1,
+            proposed: features.blemishes.len(),
+            non_spots,
+            edits: features.blemishes,
+        });
         refine.extend(features.refine);
         eyes.extend(features.eyes);
         finishing.extend(features.finishing);
+        let used: usize = planned.iter().map(Vec::len).sum();
+        repair_budget::rebalance(
+            &mut compact_repairs,
+            retouch_tools::MAX_EDITS.saturating_sub(manual + scene_ops + used),
+        );
     }
+    repair_budget::finish(compact_repairs, &mut planned[1], &mut report);
     let [skin, spots, refine, eyes, mut finishing] = planned;
     // A plain backdrop, smoothed for the whole frame when asked for.
     if settings.backdrop > 0.0

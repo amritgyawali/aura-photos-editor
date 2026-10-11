@@ -20,6 +20,7 @@ parser.add_argument('source', type=Path)
 parser.add_argument('output', type=Path)
 parser.add_argument('--collection', required=True)
 parser.add_argument('--port', type=int, default=9363)
+parser.add_argument('--under-eye-finishing', action='store_true', help='check the protected lid cores separately from deliberately corrected under-eye skin')
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
 original_hash = hashlib.sha256(args.source.read_bytes()).hexdigest()
@@ -37,6 +38,10 @@ with sync_playwright() as p:
     value = {'projectId': project, 'photoId': photo['id']}
     recipe = call('image_recipe', {'input': {'photoId': photo['id']}})
     body = json.loads(recipe['body'])
+    if args.under_eye_finishing:
+        options = body['studio_portrait_auto_v1']['options']
+        assert options['eyes'] and options['settings']['darkCircles'] > 0
+        assert options['settings']['protectEyeArea'] and options['settings']['protectNoseDetail']
     before = image(call('native_retouch_preview', {**value, 'before': True, 'quality': 'full'}))
     after = image(call('native_retouch_preview', {**value, 'before': False, 'quality': 'full'}))
     assert before.size == after.size == Image.open(args.source).size, 'Retouch was measured at preview resolution'
@@ -67,6 +72,7 @@ with sync_playwright() as p:
                              'changed_selected_pixels': int(((mask > 0) & np.any(a != b, axis=2)).sum())}
     yy, xx = np.mgrid[:h, :w]
     checks = []
+    under_eye_checks = []
     faces = body.get('studio_portrait_auto_v1', {}).get('faces', [])
     for index, face in enumerate(faces):
         left, right, nose, mouth_left, mouth_right = np.asarray(face['landmarks']) * [w, h]
@@ -83,6 +89,19 @@ with sync_playwright() as p:
             across = (dx * u[0] + dy * u[1]) / distance
             down = (dx * v[0] + dy * v[1]) / distance - shift
             mask = (across / rx) ** 2 + (down / ry) ** 2 <= 1
+            if args.under_eye_finishing and name.endswith('_eye'):
+                # The old socket ellipse includes the skin this explicit preset
+                # corrects. Keep it for all skin-only checks; this mode measures
+                # the asymmetric, rotation-aware lid core protected by eye_guard.
+                lid_down = down + shift + .03
+                mask = (across / .26) ** 2 + (lid_down / np.where(lid_down < 0, .24, .095)) ** 2 <= 1
+                # Include the measured upper crescent; the lower cheek alone can
+                # hide a successful shadow lift or show unrelated tone finishing.
+                band = (np.abs(across) < .22) & (down + shift > .09) & (down + shift < .30)
+                under_eye_checks.append({'face': index, 'region': name + '_skin_below',
+                    'pixels': int(band.sum()), 'changed_pixels': int(np.any(a[band] != b[band], axis=1).sum()),
+                    'mean_before_rgb': a[band].mean(axis=0).tolist(), 'mean_after_rgb': b[band].mean(axis=0).tolist()})
+                name += '_lid_core'
             change = int(np.max(np.abs(b[mask] - a[mask])))
             checks.append({'face': index, 'region': name, 'pixels': int(mask.sum()), 'max_channel_change': change})
             assert change == 0, checks[-1]
@@ -101,5 +120,7 @@ with sync_playwright() as p:
               'export_matches_native_full_render': True, 'retouch_preview_matches_export': True, 'dimensions': [w, h],
               'landmark_feature_checks': checks, 'export': export, 'delivered': delivered}
     report['outside_selection'] = outside_selection
+    report['under_eye_finishing'] = args.under_eye_finishing
+    report['under_eye_skin_checks'] = under_eye_checks
     (args.output / 'verification.json').write_text(json.dumps(report, indent=2), encoding='utf8')
     print(json.dumps({'verified': True, 'dimensions': [w, h], 'unchanged_feature_regions': len(checks), 'original_unchanged': True}), flush=True)
