@@ -16,6 +16,10 @@ warning; the resulting app launched and completed the native checks below.
 
 - UI: 744 tests in 87 files; TypeScript checking and production bundle passed.
 - Latest application library: 179 passed, 2 ignored.
+- The offline one-click integration test also passes with the new face/body
+  defaults and explicit custom preferences. Explicit IPC return types satisfy
+  the older phase-gate parser; the rebuilt production JavaScript is byte-identical
+  to the native-tested bundle. These compatibility fixes do not change runtime code.
 - Cloud library: 35 passed; gateway integration: 17 passed.
 - Recipe and renderer libraries: 70 and 198 passed. Additional native healing
   and residual-review integration fixtures passed, including default two-pass

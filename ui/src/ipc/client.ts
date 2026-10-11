@@ -1,5 +1,6 @@
 import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import type { InternalAiStatus } from './internalAi';
 import type { AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
 
 import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
@@ -604,8 +605,8 @@ export const asIpcError = (error: unknown): IpcError => {
 };
 
 export const api = {
-  internalAiStatus: (refresh = false): Promise<import('./internalAi').InternalAiStatus> => invoke('internal_ai_status', { refresh }),
-  internalAiFeedback: (projectId: string, callId: string, accepted: boolean): Promise<void> => invoke('internal_ai_feedback', { projectId, callId, accepted }),
+  internalAiStatus: (refresh = false): Promise<InternalAiStatus> => invoke<InternalAiStatus>('internal_ai_status', { refresh }),
+  internalAiFeedback: (projectId: string, callId: string, accepted: boolean): Promise<void> => invoke<void>('internal_ai_feedback', { projectId, callId, accepted }),
   createProject: (input: CreateProjectInput): Promise<ProjectHandle> =>
     invoke<ProjectHandle>('create_project', { input }),
 

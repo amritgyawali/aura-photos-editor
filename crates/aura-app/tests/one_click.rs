@@ -38,6 +38,14 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
         .expect("state")
         .with_licence_dir(dir.path().join("licence"))
         .with_key_store(Arc::new(MemoryKeyStore::default()));
+    // Discovery must stay offline too, even on a development machine that
+    // has the user's real internal-provider configuration file installed.
+    state
+        .set_cloud_policy(aura_cloud::CloudPolicy {
+            offline_studio_mode: true,
+            ..state.cloud_policy()
+        })
+        .expect("offline policy");
 
     let project = create_project(
         &state,
@@ -246,9 +254,22 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
         );
         assert_eq!(
             portrait["options"]["scope"],
-            if id == customized { "body" } else { "face" }
+            if id == customized {
+                "body"
+            } else {
+                "face_and_body"
+            }
         );
-        assert_eq!(portrait["options"]["teeth"], id != customized);
+        assert_eq!(portrait["options"]["teeth"], false);
+        if id != customized {
+            assert!(
+                portrait["options"]["settings"]["bodyBlemishes"]
+                    .as_f64()
+                    .expect("body healing strength")
+                    > 0.0
+            );
+            assert_eq!(portrait["options"]["settings"]["deepBlemishCleanup"], true);
+        }
         if id == customized {
             assert!((body["global"]["exposure"].as_f64().expect("exposure") - 0.73).abs() < 0.0001);
             assert!(
