@@ -5,9 +5,9 @@ checkout on `fix/eye-protection-and-retouch-coverage`. The supplied D: checkout
 and some D: evidence destinations returned filesystem errors or failed copy
 readback. Final native evidence and application backups are on C:.
 
-The tested Windows custom-protocol executable has SHA256
+The initial tested Windows custom-protocol executable has SHA256
 `FC5CF4F70A5847712B777859170178BAA216696D1FC792F4210CA0957CC1C2E2`.
-The standard `app/aura-desktop.exe` is updated from that verified executable.
+The standard `app/aura-desktop.exe` was updated from that verified executable.
 Its prior version is retained in the ignored C: validation directory. The four
 tested runtime DLLs accompany it. The GNU linker emits a resource-manifest
 warning; the resulting app launched and completed the native checks below.
@@ -111,3 +111,5 @@ backup pass integrity checks with all 13 saved recipe hashes matching the baseli
 
 See [the workflow](internal-ai-workflow.md) for controls and
 [ADR-0114](adr/ADR-0114-internal-ai-routing-and-residual-review.md) for implementation.
+See [paired reference validation](evoto-paired-validation.md) for the subsequent
+color-management and residual-review fixes and the matched public comparison.

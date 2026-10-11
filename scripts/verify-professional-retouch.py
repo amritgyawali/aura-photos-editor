@@ -141,7 +141,9 @@ def main():
             assert edits[0]['matte'] in body['studio_retouch_mattes_v1']
             assert 'without requiring a face' in body['studio_portrait_auto_v1']['message']
         elif args.skin_cleanup:
-            assert len([e for e in heal if e['id'].endswith('-clear')]) == 1 and not graft and len(finish) == 1, tools
+            faces = body['studio_portrait_auto_v1']['faces']
+            assert faces and len([e for e in heal if e['id'].endswith('-clear')]) == len(faces), tools
+            assert not graft and len(finish) == len(faces), tools
             assert any(e['id'].endswith('-body-spots') for e in heal)
             assert body['studio_portrait_auto_v1']['options']['scope'] == 'face_and_body'
             settings = body['studio_portrait_auto_v1']['options']['settings']

@@ -3,7 +3,8 @@
 #![allow(clippy::indexing_slicing)]
 use aura_recipe::retouch_tools::{Edit, Matte, Tool};
 use serde::Serialize;
-use std::collections::{BTreeMap, VecDeque};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BinaryHeap, VecDeque};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,8 +52,15 @@ pub fn measure(
     mattes: &BTreeMap<String, Matte>,
 ) -> Review {
     let probe = probe(selected);
-    let mut plane = crate::retouch_tools::frequency_heal_marks(rgb, w, h, &probe, mattes);
-    let mut regions = Vec::new();
+    let plane = crate::retouch_tools::frequency_heal_marks(rgb, w, h, &probe, mattes);
+    collect_regions(plane, w, h)
+}
+
+fn collect_regions(mut plane: Vec<f32>, w: usize, h: usize) -> Review {
+    // Keep the largest candidates throughout the scan, not the first 256.
+    // Otherwise small forehead marks hide a larger cheek/body mark lower down.
+    // Reverse(start) retains scan order for equal-size candidates deterministically.
+    let mut candidates = BinaryHeap::new();
     let mut measured_areas = 0;
     let mut selected_mark_pixels = 0;
     // Core coverage rather than the feather around the mark. The detector has already
@@ -91,22 +99,57 @@ pub fn measure(
         }
         measured_areas += 1;
         selected_mark_pixels += count;
-        if regions.len() < 256 {
-            regions.push(Region {
-                region: [
-                    (x0 + x1 + 1) as f32 / (2 * w) as f32,
-                    (y0 + y1 + 1) as f32 / (2 * h) as f32,
-                    ((x1 - x0 + 3) as f32 / (2 * w) as f32).max(0.001),
-                    ((y1 - y0 + 3) as f32 / (2 * h) as f32).max(0.001),
-                ],
-                pixels: count,
-            });
+        candidates.push(Reverse((count, Reverse(start), [x0, y0, x1, y1])));
+        if candidates.len() > 256 {
+            candidates.pop();
         }
     }
-    regions.sort_by_key(|region| std::cmp::Reverse(region.pixels));
+    let regions = candidates
+        .into_sorted_vec()
+        .into_iter()
+        .map(|Reverse((count, _, [x0, y0, x1, y1]))| Region {
+            region: [
+                (x0 + x1 + 1) as f32 / (2 * w) as f32,
+                (y0 + y1 + 1) as f32 / (2 * h) as f32,
+                ((x1 - x0 + 3) as f32 / (2 * w) as f32).max(0.001),
+                ((y1 - y0 + 3) as f32 / (2 * h) as f32).max(0.001),
+            ],
+            pixels: count,
+        })
+        .collect();
     Review {
         regions,
         measured_areas,
         selected_mark_pixels,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::collect_regions;
+
+    #[test]
+    fn larger_late_marks_are_not_hidden_by_the_review_limit() {
+        let (w, h) = (128, 64);
+        let mut plane = vec![0.0; w * h];
+        for index in 0..300 {
+            let x = (index % 32) * 4;
+            let y = (index / 32) * 2;
+            plane[y * w + x..y * w + x + 3].fill(1.0);
+        }
+        for y in 40..48 {
+            plane[y * w + 80..y * w + 90].fill(1.0);
+        }
+        let result = collect_regions(plane.clone(), w, h);
+        assert_eq!(result.measured_areas, 301);
+        assert_eq!(result.selected_mark_pixels, 980);
+        assert_eq!(result.regions.len(), 256);
+        assert_eq!(result.regions[0].pixels, 80);
+        assert!(result.regions[0].region[1] > 0.6);
+        assert!(result.regions[1].region[0] < result.regions[2].region[0]);
+        assert_eq!(
+            serde_json::to_value(&result).expect("review serialization"),
+            serde_json::to_value(collect_regions(plane, w, h)).expect("review serialization")
+        );
     }
 }

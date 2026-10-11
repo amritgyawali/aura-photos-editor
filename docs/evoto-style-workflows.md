@@ -44,11 +44,10 @@ examples. The images do not disclose Evoto's proprietary algorithms.
   bounded to 25% at full control strength and tapering at the ellipse boundary.
   Works on a chosen face, nose, waist, arm or leg region without running a model.
   This changes photographed structure and is never added by automatic skin cleanup.
-- **Browser provider setup**: Advanced > AI provider and the provider catalogue
-  offer OpenAI / ChatGPT and Claude buttons. The native shell opens a fixed
-  provider key dashboard, then the user creates an API key, returns, saves it to
-  the operating-system secure store and uses Check. Visiting the dashboard does
-  not authenticate AURA. API access and chat subscriptions are separate.
+- **Internal AI setup**: Advanced > AI provider shows routes imported from the
+  local configuration file, refresh controls and fallback status. Browser key-page
+  buttons have been replaced. Credentials remain in the operating-system secure
+  store; API access and chat subscriptions are separate.
 
 ## Gaps and quality acceptance
 
@@ -61,7 +60,7 @@ Optional cloud/model flows need their own configured runtime and real-photo
 validation. See [the route inventory](evoto-feature-inventory.json), which records
 all 143 published catalogue routes, including overlaps, use cases and video pages.
 
-ChatGPT subscription sign-in is not implemented by the key-page button. The
+ChatGPT subscription sign-in is not implemented by importing API keys. The
 [official documentation](https://developers.openai.com/siwc/request-client-id)
 describes commercial client registration; its
 [open-source integration](https://developers.openai.com/siwc/token-sharing-open-source)
@@ -107,9 +106,10 @@ Official product references used to identify workflow gaps:
 [batch edits](https://www.evoto.ai/features/batch-edits), and
 [background removal](https://www.evoto.ai/features/ai-background-remover).
 
-The new manual color/proportion tools and browser links were run in the native
-desktop app. See [their dated validation](evoto-tools-native-validation.md) for
-measured boundaries, history, full-resolution export, provider setup and limits.
+The manual color/proportion tools and the earlier browser setup were run in the
+native desktop app. See [their dated validation](evoto-tools-native-validation.md)
+for measured boundaries, history, full-resolution export, provider setup and limits.
+The browser setup has since been replaced by internal routing.
 
 Internal provider routing now replaces the browser connection buttons. The
 configured local file, fallback, daily ratings, bounded native skin advice,

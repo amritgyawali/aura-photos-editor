@@ -1,7 +1,7 @@
 //! Explicit selected color effects. No smoothing or geometric change is performed.
 // The buffers and 3x3 color matrix are dimension-checked by the render entry point.
 #![allow(clippy::indexing_slicing)]
-use aura_raw::colour::matrix::{mul, REC2020_TO_XYZ_D65, SRGB_TO_XYZ_D65};
+use aura_raw::colour::working_space::{linear_srgb_to_working_f32, working_luminance_f32};
 
 /// Convert a display sRGB choice once per operation, before the pixel loop.
 pub(crate) fn to_working(target: [f32; 3]) -> [f32; 3] {
@@ -12,11 +12,7 @@ pub(crate) fn to_working(target: [f32; 3]) -> [f32; 3] {
             ((v + 0.055) / 1.055).powf(2.4)
         }
     });
-    let matrix = mul(
-        aura_raw::colour::working_space::xyz_d65_to_rec2020(),
-        SRGB_TO_XYZ_D65,
-    );
-    std::array::from_fn(|i| (0..3).map(|j| matrix[i][j] as f32 * linear[j]).sum())
+    linear_srgb_to_working_f32(linear)
 }
 
 /// Source, target and output are linear Rec.2020.
@@ -24,13 +20,8 @@ pub(crate) fn transform(old: [f32; 3], chosen: [f32; 3], preserve_luma: bool) ->
     if !preserve_luma {
         return chosen;
     }
-    let luma = |rgb: [f32; 3]| {
-        (0..3)
-            .map(|c| REC2020_TO_XYZ_D65[1][c] as f32 * rgb[c])
-            .sum::<f32>()
-    };
-    let lum = luma(old).max(0.0);
-    let chosen_lum = luma(chosen);
+    let lum = working_luminance_f32(old).max(0.0);
+    let chosen_lum = working_luminance_f32(chosen);
     if chosen_lum < 0.000_001 {
         return [lum; 3];
     }

@@ -57,7 +57,7 @@ export function BlemishReview({ projectId, photoId, recipeHash, selection, image
         <button type="button" disabled={disabled || !offset} onClick={()=>setOffset(v=>Math.max(0,v-12))}>Previous areas</button>{' '}
         <button type="button" disabled={disabled || offset+12>=report.review.regions.length} onClick={()=>setOffset(v=>v+12)}>Next areas</button>
       </div>}
-      {report.review.measuredAreas > report.review.regions.length && <p>First 256 areas listed. Repair and check again to review more.</p>}
+      {report.review.measuredAreas > report.review.regions.length && <p>Largest 256 areas listed across the selection. Repair and check again to review more.</p>}
       {!canPrepare && <p>Apply or discard your draft before preparing another brush.</p>}
       <p>Preparing a brush does not save an edit. Preview it, adjust it, then use Apply retouch to keep it.</p>
     </>}
