@@ -2108,6 +2108,174 @@ mod tests {
     }
 
     #[test]
+    fn residual_pass_honors_dark_mark_choice_and_remaining_budget() {
+        use std::collections::BTreeMap;
+
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        for (x, y) in [(160, 285), (350, 285), (256, 130)] {
+            fill(&mut rgb, [x - 3, y - 3, x + 4, y + 4], [100, 67, 50]);
+        }
+        let pixels = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let settings = Settings {
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            max_spots: 900,
+            ..Settings::default()
+        };
+        let planned = plan(&face, 0, &pixels, "test-", &settings, Some(&matte));
+        assert!(planned.blemishes.len() >= 3);
+        // Simulate a first pass that could only find one of the neutral marks.
+        let mut first = planned.clone();
+        first.blemishes.truncate(1);
+        let mut kept = first.clone();
+        refine(
+            &face,
+            0,
+            &pixels,
+            &pixels,
+            "test-",
+            &Settings {
+                remove_dark_marks: false,
+                ..settings
+            },
+            Some(&matte),
+            &BTreeMap::new(),
+            &mut kept,
+        )
+        .unwrap();
+        assert_eq!(kept.blemishes, first.blemishes);
+        let mut repaired = first.clone();
+        refine(
+            &face,
+            0,
+            &pixels,
+            &pixels,
+            "test-",
+            &Settings {
+                max_spots: 2,
+                ..settings
+            },
+            Some(&matte),
+            &BTreeMap::new(),
+            &mut repaired,
+        )
+        .unwrap();
+        assert_eq!(repaired.blemishes.len(), 2);
+        let old = &first.blemishes[0];
+        let added = &repaired.blemishes[1];
+        assert!(
+            !added.clean_ring_fit,
+            "fixture must exercise neutral residuals"
+        );
+        assert!(
+            ((added.region[0] - old.region[0]) / old.region[2])
+                .hypot((added.region[1] - old.region[1]) / old.region[3])
+                >= 1.0
+        );
+        let before = after_edits(&pixels, &first.blemishes, &BTreeMap::new()).unwrap();
+        let after = after_edits(&pixels, &repaired.blemishes, &BTreeMap::new()).unwrap();
+        let x = (added.region[0] * 512.0) as usize;
+        let y = (added.region[1] * 512.0) as usize;
+        assert!(after[(y * 512 + x) * 3] > before[(y * 512 + x) * 3] + 20);
+    }
+
+    #[test]
+    fn compact_cleanup_passes_respect_one_pass_and_stop_on_clean_skin() {
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        for (x, y) in [(160, 285), (350, 285), (256, 130)] {
+            fill(&mut rgb, [x - 3, y - 3, x + 4, y + 4], [100, 67, 50]);
+        }
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let settings = Settings {
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            max_spots: 900,
+            cleanup_passes: 1,
+            ..Settings::default()
+        };
+        let mut first = plan(&face, 0, &px, "test-", &settings, Some(&matte));
+        assert_eq!(first.blemishes.len(), 3);
+        first.blemishes.truncate(1);
+        let mut single = first.clone();
+        let mattes = std::collections::BTreeMap::new();
+        refine(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &settings,
+            Some(&matte),
+            &mattes,
+            &mut single,
+        )
+        .unwrap();
+        assert_eq!(single.blemishes, first.blemishes);
+        let mut detailed = first.clone();
+        refine(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &Settings {
+                cleanup_passes: 4,
+                ..settings
+            },
+            Some(&matte),
+            &mattes,
+            &mut detailed,
+        )
+        .unwrap();
+        assert_eq!(detailed.blemishes.len(), 3);
+        assert!(
+            detailed
+                .report
+                .findings
+                .iter()
+                .any(|f| f.contains("2 protected residual pass(es)")),
+            "a clean second residual check must stop before the final allowed pass"
+        );
+        let after = after_edits(&px, &detailed.blemishes, &mattes).unwrap();
+        for (x, y) in [(160, 285), (350, 285), (256, 130)] {
+            assert!(after[(y * 512 + x) * 3] > 140);
+        }
+        let mut again = detailed.clone();
+        refine(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &Settings {
+                cleanup_passes: 4,
+                ..settings
+            },
+            Some(&matte),
+            &mattes,
+            &mut again,
+        )
+        .unwrap();
+        assert_eq!(again.blemishes, detailed.blemishes);
+    }
+
+    #[test]
     fn native_repair_removes_spot_preserves_eye_and_respects_dark_mark_option() {
         let face = PortraitFace {
             bounds: [0.2, 0.1, 0.8, 0.95],

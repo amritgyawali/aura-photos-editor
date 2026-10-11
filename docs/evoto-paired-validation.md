@@ -1,6 +1,67 @@
 # Paired reference validation
 
-## Native result on 2026-10-11
+## Residual dark-mark correction
+
+The second compact-repair pass previously admitted only inflamed marks and
+targeted redness, even when the photographer explicitly enabled Remove dark
+marks. It now honors that choice. Neutral candidates still have to pass the
+planner's compact-shape, surrounding-light, wider-context and clean-donor checks.
+Default dark-mark preservation, eye/nose guards and the exclusion of previous
+repair centres remain in place. The total per-face repair limit is applied after
+that exclusion so discarded candidates do not consume the remaining allowance.
+The planner version is `measured-features-v21`; existing saved recipes are not
+rewritten.
+
+Cleanup passes now also bound compact spot planning: one keeps the first pass,
+two retains the usual one residual check, and four permits three residual checks.
+Each check renders all preceding feature-protected repairs, excludes their
+footprints and searches the remaining skin. Checks stop early when no eligible
+candidate remains or the per-face limit is reached.
+
+The corrected Windows executable has SHA256
+`7FBE5CA56AC4A6B0315C9F5B3F7AEFAE4B69678F4AB29BA145325C30E5E95BEA`.
+The same offline three-face input produced 1024 operations, including 1005 compact
+repairs, compared with the baseline's 631 operations and 612 compact repairs.
+Retouch took 25.50 seconds and verified JPEG export/readback took 14.40 seconds.
+The lossless PNG again matched the full native view/render, all 12 measured
+eye/nostril regions remained pixel-identical, and both public inputs stayed
+unchanged. Evidence is in `output/internal-ai-20261011/residual-final-beauty`.
+The grouped photo reached the existing 1024-operation recipe limit: the report
+discloses that only 147 of the third face's proposed spot repairs were retained.
+The additional candidates were not saved; the limit was not raised or hidden.
+
+A separate 2048 x 3072 heavy-acne portrait produced 768 operations, including
+759 compact repairs. Retouch took 23.20 seconds and verified JPEG export/readback
+took 27.20 seconds. The lossless export matched the native full render/view, the
+original stayed unchanged, and four eye/nostril regions stayed pixel-identical.
+Both the whole portrait and an unscaled 869 x 652 detail crop were inspected.
+The result is cleaner around the cheeks and nose while retaining opening shape,
+lashes, eyes and local lighting. Residual forehead/nose redness remains.
+Evidence is in `output/internal-ai-20261011/residual-final-acne` and
+`residual-final-acne-full`.
+
+The matching 1066 x 1600 selection-grid diagnostic passed separately. Nose skin
+was 72.91% selected; wing changes were confined to saved compact repairs, with
+zero broad selection there. The inspected contour rectangle had 0.7866% maximum
+relative coarse change, below the unchanged 1% gate, and broad rendered pixels
+there were unchanged. Visible body skin was selected and changed, with no body
+coverage inside detected faces. Diagnostic writes were undone to the exact
+saved recipe hash. Evidence is in `output/internal-ai-20261011/residual-final-protected`.
+
+The corrected executable is installed as `app/aura-desktop.exe` and opens the
+working catalogue with all 13 saved recipe hashes intact, 16 configured AI routes
+and no observed page errors. The prior C0 executable is retained locally. The
+working catalogue and its C: backup pass SQLite integrity and saved-recipe checks.
+
+All three corrected face crops were visually inspected. Additional cheek marks
+are reduced without visible loss of the nose contour, eyes, teeth or expression.
+Some under-eye marks and uneven tone remain; the published reference is still
+more even there. The increase in repair count does not establish full removal,
+accuracy on arbitrary photographs or superiority. Application tests passed:
+181 tests, with two optional local-image diagnostics ignored. Strict workspace
+Clippy, formatting and the banned-code check passed.
+
+## Baseline native result on 2026-10-11
 
 The Windows executable with SHA256
 `C0ACC1D705C064AB989427E782289B94D8FA711BC3796C145593B5E99A229764`
@@ -10,9 +71,8 @@ operations, including 612 compact repairs. Retouch took 18.81 seconds; the JPEG
 export/readback took 12.59 seconds. The additional lossless PNG matched the full
 native view/render. All 12 measured eye/nostril regions remained pixel-identical,
 and both public input hashes stayed unchanged.
-This validated executable is installed as `app/aura-desktop.exe`; the previous
-validated executable is retained locally for recovery. The working catalogue and
-its C: backup pass integrity checks with all 13 saved recipe hashes unchanged.
+This baseline executable is retained locally for recovery. The working catalogue
+and its C: backup pass integrity checks with all 13 saved recipe hashes unchanged.
 
 All three face crops were inspected at their delivered dimensions beside the
 published after image. AURA reduced forehead and cheek marks while retaining
