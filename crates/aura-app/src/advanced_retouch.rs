@@ -214,6 +214,8 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         _ => None,
     };
     by_name.or(Some(match edit.tool {
+        // These tools are explicit manual edits and must never be planned as automatic retouch.
+        Tool::Colorize | Tool::BackgroundColor | Tool::Reshape => return None,
         Tool::AutoBlemish | Tool::PatchHeal | Tool::FrequencyHeal | Tool::AcneClear => {
             Stage::SkinCleanup
         }
@@ -469,6 +471,7 @@ fn base_edit(id: String, tool: Tool, region: [f32; 4], amount: f32) -> Edit {
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
         tone: 0.5,

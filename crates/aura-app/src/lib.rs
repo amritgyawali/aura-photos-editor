@@ -70,6 +70,7 @@ pub mod licensing;
 pub mod lightroom;
 pub mod native_retouch;
 pub mod personal_style;
+pub mod provider_links;
 pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching

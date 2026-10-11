@@ -1,0 +1,1319 @@
+{
+  "research_date": "2026-10-11",
+  "source": "https://www.evoto.ai/features",
+  "route_count": 143,
+  "quality_equivalence_established": false,
+  "note": "Catalogue routes include overlapping feature families, use cases and separate products. Status is a conservative implementation inventory, not a parity or runtime certification. Manual means only an explicit native selection-based tool, not Evoto automation.",
+  "features": [
+    {
+      "id": "add-aegyo-sal",
+      "source": "https://www.evoto.ai/features/add-aegyo-sal",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "add-film-grain-to-photo",
+      "source": "https://www.evoto.ai/features/add-film-grain-to-photo",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "add-text-to-image",
+      "source": "https://www.evoto.ai/features/add-text-to-image",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-background-blur",
+      "source": "https://www.evoto.ai/features/ai-background-blur",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "ai-background-fusion",
+      "source": "https://www.evoto.ai/features/ai-background-fusion",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-background-remover",
+      "source": "https://www.evoto.ai/features/ai-background-remover",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-beard-remover",
+      "source": "https://www.evoto.ai/features/ai-beard-remover",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-camera-profile-matching",
+      "source": "https://www.evoto.ai/features/ai-camera-profile-matching",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "ai-catchlights",
+      "source": "https://www.evoto.ai/features/ai-catchlights",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-clothes-lint-remover",
+      "source": "https://www.evoto.ai/features/ai-clothes-lint-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing"
+    },
+    {
+      "id": "ai-color-looks",
+      "source": "https://www.evoto.ai/features/ai-color-looks",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "ai-color-match",
+      "source": "https://www.evoto.ai/features/ai-color-match",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "ai-crop-image",
+      "source": "https://www.evoto.ai/features/ai-crop-image",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask"
+    },
+    {
+      "id": "ai-culling",
+      "source": "https://www.evoto.ai/features/ai-culling",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow"
+    },
+    {
+      "id": "ai-dodge-and-burn",
+      "source": "https://www.evoto.ai/features/ai-dodge-and-burn",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "ai-eye-color-changer",
+      "source": "https://www.evoto.ai/features/ai-eye-color-changer",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color"
+    },
+    {
+      "id": "ai-eye-symmetry",
+      "source": "https://www.evoto.ai/features/ai-eye-symmetry",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-face-editor",
+      "source": "https://www.evoto.ai/features/ai-face-editor",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape"
+    },
+    {
+      "id": "ai-glow-effect",
+      "source": "https://www.evoto.ai/features/ai-glow-effect",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-hair-editor",
+      "source": "https://www.evoto.ai/features/ai-hair-editor",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing"
+    },
+    {
+      "id": "ai-hand-rejuvenation",
+      "source": "https://www.evoto.ai/features/ai-hand-rejuvenation",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "ai-image-denoiser",
+      "source": "https://www.evoto.ai/features/ai-image-denoiser",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "ai-image-extender",
+      "source": "https://www.evoto.ai/features/ai-image-extender",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-masking-editor",
+      "source": "https://www.evoto.ai/features/ai-masking-editor",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask"
+    },
+    {
+      "id": "ai-object-remover",
+      "source": "https://www.evoto.ai/features/ai-object-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "ai-open-eyes",
+      "source": "https://www.evoto.ai/features/ai-open-eyes",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-perspective-correction",
+      "source": "https://www.evoto.ai/features/ai-perspective-correction",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask"
+    },
+    {
+      "id": "ai-photo-sharpener",
+      "source": "https://www.evoto.ai/features/ai-photo-sharpener",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "ai-product-retouching",
+      "source": "https://www.evoto.ai/features/ai-product-retouching",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-red-eye-removal",
+      "source": "https://www.evoto.ai/features/ai-red-eye-removal",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail"
+    },
+    {
+      "id": "ai-relight",
+      "source": "https://www.evoto.ai/features/ai-relight",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-skin-retouching",
+      "source": "https://www.evoto.ai/features/ai-skin-retouching",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "ai-stray-fur-removal",
+      "source": "https://www.evoto.ai/features/ai-stray-fur-removal",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ai-teeth-fixer",
+      "source": "https://www.evoto.ai/features/ai-teeth-fixer",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail"
+    },
+    {
+      "id": "background-generator",
+      "source": "https://www.evoto.ai/features/background-generator",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "background-replacer",
+      "source": "https://www.evoto.ai/features/background-replacer",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "batch-edits",
+      "source": "https://www.evoto.ai/features/batch-edits",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow"
+    },
+    {
+      "id": "black-and-white-filter",
+      "source": "https://www.evoto.ai/features/black-and-white-filter",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "black-background",
+      "source": "https://www.evoto.ai/features/black-background",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color"
+    },
+    {
+      "id": "blemish-removal",
+      "source": "https://www.evoto.ai/features/blemish-removal",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "body-editor",
+      "source": "https://www.evoto.ai/features/body-editor",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape"
+    },
+    {
+      "id": "bokeh-effect",
+      "source": "https://www.evoto.ai/features/bokeh-effect",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "bulk-background-remover",
+      "source": "https://www.evoto.ai/features/bulk-background-remover",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "camera-raw-photo-editor",
+      "source": "https://www.evoto.ai/features/camera-raw-photo-editor",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow"
+    },
+    {
+      "id": "change-background-color",
+      "source": "https://www.evoto.ai/features/change-background-color",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color"
+    },
+    {
+      "id": "change-color-of-image",
+      "source": "https://www.evoto.ai/features/change-color-of-image",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color"
+    },
+    {
+      "id": "change-skin-color",
+      "source": "https://www.evoto.ai/features/change-skin-color",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "change-smile-filter",
+      "source": "https://www.evoto.ai/features/change-smile-filter",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "cinematic-filters",
+      "source": "https://www.evoto.ai/features/cinematic-filters",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "clean-background",
+      "source": "https://www.evoto.ai/features/clean-background",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "client-gallery",
+      "source": "https://www.evoto.ai/features/client-gallery",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "clothes-color-changer",
+      "source": "https://www.evoto.ai/features/clothes-color-changer",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color"
+    },
+    {
+      "id": "cloud-storage",
+      "source": "https://www.evoto.ai/features/cloud-storage",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "color-splash",
+      "source": "https://www.evoto.ai/features/color-splash",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "colorize-photo",
+      "source": "https://www.evoto.ai/features/colorize-photo",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "cutout-image",
+      "source": "https://www.evoto.ai/features/cutout-image",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "darken-image",
+      "source": "https://www.evoto.ai/features/darken-image",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "dehaze-photo",
+      "source": "https://www.evoto.ai/features/dehaze-photo",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "double-chin-remover",
+      "source": "https://www.evoto.ai/features/double-chin-remover",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "double-exposure",
+      "source": "https://www.evoto.ai/features/double-exposure",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "double-eyelids",
+      "source": "https://www.evoto.ai/features/double-eyelids",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "ecommerce-photography",
+      "source": "https://www.evoto.ai/features/ecommerce-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "eye-contact-correction",
+      "source": "https://www.evoto.ai/features/eye-contact-correction",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "eye-editor",
+      "source": "https://www.evoto.ai/features/eye-editor",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail"
+    },
+    {
+      "id": "eyebrow-filter",
+      "source": "https://www.evoto.ai/features/eyebrow-filter",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail"
+    },
+    {
+      "id": "face-reshaping-tool",
+      "source": "https://www.evoto.ai/features/face-reshaping-tool",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape"
+    },
+    {
+      "id": "face-slimming-ai-app",
+      "source": "https://www.evoto.ai/features/face-slimming-ai-app",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape"
+    },
+    {
+      "id": "facial-expression-changer",
+      "source": "https://www.evoto.ai/features/facial-expression-changer",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "family-photography",
+      "source": "https://www.evoto.ai/features/family-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "fashion-photography",
+      "source": "https://www.evoto.ai/features/fashion-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "fix-overexposed-photos",
+      "source": "https://www.evoto.ai/features/fix-overexposed-photos",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "flat-stomach-editor",
+      "source": "https://www.evoto.ai/features/flat-stomach-editor",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape"
+    },
+    {
+      "id": "flip-image",
+      "source": "https://www.evoto.ai/features/flip-image",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask"
+    },
+    {
+      "id": "floor-reflection",
+      "source": "https://www.evoto.ai/features/floor-reflection",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "freckles-filter",
+      "source": "https://www.evoto.ai/features/freckles-filter",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "frequency-separation",
+      "source": "https://www.evoto.ai/features/frequency-separation",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "glitch-effect",
+      "source": "https://www.evoto.ai/features/glitch-effect",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "hair-color-changer",
+      "source": "https://www.evoto.ai/features/hair-color-changer",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color"
+    },
+    {
+      "id": "hair-part",
+      "source": "https://www.evoto.ai/features/hair-part",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "hair-shine-enhancement",
+      "source": "https://www.evoto.ai/features/hair-shine-enhancement",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing"
+    },
+    {
+      "id": "headshot-photography",
+      "source": "https://www.evoto.ai/features/headshot-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "image",
+      "source": "https://www.evoto.ai/features/image",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "image-brightener",
+      "source": "https://www.evoto.ai/features/image-brightener",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "image-enlarger",
+      "source": "https://www.evoto.ai/features/image-enlarger",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "image-resizer",
+      "source": "https://www.evoto.ai/features/image-resizer",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask"
+    },
+    {
+      "id": "image-splitter",
+      "source": "https://www.evoto.ai/features/image-splitter",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "image-upscaler",
+      "source": "https://www.evoto.ai/features/image-upscaler",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "invert-image-color",
+      "source": "https://www.evoto.ai/features/invert-image-color",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "light-leak-effect",
+      "source": "https://www.evoto.ai/features/light-leak-effect",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "magic-eraser",
+      "source": "https://www.evoto.ai/features/magic-eraser",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "makeup-beauty-filter",
+      "source": "https://www.evoto.ai/features/makeup-beauty-filter",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color"
+    },
+    {
+      "id": "maternity-photography",
+      "source": "https://www.evoto.ai/features/maternity-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "motion-blur-effect",
+      "source": "https://www.evoto.ai/features/motion-blur-effect",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "newborn-photography",
+      "source": "https://www.evoto.ai/features/newborn-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "nose-job-simulator",
+      "source": "https://www.evoto.ai/features/nose-job-simulator",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape"
+    },
+    {
+      "id": "old-photo-restoration",
+      "source": "https://www.evoto.ai/features/old-photo-restoration",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "outfit-extractor",
+      "source": "https://www.evoto.ai/features/outfit-extractor",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "people-remover",
+      "source": "https://www.evoto.ai/features/people-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "personal-ai-preset",
+      "source": "https://www.evoto.ai/features/personal-ai-preset",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow"
+    },
+    {
+      "id": "photo-delivery",
+      "source": "https://www.evoto.ai/features/photo-delivery",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow"
+    },
+    {
+      "id": "photo-enhancer",
+      "source": "https://www.evoto.ai/features/photo-enhancer",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "photo-filters",
+      "source": "https://www.evoto.ai/features/photo-filters",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "photo-glare-remover",
+      "source": "https://www.evoto.ai/features/photo-glare-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail"
+    },
+    {
+      "id": "photo-organizer",
+      "source": "https://www.evoto.ai/features/photo-organizer",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow"
+    },
+    {
+      "id": "photo-straightener",
+      "source": "https://www.evoto.ai/features/photo-straightener",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask"
+    },
+    {
+      "id": "png-maker",
+      "source": "https://www.evoto.ai/features/png-maker",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "portrait-retouching",
+      "source": "https://www.evoto.ai/features/portrait-retouching",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "preset-photo-editor",
+      "source": "https://www.evoto.ai/features/preset-photo-editor",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow"
+    },
+    {
+      "id": "raw-converter",
+      "source": "https://www.evoto.ai/features/raw-converter",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow"
+    },
+    {
+      "id": "remove-dark-circles",
+      "source": "https://www.evoto.ai/features/remove-dark-circles",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "remove-frown-lines",
+      "source": "https://www.evoto.ai/features/remove-frown-lines",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "remove-green-screen",
+      "source": "https://www.evoto.ai/features/remove-green-screen",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "remove-marionette-lines",
+      "source": "https://www.evoto.ai/features/remove-marionette-lines",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "remove-pet-leash",
+      "source": "https://www.evoto.ai/features/remove-pet-leash",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "remove-shadow-from-photo",
+      "source": "https://www.evoto.ai/features/remove-shadow-from-photo",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "remove-tan-lines",
+      "source": "https://www.evoto.ai/features/remove-tan-lines",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "remove-tattoo-from-photo",
+      "source": "https://www.evoto.ai/features/remove-tattoo-from-photo",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "remove-wrinkles-from-clothes",
+      "source": "https://www.evoto.ai/features/remove-wrinkles-from-clothes",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing"
+    },
+    {
+      "id": "rosy-complexion-ai-tool",
+      "source": "https://www.evoto.ai/features/rosy-complexion-ai-tool",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "rotate-image",
+      "source": "https://www.evoto.ai/features/rotate-image",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask"
+    },
+    {
+      "id": "school-photography",
+      "source": "https://www.evoto.ai/features/school-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "shadow-maker",
+      "source": "https://www.evoto.ai/features/shadow-maker",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "shoes-editor",
+      "source": "https://www.evoto.ai/features/shoes-editor",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "sky-replacement",
+      "source": "https://www.evoto.ai/features/sky-replacement",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "smooth-hair",
+      "source": "https://www.evoto.ai/features/smooth-hair",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing"
+    },
+    {
+      "id": "soften-skin",
+      "source": "https://www.evoto.ai/features/soften-skin",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    },
+    {
+      "id": "sports-photography",
+      "source": "https://www.evoto.ai/features/sports-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "stray-hair-remover",
+      "source": "https://www.evoto.ai/features/stray-hair-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing"
+    },
+    {
+      "id": "tethering-shooting-software",
+      "source": "https://www.evoto.ai/features/tethering-shooting-software",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "transparent-background-maker",
+      "source": "https://www.evoto.ai/features/transparent-background-maker",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "unblur-image",
+      "source": "https://www.evoto.ai/features/unblur-image",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent"
+    },
+    {
+      "id": "underwater-photography",
+      "source": "https://www.evoto.ai/features/underwater-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "video-ai-color-match",
+      "source": "https://www.evoto.ai/features/video-ai-color-match",
+      "status": "separate_product",
+      "implementation": [],
+      "limitation": "Separate Evoto Video capability; AURA has no equivalent video retouch pipeline."
+    },
+    {
+      "id": "video-blemish-remover",
+      "source": "https://www.evoto.ai/features/video-blemish-remover",
+      "status": "separate_product",
+      "implementation": [],
+      "limitation": "Separate Evoto Video capability; AURA has no equivalent video retouch pipeline."
+    },
+    {
+      "id": "video-face-editor",
+      "source": "https://www.evoto.ai/features/video-face-editor",
+      "status": "separate_product",
+      "implementation": [],
+      "limitation": "Separate Evoto Video capability; AURA has no equivalent video retouch pipeline."
+    },
+    {
+      "id": "video-portrait-retouching",
+      "source": "https://www.evoto.ai/features/video-portrait-retouching",
+      "status": "separate_product",
+      "implementation": [],
+      "limitation": "Separate Evoto Video capability; AURA has no equivalent video retouch pipeline."
+    },
+    {
+      "id": "vignette-effect",
+      "source": "https://www.evoto.ai/features/vignette-effect",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "vintage-filter",
+      "source": "https://www.evoto.ai/features/vintage-filter",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color"
+    },
+    {
+      "id": "watermark-photos",
+      "source": "https://www.evoto.ai/features/watermark-photos",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit."
+    },
+    {
+      "id": "wedding-photography",
+      "source": "https://www.evoto.ai/features/wedding-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests."
+    },
+    {
+      "id": "white-background",
+      "source": "https://www.evoto.ai/features/white-background",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color"
+    },
+    {
+      "id": "white-hair-blackening",
+      "source": "https://www.evoto.ai/features/white-hair-blackening",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing"
+    },
+    {
+      "id": "wrinkle-remover-for-face",
+      "source": "https://www.evoto.ai/features/wrinkle-remover-for-face",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin"
+    }
+  ]
+}

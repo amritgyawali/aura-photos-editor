@@ -16,6 +16,26 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it.each(['colorize','background_color'] as const)('saves %s with the chosen color and its own selection', async tool => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), {target:{value:tool}});
+  fireEvent.change(screen.getByLabelText('Target color'), {target:{value:'#ff0000'}});
+  if (tool === 'colorize') fireEvent.change(screen.getByLabelText('Color brightness'),{target:{value:'-.25'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool,targetColor:[1,0,0],warmth:tool === 'colorize' ? -.25 : 0})
+  ]));
+});
+it('saves local shaping only after a manual tool choice', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), {target:{value:'reshape'}});
+  fireEvent.change(screen.getByLabelText('Local width'), {target:{value:'-.3'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'reshape',warmth:-.3,tint:0,targetColor:null})
+  ]));
+  expect(nativeRetouch.autoRetouch).not.toHaveBeenCalled();
+});
 it('syncs the chosen cleanup style through separate native analysis for each photo',async()=>{
   vi.mocked(develop.imageRecipe).mockResolvedValue({photoId:'photo',recipeHash:'saved',body:JSON.stringify({global:{exposure:.3}}),params:[]} as never);
   vi.mocked(api.listImages).mockResolvedValue([{id:'photo',fileName:'face.jpg'},{id:'body',fileName:'body.jpg'}] as never);

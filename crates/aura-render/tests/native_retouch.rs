@@ -24,6 +24,7 @@ fn edit(tool: Tool) -> Edit {
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
         texture: 1.0,
@@ -61,6 +62,9 @@ fn every_tool_preserves_pixels_outside_the_selected_region() {
         Tool::Backdrop,
         Tool::Glare,
         Tool::Makeup,
+        Tool::Colorize,
+        Tool::BackgroundColor,
+        Tool::Reshape,
         Tool::SkinSmooth,
         Tool::SkinUniformity,
         Tool::PortraitDodgeBurn,
@@ -69,6 +73,9 @@ fn every_tool_preserves_pixels_outside_the_selected_region() {
     ] {
         let mut operation = edit(tool);
         operation.source = Some([0.15, 0.15]);
+        if matches!(tool, Tool::Colorize | Tool::BackgroundColor) {
+            operation.target_color = Some([0.4, 0.2, 0.8]);
+        }
         let mut pixels = frame.rgb.clone();
         aura_render::retouch_tools::apply(&mut pixels, 96, 80, &[operation]);
         assert!(pixels.iter().all(|v| v.is_finite()), "{tool:?}");
@@ -106,6 +113,59 @@ fn neutral_frequency_and_disabled_operations_are_identity() {
     op.amount = 0.0;
     aura_render::retouch_tools::apply(&mut pixels, 80, 80, &[op]);
     assert_eq!(pixels, frame.rgb);
+}
+
+#[test]
+fn new_tools_round_trip_and_legacy_color_is_absent() {
+    let legacy = edit(Tool::Heal);
+    let mut invalid_unused = legacy.clone();
+    invalid_unused.target_color = Some([2.0, 0.0, 0.0]);
+    assert!(retouch_tools::validate(&[invalid_unused]).is_err());
+    let value = serde_json::to_value(&legacy).unwrap();
+    assert!(value.get("targetColor").is_none());
+    assert_eq!(serde_json::from_value::<Edit>(value).unwrap(), legacy);
+    for tool in [Tool::Colorize, Tool::BackgroundColor] {
+        let mut operation = edit(tool);
+        assert!(retouch_tools::validate(&[operation.clone()]).is_err());
+        operation.target_color = Some([0.4, 0.2, 0.8]);
+        retouch_tools::validate(&[operation.clone()]).unwrap();
+        assert_eq!(
+            serde_json::from_value::<Edit>(serde_json::to_value(&operation).unwrap()).unwrap(),
+            operation
+        );
+        operation.target_color = Some([0.4, 2.0, 0.8]);
+        assert!(retouch_tools::validate(&[operation]).is_err());
+    }
+    let frame = fixtures::detail_frame(80, 80);
+    let mut operation = edit(Tool::Reshape);
+    operation.selection = Some(retouch_tools::Selection {
+        inverted: true,
+        ..Default::default()
+    });
+    assert!(retouch_tools::validate(&[operation.clone()]).is_err());
+    operation.selection = None;
+    operation.warmth = 0.0;
+    operation.tint = 0.0;
+    let mut pixels = frame.rgb.clone();
+    aura_render::retouch_tools::apply(&mut pixels, 80, 80, &[operation]);
+    assert_eq!(pixels, frame.rgb);
+}
+
+#[test]
+fn solid_color_does_not_skip_selected_dark_background_pixels() {
+    let (w, h) = (32, 32);
+    let mut pixels = vec![0.4; w * h * 3];
+    pixels[..w * h * 3 / 2].fill(0.001);
+    let mut op = edit(Tool::BackgroundColor);
+    op.region = [0.5, 0.5, 1.0, 1.0];
+    op.amount = 1.0;
+    op.feather = 0.0;
+    op.target_color = Some([1.0; 3]);
+    op.matte = Some("background".into());
+    let matte = retouch_tools::Matte::encode([0.0, 0.0, 1.0, 1.0], 2, 2, &[255; 4]);
+    let mattes = std::collections::BTreeMap::from([("background".into(), matte)]);
+    aura_render::retouch_tools::apply_with_mattes(&mut pixels, w, h, &[op], &mattes);
+    assert!(pixels.iter().all(|v| (*v - 1.0).abs() < 0.001));
 }
 
 #[test]

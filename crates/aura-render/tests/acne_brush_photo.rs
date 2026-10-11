@@ -59,6 +59,7 @@ fn brushes_a_real_photograph() {
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        target_color: None,
         sensitivity: Some(0.75),
         keep_dark_marks: false,
         texture: 0.25,

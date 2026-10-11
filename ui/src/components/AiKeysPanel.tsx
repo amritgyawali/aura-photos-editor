@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../ipc/client';
+import { ProviderConnect } from './ProviderConnect';
 import type {
   AiProviderDto,
   AiSetupStatusDto,
@@ -326,7 +327,7 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
         <select
           disabled={busy}
           value={provider}
-          onChange={(event) => setProvider(event.currentTarget.value)}
+          onChange={(event) => { setProvider(event.currentTarget.value); setKeyText(''); setEndpoint(''); setCheckResult(null); }}
         >
           {providerOptions(catalogue, setup?.keyedProviders ?? []).map((choice) => (
             <option key={choice.id} value={choice.id}>
@@ -335,6 +336,13 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
           ))}
         </select>
       </label>
+
+      <div className="ai-keys-actions" aria-label="Quick provider connections">
+        <ProviderConnect provider="openai" label="OpenAI / ChatGPT" disabled={busy || checking} onOpeningChange={setBusy} onOpened={() => { setProvider('openai'); setKeyText(''); setEndpoint(''); setCheckResult(null); }} />
+        <ProviderConnect provider="anthropic" label="Claude" disabled={busy || checking} onOpeningChange={setBusy} onOpened={() => { setProvider('anthropic'); setKeyText(''); setEndpoint(''); setCheckResult(null); }} />
+      </div>
+      <p className="lr-hint">Create a provider API key in the browser, paste it here, save, and check.
+        Chat subscriptions and API access are separate. Opening the browser does not sign AURA in.</p>
 
       {selected?.endpointEditable ?? provider === 'compat' ? (
         <label className="ai-keys-endpoint">
@@ -355,7 +363,7 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
           type="password"
           autoComplete="off"
           spellCheck={false}
-          placeholder={status?.keyPresent ? status.keyFingerprint : 'paste your key'}
+          placeholder={status?.provider === provider && status.keyPresent ? status.keyFingerprint : 'paste your key'}
           value={keyText}
           disabled={busy}
           onChange={(event) => setKeyText(event.currentTarget.value)}
@@ -363,7 +371,7 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
       </label>
 
       <p className="ai-keys-storage">
-        {status?.keyPresent
+        {status?.provider === provider && status.keyPresent
           ? `Saved as ${status.keyFingerprint} in this computer's secure key store (${status.keyStore}).`
           : "Keys are stored in this computer's secure key store, never in your catalog and never in a log."}
       </p>
@@ -372,10 +380,10 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
         <button type="button" disabled={busy || keyText.trim().length === 0} onClick={() => void save()}>
           Save key
         </button>
-        <button type="button" disabled={busy || checking || !status?.keyPresent} onClick={() => void check()}>
+        <button type="button" disabled={busy || checking || status?.provider !== provider || !status?.keyPresent} onClick={() => void check()}>
           Check
         </button>
-        <button type="button" disabled={busy || !status?.keyPresent} onClick={() => void forget()}>
+        <button type="button" disabled={busy || status?.provider !== provider || !status?.keyPresent} onClick={() => void forget()}>
           Forget key
         </button>
       </div>

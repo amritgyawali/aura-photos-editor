@@ -244,6 +244,7 @@ mod tests {
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
             texture: 1.0,

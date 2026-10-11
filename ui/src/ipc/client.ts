@@ -691,6 +691,8 @@ export const api = {
     invoke<CloudStatusDto>('clear_ai_key', { provider }),
 
   checkAiKey: (): Promise<KeyCheckDto> => invoke<KeyCheckDto>('check_ai_key'),
+  openAiProviderPage: (provider: string): Promise<string> =>
+    invoke<string>('open_ai_provider_page', { provider }),
 
   /** Every provider AURA knows how to reach. Static, and cheap to ask for. */
   listAiProviders: (): Promise<AiProviderDto[]> =>

@@ -258,6 +258,8 @@ fn apply_from(
             Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
         ) {
             crate::retouch_skin::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::Reshape {
+            crate::retouch_reshape::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::PatchHeal {
             crate::retouch_heal::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::FrequencyHeal {
@@ -379,6 +381,12 @@ fn apply_one(
     refine_matte_edges: bool,
 ) {
     let [cx, cy, rx, ry] = edit.region;
+    let chosen_color = edit.target_color.map(crate::retouch_color::to_working);
+    let color_exposure = if edit.tool == Tool::Colorize {
+        2.0_f32.powf(edit.warmth * 4.0)
+    } else {
+        1.0
+    };
     let radius = (edit.radius * w.min(h) as f32).round().max(1.0) as usize;
     let margin = radius * 12 + 2;
     let [x0, y0, x1, y1] = coverage.bounds;
@@ -475,7 +483,12 @@ fn apply_one(
         && edit.matte.is_some()
         && !matches!(
             edit.tool,
-            Tool::Fabric | Tool::Backdrop | Tool::Heal | Tool::Clone
+            Tool::Fabric
+                | Tool::Backdrop
+                | Tool::Heal
+                | Tool::Clone
+                | Tool::Colorize
+                | Tool::BackgroundColor
         ))
     .then_some(donor_mean);
     // Match donor tone to a ring outside the target, not to the blemish itself.
@@ -596,6 +609,16 @@ fn apply_one(
                             value[c] = old[c] + lum * (donor_mean[c] / src_l - center[c] / dst_l);
                         }
                     }
+                    Tool::Colorize | Tool::BackgroundColor => {
+                        let Some(target) = chosen_color else {
+                            continue;
+                        };
+                        value = crate::retouch_color::transform(
+                            old.map(|v| v * color_exposure),
+                            target,
+                            edit.tool == Tool::Colorize,
+                        );
+                    }
                     Tool::Mattify | Tool::Glare => {
                         let threshold = (luma(center) * 0.8).max(0.12);
                         let highlight =
@@ -630,6 +653,7 @@ fn apply_one(
                         }
                     }
                     Tool::PatchHeal
+                    | Tool::Reshape
                     | Tool::FrequencyHeal
                     | Tool::AcneClear
                     | Tool::TextureGraft
