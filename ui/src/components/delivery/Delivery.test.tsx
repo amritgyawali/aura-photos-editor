@@ -211,6 +211,23 @@ describe('the export view', () => {
     expect(screen.getByTestId('preset-reason').textContent).toContain('second quantisation');
   });
 
+  it('waits for the selected preset before enabling export', () => {
+    const onRun = vi.fn();
+    const props = {status:null, presets:[], selected:'gallery', destination:'/out', verify:true,
+      names:null, running:false, onSelectPreset:noop, onDestination:noop, onVerify:noop,
+      onPreviewNames:noop, onRun};
+    const view = render(<ExportView {...props}/>);
+    const run = screen.getByTestId('run') as HTMLButtonElement;
+    expect(run.disabled).toBe(true);
+    fireEvent.click(run);
+    expect(onRun).not.toHaveBeenCalled();
+    view.rerender(<ExportView {...props} presets={[{name:'gallery',format:'jpeg',quality:90,
+      colour:'srgb',bitDepth:8,resize:'full',sharpen:'screen',naming:'{seq}',sidecar:false,reason:'Gallery'}]}/>);
+    expect(run.disabled).toBe(false);
+    fireEvent.click(run);
+    expect(onRun).toHaveBeenCalledTimes(1);
+  });
+
   it('will not run without a destination, and shows names without writing', () => {
     const onPreview = vi.fn();
     const onRun = vi.fn();

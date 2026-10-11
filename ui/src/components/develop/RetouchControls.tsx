@@ -1,4 +1,4 @@
-import { DEFAULT_SKIN, isSampledSkinTool, needsRetouchSource, validRetouchSelection, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool } from '../../ipc/nativeRetouch';
+import { MAX_NATIVE_RETOUCH_EDITS, DEFAULT_SKIN, isSampledSkinTool, needsRetouchSource, validRetouchSelection, RETOUCH_TOOLS, type NativeRetouchEdit, type RetouchTool } from '../../ipc/nativeRetouch';
 import { RetouchSelectionControls } from './RetouchSelectionControls';
 import { RetouchPresets } from './RetouchPresets';
 import { RetouchSkinSelection } from './RetouchSkinSelection';
@@ -36,7 +36,7 @@ export function RetouchControls(props: Props) {
   const color = draft.tool === 'skin_color' || draft.tool === 'makeup';
   const sampled = isSampledSkinTool(draft.tool);
   const skin = draft.skin ?? DEFAULT_SKIN;
-  const canApply = validRetouch(draft) && (selected !== null || count < 256);
+  const canApply = validRetouch(draft) && (selected !== null || count < MAX_NATIVE_RETOUCH_EDITS);
   return <fieldset className="studio-adjustments lr-adjustments" disabled={disabled}>
     <legend>{selected ? 'Refine saved operation' : 'Create a retouch'}</legend>
     <label>Tool<select aria-label="Tool" value={draft.tool} onChange={event => props.onTool(event.target.value as RetouchTool)}>
@@ -120,8 +120,8 @@ export function RetouchControls(props: Props) {
       <input type="range" min="-1" max="1" step="0.01" value={draft[key]} onChange={event => onChange({ [key]: Number(event.target.value) })}/>
     </label>)}
     <details><summary>Quick skin presets</summary><p className="lr-hint">Target skin first. Adds three operations as one undoable change.</p>
-      <button type="button" disabled={Boolean(selected && props.dirty) || !validRetouch({ ...draft, tool: 'frequency' }) || count > 253} onClick={() => props.onPreset(false)}>Natural skin in selection</button>
-      <button type="button" disabled={Boolean(selected && props.dirty) || !validRetouch({ ...draft, tool: 'frequency' }) || count > 253} onClick={() => props.onPreset(true)}>Polished skin in selection</button>
+      <button type="button" disabled={Boolean(selected && props.dirty) || !validRetouch({ ...draft, tool: 'frequency' }) || count > MAX_NATIVE_RETOUCH_EDITS - 3} onClick={() => props.onPreset(false)}>Natural skin in selection</button>
+      <button type="button" disabled={Boolean(selected && props.dirty) || !validRetouch({ ...draft, tool: 'frequency' }) || count > MAX_NATIVE_RETOUCH_EDITS - 3} onClick={() => props.onPreset(true)}>Polished skin in selection</button>
     </details>
     <RetouchPresets draft={draft} disabled={disabled} onApply={settings => onChange(settings)}/>
   </fieldset>;

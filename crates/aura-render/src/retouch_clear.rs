@@ -4,7 +4,7 @@
 //! colour over each mark on the tone layer, and leaves the pores on the texture layer alone.
 //! This is that, measured rather than painted:
 //!
-//! 1. **Find.** At three sizes, a pixel is compared with the selected skin around it - how
+//! 1. **Find.** At four sizes, a pixel is compared with the selected skin around it - how
 //!    much darker it is, and how much redder. Both are ratios, so nothing here depends on
 //!    exposure or on what colour anybody's skin is. The thresholds are multiples of the
 //!    selection's own robust spread, so rough skin, noise and gentle shading do not read as
@@ -27,8 +27,8 @@ use crate::retouch_planes::{
 };
 use aura_recipe::retouch_tools::Edit;
 
-/// The three neighbourhood sizes a mark is measured against, in units of the frequency radius.
-const SCALES: [f32; 3] = [1.0, 2.0, 3.2];
+/// Neighbourhood sizes, including small marks, in units of the frequency radius.
+const SCALES: [f32; 4] = [0.65, 1.0, 2.0, 3.2];
 /// Stricter thresholds separate marks that touch at the most sensitive one.
 const TIERS: [f32; 3] = [1.0, 1.8, 2.8];
 /// A group longer than this many times its width is a line, not a spot.
@@ -156,8 +156,11 @@ impl Surround<'_> {
         let mut valid = 0;
         let mut darker_than = 0;
         let mut redder_than = 0;
+        let mut darkest_ring = f32::INFINITY;
+        let mut brightest_ring = 0.0_f32;
         for sector in 0..SECTORS {
             let (mut sum_luma, mut sum_red, mut count) = (0.0_f32, 0.0_f32, 0.0_f32);
+            let (mut context_luma, mut context_count) = (0.0_f32, 0.0_f32);
             for step in 0..3 {
                 let distance = group.reach + radius * (0.75 + 0.6 * step as f32);
                 for offset in [-0.3_f32, 0.0, 0.3] {
@@ -169,12 +172,22 @@ impl Surround<'_> {
                         continue;
                     }
                     let i = y as usize * w + x as usize;
+                    // Excluded facial shadows are still lighting evidence.
+                    // Reading only selected skin biases a boundary toward its
+                    // bright side and can turn a contour into a false blemish.
+                    context_luma += self.luma[i];
+                    context_count += 1.0;
                     if self.alpha[i] > 0.5 {
                         sum_luma += self.luma[i];
                         sum_red += self.red[i];
                         count += 1.0;
                     }
                 }
+            }
+            if context_count >= 3.0 {
+                let light = context_luma / context_count;
+                darkest_ring = darkest_ring.min(light);
+                brightest_ring = brightest_ring.max(light);
             }
             if count < 3.0 {
                 continue;
@@ -189,7 +202,16 @@ impl Surround<'_> {
             }
         }
 
-        valid >= SECTORS - 2 && (darker_than >= valid - 1 || redder_than >= valid - 1)
+        // Coloured directional light can satisfy the redness test along a nose
+        // shadow even though it is not a surrounded mark. Never rebuild a
+        // candidate from incompatible light on opposite sides, or from a ring
+        // substantially darker than the candidate itself. Leaving an ambiguous
+        // mark is preferable to flattening a facial contour.
+        let consistent_light =
+            darkest_ring >= own_luma * 0.8 && brightest_ring <= darkest_ring * 1.65;
+        valid >= SECTORS - 2
+            && consistent_light
+            && (darker_than >= valid - 1 || redder_than >= valid - 1)
     }
 }
 
@@ -208,7 +230,8 @@ fn marks(field: &Field, sensitivity: f32, keep_dark: bool) -> Option<Marks> {
     let Rect { w, h, .. } = field.rect;
     let n = field.rect.len();
     let r = field.radius;
-    let floor = typical_luma(field) * 0.03;
+    let midpoint = typical_luma(field);
+    let floor = midpoint * 0.03;
     // Pore-scale smoothing first, so a single bright or dark pore is never a mark.
     let fine = Weighted::new(&field.alpha, w, h, px(r, 0.3));
     let fine_luma = fine.mean(&field.luma);
@@ -232,12 +255,15 @@ fn marks(field: &Field, sensitivity: f32, keep_dark: bool) -> Option<Marks> {
             .collect();
         let base_luma = around.mean(&calm);
         let base_red = around.mean(&field.red);
+        let redder: Vec<f32> = fine_red.iter().zip(&base_red).map(|(a, b)| a - b).collect();
         let dark: Vec<f32> = base_luma
             .iter()
             .zip(&fine_luma)
-            .map(|(base, fine)| (base - fine) / (base + floor))
+            .zip(&redder)
+            .map(|((base, fine), red)| {
+                crate::retouch_analysis::darkness(*base, *fine, *red, midpoint, floor)
+            })
             .collect();
-        let redder: Vec<f32> = fine_red.iter().zip(&base_red).map(|(a, b)| a - b).collect();
         let dark_limit = (spread(&dark, &field.alpha) * k).max(0.03);
         let red_limit = (spread(&redder, &field.alpha) * k).max(0.006);
         // Where skin glints, the skin between the glints is darker than they are without
@@ -258,7 +284,7 @@ fn marks(field: &Field, sensitivity: f32, keep_dark: bool) -> Option<Marks> {
                 darker + brighter.min(red) + red
             })
             .collect();
-        let smallest = (0.36 * r * r).max(3.0);
+        let smallest = (0.36 * (r * scale.min(1.0)).powi(2)).max(3.0);
         let largest = 18.0 * scale * scale * r * r;
         for tier in TIERS {
             let flagged: Vec<bool> = score
@@ -302,7 +328,10 @@ fn marks(field: &Field, sensitivity: f32, keep_dark: bool) -> Option<Marks> {
                 let deepest = group.cells.iter().map(|i| dark[*i]).fold(0.0, f32::max);
                 let reddest_raw = group.cells.iter().map(|i| redder[*i]).fold(0.0, f32::max);
                 let shape = Surround {
-                    luma: &fine_luma,
+                    // The selection-weighted estimate is undefined in excluded
+                    // cells. Read the photograph itself for lighting context;
+                    // each sector already averages several ring samples.
+                    luma: &field.luma,
                     red: &fine_red,
                     alpha: &field.alpha,
                     w,
@@ -521,4 +550,103 @@ pub(crate) fn mark_plane(
         }
     }
     touched
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Group, Surround};
+
+    #[test]
+    fn redness_cannot_override_incompatible_light_around_a_candidate() {
+        let w = 41;
+        let mut luma = Vec::new();
+        let mut red = Vec::new();
+        let mut cells = Vec::new();
+        for y in 0..w {
+            for x in 0..w {
+                let inside = (x as f32 - 20.0).hypot(y as f32 - 20.0) <= 3.0;
+                luma.push(if inside {
+                    0.25
+                } else if x < 20 {
+                    0.4
+                } else {
+                    0.08
+                });
+                red.push(if inside { 0.2 } else { 0.05 });
+                if inside {
+                    cells.push(y * w + x);
+                }
+            }
+        }
+        let alpha = vec![1.0; w * w];
+        let group = Group {
+            cells,
+            centre: [20.0, 20.0],
+            axes: [2.0, 2.0],
+            reach: 3.0,
+        };
+        let shape = Surround {
+            luma: &luma,
+            red: &red,
+            alpha: &alpha,
+            w,
+            h: w,
+            radius: 3.0,
+        };
+        assert!(!shape.encloses(&group, 0.2, 0.15));
+        // The same redness surrounded by consistently lit skin is a valid mark.
+        let even = vec![0.4; w * w];
+        let shape = Surround {
+            luma: &even,
+            ..shape
+        };
+        assert!(shape.encloses(&group, 0.2, 0.15));
+    }
+
+    #[test]
+    fn excluded_shadow_still_informs_surrounding_light() {
+        let w = 41;
+        let mut luma = vec![0.4; w * w];
+        let mut red = vec![0.05; w * w];
+        let mut alpha = vec![1.0; w * w];
+        let mut cells = Vec::new();
+        for y in 0..w {
+            for x in 0..w {
+                let at = y * w + x;
+                if (x as f32 - 20.0).hypot(y as f32 - 20.0) <= 3.0 {
+                    luma[at] = 0.25;
+                    red[at] = 0.2;
+                    cells.push(at);
+                } else if x > 20 && y > 20 {
+                    luma[at] = 0.08;
+                    alpha[at] = 0.0;
+                }
+            }
+        }
+        let group = Group {
+            cells,
+            centre: [20.0, 20.0],
+            axes: [2.0, 2.0],
+            reach: 3.0,
+        };
+        let shape = Surround {
+            luma: &luma,
+            red: &red,
+            alpha: &alpha,
+            w,
+            h: w,
+            radius: 3.0,
+        };
+        assert!(
+            !shape.encloses(&group, 0.2, 0.15),
+            "masking a shadow must not make a contour look like a surrounded blemish"
+        );
+        // A partial selection alone is not a reason to reject a real lesion.
+        let even = vec![0.4; w * w];
+        assert!(Surround {
+            luma: &even,
+            ..shape
+        }
+        .encloses(&group, 0.2, 0.15));
+    }
 }

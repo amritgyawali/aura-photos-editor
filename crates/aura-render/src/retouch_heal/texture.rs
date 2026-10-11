@@ -1,13 +1,20 @@
 //! Robust local tone reconstruction with real, unscaled donor high frequencies.
 //! Used only by versioned opt-in heals; never synthesizes a face or random pores.
-use super::{difference, Donor, Image};
+use super::{curved, quilt, Donor, Image};
+
+#[derive(Debug)]
+enum Fit {
+    Affine([[f32; 3]; 3]),
+    Curved([[f32; 6]; 3]),
+}
 
 #[derive(Debug)]
 pub(super) struct TextureHeal {
     centre: [f32; 2],
     radius: [f32; 2],
-    plane: [[f32; 3]; 3],
+    plane: Fit,
     texture_radius: f32,
+    donors: Vec<Donor>,
 }
 
 fn solve(mut a: [[f32; 4]; 3]) -> Option<[f32; 3]> {
@@ -35,29 +42,56 @@ fn solve(mut a: [[f32; 4]; 3]) -> Option<[f32; 3]> {
 }
 
 impl TextureHeal {
-    pub(super) fn new(image: Image<'_>, source: Donor) -> Option<Self> {
+    pub(super) fn new(
+        image: Image<'_>,
+        source: Donor,
+        clean_ring_fit: bool,
+        curved_heal: bool,
+        heal_samples: &[[f32; 2]],
+        texture_sources: &[[f32; 2]],
+    ) -> Option<Self> {
         let radius = source.half_extent.map(|r| r / source.scale);
+        let donors = quilt::sources(image, source, texture_sources);
         let mut samples = Vec::new();
-        for ring in [1.05, 1.2, 1.35] {
-            for n in 0..32 {
-                let angle = std::f32::consts::TAU * n as f32 / 32.0;
-                let uv = [angle.cos() * ring, angle.sin() * ring];
-                if let Some(rgb) = image.at(
-                    source.centre[0] + uv[0] * radius[0],
-                    source.centre[1] + uv[1] * radius[1],
-                ) {
-                    samples.push(([1.0, uv[0], uv[1]], rgb));
-                }
+        let positions: Vec<_> = if heal_samples.is_empty() {
+            [1.05, 1.2, 1.35]
+                .into_iter()
+                .flat_map(|ring| {
+                    (0..32).map(move |n| {
+                        let angle = std::f32::consts::TAU * n as f32 / 32.0;
+                        [angle.cos() * ring, angle.sin() * ring]
+                    })
+                })
+                .collect()
+        } else {
+            heal_samples.to_vec()
+        };
+        for uv in positions {
+            if let Some(rgb) = image.at(
+                source.centre[0] + uv[0] * radius[0],
+                source.centre[1] + uv[1] * radius[1],
+            ) {
+                samples.push(([1.0, uv[0], uv[1]], rgb));
             }
         }
         if samples.len() < 24 {
             return None;
         }
+        if curved_heal {
+            return Some(Self {
+                centre: source.centre,
+                radius,
+                plane: Fit::Curved(curved::fit(&samples)?),
+                donors,
+                texture_radius: (source.half_extent[0].min(source.half_extent[1]) * 0.4)
+                    .clamp(1.0, 4.0),
+            });
+        }
         let mut weights = vec![1.0_f32; samples.len()];
         let mut plane = [[0.0_f32; 3]; 3];
         // Joint RGB residual rejects neighbouring dark marks and highlights without
         // independently selecting channels and introducing a coloured patch.
-        for _ in 0..5 {
+        for _ in 0..if clean_ring_fit { 8 } else { 5 } {
             for c in 0..3 {
                 let mut system = [[0.0; 4]; 3];
                 for ((uv, rgb), weight) in samples.iter().zip(&weights) {
@@ -83,9 +117,22 @@ impl TextureHeal {
                 .collect();
             let mut sorted = residuals.clone();
             sorted.sort_by(f32::total_cmp);
-            let cutoff = (sorted[sorted.len() / 2] * 2.5).max(0.002);
+            let cutoff = if clean_ring_fit {
+                // Joint RGB least-trimmed fitting retains the healthy majority.
+                // A median residual times 2.5 can give every neighboring acne
+                // sample full weight when a third of the ring is contaminated.
+                sorted[sorted.len() * 3 / 5].max(0.002)
+            } else {
+                (sorted[sorted.len() / 2] * 2.5).max(0.002)
+            };
             for (weight, residual) in weights.iter_mut().zip(residuals) {
-                *weight = if residual <= cutoff {
+                *weight = if clean_ring_fit {
+                    if residual <= cutoff {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                } else if residual <= cutoff {
                     1.0
                 } else {
                     (cutoff / residual).powi(2)
@@ -95,40 +142,33 @@ impl TextureHeal {
         Some(Self {
             centre: source.centre,
             radius,
-            plane,
+            plane: Fit::Affine(plane),
+            donors,
             texture_radius: (source.half_extent[0].min(source.half_extent[1]) * 0.4)
                 .clamp(1.0, 4.0),
         })
     }
 
     pub(super) fn at(&self, image: Image<'_>, source: Donor, x: f32, y: f32) -> Option<[f32; 3]> {
-        let donor = source.texture_at(image, x, y)?;
-        let mut low = [0.0; 3];
-        let mut count = 0.0;
-        for dy in -2..=2 {
-            for dx in -2..=2 {
-                // Filtering also stays inside the clean donor footprint. Sampling
-                // beyond it could reintroduce a nearby defect into the high band.
-                if let Some(p) = source.texture_at(
-                    image,
-                    x + dx as f32 * self.texture_radius * 0.5,
-                    y + dy as f32 * self.texture_radius * 0.5,
-                ) {
-                    for c in 0..3 {
-                        low[c] += p[c];
-                    }
-                    count += 1.0;
-                }
-            }
-        }
-        let high = difference(donor, low.map(|v| v / count));
+        let high = if self.donors.is_empty() {
+            quilt::detail(image, source, x, y, self.texture_radius)?
+        } else {
+            quilt::blend(image, source, &self.donors, x, y, self.texture_radius)?
+        };
         let uv = [
             1.0,
             (x - self.centre[0]) / self.radius[0],
             (y - self.centre[1]) / self.radius[1],
         ];
         Some(std::array::from_fn(|c| {
-            ((0..3).map(|j| self.plane[c][j] * uv[j]).sum::<f32>() + high[c]).max(0.0)
+            let light = match &self.plane {
+                Fit::Affine(plane) => (0..3).map(|j| plane[c][j] * uv[j]).sum::<f32>(),
+                Fit::Curved(plane) => {
+                    let b = curved::basis(uv);
+                    (0..6).map(|j| plane[c][j] * b[j]).sum::<f32>()
+                }
+            };
+            (light + high[c]).max(0.0)
         }))
     }
 }

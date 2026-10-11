@@ -1,5 +1,11 @@
 # Acne clear validation - 2026-10-07
 
+Historical benchmark of the automatic Acne Clear planner before the 2026-10-11
+integration. The current automatic pass retains frequency healing plus checked
+local donor repairs; the manual blemish brush still uses Acne Clear. These earlier
+operation counts and visual conclusions are not current-build validation. See
+[current workflow status](evoto-style-workflows.md).
+
 What was run for [ADR-0092](adr/ADR-0092-acne-clear-and-the-blemish-brush.md), and what the
 result looked like.
 

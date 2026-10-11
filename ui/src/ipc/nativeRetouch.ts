@@ -1,3 +1,4 @@
+export const MAX_NATIVE_RETOUCH_EDITS = 1024;
 import { invoke } from '@tauri-apps/api/core';
 import type { RecipeDto, RenderDto } from './types';
 
@@ -92,7 +93,11 @@ export type NativeRetouchEdit = {
   sourceScale?: number;
   preserveMicrotexture?: boolean;
   textureHeal?: boolean;
-  /** Frequency healing and acne clear: how readily a deviation counts as a mark (default 0.5). */
+  cleanRingFit?: boolean;
+  curvedHeal?: boolean;
+  healSamples?: [number, number][];
+  textureSources?: [number, number][];
+  /** Frequency healing only: how readily a compact deviation counts as a mark (default 0.5). */
   sensitivity?: number | null;
   /** Frequency healing and acne clear: leave marks that are darker but not redder or browner. */
   keepDarkMarks?: boolean;

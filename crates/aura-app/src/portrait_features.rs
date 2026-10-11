@@ -28,10 +28,11 @@ use aura_vision::portrait::PortraitFace;
 use serde::{Deserialize, Serialize};
 
 /// The planner version recorded in the report; bump on any behavioural change.
-pub const VERSION: &str = "measured-features-v5";
+pub const VERSION: &str = "measured-features-v20";
 pub(crate) mod deep_blemish;
 pub mod expert;
 pub(crate) mod eye_guard;
+mod nose_openings;
 /// At most this many healed spots per face. A face with more is left for a person to judge.
 pub const MAX_SPOTS: usize = 12;
 /// More compact red marks than this on one face is a pattern (freckles), not blemishes.
@@ -173,6 +174,7 @@ impl Capsule {
 struct Geometry {
     eyes: [[f32; 2]; 2],
     nose: [f32; 2],
+    nostrils: Option<[nose_openings::Opening; 2]>,
     mouth: [[f32; 2]; 2],
     mid: [f32; 2],
     mouth_centre: [f32; 2],
@@ -204,9 +206,10 @@ impl Geometry {
             v = [-v[0], -v[1]];
         }
         let [l, t, r, b] = face.bounds;
-        Some(Self {
+        let mut geometry = Self {
             eyes: [eye_a, eye_b],
             nose,
+            nostrils: None,
             mouth: [mouth_a, mouth_b],
             mid,
             mouth_centre,
@@ -215,7 +218,9 @@ impl Geometry {
             d,
             mouth_width: distance(mouth_a, mouth_b),
             bounds: [l * w, t * h, r * w, b * h],
-        })
+        };
+        geometry.nostrils = nose_openings::measure(&geometry, px);
+        Some(geometry)
     }
 
     fn skin_areas(&self) -> [Capsule; 4] {
@@ -351,6 +356,10 @@ fn base_edit(id: String, tool: Tool, amount: f32, px: &Pixels<'_>, region_px: [f
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        clean_ring_fit: false,
+        curved_heal: false,
+        heal_samples: Vec::new(),
+        texture_sources: Vec::new(),
         sensitivity: None,
         keep_dark_marks: false,
         texture: 1.0,

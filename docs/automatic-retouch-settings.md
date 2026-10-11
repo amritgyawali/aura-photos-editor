@@ -20,18 +20,23 @@ below; change any of them and it becomes *Custom*.
 
 The order a retoucher works in, as one press:
 
-1. **Acne clear** measures every pimple, red mark and brown mark against the clean skin
-   around it - in clusters, on the nose and between the brows too - and rebuilds its tone and
-   colour from that skin, leaving the pores where they are; then it evens leftover redness. It
-   runs first, on the photograph as taken. [ADR-0092](adr/ADR-0092-acne-clear-and-the-blemish-brush.md).
+1. **Frequency healing** rebuilds the tone under measured compact marks from nearby clean
+   skin while retaining pore texture. It runs first on the original photograph, with
+   eye and nose exclusions applied before planning residual repairs.
 2. **Skin smoothing, tone and light evening, micro dodge & burn** - gentle: 35 % smoothing
-   and no pore refinement, because the healing has already removed the blemishes.
-3. No donor spot repairs: a borrowed patch on skin acne clear has evened shows as a disk.
+   and no pore refinement. Healing does not guarantee every blemish was removed.
+3. **Local donor spot repairs** address remaining supported marks. Donors, lighting fits,
+   full skin clearance and protected structures are checked before a repair is saved.
 4. **The frequency-separation finish**, which evens mid-scale unevenness and keeps the
    fine band.
-5. **Restore skin texture** last: this face's own pores - as they are after acne clear, not
-   the crusts of the marks - put back where smoothing removed them, nose included, with oily
-   glints and deep pits limited. Nothing is borrowed over a healed mark.
+5. **Restore skin texture** last: original pore detail is restored where smoothing removed
+   it, with glints and deep pits limited. Healed blemishes can borrow clean donor texture.
+
+The manual **Blemish brush** uses the newer Acne Clear renderer for painted selections.
+The automatic planner currently retains the independently validated frequency-healing and
+local-donor route. Historical Acne Clear automatic benchmark results describe a different
+planner revision. See [current workflow status](evoto-style-workflows.md) and the
+[native validation record](retouch-recovery-validation.md).
 
 Steps 1, 4 and 5 work on the whole face, including the side in shadow. A segmenter is often
 unsure of skin in deep shadow - most often on darker skin - so where it left skin out, any

@@ -42,7 +42,10 @@ impl Checkpoint {
 }
 
 /// Memory kept for checkpoints: a few full-resolution frames, or many screen-sized ones.
-const BUDGET: usize = 1024 * 1024 * 1024;
+const BUDGET: usize = 256 * 1024 * 1024;
+/// Live-preview pairs retain their own strong references even after entry eviction.
+/// Bound them independently so evicting a checkpoint actually releases memory.
+const LATEST_BUDGET: usize = 128 * 1024 * 1024;
 const ENTRIES: usize = 16;
 
 #[derive(Debug, Default)]
@@ -91,11 +94,25 @@ impl Checkpoints {
 
     /// Remember the newest pair either side of a photograph's stack.
     pub(crate) fn remember(&self, latest: Latest) {
+        self.remember_with_budget(latest, LATEST_BUDGET);
+    }
+
+    fn remember_with_budget(&self, latest: Latest, budget: usize) {
         let mut store = self.store.lock().unwrap_or_else(PoisonError::into_inner);
         store
             .latest
             .retain(|saved| saved.scope != latest.scope || saved.stack != latest.stack);
-        if store.latest.len() >= LATEST {
+        let size = latest.before.bytes().saturating_add(latest.after.bytes());
+        if size > budget {
+            return;
+        }
+        while store.latest.len() >= LATEST
+            || store.latest.iter().fold(size, |bytes, saved| {
+                bytes
+                    .saturating_add(saved.before.bytes())
+                    .saturating_add(saved.after.bytes())
+            }) > budget
+        {
             store.latest.pop_front();
         }
         store.latest.push_back(latest);
@@ -241,6 +258,34 @@ mod tests {
     }
 
     #[test]
+    fn live_pairs_release_evicted_buffers_and_reject_oversized_pairs() {
+        let cache = Checkpoints::new();
+        let pair = |scope: &str, pixels: usize| Latest {
+            scope: scope.into(),
+            stack: "saved".into(),
+            before: Arc::new(checkpoint(pixels)),
+            after: Arc::new(checkpoint(pixels)),
+        };
+        let first = pair("first", 3);
+        let old_buffer = Arc::downgrade(&first.before);
+        cache.remember_with_budget(first, 48);
+        cache.remember_with_budget(pair("second", 3), 48);
+        assert!(old_buffer.upgrade().is_some());
+        cache.remember_with_budget(pair("third", 3), 48);
+        assert!(
+            old_buffer.upgrade().is_none(),
+            "eviction still pins a buffer"
+        );
+        assert!(cache.latest("first", "saved").is_none());
+        assert!(cache.latest("second", "saved").is_some());
+        assert!(cache.latest("third", "saved").is_some());
+        cache.remember_with_budget(pair("oversized", 9), 48);
+        assert!(cache.latest("oversized", "saved").is_none());
+        cache.clear();
+        assert!(cache.latest("third", "saved").is_none());
+    }
+
+    #[test]
     fn a_renamed_operation_keeps_its_key_and_a_changed_one_does_not() {
         let edit = aura_recipe::retouch_tools::Edit {
             id: "a".into(),
@@ -254,6 +299,10 @@ mod tests {
             source_scale: 1.0,
             preserve_microtexture: false,
             texture_heal: false,
+            clean_ring_fit: false,
+            curved_heal: false,
+            heal_samples: Vec::new(),
+            texture_sources: Vec::new(),
             sensitivity: None,
             keep_dark_marks: false,
             texture: 1.0,

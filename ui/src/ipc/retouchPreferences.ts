@@ -22,7 +22,7 @@ export function readRetouchPreferences(recipe?: RecipeDto | null): AutoRetouchOp
       if (typeof saved[key] === 'boolean') options[key] = saved[key];
     }
     if (record(saved.settings)) {
-      const spotLimit = saved.settings.deepBlemishCleanup === true ? 220 : 24;
+      const spotLimit = saved.settings.deepBlemishCleanup === true ? 900 : 24;
       for (const key of Object.keys(settings) as (keyof RetouchSettings)[]) {
         const value = saved.settings[key];
         if (typeof settings[key] === 'boolean' && typeof value === 'boolean') Object.assign(settings, { [key]: value });

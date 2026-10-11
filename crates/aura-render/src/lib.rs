@@ -118,6 +118,7 @@ pub mod profiles;
 pub mod restore;
 pub mod retouch;
 mod retouch_acne;
+pub mod retouch_analysis;
 pub mod retouch_cache;
 mod retouch_clear;
 mod retouch_heal;

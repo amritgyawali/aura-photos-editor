@@ -50,7 +50,11 @@ use crate::portrait::PortraitFace;
 #[path = "skin_orientation.rs"]
 mod orientation;
 
-pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v3";
+#[path = "skin_body.rs"]
+mod body;
+pub use body::analyse_body;
+
+pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v4";
 pub const MODEL_HASH: &str = "10eee962bb85d9f5d0b292376f595ce70d810becfcef17feeb4762e62d8a7754";
 const SIDE: usize = 256;
 const CLASSES: usize = 6;
@@ -849,7 +853,9 @@ fn analyse_upright(
             .min_by(|a, b| a.1.total_cmp(&b.1))
     };
 
-    let body_regions = assign_regions(field.plane(Class::BodySkin), w, h, &boxes, 7.0);
+    // Clothing can disconnect hands and legs from the neck. Their distance from
+    // a face does not make confidently segmented body skin cease to be skin.
+    let body_regions = assign_regions(field.plane(Class::BodySkin), w, h, &boxes, f32::INFINITY);
     let hair_regions = assign_regions(field.plane(Class::Hair), w, h, &boxes, 2.5);
     let clothes_regions = assign_regions(field.plane(Class::Clothes), w, h, &boxes, 6.0);
 
@@ -979,6 +985,26 @@ fn analyse_upright(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn detached_hands_and_legs_are_assigned_even_far_from_faces() {
+        let (w, h) = (80, 220);
+        let mut plane = vec![0.0; w * h];
+        for (x, y) in [(10, 110), (60, 190)] {
+            for yy in y..y + 10 {
+                for xx in x..x + 8 {
+                    plane[yy * w + xx] = 1.0;
+                }
+            }
+        }
+        let boxes = [[25.0, 5.0, 35.0, 15.0]];
+        assert!(assign_regions(&plane, w, h, &boxes, 7.0)[0]
+            .iter()
+            .all(|v| !v));
+        let regions = assign_regions(&plane, w, h, &boxes, f32::INFINITY);
+        for (selected, probability) in regions[0].iter().zip(plane) {
+            assert_eq!(*selected, probability > 0.5);
+        }
+    }
 
     #[test]
     fn touching_people_do_not_share_one_body_owner() {

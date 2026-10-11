@@ -33,9 +33,9 @@ use serde::{Deserialize, Serialize};
 
 /// The size of the fast first look.
 const FAST_EDGE: u32 = 1600;
-/// Memory kept for finished previews: about twenty full-resolution 24 MP photographs or
-/// several dozen of the size most portraits are.
-const MEMORY_BYTES: usize = 384 * 1024 * 1024;
+/// Finished previews compete with active rendering, model inference and the `WebView`.
+/// Keep a modest memory budget; larger and older previews remain available on disk.
+const MEMORY_BYTES: usize = 128 * 1024 * 1024;
 const MEMORY_ENTRIES: usize = 48;
 /// Disk kept for finished previews. The oldest are removed first.
 const DISK_BYTES: u64 = 3 * 1024 * 1024 * 1024;

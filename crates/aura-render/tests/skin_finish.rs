@@ -38,6 +38,10 @@ fn operation(tool: Tool) -> Edit {
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        clean_ring_fit: false,
+        curved_heal: false,
+        heal_samples: Vec::new(),
+        texture_sources: Vec::new(),
         sensitivity: None,
         keep_dark_marks: false,
         texture: 0.25,
@@ -197,6 +201,54 @@ fn frequency_healing_rebuilds_compact_marks_and_leaves_lines_and_clean_skin_alon
     let mut again = before.clone();
     apply(&mut again, W, W, std::slice::from_ref(&edit));
     assert_eq!(after, again, "frequency healing must be deterministic");
+}
+
+#[test]
+fn small_red_marks_are_repaired_without_removing_surrounding_pores() {
+    let clean = skin([0.42, 0.30, 0.22], 1.0);
+    let mut before = clean.clone();
+    mark(&mut before, [60, 60], 2.5, RED_MARK);
+    let mut edit = operation(Tool::FrequencyHeal);
+    edit.sensitivity = Some(0.85);
+    let mut after = before.clone();
+    apply(&mut after, W, W, &[edit]);
+    let at = (60 * W + 60) * 3;
+    assert!(
+        (luma(&after[at..at + 3]) - luma(&clean[at..at + 3])).abs()
+            < (luma(&before[at..at + 3]) - luma(&clean[at..at + 3])).abs() * 0.5
+    );
+    for y in 100..140 {
+        for x in 100..140 {
+            let i = (y * W + x) * 3;
+            assert_eq!(&after[i..i + 3], &before[i..i + 3]);
+        }
+    }
+}
+
+#[test]
+fn frequency_healing_preserves_curved_chromatic_shadow_boundaries() {
+    let mut before = skin([0.42, 0.30, 0.22], 1.0);
+    // A curved nose-like shadow has both a luminance transition and a colour
+    // transition. Redness alone must not turn its bright edge into a blemish.
+    for y in 0..W {
+        for x in 0..W {
+            let edge = 128.0 + 12.0 * (y as f32 / 24.0).sin();
+            let shade = ((x as f32 - edge) / 5.0).tanh() * 0.5 + 0.5;
+            for (c, dark) in [0.20, 0.28, 0.32].into_iter().enumerate() {
+                before[(y * W + x) * 3 + c] *= 1.0 + shade * (dark - 1.0);
+            }
+        }
+    }
+    mark(&mut before, [60, 60], 5.0, RED_MARK);
+    let mut after = before.clone();
+    apply(&mut after, W, W, &[operation(Tool::FrequencyHeal)]);
+    for y in 16..W - 16 {
+        for x in 100..166 {
+            let i = (y * W + x) * 3;
+            assert_eq!(&before[i..i + 3], &after[i..i + 3], "shadow at {x},{y}");
+        }
+    }
+    assert!(contrast(&after, [60, 60], 5.0).abs() < 0.04);
 }
 
 #[test]

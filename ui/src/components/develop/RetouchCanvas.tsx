@@ -2,11 +2,18 @@ import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from '
 import type { BrushPoint, BrushStroke, NativeRetouchEdit } from '../../ipc/nativeRetouch';
 
 export type RetouchMode = 'ellipse' | 'paint' | 'erase' | 'pan' | 'gradient';
+export type SkinInspectionView = 'color' | 'grayscale' | 'high-contrast' | 'low-contrast';
+const INSPECTION_FILTERS: Record<SkinInspectionView, string | undefined> = {
+  color: undefined, grayscale: 'grayscale(1)',
+  'high-contrast': 'grayscale(1) contrast(4)',
+  'low-contrast': 'grayscale(1) contrast(0.25)',
+};
 type Props = {
   src: string | null; width: number; height: number; compare: boolean; disabled: boolean;
   beforeSrc?: string | null; split?: boolean;
   maskView?: boolean;
   coverageView?: boolean;
+  inspectionView?: SkinInspectionView;
   draft: NativeRetouchEdit; mode: RetouchMode; radius: number; opacity: number;
   overlay: boolean; sourceMode: boolean;
   onTarget: (point: [number, number]) => void; onSource: (point: [number, number]) => void;
@@ -16,6 +23,7 @@ type Props = {
 
 export function RetouchCanvas(props: Props) {
   const { src, width, height, draft, mode, disabled, compare, overlay } = props;
+  const photoFilter = props.maskView || props.coverageView ? undefined : INSPECTION_FILTERS[props.inspectionView ?? 'color'];
   const viewport = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const gesture = useRef<{ id: number; x: number; y: number; left: number; top: number; stroke: BrushStroke | null; gradient?: [number, number] } | null>(null);
@@ -178,10 +186,10 @@ export function RetouchCanvas(props: Props) {
           onLostPointerCapture={event => finish(event, true)}
           style={{ width: imageWidth, height: imageHeight, left: (canvasWidth - imageWidth) / 2, top: (canvasHeight - imageHeight) / 2,
             cursor: mode === 'pan' || split || props.maskView || props.coverageView ? 'grab' : props.sourceMode ? 'copy' : 'crosshair' }}>
-          {src ? <img src={src} draggable={false} alt={props.coverageView ? 'Saved retouch coverage' : props.maskView ? 'Selection mask' : compare ? 'Before native retouch' : 'Retouched photograph'}/> : <p>Loading retouch preview…</p>}
+          {src ? <img src={src} draggable={false} style={{filter:photoFilter}} alt={props.coverageView ? 'Saved retouch coverage' : props.maskView ? 'Selection mask' : compare ? 'Before native retouch' : 'Retouched photograph'}/> : <p>Loading retouch preview…</p>}
           {split && <>
             <img className="retouch-before-layer" src={props.beforeSrc ?? undefined} draggable={false} alt="Before native retouch comparison"
-              style={{ clipPath: `inset(0 ${100 - splitPosition}% 0 0)` }}/>
+              style={{ clipPath: `inset(0 ${100 - splitPosition}% 0 0)`, filter:photoFilter }}/>
             <div className="retouch-compare-labels" aria-hidden="true"><span>Before</span><span>Retouched</span></div>
             <div className="retouch-compare-divider" style={{ left: `${splitPosition}%` }} aria-hidden="true"
               onPointerDown={event => {

@@ -79,8 +79,8 @@ pub struct Settings {
     /// Rebuild the tone under every compact mark from the clean skin around it, leaving the
     /// pores where they are (frequency healing). 0 is off. ADR-0090.
     pub frequency_heal: f32,
-    /// At most this many spots healed per face (1..=220 in deep cleanup).
-    pub max_spots: u8,
+    /// At most this many spots healed per face (1..=900 in deep cleanup).
+    pub max_spots: u16,
     /// Treat a field of many small marks as freckles and keep all of them.
     pub keep_freckles: bool,
 
@@ -266,7 +266,7 @@ impl Settings {
             frequency_heal: unit(self.frequency_heal, 0.0),
             max_spots: self
                 .max_spots
-                .clamp(1, if self.deep_blemish_cleanup { 220 } else { 24 }),
+                .clamp(1, if self.deep_blemish_cleanup { 900 } else { 24 }),
             keep_freckles: self.keep_freckles,
             forehead_lines: unit(self.forehead_lines, d.forehead_lines),
             crows_feet: unit(self.crows_feet, d.crows_feet),
@@ -366,11 +366,11 @@ mod tests {
         assert_eq!(wild.max_spots, 24);
         let deep = Settings {
             deep_blemish_cleanup: true,
-            max_spots: 255,
+            max_spots: 1200,
             ..Settings::default()
         }
         .sanitised();
-        assert_eq!(deep.max_spots, 220);
+        assert_eq!(deep.max_spots, 900);
         assert_eq!(gain(0.5), 1.0);
         assert!(threshold(1.0, 1.0) < threshold(1.0, 0.5));
         assert!(threshold(1.0, 0.0) > 1.0);

@@ -341,8 +341,9 @@ impl Grid {
     fn spread(self, levels: &[f32], supports: &[f32], own: &[f32]) -> Percentile {
         // Where every column falls between grid samples is the same on every row, so it is
         // worked out once; rows are independent and are written in place in parallel.
-        let columns: Vec<(usize, usize, f32)> =
-            (0..self.w).map(|x| self.locate(x, self.w, self.cols)).collect();
+        let columns: Vec<(usize, usize, f32)> = (0..self.w)
+            .map(|x| self.locate(x, self.w, self.cols))
+            .collect();
         let mut level = vec![0.0_f32; self.w * self.h];
         let mut support = vec![0.0_f32; self.w * self.h];
         level

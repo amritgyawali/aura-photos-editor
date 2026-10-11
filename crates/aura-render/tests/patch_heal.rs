@@ -19,6 +19,10 @@ fn operation() -> Edit {
         source_scale: 1.0,
         preserve_microtexture: false,
         texture_heal: false,
+        clean_ring_fit: false,
+        curved_heal: false,
+        heal_samples: Vec::new(),
+        texture_sources: Vec::new(),
         sensitivity: None,
         keep_dark_marks: false,
         texture: 1.0,
@@ -55,49 +59,254 @@ fn blemish(rgb: &mut [f32]) {
 }
 
 #[test]
-fn texture_heal_preserves_lighting_and_real_pores_across_exposure_levels() {
-    for exposure in [0.35, 1.0, 1.8] {
-        let clean: Vec<_> = surface().into_iter().map(|v| v * exposure).collect();
-        let mut damaged = clean.clone();
-        // A real donor pattern with a different low-frequency colour and light.
-        for y in 50..80 {
-            for x in 18..46 {
-                for c in 0..3 {
-                    damaged[(y * W + x) * 3 + c] +=
-                        (0.03 + (x as f32 - 32.0) * 0.002 + if x % 2 == 0 { 0.01 } else { -0.01 })
-                            * exposure;
-                }
+fn multiple_saved_texture_sources_replay_and_do_not_change_pixels_outside_the_heal() {
+    let mut damaged = surface();
+    blemish(&mut damaged);
+    let mut edit = operation();
+    edit.texture_heal = true;
+    edit.source_scale = 0.5;
+    edit.source = Some([0.25, 0.25]);
+    edit.texture_sources = vec![[0.25, 0.25], [0.75, 0.25], [0.25, 0.75]];
+    let mut first = damaged.clone();
+    apply(&mut first, W, W, std::slice::from_ref(&edit));
+    let saved: Edit = serde_json::from_str(&serde_json::to_string(&edit).unwrap()).unwrap();
+    let mut replay = damaged.clone();
+    apply(&mut replay, W, W, &[saved]);
+    assert_eq!(first, replay);
+    assert!(first[(64 * W + 64) * 3] > damaged[(64 * W + 64) * 3] + 0.1);
+    for y in 0..W {
+        for x in 0..W {
+            if (x as f32 - 64.0).hypot(y as f32 - 64.0) >= 7.0 {
+                assert_eq!(
+                    &first[(y * W + x) * 3..(y * W + x) * 3 + 3],
+                    &damaged[(y * W + x) * 3..(y * W + x) * 3 + 3]
+                );
             }
         }
-        blemish(&mut damaged);
-        let before = damaged.clone();
-        let mut edit = operation();
-        edit.texture_heal = true;
-        edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
-        let serialized = serde_json::to_string(&edit).unwrap();
-        let saved: Edit = serde_json::from_str(&serialized).unwrap();
-        apply(&mut damaged, W, W, std::slice::from_ref(&saved));
-        let mut replay = before.clone();
-        apply(&mut replay, W, W, &[saved]);
-        assert_eq!(damaged, replay, "saved heals must reproduce exactly");
-        let mean_error = (61..68)
-            .flat_map(|y| (61..68).map(move |x| (y * W + x) * 3))
-            .map(|i| damaged[i] - clean[i])
-            .sum::<f32>()
-            .abs()
-            / 49.0;
-        assert!(mean_error < 0.004 * exposure, "colour drift: {mean_error}");
-        let detail = (61..67)
-            .map(|x| (damaged[(64 * W + x + 1) * 3] - damaged[(64 * W + x) * 3]).abs())
-            .sum::<f32>()
-            / 6.0;
-        assert!(detail > 0.01 * exposure, "donor pores lost: {detail}");
-        assert!((damaged[(64 * W + 64) * 3] - clean[(64 * W + 64) * 3]).abs() < 0.02 * exposure);
-        for y in 0..W {
-            for x in 0..W {
-                if (x as f32 - 64.0).hypot(y as f32 - 64.0) >= 7.0 {
-                    let i = (y * W + x) * 3;
-                    assert_eq!(&damaged[i..i + 3], &before[i..i + 3]);
+    }
+    for points in [
+        vec![[0.2, 0.2]; 2],
+        vec![[0.2, 0.2]; 9],
+        vec![[f32::NAN, 0.2]; 3],
+    ] {
+        let mut invalid = edit.clone();
+        invalid.texture_sources = points;
+        assert!(retouch_tools::validate(&[invalid]).is_err());
+    }
+}
+
+#[test]
+fn saved_healthy_context_avoids_a_contaminated_rim_and_keeps_outside_pixels_exact() {
+    let clean = vec![0.4; W * W * 3];
+    let mut damaged = clean.clone();
+    blemish(&mut damaged);
+    for y in 52..=77 {
+        for x in 52..=77 {
+            let r = (x as f32 - 64.5).hypot(y as f32 - 64.5) / 7.0;
+            if (0.95..1.55).contains(&r) {
+                damaged[(y * W + x) * 3..(y * W + x) * 3 + 3].copy_from_slice(&[0.3, 0.15, 0.12]);
+            }
+        }
+    }
+    let mut edit = operation();
+    edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
+    edit.texture_heal = true;
+    edit.clean_ring_fit = true;
+    edit.curved_heal = true;
+    let mut legacy = damaged.clone();
+    apply(&mut legacy, W, W, std::slice::from_ref(&edit));
+    assert!((legacy[(64 * W + 64) * 3 + 1] - 0.4).abs() > 0.05);
+    edit.heal_samples = [1.8, 2.2, 2.7]
+        .into_iter()
+        .flat_map(|r| {
+            (0..32).map(move |n| {
+                let a = std::f32::consts::TAU * n as f32 / 32.0;
+                [r * a.cos(), r * a.sin()]
+            })
+        })
+        .collect();
+    let saved: Edit = serde_json::from_str(&serde_json::to_string(&edit).unwrap()).unwrap();
+    let mut repaired = damaged.clone();
+    apply(&mut repaired, W, W, std::slice::from_ref(&saved));
+    for y in 62..=66 {
+        for x in 62..=66 {
+            for c in 0..3 {
+                assert!((repaired[(y * W + x) * 3 + c] - 0.4).abs() < 0.002);
+            }
+        }
+    }
+    for y in 0..W {
+        for x in 0..W {
+            if (x as f32 - 64.0).hypot(y as f32 - 64.0) >= 7.0 {
+                assert_eq!(
+                    &repaired[(y * W + x) * 3..(y * W + x) * 3 + 3],
+                    &damaged[(y * W + x) * 3..(y * W + x) * 3 + 3]
+                );
+            }
+        }
+    }
+    let mut replay = damaged.clone();
+    apply(&mut replay, W, W, &[saved]);
+    assert_eq!(repaired, replay);
+}
+
+#[test]
+fn curved_heal_preserves_curved_illumination_instead_of_filling_a_flat_patch() {
+    let mut clean: Vec<f32> = (0..W * W)
+        .flat_map(|i| {
+            let x = ((i % W) as f32 - 64.0) / 7.0;
+            let y = ((i / W) as f32 - 64.0) / 7.0;
+            [
+                0.4 + 0.04 * x * x + 0.01 * y * y,
+                0.35 + 0.035 * x * x + 0.005 * y * y,
+                0.3 + 0.01 * x * x + 0.015 * y * y,
+            ]
+        })
+        .collect();
+    for y in 45..84 {
+        for x in 15..49 {
+            clean[(y * W + x) * 3..(y * W + x) * 3 + 3].copy_from_slice(&[0.3, 0.25, 0.2]);
+        }
+    }
+    let mut damaged = clean.clone();
+    blemish(&mut damaged);
+    let mut edit = operation();
+    edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
+    edit.texture_heal = true;
+    edit.clean_ring_fit = true;
+    let mut flat = damaged.clone();
+    apply(&mut flat, W, W, std::slice::from_ref(&edit));
+    assert!(
+        (flat[(64 * W + 64) * 3] - clean[(64 * W + 64) * 3]).abs() > 0.02,
+        "flat-fit negative control must flatten the curved illumination"
+    );
+    edit.curved_heal = true;
+    let saved: Edit = serde_json::from_str(&serde_json::to_string(&edit).unwrap()).unwrap();
+    let mut repaired = damaged.clone();
+    apply(&mut repaired, W, W, std::slice::from_ref(&saved));
+    for y in 62..=66 {
+        for x in 62..=66 {
+            for c in 0..3 {
+                let i = (y * W + x) * 3 + c;
+                assert!(
+                    (repaired[i] - clean[i]).abs() < 0.006,
+                    "curved light was flattened"
+                );
+            }
+        }
+    }
+    let mut replay = damaged.clone();
+    apply(&mut replay, W, W, &[saved]);
+    assert_eq!(repaired, replay);
+    for y in 0..W {
+        for x in 0..W {
+            if (x as f32 - 64.0).hypot(y as f32 - 64.0) >= 7.0 {
+                assert_eq!(
+                    &repaired[(y * W + x) * 3..(y * W + x) * 3 + 3],
+                    &damaged[(y * W + x) * 3..(y * W + x) * 3 + 3]
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn clean_ring_fit_removes_neighbor_contamination_without_changing_legacy_heals() {
+    let clean = vec![0.4; W * W * 3];
+    let mut damaged = clean.clone();
+    for y in 60..=68 {
+        for x in 53..=75 {
+            damaged[(y * W + x) * 3..(y * W + x) * 3 + 3].copy_from_slice(&[0.30, 0.20, 0.20]);
+        }
+    }
+    blemish(&mut damaged);
+    let mut edit = operation();
+    edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
+    edit.texture_heal = true;
+    let serialized = serde_json::to_string(&edit).unwrap();
+    assert!(!serialized.contains("cleanRingFit"));
+    let legacy: Edit = serde_json::from_str(&serialized).unwrap();
+    let mut old = damaged.clone();
+    apply(&mut old, W, W, &[legacy]);
+    assert!(
+        (old[(64 * W + 64) * 3 + 1] - 0.4).abs() > 0.01,
+        "negative control must retain ring contamination"
+    );
+    edit.clean_ring_fit = true;
+    let saved: Edit = serde_json::from_str(&serde_json::to_string(&edit).unwrap()).unwrap();
+    let mut healed = damaged.clone();
+    apply(&mut healed, W, W, std::slice::from_ref(&saved));
+    let mut replay = damaged.clone();
+    apply(&mut replay, W, W, &[saved]);
+    assert_eq!(healed, replay);
+    for channel in 0..3 {
+        assert!(
+            (healed[(64 * W + 64) * 3 + channel] - 0.4).abs() < 0.005,
+            "neighboring acne contaminated the repair"
+        );
+    }
+    for y in 0..W {
+        for x in 0..W {
+            if (x as f32 - 64.0).hypot(y as f32 - 64.0) >= 7.0 {
+                assert_eq!(
+                    &healed[(y * W + x) * 3..(y * W + x) * 3 + 3],
+                    &damaged[(y * W + x) * 3..(y * W + x) * 3 + 3]
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn texture_heal_preserves_lighting_and_real_pores_across_exposure_levels() {
+    for clean_ring_fit in [false, true] {
+        for exposure in [0.35, 1.0, 1.8] {
+            let clean: Vec<_> = surface().into_iter().map(|v| v * exposure).collect();
+            let mut damaged = clean.clone();
+            // A real donor pattern with a different low-frequency colour and light.
+            for y in 50..80 {
+                for x in 18..46 {
+                    for c in 0..3 {
+                        damaged[(y * W + x) * 3 + c] += (0.03
+                            + (x as f32 - 32.0) * 0.002
+                            + if x % 2 == 0 { 0.01 } else { -0.01 })
+                            * exposure;
+                    }
+                }
+            }
+            blemish(&mut damaged);
+            let before = damaged.clone();
+            let mut edit = operation();
+            edit.texture_heal = true;
+            edit.clean_ring_fit = clean_ring_fit;
+            edit.source = Some([32.5 / W as f32, 64.5 / W as f32]);
+            let serialized = serde_json::to_string(&edit).unwrap();
+            let saved: Edit = serde_json::from_str(&serialized).unwrap();
+            apply(&mut damaged, W, W, std::slice::from_ref(&saved));
+            let mut replay = before.clone();
+            apply(&mut replay, W, W, &[saved]);
+            assert_eq!(damaged, replay, "saved heals must reproduce exactly");
+            let mean_error = (61..68)
+                .flat_map(|y| (61..68).map(move |x| (y * W + x) * 3))
+                .map(|i| damaged[i] - clean[i])
+                .sum::<f32>()
+                .abs()
+                / 49.0;
+            assert!(mean_error < 0.004 * exposure, "colour drift: {mean_error}");
+            let detail = (61..67)
+                .map(|x| (damaged[(64 * W + x + 1) * 3] - damaged[(64 * W + x) * 3]).abs())
+                .sum::<f32>()
+                / 6.0;
+            assert!(detail > 0.01 * exposure, "donor pores lost: {detail}");
+            assert!(
+                (damaged[(64 * W + 64) * 3] - clean[(64 * W + 64) * 3]).abs() < 0.02 * exposure
+            );
+            for y in 0..W {
+                for x in 0..W {
+                    if (x as f32 - 64.0).hypot(y as f32 - 64.0) >= 7.0 {
+                        let i = (y * W + x) * 3;
+                        assert_eq!(&damaged[i..i + 3], &before[i..i + 3]);
+                    }
                 }
             }
         }
