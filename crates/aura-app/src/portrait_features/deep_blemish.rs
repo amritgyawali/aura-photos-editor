@@ -1288,6 +1288,7 @@ pub(crate) fn frequency_heal(
     // under it stays, and the texture graft restores what the repair cost.
     edit.texture = 0.25;
     edit.sensitivity = Some(settings.blemish_sensitivity.clamp(0.0, 1.0));
+    edit.repair_passes = (settings.cleanup_passes != 2).then_some(settings.cleanup_passes);
     edit.keep_dark_marks = !settings.remove_dark_marks;
     Some(edit)
 }

@@ -1447,6 +1447,34 @@ async fn cloud_spend(state: State<'_, AppState>, project_id: String) -> IpcResul
 }
 
 #[tauri::command]
+async fn internal_ai_status(
+    state: State<'_, AppState>,
+    refresh: Option<bool>,
+) -> IpcResult<aura_app::internal_ai::Status> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::internal_ai::initialize(&app, refresh.unwrap_or(false)).map_err(Into::into)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn internal_ai_feedback(
+    state: State<'_, AppState>,
+    project_id: String,
+    call_id: String,
+    accepted: bool,
+) -> IpcResult<()> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::internal_ai::feedback(&app, &project_id, &call_id, accepted).map_err(Into::into)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn cloud_status(state: State<'_, AppState>) -> IpcResult<CloudStatusDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::cloud_status(&app))
@@ -3601,6 +3629,17 @@ async fn photo_original(
 }
 
 #[tauri::command]
+async fn native_retouch_blemish_review(
+    state: State<'_, AppState>,
+    input: aura_app::blemish_review::Input,
+) -> IpcResult<aura_app::blemish_review::Report> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::blemish_review::inspect(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn native_retouch_draft_preview(
     state: State<'_, AppState>,
     input: aura_app::native_retouch::DraftInput,
@@ -3750,6 +3789,12 @@ fn main() {
             }
             // The learned masking models load while the window opens. ADR-0103.
             aura_app::local_mask_commands::warm_up();
+            let ai_state = app.state::<AppState>().inner().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(error) = aura_app::internal_ai::initialize(&ai_state, false) {
+                    tracing::warn!(target: "internal_ai", code = error.code.0, "Internal AI configuration could not be loaded");
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -3767,6 +3812,7 @@ fn main() {
             sync_settings,
             pick_white_balance,
             native_retouch_edit,
+            native_retouch_blemish_review,
             native_retouch_selection_preview,
             native_retouch_saved_selection,
             local_masks,
@@ -3943,6 +3989,8 @@ fn main() {
             cloud_calls,
             cloud_spend,
             cloud_status,
+            internal_ai_status,
+            internal_ai_feedback,
             develop_status,
             dismiss_flag,
             edit_mask,

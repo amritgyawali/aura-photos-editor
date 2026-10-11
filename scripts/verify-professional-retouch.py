@@ -53,9 +53,12 @@ def main():
     parser.add_argument('--resume', action='store_true', help='the collection already holds the portrait')
     parser.add_argument('--retouch-only', action='store_true', help='reset the automatic global edit first')
     parser.add_argument('--acne-only', action='store_true', help='preserve detail and run only blemish repair')
+    parser.add_argument('--detailed-skin', action='store_true', help='use the bounded four-pass detailed cleanup and review preset')
     parser.add_argument('--skin-cleanup', action='store_true', help='blemish repair plus adjustable pore refinement')
     parser.add_argument('--body-only-photo', action='store_true', help='verify visible body skin on a photo with no detectable face')
     args = parser.parse_args()
+    if args.detailed_skin:
+        args.skin_cleanup = True
     collection = args.collection
     args.output.mkdir(parents=True, exist_ok=True)
     original_hash = hashlib.sha256(args.source.read_bytes()).hexdigest()
@@ -105,7 +108,7 @@ def main():
             (args.output / 'reset-global.json').write_text(json.dumps(reset_global, indent=2), encoding='utf-8')
         page.screenshot(path=str(args.output / 'develop.png'))
         retouch.click()
-        preset = 'Skin cleanup \u00b7 refine pores' if args.skin_cleanup else ('Acne only \u00b7 preserve detail' if args.acne_only else 'Professional retouch')
+        preset = 'Detailed skin repair and review' if args.detailed_skin else ('Skin cleanup \u00b7 refine pores' if args.skin_cleanup else ('Acne only \u00b7 preserve detail' if args.acne_only else 'Professional retouch'))
         page.get_by_role('radio', name=preset, exact=True).check()
         expect(page.get_by_text('Frequency healing rebuilds the tone under each mark first')).to_be_visible()
         run = page.get_by_role('button', name='Auto retouch: Face + body skin' if args.acne_only or args.skin_cleanup else 'Auto retouch: Face', exact=True)
@@ -123,9 +126,12 @@ def main():
         (args.output / 'recipe.json').write_text(json.dumps(recipe, indent=2), encoding='utf-8')
         body = json.loads(recipe['body'])
         edits = body['studio_retouch_v1']
+        if args.detailed_skin:
+            repeated = [e for e in edits if e['tool'] in ('frequency_heal', 'acne_clear')]
+            assert repeated and all(e.get('repairPasses') == 4 for e in repeated)
         tools = [edit['tool'] for edit in edits]
         automatic = [edit for edit in edits if edit['id'].startswith('auto-portrait-v1-0-')]
-        heal = [edit for edit in edits if edit['tool'] == 'acne_clear']
+        heal = [edit for edit in edits if edit['tool'] in ('acne_clear', 'frequency_heal')]
         graft = [edit for edit in edits if edit['tool'] == 'texture_graft']
         finish = [edit for edit in edits if edit['id'].endswith('-surface-finish')]
         if args.body_only_photo:

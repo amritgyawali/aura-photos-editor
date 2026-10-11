@@ -471,6 +471,7 @@ fn base_edit(id: String, tool: Tool, region: [f32; 4], amount: f32) -> Edit {
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,

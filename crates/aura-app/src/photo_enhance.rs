@@ -21,7 +21,7 @@ pub fn enhance_photo(state: &AppState, input: &DevelopImageInput) -> IpcResult<R
 /// # Errors
 /// Returns a typed analysis, decode or recipe storage error.
 pub fn enhance_portrait(state: &AppState, input: &DevelopImageInput) -> IpcResult<RecipeDto> {
-    crate::smart_edit::run(state, input, false)
+    crate::internal_ai::retouch(state, input)
 }
 
 #[cfg(test)]

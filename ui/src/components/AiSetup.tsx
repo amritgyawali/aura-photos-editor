@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../ipc/client';
 import type { AiModelDto, AiProviderDto, AiSetupStatusDto } from '../ipc/types';
-import { ProviderConnect } from './ProviderConnect';
+import { InternalAiStatus } from './InternalAiStatus';
 
 export type AiSetupProps = {
   /** Called once the question has been answered, either way. */
@@ -291,11 +291,7 @@ export function AiSetup({ onDone, onDismiss, onError }: AiSetupProps): JSX.Eleme
 
         {step === 'choose' ? (
           <>
-            <div className="ai-setup-actions" aria-label="Quick provider connections">
-              {providers.filter(p => p.id === 'openai' || p.id === 'anthropic').map(p =>
-                <ProviderConnect key={p.id} provider={p.id} label={p.id === 'openai' ? 'OpenAI / ChatGPT' : 'Claude'} disabled={busy} onOpeningChange={setBusy} onOpened={() => choose(p)} />
-              )}
-            </div>
+            <InternalAiStatus />
             <label className="ai-setup-search">
               Search
               <input
@@ -381,8 +377,6 @@ export function AiSetup({ onDone, onDismiss, onError }: AiSetupProps): JSX.Eleme
               </p>
             ) : null}
 
-            {selected.requiresKey && selected.keysUrl.length > 0 &&
-              <ProviderConnect provider={selected.id} label={selected.id === 'openai' ? 'OpenAI / ChatGPT' : selected.id === 'anthropic' ? 'Claude' : selected.label} disabled={busy} onOpeningChange={setBusy} />}
             {(selected.id === 'openai' || selected.id === 'anthropic') && <p className="lr-hint">
               Connect using a provider API key. A browser visit alone does not connect your account.
               ChatGPT and Claude chat subscriptions are separate from API access. Keys add editing advice;

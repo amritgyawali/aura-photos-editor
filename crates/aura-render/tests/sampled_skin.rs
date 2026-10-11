@@ -24,6 +24,7 @@ fn operation(tool: Tool) -> Edit {
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,

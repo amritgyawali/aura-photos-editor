@@ -604,6 +604,8 @@ export const asIpcError = (error: unknown): IpcError => {
 };
 
 export const api = {
+  internalAiStatus: (refresh = false): Promise<import('./internalAi').InternalAiStatus> => invoke('internal_ai_status', { refresh }),
+  internalAiFeedback: (projectId: string, callId: string, accepted: boolean): Promise<void> => invoke('internal_ai_feedback', { projectId, callId, accepted }),
   createProject: (input: CreateProjectInput): Promise<ProjectHandle> =>
     invoke<ProjectHandle>('create_project', { input }),
 

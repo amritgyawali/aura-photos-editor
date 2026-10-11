@@ -10,6 +10,7 @@ import { previewSource, useProgressivePreview } from '../../state/previewCache';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
 import { RetouchCanvas, type RetouchMode, type SkinInspectionView } from './RetouchCanvas';
 import { RetouchControls, validRetouch } from './RetouchControls';
+import { BlemishReview } from './BlemishReview';
 import { useRetouchDraftPreview } from './useRetouchDraftPreview';
 import { retouchCollection, type RetouchOutcome } from './batchRetouch';
 import './precision-retouch.css';
@@ -138,7 +139,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   });
   const chooseTool=(tool:RetouchTool)=>{
     if(selected&&dirty){setError('Apply or discard your changes before choosing another tool.');return;}
-    setSelected(null);change({id:'draft',tool,enabled:true,amount:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null});
+    setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null});
   };
   const chooseMode=(next:RetouchMode)=>{
     setMode(next);setSourceMode(false);setMaskView(false);
@@ -275,6 +276,17 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           </li>)}</ol>
         </details>
       </div>
+      <BlemishReview projectId={projectId} photoId={photoId} recipeHash={retouchRecipe?.recipeHash ?? ''}
+        selection={draft} imageSrc={previewSource(preview)} disabled={blocked} canPrepare={!dirty}
+        onChecking={value=>{if(mounted.current)setBusy(value);}}
+        onPrepare={region=>{
+          if(dirty){setError(draftNotice);return;}
+          const short=Math.min(preview?.width??1,preview?.height??1);
+          const radius=Math.min(.1,Math.max(.001,region[2]*(preview?.width??1)/short,region[3]*(preview?.height??1)/short));
+          setSelected(null);setMode('paint');setMaskView(false);setCompare(false);setCoverageView(false);setDirty(true);
+          setDraft({...blemishBrush(region),region,matte:draft.matte,skin:draft.skin,source:draft.skin?draft.source:null,amount:1,tone:1,texture:.25,repairPasses:4,
+            keepDarkMarks:draft.keepDarkMarks??false,mask:{strokes:[{erase:false,radius,opacity:1,points:[[region[0],region[1],1]]}]}});
+        }}/>
       <RetouchControls draft={draft} edits={edits} selected={selected} count={edits.length} disabled={blocked||!preview} sourceMode={sourceMode} live={live} dirty={dirty}
         onChange={change} onTool={chooseTool} onSourceMode={()=>{setSourceMode(v=>!v);setCompare(false);setMaskView(false);setSplit(false);}} onLive={setLive} onApply={apply}
         onSelectAll={()=>{setMode('ellipse');change({region:[.5,.5,1,1],mask:null,matte:null,feather:0,selection:{...draft.selection,inverted:false,gradient:null}});}}

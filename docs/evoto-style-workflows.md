@@ -110,3 +110,9 @@ Official product references used to identify workflow gaps:
 The new manual color/proportion tools and browser links were run in the native
 desktop app. See [their dated validation](evoto-tools-native-validation.md) for
 measured boundaries, history, full-resolution export, provider setup and limits.
+
+Internal provider routing now replaces the browser connection buttons. The
+configured local file, fallback, daily ratings, bounded native skin advice,
+four-pass healing and read-only residual review are documented in
+[Internal AI and native skin repair](internal-ai-workflow.md). These extensions
+do not establish complete Evoto parity or guaranteed complete blemish removal.

@@ -139,6 +139,9 @@ pub struct Edit {
     pub id: String,
     pub tool: Tool,
     pub enabled: bool,
+    /// Bounded repeated residual healing. Absent keeps the original two-pass rendering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repair_passes: Option<u8>,
     /// Center x/y and ellipse radii x/y in normalized full-frame coordinates.
     pub region: [f32; 4],
     /// Normalized donor/reference point; mandatory for clone and color matching.
@@ -404,6 +407,9 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || !(-1.0..=1.0).contains(&edit.tint)
             || edit.source.is_some_and(|p| !p.iter().all(|v| unit(*v)))
             || !valid_heal_support(edit)
+            || edit.repair_passes.is_some_and(|n| {
+                !(1..=4).contains(&n) || !matches!(edit.tool, Tool::AcneClear | Tool::FrequencyHeal)
+            })
             || edit
                 .target_color
                 .is_some_and(|rgb| !rgb.iter().all(|v| unit(*v)))

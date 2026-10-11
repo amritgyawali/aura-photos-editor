@@ -94,6 +94,9 @@ pub struct Report {
     /// The finishing choices this pass used; a later pass repeats them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<portrait_features::Options>,
+    /// Options explicitly supplied to a retouch run, including a no-face result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explicit_options: Option<bool>,
     /// How skin was found: by the bundled segmenter or by landmark geometry. ADR-0082.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub segmentation: Option<SegmentationSummary>,
@@ -334,6 +337,7 @@ pub fn plan_with_faces(
         steps: Vec::new(),
         scene: None,
         options: Some(options),
+        explicit_options: None,
         segmentation: None,
     };
     let mut groups = BTreeMap::new();
@@ -785,6 +789,13 @@ pub fn plan_with_faces(
             &mut features.finishing,
         ] {
             edits.retain(|e| !overridden.contains(&e.id));
+            for edit in edits
+                .iter_mut()
+                .filter(|e| matches!(e.tool, Tool::AcneClear | Tool::FrequencyHeal))
+            {
+                edit.repair_passes =
+                    (settings.cleanup_passes != 2).then_some(settings.cleanup_passes);
+            }
         }
         let used: usize = planned.iter().map(Vec::len).sum();
         if settings.deep_blemish_cleanup {
@@ -1128,6 +1139,7 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
@@ -1259,6 +1271,7 @@ fn plan_body(
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
@@ -2099,6 +2112,7 @@ fn face_extras(
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
@@ -2266,6 +2280,7 @@ fn plan_face_from_matte(
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
@@ -2369,6 +2384,7 @@ fn plan_body_matte(
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
@@ -2527,6 +2543,7 @@ fn hair_ops(
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
@@ -2580,6 +2597,7 @@ fn fabric_op(index: usize, matte: &MatteUse, face: &PortraitFace, settings: &Set
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
@@ -2622,6 +2640,7 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
@@ -3243,6 +3262,7 @@ mod tests {
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,

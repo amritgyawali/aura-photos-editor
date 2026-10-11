@@ -58,7 +58,7 @@ export type RetouchSettings = {
   aiSkinDetection: boolean; mainSubjectOnly: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean; protectEyeArea: boolean; protectNoseDetail: boolean;
   smoothing: number; texture: number; smoothingSize: number; toneEvenness: number; lightEvenness: number; microDodgeBurn: number;
   poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
-  blemishSensitivity: number; maxSpots: number; keepFreckles: boolean;
+  blemishSensitivity: number; cleanupPasses: number; maxSpots: number; keepFreckles: boolean;
   deepBlemishCleanup: boolean; removeDarkMarks: boolean;
   /** Frequency healing and the texture graft (ADR-0090); 0 is off. */
   frequencyHeal: number; textureGraft: number;
@@ -74,7 +74,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
   smoothing: .5, texture: .85, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
-  blemishSensitivity: .5, maxSpots: 12, keepFreckles: true,
+  blemishSensitivity: .5, cleanupPasses: 2, maxSpots: 12, keepFreckles: true,
   deepBlemishCleanup: false, removeDarkMarks: false,
   frequencyHeal: 0, textureGraft: 0,
   foreheadLines: .5, crowsFeet: .5, smileLines: .5, underEyeLines: .25, neckLines: 0,
@@ -107,6 +107,7 @@ export type NativeRetouchEdit = {
   texture: number; tone: number; warmth: number; tint: number;
   /** Chosen display sRGB, normalized 0..1. Required by explicit color tools. */
   targetColor?: [number, number, number] | null;
+  repairPasses?: number;
   mask?: BrushMask | null;
   skin?: SkinSettings | null;
   selection?: RetouchSelection | null;
@@ -135,7 +136,12 @@ export const blemishBrush = (region: NativeRetouchEdit['region']): NativeRetouch
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
 /** How sharp a preview is: the original's own resolution, or a screen-sized first look. */
 export type PreviewQuality = 'full' | 'fast';
+export type BlemishReview = {
+  recipeHash: string; width: number; height: number;
+  review: { regions: { region: [number, number, number, number]; pixels: number }[]; measuredAreas: number; selectedMarkPixels: number };
+};
 export const nativeRetouch = {
+  review: (projectId: string, photoId: string, recipeHash: string, selection: NativeRetouchEdit, quality: PreviewQuality = 'full') => invoke<BlemishReview>('native_retouch_blemish_review',{input:{projectId,photoId,recipeHash,selection,quality}}),
   autoPortrait: (photoId: string) => invoke<RecipeDto>('enhance_portrait', { input: { photoId } }),
   autoRetouch: (projectId: string, photoId: string, options: AutoRetouchOptions, global = false) => invoke<RecipeDto>('auto_retouch', { input: { projectId, photoId, global, options } }),
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),

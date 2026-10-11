@@ -14,6 +14,7 @@ export function validRetouch(draft: NativeRetouchEdit): boolean {
     && Number.isFinite(draft.sourceScale ?? 1) && (draft.sourceScale ?? 1) >= .2 && (draft.sourceScale ?? 1) <= 1
     && !(draft.tool === 'patch_heal' && (draft.sourceScale ?? 1) !== 1 && !draft.source)
     && validRetouchSelection(draft)
+    && (draft.repairPasses == null || (Number.isInteger(draft.repairPasses) && draft.repairPasses >= 1 && draft.repairPasses <= 4 && ['acne_clear','frequency_heal'].includes(draft.tool)))
     && (!draft.targetColor || (draft.targetColor.length === 3 && draft.targetColor.every(v => Number.isFinite(v) && v >= 0 && v <= 1)))
     && (!['colorize', 'background_color'].includes(draft.tool) || Boolean(draft.targetColor))
     && !(draft.tool === 'reshape' && draft.selection?.inverted)
@@ -60,6 +61,9 @@ export function RetouchControls(props: Props) {
     </label>}
     {draft.tool === 'colorize' && <label>Color brightness ({(draft.warmth*4).toFixed(2)} stops)
       <input aria-label="Color brightness" type="range" min="-1" max="1" step=".01" value={draft.warmth} onChange={event=>onChange({warmth:Number(event.target.value)})}/>
+    </label>}
+    {['acne_clear','frequency_heal'].includes(draft.tool) && <label>Residual healing passes ({draft.repairPasses ?? 2})
+      <input aria-label="Residual healing passes" type="range" min="1" max="4" step="1" value={draft.repairPasses ?? 2} onChange={event=>onChange({repairPasses:Number(event.target.value)})}/>
     </label>}
     <label>Strength ({Math.round(draft.amount * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.amount} onChange={event => onChange({ amount: Number(event.target.value) })}/></label>
     {!draft.selection?.gradient && <label>Feather ({Math.round(draft.feather * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.feather} onChange={event => onChange({ feather: Number(event.target.value) })}/></label>}

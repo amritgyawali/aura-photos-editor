@@ -15,8 +15,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-// This bounds provider calls, never the number of photos processed or delivered.
-const MAX_AI_EDITS: usize = 600;
+// Only one background collection run owns the delivery queue at a time.
 static REQUESTS: Mutex<()> = Mutex::new(());
 static JOBS: Mutex<BTreeMap<String, JobSlot>> = Mutex::new(BTreeMap::new());
 struct JobSlot {
@@ -243,7 +242,11 @@ fn edit_one(
         let mut answer = answer?;
         // Run the portrait pass AFTER grading so its luminance selections use the exposure
         // being exported. It reads this photo's saved choices and protects manual work.
-        answer.recipe = crate::photo_enhance::enhance_portrait(state, &develop)?;
+        let cancel = JOBS
+            .lock()
+            .get(job)
+            .map_or_else(CancelToken::new, |slot| slot.cancel.clone());
+        answer.recipe = crate::internal_ai::retouch_with_cancel(state, &develop, &cancel)?;
         answer.reasons.push("Local portrait retouch evaluated with this photo's saved preferences. Applied and skipped corrections are recorded in its portrait report.".into());
         return Ok(EditedPhoto {
             photo_id: photo.to_owned(),
@@ -691,19 +694,38 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     }
 
     phase(job, "cloud", "Checking the configured vision provider.", 0);
+    if let Err(error) = crate::internal_ai::initialize(state, false) {
+        note(
+            job,
+            format!(
+                "Internal AI configuration refresh failed ({}); using saved provider settings or local editing.",
+                error.code.0
+            ),
+        );
+    }
+    crate::internal_ai::authorize_new_project(state, project)?;
     let policy = state.cloud_policy();
-    let checked = if !policy.project_enabled || policy.offline_studio_mode || policy.blur_faces {
-        None
-    } else {
-        crate::check_ai_key(state).ok()
-    };
-    let use_cloud = checked.as_ref().is_some_and(|c| c.ok);
+    let internal = state.cloud()?.has_internal_routes();
+    let checked =
+        if internal || !policy.project_enabled || policy.offline_studio_mode || policy.blur_faces {
+            None
+        } else {
+            crate::check_ai_key(state).ok()
+        };
+    let use_cloud = !policy.offline_studio_mode
+        && policy.project_enabled
+        && !policy.blur_faces
+        && (internal || checked.as_ref().is_some_and(|c| c.ok));
     if use_cloud {
         update(job, |s| {
-            s.model = checked
-                .as_ref()
-                .map(|c| c.model.clone())
-                .unwrap_or_default();
+            s.model = if internal {
+                "internal AI routing".to_string()
+            } else {
+                checked
+                    .as_ref()
+                    .map(|c| c.model.clone())
+                    .unwrap_or_default()
+            };
         });
     } else {
         update(job, |s| s.model = "local reference".into());
@@ -898,7 +920,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             project,
             photo,
             look,
-            use_cloud && look.is_none() && index < MAX_AI_EDITS,
+            use_cloud && look.is_none(),
         );
         if stopped(job) {
             return Ok(());
@@ -927,9 +949,6 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             }
         }
         update(job, |s| s.items_done = (index + 1) as u64);
-    }
-    if use_cloud && look.is_none() && targets.len() > MAX_AI_EDITS {
-        note(job, format!("Provider calls capped at {MAX_AI_EDITS}; ALL remaining photos received local adaptive edits and remain in the export."));
     }
     edits.close()?;
     if stopped(job) {

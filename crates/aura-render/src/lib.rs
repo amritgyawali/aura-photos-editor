@@ -98,6 +98,7 @@ pub mod contract {
 }
 
 pub mod bands;
+pub mod blemish_review;
 pub mod cleanup;
 pub mod colour;
 pub mod cpu;

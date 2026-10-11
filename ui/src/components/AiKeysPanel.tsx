@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../ipc/client';
-import { ProviderConnect } from './ProviderConnect';
+import { InternalAiStatus } from './InternalAiStatus';
 import type {
   AiProviderDto,
   AiSetupStatusDto,
@@ -154,6 +154,8 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ratings, setRatings] = useState<Record<string, string>>({});
+  const [ratingBusy, setRatingBusy] = useState<string | null>(null);
 
   const report = useCallback(
     (error: unknown) => {
@@ -337,12 +339,7 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
         </select>
       </label>
 
-      <div className="ai-keys-actions" aria-label="Quick provider connections">
-        <ProviderConnect provider="openai" label="OpenAI / ChatGPT" disabled={busy || checking} onOpeningChange={setBusy} onOpened={() => { setProvider('openai'); setKeyText(''); setEndpoint(''); setCheckResult(null); }} />
-        <ProviderConnect provider="anthropic" label="Claude" disabled={busy || checking} onOpeningChange={setBusy} onOpened={() => { setProvider('anthropic'); setKeyText(''); setEndpoint(''); setCheckResult(null); }} />
-      </div>
-      <p className="lr-hint">Create a provider API key in the browser, paste it here, save, and check.
-        Chat subscriptions and API access are separate. Opening the browser does not sign AURA in.</p>
+      <InternalAiStatus />
 
       {selected?.endpointEditable ?? provider === 'compat' ? (
         <label className="ai-keys-endpoint">
@@ -461,7 +458,19 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
       <h3>What the AI was asked</h3>
       <ul className="ai-keys-audit">
         {calls.map((call) => (
-          <li key={call.id}>{callSummary(call)}</li>
+          <li key={call.id}>{callSummary(call)}
+            {call.source === 'cloud' && (call.status === 'ok' || call.status === 'repaired') && projectId && <>
+              <button type="button" disabled={ratingBusy !== null} onClick={() => {
+                setRatingBusy(call.id);
+                void api.internalAiFeedback(projectId, call.id, true).then(() => setRatings(old => ({ ...old, [call.id]: 'Useful result saved' }))).catch(report).finally(() => setRatingBusy(null));
+              }}>Useful result</button>
+              <button type="button" disabled={ratingBusy !== null} onClick={() => {
+                setRatingBusy(call.id);
+                void api.internalAiFeedback(projectId, call.id, false).then(() => setRatings(old => ({ ...old, [call.id]: 'Needs improvement saved' }))).catch(report).finally(() => setRatingBusy(null));
+              }}>Needs improvement</button>
+              {ratings[call.id] && <span role="status">{ratings[call.id]}</span>}
+            </>}
+          </li>
         ))}
       </ul>
       {calls.length === 0 ? <p className="ai-keys-audit-empty">No AI decisions yet.</p> : null}

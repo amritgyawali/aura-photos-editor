@@ -53,6 +53,7 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['removeDarkMarks', 'Remove dark marks', 'toggle', 'Include compact dark spots in deep cleanup. This may also remove freckles or beauty marks; review the result.'],
     ['frequencyHeal', 'Frequency healing', 'unit', 'Runs first: rebuilds the tone under measured compact marks from nearby clean skin while retaining pore texture. Local donor repairs follow for remaining detected spots. Off at 0%.'],
     ['blemishSensitivity', 'Blemish sensitivity', 'unit', 'How small a departure still counts as a spot.'],
+    ['cleanupPasses', 'Residual healing passes', 'count', 'Re-check compact marks after each measured heal. Bounded to four passes; inspect texture and protected features after cleanup.'],
     ['maxSpots', 'Most spots per face', 'count', 'Raise this for dense acne. Larger passes take longer; remaining measured candidates are reported for review.'],
     ['keepFreckles', 'Keep freckles', 'toggle', 'A field of many small marks is treated as freckles and kept.'],
   ]],
@@ -109,6 +110,7 @@ const ACNE_ONLY: Partial<RetouchSettings> = { deepBlemishCleanup: true, removeDa
 export const PRESETS: Preset[] = [
   ['natural', 'Natural', {}],
   ['acne_only', 'Acne only · preserve detail', ACNE_ONLY],
+  ['detailed_skin', 'Detailed skin repair and review', { ...ACNE_ONLY, cleanupPasses: 4, blemishSensitivity: 1, poreRefine: .4, smoothing: .25, bodySmoothing: .25, texture: .85 }],
   ['skin_cleanup', 'Skin cleanup · refine pores', { ...ACNE_ONLY, smoothing: .3, texture: .85, poreRefine: .3, redness: .15, bodySmoothing: .25 }],
   ['acne', 'Deep acne cleanup', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 512, blemishSensitivity: .9, smoothing: .8, texture: .85, toneEvenness: .7, microDodgeBurn: .65, poreRefine: .3, shine: .85, hairDetail: .4, hairShine: .2 }],
   ['pro', 'Professional retouch', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 512, blemishSensitivity: .8, frequencyHeal: 1, textureGraft: .8, smoothing: .35, texture: .9, toneEvenness: .6, microDodgeBurn: .55, shine: .7, hairDetail: .4, hairShine: .2 }],
@@ -143,7 +145,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollec
   const choose = ([id, , values, intensity]: Preset) => {
     setPreset(id);
     setOptions({ ...options, intensity: intensity ?? 1, settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values },
-      ...(['acne_only', 'skin_cleanup'].includes(id) ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face_and_body' as const } : {}),
+      ...(['acne_only', 'skin_cleanup', 'detailed_skin'].includes(id) ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face_and_body' as const } : {}),
     });
   };
   return <fieldset className="auto-retouch-settings" disabled={disabled}>
@@ -193,7 +195,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollec
           </label>;
         }
         const n = Number(value);
-        const [min, max, scale] = kind === 'signed' ? [-100, 100, 100] : kind === 'count' ? [1, settings.deepBlemishCleanup ? 900 : 24, 1] : [0, 100, 100];
+        const [min, max, scale] = kind === 'signed' ? [-100, 100, 100] : kind === 'count' ? [1, key === 'cleanupPasses' ? 4 : settings.deepBlemishCleanup ? 900 : 24, 1] : [0, 100, 100];
         const shown = kind === 'count' ? String(n) : kind === 'signed' ? `${n > 0 ? '+' : ''}${Math.round(n * 100)}` : percent(n);
         return <label key={key} title={hint}>{name}: {shown}
           <input type="range" min={min} max={max} step={1} value={Math.round(n * scale)} aria-label={name}
