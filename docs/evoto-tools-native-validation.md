@@ -78,6 +78,17 @@ not represented as successful MSVC validation.
 
 Local photos, exports, profiles, catalogues, raw logs and executables are excluded
 from Git. Evidence is under `E:\aura-native-evoto-20261011\native-validation`.
+
+After validation, a backup copy of the previous local executable on D: did not
+match its source hash, so `app/aura-desktop.exe` was left untouched. The validated
+executable remains in the working C: build cache. A separate SQLite snapshot of
+the working catalogue passed integrity checks and matched all six saved recipes.
+The updated native app was then launched with that working catalogue/profile on
+port 9359; its native recipe reads matched all six saved hashes. The local
+`output/evoto-feature-work/Open updated AURA working catalog.ps1` launcher checks
+the validated executable hash before opening this catalogue. This recovery does
+not establish preservation of the old unsaved UI draft.
+
 See [the workflow and gaps](evoto-style-workflows.md) and
 [the published route inventory](evoto-feature-inventory.json). All commercial
 features, varied-photo quality, provider responses and cross-platform CI remain
