@@ -1360,6 +1360,13 @@ async fn plan_geometry(
 
 // PHASE-04, extended for the provider catalogue and the first-run setup screen.
 #[tauri::command]
+async fn open_ai_provider_page(provider: String) -> IpcResult<String> {
+    tauri::async_runtime::spawn_blocking(move || aura_app::provider_links::open_key_page(&provider))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn list_ai_providers(state: State<'_, AppState>) -> IpcResult<Vec<AiProviderDto>> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::list_ai_providers(&app))
@@ -4003,6 +4010,7 @@ fn main() {
             score_emotion,
             segment_story,
             list_ai_providers,
+            open_ai_provider_page,
             save_ai_setup,
             set_ai_key,
             skip_ai_setup,

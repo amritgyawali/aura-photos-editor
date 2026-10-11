@@ -2,6 +2,7 @@ import { MAX_NATIVE_RETOUCH_EDITS, DEFAULT_SKIN, isSampledSkinTool, needsRetouch
 import { RetouchSelectionControls } from './RetouchSelectionControls';
 import { RetouchPresets } from './RetouchPresets';
 import { RetouchSkinSelection } from './RetouchSkinSelection';
+import { colorHex, colorRgb } from './retouchColor';
 
 export function validRetouch(draft: NativeRetouchEdit): boolean {
   return [...draft.region, draft.amount, draft.feather, draft.radius, draft.texture, draft.tone, draft.warmth, draft.tint, ...(draft.source ?? [])].every(Number.isFinite)
@@ -13,6 +14,9 @@ export function validRetouch(draft: NativeRetouchEdit): boolean {
     && Number.isFinite(draft.sourceScale ?? 1) && (draft.sourceScale ?? 1) >= .2 && (draft.sourceScale ?? 1) <= 1
     && !(draft.tool === 'patch_heal' && (draft.sourceScale ?? 1) !== 1 && !draft.source)
     && validRetouchSelection(draft)
+    && (!draft.targetColor || (draft.targetColor.length === 3 && draft.targetColor.every(v => Number.isFinite(v) && v >= 0 && v <= 1)))
+    && (!['colorize', 'background_color'].includes(draft.tool) || Boolean(draft.targetColor))
+    && !(draft.tool === 'reshape' && draft.selection?.inverted)
     // A blemish brush with nothing painted would save an operation that does nothing.
     && !(draft.tool === 'acne_clear' && draft.mask && draft.mask.strokes.length === 0)
     && (!draft.skin || (Number.isFinite(draft.skin.tolerance) && draft.skin.tolerance >= .015 && draft.skin.tolerance <= .3
@@ -45,6 +49,18 @@ export function RetouchControls(props: Props) {
       </optgroup>)}
     </select></label>
     <p className="lr-hint">{info[3]}</p>
+    {draft.tool === 'reshape' && <>
+      {(['warmth','tint'] as const).map((key,index) => <label key={key}>{index ? 'Local height' : 'Local width'} ({Math.round(draft[key]*25)}%)
+        <input type="range" aria-label={index ? 'Local height' : 'Local width'} min="-1" max="1" step=".01" value={draft[key]} onChange={event=>onChange({[key]:Number(event.target.value)})}/>
+      </label>)}
+      <p className="lr-hint">Choose an ellipse around the area. The warp tapers to zero at its boundary. Undo restores the source geometry.</p>
+    </>}
+    {['colorize', 'background_color'].includes(draft.tool) && <label>Target color
+      <input type="color" aria-label="Target color" value={colorHex(draft.targetColor ?? [0.45,0.2,0.1])} onChange={event => onChange({targetColor:colorRgb(event.target.value)})}/>
+    </label>}
+    {draft.tool === 'colorize' && <label>Color brightness ({(draft.warmth*4).toFixed(2)} stops)
+      <input aria-label="Color brightness" type="range" min="-1" max="1" step=".01" value={draft.warmth} onChange={event=>onChange({warmth:Number(event.target.value)})}/>
+    </label>}
     <label>Strength ({Math.round(draft.amount * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.amount} onChange={event => onChange({ amount: Number(event.target.value) })}/></label>
     {!draft.selection?.gradient && <label>Feather ({Math.round(draft.feather * 100)}%)<input type="range" min="0" max="1" step="0.01" value={draft.feather} onChange={event => onChange({ feather: Number(event.target.value) })}/></label>}
     <div className="retouch-apply-bar">
@@ -66,6 +82,7 @@ export function RetouchControls(props: Props) {
     </details>}
     <RetouchSkinSelection draft={draft} edits={props.edits} onChange={onChange}/>
     <RetouchSelectionControls draft={draft} onChange={onChange}/>
+    {draft.tool === 'reshape' && draft.selection?.inverted && <p role="status">Local proportions changes the selected ellipse. Turn off Invert selection before applying.</p>}
     <button type="button" onClick={props.onSelectAll}>Select entire photo</button>
     <details open><summary>{draft.mask || draft.selection?.gradient ? 'Clone anchor / keyboard target' : 'Target region'}</summary>
       {['Center X (%)', 'Center Y (%)', 'Horizontal radius (%)', 'Vertical radius (%)'].map((label, index) => <label key={label}>{label}

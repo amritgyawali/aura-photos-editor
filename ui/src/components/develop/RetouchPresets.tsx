@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { freshRetouch, RETOUCH_TOOLS, type NativeRetouchEdit } from '../../ipc/nativeRetouch';
 
 const KEY = 'aura.retouch.presets.v1';
-const FIELDS = ['tool', 'amount', 'feather', 'radius', 'texture', 'tone', 'warmth', 'tint', 'skin', 'preserveMicrotexture', 'textureHeal', 'sensitivity', 'keepDarkMarks'] as const;
+const FIELDS = ['tool', 'amount', 'feather', 'radius', 'texture', 'tone', 'warmth', 'tint', 'skin', 'preserveMicrotexture', 'textureHeal', 'sensitivity', 'keepDarkMarks', 'targetColor'] as const;
 type Settings = Pick<NativeRetouchEdit, typeof FIELDS[number]>;
 type Preset = { name: string; settings: Settings };
 
@@ -22,6 +22,8 @@ export function parseRetouchPresets(value: string | null): Preset[] {
       || (s.preserveMicrotexture !== undefined && typeof s.preserveMicrotexture !== 'boolean')
       || (s.keepDarkMarks !== undefined && typeof s.keepDarkMarks !== 'boolean')
       || (s.sensitivity != null && (!Number.isFinite(s.sensitivity) || s.sensitivity < 0 || s.sensitivity > 1))
+      || (s.targetColor != null && (!Array.isArray(s.targetColor) || s.targetColor.length !== 3 || !s.targetColor.every(v => Number.isFinite(v) && v >= 0 && v <= 1)))
+      || (['colorize','background_color'].includes(s.tool) && s.targetColor == null)
       || (s.skin && (!Number.isFinite(s.skin.tolerance) || s.skin.tolerance < .015 || s.skin.tolerance > .3
         || !Number.isFinite(s.skin.edgeProtection) || s.skin.edgeProtection < 0 || s.skin.edgeProtection > 1))) {
       throw new Error('Saved retouch presets contain invalid settings.');

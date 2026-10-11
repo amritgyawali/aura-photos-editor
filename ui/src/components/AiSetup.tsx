@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../ipc/client';
 import type { AiModelDto, AiProviderDto, AiSetupStatusDto } from '../ipc/types';
+import { ProviderConnect } from './ProviderConnect';
 
 export type AiSetupProps = {
   /** Called once the question has been answered, either way. */
@@ -30,7 +31,7 @@ export function filterProviders(
     return providers;
   }
   return providers.filter((provider) =>
-    `${provider.id} ${provider.label} ${provider.blurb}`.toLowerCase().includes(wanted),
+    `${provider.id} ${provider.label} ${provider.blurb} ${provider.id === 'openai' ? 'chatgpt chat gpt' : ''}`.toLowerCase().includes(wanted),
   );
 }
 
@@ -140,13 +141,11 @@ export function setupHeadline(status: AiSetupStatusDto | null): string {
  * models when they want to name them, and a Check button that spends one round
  * trip proving the key works before anybody starts a four-thousand-frame run.
  *
- * Three things this screen will not do. It does not require an answer - "not now"
+ * It does not require an answer - "not now"
  * is a first-class button and the product is complete without a key. It does not
  * read a key back, ever; the field is cleared the moment it is saved and there is
- * no command that could return one. And it does not open a browser: a vendor's
- * key page is printed as text to be copied, because a desktop application that
- * launches a browser from a settings screen is a desktop application that can be
- * talked into launching one somewhere else.
+ * no command that could return one. Browser buttons open only published provider
+ * key dashboards through the native shell.
  */
 export function AiSetup({ onDone, onDismiss, onError }: AiSetupProps): JSX.Element {
   const [providers, setProviders] = useState<AiProviderDto[]>([]);
@@ -292,6 +291,11 @@ export function AiSetup({ onDone, onDismiss, onError }: AiSetupProps): JSX.Eleme
 
         {step === 'choose' ? (
           <>
+            <div className="ai-setup-actions" aria-label="Quick provider connections">
+              {providers.filter(p => p.id === 'openai' || p.id === 'anthropic').map(p =>
+                <ProviderConnect key={p.id} provider={p.id} label={p.id === 'openai' ? 'OpenAI / ChatGPT' : 'Claude'} disabled={busy} onOpeningChange={setBusy} onOpened={() => choose(p)} />
+              )}
+            </div>
             <label className="ai-setup-search">
               Search
               <input
@@ -308,6 +312,7 @@ export function AiSetup({ onDone, onDismiss, onError }: AiSetupProps): JSX.Eleme
                   <button
                     type="button"
                     className="ai-setup-card"
+                    disabled={busy}
                     onClick={() => choose(provider)}
                     aria-label={`Choose ${provider.label}`}
                   >
@@ -375,6 +380,14 @@ export function AiSetup({ onDone, onDismiss, onError }: AiSetupProps): JSX.Eleme
                 Keys come from <code>{selected.keysUrl}</code>
               </p>
             ) : null}
+
+            {selected.requiresKey && selected.keysUrl.length > 0 &&
+              <ProviderConnect provider={selected.id} label={selected.id === 'openai' ? 'OpenAI / ChatGPT' : selected.id === 'anthropic' ? 'Claude' : selected.label} disabled={busy} onOpeningChange={setBusy} />}
+            {(selected.id === 'openai' || selected.id === 'anthropic') && <p className="lr-hint">
+              Connect using a provider API key. A browser visit alone does not connect your account.
+              ChatGPT and Claude chat subscriptions are separate from API access. Keys add editing advice;
+              AURA&apos;s native tools render the photograph.
+            </p>}
 
             {selected.endpointEditable ? (
               <label className="ai-setup-endpoint">

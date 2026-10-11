@@ -3,6 +3,16 @@ import { expect, it, vi } from 'vitest';
 import { freshRetouch } from '../../ipc/nativeRetouch';
 import { RetouchSkinSelection } from './RetouchSkinSelection';
 
+it('reuses the hair selection for color without copying an automatic repair', () => {
+  const change = vi.fn();
+  const hair = {...freshRetouch(),matte:'auto-portrait-v20-0-hair',id:'hair'};
+  render(<RetouchSkinSelection draft={{...freshRetouch(),tool:'colorize',targetColor:[1,0,0]}} edits={[hair]} onChange={change}/>);
+  fireEvent.change(screen.getByLabelText('Use detected region'), {target:{value:hair.matte}});
+  expect(change).toHaveBeenCalledWith(expect.objectContaining({matte:hair.matte}));
+  expect(change.mock.calls[0]?.[0]).not.toHaveProperty('tool');
+  expect(change.mock.calls[0]?.[0]).not.toHaveProperty('targetColor');
+});
+
 it('offers the nose-inclusive blemish selection for the correct person',()=>{
   const edit={...freshRetouch(),id:'clear',matte:'auto-portrait-v1-2-blemish-surface-blemish-feature-safe'};
   const change=vi.fn();

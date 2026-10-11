@@ -30,6 +30,9 @@ export const RETOUCH_TOOLS = [
   ['backdrop', 'Backdrop smoothing', 'Cleanup', 'Smooths a selected backdrop patch. Avoid subject edges.'],
   ['glare', 'Glare softening', 'Details', 'Reduces bright reflections; cannot reconstruct detail hidden by glare.'],
   ['makeup', 'Local cosmetic tint', 'Color', 'Applies a controlled warm or magenta tint to a chosen region.'],
+  ['colorize', 'Hair, clothes & makeup color', 'Color', 'Choose any color, then select hair, clothing, lips or another area. Preserves the photographed light and fine detail. Reuse a saved hair or clothes selection, or paint and refine your own.'],
+  ['background_color', 'Solid background color', 'Cleanup', 'Replace only the selected background with a chosen solid color. Use a saved background selection or paint it; inspect subject edges before applying.'],
+  ['reshape', 'Local face & body proportions', 'Shape', 'Explicitly change width and height inside an ellipse. Use on a face, nose, waist, arm or leg. This changes photographed structure and is never part of automatic skin cleanup. Start with small changes and inspect the edges.'],
 ] as const;
 export type RetouchTool = typeof RETOUCH_TOOLS[number][0];
 export type BrushPoint = [number, number, number];
@@ -102,6 +105,8 @@ export type NativeRetouchEdit = {
   /** Frequency healing and acne clear: leave marks that are darker but not redder or browner. */
   keepDarkMarks?: boolean;
   texture: number; tone: number; warmth: number; tint: number;
+  /** Chosen display sRGB, normalized 0..1. Required by explicit color tools. */
+  targetColor?: [number, number, number] | null;
   mask?: BrushMask | null;
   skin?: SkinSettings | null;
   selection?: RetouchSelection | null;
