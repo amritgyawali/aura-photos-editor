@@ -18,7 +18,7 @@
 //! it stays that way from the first stage to the output transform. A `f16` working buffer
 //! would round twice per stage and eat the parity tolerance the gate is written against.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
 
 use aura_core::clock::Clock;
 use aura_core::errors::render::tiled_fallback;
@@ -126,6 +126,8 @@ pub struct CpuEngine {
     working_bytes: u64,
     /// Buffers before and after the retouch stack, shared across renders. ADR-0098.
     checkpoints: Option<crate::retouch_cache::Checkpoints>,
+    /// Shared with retouch planning by the application, before decoding large frames.
+    image_work_gate: Option<Arc<Mutex<()>>>,
 }
 
 impl CpuEngine {
@@ -139,6 +141,7 @@ impl CpuEngine {
         recipe: &Recipe,
         only: Option<&str>,
     ) -> AuraResult<(Vec<u8>, u32, u32)> {
+        let _image_work = self.image_work();
         aura_recipe::schema::Validation::check(recipe)?;
         let edits = aura_recipe::retouch_tools::read(recipe)?;
         if only.is_some_and(|id| !edits.iter().any(|e| e.id == id)) {
@@ -187,6 +190,7 @@ impl CpuEngine {
         recipe: &Recipe,
         mask: &str,
     ) -> AuraResult<(Vec<u8>, u32, u32)> {
+        let _image_work = self.image_work();
         aura_recipe::schema::Validation::check(recipe)?;
         let mut prepared = recipe.clone();
         aura_recipe::retouch_tools::write(&mut prepared, &[])?;
@@ -224,6 +228,7 @@ impl CpuEngine {
         draft: &aura_recipe::retouch_tools::Edit,
         replace: Option<&str>,
     ) -> AuraResult<(Vec<u8>, u32, u32)> {
+        let _image_work = self.image_work();
         aura_recipe::schema::Validation::check(recipe)?;
         aura_recipe::retouch_tools::validate(std::slice::from_ref(draft))?;
         let mut prior = aura_recipe::retouch_tools::read(recipe)?;
@@ -282,6 +287,7 @@ impl CpuEngine {
             },
             working_bytes: DEFAULT_WORKING_BYTES,
             checkpoints: None,
+            image_work_gate: None,
         }
     }
 
@@ -292,6 +298,20 @@ impl CpuEngine {
     pub fn with_checkpoints(mut self, checkpoints: crate::retouch_cache::Checkpoints) -> Self {
         self.checkpoints = Some(checkpoints);
         self
+    }
+
+    /// Serialize decoding and rendering with other expensive image work in the same app.
+    /// The gate changes scheduling only; render keys and pixel calculations stay unchanged.
+    #[must_use]
+    pub fn with_image_work_gate(mut self, gate: Arc<Mutex<()>>) -> Self {
+        self.image_work_gate = Some(gate);
+        self
+    }
+
+    fn image_work(&self) -> Option<MutexGuard<'_, ()>> {
+        self.image_work_gate
+            .as_ref()
+            .map(|gate| gate.lock().unwrap_or_else(PoisonError::into_inner))
     }
 
     /// Override the working-buffer ceiling. Used by the tiling tests and by the phase 03
@@ -943,6 +963,17 @@ impl CpuEngine {
     /// An invalid recipe, or pixels the frame source cannot provide.
     pub fn render_live(&self, req: &RenderRequest) -> AuraResult<Option<RenderedImage>> {
         aura_recipe::schema::Validation::check(&req.recipe)?;
+        // A carried preview is optional. Keep the displayed frame while a full
+        // render or retouch plan owns the buffers, rather than queue more work.
+        let _image_work = if let Some(gate) = &self.image_work_gate {
+            match gate.try_lock() {
+                Ok(guard) => Some(guard),
+                Err(TryLockError::Poisoned(error)) => Some(error.into_inner()),
+                Err(TryLockError::WouldBlock) => return Ok(None),
+            }
+        } else {
+            None
+        };
         let Some(checkpoints) = &self.checkpoints else {
             return Ok(None);
         };
@@ -1157,6 +1188,7 @@ pub(crate) fn apply_mask_params(
 impl RenderService for CpuEngine {
     fn render(&self, req: RenderRequest) -> AuraResult<RenderedImage> {
         aura_recipe::schema::Validation::check(&req.recipe)?;
+        let _image_work = self.image_work();
         let frame = self.source.frame(&req.image_id, req.level)?;
 
         let mut image = if let Some(warning) = self.budget_warning(frame.pixels()) {
@@ -1235,6 +1267,99 @@ mod tests {
 
     fn engine(source: Arc<dyn FrameSource>) -> CpuEngine {
         CpuEngine::new(source, FixedClock::at(time::OffsetDateTime::UNIX_EPOCH))
+    }
+
+    #[derive(Debug)]
+    struct ObservedSource {
+        frame: Frame,
+        active: std::sync::atomic::AtomicUsize,
+        peak: std::sync::atomic::AtomicUsize,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl FrameSource for ObservedSource {
+        fn frame(&self, _image: &PhotoId, _level: RenderLevel) -> AuraResult<Frame> {
+            use std::sync::atomic::Ordering;
+            let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+            self.peak.fetch_max(active, Ordering::SeqCst);
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            std::thread::sleep(std::time::Duration::from_millis(30));
+            let frame = self.frame.clone();
+            self.active.fetch_sub(1, Ordering::SeqCst);
+            Ok(frame)
+        }
+    }
+
+    #[test]
+    fn a_shared_image_gate_serializes_decode_and_keeps_rendered_pixels_identical() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let frame = fixtures::ramp_frame(64, 48);
+        let source = Arc::new(ObservedSource {
+            frame: frame.clone(),
+            active: AtomicUsize::new(0),
+            peak: AtomicUsize::new(0),
+            calls: AtomicUsize::new(0),
+        });
+        let request = RenderRequest {
+            image_id: PhotoId::new(),
+            recipe: recipes::reference(),
+            level: RenderLevel::Full,
+            output: OutputSpec::default(),
+            purpose: RenderPurpose::Export,
+        };
+        let expected = engine(fixtures::StaticSource::shared(frame))
+            .render(request.clone())
+            .unwrap();
+        let gate = Arc::new(Mutex::new(()));
+        let start = Arc::new(std::sync::Barrier::new(3));
+        let workers: Vec<_> = (0..2)
+            .map(|_| {
+                let engine = engine(source.clone()).with_image_work_gate(Arc::clone(&gate));
+                let request = request.clone();
+                let start = Arc::clone(&start);
+                std::thread::spawn(move || {
+                    start.wait();
+                    engine.render(request).unwrap()
+                })
+            })
+            .collect();
+        start.wait();
+        for worker in workers {
+            let actual = worker.join().unwrap();
+            assert_eq!(actual.data, expected.data);
+            assert_eq!(actual.render_hash, expected.render_hash);
+        }
+        assert_eq!(source.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(source.peak.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_busy_image_gate_defers_carried_preview_without_decoding_another_frame() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let source = Arc::new(ObservedSource {
+            frame: fixtures::grey_frame(16, 16, 0.18),
+            active: AtomicUsize::new(0),
+            peak: AtomicUsize::new(0),
+            calls: AtomicUsize::new(0),
+        });
+        let gate = Arc::new(Mutex::new(()));
+        let engine = engine(source.clone())
+            .with_image_work_gate(Arc::clone(&gate))
+            .with_checkpoints(crate::retouch_cache::Checkpoints::new());
+        let request = RenderRequest {
+            image_id: PhotoId::new(),
+            recipe: recipes::neutral(recipes::FIXTURE_HASH, "Bench-01"),
+            level: RenderLevel::Full,
+            output: OutputSpec::default(),
+            purpose: RenderPurpose::Export,
+        };
+        engine.render(request.clone()).unwrap();
+        let held = gate.lock().unwrap();
+        assert!(engine.render_live(&request).unwrap().is_none());
+        assert_eq!(source.calls.load(Ordering::SeqCst), 1);
+        drop(held);
+        assert!(engine.render_live(&request).unwrap().is_some());
+        assert_eq!(source.calls.load(Ordering::SeqCst), 2);
     }
 
     #[test]

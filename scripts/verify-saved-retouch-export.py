@@ -21,6 +21,8 @@ parser.add_argument('output', type=Path)
 parser.add_argument('--collection', required=True)
 parser.add_argument('--port', type=int, default=9363)
 parser.add_argument('--under-eye-finishing', action='store_true', help='check the protected lid cores separately from deliberately corrected under-eye skin')
+parser.add_argument('--protected-rect', type=float, nargs=4, action='append', default=[],
+                    help='independently inspected normalized feature rectangle that must stay pixel-identical')
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
 original_hash = hashlib.sha256(args.source.read_bytes()).hexdigest()
@@ -73,6 +75,16 @@ with sync_playwright() as p:
     yy, xx = np.mgrid[:h, :w]
     checks = []
     under_eye_checks = []
+    extra_checks = []
+    for index, rect in enumerate(args.protected_rect):
+        l, t, r, bottom = rect
+        assert all(math.isfinite(value) for value in rect) and 0 <= l < r <= 1 and 0 <= t < bottom <= 1
+        x0, y0, x1, y1 = round(l * w), round(t * h), round(r * w), round(bottom * h)
+        assert x0 < x1 and y0 < y1, 'Protected rectangle contains no pixels'
+        change = int(np.max(np.abs(b[y0:y1, x0:x1] - a[y0:y1, x0:x1])))
+        extra_checks.append({'region': 'supplied_protected_rectangle_' + str(index + 1),
+                             'bounds': rect, 'pixels': (x1-x0) * (y1-y0), 'max_channel_change': change})
+        assert change == 0, extra_checks[-1]
     faces = body.get('studio_portrait_auto_v1', {}).get('faces', [])
     for index, face in enumerate(faces):
         left, right, nose, mouth_left, mouth_right = np.asarray(face['landmarks']) * [w, h]
@@ -122,5 +134,6 @@ with sync_playwright() as p:
     report['outside_selection'] = outside_selection
     report['under_eye_finishing'] = args.under_eye_finishing
     report['under_eye_skin_checks'] = under_eye_checks
+    report['extra_feature_checks'] = extra_checks
     (args.output / 'verification.json').write_text(json.dumps(report, indent=2), encoding='utf8')
-    print(json.dumps({'verified': True, 'dimensions': [w, h], 'unchanged_feature_regions': len(checks), 'original_unchanged': True}), flush=True)
+    print(json.dumps({'verified': True, 'dimensions': [w, h], 'unchanged_feature_regions': len(checks) + len(extra_checks), 'original_unchanged': True}), flush=True)

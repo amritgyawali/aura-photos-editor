@@ -3320,6 +3320,17 @@ async fn apply_reference_style(
 }
 
 #[tauri::command]
+async fn match_paired_reference(
+    state: State<'_, AppState>,
+    input: aura_app::paired_reference::PairedReferenceInput,
+) -> IpcResult<aura_app::paired_reference::PairedReferenceReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::paired_reference::match_paired_reference(&app, &input)
+    }).await.map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn analyse_portrait(
     state: State<'_, AppState>,
     input: aura_app::portrait_commands::PortraitInput,
@@ -3834,6 +3845,7 @@ fn main() {
             preview_edit_profile,
             analyse_reference_style,
             apply_reference_style,
+            match_paired_reference,
             enhance_photo,
             enhance_portrait,
             auto_retouch,

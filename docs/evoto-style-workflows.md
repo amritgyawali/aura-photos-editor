@@ -8,6 +8,11 @@ examples. The images do not disclose Evoto's proprietary algorithms.
 
 ## Delivered workflows
 
+- Paired finished-reference matching: choose a JPEG/PNG export of the same photo
+  in the studio to fit nine native tone/colour settings. AURA keeps saved healing
+  and manual settings, measures improvement at full resolution before saving,
+  and reports strict equality separately. See the
+  [workflow and limits](paired-reference-matching.md).
 - Face and visible body skin: independently measured skin selections, localized
   blemish repair, pore refinement, texture restoration, skin tone and light controls.
   Available skin can include nose, forehead, cheeks, neck, hands and other body

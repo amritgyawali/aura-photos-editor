@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { PhotoStudio } from './PhotoStudio';
-import { api, develop, editProfiles, pickWhiteBalance } from '../../ipc/client';
+import { api, develop, editProfiles, pairedReference, pickPairedReference, pickWhiteBalance } from '../../ipc/client';
 import type { RenderDto } from '../../ipc/types';
 import { nativeRetouch } from '../../ipc/nativeRetouch';
 import { forgetPreviews } from '../../state/previewCache';
@@ -9,9 +9,10 @@ import { forgetPreviews } from '../../state/previewCache';
 vi.mock('../../ipc/client', () => ({
   inTauri: () => true,
   asIpcError: (error: Error) => ({ message: error.message }),
-  api: { getPreview: vi.fn() },
+  api: { getPreview: vi.fn(), cancelJob: vi.fn() },
   develop: { imageRecipe: vi.fn(), imageHistory: vi.fn(), renderImage: vi.fn(), enhancePhoto: vi.fn(), setParam: vi.fn(), historyStep: vi.fn(), snapshot: vi.fn() },
   editProfiles: { list: vi.fn() }, syncSettings: vi.fn(), pickWhiteBalance: vi.fn(),
+  pairedReference: { match: vi.fn() }, pickPairedReference: vi.fn(),
 }));
 
 vi.mock('../../ipc/nativeRetouch', async () => ({ ...await vi.importActual('../../ipc/nativeRetouch'), nativeRetouch: { original: vi.fn() } }));
@@ -42,6 +43,39 @@ it('saves named snapshots and restores them through the persisted history comman
   await waitFor(() => expect((screen.getByRole('button', { name: 'Restore snapshot First look' }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole('button', { name: 'Restore snapshot First look' }));
   await waitFor(() => expect(develop.snapshot).toHaveBeenLastCalledWith({ projectId: 'project', photoId: 'portrait', action: 'restore', name: 'First look' }));
+});
+
+it('keeps exactly one reference control across loading and recipe refreshes', async () => {
+  const props = { projectId: 'project', photoId: 'portrait', disabled: false, onBusyChange: vi.fn() };
+  const view = render(<PhotoStudio {...props} />);
+  await waitFor(() => expect(develop.imageRecipe).toHaveBeenCalled());
+  expect(screen.getAllByRole('button', { name: 'Choose finished reference' })).toHaveLength(1);
+  for (const revision of [1, 2, 3]) {
+    view.rerender(<PhotoStudio {...props} revision={revision} />);
+    await waitFor(() => expect(develop.imageRecipe).toHaveBeenCalledTimes(revision + 1));
+    expect(screen.getAllByRole('button', { name: 'Choose finished reference' })).toHaveLength(1);
+  }
+});
+
+it('keeps native reference cancellation usable while adjustment controls are disabled', async () => {
+  let reject!: (reason: Error) => void;
+  vi.mocked(pickPairedReference).mockResolvedValue('C:/finished.png');
+  vi.mocked(pairedReference.match).mockReturnValue(new Promise((_resolve, fail) => { reject = fail; }));
+  vi.mocked(api.cancelJob).mockResolvedValue(true);
+  const busy = vi.fn();
+  render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={busy} />);
+  await screen.findByAltText('Edited photograph');
+  await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+  fireEvent.click(screen.getByRole('button', { name: 'Choose finished reference' }));
+  await waitFor(() => expect(pairedReference.match).toHaveBeenCalledOnce());
+  const stop = screen.getByRole('button', { name: 'Stop reference matching' }) as HTMLButtonElement;
+  expect(stop.closest('fieldset')).toBeNull();
+  expect(stop.disabled).toBe(false);
+  expect((screen.getByRole('button', { name: 'Auto enhance photo' }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(stop);
+  expect(api.cancelJob).toHaveBeenCalledWith(vi.mocked(pairedReference.match).mock.calls[0]?.[2]);
+  await act(async () => reject(new Error('Reference matching stopped. No edit was saved.')));
+  expect((await screen.findByRole('alert')).textContent).toContain('No edit was saved');
 });
 
 it('provides a keyboard-accessible neutral picker with normalized original coordinates', async () => {

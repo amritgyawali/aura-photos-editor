@@ -208,6 +208,26 @@ export const referenceStyle = {
     input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null } }),
 };
 
+export type PairedReferenceReport = {
+  changed: number; probes: number; beforeError: number; afterError: number;
+  exactMatch: boolean; matchingPixels: number; totalPixels: number;
+  protectedFields: number; referenceHash: string; width: number; height: number;
+  subjectErrorsBefore: number[]; subjectErrorsAfter: number[];
+};
+
+export const pairedReference = {
+  match: (photoId: string, referencePath: string, cancelId: string) =>
+    invoke<PairedReferenceReport>('match_paired_reference', { input: { photoId, referencePath, cancelId } }),
+};
+
+export async function pickPairedReference(): Promise<string | null> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: false, multiple: false, title: 'Choose the finished version of this same photo',
+      filters: [{ name: 'Finished photo', extensions: ['jpg', 'jpeg', 'png'] }] },
+  });
+  return Array.isArray(result) ? result[0] ?? null : result;
+}
+
 // Portrait retouching: what AURA found in a photograph, and what a photographer asks for.
 export type PortraitFace = {
   bbox: [number, number, number, number];

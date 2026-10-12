@@ -154,6 +154,8 @@ pub struct AppState {
     /// Buffers before and after each photograph's retouch stack, shared by every render this
     /// process makes. ADR-0098.
     retouch_checkpoints: aura_render::retouch_cache::Checkpoints,
+    /// One expensive image pass at a time, shared by planners and every renderer.
+    image_work_gate: Arc<std::sync::Mutex<()>>,
     cache_root: PathBuf,
     /// Where `models.lock`, its signature and the model files live.
     ///
@@ -288,6 +290,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
+            image_work_gate: Arc::default(),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -314,6 +317,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
+            image_work_gate: Arc::default(),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -1469,6 +1473,10 @@ impl AppState {
     /// Finished editing previews held in memory. ADR-0097.
     pub(crate) fn edited_previews(&self) -> &Mutex<crate::preview_render::Memory> {
         &self.edited_previews
+    }
+
+    pub(crate) fn image_work_gate(&self) -> &Arc<std::sync::Mutex<()>> {
+        &self.image_work_gate
     }
 
     /// Where cached previews live.
@@ -3051,7 +3059,8 @@ impl AppState {
             Arc::new(crate::photo_frames::CatalogFrames::new(self.clone()));
         Ok(Arc::new(
             aura_render::CpuEngine::new(source, Arc::clone(&self.clock))
-                .with_checkpoints(self.retouch_checkpoints.clone()),
+                .with_checkpoints(self.retouch_checkpoints.clone())
+                .with_image_work_gate(Arc::clone(&self.image_work_gate)),
         ))
     }
 

@@ -123,6 +123,8 @@ summary { cursor: pointer; padding: 12px 0; color: var(--muted); }
 .view-switch button { font-size: 12px; padding: 7px 11px; }
 .view-switch button[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
 .studio-layout { display: grid; grid-template-columns: minmax(0,1fr) 238px; gap: 24px; }
+.studio-adjustments-column { min-width: 0; display: grid; align-content: start; gap: 20px; }
+.studio-adjustments-column > .lr-panel { border-top: 1px solid var(--line); padding-top: 16px; }
 .studio-canvas { position: relative; background: #111015; min-height: 360px; height: min(65vh,720px); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: grid; place-items: center; }
 .studio-canvas img { position: absolute; width: 100%; height: 100%; object-fit: contain; }
 .studio-canvas p { color: var(--muted); }

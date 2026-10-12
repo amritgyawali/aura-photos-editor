@@ -94,6 +94,7 @@ pub mod mask_commands;
 pub mod measured_cull;
 pub mod micro_commands;
 pub mod moment_commands;
+pub mod paired_reference;
 pub mod people_commands;
 pub mod photo_enhance;
 mod photo_frames;

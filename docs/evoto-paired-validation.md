@@ -1,5 +1,141 @@
 # Paired reference validation
 
+## Face-aware reference matching through the native studio
+
+The studio can now match a saved photo to its finished JPEG/PNG reference
+through bounded native tone/colour renders. The saved healing, masks, geometry,
+unknown recipe fields and manual-field protections remain intact. Accepted
+settings create one normal history step, protected by an atomic baseline-hash
+check. Source and reference pixels are read only; reference pixels are never
+substituted into an export. See [the workflow](paired-reference-matching.md)
+and [ADR-0115](adr/ADR-0115-paired-reference-calibration.md).
+
+An intermediate whole-image-only candidate reduced RGB error from 5.36122 to
+4.15560 but worsened two faces. It was rejected for installation and undone
+to the exact saved baseline. The final search gives detected faces 80% of its
+objective and refuses candidates that worsen any face. Both whole-image and
+per-face measurements must pass again at full export resolution before saving.
+
+Native Windows validation on 2026-10-12 used executable SHA256
+`0F8FECA20432834733FEF3E5612C72D398DA82DB4ED672C81A1F17F43D768399`.
+The public 2000 x 1200 three-person before image was imported into the isolated
+catalogue, healed with Portrait skin finish, then matched using the actual
+studio button and owned Windows reference picker. Both published WebP inputs
+were losslessly converted to identical-pixel PNGs. The matcher evaluated
+54 candidates and saved six global changes while retaining the healing stack
+and all 91 manual-field protections. Whole-photo mean absolute RGB byte error
+fell from 5.36122 to 4.78421, a 10.76% error reduction. Face errors fell from
+4.53077 to 4.32316, 4.55180 to 4.37893, and 4.74737 to 4.50427.
+This is a measured reference-error reduction, not a skin-removal percentage.
+
+The final lossless PNG equals the native full render and retouch view.
+All 12 measured lid/nostril regions are unchanged relative to the original
+with the same global grade; intentional global colour changes can affect
+their values relative to the neutral baseline. Original, imported-copy and
+reference hashes remain intact. Wrong dimensions, an unrelated scene and
+native cancellation all refused the edit without changing its saved hash.
+The studio displayed one reference control and no observed page errors.
+
+Native UI Undo/Redo restored the exact paired recipe and rendered pixels, and
+the same checks passed on the heavy finishing portrait. A normal close/restart
+then restored exact saved recipes and full-resolution RGB hashes for the paired,
+heavy finishing and acne-only workflows. The heavy exports remained pixel-equal
+to their earlier gated v24 results. The final matching/history session peaked
+at 1042.74 MB private memory and closed normally; the restart verification
+session peaked at 781.36 MB and also closed normally. Evidence:
+`gate-history.json`, `paired-restart/verification.json`,
+`paired-before-restart-memory.json` and `paired-graceful-close.json`.
+
+The tested 0F8F executable is installed at `app/aura-desktop.exe` and launched
+in the visible working window; the launcher pins its full validated hash.
+The previous 07169 build is retained at
+`app/internal-ai-20261011/aura-desktop-before-reference-match.exe` for recovery.
+Read-only checks of the working catalogue, its C: backup and the running native
+app confirmed all 13 saved recipe hashes unchanged and database integrity OK.
+The running app reported 16 configured internal AI routes and no observed page
+errors. This route inventory does not mean every provider accepts inference.
+
+All three face comparisons were inspected at delivered pixel dimensions,
+along with the full photograph. No obvious anatomical changes or hard repair
+edges were seen. Some marks, under-eye lines and uneven tone remain, and the
+published Evoto result still looks different. Strict equality is false:
+69,849 of 2,400,000 pixels match exactly, with maximum channel error 99.
+The equal-pixel fraction is not an accuracy score. Complete removal, exact
+Evoto matching, full parity and superior quality are not established.
+
+Final automated checks: application library 191 passed, two optional local
+image diagnostics ignored; recipe library 71 passed; renderer library 201
+passed; colour-discipline integration four passed; UI 750 tests across 88 files
+passed, followed by the final 11 focused reference tests. Production UI build,
+strict workspace/all-target Clippy, formatting, Python compilation, all 83
+locked contracts and the 319-command IPC inventory pass. Reference images,
+exports, native binaries and private configuration are ignored evidence,
+not application assets. Pair evidence:
+`output/internal-ai-20261011/paired-calibrated`; the rejected whole-image
+candidate remains separately in `paired-background-only`.
+
+## Forehead selection, resource scheduling and exact comparison
+
+Planner `measured-features-v24` lets compact repairs reach strongly segmented,
+skin-coloured forehead cells beside the landmark brow band. Detected brow hair
+and its margin remain excluded, as do eyes and nostril openings. The band and
+feather for broad smoothing and frequency healing remain unchanged. Compact
+search uses a narrower feather; each repair still requires its complete safe
+ellipse, surrounding-light evidence, clean donor and final feature mask.
+The new regression was missed by v23; it now heals a forehead mark while keeping
+every synthetic brow-hair pixel unchanged and retaining the broad exclusion.
+
+The initial native candidate exposed an allocation failure during the third
+workflow, after its finishing and paired exports had passed. Completed preview
+and retouch caches already have byte budgets; concurrent decoding, full rendering
+and residual planning can still overlap their temporary buffers. Every renderer
+created by an `AppState` now shares an execution gate with its automatic retouch
+planner. Render, mask-coverage and draft work acquire it before decoding. A
+carried live preview returns no new frame when it is busy, allowing the view to
+keep its displayed frame while the exact render completes. Direct supplied-frame
+rendering and internal tiled calls are not recursively locked. Pixel arithmetic
+and render keys are unchanged. Two concurrency regressions verify non-overlapping
+source calls, identical output pixels/hashes and live-preview deferral without
+another decode. Application library: 185 passed, two optional diagnostics ignored;
+renderer library: 201 passed; colour-discipline integration: four passed. Strict
+workspace Clippy, formatting and banned checks pass.
+
+The gated v24 native regression ran all three workflows in one isolated session:
+heavy Portrait skin finish saved 830 operations (809 texture, five local pigment,
+two under-eye); public group Portrait skin finish saved 1024 operations (977
+texture, three local pigment, four under-eye); heavy Acne only saved 696
+operations (692 texture, two local pigment, two frequency-heal). The public
+group retained 281, 484 and 215 spot repairs per face and disclosed truncation
+for the middle face. Verified JPEGs were read back; lossless PNGs matched the
+full native render/view. All 24 full-resolution feature checks passed, including
+the two inspected brow cores in each heavy-portrait preset. Original hashes
+stayed unchanged. This session peaked at 1087.43 MB private memory rather than
+repeating the earlier allocation failure; this does not guarantee no memory
+failure on arbitrary hardware or workloads.
+
+Acne-only coverage selected 71.75% of the landmark nose sample, with zero
+selected/changed eye and nostril-opening pixels and no broad nose-wing selection.
+The independent contour rectangle's maximum coarse change was 0.3960%, below
+the existing 1% gate. Visible body skin selected 88,192 pixels and changed
+22,151 outside face holes; hands and legs are absent. Diagnostic writes were
+undone to the exact recipe. Compared with 07169, the measured forehead rectangle
+had 7.94% less mean normalized red signal, while the glabella was effectively
+unchanged. Blackheads and protected marks remain. Evidence: `gate-acne`,
+`gate-acne-full`, `gate-beauty`, `gate-acne-only`, `gate-acne-only-full`,
+and `gate-protected` under `output/internal-ai-20261011`.
+
+The paired harness now reports delivered RGB equality, equal-pixel count,
+per-channel mean absolute error and maximum error for the whole photograph and
+each detected face. It does not resize, align or introduce a tolerance to report
+an exact match. A single changed channel in one pixel fails equality. These
+metrics do not measure defect-removal percentage or perceptual quality, and
+export/readback success never establishes complete removal.
+
+The full-resolution export harness also accepts repeatable `--protected-rect`
+arguments for independently inspected anatomical features. This validation uses
+two actual brow-hair cores in the heavy portrait, in addition to the existing
+eye/lid and nostril regions.
+
 ## Moderate redness beside uneven light
 
 Planner `measured-features-v23` lets the existing local pigment fallback consider
@@ -191,7 +327,7 @@ saved recipe hash. Evidence is in `output/internal-ai-20261011/residual-final-pr
 
 At this earlier validation, the 7FB executable was installed and opened the
 working catalogue with all 13 saved recipe hashes intact, 16 configured AI routes
-and no observed page errors. The prior 7FB executable is retained locally. The
+and no observed page errors. The newer A741 executable is retained locally. The
 working catalogue and its C: backup pass SQLite integrity and saved-recipe checks.
 
 All three corrected face crops were visually inspected. Additional cheek marks
@@ -212,7 +348,7 @@ operations, including 612 compact repairs. Retouch took 18.81 seconds; the JPEG
 export/readback took 12.59 seconds. The additional lossless PNG matched the full
 native view/render. All 12 measured eye/nostril regions remained pixel-identical,
 and both public input hashes stayed unchanged.
-This baseline is historical evidence; the newer 7FB executable is retained for recovery. The working catalogue
+This baseline is historical evidence; the newer A741 executable is retained for recovery. The working catalogue
 and its C: backup pass integrity checks with all 13 saved recipe hashes unchanged.
 
 All three face crops were inspected at their delivered dimensions beside the

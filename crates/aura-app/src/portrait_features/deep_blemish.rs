@@ -1058,10 +1058,11 @@ fn surface_selection(
         exclusions.clear();
     }
     let mut brow_areas = Vec::with_capacity(2);
+    let mut brow_bands = Vec::with_capacity(2);
     for eye in g.eyes {
         exclusions.push(super::Capsule::disk(eye, g.d * 0.25));
         let brow = super::add(eye, g.v, -g.d * 0.32);
-        exclusions.push(super::Capsule {
+        brow_bands.push(super::Capsule {
             a: super::add(brow, g.u, -g.d * 0.28),
             b: super::add(brow, g.u, g.d * 0.28),
             r: g.d * 0.085,
@@ -1096,7 +1097,13 @@ fn surface_selection(
     for i in 0..w * h {
         let point = centre(i);
         let on_brow = to_brow[i] <= brow_margin && brow_areas.iter().any(|a| a.contains(point));
+        // The landmark band is deliberately generous for broad finishing. A
+        // compact repair may reach confidently segmented, skin-coloured cells
+        // beside it, provided the measured hair and its margin are still out.
+        let confirmed_skin =
+            matches!(kind, SurfaceKind::Spots) && matte.alpha[i] > 224 && skin_like[i] && !on_brow;
         if on_brow
+            || (brow_bands.iter().any(|band| band.contains(point)) && !confirmed_skin)
             || exclusions.iter().any(|e| e.contains(point))
             || (blemish
                 && if matches!(kind, SurfaceKind::Spots) {
@@ -1109,7 +1116,16 @@ fn surface_selection(
         }
     }
     let distance = clearance(&selected, w, h);
-    let feather = (g.d * 0.08 / cell).max(2.0);
+    // A broad finishing feather must not remove thin strips of safe skin from
+    // compact detection. Every later repair still needs its whole ellipse,
+    // enclosing healthy context and the final eye/nostril guard.
+    let feather =
+        (g.d * if matches!(kind, SurfaceKind::Spots) {
+            0.025
+        } else {
+            0.08
+        } / cell)
+            .max(2.0);
     Some(
         distance
             .iter()
@@ -2713,6 +2729,69 @@ mod tests {
         // Eyes and lips stay out, as before.
         assert_eq!(at(column as usize, row(205.0)), 0);
         assert_eq!(at(((255.0_f32 - 102.4) / 3.2) as usize, row(370.0)), 0);
+    }
+
+    #[test]
+    fn compact_forehead_mark_beyond_brow_hair_is_healed_without_selecting_the_brow() {
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        for eye in [195, 317] {
+            fill(&mut rgb, [eye - 35, 164, eye + 30, 171], [40, 28, 22]);
+        }
+        fill(&mut rgb, [233, 152, 237, 156], [130, 68, 50]);
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 256,
+            height: 256,
+            alpha: vec![255; 256 * 256],
+        };
+        let settings = Settings {
+            deep_blemish_cleanup: true,
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            ..Settings::default()
+        };
+        let mut edits = plan(&face, 0, &px, "test-", &settings, Some(&matte)).blemishes;
+        let point = [235.0 / 512.0, 154.0 / 512.0];
+        assert!(
+            edits.iter().any(|e| {
+                ((point[0] - e.region[0]) / e.region[2])
+                    .hypot((point[1] - e.region[1]) / e.region[3])
+                    < 0.75
+            }),
+            "confirmed forehead skin beside a brow must remain repairable"
+        );
+        let mut mattes = std::collections::BTreeMap::new();
+        super::super::eye_guard::protect(
+            &face,
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "guard",
+            &settings,
+        )
+        .unwrap();
+        let before: Vec<f32> = rgb.iter().map(|v| f32::from(*v) / 255.0).collect();
+        let mut after = before.clone();
+        aura_render::retouch_tools::apply_with_mattes(&mut after, 512, 512, &edits, &mattes);
+        let at = (154 * 512 + 235) * 3;
+        assert!(after[at + 1] > before[at + 1] + 0.03);
+        for eye in [195, 317] {
+            for y in 164..171 {
+                for x in eye - 35..eye + 30 {
+                    let at = (y * 512 + x) * 3;
+                    assert_eq!(&before[at..at + 3], &after[at..at + 3], "brow hair changed");
+                }
+            }
+        }
+        // Broad skin finishing retains its original conservative selection.
+        let finish = surface_matte(&face, &px, &matte).unwrap();
+        let [l, t, r, b] = finish.bounds;
+        let column = ((point[0] - l) / (r - l) * finish.width as f32) as usize;
+        let row = ((point[1] - t) / (b - t) * finish.height as f32) as usize;
+        assert!(finish.decode().unwrap()[row * finish.width as usize + column] < 51);
     }
 
     #[test]
