@@ -3327,7 +3327,9 @@ async fn match_paired_reference(
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         aura_app::paired_reference::match_paired_reference(&app, &input)
-    }).await.map_err(|_| background_request_failed())?
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
