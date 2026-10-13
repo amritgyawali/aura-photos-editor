@@ -311,8 +311,9 @@ where
     let mut best = base.clone();
     let mut distance = before;
     let mut probes = 0;
-    // Deterministic coordinate descent; <=54 renders, no unbounded/stochastic search.
-    for scale in [1.0, 0.33, 0.11] {
+    // Deterministic coordinate descent; <=72 renders, no unbounded/stochastic search.
+    // The last sweep can resolve exposure changes below the old 0.033-stop step.
+    for scale in [1.0, 0.33, 0.11, 0.035] {
         for axis in 0..AXES {
             check_cancel(cancel)?;
             let centre = best.clone();
@@ -647,7 +648,7 @@ mod tests {
         assert_eq!(best.extra, base.extra);
         assert_eq!(best.masks, base.masks);
         assert_eq!(best.geometry, base.geometry);
-        assert!(probes <= 54);
+        assert!(probes <= 72);
         assert_eq!(fit(&base, 0.0, &cancel, |_| Ok(0.0)).unwrap().0, base);
         cancel.cancel();
         assert!(fit(&base, 100.0, &cancel, |_| panic!(
@@ -693,5 +694,43 @@ mod tests {
         assert_eq!(best.extra, base.extra);
         assert_eq!(best.geometry, base.geometry);
         assert_eq!(best.retouch, base.retouch);
+
+        // A small real exposure correction sits below the old 0.033-stop
+        // final step. Locked colour controls must not disguise that failure.
+        let mut fine_base = base;
+        fine_base.provenance.user_edited_fields = [
+            "temperature",
+            "tint",
+            "contrast",
+            "highlights",
+            "shadows",
+            "whites",
+            "blacks",
+            "saturation",
+        ]
+        .map(|field| format!("global.{field}"))
+        .to_vec();
+        let mut fine_desired = fine_base.clone();
+        fine_desired.global.exposure = 0.012;
+        let fine_target = rendered(&engine, &frame, &fine_desired).unwrap();
+        let fine_before = score(&original.data, &fine_target, 16, 16).unwrap().error;
+        let (fine_best, _) = fit(&fine_base, fine_before, &CancelToken::new(), |r| {
+            let image = rendered(&engine, &frame, r)?;
+            Ok(score(&image.data, &fine_target, 16, 16)?.error)
+        })
+        .unwrap();
+        assert!(fine_best.global.exposure > 0.0 && fine_best.global.exposure < 0.02);
+        let fine_result = rendered(&engine, &frame, &fine_best).unwrap();
+        assert!(
+            score(&fine_result.data, &fine_target, 16, 16)
+                .unwrap()
+                .error
+                < fine_before
+        );
+        assert_eq!(
+            fine_best.provenance.user_edited_fields,
+            fine_base.provenance.user_edited_fields
+        );
+        assert_eq!(fine_best.retouch, fine_base.retouch);
     }
 }

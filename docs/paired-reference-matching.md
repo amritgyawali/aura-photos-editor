@@ -11,12 +11,16 @@ import lacks catalogue dimensions, a bounded decode checks its real dimensions
 and imported content hash before the full native frame is requested.
 
 AURA searches exposure, temperature, tint, contrast, highlights, shadows,
-whites, blacks and saturation through its native CPU renderer. Three
-deterministic coarse-to-fine sweeps evaluate at most 54 candidates at a
+whites, blacks and saturation through its native CPU renderer. Four
+deterministic coarse-to-fine sweeps evaluate at most 72 candidates at a
 384-pixel edge. Every candidate passes recipe validation and the existing
 automated merge rules, including protection of manually edited fields.
 Each direction starts from the same current best candidate. The search is
 bounded around the saved baseline, and only strictly better candidates advance.
+The final sweep resolves exposure changes as small as 0.0105 stops; integer
+controls retain their schema's quantization. A native-gradient regression checks
+a small correction the previous 0.033-stop final step missed, with the other
+eight global fields manually protected.
 
 For a saved portrait, the search weights the mean detected-face RGB error at
 80% and whole-image error at 20%. Every detected face must also remain no worse

@@ -14,13 +14,15 @@ mod curvature;
 mod diagnostics;
 mod lighting;
 mod refinement;
+mod upper_cheek;
 pub(crate) use refinement::refine;
+pub(crate) use upper_cheek::supplement;
 
 #[derive(Clone, Copy)]
 enum SurfaceKind {
     Finish,
     Blemishes,
-    Spots,
+    Spots(bool),
 }
 
 #[derive(Clone, Debug)]
@@ -685,6 +687,18 @@ pub(crate) fn plan(
     settings: &Settings,
     matte: Option<&Matte>,
 ) -> FeatureEdits {
+    plan_with_cheek(face, index, px, prefix, settings, matte, false)
+}
+
+fn plan_with_cheek(
+    face: &PortraitFace,
+    index: usize,
+    px: &Pixels<'_>,
+    prefix: &str,
+    settings: &Settings,
+    matte: Option<&Matte>,
+    upper_cheek: bool,
+) -> FeatureEdits {
     let mut out = FeatureEdits::default();
     let Some(g) = Geometry::new(face, px) else {
         return out;
@@ -700,12 +714,13 @@ pub(crate) fn plan(
     }
     // Reuse the connected, feature-safe skin fill used by frequency healing. Small
     // segmentation holes must not keep a remaining mark outside the residual search.
-    let expanded = surface_selection(&g, px, matte, SurfaceKind::Spots).map(|alpha| Matte {
-        bounds: matte.bounds,
-        width: matte.width,
-        height: matte.height,
-        alpha,
-    });
+    let expanded =
+        surface_selection(&g, px, matte, SurfaceKind::Spots(upper_cheek)).map(|alpha| Matte {
+            bounds: matte.bounds,
+            width: matte.width,
+            height: matte.height,
+            alpha,
+        });
     let search_matte = expanded.as_ref().unwrap_or(matte);
     let [l, t, r, b] = matte.bounds;
     let x0 = (l * px.width as f32).floor().max(0.0) as usize;
@@ -743,12 +758,31 @@ pub(crate) fn plan(
     // glabella and smile-line disks. Shape and ring-light checks reject creases;
     // a true lesion beside one still needs a complete clean surrounding ring.
     exclusions.truncate(4);
+    if upper_cheek {
+        exclusions = exclusions
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, area)| (i % 2 == 1).then_some(area))
+            .collect();
+    }
     exclusions.push(lip_protection(&g));
     for y in 0..h {
         for x in 0..w {
             let point = [(x + x0) as f32 + 0.5, (y + y0) as f32 + 0.5];
+            let uncertain_cheek = upper_cheek
+                && settings.protect_eye_area
+                && settings.deep_blemish_cleanup
+                && settings.remove_dark_marks
+                && super::eye_guard::spot_eye_weight(&g, point, false) < 1.0
+                && matte.at(point[0] / px.width as f32, point[1] / px.height as f32)
+                    <= 224.0 / 255.0;
             if exclusions.iter().any(|e| e.contains(point))
-                || (super::eye_guard::spot_weight(&g, point, settings) < 1.0)
+                || ((if upper_cheek {
+                    super::eye_guard::cheek_weight(&g, point, settings)
+                } else {
+                    super::eye_guard::spot_weight(&g, point, settings)
+                }) < 1.0)
+                || uncertain_cheek
             {
                 mask[y * w + x] = false;
             }
@@ -1100,13 +1134,21 @@ fn surface_selection(
         // The landmark band is deliberately generous for broad finishing. A
         // compact repair may reach confidently segmented, skin-coloured cells
         // beside it, provided the measured hair and its margin are still out.
-        let confirmed_skin =
-            matches!(kind, SurfaceKind::Spots) && matte.alpha[i] > 224 && skin_like[i] && !on_brow;
+        let confirmed_skin = matches!(kind, SurfaceKind::Spots(_))
+            && matte.alpha[i] > 224
+            && skin_like[i]
+            && !on_brow;
+        let conservative_eye = super::eye_guard::spot_eye_weight(g, point, false);
+        let extended_eye = super::eye_guard::spot_eye_weight(g, point, true);
+        let confirmed_cheek = matches!(kind, SurfaceKind::Spots(true))
+            && confirmed_skin
+            && conservative_eye < 1.0
+            && extended_eye >= 1.0;
         if on_brow
             || (brow_bands.iter().any(|band| band.contains(point)) && !confirmed_skin)
-            || exclusions.iter().any(|e| e.contains(point))
+            || (exclusions.iter().any(|e| e.contains(point)) && !confirmed_cheek)
             || (blemish
-                && if matches!(kind, SurfaceKind::Spots) {
+                && if matches!(kind, SurfaceKind::Spots(_)) {
                     super::eye_guard::nostril_opening_weight(g, point) < 1.0
                 } else {
                     super::eye_guard::nostril_weight(g, point) < 1.0
@@ -1120,7 +1162,7 @@ fn surface_selection(
     // compact detection. Every later repair still needs its whole ellipse,
     // enclosing healthy context and the final eye/nostril guard.
     let feather =
-        (g.d * if matches!(kind, SurfaceKind::Spots) {
+        (g.d * if matches!(kind, SurfaceKind::Spots(_)) {
             0.025
         } else {
             0.08
@@ -2729,6 +2771,136 @@ mod tests {
         // Eyes and lips stay out, as before.
         assert_eq!(at(column as usize, row(205.0)), 0);
         assert_eq!(at(((255.0_f32 - 102.4) / 3.2) as usize, row(370.0)), 0);
+    }
+
+    #[test]
+    fn confirmed_upper_cheek_spot_is_healed_without_touching_lids_or_a_crease() {
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        fill(&mut rgb, [170, 199, 219, 211], [40, 28, 22]);
+        fill(&mut rgb, [192, 239, 196, 243], [100, 55, 42]);
+        fill(&mut rgb, [145, 245, 175, 247], [100, 67, 50]);
+        fill(&mut rgb, [199, 313, 203, 317], [100, 55, 42]);
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 256,
+            height: 256,
+            alpha: vec![255; 256 * 256],
+        };
+        let settings = Settings {
+            deep_blemish_cleanup: true,
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            ..Settings::default()
+        };
+        let mut planned = plan(&face, 0, &px, "test-", &settings, Some(&matte));
+        let primary = planned.blemishes.clone();
+        assert!(
+            !primary.is_empty(),
+            "fixture must contain an established nose repair"
+        );
+        supplement(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &settings,
+            Some(&matte),
+            &std::collections::BTreeMap::new(),
+            &mut planned,
+        )
+        .unwrap();
+        assert!(
+            planned.blemishes.starts_with(&primary),
+            "supplement changed established repairs"
+        );
+        let mut edits = planned.blemishes;
+        let point = [194.0 / 512.0, 241.0 / 512.0];
+        let repairs = |edits: &[aura_recipe::retouch_tools::Edit]| {
+            edits.iter().any(|e| {
+                ((point[0] - e.region[0]) / e.region[2])
+                    .hypot((point[1] - e.region[1]) / e.region[3])
+                    < 0.75
+            })
+        };
+        assert!(
+            repairs(&edits),
+            "confirmed cheek skin below a lid was excluded"
+        );
+        let mut mattes = std::collections::BTreeMap::new();
+        super::super::eye_guard::protect(
+            &face,
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "guard",
+            &settings,
+        )
+        .unwrap();
+        let before: Vec<f32> = rgb.iter().map(|v| f32::from(*v) / 255.0).collect();
+        let mut after = before.clone();
+        aura_render::retouch_tools::apply_with_mattes(&mut after, 512, 512, &edits, &mattes);
+        let at = (241 * 512 + 194) * 3;
+        assert!(after[at + 1] > before[at + 1] + 0.05);
+        for rect in [[170, 199, 219, 211], [145, 245, 175, 247]] {
+            for y in rect[1]..rect[3] {
+                for x in rect[0]..rect[2] {
+                    let at = (y * 512 + x) * 3;
+                    assert_eq!(
+                        &before[at..at + 3],
+                        &after[at..at + 3],
+                        "lid or crease changed"
+                    );
+                }
+            }
+        }
+        let uncertain = Matte {
+            alpha: vec![180; 256 * 256],
+            ..matte.clone()
+        };
+        let mut unconfirmed = plan(&face, 0, &px, "test-", &settings, Some(&uncertain));
+        supplement(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &settings,
+            Some(&uncertain),
+            &std::collections::BTreeMap::new(),
+            &mut unconfirmed,
+        )
+        .unwrap();
+        assert!(!repairs(&unconfirmed.blemishes));
+        let conservative = Settings {
+            remove_dark_marks: false,
+            ..settings
+        };
+        let mut ordinary = plan(&face, 0, &px, "test-", &conservative, Some(&matte));
+        supplement(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &conservative,
+            Some(&matte),
+            &std::collections::BTreeMap::new(),
+            &mut ordinary,
+        )
+        .unwrap();
+        assert!(!repairs(&ordinary.blemishes));
+        assert_eq!(
+            super::super::eye_guard::feature_weight(
+                &Geometry::new(&face, &px).unwrap(),
+                point.map(|v| v * 512.0),
+                &settings,
+            ),
+            0.0
+        );
     }
 
     #[test]

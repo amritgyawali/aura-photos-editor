@@ -98,13 +98,53 @@ fn nostril_exclusion(g: &Geometry, point: [f32; 2], wings: bool) -> f32 {
 /// Its surrounding-light and donor checks run before this precise mask is used.
 pub(super) fn spot_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
     let eyes = if settings.protect_eye_area {
-        // Compact measured repairs can reach upper-cheek skin. Keep generous
-        // eye/inner-corner cores, but do not inherit the broad orbital exclusion.
-        eye_weight(g, point, 0.34, 0.23, 0.25)
+        spot_eye_weight(g, point, false)
     } else {
         1.0
     };
     eyes.min(nostril_opening_weight(g, point))
+}
+
+pub(super) fn cheek_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
+    let eyes = if settings.protect_eye_area {
+        spot_eye_weight(
+            g,
+            point,
+            settings.deep_blemish_cleanup && settings.remove_dark_marks,
+        )
+    } else {
+        1.0
+    };
+    eyes.min(nostril_opening_weight(g, point))
+}
+
+/// Only confirmed compact cleanup can reach the lower orbital skin. The lid,
+/// inner-corner shadow and existing upper-eye exclusion remain protected.
+pub(super) fn spot_eye_weight(g: &Geometry, point: [f32; 2], include_upper_cheek: bool) -> f32 {
+    if !include_upper_cheek {
+        return eye_weight(g, point, 0.34, 0.23, 0.25);
+    }
+    let smooth = |t: f32| {
+        let t = t.clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
+    let lids = lid(g, point);
+    g.eyes
+        .iter()
+        .enumerate()
+        .fold(1.0_f32, |safe, (index, eye)| {
+            let dx = point[0] - eye[0];
+            let dy = point[1] - eye[1];
+            let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
+            let below = (dx * g.v[0] + dy * g.v[1]) / g.d;
+            let distance = (across / 0.34).hypot((below - 0.035) / 0.23);
+            let existing = smooth((distance - 1.0) / 0.25);
+            let inward = if index == 0 { across } else { -across };
+            // No new coverage above 0.14 eye distances below the centre or on the
+            // nose-facing inner corner. Full eligibility starts below 0.20.
+            let cheek = smooth((below - 0.14) / 0.06) * smooth((0.28 - inward) / 0.08);
+            safe.min(existing.max(cheek.min(lids)))
+        })
 }
 
 pub(super) fn blemish_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
@@ -127,14 +167,21 @@ fn is_blemish(tool: super::Tool) -> bool {
     )
 }
 
+#[derive(Clone, Copy)]
+enum Guard {
+    Finish,
+    Blemish,
+    Compact,
+    UpperCheek,
+    DarkCircle,
+}
+
 fn guarded(
     g: &Geometry,
     px: &Pixels<'_>,
     original: &Matte,
     settings: &super::Settings,
-    blemish: bool,
-    precise: bool,
-    dark_circle: bool,
+    mode: Guard,
 ) -> Option<Matte> {
     let mut alpha = original.decode()?;
     let [l, t, r, b] = original.bounds;
@@ -154,14 +201,12 @@ fn guarded(
             .flat_map(|dy| {
                 [-margin, 0.0, margin].into_iter().map(move |dx| {
                     let at = [point[0] + dx, point[1] + dy];
-                    if dark_circle {
-                        lid(g, at)
-                    } else if precise {
-                        spot_weight(g, at, settings)
-                    } else if blemish {
-                        blemish_weight(g, at, settings)
-                    } else {
-                        feature_weight(g, at, settings)
+                    match mode {
+                        Guard::DarkCircle => lid(g, at),
+                        Guard::UpperCheek => cheek_weight(g, at, settings),
+                        Guard::Compact => spot_weight(g, at, settings),
+                        Guard::Blemish => blemish_weight(g, at, settings),
+                        Guard::Finish => feature_weight(g, at, settings),
                     }
                 })
             })
@@ -195,13 +240,27 @@ pub(crate) fn protect<'a>(
     let mut created = BTreeMap::new();
     for edit in edits {
         let dark_circle = is_dark_circle(edit);
+        let upper_cheek = edit.id.contains("-spot-deep-cheek-");
         let blemish = is_blemish(edit.tool);
         let precise = matches!(edit.tool, super::Tool::PatchHeal | super::Tool::Heal)
             || (edit.tool == super::Tool::SkinUniformity && edit.id.contains("-spot-deep-"));
+        let mode = if dark_circle {
+            Guard::DarkCircle
+        } else if upper_cheek {
+            Guard::UpperCheek
+        } else if precise {
+            Guard::Compact
+        } else if blemish {
+            Guard::Blemish
+        } else {
+            Guard::Finish
+        };
         let id = edit.matte.as_ref().map_or_else(
             || {
                 if dark_circle {
                     format!("{guard_id}-lid-safe")
+                } else if upper_cheek {
+                    format!("{guard_id}-cheek-feature-guard")
                 } else if precise {
                     format!("{guard_id}-spot-feature-guard")
                 } else if blemish {
@@ -213,6 +272,8 @@ pub(crate) fn protect<'a>(
             |id| {
                 if dark_circle {
                     format!("{id}-lid-safe")
+                } else if upper_cheek {
+                    format!("{id}-cheek-feature-safe")
                 } else if precise {
                     format!("{id}-spot-feature-safe")
                 } else if blemish {
@@ -232,8 +293,7 @@ pub(crate) fn protect<'a>(
             };
             created.insert(
                 id.clone(),
-                guarded(&g, px, source, settings, blemish, precise, dark_circle)
-                    .ok_or_else(invalid)?,
+                guarded(&g, px, source, settings, mode).ok_or_else(invalid)?,
             );
         }
         edit.matte = Some(id);
@@ -605,7 +665,27 @@ mod tests {
         rotated.landmarks = rotated.landmarks.map(|[x, y]| [1.0 - y, x]);
         let a = Geometry::new(&original, &px).unwrap();
         let b = Geometry::new(&rotated, &px).unwrap();
-        for [x, y] in [[0.445, 0.42], [0.35, 0.49], [0.3, 0.65], [0.5, 0.23]] {
+        let compact = super::super::Settings {
+            deep_blemish_cleanup: true,
+            remove_dark_marks: true,
+            ..Default::default()
+        };
+        let cheek = [0.35 * 256.0, 0.472 * 256.0];
+        assert_eq!(cheek_weight(&a, cheek, &compact), 1.0);
+        assert_eq!(
+            spot_weight(&a, cheek, &super::super::Settings::default()),
+            0.0
+        );
+        for p in [[0.35, 0.4], [0.65, 0.4], [0.445, 0.42], [0.555, 0.42]] {
+            assert_eq!(cheek_weight(&a, p.map(|v| v * 256.0), &compact), 0.0);
+        }
+        for [x, y] in [
+            [0.445, 0.42],
+            [0.35, 0.472],
+            [0.35, 0.49],
+            [0.3, 0.65],
+            [0.5, 0.23],
+        ] {
             assert!(
                 (feature_weight(&a, [x * 256., y * 256.], &super::super::Settings::default())
                     - feature_weight(
@@ -613,6 +693,12 @@ mod tests {
                         [(1. - y) * 256., x * 256.],
                         &super::super::Settings::default()
                     ))
+                .abs()
+                    < 1e-5
+            );
+            assert!(
+                (cheek_weight(&a, [x * 256., y * 256.], &compact)
+                    - cheek_weight(&b, [(1. - y) * 256., x * 256.], &compact))
                 .abs()
                     < 1e-5
             );

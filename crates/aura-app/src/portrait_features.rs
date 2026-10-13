@@ -28,7 +28,7 @@ use aura_vision::portrait::PortraitFace;
 use serde::{Deserialize, Serialize};
 
 /// The planner version recorded in the report; bump on any behavioural change.
-pub const VERSION: &str = "measured-features-v24";
+pub const VERSION: &str = "measured-features-v25";
 pub(crate) mod deep_blemish;
 pub mod expert;
 pub(crate) mod eye_guard;

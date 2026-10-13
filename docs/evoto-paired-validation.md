@@ -1,5 +1,93 @@
 # Paired reference validation
 
+## Primary-preserving cheek healing and finer matching (2026-10-13)
+
+Planner `measured-features-v25` adds a separate compact upper-cheek check after
+the unchanged primary and residual repairs have been rendered. Strong original
+skin confidence, whole footprints, donor/light evidence and lid/inner-corner
+protection remain required. Separate operation IDs and feature mattes prevent
+the extension from changing the primary search or its final masks. The group
+allocator reserves primary shares first and gives supplemental repairs only
+spare capacity. See [ADR-0116](adr/ADR-0116-compact-upper-cheek-healing.md).
+
+A native-gradient regression found that the reference fitter's 0.033-stop last
+step missed a real 0.012-stop correction when the other eight global fields
+were manually protected. A fourth sweep resolves 0.0105-stop increments, within
+a 72-candidate bound. Manual, regional and full-resolution acceptance checks
+remain unchanged. Both the original missed-cheek case and small exposure case
+were reproduced before their fixes. The final regression additionally checks
+an unchanged primary nose repair, unchanged lid/crease pixels, refusal on
+uncertain skin and opt-out, rotation, and no displacement of the original group
+allocation. Application library: 193 passed, two optional diagnostics ignored;
+strict workspace/all-target Clippy and formatting pass. UI source is unchanged;
+its preceding 750-test run is not a fresh current-turn UI result.
+
+Final native Windows executable SHA256:
+`6993E7692D4574081B45F28644E697D2AD759A953FDA52DDA7FEC869E1AE695F`.
+Tests used an isolated catalogue and offline privacy before native import/edit:
+
+- The 2000 x 1200 public group retained all 1024 original operations and all
+  18 original mattes exactly. The original spot shares remain 281, 484 and 215.
+  No supplemental repair fits its exhausted operation allowance; the report
+  discloses proposed and retained supplemental counts. Its neutral JPEG bytes
+  match the previous result's BLAKE3, before reference fitting.
+- Heavy Portrait skin finish retains all 830 original operations and seven
+  original mattes, then saves seven supplemental texture repairs: 837 total
+  operations, 816 texture repairs, five existing pigment repairs and two
+  under-eye corrections. Heavy Acne only retains all 696 original operations
+  and three original mattes, then saves six supplemental texture repairs:
+  702 total operations, 698 texture repairs and two pigment repairs.
+- Verified JPEG readbacks and lossless PNG/native full-render/retouch-view
+  equality passed for all three workflows. All 24 full-resolution feature
+  checks passed, including independently inspected brow cores. Original and
+  reference hashes stayed unchanged. An additional 22,100-pixel lower-nose
+  region is bit-identical to v24 in each heavy preset, resolving the nose
+  regression seen in the combined-search experiment.
+
+The studio button and actual Windows reference picker were exercised again.
+The final fit evaluates 68 candidates and saves six global changes while
+preserving the healing/masks/geometry and 91 manual-field protections.
+Whole-image mean RGB byte error falls 5.36122 to 4.72386, about 11.89% lower
+than the healed neutral baseline and 1.26% lower than the preceding 4.78421
+matched export. Face errors fall 4.53077 to 4.31854, 4.55180 to 4.38945, and
+4.74737 to 4.48784. All improve relative to the saved neutral baseline; compared
+with the previous matched export, the middle face's error is slightly higher
+(4.37893 to 4.38945). The whole-image gain is not a uniform quality claim.
+Strict equality is false: 73,615 / 2,400,000 pixels match, maximum channel error
+98. These error metrics and equal-pixel counts are not removal/accuracy rates.
+
+All three paired faces, both heavy-preset face details and both unscaled nose
+crops were visually inspected. More confirmed cheek skin can be healed without
+changing the established nose cleanup. No obvious new anatomical changes or
+hard repair boundaries were seen. Blackheads, glabella/forehead marks, protected
+marks, under-eye lines and uneven tone still remain. Exact Evoto matching,
+100% blemish removal, full parity and superior quality are not established.
+Wrong dimensions, an unrelated reference and native cancellation preserve the
+saved recipe; native UI Undo/Redo restores exact recipes and rendered pixels
+for paired and heavy finishing photographs without observed page errors.
+
+A normal close/restart restored the exact recipes and full-resolution RGB
+hashes for all three workflows. The main validation/history session peaked at
+1251.76 MB private memory; the restart check peaked at 691.20 MB. Both owned
+test sessions closed normally. The validated 6993 executable is installed at
+`app/aura-desktop.exe` and launched in the visible working window. Its launcher
+pins the validated hash; the preceding 0F8F build remains at
+`app/internal-ai-20261011/aura-desktop-before-upper-cheek-v25.exe` for recovery.
+The working catalogue, C: backup and running native readbacks retain all
+13 original saved recipe hashes and pass integrity checks. The running app
+reports 15 configured internal AI routes, with no observed page errors; the
+route inventory is not an inference-availability claim.
+
+Evidence: `output/retouch-20261013/paired`, `acne`, `acne-full`, `acne-only`,
+`acne-only-full`, `protected`, `established-repairs.json`, `history.json`, and
+`paired-failure-checks.json`. Rejected combined-search exports remain separately
+under `combined-*`, with earlier selection experiments in `paired-initial` and
+`paired-54`. The earlier combined approach passed integrity/protected-region
+checks while weakening visible nose cleanup; this is why those checks alone
+were insufficient and the final implementation preserves primary repairs.
+Reference images, generated outputs, binaries and private configuration remain
+ignored and are not application assets.
+
 ## Face-aware reference matching through the native studio
 
 The studio can now match a saved photo to its finished JPEG/PNG reference

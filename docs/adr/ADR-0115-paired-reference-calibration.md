@@ -34,6 +34,12 @@ detected face regions, refuses worse face candidates, and checks every face
 again at full resolution before saving. Report both regional and whole-image
 errors; neither is a perceptual-quality or blemish-removal certification.
 
+A native-gradient regression found that the initial three sweeps could leave a
+0.012-stop exposure difference untreated even with all colour controls locked.
+A fourth, finer sweep adds at most 18 candidates and resolves 0.0105-stop
+increments. The 72-render bound, manual protections, cancellation, regional
+gates and final full-resolution acceptance remain mandatory.
+
 Report mean RGB byte error and strict equality independently of blemish
 removal or perceptual quality. The heuristic and compressed public examples
 do not establish shared camera provenance, recovery of proprietary models,

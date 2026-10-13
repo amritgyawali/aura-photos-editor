@@ -676,6 +676,17 @@ pub fn plan_with_faces(
                     // dark it can repair fewer spots than the sparse one. Keep the better plan.
                     let use_deep = chosen_deep || deep.blemishes.len() > features.blemishes.len();
                     if use_deep {
+                        portrait_features::deep_blemish::supplement(
+                            face,
+                            index,
+                            px,
+                            spot_px,
+                            PREFIX,
+                            &settings,
+                            face_matte.as_ref().map(|m| &m.matte),
+                            &mattes,
+                            &mut deep,
+                        )?;
                         features.blemishes = deep.blemishes;
                         features.report.spots_healed = deep.report.spots_healed;
                         features.report.marks_kept = deep.report.marks_kept;
@@ -860,6 +871,11 @@ pub fn plan_with_faces(
         compact_repairs.push(repair_budget::FaceRepairs {
             assessment: report.assessments.len() - 1,
             proposed: features.blemishes.len(),
+            primary: features
+                .blemishes
+                .iter()
+                .take_while(|e| !e.id.contains("-spot-deep-cheek-"))
+                .count(),
             non_spots,
             edits: features.blemishes,
         });
