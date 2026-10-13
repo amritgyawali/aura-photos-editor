@@ -26,6 +26,7 @@ use crate::portrait_features;
 use crate::retouch_settings::{gain, Settings};
 
 mod body_cleanup;
+mod repair_budget;
 
 pub const KEY: &str = "studio_portrait_auto_v1";
 /// Stable ID prefix of every automatic portrait operation.
@@ -94,6 +95,9 @@ pub struct Report {
     /// The finishing choices this pass used; a later pass repeats them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<portrait_features::Options>,
+    /// Options explicitly supplied to a retouch run, including a no-face result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub explicit_options: Option<bool>,
     /// How skin was found: by the bundled segmenter or by landmark geometry. ADR-0082.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub segmentation: Option<SegmentationSummary>,
@@ -334,6 +338,7 @@ pub fn plan_with_faces(
         steps: Vec::new(),
         scene: None,
         options: Some(options),
+        explicit_options: None,
         segmentation: None,
     };
     let mut groups = BTreeMap::new();
@@ -437,6 +442,7 @@ pub fn plan_with_faces(
             .map_or(0.0, crate::smart_edit::noise_sigma),
     };
     let mut planned: [Vec<Edit>; 5] = Default::default();
+    let mut compact_repairs = Vec::new();
     let mut bodies = 0_usize;
     for (index, face) in report.faces.iter().enumerate() {
         if main.is_some_and(|m| m != index) {
@@ -670,6 +676,17 @@ pub fn plan_with_faces(
                     // dark it can repair fewer spots than the sparse one. Keep the better plan.
                     let use_deep = chosen_deep || deep.blemishes.len() > features.blemishes.len();
                     if use_deep {
+                        portrait_features::deep_blemish::supplement(
+                            face,
+                            index,
+                            px,
+                            spot_px,
+                            PREFIX,
+                            &settings,
+                            face_matte.as_ref().map(|m| &m.matte),
+                            &mattes,
+                            &mut deep,
+                        )?;
                         features.blemishes = deep.blemishes;
                         features.report.spots_healed = deep.report.spots_healed;
                         features.report.marks_kept = deep.report.marks_kept;
@@ -785,37 +802,31 @@ pub fn plan_with_faces(
             &mut features.finishing,
         ] {
             edits.retain(|e| !overridden.contains(&e.id));
-        }
-        let used: usize = planned.iter().map(Vec::len).sum();
-        if settings.deep_blemish_cleanup {
-            let non_spots = plan.edits.len()
-                + usize::from(clear.is_some())
-                + body.edits.len()
-                + features.refine.len()
-                + features.eyes.len()
-                + features.finishing.len();
-            let room =
-                retouch_tools::MAX_EDITS.saturating_sub(manual + scene_ops + used + non_spots);
-            if features.blemishes.len() > room {
-                features.blemishes.truncate(room);
-                features.report.spots_healed = features.blemishes.len();
-                features.report.findings.push(format!("Operation budget: retained {room} of this face's proposed spot repairs; existing edits are preserved."));
+            for edit in edits
+                .iter_mut()
+                .filter(|e| matches!(e.tool, Tool::AcneClear | Tool::FrequencyHeal))
+            {
+                edit.repair_passes =
+                    (settings.cleanup_passes != 2).then_some(settings.cleanup_passes);
             }
         }
-        let mut wanted = plan.edits.len()
+        let used: usize = planned.iter().map(Vec::len).sum();
+        let mut non_spots = plan.edits.len()
             + usize::from(clear.is_some())
             + body.edits.len()
-            + features.blemishes.len()
             + features.refine.len()
             + features.eyes.len()
             + features.finishing.len();
-        if manual + scene_ops + used + wanted > retouch_tools::MAX_EDITS {
+        // Reserve each person's required masks/finishing first. Compact repairs share
+        // the remaining allowance across all faces instead of consuming it in scan order.
+        if manual + scene_ops + used + non_spots > retouch_tools::MAX_EDITS {
             plan = FacePlan::skip("The saved retouch stack has reached its operation limit.");
             clear = None;
             body = FacePlan::skip("");
             features = portrait_features::FeatureEdits::default();
-            wanted = 0;
+            non_spots = 0;
         }
+        let wanted = non_spots + features.blemishes.len();
         let mut findings = features.report.findings;
         if options.scope.body() && !body.reason.is_empty() {
             findings.insert(0, body.reason.clone());
@@ -857,11 +868,27 @@ pub fn plan_with_faces(
                 skin.push(edit);
             }
         }
-        spots.extend(features.blemishes);
+        compact_repairs.push(repair_budget::FaceRepairs {
+            assessment: report.assessments.len() - 1,
+            proposed: features.blemishes.len(),
+            primary: features
+                .blemishes
+                .iter()
+                .take_while(|e| !e.id.contains("-spot-deep-cheek-"))
+                .count(),
+            non_spots,
+            edits: features.blemishes,
+        });
         refine.extend(features.refine);
         eyes.extend(features.eyes);
         finishing.extend(features.finishing);
+        let used: usize = planned.iter().map(Vec::len).sum();
+        repair_budget::rebalance(
+            &mut compact_repairs,
+            retouch_tools::MAX_EDITS.saturating_sub(manual + scene_ops + used),
+        );
     }
+    repair_budget::finish(compact_repairs, &mut planned[1], &mut report);
     let [skin, spots, refine, eyes, mut finishing] = planned;
     // A plain backdrop, smoothed for the whole frame when asked for.
     if settings.backdrop > 0.0
@@ -1128,6 +1155,8 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
+            target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
             texture: if smooth { 0.7 } else { 1.0 },
@@ -1258,6 +1287,8 @@ fn plan_body(
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
+        target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
         texture: if tool == Tool::SkinSmooth { 0.75 } else { 1.0 },
@@ -2097,6 +2128,8 @@ fn face_extras(
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
+            target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
             texture: 1.0,
@@ -2263,6 +2296,8 @@ fn plan_face_from_matte(
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
+            target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
             texture: if smooth { 0.7 } else { 1.0 },
@@ -2365,6 +2400,8 @@ fn plan_body_matte(
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
+            target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
             texture: 1.0,
@@ -2522,6 +2559,8 @@ fn hair_ops(
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
+        target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
         texture: 1.0,
@@ -2574,6 +2613,8 @@ fn fabric_op(index: usize, matte: &MatteUse, face: &PortraitFace, settings: &Set
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
+        target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
         texture: 1.0,
@@ -2615,6 +2656,8 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
+        target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
         texture: 1.0,
@@ -3235,6 +3278,8 @@ mod tests {
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
+            target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
             texture: 1.0,

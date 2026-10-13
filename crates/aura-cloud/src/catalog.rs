@@ -140,7 +140,7 @@ pub struct ProviderSpec {
     pub requires_key: bool,
     /// What the key looks like, so a paste into the wrong provider is visible.
     pub key_hint: &'static str,
-    /// Where the vendor issues keys. Shown as text; the app opens no browser.
+    /// Where the vendor issues keys. Browser actions resolve this fixed address by provider ID.
     pub keys_url: &'static str,
     /// True when the default models here can see a photograph.
     ///

@@ -955,7 +955,7 @@ fn rebuild(
     coverage: &Coverage,
     mut touched: Option<&mut [f32]>,
 ) {
-    for _ in 0..PASSES {
+    for _ in 0..usize::from(edit.repair_passes.unwrap_or(PASSES as u8)) {
         let Some(field) = Field::new(rgb, w, h, edit, coverage) else {
             return;
         };

@@ -62,7 +62,8 @@ use crate::schema::Schema;
 use crate::tasks::Scored;
 
 /// What is switched on for one installation and one project.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 pub struct CloudPolicy {
     /// The global switch. When true the crate is inert and no key is read.
     pub offline_studio_mode: bool,
@@ -143,8 +144,14 @@ pub struct CloudAiGateway {
     ledger: Arc<FallbackLedger>,
     clock: Arc<dyn Clock>,
     policy: CloudPolicy,
+    routes: Vec<Arc<Self>>,
+    key_account: Option<String>,
+    profile_id: Option<String>,
+    image_capable: bool,
+    cooldowns: parking_lot::Mutex<std::collections::BTreeMap<usize, u64>>,
+    daily_order: parking_lot::Mutex<std::collections::BTreeMap<(String, time::Date), Vec<usize>>>,
     /// Makes call identifiers unique within a run without a random number.
-    sequence: AtomicU64,
+    sequence: Arc<AtomicU64>,
 }
 
 impl CloudAiGateway {
@@ -171,7 +178,13 @@ impl CloudAiGateway {
             ledger: Arc::new(FallbackLedger::new()),
             clock,
             policy,
-            sequence: AtomicU64::new(0),
+            routes: Vec::new(),
+            key_account: None,
+            profile_id: None,
+            image_capable: false,
+            cooldowns: parking_lot::Mutex::new(std::collections::BTreeMap::new()),
+            daily_order: parking_lot::Mutex::new(std::collections::BTreeMap::new()),
+            sequence: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -186,6 +199,102 @@ impl CloudAiGateway {
     #[must_use]
     pub const fn policy(&self) -> CloudPolicy {
         self.policy
+    }
+
+    /// Add file-configured routes. Each keeps its own key, breaker, prices and
+    /// audit identity; every attempt still passes this gateway's policy gates.
+    #[must_use]
+    pub fn with_internal_routes(
+        mut self,
+        profiles: &[crate::internal_ai::Profile],
+        transport: &Arc<dyn crate::provider::Transport>,
+    ) -> Self {
+        for profile in profiles.iter().filter(|p| p.available()) {
+            let mut route = Self::new(
+                profile.client(Arc::clone(transport)),
+                Arc::clone(&self.keys),
+                Arc::clone(&self.cache),
+                Arc::clone(&self.audit),
+                Arc::clone(&self.governor),
+                Arc::clone(&self.consent),
+                Arc::clone(&self.clock),
+                self.policy,
+            );
+            route.key_account = Some(profile.account());
+            // Capability and quality prior are kept with the profile, not inferred
+            // from a successful text-only completion.
+            route.profile_id = Some(profile.id.clone());
+            route.image_capable = profile.vision;
+            route.sequence = Arc::clone(&self.sequence);
+            route.ledger = Arc::clone(&self.ledger);
+            self.routes.push(Arc::new(route));
+        }
+        if let Some(primary) = self
+            .routes
+            .iter()
+            .find(|route| route.image_capable)
+            .or_else(|| self.routes.first())
+        {
+            self.client = Arc::clone(&primary.client);
+            self.key_account.clone_from(&primary.key_account);
+        }
+        self
+    }
+
+    /// The selected route's secure account, including internally configured keys.
+    #[must_use]
+    pub fn credential_account(&self) -> String {
+        self.key_account
+            .clone()
+            .unwrap_or_else(|| self.client.provider().kind().account())
+    }
+
+    /// Refresh per-project ranking once each UTC day from persisted outcomes.
+    /// Only explicit accepted/rejected feedback is used as quality evidence;
+    /// typed response success and latency are reliability evidence.
+    pub(crate) fn ranked_routes(&self, project: &str) -> Vec<usize> {
+        let day = self.clock.now_utc().date();
+        let mut orders = self.daily_order.lock();
+        let key = (project.to_string(), day);
+        if let Some(order) = orders.get(&key) {
+            return order.clone();
+        }
+        orders.retain(|(_, recorded), _| *recorded == day);
+        let rows = self.audit.recent(project, 256).unwrap_or_default();
+        let mut scored: Vec<(usize, f64)> = self
+            .routes
+            .iter()
+            .enumerate()
+            .map(|(index, route)| {
+                let mut score = (self.routes.len().saturating_sub(index)) as f64;
+                for row in rows
+                    .iter()
+                    .filter(|row| Some(&row.provider) == route.profile_id.as_ref())
+                {
+                    score += match row.status.as_str() {
+                        "accepted" => 3.0,
+                        "rejected" => -5.0,
+                        "ok" | "repaired" => 0.25 - (row.latency_ms as f64 / 60_000.0).min(0.2),
+                        "schema_invalid" => -1.0,
+                        "fallback" if row.fallback_reason.as_deref() == Some("provider_failed") => {
+                            -1.0
+                        }
+                        _ => 0.0,
+                    };
+                }
+                (index, score.clamp(-100.0, 100.0))
+            })
+            .collect();
+        scored.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        let order: Vec<_> = scored.into_iter().map(|(index, _)| index).collect();
+        orders.insert(key, order.clone());
+        order
+    }
+
+    /// True when this installation has suitable internally managed routes.
+    #[must_use]
+    pub fn has_internal_routes(&self) -> bool {
+        !self.routes.is_empty()
     }
 
     /// What fell back, and how often.
@@ -229,6 +338,7 @@ impl CloudAiGateway {
     /// # Errors
     ///
     /// Whatever `local_fallback` raised, or `AURA-CLOUD-6013` on cancellation.
+    #[allow(clippy::too_many_lines)] // The ordered policy, routing and settlement gates stay visible together.
     pub fn run<T>(
         &self,
         task: &T,
@@ -270,6 +380,76 @@ impl CloudAiGateway {
             return self.fall_back(task, input, &project, context, &err, started_ms);
         }
 
+        if !self.routes.is_empty() {
+            let mut last = None;
+            let mut attempted = 0;
+            for index in self.ranked_routes(&project) {
+                let Some(route) = self.routes.get(index) else {
+                    continue;
+                };
+                // The import stores verified capability in a private routing
+                // marker. Text-only routes never receive an image payload.
+                if !prompt.images.is_empty() && !route.image_capable {
+                    continue;
+                }
+                if route.client.breaker().is_open() {
+                    continue;
+                }
+                if self
+                    .cooldowns
+                    .lock()
+                    .get(&index)
+                    .is_some_and(|until| *until > self.clock.monotonic_ms())
+                {
+                    continue;
+                }
+                if attempted >= 3 {
+                    break;
+                }
+                let result = route.run(task, input, context)?;
+                if result.source != Source::LocalFallback {
+                    return Ok(result);
+                }
+                let reason = self
+                    .audit
+                    .recent(&project, 32)
+                    .ok()
+                    .and_then(|rows| rows.into_iter().find(|row| row.id == result.call_id))
+                    .and_then(|row| row.fallback_reason);
+                let retryable = reason.as_deref().is_some_and(|reason| {
+                    matches!(
+                        reason,
+                        "provider_failed" | "schema_invalid" | "no_key" | "cost_ceiling"
+                    )
+                });
+                // A route refused before any call does not consume one of the
+                // three provider attempts; continue to an affordable model.
+                if reason.as_deref() != Some("cost_ceiling") {
+                    attempted += 1;
+                }
+                if retryable && reason.as_deref() != Some("cost_ceiling") {
+                    self.cooldowns
+                        .lock()
+                        .insert(index, self.clock.monotonic_ms().saturating_add(60_000));
+                }
+                last = Some(result);
+                if !retryable {
+                    break;
+                }
+            }
+            if let Some(result) = last {
+                return Ok(result);
+            }
+            return self.fall_back(
+                task,
+                input,
+                &project,
+                context,
+                &no_key("No eligible internal AI route"),
+                started_ms,
+            );
+        }
+
         let schema = match Schema::parse(task.output_schema()) {
             Ok(schema) => schema,
             // An unparseable schema is a programming error in the task, caught by
@@ -295,7 +475,13 @@ impl CloudAiGateway {
         };
 
         let key = cache::key(T::NAME, T::VERSION, &prompt, &plan.model.model);
-        let id = call_id(&key, self.sequence.fetch_add(1, Ordering::Relaxed));
+        // Keep billing/feedback rows distinct after an application restart.
+        // Wall-clock identity does not affect the deterministic response cache.
+        let audit_key = format!(
+            "{key}:{project}:{}",
+            self.clock.now_utc().unix_timestamp_nanos()
+        );
+        let id = call_id(&audit_key, self.sequence.fetch_add(1, Ordering::Relaxed));
 
         // 4. Cache.
         if let Some(hit) = self.try_cache::<T>(
@@ -310,7 +496,10 @@ impl CloudAiGateway {
         // builders already suppress the credential header for one, and a local
         // server with no key at all would otherwise read as "no key stored" and
         // degrade to the fallback for ever.
-        let account = config.kind.account();
+        let account = self
+            .key_account
+            .clone()
+            .unwrap_or_else(|| config.kind.account());
         let requires_key = crate::catalog::spec(config.kind).requires_key;
         let stored = self.keys.load(&account);
         let secret = match (requires_key, stored) {
@@ -339,11 +528,44 @@ impl CloudAiGateway {
         }
 
         // 6. Call, validate, repair once, validate again.
-        let attempt = self.ask::<T>(&prompt, &plan.model.model, &secret, &schema);
+        let mut usage = AttemptUsage::default();
+        let attempt = self.ask::<T>(
+            &prompt,
+            &plan.model,
+            &secret,
+            &schema,
+            &project,
+            &mut usage,
+            f64::from(task.max_cost_usd()),
+        );
 
         let (validated, response, outcome) = match attempt {
             Ok(complete) => complete,
             Err(err) => {
+                if self.profile_id.is_some() && (usage.tokens_in > 0 || usage.tokens_out > 0) {
+                    // A provider can bill a completion that fails schema validation.
+                    // Record that spend separately from the zero-cost local answer.
+                    let mut billed = CallRecord::local(
+                        id,
+                        T::NAME,
+                        T::VERSION,
+                        FallbackReason::of(&err).as_str(),
+                    )
+                    .in_project(&project);
+                    billed.provider = self.profile_id.clone().unwrap_or_default();
+                    billed.model.clone_from(&plan.model.model);
+                    billed.source = Source::Cloud;
+                    billed.status = "invalid_response".to_string();
+                    billed.tokens_in = usage.tokens_in;
+                    billed.tokens_out = usage.tokens_out;
+                    billed.cost_usd = usage.cost;
+                    billed.prompt_hash = prompt.prompt_hash();
+                    billed.image_hashes = image_hashes(&prompt);
+                    billed.transport = self.client.transport_name().to_string();
+                    billed.latency_ms = self.clock.monotonic_ms().saturating_sub(started_ms);
+                    billed.decision_ref = context.decision_ref.map(ToString::to_string);
+                    self.audit.record(&billed);
+                }
                 return self.fall_back(task, input, &project, context, &err, started_ms);
             }
         };
@@ -392,7 +614,11 @@ impl CloudAiGateway {
         } = *settlement;
 
         let cost = plan.model.price(response.tokens_in, response.tokens_out);
-        if let Err(err) = self.governor.charge(project, cost, plan.downgraded) {
+        if let Err(err) = if self.profile_id.is_none() {
+            self.governor.charge(project, cost, plan.downgraded)
+        } else {
+            Ok(())
+        } {
             tracing::warn!(
                 target: "cloud.budget",
                 code = err.code.0,
@@ -428,7 +654,10 @@ impl CloudAiGateway {
                 task: T::NAME.to_string(),
                 task_version: T::VERSION,
                 model: response.model.clone(),
-                provider: self.client.provider().kind().as_str().to_string(),
+                provider: self
+                    .profile_id
+                    .clone()
+                    .unwrap_or_else(|| self.client.provider().kind().as_str().to_string()),
                 transport: self.client.transport_name().to_string(),
                 source: Source::Cloud,
                 tier: Some(plan.tier.as_str().to_string()),
@@ -621,12 +850,16 @@ impl CloudAiGateway {
     }
 
     /// One call, one repair, and the outcome for the audit row.
+    #[allow(clippy::too_many_arguments)]
     fn ask<T>(
         &self,
         prompt: &PromptSpec,
-        model: &str,
+        alias: &crate::provider::ModelAlias,
         secret: &SecretKey,
         schema: &Schema,
+        project: &str,
+        usage: &mut AttemptUsage,
+        max_cost: f64,
     ) -> AuraResult<(
         crate::validate::Validated<T::Output>,
         crate::provider::CloudResponse,
@@ -638,16 +871,31 @@ impl CloudAiGateway {
     {
         let first = self.client.call(
             &CloudRequest {
-                model: model.to_string(),
+                model: alias.model.clone(),
                 prompt: prompt.clone(),
                 repair: None,
             },
             secret,
         )?;
+        self.charge_attempt(&first, alias, project, usage)?;
 
         match crate::validate::parse::<T::Output>(T::NAME, schema, &first.text) {
             Ok(validated) => Ok((validated, first, RepairOutcome::NotNeeded)),
             Err(complaint) => {
+                if self.profile_id.is_some() {
+                    let mut repair_prompt = prompt.clone();
+                    repair_prompt
+                        .user
+                        .push_str(&crate::provider::truncate(&first.text, 4_000));
+                    repair_prompt.user.push_str(&complaint.detail);
+                    self.governor.plan(
+                        T::NAME,
+                        project,
+                        self.client.provider().config(),
+                        &repair_prompt,
+                        max_cost,
+                    )?;
+                }
                 tracing::info!(
                     target: "cloud.repair",
                     task = T::NAME,
@@ -655,7 +903,7 @@ impl CloudAiGateway {
                 );
                 let second = self.client.call(
                     &CloudRequest {
-                        model: model.to_string(),
+                        model: alias.model.clone(),
                         prompt: prompt.clone(),
                         repair: Some(RepairTurn {
                             previous: crate::provider::truncate(&first.text, 4_000),
@@ -664,6 +912,7 @@ impl CloudAiGateway {
                     },
                     secret,
                 )?;
+                self.charge_attempt(&second, alias, project, usage)?;
                 let validated = crate::validate::parse::<T::Output>(T::NAME, schema, &second.text)?;
                 // Tokens from both attempts are billed, so both are charged.
                 let combined = crate::provider::CloudResponse {
@@ -674,6 +923,25 @@ impl CloudAiGateway {
                 Ok((validated, combined, RepairOutcome::Repaired))
             }
         }
+    }
+
+    fn charge_attempt(
+        &self,
+        response: &crate::provider::CloudResponse,
+        alias: &crate::provider::ModelAlias,
+        project: &str,
+        usage: &mut AttemptUsage,
+    ) -> AuraResult<()> {
+        if self.profile_id.is_none() {
+            return Ok(());
+        }
+        usage.tokens_in = usage.tokens_in.saturating_add(response.tokens_in);
+        usage.tokens_out = usage.tokens_out.saturating_add(response.tokens_out);
+        let cost = alias.price(response.tokens_in, response.tokens_out);
+        usage.cost += cost;
+        self.governor.charge(project, cost, false).map_err(|_| {
+            payload_refused("Could not record AI spending; stopping provider requests")
+        })
     }
 
     /// The local answer, plus the row that records why it was needed.
@@ -696,13 +964,23 @@ impl CloudAiGateway {
         let value = task.local_fallback(input)?;
         let confidence = value.confidence();
         let id = call_id(
-            &format!("{}:{}:{}", T::NAME, T::VERSION, reason.as_str()),
+            &format!(
+                "{}:{}:{}:{project}:{}",
+                T::NAME,
+                T::VERSION,
+                reason.as_str(),
+                self.clock.now_utc().unix_timestamp_nanos()
+            ),
             self.sequence.fetch_add(1, Ordering::Relaxed),
         );
 
         let mut record =
             CallRecord::local(id, T::NAME, T::VERSION, reason.as_str()).in_project(project);
         record.confidence = confidence;
+        if let Some(profile) = &self.profile_id {
+            record.provider.clone_from(profile);
+            record.scratchpad = Some(format!("{{\"errorCode\":\"{}\"}}", cause.code.0));
+        }
         record.latency_ms = self.clock.monotonic_ms().saturating_sub(started_ms);
         record.status = if reason == FallbackReason::SchemaInvalid {
             "schema_invalid".to_string()
@@ -726,6 +1004,13 @@ impl CloudAiGateway {
             call_id: id,
         })
     }
+}
+
+#[derive(Debug, Default)]
+struct AttemptUsage {
+    tokens_in: u32,
+    tokens_out: u32,
+    cost: f64,
 }
 
 /// Everything step 7 needs, gathered so the settle function takes three

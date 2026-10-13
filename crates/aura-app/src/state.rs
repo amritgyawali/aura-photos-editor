@@ -154,6 +154,8 @@ pub struct AppState {
     /// Buffers before and after each photograph's retouch stack, shared by every render this
     /// process makes. ADR-0098.
     retouch_checkpoints: aura_render::retouch_cache::Checkpoints,
+    /// One expensive image pass at a time, shared by planners and every renderer.
+    image_work_gate: Arc<std::sync::Mutex<()>>,
     cache_root: PathBuf,
     /// Where `models.lock`, its signature and the model files live.
     ///
@@ -214,6 +216,7 @@ struct CloudSlot {
     /// state and means the catalog's own names apply.
     models: ModelChoice,
     policy: CloudPolicy,
+    policy_restored: bool,
     /// Swapped for a cassette transport by the tests and the phase gate.
     transport: Option<Arc<dyn Transport>>,
     /// True once the stored choice has been read back from the catalog.
@@ -234,6 +237,7 @@ impl Default for CloudSlot {
             endpoint: None,
             models: ModelChoice::default(),
             policy: CloudPolicy::default(),
+            policy_restored: false,
             transport: None,
             restored: false,
         }
@@ -286,6 +290,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
+            image_work_gate: Arc::default(),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -312,6 +317,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
+            image_work_gate: Arc::default(),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -1469,6 +1475,10 @@ impl AppState {
         &self.edited_previews
     }
 
+    pub(crate) fn image_work_gate(&self) -> &Arc<std::sync::Mutex<()>> {
+        &self.image_work_gate
+    }
+
     /// Where cached previews live.
     #[must_use]
     pub fn cache_root(&self) -> &Path {
@@ -1730,8 +1740,17 @@ impl AppState {
     ///
     /// Never in itself; the signature matches the other setters.
     pub fn set_cloud_policy(&self, policy: CloudPolicy) -> AuraResult<()> {
+        let encoded = serde_json::to_string(&policy)
+            .map_err(|_| aura_core::errors::cloud::payload_refused("Invalid AI privacy setting"))?;
+        let now = aura_catalog::rfc3339(self.clock.now_utc());
+        self.catalog.writer().with(move |conn| {
+            conn.execute("INSERT INTO setting(key,value_json,updated_at) VALUES('ai.privacy.v1',?1,?2) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at", rusqlite::params![encoded, now])
+                .map_err(|e| aura_core::errors::db::statement_failed("Could not save AI privacy setting", &e))?;
+            Ok(())
+        })?;
         let mut slot = self.cloud.lock();
         slot.policy = policy;
+        slot.policy_restored = true;
         slot.gateway = None;
         Ok(())
     }
@@ -1824,6 +1843,25 @@ impl AppState {
             return Ok(());
         }
         let stored = self.catalog.read(crate::ai_settings::read)?;
+        let privacy: Option<CloudPolicy> = self.catalog.read(|conn| {
+            use rusqlite::OptionalExtension;
+            let json: Option<String> = conn
+                .query_row(
+                    "SELECT value_json FROM setting WHERE key='ai.privacy.v1'",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|e| {
+                    aura_core::errors::db::statement_failed("Could not read AI privacy setting", &e)
+                })?;
+            json.map(|text| {
+                serde_json::from_str(&text).map_err(|_| {
+                    aura_core::errors::cloud::payload_refused("Invalid saved AI privacy setting")
+                })
+            })
+            .transpose()
+        })?;
         let mut slot = self.cloud.lock();
         // Checked again under the lock: two commands arriving together would
         // otherwise both read and both apply, and the second would discard a
@@ -1834,6 +1872,12 @@ impl AppState {
         slot.provider = stored.kind();
         slot.endpoint = stored.endpoint().map(ToString::to_string);
         slot.models = stored.models();
+        if !slot.policy_restored {
+            if let Some(privacy) = privacy {
+                slot.policy = privacy;
+            }
+            slot.policy_restored = true;
+        }
         slot.restored = true;
         slot.gateway = None;
         Ok(())
@@ -1854,6 +1898,7 @@ impl AppState {
             }
         }
         self.restore_ai_setup()?;
+        let internal = crate::internal_ai::status(self)?;
         let keys = self.key_store()?;
 
         let mut slot = self.cloud.lock();
@@ -1865,7 +1910,7 @@ impl AppState {
 
         let client = Arc::new(ProviderClient::new(
             provider,
-            transport,
+            Arc::clone(&transport),
             Arc::new(ThreadSleeper),
         ));
         let cache: Arc<dyn ResponseCache> = Arc::new(CatalogCache::new(
@@ -1885,18 +1930,26 @@ impl AppState {
             Arc::clone(&self.clock),
         ));
 
-        let gateway = Arc::new(CloudAiGateway::new(
-            client,
-            keys,
-            cache,
-            audit,
-            governor,
-            consent,
-            Arc::clone(&self.clock),
-            slot.policy,
-        ));
+        let gateway = Arc::new(
+            CloudAiGateway::new(
+                client,
+                keys,
+                cache,
+                audit,
+                governor,
+                consent,
+                Arc::clone(&self.clock),
+                slot.policy,
+            )
+            .with_internal_routes(&internal.profiles, &transport),
+        );
         slot.gateway = Some(Arc::clone(&gateway));
         Ok(gateway)
+    }
+
+    /// Rebuild routes after configuration refresh without changing privacy.
+    pub fn reload_internal_ai(&self) {
+        self.cloud.lock().gateway = None;
     }
 
     /// Where `hardware_plan.json` lives: beside the catalog, like the cache.
@@ -3006,7 +3059,8 @@ impl AppState {
             Arc::new(crate::photo_frames::CatalogFrames::new(self.clone()));
         Ok(Arc::new(
             aura_render::CpuEngine::new(source, Arc::clone(&self.clock))
-                .with_checkpoints(self.retouch_checkpoints.clone()),
+                .with_checkpoints(self.retouch_checkpoints.clone())
+                .with_image_work_gate(Arc::clone(&self.image_work_gate)),
         ))
     }
 

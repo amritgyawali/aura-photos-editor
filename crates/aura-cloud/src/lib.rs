@@ -117,6 +117,7 @@ pub mod fallback;
 pub mod gateway;
 pub mod google;
 pub mod http;
+pub mod internal_ai;
 pub mod moment_significance;
 pub mod openai;
 pub mod payload;
@@ -125,6 +126,7 @@ pub mod provider;
 pub mod redact;
 pub mod repair;
 pub mod schema;
+pub mod skin_advice;
 pub mod tasks;
 #[cfg(feature = "tls")]
 pub mod tls;

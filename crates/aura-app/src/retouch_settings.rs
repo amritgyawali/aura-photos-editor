@@ -79,6 +79,9 @@ pub struct Settings {
     /// Rebuild the tone under every compact mark from the clean skin around it, leaving the
     /// pores where they are (frequency healing). 0 is off. ADR-0090.
     pub frequency_heal: f32,
+    /// Re-check compact residual marks after each heal, at most four passes.
+    #[serde(skip_serializing_if = "default_cleanup_passes")]
+    pub cleanup_passes: u8,
     /// At most this many spots healed per face (1..=900 in deep cleanup).
     pub max_spots: u16,
     /// Treat a field of many small marks as freckles and keep all of them.
@@ -149,6 +152,11 @@ pub struct Settings {
     pub backdrop: f32,
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)] // Serde skip_serializing_if requires a reference.
+fn default_cleanup_passes(value: &u8) -> bool {
+    *value == 2
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -177,6 +185,7 @@ impl Default for Settings {
             deep_blemish_cleanup: false,
             remove_dark_marks: false,
             frequency_heal: 0.0,
+            cleanup_passes: 2,
             max_spots: 12,
             keep_freckles: true,
             forehead_lines: 0.5,
@@ -264,6 +273,7 @@ impl Settings {
             deep_blemish_cleanup: self.deep_blemish_cleanup,
             remove_dark_marks: self.remove_dark_marks,
             frequency_heal: unit(self.frequency_heal, 0.0),
+            cleanup_passes: self.cleanup_passes.clamp(1, 4),
             max_spots: self
                 .max_spots
                 .clamp(1, if self.deep_blemish_cleanup { 900 } else { 24 }),

@@ -525,7 +525,7 @@ fn pass(
 /// Find and rebuild, then once more on the result: with the strongest marks gone, the skin
 /// between them is a truer reference, and fainter marks beside them measure as marks.
 pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) {
-    for _ in 0..PASSES {
+    for _ in 0..usize::from(edit.repair_passes.unwrap_or(PASSES as u8)) {
         if !pass(rgb, w, h, edit, coverage, None) {
             break;
         }
@@ -544,7 +544,7 @@ pub(crate) fn mark_plane(
 ) -> Vec<f32> {
     let mut touched = vec![0.0; w * h];
     let mut scratch = rgb.to_vec();
-    for _ in 0..PASSES {
+    for _ in 0..usize::from(edit.repair_passes.unwrap_or(PASSES as u8)) {
         if !pass(&mut scratch, w, h, edit, coverage, Some(&mut touched)) {
             break;
         }

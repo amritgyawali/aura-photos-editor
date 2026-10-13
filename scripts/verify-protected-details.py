@@ -34,13 +34,15 @@ with sync_playwright() as p:
  page=browser.contexts[0].pages[0]
  page.set_default_timeout(180000)
  data=page.evaluate('''async ({collection,localWings,structureSpots}) => {
-  const invoke=window.__TAURI_INTERNALS__.invoke;
+  const invoke=async (command,args)=>{try{return await window.__TAURI_INTERNALS__.invoke(command,args)}catch(error){throw new Error(command+': '+JSON.stringify(error))}};
   const project=(await invoke('list_projects')).find(p=>p.name===collection);
   const photo=(await invoke('list_images',{input:{projectId:project.id,offset:0,limit:10,orderBy:null}}))[0];
   const input={projectId:project.id,photoId:photo.id};
   const recipe=await invoke('image_recipe',{input:{photoId:photo.id}});
-  const before=await invoke('native_retouch_preview',{...input,before:true});
-  const after=await invoke('native_retouch_preview',{...input,before:false});
+  // Saved coverage is a fast-resolution plane. Match its grid explicitly;
+  // full-resolution export/feature checks are a separate verification.
+  const before=await invoke('native_retouch_preview',{...input,before:true,quality:'fast'});
+  const after=await invoke('native_retouch_preview',{...input,before:false,quality:'fast'});
   const coverage=await invoke('native_retouch_saved_selection',{input:{...input,operationId:null}});
   const bodyEdit=JSON.parse(recipe.body).studio_retouch_v1.find(e=>e.id.endsWith('-body-spots'));
   const bodyCoverage=bodyEdit?await invoke('native_retouch_saved_selection',{input:{...input,operationId:bodyEdit.id}}):null;
@@ -71,7 +73,7 @@ with sync_playwright() as p:
      await invoke('native_retouch_edit',{input:{...input,action:'append',edits:wide,id:null}});
      undoCount++;
     }
-    broadFrame=await invoke('native_retouch_preview',{...input,before:false});
+    broadFrame=await invoke('native_retouch_preview',{...input,before:false,quality:'fast'});
    } finally {
     for(let j=0;j<undoCount;j++) await invoke('history_step',{input:{...input,action:'undo'}});
     const restored=await invoke('image_recipe',{input:{photoId:photo.id}});

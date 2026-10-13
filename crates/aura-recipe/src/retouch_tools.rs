@@ -107,6 +107,12 @@ pub enum Tool {
     Backdrop,
     Glare,
     Makeup,
+    /// Set chroma from a chosen sRGB color, preserving the photographed luminance.
+    Colorize,
+    /// Composite a solid chosen sRGB color inside the saved selection.
+    BackgroundColor,
+    /// Explicit local width/height change. Warmth/tint are signed horizontal/vertical amounts.
+    Reshape,
     SkinSmooth,
     SkinUniformity,
     PortraitDodgeBurn,
@@ -133,6 +139,9 @@ pub struct Edit {
     pub id: String,
     pub tool: Tool,
     pub enabled: bool,
+    /// Bounded repeated residual healing. Absent keeps the original two-pass rendering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repair_passes: Option<u8>,
     /// Center x/y and ellipse radii x/y in normalized full-frame coordinates.
     pub region: [f32; 4],
     /// Normalized donor/reference point; mandatory for clone and color matching.
@@ -184,6 +193,9 @@ pub struct Edit {
     pub tone: f32,
     pub warmth: f32,
     pub tint: f32,
+    /// Display-referred sRGB in 0..=1, only for explicit color tools. Absent on old edits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_color: Option<[f32; 3]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mask: Option<BrushMask>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -395,6 +407,15 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || !(-1.0..=1.0).contains(&edit.tint)
             || edit.source.is_some_and(|p| !p.iter().all(|v| unit(*v)))
             || !valid_heal_support(edit)
+            || edit.repair_passes.is_some_and(|n| {
+                !(1..=4).contains(&n) || !matches!(edit.tool, Tool::AcneClear | Tool::FrequencyHeal)
+            })
+            || edit
+                .target_color
+                .is_some_and(|rgb| !rgb.iter().all(|v| unit(*v)))
+            || (matches!(edit.tool, Tool::Colorize | Tool::BackgroundColor)
+                && edit.target_color.is_none())
+            || (edit.tool == Tool::Reshape && edit.selection.as_ref().is_some_and(|s| s.inverted))
             || !edit.source_scale.is_finite()
             || !(0.2..=1.0).contains(&edit.source_scale)
             || edit.sensitivity.is_some_and(|v| !unit(v))

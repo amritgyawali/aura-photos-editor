@@ -14,7 +14,7 @@ it('starts new photos with pore retention and natural body colour, while retaini
 
 it('restores all fine controls and per-photo scope without sharing mutable defaults', () => {
   const settings = Object.fromEntries(Object.entries(DEFAULT_RETOUCH_SETTINGS).map(([key, value]) =>
-    [key, typeof value === 'boolean' ? !value : key === 'maxSpots' ? 7 : .23]));
+    [key, typeof value === 'boolean' ? !value : key === 'maxSpots' ? 7 : key === 'cleanupPasses' ? 3 : .23]));
   const saved = { intensity: .65, scope: 'face_and_body', blemishes: false, refine: true, eyes: false, teeth: true, adaptive: false, settings };
   expect(readRetouchPreferences(recipe(saved))).toEqual(saved);
   const first = readRetouchPreferences(recipe(saved));
@@ -25,9 +25,9 @@ it('restores all fine controls and per-photo scope without sharing mutable defau
 
 it('bounds numeric values and ignores unknown or incorrectly typed fields', () => {
   const actual = readRetouchPreferences(recipe({ intensity: 100, scope: 'unknown', eyes: 'false',
-    settings: { smoothing: 12, skinWarmth: -12, skinTint: -.4, maxSpots: 3.7, keepFreckles: 0, unknown: 1 } }));
+    settings: { smoothing: 12, cleanupPasses: 12, skinWarmth: -12, skinTint: -.4, maxSpots: 3.7, keepFreckles: 0, unknown: 1 } }));
   expect(actual).toMatchObject({ intensity: 1.5, scope: 'face', eyes: true,
-    settings: { smoothing: 1, skinWarmth: -1, skinTint: -.4, maxSpots: 4, keepFreckles: DEFAULT_RETOUCH_SETTINGS.keepFreckles } });
+    settings: { smoothing: 1, cleanupPasses: 4, skinWarmth: -1, skinTint: -.4, maxSpots: 4, keepFreckles: DEFAULT_RETOUCH_SETTINGS.keepFreckles } });
   expect(actual.settings).not.toHaveProperty('unknown');
 });
 

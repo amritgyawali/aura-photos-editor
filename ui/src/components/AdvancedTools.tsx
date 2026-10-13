@@ -8,6 +8,7 @@ import { CullView } from './cull/CullView';
 import { DevelopWorkspace } from './develop/DevelopWorkspace';
 import { ToneReviewQueue } from './develop/ToneReviewQueue';
 import { PortraitRetouch } from './develop/PortraitRetouch';
+import { NativeRetouchWorkspace } from './develop/NativeRetouchWorkspace';
 import { Inspector } from './explain/Inspector';
 import { FilterChips } from './explain/FilterChips';
 import { MomentStack } from './grid/MomentStack';
@@ -37,6 +38,7 @@ export function AdvancedTools({ projectId, photoId, onOpen, onError, onRefresh, 
     <Tool title="Photo evidence"><FilterChips projectId={projectId} onSelect={ids => { if (ids[0]) onOpen(ids[0]); }} /><Inspector projectId={projectId} photoId={photoId} onSelect={onOpen} onError={onError} /></Tool>
     <Tool title="Detailed development"><DevelopWorkspace projectId={projectId} photoId={photoId} onError={onError} /><ToneReviewQueue projectId={projectId} onOpen={onOpen} onError={onError} /></Tool>
     <Tool title="Portrait regions">{photoId ? <PortraitRetouch projectId={projectId} photoId={photoId} disabled={false} onBusyChange={onBusyChange} /> : <p>Select a photo first.</p>}</Tool>
+    <Tool title="Precision retouch, hair color and proportions">{photoId ? <NativeRetouchWorkspace key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId} onClose={() => onOpen(photoId)} onBusyChange={onBusyChange}/> : <p>Select a photo first.</p>}</Tool>
     <Tool title="Object cleanup"><CleanupPanel projectId={projectId} photoId={photoId} onError={onError} /></Tool>
     <Tool title="Learn a style"><StylePanel projectId={projectId} onError={onError} /></Tool>
     <Tool title="Complete collection workflow"><OneClickRunner onFinished={onRefresh} /></Tool>

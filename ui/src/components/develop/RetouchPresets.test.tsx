@@ -4,6 +4,13 @@ import { freshRetouch } from '../../ipc/nativeRetouch';
 import { RetouchPresets, parseRetouchPresets } from './RetouchPresets';
 
 beforeEach(() => localStorage.clear());
+it('saves a chosen hair color without carrying the old photo selection', () => {
+  const settings = {...freshRetouch(),tool:'colorize',targetColor:[.3,.2,.8]};
+  const [preset] = parseRetouchPresets(JSON.stringify({version:1,items:[{name:'Violet hair',settings}]}));
+  expect(preset?.settings.targetColor).toEqual([.3,.2,.8]);
+  expect(preset?.settings).not.toHaveProperty('region');
+  expect(() => parseRetouchPresets(JSON.stringify({version:1,items:[{name:'Bad color',settings:{...settings,targetColor:[.3,2,.8]}}]}))).toThrow('invalid');
+});
 it('persists reusable settings without carrying masks, sources or photo-specific IDs', () => {
   const apply = vi.fn();
   const draft = { ...freshRetouch(), tool: 'dodge' as const, source: [.2,.3] as [number, number], mask: { strokes: [] } };

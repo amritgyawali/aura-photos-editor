@@ -98,6 +98,7 @@ pub mod contract {
 }
 
 pub mod bands;
+pub mod blemish_review;
 pub mod cleanup;
 pub mod colour;
 pub mod cpu;
@@ -121,10 +122,12 @@ mod retouch_acne;
 pub mod retouch_analysis;
 pub mod retouch_cache;
 mod retouch_clear;
+mod retouch_color;
 mod retouch_heal;
 mod retouch_mask;
 mod retouch_matte;
 mod retouch_planes;
+mod retouch_reshape;
 mod retouch_skin;
 mod retouch_texture;
 pub mod retouch_tools;

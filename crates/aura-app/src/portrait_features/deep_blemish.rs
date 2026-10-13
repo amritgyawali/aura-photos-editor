@@ -14,13 +14,15 @@ mod curvature;
 mod diagnostics;
 mod lighting;
 mod refinement;
+mod upper_cheek;
 pub(crate) use refinement::refine;
+pub(crate) use upper_cheek::supplement;
 
 #[derive(Clone, Copy)]
 enum SurfaceKind {
     Finish,
     Blemishes,
-    Spots,
+    Spots(bool),
 }
 
 #[derive(Clone, Debug)]
@@ -232,17 +234,17 @@ fn candidates(
                 }
                 let half = (xx + yy) * 0.5 / area;
                 let root = (((xx - yy) * 0.5).powi(2) + xy * xy).sqrt() / area;
+                let mean_red = group.iter().map(|&i| redness[i].max(0.0)).sum::<f32>() / area;
                 #[cfg(test)]
                 let trace = |stage: &str| {
                     if std::env::var_os("AURA_SPOT_TRACE").is_some() {
-                        println!("spot-trace {stage} {x:.2} {y:.2} area={area:.1} reach={reach:.2} aspect={:.2} red={rmax:.4}", (half + root) / (half - root).max(0.2));
+                        println!("spot-trace {stage} {x:.2} {y:.2} area={area:.1} reach={reach:.2} aspect={:.2} red={rmax:.4} mean-red={mean_red:.4}", (half + root) / (half - root).max(0.2));
                     }
                 };
                 // Positive color evidence must cover the component, not just one
                 // red pixel on a neutral crease. Neutral marks keep the strict
                 // compact-shape path; measured inflammation can be elongated.
-                let inflamed = rmax > 0.025
-                    && group.iter().map(|&i| redness[i].max(0.0)).sum::<f32>() / area > 0.012;
+                let inflamed = rmax > 0.025 && mean_red > 0.012;
                 if (half + root) / (half - root).max(0.2) > if inflamed { 25.0 } else { 5.5 }
                     || reach > 18.0 * scale
                 {
@@ -363,19 +365,25 @@ fn candidates(
                         .map(|(r, _)| *r)
                         .collect(),
                 );
-                // Unsupported brightness forbids rebuilding texture. Strong,
-                // independently supported inflammation can instead lose pigment
-                // while retaining the original luminance and fine detail.
+                // Unsupported brightness forbids rebuilding texture. Consistent
+                // local inflammation can instead lose pigment while retaining
+                // original luminance and detail. The peak alone must not reject
+                // moderate redness supported by the whole component and a clean,
+                // enclosing ring; those independent checks remain mandatory.
                 let color_support = surrounded
                     && inflamed
-                    && rmax > 0.06
-                    && group.iter().map(|&i| redness[i].max(0.0)).sum::<f32>() / area > 0.025
+                    && rmax > 0.04
+                    && mean_red > 0.025
                     && clean_ring.iter().filter(|v| **v).count() >= 10
                     && clean_ring
                         .chunks(4)
                         .all(|q| q.iter().filter(|v| **v).count() >= 2)
                     && healthy_red.is_some_and(|r| fine_red[at] > r + 0.025);
                 let chroma_only = chosen_light.is_none() && color_support;
+                #[cfg(test)]
+                if chosen_light.is_none() && std::env::var_os("AURA_SPOT_TRACE").is_some() {
+                    println!("pigment-trace {x:.2} {y:.2} surrounded={surrounded} clean={} red-delta={:.4}", clean_ring.iter().filter(|v| **v).count(), healthy_red.map_or(0.0, |r| fine_red[at] - r));
+                }
                 let reference_luma =
                     if let Some(light) = chosen_light.filter(|_| surrounded || contextual) {
                         light
@@ -679,6 +687,18 @@ pub(crate) fn plan(
     settings: &Settings,
     matte: Option<&Matte>,
 ) -> FeatureEdits {
+    plan_with_cheek(face, index, px, prefix, settings, matte, false)
+}
+
+fn plan_with_cheek(
+    face: &PortraitFace,
+    index: usize,
+    px: &Pixels<'_>,
+    prefix: &str,
+    settings: &Settings,
+    matte: Option<&Matte>,
+    upper_cheek: bool,
+) -> FeatureEdits {
     let mut out = FeatureEdits::default();
     let Some(g) = Geometry::new(face, px) else {
         return out;
@@ -694,12 +714,13 @@ pub(crate) fn plan(
     }
     // Reuse the connected, feature-safe skin fill used by frequency healing. Small
     // segmentation holes must not keep a remaining mark outside the residual search.
-    let expanded = surface_selection(&g, px, matte, SurfaceKind::Spots).map(|alpha| Matte {
-        bounds: matte.bounds,
-        width: matte.width,
-        height: matte.height,
-        alpha,
-    });
+    let expanded =
+        surface_selection(&g, px, matte, SurfaceKind::Spots(upper_cheek)).map(|alpha| Matte {
+            bounds: matte.bounds,
+            width: matte.width,
+            height: matte.height,
+            alpha,
+        });
     let search_matte = expanded.as_ref().unwrap_or(matte);
     let [l, t, r, b] = matte.bounds;
     let x0 = (l * px.width as f32).floor().max(0.0) as usize;
@@ -737,12 +758,31 @@ pub(crate) fn plan(
     // glabella and smile-line disks. Shape and ring-light checks reject creases;
     // a true lesion beside one still needs a complete clean surrounding ring.
     exclusions.truncate(4);
+    if upper_cheek {
+        exclusions = exclusions
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, area)| (i % 2 == 1).then_some(area))
+            .collect();
+    }
     exclusions.push(lip_protection(&g));
     for y in 0..h {
         for x in 0..w {
             let point = [(x + x0) as f32 + 0.5, (y + y0) as f32 + 0.5];
+            let uncertain_cheek = upper_cheek
+                && settings.protect_eye_area
+                && settings.deep_blemish_cleanup
+                && settings.remove_dark_marks
+                && super::eye_guard::spot_eye_weight(&g, point, false) < 1.0
+                && matte.at(point[0] / px.width as f32, point[1] / px.height as f32)
+                    <= 224.0 / 255.0;
             if exclusions.iter().any(|e| e.contains(point))
-                || (super::eye_guard::spot_weight(&g, point, settings) < 1.0)
+                || ((if upper_cheek {
+                    super::eye_guard::cheek_weight(&g, point, settings)
+                } else {
+                    super::eye_guard::spot_weight(&g, point, settings)
+                }) < 1.0)
+                || uncertain_cheek
             {
                 mask[y * w + x] = false;
             }
@@ -1052,10 +1092,11 @@ fn surface_selection(
         exclusions.clear();
     }
     let mut brow_areas = Vec::with_capacity(2);
+    let mut brow_bands = Vec::with_capacity(2);
     for eye in g.eyes {
         exclusions.push(super::Capsule::disk(eye, g.d * 0.25));
         let brow = super::add(eye, g.v, -g.d * 0.32);
-        exclusions.push(super::Capsule {
+        brow_bands.push(super::Capsule {
             a: super::add(brow, g.u, -g.d * 0.28),
             b: super::add(brow, g.u, g.d * 0.28),
             r: g.d * 0.085,
@@ -1090,10 +1131,24 @@ fn surface_selection(
     for i in 0..w * h {
         let point = centre(i);
         let on_brow = to_brow[i] <= brow_margin && brow_areas.iter().any(|a| a.contains(point));
+        // The landmark band is deliberately generous for broad finishing. A
+        // compact repair may reach confidently segmented, skin-coloured cells
+        // beside it, provided the measured hair and its margin are still out.
+        let confirmed_skin = matches!(kind, SurfaceKind::Spots(_))
+            && matte.alpha[i] > 224
+            && skin_like[i]
+            && !on_brow;
+        let conservative_eye = super::eye_guard::spot_eye_weight(g, point, false);
+        let extended_eye = super::eye_guard::spot_eye_weight(g, point, true);
+        let confirmed_cheek = matches!(kind, SurfaceKind::Spots(true))
+            && confirmed_skin
+            && conservative_eye < 1.0
+            && extended_eye >= 1.0;
         if on_brow
-            || exclusions.iter().any(|e| e.contains(point))
+            || (brow_bands.iter().any(|band| band.contains(point)) && !confirmed_skin)
+            || (exclusions.iter().any(|e| e.contains(point)) && !confirmed_cheek)
             || (blemish
-                && if matches!(kind, SurfaceKind::Spots) {
+                && if matches!(kind, SurfaceKind::Spots(_)) {
                     super::eye_guard::nostril_opening_weight(g, point) < 1.0
                 } else {
                     super::eye_guard::nostril_weight(g, point) < 1.0
@@ -1103,7 +1158,16 @@ fn surface_selection(
         }
     }
     let distance = clearance(&selected, w, h);
-    let feather = (g.d * 0.08 / cell).max(2.0);
+    // A broad finishing feather must not remove thin strips of safe skin from
+    // compact detection. Every later repair still needs its whole ellipse,
+    // enclosing healthy context and the final eye/nostril guard.
+    let feather =
+        (g.d * if matches!(kind, SurfaceKind::Spots(_)) {
+            0.025
+        } else {
+            0.08
+        } / cell)
+            .max(2.0);
     Some(
         distance
             .iter()
@@ -1288,6 +1352,7 @@ pub(crate) fn frequency_heal(
     // under it stays, and the texture graft restores what the repair cost.
     edit.texture = 0.25;
     edit.sensitivity = Some(settings.blemish_sensitivity.clamp(0.0, 1.0));
+    edit.repair_passes = (settings.cleanup_passes != 2).then_some(settings.cleanup_passes);
     edit.keep_dark_marks = !settings.remove_dark_marks;
     Some(edit)
 }
@@ -1427,6 +1492,83 @@ mod tests {
                 assert!(a == b, "pigment repair changed skin outside its region");
             }
         }
+    }
+    #[test]
+    fn moderate_local_redness_on_a_shadow_edge_uses_colour_only() {
+        let (w, h) = (160, 160);
+        let mask = vec![true; w * h];
+        let mut lum = vec![0.4; w * h];
+        let mut red = vec![0.1; w * h];
+        for y in 0..h {
+            for x in 80..w {
+                lum[y * w + x] = 0.18;
+            }
+        }
+        // A clean shadow with the same skin colour is never a pigment repair.
+        assert!(candidates(&lum, &red, &mask, w, h, 250.0, 1.0)
+            .0
+            .iter()
+            .all(|s| !s.chroma_only));
+        for y in 0..h {
+            for x in 0..w {
+                if (x as f32 - 80.0).hypot(y as f32 - 80.0) < 6.0 {
+                    red[y * w + x] += 0.055;
+                }
+            }
+        }
+        let spots = candidates(&lum, &red, &mask, w, h, 250.0, 1.0).0;
+        let spot = spots
+            .iter()
+            .find(|s| distance([s.x, s.y], [80.0, 80.0]) < 3.0)
+            .expect("supported moderate inflammation should retain its shadow and lose pigment");
+        assert!(
+            spot.chroma_only,
+            "a shadow edge must not receive texture replacement"
+        );
+        assert!(!spot.curved_heal && spot.heal_samples.is_empty());
+        let rgb: Vec<f32> = lum
+            .iter()
+            .zip(&red)
+            .flat_map(|(l, r)| {
+                let difference = r * (3.0 * l + 0.05) / (1.0 - 0.3622 * r);
+                let green = l - 0.2126 * difference;
+                [green + difference, green, green]
+            })
+            .collect();
+        let encoded: Vec<u8> = rgb.iter().map(|v| (v * 255.0).round() as u8).collect();
+        let pixels = Pixels::new(&encoded, w as u32, h as u32).unwrap();
+        let mut edit = base_edit(
+            "test-moderate-pigment".into(),
+            Tool::SkinUniformity,
+            0.8,
+            &pixels,
+            [spot.x, spot.y, spot.radii[0], spot.radii[1]],
+        );
+        edit.source = Some([110.0 / w as f32, 80.0 / h as f32]);
+        configure_pigment_repair(&mut edit, spot.radius, w.min(h));
+        let mut after = rgb.clone();
+        aura_render::retouch_tools::apply(&mut after, w, h, &[edit]);
+        let at = (80 * w + 80) * 3;
+        let redness = |p: &[f32]| (p[0] - (p[1] + p[2]) * 0.5) / (p.iter().sum::<f32>() + 0.05);
+        assert!(redness(&after[at..at + 3]) < redness(&rgb[at..at + 3]) - 0.005);
+        for (i, (a, b)) in rgb.chunks_exact(3).zip(after.chunks_exact(3)).enumerate() {
+            let luminance = |p: &[f32]| p[0] * 0.2627 + p[1] * 0.6780 + p[2] * 0.0593;
+            assert!((luminance(a) - luminance(b)).abs() < 0.000_001);
+            if ((i % w) as f32 - spot.x).abs() > spot.radii[0] + 1.0
+                || ((i / w) as f32 - spot.y).abs() > spot.radii[1] + 1.0
+            {
+                assert_eq!(a, b, "local pigment repair escaped its region");
+            }
+        }
+        // Only the inflamed centre is selected: there is no enclosing selected
+        // healthy skin, even for the detector's smallest allowed repair.
+        let clipped: Vec<_> = (0..w * h)
+            .map(|i| ((i % w) as f32 - 80.0).hypot((i / w) as f32 - 80.0) < 4.0)
+            .collect();
+        assert!(candidates(&lum, &red, &clipped, w, h, 250.0, 1.0)
+            .0
+            .iter()
+            .all(|s| distance([s.x, s.y], [80.0, 80.0]) >= 3.0));
     }
     #[test]
     fn clean_texture_patches_between_polar_search_rays_are_found_by_the_bounded_grid() {
@@ -2107,6 +2249,174 @@ mod tests {
     }
 
     #[test]
+    fn residual_pass_honors_dark_mark_choice_and_remaining_budget() {
+        use std::collections::BTreeMap;
+
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        for (x, y) in [(160, 285), (350, 285), (256, 130)] {
+            fill(&mut rgb, [x - 3, y - 3, x + 4, y + 4], [100, 67, 50]);
+        }
+        let pixels = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let settings = Settings {
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            max_spots: 900,
+            ..Settings::default()
+        };
+        let planned = plan(&face, 0, &pixels, "test-", &settings, Some(&matte));
+        assert!(planned.blemishes.len() >= 3);
+        // Simulate a first pass that could only find one of the neutral marks.
+        let mut first = planned.clone();
+        first.blemishes.truncate(1);
+        let mut kept = first.clone();
+        refine(
+            &face,
+            0,
+            &pixels,
+            &pixels,
+            "test-",
+            &Settings {
+                remove_dark_marks: false,
+                ..settings
+            },
+            Some(&matte),
+            &BTreeMap::new(),
+            &mut kept,
+        )
+        .unwrap();
+        assert_eq!(kept.blemishes, first.blemishes);
+        let mut repaired = first.clone();
+        refine(
+            &face,
+            0,
+            &pixels,
+            &pixels,
+            "test-",
+            &Settings {
+                max_spots: 2,
+                ..settings
+            },
+            Some(&matte),
+            &BTreeMap::new(),
+            &mut repaired,
+        )
+        .unwrap();
+        assert_eq!(repaired.blemishes.len(), 2);
+        let old = &first.blemishes[0];
+        let added = &repaired.blemishes[1];
+        assert!(
+            !added.clean_ring_fit,
+            "fixture must exercise neutral residuals"
+        );
+        assert!(
+            ((added.region[0] - old.region[0]) / old.region[2])
+                .hypot((added.region[1] - old.region[1]) / old.region[3])
+                >= 1.0
+        );
+        let before = after_edits(&pixels, &first.blemishes, &BTreeMap::new()).unwrap();
+        let after = after_edits(&pixels, &repaired.blemishes, &BTreeMap::new()).unwrap();
+        let x = (added.region[0] * 512.0) as usize;
+        let y = (added.region[1] * 512.0) as usize;
+        assert!(after[(y * 512 + x) * 3] > before[(y * 512 + x) * 3] + 20);
+    }
+
+    #[test]
+    fn compact_cleanup_passes_respect_one_pass_and_stop_on_clean_skin() {
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        for (x, y) in [(160, 285), (350, 285), (256, 130)] {
+            fill(&mut rgb, [x - 3, y - 3, x + 4, y + 4], [100, 67, 50]);
+        }
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let settings = Settings {
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            max_spots: 900,
+            cleanup_passes: 1,
+            ..Settings::default()
+        };
+        let mut first = plan(&face, 0, &px, "test-", &settings, Some(&matte));
+        assert_eq!(first.blemishes.len(), 3);
+        first.blemishes.truncate(1);
+        let mut single = first.clone();
+        let mattes = std::collections::BTreeMap::new();
+        refine(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &settings,
+            Some(&matte),
+            &mattes,
+            &mut single,
+        )
+        .unwrap();
+        assert_eq!(single.blemishes, first.blemishes);
+        let mut detailed = first.clone();
+        refine(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &Settings {
+                cleanup_passes: 4,
+                ..settings
+            },
+            Some(&matte),
+            &mattes,
+            &mut detailed,
+        )
+        .unwrap();
+        assert_eq!(detailed.blemishes.len(), 3);
+        assert!(
+            detailed
+                .report
+                .findings
+                .iter()
+                .any(|f| f.contains("2 protected residual pass(es)")),
+            "a clean second residual check must stop before the final allowed pass"
+        );
+        let after = after_edits(&px, &detailed.blemishes, &mattes).unwrap();
+        for (x, y) in [(160, 285), (350, 285), (256, 130)] {
+            assert!(after[(y * 512 + x) * 3] > 140);
+        }
+        let mut again = detailed.clone();
+        refine(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &Settings {
+                cleanup_passes: 4,
+                ..settings
+            },
+            Some(&matte),
+            &mattes,
+            &mut again,
+        )
+        .unwrap();
+        assert_eq!(again.blemishes, detailed.blemishes);
+    }
+
+    #[test]
     fn native_repair_removes_spot_preserves_eye_and_respects_dark_mark_option() {
         let face = PortraitFace {
             bounds: [0.2, 0.1, 0.8, 0.95],
@@ -2461,6 +2771,199 @@ mod tests {
         // Eyes and lips stay out, as before.
         assert_eq!(at(column as usize, row(205.0)), 0);
         assert_eq!(at(((255.0_f32 - 102.4) / 3.2) as usize, row(370.0)), 0);
+    }
+
+    #[test]
+    fn confirmed_upper_cheek_spot_is_healed_without_touching_lids_or_a_crease() {
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        fill(&mut rgb, [170, 199, 219, 211], [40, 28, 22]);
+        fill(&mut rgb, [192, 239, 196, 243], [100, 55, 42]);
+        fill(&mut rgb, [145, 245, 175, 247], [100, 67, 50]);
+        fill(&mut rgb, [199, 313, 203, 317], [100, 55, 42]);
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 256,
+            height: 256,
+            alpha: vec![255; 256 * 256],
+        };
+        let settings = Settings {
+            deep_blemish_cleanup: true,
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            ..Settings::default()
+        };
+        let mut planned = plan(&face, 0, &px, "test-", &settings, Some(&matte));
+        let primary = planned.blemishes.clone();
+        assert!(
+            !primary.is_empty(),
+            "fixture must contain an established nose repair"
+        );
+        supplement(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &settings,
+            Some(&matte),
+            &std::collections::BTreeMap::new(),
+            &mut planned,
+        )
+        .unwrap();
+        assert!(
+            planned.blemishes.starts_with(&primary),
+            "supplement changed established repairs"
+        );
+        let mut edits = planned.blemishes;
+        let point = [194.0 / 512.0, 241.0 / 512.0];
+        let repairs = |edits: &[aura_recipe::retouch_tools::Edit]| {
+            edits.iter().any(|e| {
+                ((point[0] - e.region[0]) / e.region[2])
+                    .hypot((point[1] - e.region[1]) / e.region[3])
+                    < 0.75
+            })
+        };
+        assert!(
+            repairs(&edits),
+            "confirmed cheek skin below a lid was excluded"
+        );
+        let mut mattes = std::collections::BTreeMap::new();
+        super::super::eye_guard::protect(
+            &face,
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "guard",
+            &settings,
+        )
+        .unwrap();
+        let before: Vec<f32> = rgb.iter().map(|v| f32::from(*v) / 255.0).collect();
+        let mut after = before.clone();
+        aura_render::retouch_tools::apply_with_mattes(&mut after, 512, 512, &edits, &mattes);
+        let at = (241 * 512 + 194) * 3;
+        assert!(after[at + 1] > before[at + 1] + 0.05);
+        for rect in [[170, 199, 219, 211], [145, 245, 175, 247]] {
+            for y in rect[1]..rect[3] {
+                for x in rect[0]..rect[2] {
+                    let at = (y * 512 + x) * 3;
+                    assert_eq!(
+                        &before[at..at + 3],
+                        &after[at..at + 3],
+                        "lid or crease changed"
+                    );
+                }
+            }
+        }
+        let uncertain = Matte {
+            alpha: vec![180; 256 * 256],
+            ..matte.clone()
+        };
+        let mut unconfirmed = plan(&face, 0, &px, "test-", &settings, Some(&uncertain));
+        supplement(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &settings,
+            Some(&uncertain),
+            &std::collections::BTreeMap::new(),
+            &mut unconfirmed,
+        )
+        .unwrap();
+        assert!(!repairs(&unconfirmed.blemishes));
+        let conservative = Settings {
+            remove_dark_marks: false,
+            ..settings
+        };
+        let mut ordinary = plan(&face, 0, &px, "test-", &conservative, Some(&matte));
+        supplement(
+            &face,
+            0,
+            &px,
+            &px,
+            "test-",
+            &conservative,
+            Some(&matte),
+            &std::collections::BTreeMap::new(),
+            &mut ordinary,
+        )
+        .unwrap();
+        assert!(!repairs(&ordinary.blemishes));
+        assert_eq!(
+            super::super::eye_guard::feature_weight(
+                &Geometry::new(&face, &px).unwrap(),
+                point.map(|v| v * 512.0),
+                &settings,
+            ),
+            0.0
+        );
+    }
+
+    #[test]
+    fn compact_forehead_mark_beyond_brow_hair_is_healed_without_selecting_the_brow() {
+        let face = finish_face();
+        let mut rgb = [150_u8, 100, 75].repeat(512 * 512);
+        for eye in [195, 317] {
+            fill(&mut rgb, [eye - 35, 164, eye + 30, 171], [40, 28, 22]);
+        }
+        fill(&mut rgb, [233, 152, 237, 156], [130, 68, 50]);
+        let px = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 256,
+            height: 256,
+            alpha: vec![255; 256 * 256],
+        };
+        let settings = Settings {
+            deep_blemish_cleanup: true,
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            ..Settings::default()
+        };
+        let mut edits = plan(&face, 0, &px, "test-", &settings, Some(&matte)).blemishes;
+        let point = [235.0 / 512.0, 154.0 / 512.0];
+        assert!(
+            edits.iter().any(|e| {
+                ((point[0] - e.region[0]) / e.region[2])
+                    .hypot((point[1] - e.region[1]) / e.region[3])
+                    < 0.75
+            }),
+            "confirmed forehead skin beside a brow must remain repairable"
+        );
+        let mut mattes = std::collections::BTreeMap::new();
+        super::super::eye_guard::protect(
+            &face,
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "guard",
+            &settings,
+        )
+        .unwrap();
+        let before: Vec<f32> = rgb.iter().map(|v| f32::from(*v) / 255.0).collect();
+        let mut after = before.clone();
+        aura_render::retouch_tools::apply_with_mattes(&mut after, 512, 512, &edits, &mattes);
+        let at = (154 * 512 + 235) * 3;
+        assert!(after[at + 1] > before[at + 1] + 0.03);
+        for eye in [195, 317] {
+            for y in 164..171 {
+                for x in eye - 35..eye + 30 {
+                    let at = (y * 512 + x) * 3;
+                    assert_eq!(&before[at..at + 3], &after[at..at + 3], "brow hair changed");
+                }
+            }
+        }
+        // Broad skin finishing retains its original conservative selection.
+        let finish = surface_matte(&face, &px, &matte).unwrap();
+        let [l, t, r, b] = finish.bounds;
+        let column = ((point[0] - l) / (r - l) * finish.width as f32) as usize;
+        let row = ((point[1] - t) / (b - t) * finish.height as f32) as usize;
+        assert!(finish.decode().unwrap()[row * finish.width as usize + column] < 51);
     }
 
     #[test]

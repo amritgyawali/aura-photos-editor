@@ -644,3 +644,10 @@ remain in the heavy-acne portrait. Even the additional brush dabs did not remove
 every target mark. Dedicated arbitrary hair-color selection, background replacement
 with transparency/contact shadows, face/body reshaping and the entire commercial
 tool catalogue remain gaps; general sliders are not represented as those features.
+
+Update 2026-10-11: explicit manual chosen-color and local proportion tools are now
+implemented and have native validation in
+[evoto-tools-native-validation.md](evoto-tools-native-validation.md). Automatic
+anatomical reshaping, image background replacement/transparency/contact shadows,
+complete catalogue coverage and quality equivalence remain unestablished. The
+historical quality verdict above remains unchanged.

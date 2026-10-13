@@ -12,6 +12,7 @@ import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { MasksPanel, type BrushSettings, type MaskTool } from './MasksPanel';
 import { coverageDataUrl } from './rgbImage';
+import { PairedReference } from '../look/PairedReference';
 import { localMasks, masksOf, type MaskCoverage, type MaskSource } from '../../ipc/localMasks';
 import type { BrushStroke } from '../../ipc/nativeRetouch';
 
@@ -249,6 +250,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
         <p className="studio-footnote" role="status">{busy ? 'Saving your edit…' : loading ? 'Rendering your photograph…' : problem ? 'Preview needs attention.' : 'Edits saved. Your original stays untouched.'}{render && (editedPreview.quality === 'live' ? ' · Live preview - finishing the retouch…' : editedPreview.upgrading ? ' · Quick preview - rendering full quality…' : ` · Full quality ${render.width} × ${render.height}`)}</p>
         {render?.notes.filter(note => note.isCaveat).map(note => <p className="studio-footnote" key={`${note.stage}:${note.reason}`}>{note.detail ?? note.reason}</p>)}
       </div>
+      <div className="studio-adjustments-column">
       <fieldset className="studio-adjustments lr-adjustments" disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}>
         <legend>Develop</legend>
         <div className="studio-edit-modes" aria-label="Editing controls">
@@ -303,6 +305,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           onTake={name => void write(() => develop.snapshot({ projectId, photoId, action: 'take', name }))}
           onRestore={name => void write(() => develop.snapshot({ projectId, photoId, action: 'restore', name }))} />
       </fieldset>
+      <PairedReference key={`paired:${projectId}:${photoId}`} photoId={photoId} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
+      </div>
     </div>
     {history && <details className="advanced-tools" open={history.entries.some(entry => entry.source !== 'user')}><summary>Review every edit on this photo ({history.entries.length})</summary>
       {history.entries.length === 0 ? <p>No edits have been saved yet.</p> : <ol className="photo-edit-history">

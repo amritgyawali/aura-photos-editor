@@ -28,7 +28,7 @@ use aura_vision::portrait::PortraitFace;
 use serde::{Deserialize, Serialize};
 
 /// The planner version recorded in the report; bump on any behavioural change.
-pub const VERSION: &str = "measured-features-v20";
+pub const VERSION: &str = "measured-features-v25";
 pub(crate) mod deep_blemish;
 pub mod expert;
 pub(crate) mod eye_guard;
@@ -360,6 +360,8 @@ fn base_edit(id: String, tool: Tool, amount: f32, px: &Pixels<'_>, region_px: [f
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: None,
+        target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
         texture: 1.0,

@@ -53,6 +53,7 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['removeDarkMarks', 'Remove dark marks', 'toggle', 'Include compact dark spots in deep cleanup. This may also remove freckles or beauty marks; review the result.'],
     ['frequencyHeal', 'Frequency healing', 'unit', 'Runs first: rebuilds the tone under measured compact marks from nearby clean skin while retaining pore texture. Local donor repairs follow for remaining detected spots. Off at 0%.'],
     ['blemishSensitivity', 'Blemish sensitivity', 'unit', 'How small a departure still counts as a spot.'],
+    ['cleanupPasses', 'Residual healing passes', 'count', 'Re-check compact marks after each measured heal. Bounded to four passes; inspect texture and protected features after cleanup.'],
     ['maxSpots', 'Most spots per face', 'count', 'Raise this for dense acne. Larger passes take longer; remaining measured candidates are reported for review.'],
     ['keepFreckles', 'Keep freckles', 'toggle', 'A field of many small marks is treated as freckles and kept.'],
   ]],
@@ -109,6 +110,8 @@ const ACNE_ONLY: Partial<RetouchSettings> = { deepBlemishCleanup: true, removeDa
 export const PRESETS: Preset[] = [
   ['natural', 'Natural', {}],
   ['acne_only', 'Acne only · preserve detail', ACNE_ONLY],
+  ['detailed_skin', 'Detailed skin repair and review', { ...ACNE_ONLY, cleanupPasses: 4, blemishSensitivity: 1, poreRefine: .4, smoothing: .25, bodySmoothing: .25, texture: .85 }],
+  ['portrait_finish', 'Portrait skin finish', { ...ACNE_ONLY, cleanupPasses: 4, blemishSensitivity: 1, poreRefine: .35, smoothing: .3, texture: .9, toneEvenness: .6, lightEvenness: .35, microDodgeBurn: .25, redness: .5, shine: .35, darkCircles: .75, bodySmoothing: .25, bodyTone: .35, matchBodyToFace: .25, bodyRedness: .3, bodyShine: .25 }],
   ['skin_cleanup', 'Skin cleanup · refine pores', { ...ACNE_ONLY, smoothing: .3, texture: .85, poreRefine: .3, redness: .15, bodySmoothing: .25 }],
   ['acne', 'Deep acne cleanup', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 512, blemishSensitivity: .9, smoothing: .8, texture: .85, toneEvenness: .7, microDodgeBurn: .65, poreRefine: .3, shine: .85, hairDetail: .4, hairShine: .2 }],
   ['pro', 'Professional retouch', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 512, blemishSensitivity: .8, frequencyHeal: 1, textureGraft: .8, smoothing: .35, texture: .9, toneEvenness: .6, microDodgeBurn: .55, shine: .7, hairDetail: .4, hairShine: .2 }],
@@ -143,7 +146,8 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollec
   const choose = ([id, , values, intensity]: Preset) => {
     setPreset(id);
     setOptions({ ...options, intensity: intensity ?? 1, settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values },
-      ...(['acne_only', 'skin_cleanup'].includes(id) ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face_and_body' as const } : {}),
+      ...(['acne_only', 'skin_cleanup', 'detailed_skin'].includes(id) ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face_and_body' as const } : {}),
+      ...(id === 'portrait_finish' ? { eyes: true, teeth: false, refine: true, blemishes: true, scope: 'face_and_body' as const } : {}),
     });
   };
   return <fieldset className="auto-retouch-settings" disabled={disabled}>
@@ -165,6 +169,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollec
     </label>
     <p className="lr-hint">{options.adaptive !== false ? 'Each face is measured and gets its own amounts; the report lists what was changed and why.' : 'The settings below are used exactly as set on every face.'}</p>
     <p className="lr-hint">{scope?.[2]} Skin is found by AI segmentation and measured against the same person's own skin; every result becomes an ordinary operation you can adjust, disable or remove below.</p>
+    {preset === 'portrait_finish' && <p className="lr-hint">Detailed healing, pore refinement, skin tone, redness and measured under-eye correction on each person. Eyes, teeth and face shape keep their original appearance. Review before exporting; each photo needs its own settings.</p>}
     {settings.deepBlemishCleanup && <p className="lr-hint">Deep cleanup searches the full detected face. {settings.removeDarkMarks ? 'Dark-mark removal is on and can also remove freckles or beauty marks. Review the before/after.' : 'Dark marks are protected.'}</p>}
     {(settings.frequencyHeal > 0 || settings.textureGraft > 0) && <p className="lr-hint">{settings.frequencyHeal > 0 ? 'Frequency healing rebuilds the tone under each mark first and keeps the pores. ' : ''}{settings.textureGraft > 0 ? 'Texture restore runs last and restores the original pores within the selected skin. Protected details stay unchanged.' : ''}</p>}
     {settings.protectEyeArea && options.scope !== 'body' && <p className="lr-hint">Eye protection is on. Eyelids and inner corners stay protected. Measured dark-circle correction can treat skin below the lashes; other automatic tools avoid the surrounding eye area. Use Show retouched areas to inspect the saved selection.</p>}
@@ -193,7 +198,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollec
           </label>;
         }
         const n = Number(value);
-        const [min, max, scale] = kind === 'signed' ? [-100, 100, 100] : kind === 'count' ? [1, settings.deepBlemishCleanup ? 900 : 24, 1] : [0, 100, 100];
+        const [min, max, scale] = kind === 'signed' ? [-100, 100, 100] : kind === 'count' ? [1, key === 'cleanupPasses' ? 4 : settings.deepBlemishCleanup ? 900 : 24, 1] : [0, 100, 100];
         const shown = kind === 'count' ? String(n) : kind === 'signed' ? `${n > 0 ? '+' : ''}${Math.round(n * 100)}` : percent(n);
         return <label key={key} title={hint}>{name}: {shown}
           <input type="range" min={min} max={max} step={1} value={Math.round(n * scale)} aria-label={name}

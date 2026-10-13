@@ -43,7 +43,7 @@ use crate::state::AppState;
 pub fn cloud_status(state: &AppState) -> IpcResult<CloudStatusDto> {
     let cloud = state.cloud()?;
     let config = cloud.client().provider().config().clone();
-    let account = config.kind.account();
+    let account = cloud.credential_account();
 
     let stored = state.key_store()?.load(&account)?;
     let policy = cloud.policy();
@@ -124,7 +124,7 @@ pub fn check_ai_key(state: &AppState) -> IpcResult<KeyCheckDto> {
     let cloud = state.cloud()?;
     let kind = cloud.client().provider().config().kind;
 
-    let stored = state.key_store()?.load(&kind.account())?;
+    let stored = state.key_store()?.load(&cloud.credential_account())?;
     let secret = match stored {
         Some(secret) => secret,
         // A local server has no key, and "check" is the most useful button on the
@@ -309,6 +309,7 @@ pub fn set_cloud_privacy(
     state: &AppState,
     input: &SetCloudPrivacyInput,
 ) -> IpcResult<CloudStatusDto> {
+    crate::internal_ai::enable_project(state, &input.project_id, input.enabled)?;
     state.set_cloud_policy(aura_cloud::CloudPolicy {
         offline_studio_mode: input.offline_studio_mode,
         project_enabled: input.enabled,

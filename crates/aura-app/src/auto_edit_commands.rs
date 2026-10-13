@@ -91,6 +91,7 @@ fn edit(
     if !belongs {
         return Err(invalid("photo does not belong to this project").into());
     }
+    crate::internal_ai::authorize_new_project(state, &input.project_id)?;
     let buffer = state.previews(&input.project_id)?.get(
         photo,
         aura_raw::PixelLevel::Thumb(512),
@@ -149,11 +150,18 @@ fn edit(
         answer.value.preset,
         answer.value.reasons.join(" ")
     );
-    state
-        .recipe_store()
-        .save(&project, &photo, &merged, &report.changed, &label)?;
+    // A repeated/cached recommendation can change only audit provenance.
+    // Keep the existing recipe and history when no editable parameter changed.
+    let saved = if report.changed.is_empty() {
+        base
+    } else {
+        state
+            .recipe_store()
+            .save(&project, &photo, &merged, &report.changed, &label)?;
+        merged
+    };
     Ok(PhotoAutoEditDto {
-        recipe: recipe_dto(&input.photo_id, &merged),
+        recipe: recipe_dto(&input.photo_id, &saved),
         source,
         model: answer.model,
         reasons: answer.value.reasons,

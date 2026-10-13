@@ -34,6 +34,8 @@ pub(super) fn spots(
         curved_heal: false,
         heal_samples: Vec::new(),
         texture_sources: Vec::new(),
+        repair_passes: (deep && settings.cleanup_passes != 2).then_some(settings.cleanup_passes),
+        target_color: None,
         sensitivity: deep.then_some(settings.blemish_sensitivity),
         keep_dark_marks: deep && !settings.remove_dark_marks,
         texture: if deep { 0.65 } else { 1.0 },

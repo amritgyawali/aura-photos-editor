@@ -888,6 +888,8 @@ pub fn analyse(
                 curved_heal: false,
                 heal_samples: Vec::new(),
                 texture_sources: Vec::new(),
+                repair_passes: None,
+        target_color: None,
                 sensitivity: None,
                 keep_dark_marks: false,
                 tone: 0.5,
@@ -1149,6 +1151,12 @@ fn run_with(
     global: bool,
     chosen: Option<crate::portrait_features::Options>,
 ) -> IpcResult<RecipeDto> {
+    // Residual planning renders working skin buffers directly. Share the same
+    // gate as previews and exports so they cannot inflate its transient peak.
+    let _image_work = state
+        .image_work_gate()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let input = DevelopImageInput {
         photo_id: photo_id.to_owned(),
     };
@@ -1189,11 +1197,15 @@ fn run_with(
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
     // A later Auto enhance repeats whatever finishing the photographer last chose.
     let options = chosen.unwrap_or_else(|| {
-        base.extra
-            .get(portrait_auto::KEY)
-            .and_then(|report| report.get("options"))
-            .and_then(|value| serde_json::from_value(value.clone()).ok())
-            .unwrap_or_default()
+        if crate::internal_ai::has_custom_skin_preferences(&base) {
+            base.extra
+                .get(portrait_auto::KEY)
+                .and_then(|report| report.get("options"))
+                .and_then(|value| serde_json::from_value(value.clone()).ok())
+                .unwrap_or_else(|| crate::internal_ai::fresh_skin_options(None))
+        } else {
+            crate::internal_ai::fresh_skin_options(None)
+        }
     });
     let disabled = std::env::var_os("AURA_DISABLE_AUTO_PORTRAIT").is_some_and(|v| v == "1");
     let faces = if disabled {
@@ -1236,6 +1248,14 @@ fn run_with(
             path == retouch_tools::KEY || path.starts_with(&format!("{}.", retouch_tools::KEY))
         });
     let mut report = portrait.report.clone();
+    // A chosen face-only preference must survive even when no face/operations
+    // are found. Operation provenance alone cannot represent that choice.
+    report.explicit_options = chosen.is_some().then_some(true).or_else(|| {
+        base.extra
+            .get(portrait_auto::KEY)
+            .and_then(|value| value.get("explicitOptions"))
+            .and_then(serde_json::Value::as_bool)
+    });
     let mut groups = portrait.groups.clone();
 
     let mut global_plan = None;
@@ -1752,6 +1772,8 @@ mod tests {
             curved_heal: false,
             heal_samples: Vec::new(),
             texture_sources: Vec::new(),
+            repair_passes: None,
+            target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
             tone: 0.5,
