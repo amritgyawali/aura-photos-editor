@@ -49,15 +49,13 @@ pub fn tier3(
     if matches!(meta.format, crate::RawFormat::Jpeg | crate::RawFormat::Png) {
         // A JPEG is already a developed image. Full-resolution export should
         // decode its pixels, not ask for a sensor mosaic that does not exist.
-        return crate::thumb::tier1(
+        return crate::thumb::decode_full(
             bytes,
             meta,
-            u32::MAX,
             limits,
             clock,
             std::path::Path::new("photo"),
-        )
-        .map(|decoded| decoded.buffer);
+        );
     }
     let (result, decode_ms) = timed(clock, || {
         let (mosaic, levels, matrix) = prepare(bytes, meta, limits)?;

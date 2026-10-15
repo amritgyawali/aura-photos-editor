@@ -216,9 +216,11 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
     by_name.or(Some(match edit.tool {
         // These tools are explicit manual edits and must never be planned as automatic retouch.
         Tool::Colorize | Tool::BackgroundColor | Tool::Reshape => return None,
-        Tool::AutoBlemish | Tool::PatchHeal | Tool::FrequencyHeal | Tool::AcneClear => {
-            Stage::SkinCleanup
-        }
+        Tool::AutoBlemish
+        | Tool::PatchHeal
+        | Tool::FrequencyHeal
+        | Tool::AcneClear
+        | Tool::StretchMarks => Stage::SkinCleanup,
         Tool::SkinSmooth | Tool::Frequency | Tool::Wrinkle | Tool::TextureGraft => {
             Stage::FrequencySeparation
         }
@@ -453,7 +455,7 @@ fn report_mut(reports: &mut [StageReport], stage: Stage) -> Option<&mut StageRep
     reports.iter_mut().find(|r| r.stage == stage)
 }
 
-fn base_edit(id: String, tool: Tool, region: [f32; 4], amount: f32) -> Edit {
+pub(crate) fn base_edit(id: String, tool: Tool, region: [f32; 4], amount: f32) -> Edit {
     Edit {
         id,
         tool,
@@ -475,6 +477,7 @@ fn base_edit(id: String, tool: Tool, region: [f32; 4], amount: f32) -> Edit {
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         tone: 0.5,
         warmth: 0.0,
         tint: 0.0,
@@ -520,10 +523,13 @@ pub fn plan(
         .unwrap_or(thumb);
 
     // ---- 1. RAW foundation -----------------------------------------------------------------
+    // The same guards, in the same order, as Auto enhance: one answer to how this frame's
+    // light should be read, whichever button asked.
     let mut tone = crate::photo_enhance::correction(rgb)?;
-    let (capped, note) = smart_edit::face_exposure_cap(tone.0, &thumb, &faces);
-    tone.0 = capped;
-    let note = note.or_else(|| smart_edit::respect_intent(&mut tone, &thumb, &faces));
+    if smart_edit::veiled(&thumb, &faces) {
+        tone = (0.0, 0, 0, 0);
+    }
+    let note = smart_edit::guard_tone(&mut tone, &thumb, &faces);
     let exposure = smart_edit::effective_exposure(base, tone.0, true);
     let mut global = smart_edit::analyse(&px, frame, &faces, exposure);
     if let Some(r) = report_mut(&mut reports, Stage::Foundation) {
@@ -1245,6 +1251,9 @@ fn apply_globals(stage: Stage, recipe: &mut Recipe, planned: &Planned) {
             }
             g.whites = plan.whites;
             g.blacks = plan.blacks;
+            if let Some(points) = plan.levels {
+                crate::smart_edit::set_levels(g, points);
+            }
             g.dehaze = plan.dehaze;
             if let Some((luminance, colour)) = plan.noise {
                 g.noise.luminance = luminance;

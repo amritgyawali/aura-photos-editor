@@ -605,8 +605,7 @@ impl SceneStats {
             }
             // Midtones only: a clipped window or a black shadow says nothing about the light.
             if (40..=215).contains(&lum) {
-                let [lr, lg, lb] =
-                    [r, g, b].map(|v| aura_raw::colour::curve::srgb_decode(f32::from(v) / 255.0));
+                let [lr, lg, lb] = [r, g, b].map(aura_raw::colour::curve::srgb_byte_to_linear);
                 let sum = lr + lg + lb;
                 if sum > 1e-4 {
                     warm_sum += f64::from((lr - lb) / sum);
@@ -996,7 +995,7 @@ fn photo_project(state: &AppState, photo_id: &str) -> AuraResult<(PhotoId, Strin
     Ok((photo, project_key, project))
 }
 
-fn measure_photo(
+pub(crate) fn measure_photo(
     state: &AppState,
     photo: PhotoId,
     project_key: &str,

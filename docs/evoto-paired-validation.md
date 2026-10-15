@@ -1,5 +1,240 @@
 # Paired reference validation
 
+## The six remaining differences, measured again (2026-10-13, second pass)
+
+The section below this one ended with six differences from the published
+results. Each was measured again before anything was changed, per face and per
+detail band. Two of the six statements were wrong. Four were defects or missing
+operations. See
+[ADR-0118](adr/ADR-0118-stretch-marks-moles-and-structured-skin.md).
+
+### Two statements that were wrong
+
+- **"The Events after image is not pixel-aligned."** It is. The comparison
+  script now registers every finished image onto its original (an affine fit to
+  local structure, which a grade does not move) and prints the largest
+  displacement the fit asks for: 0.00 to 0.01 px on all six pairs, and a known
+  test transform is recovered to a hundredth of a pixel. The large detail error
+  that suggested misalignment is the edit itself: highlights recovered, shadows
+  lifted, contrast lowered. Events is scoreable like the others.
+- **"The published result is smoother overall."** Per band it is gentler. Share
+  of each detail band kept inside face skin, mean over the faces of a pair
+  (1.00 keeps all of it):
+
+  | Band (px) | 0-1 | 1-2 | 2-4 | 4-8 | 8-16 | 16-32 |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | Beauty, published | 0.86 | 0.67 | 0.71 | 0.89 | 0.98 | 1.01 |
+  | Beauty, Portrait skin finish, first pass | 0.80 | 0.62 | 0.62 | 0.76 | 0.91 | 0.98 |
+  | Beauty, Smooth portrait finish, first pass | 0.65 | 0.49 | 0.51 | 0.68 | 0.88 | 0.96 |
+  | Beauty, Portrait skin finish, now | 0.83 | 0.71 | 0.75 | 0.87 | 0.97 | 1.00 |
+  | Headshots, published | 0.83 | 0.71 | 0.86 | 0.96 | 0.99 | 1.00 |
+  | Headshots, Portrait skin finish, first pass | 0.83 | 0.67 | 0.77 | 0.89 | 0.97 | 1.00 |
+  | Headshots, Smooth portrait finish, first pass | 0.66 | 0.55 | 0.69 | 0.85 | 0.94 | 0.98 |
+  | Headshots, Portrait skin finish, now | 0.88 | 0.79 | 0.88 | 0.96 | 1.00 | 1.01 |
+  | Newborn, published | 0.98 | 0.87 | 0.74 | 0.74 | 0.86 | 0.94 |
+  | Newborn, Portrait skin finish, first pass | 0.74 | 0.54 | 0.46 | 0.53 | 0.74 | 0.89 |
+  | Newborn, Smooth portrait finish, first pass | 0.60 | 0.41 | 0.35 | 0.46 | 0.69 | 0.86 |
+  | Newborn, Portrait skin finish, now | 0.77 | 0.64 | 0.59 | 0.66 | 0.84 | 0.94 |
+
+  Every row is measured on the same face boxes and the same skin selection.
+  The published results look cleaner because marks are gone and lines are
+  softened, not because more texture is removed. Portrait skin finish was
+  taking more out of every band, most on the newborn, and Smooth portrait
+  finish more still. Attributed one control at a time: face smoothing cost 0.10
+  to 0.15 of the 2-8 px bands, micro dodge and burn with light evening 0.04 to
+  0.05, the 900 spot repairs 0.04 to 0.05 of the finest two, pore refinement
+  0.02 to 0.03. The preset is recalibrated to smoothing 5%, light evenness 10%,
+  micro dodge and burn off and pore refinement 80%. From 4 px up it now keeps
+  what the published results keep, within 0.02, on the adult faces, and under
+  4 px it keeps a little more than they do. On the newborn it still removes
+  more of the bands under 8 px than they do.
+
+### What was closed
+
+Mean absolute RGB error against the published after image, as before. Portrait
+skin finish on the three face pairs, Body skin finish on Maternity, Choose
+finished reference on the two graded pairs.
+
+| Pair | Untouched | First pass | Now |
+| --- | ---: | ---: | ---: |
+| Beauty (three faces) | 1.75 | 1.88 | 1.83 |
+| Headshots (six faces) | 1.25 | 1.29 | 1.27 |
+| Newborn | 2.01 | 1.98 | 1.96 |
+| Maternity, whole frame | 2.20 | 2.22 | 2.19 |
+| Maternity, abdomen only | 4.49 | not measured | 2.96 |
+| Wedding, reference match | 13.54 | 4.76 | 4.43 |
+| Wedding, kept look applied again | 13.54 | not built | 5.16 |
+| Events, reference match | 13.17 | 6.93 | 6.86 |
+| Events, kept look applied again | 13.17 | not built | 9.61 |
+
+The whole-frame figures move little because most of every frame is backdrop and
+compression noise; the abdomen row and the band table are where the change is.
+
+- **Stretch marks are cleared.** `Tool::StretchMarks` evens body skin with a
+  filter that flows across a mark and is stopped by structure. On the Maternity
+  pair the abdomen is clean, including the deepest marks; the navel, the hem of
+  the top, both hands and the knuckle creases are as they were. No pixel moves
+  by more than 60 codes and 37 by more than 40. It is planned only when Stretch
+  marks is above zero, which the **Body skin finish** preset sets: no measure
+  tried tells stretch-marked skin from ordinary skin texture, so nothing turns
+  it on automatically.
+- **The whole abdomen is selected.** The segmenter is 87% sure the lower half
+  is an object. An unselected island entirely enclosed by the body's skin, of
+  that skin's own colour and not claimed as clothing, now joins.
+- **Moles are kept.** Pigment (red under half the skin's red) with a crisp edge
+  is left alone by frequency healing and by the spot planner. Both moles on the
+  bearded man's cheek and the mole on the first Beauty face are kept, as in the
+  published results; the freckles and the marks on the second Beauty face's
+  forehead are still healed. A first version of the rule averaged each cell
+  with its neighbours and did the reverse on both.
+- **Spot repairs no longer flatten features.** The planned repairs were
+  changing about two and a half times as many dark features as the published
+  results. Three were visible defects, all gone: a flat patch across a
+  nasolabial fold, a smeared corner of a mouth, and a blue-grey streak beside
+  a nose. A repair is now refused where the slope of the skin around it is not
+  a single even slope.
+- **Freckles below the eyes.** With dark marks being removed, frequency healing
+  may work on the cheek below an eye, where confirmed spot repairs already
+  could. Lids, the inner corner and everything above the eye stay out.
+- **A matched look is kept.** Choose finished reference with a name keeps the
+  look as a personal look. Applied again through the preset path, with its
+  scene guards (warmth held to a fifth on the Wedding frame, because its light
+  is already warm), it lands 5.16 from the published Wedding image against
+  4.43 for the match itself and 13.54 untouched.
+
+### What still differs
+
+- One dark mark on a cheek of the second Beauty face remains where the
+  published result is clean, and a few freckles close under the eyes of the
+  first.
+- On the newborn, spots between the brows remain and the flush of the cheek is
+  not evened to the surrounding skin as it is in the published result.
+- The published results soften under-eye lines and bags. Portrait skin finish
+  leaves them; Smooth portrait finish softens them and removes more texture
+  than the published results do.
+- One small brown spot under an eye on a Headshots face is removed in the
+  published result and kept here.
+- A look still has to come from somewhere: a finished frame to match, or one of
+  the shipped looks. None of the thirteen shipped colour looks tried reproduces
+  the Wedding grade (the nearest, Portra Film, ends 10.60 from it) and all of
+  them move the Events frame away from its published result.
+- Broad tone on the Beauty pair ends further from the published result than the
+  untouched photograph is (0.54 against 0.44). Switching every colour and tone
+  control off moved it by 0.03, so it is not one of them; it was not pursued.
+
+Automated checks for this pass are recorded in the changelog entry of the same
+date. The renders, sheets and per-face comparisons are under
+`output/reference-pairs-20261013/second-pass/` and are not committed.
+
+## All six homepage pairs through the native commands (2026-10-13)
+
+`crates/aura-app/tests/reference_pairs.rs` imports each published before image
+into an isolated catalogue, edits it through the same commands the studio's
+buttons call, and writes the full-resolution render. No window, WebView or
+browser driver is involved, so it runs on a machine that has only the Rust
+toolchain. `scripts/compare-reference-pairs.py` scores the render against the
+published after image without resizing or a tolerance, and measures whether the
+two halves of a pair are the same frame. See
+[ADR-0117](adr/ADR-0117-display-referred-input-and-selected-bands.md).
+
+```bash
+AURA_PAIR_DIR=<folder of NAME-before.png / NAME-after.png> \
+AURA_PAIR_MODES=neutral,auto,retouch AURA_PAIR_OPTIONS=<options.json> \
+  cargo test -p aura-app --test reference_pairs -- --ignored --nocapture
+python scripts/compare-reference-pairs.py <folder>
+```
+
+Mean absolute RGB error against the published after image, in byte values out of
+255, at 2000 x 1200. "Untouched" is the before image itself, so it is what doing
+nothing scores. Retouch is Auto retouch with the Portrait skin finish preset and
+no light or colour change.
+
+| Pair | Untouched | No edit | Retouch, before | Retouch, now |
+| --- | ---: | ---: | ---: | ---: |
+| Beauty (three faces) | 1.75 | 1.75 | 5.36 | 1.88 |
+| Headshots (six faces) | 1.25 | 1.26 | 1.64 | 1.29 |
+| Newborn | 2.01 | 2.02 | 3.81 | 1.98 |
+| Maternity (no face) | 2.20 | 2.20 | 3.80 | 2.22 |
+| Events | 13.17 | 13.19 | 12.90 | 13.13 |
+| Wedding | 13.54 | 13.54 | 12.18 | 13.51 |
+
+"No edit" is the render with every control at zero, after this change; it was
+not rendered before it. "Retouch, before" is the same preset on the checkout as
+it stood at the start of the day.
+
+What the figures do and do not say:
+
+- **An untouched render is now the file.** Against its own source the no-edit
+  render differs by at most one code, on about 4.5% of pixels, which is the
+  8-bit dither. Before, a white wall at 239 was delivered at 230 and paper
+  white at 253 as 236, measured on backdrop pixels of a render whose global
+  controls were all at zero. That one defect was the largest term in every paired
+  figure recorded above this section, including the 5.36 baseline the
+  reference fitter was measured against.
+- **Retouch is now about as close to the published result as the untouched
+  photograph is, and no closer.** Its error fell on the four retouching pairs,
+  but only the newborn ends below untouched. The edit moves in the published
+  result's direction (the cosine between the two change fields is +0.15 to
+  +0.28 in fine detail, and +0.65 in broad tone on the newborn) and delivers
+  7% to 20% of its fine-detail change. It is the same kind of edit by a different
+  algorithm, and the two do not agree pixel for pixel.
+- **Events and Wedding are not retouching pairs.** (The next sentence is wrong
+  and is corrected in the section above: the pair is aligned to a hundredth of
+  a pixel.) The published Events after
+  image is not pixel-aligned with its own before image, so no per-pixel figure
+  for it means anything. The Wedding after image is a warm colour grade, a
+  look somebody chose; Auto retouch makes no colour change and is not expected
+  to move toward it. Their "before" retouch figures were lower only because
+  the second tone map happened to darken the frame the same way the grade did.
+- **A chosen look is matched by Choose finished reference, not by retouching.**
+  The harness's `match` mode runs Auto retouch and then the studio's own
+  reference match against the published after image. It fits the nine global
+  controls and copies no pixels. Wedding: 13.51 to 4.76, with the broad tone
+  change at cosine +0.97 and 102% of the published one. Events: 13.13 to 6.93,
+  which for an unaligned pair says only that the overall light now agrees.
+  That feature needs the finished version of the same photograph to fit to;
+  it does not choose a look for a photograph that has none.
+
+Seen at the size of one face, enlarged:
+
+- Portrait skin finish removes freckles, spots and acne marks and keeps each
+  person's skin colour and the shading of the face. The pale rim it used to
+  leave along the jaw and the lifted shadow under the lower lip are gone.
+- (Wrong as stated, and corrected in the section above: per detail band the
+  published result is gentler, and Smooth portrait finish moves further from
+  it.) The published result is smoother: forehead lines, crow's feet and under-eye
+  bags are softened and pores reduced. The new Smooth portrait finish preset
+  does the same on the adult faces and comes closer by eye. On the newborn it
+  over-blurs the cheek; Portrait skin finish is the better choice there.
+- The published result keeps distinct moles (three on one face). AURA removes
+  them with these presets, because Remove dark marks does not tell a mole from
+  a dark acne mark.
+- One acne scar on a cheek and a few spots beside a brow remain where the
+  published result is clean.
+- **Stretch marks are not removed.** The published Maternity result is clean
+  skin; AURA's is the original with a few spots healed. Before this change it
+  also carried a pale patch with an edge across the abdomen, which is gone.
+
+Auto enhance is a different feature from retouching: it also measures light and
+colour. On the Beauty pair it no longer turns the white backdrop grey (error
+5.93 to 2.06). On the Headshots contact sheet it still reads the blue-grey
+backdrop as a colour cast and neutralises it, which the published result does
+not do.
+
+Automated checks on 2026-10-13, GNU toolchain, `AURA_PERF_HOST_SCALE=6`:
+`cargo test --workspace --all-targets` passes 4,077 tests with none failing and
+30 ignored (the ignored ones need real photographs or a release build); strict
+Clippy on `aura-render`, `aura-vision` and `aura-app`, formatting and the
+banned-pattern check are clean; all 83 locked
+contracts are unchanged; the UI type-checks and 750 of its 751 tests pass in
+the parallel run (the other, a repair-list test, times out there on this
+machine and passes when run alone). The desktop shell was rebuilt from this source and starts against an
+isolated catalogue; nothing was clicked in it, so the window itself is untested
+here. Reference images and renders are not committed.
+
+Exact equality with the published results, complete removal, feature parity and
+superior quality are not established and are not claimed.
+
 ## Primary-preserving cheek healing and finer matching (2026-10-13)
 
 Planner `measured-features-v25` adds a separate compact upper-cheek check after

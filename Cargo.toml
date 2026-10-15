@@ -153,6 +153,12 @@ opt-level = 2
 [profile.dev.package.aura-app]
 opt-level = 2
 
+# Every JPEG, PNG and TIFF is decoded here. Unoptimised, a 35-megapixel JPEG misses the tier 1
+# deadline and a test reports "took too long to open" for a file the desktop shell - which
+# builds this crate as an optimised dependency - opens in a second or two.
+[profile.dev.package.aura-raw]
+opt-level = 2
+
 [profile.dev.package.aura-render]
 opt-level = 2
 

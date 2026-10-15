@@ -59,6 +59,8 @@ export type RetouchSettings = {
   smoothing: number; texture: number; smoothingSize: number; toneEvenness: number; lightEvenness: number; microDodgeBurn: number;
   poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
   blemishSensitivity: number; cleanupPasses: number; maxSpots: number; keepFreckles: boolean;
+  /** Moles and beauty marks are left alone (ADR-0118); on by default. */
+  keepMoles: boolean;
   deepBlemishCleanup: boolean; removeDarkMarks: boolean;
   /** Frequency healing and the texture graft (ADR-0090); 0 is off. */
   frequencyHeal: number; textureGraft: number;
@@ -68,13 +70,15 @@ export type RetouchSettings = {
   teethWhitening: number; lipColour: number; lipDefinition: number;
   contour: number; highlight: number; blush: number; faceLight: number;
   bodySmoothing: number; bodyTone: number; matchBodyToFace: number; bodyShine: number; bodyRedness: number; bodyBlemishes: number;
+  /** Stretch marks evened out of body skin (ADR-0118); 0 is off. */
+  stretchMarks: number;
   hairDetail: number; hairShine: number; fabric: number; backdrop: number;
 };
 export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
   smoothing: .5, texture: .85, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
-  blemishSensitivity: .5, cleanupPasses: 2, maxSpots: 12, keepFreckles: true,
+  blemishSensitivity: .5, cleanupPasses: 2, maxSpots: 12, keepFreckles: true, keepMoles: true,
   deepBlemishCleanup: false, removeDarkMarks: false,
   frequencyHeal: 0, textureGraft: 0,
   foreheadLines: .5, crowsFeet: .5, smileLines: .5, underEyeLines: .25, neckLines: 0,
@@ -82,7 +86,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   eyeWhitening: .2, eyeVessels: .5, irisDetail: .5, irisBrightness: 0, redEye: true, lashDefinition: 0, browDefinition: 0,
   teethWhitening: .5, lipColour: 0, lipDefinition: 0,
   contour: 0, highlight: 0, blush: 0, faceLight: 0,
-  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
+  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0, stretchMarks: 0,
   hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0,
 };
 /** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */
@@ -104,6 +108,8 @@ export type NativeRetouchEdit = {
   sensitivity?: number | null;
   /** Frequency healing and acne clear: leave marks that are darker but not redder or browner. */
   keepDarkMarks?: boolean;
+  /** How crisp a pigment-dark patch must be for frequency healing to keep it (ADR-0118); absent heals it. */
+  moleEdge?: number;
   texture: number; tone: number; warmth: number; tint: number;
   /** Chosen display sRGB, normalized 0..1. Required by explicit color tools. */
   targetColor?: [number, number, number] | null;

@@ -60,7 +60,7 @@ pub fn decode_png(bytes: &[u8], limits: DecodeLimits) -> AuraResult<Rgb8> {
         for value in rgb {
             // Composite in linear light so translucent edges retain their color.
             let a = f32::from(alpha) / 255.0;
-            let linear = crate::colour::curve::srgb_decode(f32::from(value) / 255.0);
+            let linear = crate::colour::curve::srgb_byte_to_linear(value);
             pixels.push(crate::colour::curve::quantise_u8(
                 crate::colour::curve::srgb_encode(linear * a + 1.0 - a),
             ));

@@ -128,6 +128,11 @@ pub enum Tool {
     /// pores. With `preserve_microtexture` it also evens flat redness. Without a matte it is
     /// a brush: paint over what is left. ADR-0092.
     AcneClear,
+    /// Evens long, faint marks out of an expanse of skin with a filter that flows across
+    /// them and stops at structure: a hand resting on an abdomen and a navel are left as
+    /// they are. `radius` is the reach of the evening and `texture` how much of the clean
+    /// skin's own grain is put back. ADR-0118.
+    StretchMarks,
 }
 
 // Each flag is an independent opt-in that old recipes read as off; none of them is a state
@@ -190,6 +195,16 @@ pub struct Edit {
     /// them, so a mole or a freckle is never removed by default-off automation.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub keep_dark_marks: bool,
+    /// Healing leaves pigment: a connected patch whose red channel is under half that of the
+    /// skin around it. The value is the step its edge must have, as a share of the skin's red
+    /// across one frequency radius, to count. `1` keeps what has a crisp edge - a mole, a
+    /// beauty mark - and still heals the diffuse trace of an old spot, which is what a face
+    /// wants. `0` keeps every such patch, which is what a body wants: it has no landmarks,
+    /// and a navel is pigment-dark with no edge at all. Absent heals pigment like any other
+    /// mark, as recipes written before it existed do. Only read by [`Tool::FrequencyHeal`].
+    /// ADR-0118.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mole_edge: Option<f32>,
     pub tone: f32,
     pub warmth: f32,
     pub tint: f32,
@@ -419,6 +434,9 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || !edit.source_scale.is_finite()
             || !(0.2..=1.0).contains(&edit.source_scale)
             || edit.sensitivity.is_some_and(|v| !unit(v))
+            || edit
+                .mole_edge
+                .is_some_and(|v| !v.is_finite() || !(0.0..=4.0).contains(&v))
             || (edit.source_scale < 1.0 && edit.tool == Tool::PatchHeal && edit.source.is_none())
             || (matches!(
                 edit.tool,

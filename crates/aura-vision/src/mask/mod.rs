@@ -154,7 +154,7 @@ impl MaskFrame {
                 bytes
                     .iter()
                     .take(want)
-                    .map(|b| curve::srgb_decode(f32::from(*b) / 255.0))
+                    .map(|b| curve::srgb_byte_to_linear(*b))
                     .collect()
             }
             PixelData::Linear16(codes) => {

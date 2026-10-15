@@ -40,8 +40,8 @@ const KNEE: f32 = 0.6;
 
 fn filmic_lite(x: f32) -> f32 {
     if (x <= KNEE) { return x; }
-    let over = x - KNEE;
-    return KNEE + (1.0 - KNEE) * over / (over + (1.0 - KNEE));
+    let span = 1.0 - KNEE;
+    return KNEE + span * (1.0 - exp(-(x - KNEE) / span));
 }
 
 fn encode_srgb(linear: f32) -> f32 {
@@ -106,6 +106,8 @@ fn stage_output_transform(@builtin(global_invocation_id) id: vec3<u32>) {
     let threshold = bayer(x, y);
     for (var channel = 0u; channel < 3u; channel = channel + 1u) {
         let value = encoded[channel] * 255.0;
-        quantised[base + channel] = u32(clamp(round(value + threshold - 0.5), 0.0, 255.0));
+        // Rust rounds positive half-values away from zero; WGSL round uses even ties.
+        // After clamping negatives, floor(value + threshold) is the exact Rust rule.
+        quantised[base + channel] = u32(clamp(floor(value + threshold), 0.0, 255.0));
     }
 }

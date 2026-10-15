@@ -28,6 +28,7 @@ fn edit(tool: Tool) -> Edit {
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.3,
@@ -166,7 +167,17 @@ fn solid_color_does_not_skip_selected_dark_background_pixels() {
     let matte = retouch_tools::Matte::encode([0.0, 0.0, 1.0, 1.0], 2, 2, &[255; 4]);
     let mattes = std::collections::BTreeMap::from([("background".into(), matte)]);
     aura_render::retouch_tools::apply_with_mattes(&mut pixels, w, h, &[op], &mattes);
-    assert!(pixels.iter().all(|v| (*v - 1.0).abs() < 0.001));
+    // Every pixel is the working-space value the output transform delivers as white, dark
+    // source pixels included.
+    let white = aura_render::output::display_srgb_to_working([1.0; 3]);
+    assert!(pixels.chunks_exact(3).all(|p| p
+        .iter()
+        .zip(white)
+        .all(|(v, want)| (v - want).abs() < 0.001)));
+    let srgb = aura_render::OutputColour::Srgb;
+    let delivered =
+        aura_render::output::map_one(white, aura_render::output::working_to_output(srgb), srgb);
+    assert!(delivered.iter().all(|v| (v - 1.0).abs() < 0.001));
 }
 
 #[test]
@@ -869,4 +880,48 @@ fn pore_separation_retains_fine_detail_reduces_blotches_and_preserves_colour_and
             .unwrap()
             .preserve_microtexture
     );
+}
+
+#[test]
+fn evening_runs_to_the_edge_of_a_selection_without_flattening_its_shading() {
+    // Skin that darkens steadily toward the edge of its selection, as a cheek does toward a
+    // jaw, and nothing uneven on it. An operation that evens a band has nothing to do here.
+    let (w, h) = (128, 96);
+    let shaded: Vec<f32> = (0..w * h)
+        .flat_map(|i| {
+            let value = 0.6 - (i % w) as f32 * 0.0039;
+            [value, value * 0.7, value * 0.5]
+        })
+        .collect();
+    let matte = retouch_tools::Matte::encode([0.0, 0.0, 0.55, 1.0], 4, 4, &[255; 16]);
+    let mattes = std::collections::BTreeMap::from([("skin".to_owned(), matte)]);
+    for tool in [Tool::Frequency, Tool::MicroDodgeBurn, Tool::SkinSmooth] {
+        let mut op = edit(tool);
+        op.region = [0.3, 0.5, 1.0, 1.0];
+        op.source = Some([0.3, 0.5]);
+        op.amount = 1.0;
+        op.feather = 0.0;
+        op.radius = 0.03;
+        op.tone = 0.95;
+        op.matte = Some("skin".into());
+        let mut pixels = shaded.clone();
+        aura_render::retouch_tools::apply_with_mattes(&mut pixels, w, h, &[op], &mattes);
+        let (at, moved) = pixels
+            .iter()
+            .zip(&shaded)
+            .map(|(after, before)| (after - before).abs() / before)
+            .enumerate()
+            .fold(
+                (0, 0.0_f32),
+                |worst, (i, v)| if v > worst.1 { (i, v) } else { worst },
+            );
+        // A plain or one-sided blur moves the last few columns by several per cent.
+        assert!(
+            moved < 0.006,
+            "{tool:?} moved the shading by {:.2}% at {},{}",
+            moved * 100.0,
+            at / 3 % w,
+            at / 3 / w
+        );
+    }
 }

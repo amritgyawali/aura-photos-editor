@@ -248,6 +248,7 @@ mod tests {
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
+            mole_edge: None,
             texture: 1.0,
             tone: 1.0,
             warmth: 0.0,

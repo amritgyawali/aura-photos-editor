@@ -40,6 +40,21 @@ struct Spot {
     red: f32,
 }
 
+/// Red below this share of the surrounding skin's red is pigment, and pigment with a step of
+/// [`CRISP`] at its edge is a mole. The same rule, and the same evidence, as frequency
+/// healing's. ADR-0118.
+const MOLE: f32 = 0.5;
+/// The step at a mole's edge, as a share of the skin's red across one frequency radius.
+/// Read off radial profiles in published retouching of the same photographs: two moles it
+/// kept come to about 1.5 and 1.9, and the darkest mark it removed, the trace of an old spot
+/// on dark skin, to about 0.6.
+pub(crate) const CRISP: f32 = 1.0;
+
+/// How far the slope of the skin around a repair may spread, across the repair's own radius
+/// and as a share of that skin's brightness, before the repair is refused. See
+/// [`in_structure`].
+const STRUCTURE: f32 = 0.15;
+
 // Deterministic four-connected components, including zero-valued mask holes.
 pub(super) fn components(mask: &[bool], w: usize, h: usize) -> Vec<Vec<usize>> {
     let mut seen = vec![false; mask.len()];
@@ -161,6 +176,79 @@ fn ellipse_inside(mask: &[bool], w: usize, h: usize, centre: [f32; 2], radii: [f
     true
 }
 
+/// Whether the skin around a repair is anything but plain skin.
+///
+/// A repair is built from its surroundings, so it can only be trusted where they are simple.
+/// Every check before this one reads a ring of sixteen points, and a fold running through a
+/// repair meets that ring at two of them: the ring agrees, the repair is pasted, and a
+/// nasolabial fold, the corner of a mouth or the wing of a nose comes out as a flat patch.
+/// This reads every cell between one and two and a half radii out instead, and asks how far
+/// the slope there departs from a single even slope. Plain skin under any lighting has one
+/// slope, and none of it is left; a crease has two that oppose each other. When that spread,
+/// carried across the repair's own radius, exceeds about a seventh of the skin's brightness
+/// the repair is refused. Measured on 980 planned repairs of three faces: the ones that
+/// flattened a feature were between 0.18 and 0.33, and nine in ten of all of them were
+/// below 0.13.
+fn in_structure(fine: &[f32], w: usize, h: usize, centre: [f32; 2], radius: f32) -> bool {
+    let radius = radius.max(3.0);
+    let outer = radius * 2.5;
+    let (cx, cy) = (
+        centre[0].round().max(0.0) as usize,
+        centre[1].round().max(0.0) as usize,
+    );
+    let reach = outer.ceil() as usize;
+    let mut slopes = Vec::new();
+    let mut levels = Vec::new();
+    for y in cy.saturating_sub(reach).max(1)..=(cy + reach).min(h.saturating_sub(2)) {
+        for x in cx.saturating_sub(reach).max(1)..=(cx + reach).min(w.saturating_sub(2)) {
+            let distance = (x as f32 - cx as f32).hypot(y as f32 - cy as f32);
+            if distance < radius || distance > outer {
+                continue;
+            }
+            let i = y * w + x;
+            slopes.push([
+                (fine[i + 1] - fine[i - 1]) * 0.5,
+                (fine[i + w] - fine[i - w]) * 0.5,
+            ]);
+            levels.push(fine[i]);
+        }
+    }
+    if slopes.len() < 16 {
+        return false;
+    }
+    let n = slopes.len() as f32;
+    let mean = [0, 1].map(|k| slopes.iter().map(|s| s[k]).sum::<f32>() / n);
+    let (mut xx, mut yy, mut xy) = (0.0_f32, 0.0_f32, 0.0_f32);
+    for s in &slopes {
+        let (dx, dy) = (s[0] - mean[0], s[1] - mean[1]);
+        xx += dx * dx;
+        yy += dy * dy;
+        xy += dx * dy;
+    }
+    // The larger eigenvalue of the slopes' covariance: their spread along its main direction.
+    let spread = ((xx + yy) * 0.5 + (((xx - yy) * 0.5).powi(2) + xy * xy).sqrt()) / n;
+    let level = median(levels).unwrap_or(0.5).max(0.02);
+    spread.sqrt() * radius / level > STRUCTURE
+}
+
+/// The robust spread of `score` over the selected skin: 1.4826 times the median absolute
+/// deviation, which half the skin being marked would not move.
+fn own_spread(score: &[f32], mask: &[bool]) -> f32 {
+    let selected = mask.iter().filter(|on| **on).count();
+    let step = (selected / 60_000).max(1);
+    let samples: Vec<f32> = score
+        .iter()
+        .zip(mask)
+        .filter(|(_, on)| **on)
+        .map(|(v, _)| *v)
+        .step_by(step)
+        .collect();
+    let Some(centre) = median(samples.clone()) else {
+        return 0.0;
+    };
+    median(samples.iter().map(|v| (v - centre).abs()).collect()).unwrap_or(0.0) * 1.4826
+}
+
 fn candidates(
     lum: &[f32],
     red: &[f32],
@@ -169,6 +257,7 @@ fn candidates(
     h: usize,
     eye_distance: f32,
     sensitivity: f32,
+    moles: Option<&[f32]>,
 ) -> (Vec<Spot>, Vec<f32>, Vec<f32>) {
     let scale = (eye_distance / 250.0).clamp(0.25, 4.0);
     let fine_r = (scale * 0.8).round().max(1.0) as usize;
@@ -182,6 +271,52 @@ fn candidates(
         .map(|(a, b)| a - b)
         .collect();
     let inside = clearance(mask, w, h);
+    // Cells on or beside a mole: a connected patch whose red is under half that of the skin
+    // around it, with an edge that happens within one cell. Red rather than brightness or
+    // redness, because inflammation leaves the red channel nearly where it was and pigment
+    // takes it down with the rest; an edge, because the trace of an old spot is as dark and
+    // fades into the skin instead.
+    let near_mole: Option<Vec<bool>> = moles.map(|deep| {
+        // A quarter of the distance between the eyes: several times the width of a mole.
+        let skin = aura_render::bands::blur(deep, w, h, (scale * 60.0).round().max(6.0) as usize);
+        let dark: Vec<bool> = deep
+            .iter()
+            .zip(&skin)
+            .map(|(own, skin)| *own < skin * MOLE)
+            .collect();
+        // Frequency healing's radius on this face: a fiftieth of the eye distance.
+        let radius = (eye_distance * 0.02).max(1.0);
+        let step = |i: usize| -> f32 {
+            let (x, y) = (i % w, i / w);
+            let beside = [
+                (x > 0).then(|| i - 1),
+                (x + 1 < w).then(|| i + 1),
+                (y > 0).then(|| i - w),
+                (y + 1 < h).then(|| i + w),
+            ];
+            beside
+                .into_iter()
+                .flatten()
+                .map(|n| (deep[i] - deep[n]).abs())
+                .fold(0.0, f32::max)
+                / skin[i].max(1e-6)
+                * radius
+        };
+        let mut found = vec![0.0_f32; w * h];
+        // `components` also returns the unflagged regions between the dark ones.
+        for group in components(&dark, w, h) {
+            let pigment = group.first().is_some_and(|i| dark[*i]);
+            if pigment && group.iter().any(|i| step(*i) >= CRISP) {
+                for i in group {
+                    found[i] = 1.0;
+                }
+            }
+        }
+        aura_render::bands::blur(&found, w, h, (scale * 2.0).round().max(1.0) as usize)
+            .iter()
+            .map(|v| *v > 1e-4)
+            .collect()
+    });
     let threshold = 0.06 - sensitivity * 0.035;
     let midpoint = median(
         lum.iter()
@@ -206,6 +341,10 @@ fn candidates(
                     + redness[i].max(0.0) * 1.5
             })
             .collect();
+        // The threshold is never under a multiple of what this skin does everywhere: on a
+        // close-up of fine skin, or a noisy frame, texture itself clears a fixed threshold
+        // and every bump is planned as a spot. The same multiples as frequency healing's.
+        let threshold = threshold.max(own_spread(&score, mask) * (4.2 - 2.4 * sensitivity));
         // Higher thresholds split touching marks that merge at the sensitive threshold.
         for tier in [1.0, 1.8, 2.8, 4.5, 7.0, 12.0, 20.0] {
             let selected: Vec<_> = (0..w * h)
@@ -401,6 +540,15 @@ fn candidates(
                         trace(if surrounded { "lighting" } else { "ring-mask" });
                         continue;
                     };
+                // A mole or a beauty mark is somebody's face rather than something on it.
+                if near_mole
+                    .as_ref()
+                    .is_some_and(|near| group.iter().any(|&i| near[i]))
+                {
+                    #[cfg(test)]
+                    trace("mole");
+                    continue;
+                }
                 if rmax <= 0.006
                     && !lighting::context_consistent(
                         &fine,
@@ -413,6 +561,16 @@ fn candidates(
                 {
                     #[cfg(test)]
                     trace("context");
+                    continue;
+                }
+                // A colour-only repair keeps the light it finds, so a compact one may sit on a
+                // shadow's edge. A long one there is the redness of the fold itself.
+                let long = (half + root) / (half - root).max(0.2) > 2.5;
+                if (!chroma_only || long)
+                    && in_structure(&fine, w, h, [x, y], radii[0].max(radii[1]))
+                {
+                    #[cfg(test)]
+                    trace("structure");
                     continue;
                 }
                 #[cfg(test)]
@@ -735,10 +893,13 @@ fn plan_with_cheek(
     let mut donor_mask = vec![false; w * h];
     let mut lum = vec![0.0_f32; w * h];
     let mut red = vec![0.0_f32; w * h];
+    // The red channel in linear light, which is what tells a mole from a spot.
+    let mut deep = vec![0.0_f32; w * h];
     for y in 0..h {
         for x in 0..w {
             let p = px.encoded(x + x0, y + y0);
             let i = y * w + x;
+            deep[i] = aura_raw::colour::curve::srgb_decode(p[0]);
             lum[i] = p[0] * 0.2126 + p[1] * 0.7152 + p[2] * 0.0722;
             red[i] = (p[0] - (p[1] + p[2]) * 0.5) / (p[0] + p[1] + p[2] + 0.05);
             let confidence = matte.at(
@@ -788,8 +949,16 @@ fn plan_with_cheek(
             }
         }
     }
-    let (spots, broad, broad_red) =
-        candidates(&lum, &red, &mask, w, h, g.d, settings.blemish_sensitivity);
+    let (spots, broad, broad_red) = candidates(
+        &lum,
+        &red,
+        &mask,
+        w,
+        h,
+        g.d,
+        settings.blemish_sensitivity,
+        settings.keep_moles.then_some(deep.as_slice()),
+    );
     // Reserve every detected mark from donor selection, including marks deliberately kept.
     let mut clean = mask.clone();
     let fine = aura_render::bands::blur(&lum, w, h, (g.d / 250.0).round().max(1.0) as usize);
@@ -1354,6 +1523,7 @@ pub(crate) fn frequency_heal(
     edit.sensitivity = Some(settings.blemish_sensitivity.clamp(0.0, 1.0));
     edit.repair_passes = (settings.cleanup_passes != 2).then_some(settings.cleanup_passes);
     edit.keep_dark_marks = !settings.remove_dark_marks;
+    edit.mole_edge = settings.keep_moles.then_some(CRISP);
     Some(edit)
 }
 
@@ -1375,7 +1545,7 @@ fn after_edits(
     edits: &[aura_recipe::retouch_tools::Edit],
     mattes: &std::collections::BTreeMap<String, aura_recipe::retouch_tools::Matte>,
 ) -> Option<Vec<u8>> {
-    use aura_raw::colour::curve::{srgb_decode, srgb_encode};
+    use aura_raw::colour::curve::srgb_encode;
     use aura_raw::colour::matrix::{invert, mul, REC2020_TO_XYZ_D65, SRGB_TO_XYZ_D65};
     let to_working = aura_render::colour::narrow(mul(invert(REC2020_TO_XYZ_D65)?, SRGB_TO_XYZ_D65));
     let to_display = aura_render::output::working_to_output(aura_render::OutputColour::Srgb);
@@ -1385,7 +1555,7 @@ fn after_edits(
         .flat_map(|p| {
             aura_render::colour::apply_f32(
                 to_working,
-                [p[0], p[1], p[2]].map(|v| srgb_decode(f32::from(v) / 255.0)),
+                [p[0], p[1], p[2]].map(aura_raw::colour::curve::srgb_byte_to_linear),
             )
         })
         .collect();
@@ -1505,7 +1675,7 @@ mod tests {
             }
         }
         // A clean shadow with the same skin colour is never a pigment repair.
-        assert!(candidates(&lum, &red, &mask, w, h, 250.0, 1.0)
+        assert!(candidates(&lum, &red, &mask, w, h, 250.0, 1.0, None)
             .0
             .iter()
             .all(|s| !s.chroma_only));
@@ -1516,7 +1686,7 @@ mod tests {
                 }
             }
         }
-        let spots = candidates(&lum, &red, &mask, w, h, 250.0, 1.0).0;
+        let spots = candidates(&lum, &red, &mask, w, h, 250.0, 1.0, None).0;
         let spot = spots
             .iter()
             .find(|s| distance([s.x, s.y], [80.0, 80.0]) < 3.0)
@@ -1565,7 +1735,7 @@ mod tests {
         let clipped: Vec<_> = (0..w * h)
             .map(|i| ((i % w) as f32 - 80.0).hypot((i / w) as f32 - 80.0) < 4.0)
             .collect();
-        assert!(candidates(&lum, &red, &clipped, w, h, 250.0, 1.0)
+        assert!(candidates(&lum, &red, &clipped, w, h, 250.0, 1.0, None)
             .0
             .iter()
             .all(|s| distance([s.x, s.y], [80.0, 80.0]) >= 3.0));
@@ -1767,7 +1937,7 @@ mod tests {
                 }
             }
         }
-        let spots = candidates(&lum, &red, &vec![true; w * h], w, h, 250.0, 0.85).0;
+        let spots = candidates(&lum, &red, &vec![true; w * h], w, h, 250.0, 0.85, None).0;
         for cx in [60.0, 100.0] {
             assert!(
                 spots.iter().any(|s| distance([s.x, s.y], [cx, 80.0]) < 3.0),
@@ -1789,7 +1959,7 @@ mod tests {
                 }
             }
         }
-        let spots = candidates(&lum, &red, &mask, w, h, 250.0, 0.85).0;
+        let spots = candidates(&lum, &red, &mask, w, h, 250.0, 0.85, None).0;
         assert!(
             spots
                 .iter()
@@ -1849,6 +2019,8 @@ mod tests {
         let settings = Settings {
             deep_blemish_cleanup: true,
             remove_dark_marks: true,
+            // The painted marks are hard-edged and dark in red: moles, unless told otherwise.
+            keep_moles: false,
             keep_freckles: false,
             blemish_sensitivity: 0.85,
             max_spots: 220,
@@ -1888,7 +2060,7 @@ mod tests {
                 }
             }
         }
-        let spots = candidates(&lum, &red, &vec![true; w * h], w, h, 250.0, 0.85).0;
+        let spots = candidates(&lum, &red, &vec![true; w * h], w, h, 250.0, 0.85, None).0;
         assert!(
             spots
                 .iter()
@@ -1911,6 +2083,8 @@ mod tests {
         let settings = Settings {
             deep_blemish_cleanup: true,
             remove_dark_marks: true,
+            // The painted marks are hard-edged and dark in red: moles, unless told otherwise.
+            keep_moles: false,
             keep_freckles: false,
             blemish_sensitivity: 0.85,
             ..Settings::default()
@@ -1956,6 +2130,8 @@ mod tests {
         let settings = Settings {
             deep_blemish_cleanup: true,
             remove_dark_marks: true,
+            // The painted marks are hard-edged and dark in red: moles, unless told otherwise.
+            keep_moles: false,
             keep_freckles: false,
             blemish_sensitivity: 0.85,
             ..Settings::default()
@@ -2001,7 +2177,7 @@ mod tests {
                 }
             }
         }
-        let spots = candidates(&lum, &red, &vec![true; w * h], w, h, 250.0, 0.85).0;
+        let spots = candidates(&lum, &red, &vec![true; w * h], w, h, 250.0, 0.85, None).0;
         assert!(
             spots
                 .iter()
@@ -2024,7 +2200,7 @@ mod tests {
                 }
             }
         }
-        let spots = candidates(&lum, &red, &vec![true; w * h], w, h, 250.0, 0.85).0;
+        let spots = candidates(&lum, &red, &vec![true; w * h], w, h, 250.0, 0.85, None).0;
         assert!(
             !spots
                 .iter()
@@ -2051,7 +2227,7 @@ mod tests {
                 }
             }
             let mask = vec![true; w * h];
-            let spots = candidates(&lum, &red, &mask, w, h, 250.0, 0.85).0;
+            let spots = candidates(&lum, &red, &mask, w, h, 250.0, 0.85, None).0;
             assert!(
                 spots
                     .iter()
@@ -2076,14 +2252,14 @@ mod tests {
         let mask = vec![true; 128 * 128];
         let red = vec![0.1; 128 * 128];
         let mut lum = vec![0.4; 128 * 128];
-        assert!(candidates(&lum, &red, &mask, 128, 128, 100.0, 0.9)
+        assert!(candidates(&lum, &red, &mask, 128, 128, 100.0, 0.9, None)
             .0
             .is_empty());
         for y in 20..108 {
             lum[y * 128 + 64] = 0.1;
             lum[y * 128 + 65] = 0.1;
         }
-        assert!(candidates(&lum, &red, &mask, 128, 128, 100.0, 0.9)
+        assert!(candidates(&lum, &red, &mask, 128, 128, 100.0, 0.9, None)
             .0
             .is_empty());
     }
@@ -2100,10 +2276,10 @@ mod tests {
                     }
                 }
             }
-            let spots = candidates(&lum, &red, &mask, 128, 128, 100.0, 0.9).0;
+            let spots = candidates(&lum, &red, &mask, 128, 128, 100.0, 0.9, None).0;
             assert_eq!(spots.len(), 1, "base={base}, spots={spots:?}");
             disk(&mut mask, 128, 128, 63.0, 63.0, 15.0);
-            assert!(candidates(&lum, &red, &mask, 128, 128, 100.0, 0.9)
+            assert!(candidates(&lum, &red, &mask, 128, 128, 100.0, 0.9, None)
                 .0
                 .is_empty());
         }
@@ -2128,6 +2304,7 @@ mod tests {
             128,
             100.0,
             0.9,
+            None,
         )
         .0;
         assert!(
@@ -2249,6 +2426,85 @@ mod tests {
     }
 
     #[test]
+    fn a_mole_is_not_planned_for_repair_and_a_fainter_dark_mark_beside_it_is() {
+        let face = finish_face();
+        let mut rgb = [190_u8, 140, 110].repeat(512 * 512);
+        // Pigment takes red down with the rest; what a spot leaves behind does not.
+        fill(&mut rgb, [157, 282, 164, 289], [70, 45, 35]);
+        fill(&mut rgb, [347, 282, 354, 289], [160, 112, 88]);
+        let pixels = Pixels::new(&rgb, 512, 512).unwrap();
+        let matte = Matte {
+            bounds: face.bounds,
+            width: 96,
+            height: 128,
+            alpha: vec![255; 96 * 128],
+        };
+        let planned_near = |settings: &Settings, x: f32| -> bool {
+            plan(&face, 0, &pixels, "test-", settings, Some(&matte))
+                .blemishes
+                .iter()
+                .any(|e| {
+                    (e.region[0] * 512.0 - x).abs() < 6.0
+                        && (e.region[1] * 512.0 - 285.5).abs() < 6.0
+                })
+        };
+        let keeping = Settings {
+            remove_dark_marks: true,
+            keep_freckles: false,
+            blemish_sensitivity: 1.0,
+            max_spots: 900,
+            ..Settings::default()
+        };
+        assert!(keeping.keep_moles);
+        assert!(
+            !planned_near(&keeping, 160.5),
+            "the mole was planned for repair"
+        );
+        assert!(planned_near(&keeping, 350.5), "the fainter mark was left");
+        let all = Settings {
+            keep_moles: false,
+            ..keeping
+        };
+        assert!(
+            planned_near(&all, 160.5),
+            "the mole was kept when it was not asked for"
+        );
+        assert!(planned_near(&all, 350.5));
+    }
+
+    #[test]
+    fn a_repair_is_refused_where_the_skin_around_it_is_a_fold() {
+        let (w, h) = (160, 160);
+        let mask = vec![true; w * h];
+        let red = vec![0.1; w * h];
+        // A dark mark on plain skin, and the same mark sitting in a fold: a narrow valley
+        // that runs on through it in both directions.
+        let paint = |fold: bool| -> Vec<f32> {
+            (0..w * h)
+                .map(|i| {
+                    let (x, y) = ((i % w) as f32, (i / w) as f32);
+                    let mut v = 0.5;
+                    if fold {
+                        v -= 0.2 * (-((x - 80.0) / 3.0).powi(2)).exp();
+                    }
+                    if (x - 80.0).hypot(y - 80.0) < 4.0 {
+                        v -= 0.12;
+                    }
+                    v
+                })
+                .collect()
+        };
+        let found = |lum: &[f32]| -> bool {
+            candidates(lum, &red, &mask, w, h, 250.0, 1.0, None)
+                .0
+                .iter()
+                .any(|s| distance([s.x, s.y], [80.0, 80.0]) < 4.0)
+        };
+        assert!(found(&paint(false)), "a mark on plain skin was not planned");
+        assert!(!found(&paint(true)), "a repair was planned across a fold");
+    }
+
+    #[test]
     fn residual_pass_honors_dark_mark_choice_and_remaining_budget() {
         use std::collections::BTreeMap;
 
@@ -2266,6 +2522,8 @@ mod tests {
         };
         let settings = Settings {
             remove_dark_marks: true,
+            // The painted marks are darker than half their skin: moles, unless told otherwise.
+            keep_moles: false,
             keep_freckles: false,
             blemish_sensitivity: 1.0,
             max_spots: 900,
@@ -2344,6 +2602,8 @@ mod tests {
         };
         let settings = Settings {
             remove_dark_marks: true,
+            // The painted marks are darker than half their skin: moles, unless told otherwise.
+            keep_moles: false,
             keep_freckles: false,
             blemish_sensitivity: 1.0,
             max_spots: 900,
@@ -2451,6 +2711,8 @@ mod tests {
             deep_blemish_cleanup: true,
             max_spots: 220,
             keep_freckles: false,
+            // The painted defect is darker than half its skin: a mole, unless told otherwise.
+            keep_moles: false,
             blemish_sensitivity: 0.9,
             ..Settings::default()
         };
@@ -2791,6 +3053,8 @@ mod tests {
         let settings = Settings {
             deep_blemish_cleanup: true,
             remove_dark_marks: true,
+            // The painted marks are hard-edged and dark in red: moles, unless told otherwise.
+            keep_moles: false,
             keep_freckles: false,
             blemish_sensitivity: 1.0,
             ..Settings::default()

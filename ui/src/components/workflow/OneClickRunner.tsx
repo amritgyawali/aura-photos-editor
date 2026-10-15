@@ -3,14 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   oneClickCancel,
   oneClickFinish,
-  oneClickStatus,
   pickImportPaths,
   inTauri,
   asIpcError,
 } from '../../ipc/client';
-import type { OneClickStatusDto } from '../../ipc/types';
 import { useStore } from '../../state/store';
-import { useAutomatic } from '../../state/automaticStore';
+import { automaticBusy, useAutomatic } from '../../state/automaticStore';
 
 /**
  * One button that finishes a wedding. ADR-0068's surface.
@@ -48,50 +46,30 @@ export function OneClickRunner({ onFinished }: OneClickRunnerProps): JSX.Element
   const activeProjectId = useStore((state) => state.activeProjectId);
   const progress = useStore((state) => state.progress);
   const [destination, setDestination] = useState('');
-  const [status, setStatus] = useState<OneClickStatusDto | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const jobRef = useRef<string | null>(null);
-  const timerRef = useRef<number | null>(null);
-
-  const stop = useCallback(() => {
-    if (timerRef.current !== null) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
+  // The shell's AutomaticProgress owns one non-overlapping status poll. This panel
+  // observes that same run, including after navigation, rather than starting a second poll.
+  const automatic = useAutomatic();
+  const busy = useAutomatic(automaticBusy);
+  const status = automatic.projectId === activeProjectId ? automatic.status : null;
+  const observedJob = useRef<string | null>(null);
+  const finished = useRef(onFinished);
+  finished.current = onFinished;
+  useEffect(() => {
+    if (automatic.starting || automatic.projectId !== activeProjectId || !automatic.jobId) return;
+    if (busy) observedJob.current = automatic.jobId;
+    else if (observedJob.current === automatic.jobId && status) {
+      observedJob.current = null;
+      finished.current();
     }
-  }, []);
-
-  useEffect(() => stop, [stop]);
-
-  const poll = useCallback(
-    (jobId: string) => {
-      void oneClickStatus(jobId)
-        .then((row) => {
-          setStatus(row);
-          if (row.status !== 'running' && row.status !== 'cancelling') {
-            stop();
-            setBusy(false);
-            jobRef.current = null;
-            onFinished();
-          }
-        })
-        .catch((err: unknown) => {
-          setError(asIpcError(err).message);
-          stop();
-          setBusy(false);
-        });
-    },
-    [onFinished, stop],
-  );
+  }, [activeProjectId, automatic.projectId, automatic.jobId, automatic.starting, busy, status]);
 
   const start = useCallback(async () => {
-    if (!activeProjectId || !inTauri() || !destination) {
+    if (!activeProjectId || !inTauri() || !destination || automaticBusy(useAutomatic.getState())) {
       return;
     }
-    setBusy(true);
     useAutomatic.setState({ starting: true });
     setError(null);
-    setStatus(null);
     try {
       const handle = await oneClickFinish({
         projectId: activeProjectId,
@@ -99,26 +77,21 @@ export function OneClickRunner({ onFinished }: OneClickRunnerProps): JSX.Element
         // The wizard's still-running import joins this run rather than racing it.
         ingestJobId: progress.running ? progress.jobId : null,
       });
-      jobRef.current = handle.jobId;
       useAutomatic.getState().adopt(handle.jobId, activeProjectId);
-      timerRef.current = window.setInterval(() => {
-        void poll(handle.jobId);
-      }, 1000);
-      poll(handle.jobId);
     } catch (err) {
       useAutomatic.setState({ starting: false });
-      setBusy(false);
       const message =
         typeof err === 'object' && err !== null && 'message' in err
           ? String((err as { message: unknown }).message)
           : String(err);
       setError(message);
     }
-  }, [activeProjectId, destination, poll, progress.jobId, progress.running]);
+  }, [activeProjectId, destination, progress.jobId, progress.running]);
 
   const cancel = useCallback(() => {
-    if (jobRef.current) {
-      void oneClickCancel(jobRef.current).catch((err: unknown) => setError(asIpcError(err).message));
+    const jobId = useAutomatic.getState().jobId;
+    if (jobId) {
+      void oneClickCancel(jobId).catch((err: unknown) => setError(asIpcError(err).message));
     }
   }, []);
 

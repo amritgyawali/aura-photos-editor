@@ -328,7 +328,10 @@ impl Source for ExportSource<'_> {
         })?;
         // The recipe the develop surface already loads: stored, or neutral when this frame has
         // never been edited. One loader, because two would be two answers to what the edit is.
-        let recipe = crate::develop_commands::load_or_neutral(self.state, image)?;
+        let recipe = {
+            let _t = crate::perf::step(self.state, "export.recipe_load");
+            crate::develop_commands::load_or_neutral(self.state, image)?
+        };
 
         // `RenderPurpose::Export`: nothing is skipped, at full precision. The interactive path
         // skips restoration and heavy retouch, and a delivered file that skipped them is a file
@@ -344,7 +347,10 @@ impl Source for ExportSource<'_> {
             },
             purpose: RenderPurpose::Export,
         };
-        let rendered = engine.render(request)?;
+        let rendered = {
+            let _t = crate::perf::step(self.state, "export.render_full");
+            engine.render(request)?
+        };
 
         Ok(Rendered {
             width: rendered.width,
@@ -468,13 +474,61 @@ pub fn export_run_with_watermark(
     input: ExportJobInput,
     watermark: Option<Watermark>,
 ) -> IpcResult<ExportStatusDto> {
+    export_run_reporting(state, input, watermark, None)
+}
+
+/// [`export_run_with_watermark`], also telling `also` after every file. The export appears in
+/// the status bar for as long as it runs, with the file it has just written.
+/// # Errors
+/// Invalid job/graphic, unavailable pixels, or export I/O failure.
+pub(crate) fn export_run_reporting(
+    state: &AppState,
+    input: ExportJobInput,
+    watermark: Option<Watermark>,
+    also: Option<&(dyn Fn(aura_export::api::Progress<'_>) + Sync)>,
+) -> IpcResult<ExportStatusDto> {
     crate::licensing::require_export(state)?;
+    let photos: usize = input.sets.iter().map(|set| set.image_ids.len()).sum();
+    let busy = crate::activity::begin(
+        state,
+        "export",
+        format!("Exporting {photos} photograph(s) to {}", input.destination),
+    );
+    busy.progress(0, photos as u64);
+    let report = |p: aura_export::api::Progress<'_>| {
+        busy.progress(p.done as u64, p.total as u64);
+        if let Some((first, last)) = p.rendering {
+            busy.detail(format!(
+                "Rendering photos {first} to {last}; {} written so far",
+                p.written
+            ));
+            if let Some(also) = also {
+                also(p);
+            }
+            return;
+        }
+        busy.detail(format!(
+            "{}{} written, {} read back and verified",
+            if p.path.as_os_str().is_empty() {
+                String::new()
+            } else {
+                format!("{} - ", p.path.display())
+            },
+            p.written,
+            p.verified
+        ));
+        if let Some(also) = also {
+            also(p);
+        }
+    };
     let project = parse_project(&input.project_id)?;
     let job = build_job(&input)?;
     let field = ExportField::new(state, project)?;
     let source = ExportSource::new(state);
     let store = ExportStore::new(Arc::clone(state.catalog()));
-    let pass = ExportPass::new(&store, &field, &source, crate::state::APP_VERSION);
+    let pass = ExportPass::new(&store, &field, &source, crate::state::APP_VERSION)
+        .with_workers(state.image_work_gate().permits())
+        .with_progress(&report);
     pass.run_with_watermark(project, &job, watermark.as_ref())?;
 
     let service = Export::new(store, field.photos(), field.selected());

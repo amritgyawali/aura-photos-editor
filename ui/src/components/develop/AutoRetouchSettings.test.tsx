@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { AutoRetouchSettings, PRESETS, SETTING_GROUPS } from './AutoRetouchSettings';
+import { AutoRetouchSettings, PRESETS, SETTING_GROUPS, presetOf } from './AutoRetouchSettings';
+import type { RecipeDto } from '../../ipc/types';
 import { DEFAULT_RETOUCH_SETTINGS } from '../../ipc/nativeRetouch';
 import { automaticLabel } from './NativeRetouchWorkspace';
 
@@ -67,15 +68,15 @@ describe('automatic retouch settings', () => {
   });
   it('offers every fine control exactly once', () => {
     const keys = SETTING_GROUPS.flatMap(([, controls]) => controls.map(([key]) => key));
-    expect(keys.length).toBe(59);
-    expect(new Set(keys).size).toBe(59);
+    expect(keys.length).toBe(61);
+    expect(new Set(keys).size).toBe(61);
     expect([...keys].sort()).toEqual(Object.keys(DEFAULT_RETOUCH_SETTINGS).sort());
   });
   it('runs deep cleanup as one native pass and exposes dark-mark removal', () => {
     const run = vi.fn();
     render(<AutoRetouchSettings disabled={false} onRun={run} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
-    expect(screen.getByText(/can also remove freckles or beauty marks/)).toBeTruthy();
+    expect(screen.getByText(/freckles and the marks spots leave are healed. Moles and beauty marks are kept/)).toBeTruthy();
     fireEvent.click(screen.getByText('Blemishes'));
     expect(screen.getByLabelText('Most spots per face').getAttribute('max')).toBe('900');
     fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
@@ -152,7 +153,7 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
   expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
   expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
   for (const [id, , values] of PRESETS) {
-    if (id === 'pro' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin' || id === 'portrait_finish') continue;
+    if (id === 'pro' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin' || id === 'portrait_finish' || id === 'smooth_finish' || id === 'body_finish') continue;
     expect(values.frequencyHeal ?? 0).toBe(0);
     expect(values.textureGraft ?? 0).toBe(0);
   }
@@ -181,4 +182,58 @@ it('restores the complete finishing scope after acne-only without enabling iris,
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
   expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ eyes: false, refine: false,
     settings: expect.objectContaining({ darkCircles: 0, toneEvenness: 0 }) }));
+});
+
+it('offers a smoother portrait finish that softens lines and under-eye bags and still leaves eyes, teeth and shape alone', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByRole('radio', { name: 'Smooth portrait finish' }));
+  expect(screen.getByText(/more of the smoothing a polished headshot carries/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ scope: 'face_and_body', eyes: true, refine: true, teeth: false,
+    settings: expect.objectContaining({ cleanupPasses: 4, darkCircles: .75, toneEvenness: .6, smoothing: .5, texture: .75,
+      foreheadLines: .6, crowsFeet: .6, smileLines: .35, underEyeLines: .9, eyeBags: .75, protectEyeArea: false,
+      protectNoseDetail: true, irisDetail: 0, eyeWhitening: 0, redEye: false, teethWhitening: 0, contour: 0, highlight: 0 }) }));
+  // The finish it is built on is unchanged by it.
+  fireEvent.click(screen.getByRole('radio', { name: 'Portrait skin finish' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenLastCalledWith(expect.objectContaining({
+    settings: expect.objectContaining({ smoothing: .05, microDodgeBurn: 0, lightEvenness: .1, poreRefine: .8, texture: .9, foreheadLines: 0, eyeBags: 0, protectEyeArea: true }) }));
+});
+
+it('keeps moles by default and clears stretch marks only when a preset or a person asks', () => {
+  expect(DEFAULT_RETOUCH_SETTINGS.keepMoles).toBe(true);
+  expect(DEFAULT_RETOUCH_SETTINGS.stretchMarks).toBe(0);
+  for (const [id, , values] of PRESETS) {
+    expect(values.keepMoles ?? true).toBe(true);
+    if (id !== 'body_finish') expect(values.stretchMarks ?? 0).toBe(0);
+  }
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByRole('radio', { name: 'Body skin finish · stretch marks' }));
+  expect(screen.getByText(/Moles and beauty marks are kept/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ scope: 'face_and_body', teeth: false,
+    settings: expect.objectContaining({ stretchMarks: 1, keepMoles: true, removeDarkMarks: true, bodyBlemishes: 1 }) }));
+  fireEvent.click(screen.getByText('Blemishes'));
+  fireEvent.click(screen.getByLabelText('Keep moles'));
+  expect(screen.getByText(/moles and beauty marks can all be removed/)).toBeTruthy();
+});
+
+it('shows the preset a saved retouch was made with instead of Custom with nothing chosen', () => {
+  // Every preset is recognised from its own values, and a changed value is Custom.
+  for (const [id, , values, intensity] of PRESETS) {
+    const options = { intensity: intensity ?? 1, blemishes: true, eyes: true, teeth: true, refine: true,
+      scope: 'face' as const, settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values } };
+    expect(PRESETS.find(([other]) => other === presetOf(options))?.[2]).toEqual(values);
+    expect(presetOf({ ...options, settings: { ...options.settings, glow: .37 } })).toBe('custom');
+    expect(id).toBeTruthy();
+  }
+  const body = PRESETS.find(([id]) => id === 'body_finish')!;
+  const recipe = { body: JSON.stringify({ studio_portrait_auto_v1: { options: {
+    intensity: 1, scope: 'face_and_body', blemishes: true, eyes: true, teeth: false, refine: true,
+    settings: { ...DEFAULT_RETOUCH_SETTINGS, ...body[2] } } } }) } as RecipeDto;
+  render(<AutoRetouchSettings disabled={false} onRun={vi.fn()} recipe={recipe} />);
+  expect((screen.getByRole('radio', { name: body[1] }) as HTMLInputElement).checked).toBe(true);
+  expect(screen.queryByText('Custom')).toBeNull();
 });

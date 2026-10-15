@@ -1,10 +1,7 @@
 //! Native remaining-mark review. Uses the saved retouch view and never saves an edit.
 use crate::{commands::IpcResult, AppState};
 use aura_core::PhotoId;
-use aura_raw::colour::{
-    curve::srgb_decode,
-    matrix::{mul, SRGB_TO_XYZ_D65},
-};
+use aura_raw::colour::matrix::{mul, SRGB_TO_XYZ_D65};
 use aura_recipe::retouch_tools::{self, Edit};
 use serde::{Deserialize, Serialize};
 
@@ -89,7 +86,7 @@ pub fn inspect(state: &AppState, input: &Input) -> IpcResult<Report> {
         .flat_map(|pixel| {
             let mut rgb = [0.0; 3];
             for (out, value) in rgb.iter_mut().zip(pixel) {
-                *out = srgb_decode(f32::from(*value) / 255.0);
+                *out = aura_raw::colour::curve::srgb_byte_to_linear(*value);
             }
             aura_render::colour::apply_f32(matrix, rgb)
         })

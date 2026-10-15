@@ -24,8 +24,9 @@
 //! the same place always gets the same offset. That is stronger than a fixed seed: it is
 //! reproducible across tile boundaries, which a sequence-based dither is not.
 
-use aura_raw::colour::curve::filmic_lite;
+use aura_raw::colour::curve::{filmic_lite, filmic_lite_inverse, srgb_decode};
 use aura_raw::colour::matrix::{invert, mul, Mat3, IDENTITY, REC2020_TO_XYZ_D65, SRGB_TO_XYZ_D65};
+use aura_raw::colour::working_space::linear_srgb_to_working_f32;
 
 use crate::colour::{apply_f32, narrow};
 use crate::contract::render::{OutputColour, RenderedData};
@@ -73,6 +74,44 @@ pub fn srgb_to_output(space: OutputColour) -> [[f32; 3]; 3] {
         OutputColour::DisplayP3 => DISPLAY_P3_TO_XYZ_D65,
     };
     narrow(mul(invert(target).unwrap_or(IDENTITY), SRGB_TO_XYZ_D65))
+}
+
+/// Where a display-referred file's peak code is taken to sit, in scene-linear units.
+///
+/// [`filmic_lite`] reaches 1.0 only at infinity, so the inverse needs a ceiling. Two stops
+/// over diffuse white rolls back off to within a hundredth of an 8-bit code of white, which
+/// is what lets a file's own 255 come out as 255.
+pub const DISPLAY_PEAK: f32 = 4.0;
+
+/// Bumped whenever [`unroll`] changes, because it decides the pixels of every photograph that
+/// arrives display-referred. Folded into the engine string.
+pub const DISPLAY_INPUT_VER: u32 = 1;
+
+/// Undo the tone map on working-space samples that were made by a display rendering.
+///
+/// A JPEG, a PNG and the proxy phase 02 renders have all been through a shoulder already.
+/// Step 1 of [`map_one`] would roll them off a second time: a white wall at 239 comes back
+/// at 230, and a photograph exported with no edits at all is duller than the file it was
+/// imported from. Bringing such a file into the scene-referred working space is the inverse
+/// of leaving it, so the untouched render is the file, and an exposure lift still rolls off
+/// the way it does on a raw frame instead of clipping.
+pub fn unroll(rgb: &mut [f32]) {
+    use rayon::prelude::*;
+    let ceiling = filmic_lite(DISPLAY_PEAK);
+    let one = |value: &mut f32| *value = filmic_lite_inverse(value.min(ceiling));
+    if rgb.len() >= 1 << 18 {
+        rgb.par_iter_mut().for_each(one);
+    } else {
+        rgb.iter_mut().for_each(one);
+    }
+}
+
+/// One display sRGB colour as the scene-referred working-space value that renders back to it.
+#[must_use]
+pub fn display_srgb_to_working(encoded: [f32; 3]) -> [f32; 3] {
+    let mut working = linear_srgb_to_working_f32(encoded.map(srgb_decode));
+    unroll(&mut working);
+    working
 }
 
 /// sRGB's piecewise encoding.
@@ -179,6 +218,67 @@ pub fn transform(
     RenderedData::Eight(out)
 }
 
+/// GPU identity for capabilities and cache separation, if a hardware device is usable.
+#[must_use]
+pub fn gpu_identity() -> Option<&'static str> {
+    crate::gpu_output::available().map(|device| device.identity.as_str())
+}
+
+/// Minimum image size that passed the device's startup speed comparison.
+#[must_use]
+pub fn gpu_min_pixels() -> Option<usize> {
+    crate::gpu_output::available().map(|device| device.min_pixels)
+}
+
+/// Human-readable fallback reason for diagnostics; no file or photograph data is included.
+#[must_use]
+pub fn gpu_unavailable_reason() -> Option<String> {
+    crate::gpu_output::unavailable_reason()
+}
+
+/// Execute the same output shader on a hardware device, with bounded row stripes.
+/// # Errors
+/// Missing/disabled hardware, invalid input or a GPU failure. The caller retains its CPU input.
+pub fn transform_gpu(
+    rgb: &[f32],
+    width: u32,
+    height: u32,
+    space: OutputColour,
+    bit_depth: u8,
+    origin: (u32, u32),
+) -> Result<RenderedData, String> {
+    let device = crate::gpu_output::available().ok_or("GPU output is unavailable or disabled")?;
+    let codes = device.transform(rgb, width, height, gpu_params(space, bit_depth, origin))?;
+    Ok(if bit_depth == 16 {
+        RenderedData::Sixteen(
+            codes
+                .into_iter()
+                .map(|code| code.min(65535) as u16)
+                .collect(),
+        )
+    } else {
+        RenderedData::Eight(codes.into_iter().map(|code| code.min(255) as u8).collect())
+    })
+}
+
+// WGSL mat3 columns have 16-byte stride. The remaining four words carry output settings.
+// These indices are statically bounded by the declared 16-element parameter array.
+#[allow(clippy::indexing_slicing)]
+pub(crate) fn gpu_params(space: OutputColour, bit_depth: u8, origin: (u32, u32)) -> [u32; 16] {
+    let matrix = working_to_output(space);
+    let mut params = [0_u32; 16];
+    for column in 0..3 {
+        for row in 0..3 {
+            params[column * 4 + row] = matrix[row][column].to_bits();
+        }
+    }
+    params[12] = u32::from(space == OutputColour::AdobeRgb);
+    params[13] = u32::from(bit_depth);
+    params[14] = origin.0;
+    params[15] = origin.1;
+    params
+}
+
 fn read(rgb: &[f32], base: usize) -> [f32; 3] {
     [
         rgb.get(base).copied().unwrap_or(0.0),
@@ -218,6 +318,47 @@ mod tests {
         assert!((encode_srgb(1.0) - 1.0).abs() < 1e-6);
         assert!(encode_gamma_2_2(0.0).abs() < 1e-6);
         assert!((encode_gamma_2_2(1.0) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn a_display_referred_file_renders_back_to_its_own_codes() {
+        // Every grey code and the six saturated corners, through the whole 8-bit transform.
+        let mut codes: Vec<[u8; 3]> = (0..=255).map(|v| [v; 3]).collect();
+        codes.extend([
+            [255, 0, 0],
+            [0, 255, 0],
+            [0, 0, 255],
+            [255, 255, 0],
+            [0, 255, 255],
+            [255, 0, 255],
+            [239, 214, 198],
+            [250, 252, 254],
+        ]);
+        for code in codes {
+            let working = display_srgb_to_working(code.map(|v| f32::from(v) / 255.0));
+            // Sixteen bits carry no dither, so the comparison is of the transform alone.
+            let RenderedData::Sixteen(out) =
+                transform(&working, 1, 1, OutputColour::Srgb, 16, (0, 0))
+            else {
+                panic!("a 16-bit render");
+            };
+            for (channel, value) in code.iter().zip(out) {
+                let back = f32::from(value) / 65535.0 * 255.0;
+                assert!(
+                    (back - f32::from(*channel)).abs() < 0.2,
+                    "{code:?} came back with {back}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn unrolling_leaves_everything_below_the_knee_alone() {
+        let mut samples = [0.0, 0.18, 0.6, 0.8, 1.0];
+        unroll(&mut samples);
+        assert_eq!(samples[..3], [0.0, 0.18, 0.6]);
+        assert!(samples[3] > 0.8 && samples[4] > samples[3]);
+        assert!((samples[4] - DISPLAY_PEAK).abs() < 1e-3);
     }
 
     #[test]

@@ -283,3 +283,14 @@ fn a_buffer_whose_length_disagrees_with_its_dimensions_is_returned_untouched() {
     assert_eq!(out, data);
     assert_eq!((width, height), (4, 4));
 }
+
+#[test]
+fn an_iphone_heic_photo_is_refused_with_its_own_code_and_a_way_forward() {
+    let mut heic = vec![0, 0, 0, 0x18];
+    heic.extend_from_slice(b"ftypheic\0\0\0\0mif1heic");
+    heic.resize(64, 0);
+    assert_eq!(sniff(&heic), RawFormat::Heif);
+    let refused = meta::read(&heic, std::path::Path::new("IMG_0001.HEIC")).unwrap_err();
+    assert_eq!(refused.code.0, "AURA-RAW-2009");
+    assert!(refused.user_message.contains("JPEG"));
+}

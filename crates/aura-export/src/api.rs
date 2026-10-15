@@ -28,7 +28,7 @@ use aura_core::contract::delivery::{
 };
 use aura_core::{AuraResult, ProjectId};
 
-use crate::errors::{destination_bad, job_refused};
+use crate::errors::{destination_bad, job_refused, render_failed};
 use crate::manifest;
 use crate::metadata;
 use crate::naming;
@@ -45,6 +45,46 @@ pub struct ExportPass<'a> {
     field: &'a dyn Field,
     source: &'a dyn Source,
     app_version: String,
+    workers: usize,
+    progress: Option<Sink<'a>>,
+}
+
+/// A progress callback, kept beside the pass.
+#[derive(Clone, Copy)]
+struct Sink<'a>(&'a (dyn Fn(Progress<'_>) + Sync));
+
+impl std::fmt::Debug for Sink<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("progress callback")
+    }
+}
+
+/// Where a pass has got, reported after every frame is written and read back or left out.
+#[derive(Debug, Clone, Copy)]
+pub struct Progress<'p> {
+    /// Frames finished, written or left out.
+    pub done: usize,
+    /// Frames in the job.
+    pub total: usize,
+    /// Files written so far, and how many of them read back the same.
+    pub written: usize,
+    pub verified: u32,
+    /// The file just finished, relative to the destination, or empty when it was left out
+    /// or when nothing has finished yet.
+    pub path: &'p std::path::Path,
+    /// Frames being rendered and encoded now: the first and last, counting from one.
+    pub rendering: Option<(usize, usize)>,
+}
+
+/// A frame after stage one of the pass: encoded and ready to write, or left out with a reason.
+#[derive(Debug)]
+enum Prepared {
+    Ready {
+        sharpened: Rendered,
+        bytes: Vec<u8>,
+        reasons: Vec<DeliveryReason>,
+    },
+    Skipped(String),
 }
 
 /// What a pass produced.
@@ -74,7 +114,118 @@ impl<'a> ExportPass<'a> {
             field,
             source,
             app_version: app_version.into(),
+            workers: 1,
+            progress: None,
         }
+    }
+
+    /// Stage one of one frame: its pixels, resized, sharpened, marked and encoded. Nothing is
+    /// written, so any number of these may run at once.
+    fn prepare(
+        &self,
+        project: ProjectId,
+        job: &ExportJob,
+        planned: &naming::PlannedName,
+        watermark: Option<&crate::watermark::Watermark>,
+    ) -> AuraResult<Prepared> {
+        let Some(set) = job.sets.iter().find(|s| s.name == planned.set) else {
+            return Ok(Prepared::Skipped(String::new()));
+        };
+        // 4a. Pixels, from the one place they come from.
+        let rendered = match self
+            .source
+            .render(project, planned.image, set.colour, set.bit_depth)
+        {
+            Ok(r) if r.is_well_formed() => r,
+            Ok(_) => {
+                return Ok(Prepared::Skipped(
+                    "the render returned a malformed buffer".to_owned(),
+                ));
+            }
+            Err(e) => {
+                // Item-level. The wedding delivers without this frame and the summary names it.
+                return Ok(Prepared::Skipped(e.to_string()));
+            }
+        };
+
+        let mut reasons = planned.reasons.clone();
+
+        // 4b. Resize, in linear light, never upward.
+        let (tw, th) = set.resize.target(rendered.width, rendered.height);
+        if set.resize.would_upscale(rendered.width, rendered.height) {
+            reasons.push(DeliveryReason::with(
+                DeliveryCode::ResizeIgnoredUpscale,
+                format!("{}x{}", rendered.width, rendered.height),
+            ));
+        }
+        let resized: Rendered = if tw == rendered.width && th == rendered.height {
+            rendered
+        } else {
+            resample::downscale(&rendered, tw, th)
+        };
+
+        // 4c. Sharpen, in the encoded domain, by how far the frame was scaled.
+        let scale = if resized.width.max(resized.height) == 0 {
+            1.0
+        } else {
+            f64::from(resized.width.max(resized.height)) as f32
+                / f64::from(tw.max(th).max(1)) as f32
+        };
+        let long_before = f64::from(set.resize.target(resized.width, resized.height).0);
+        let _ = long_before;
+        let scale_factor = if matches!(set.resize, Resize::Full) {
+            1.0
+        } else {
+            scale
+        };
+        let sharpened = resample::sharpen(&resized, set.sharpen, scale_factor);
+        if set.sharpen != aura_core::contract::delivery::OutputSharpen::None {
+            reasons.push(DeliveryReason::with(
+                DeliveryCode::SharpenedForOutput,
+                format!("{}x{}", sharpened.width, sharpened.height),
+            ));
+        }
+
+        let sharpened = if let Some(mark) = watermark {
+            mark.apply(&sharpened)?
+        } else {
+            sharpened
+        };
+
+        // 4d. Encode.
+        let (bytes, mut encode_reasons) = match set.format {
+            aura_core::contract::delivery::FileFormat::Jpeg => {
+                jpeg::encode(&sharpened, set.quality, &job.metadata)?
+            }
+            aura_core::contract::delivery::FileFormat::Tiff => {
+                tiff::encode(&sharpened, &job.metadata)?
+            }
+            aura_core::contract::delivery::FileFormat::Png => {
+                png::encode(&sharpened, &job.metadata)?
+            }
+        };
+        reasons.append(&mut encode_reasons);
+        Ok(Prepared::Ready {
+            sharpened,
+            bytes,
+            reasons,
+        })
+    }
+
+    /// Say where the pass has got after every frame, for a progress display.
+    #[must_use]
+    pub fn with_progress(mut self, progress: &'a (dyn Fn(Progress<'_>) + Sync)) -> Self {
+        self.progress = Some(Sink(progress));
+        self
+    }
+
+    /// Render and encode up to `workers` frames at once. Files are still written, read back
+    /// and recorded one at a time in the plan's order, so names, the manifest and the point a
+    /// failing destination stops the job are the same as with one worker.
+    #[must_use]
+    pub fn with_workers(mut self, workers: usize) -> Self {
+        self.workers = workers.max(1);
+        self
     }
 
     /// Run a job.
@@ -136,143 +287,136 @@ impl<'a> ExportPass<'a> {
             std::collections::BTreeMap::new();
         let mut sidecars = 0_u32;
 
-        for planned in &plan {
-            let Some(set) = job.sets.iter().find(|s| s.name == planned.set) else {
-                continue;
-            };
-
-            // 4a. Pixels, from the one place they come from.
-            let rendered =
-                match self
-                    .source
-                    .render(project, planned.image, set.colour, set.bit_depth)
-                {
-                    Ok(r) if r.is_well_formed() => r,
-                    Ok(_) => {
-                        skipped.push((
-                            planned.image,
-                            "the render returned a malformed buffer".to_owned(),
-                        ));
-                        continue;
-                    }
-                    Err(e) => {
-                        // Item-level. The wedding delivers without this frame and the summary names it.
-                        skipped.push((planned.image, e.to_string()));
+        // Frames are rendered and encoded ahead of the writer, a window of them at a time,
+        // while each finished one is written, synced and read back in the job's order.
+        let frames: Vec<&naming::PlannedName> = plan.iter().collect();
+        let window = self.workers.saturating_mul(2).max(1);
+        let ahead = crate::ahead::Ahead::new(frames.len(), window);
+        std::thread::scope(|scope| -> AuraResult<()> {
+            if self.workers > 1 {
+                for _ in 0..self.workers.min(frames.len()) {
+                    scope.spawn(|| {
+                        ahead.work(
+                            |index| {
+                                frames.get(index).map_or_else(
+                                    || Err(render_failed("frame outside the plan")),
+                                    |planned| self.prepare(project, job, planned, watermark),
+                                )
+                            },
+                            || Err(render_failed("rendering this frame stopped unexpectedly")),
+                        );
+                    });
+                }
+            }
+            let _stop = crate::ahead::StopOnDrop(&ahead);
+            for (index, planned) in frames.iter().copied().enumerate() {
+                if let Some(Sink(report)) = self.progress {
+                    let first = files.len() + skipped.len() + 1;
+                    report(Progress {
+                        done: first - 1,
+                        total: plan.len(),
+                        written: files.len(),
+                        verified: verified_count,
+                        path: std::path::Path::new(""),
+                        rendering: Some((first, (first + window - 1).min(plan.len()))),
+                    });
+                }
+                let prepared = if self.workers > 1 {
+                    ahead
+                        .take(index)
+                        .unwrap_or_else(|| Err(render_failed("rendering stopped")))
+                } else {
+                    self.prepare(project, job, planned, watermark)
+                };
+                let Some(set) = job.sets.iter().find(|s| s.name == planned.set) else {
+                    continue;
+                };
+                let (sharpened, bytes, mut reasons) = match prepared? {
+                    Prepared::Ready {
+                        sharpened,
+                        bytes,
+                        reasons,
+                    } => (sharpened, bytes, reasons),
+                    Prepared::Skipped(why) => {
+                        skipped.push((planned.image, why));
+                        if let Some(Sink(report)) = self.progress {
+                            report(Progress {
+                                done: files.len() + skipped.len(),
+                                total: plan.len(),
+                                written: files.len(),
+                                verified: verified_count,
+                                path: std::path::Path::new(""),
+                                rendering: None,
+                            });
+                        }
                         continue;
                     }
                 };
 
-            let mut reasons = planned.reasons.clone();
-
-            // 4b. Resize, in linear light, never upward.
-            let (tw, th) = set.resize.target(rendered.width, rendered.height);
-            if set.resize.would_upscale(rendered.width, rendered.height) {
-                reasons.push(DeliveryReason::with(
-                    DeliveryCode::ResizeIgnoredUpscale,
-                    format!("{}x{}", rendered.width, rendered.height),
-                ));
-            }
-            let resized: Rendered = if tw == rendered.width && th == rendered.height {
-                rendered
-            } else {
-                resample::downscale(&rendered, tw, th)
-            };
-
-            // 4c. Sharpen, in the encoded domain, by how far the frame was scaled.
-            let scale = if resized.width.max(resized.height) == 0 {
-                1.0
-            } else {
-                f64::from(resized.width.max(resized.height)) as f32
-                    / f64::from(tw.max(th).max(1)) as f32
-            };
-            let long_before = f64::from(set.resize.target(resized.width, resized.height).0);
-            let _ = long_before;
-            let scale_factor = if matches!(set.resize, Resize::Full) {
-                1.0
-            } else {
-                scale
-            };
-            let sharpened = resample::sharpen(&resized, set.sharpen, scale_factor);
-            if set.sharpen != aura_core::contract::delivery::OutputSharpen::None {
-                reasons.push(DeliveryReason::with(
-                    DeliveryCode::SharpenedForOutput,
-                    format!("{}x{}", sharpened.width, sharpened.height),
-                ));
-            }
-
-            let sharpened = if let Some(mark) = watermark {
-                mark.apply(&sharpened)?
-            } else {
-                sharpened
-            };
-
-            // 4d. Encode.
-            let (bytes, mut encode_reasons) = match set.format {
-                aura_core::contract::delivery::FileFormat::Jpeg => {
-                    jpeg::encode(&sharpened, set.quality, &job.metadata)?
+                // 4e. Write, read back, hash. A failure here stops the job.
+                let path = root.join(&planned.rel_path);
+                let written = write_and_verify(&path, &bytes, job.verify)?;
+                reasons.push(DeliveryReason::plain(if written.verified {
+                    DeliveryCode::WrittenAndVerified
+                } else {
+                    DeliveryCode::WrittenUnverified
+                }));
+                if written.verified {
+                    verified_count += 1;
                 }
-                aura_core::contract::delivery::FileFormat::Tiff => {
-                    tiff::encode(&sharpened, &job.metadata)?
-                }
-                aura_core::contract::delivery::FileFormat::Png => {
-                    png::encode(&sharpened, &job.metadata)?
-                }
-            };
-            reasons.append(&mut encode_reasons);
+                bytes_total = bytes_total.saturating_add(written.bytes);
 
-            // 4e. Write, read back, hash. A failure here stops the job.
-            let path = root.join(&planned.rel_path);
-            let written = write_and_verify(&path, &bytes, job.verify)?;
-            reasons.push(DeliveryReason::plain(if written.verified {
-                DeliveryCode::WrittenAndVerified
-            } else {
-                DeliveryCode::WrittenUnverified
-            }));
-            if written.verified {
-                verified_count += 1;
-            }
-            bytes_total = bytes_total.saturating_add(written.bytes);
+                // 4f. The sidecar, when the set asked for one.
+                let frame = self.field.frame(planned.image);
+                if set.sidecar {
+                    if let Some(recipe) = &frame.recipe_json {
+                        let sidecar_path =
+                            path.with_extension(aura_core::contract::delivery::SIDECAR_EXT);
+                        write_and_verify(&sidecar_path, recipe.as_bytes(), job.verify)?;
+                        reasons.push(DeliveryReason::plain(DeliveryCode::SidecarWritten));
+                        sidecars += 1;
+                    }
+                }
 
-            // 4f. The sidecar, when the set asked for one.
-            let frame = self.field.frame(planned.image);
-            if set.sidecar {
-                if let Some(recipe) = &frame.recipe_json {
-                    let sidecar_path =
-                        path.with_extension(aura_core::contract::delivery::SIDECAR_EXT);
-                    write_and_verify(&sidecar_path, recipe.as_bytes(), job.verify)?;
-                    reasons.push(DeliveryReason::plain(DeliveryCode::SidecarWritten));
-                    sidecars += 1;
+                // 4g. Phase 24's disclosures travel to the manifest.
+                for what in &frame.cleanup_disclosures {
+                    reasons.push(DeliveryReason::with(
+                        DeliveryCode::CleanupDisclosed,
+                        what.clone(),
+                    ));
+                }
+
+                reasons.truncate(aura_core::contract::delivery::MAX_REASONS);
+
+                let file = ExportedFile {
+                    image: planned.image,
+                    set: planned.set.clone(),
+                    path: planned.rel_path.clone(),
+                    bytes: written.bytes,
+                    hash: written.hash,
+                    width: sharpened.width,
+                    height: sharpened.height,
+                    render_hash: sharpened.render_hash,
+                    verified: written.verified,
+                    renamed: planned.renamed,
+                    reasons,
+                };
+                self.store.write_file(&job_id, &file)?;
+                *per_set.entry(planned.set.clone()).or_insert(0) += 1;
+                files.push(file);
+                if let Some(Sink(report)) = self.progress {
+                    report(Progress {
+                        done: files.len() + skipped.len(),
+                        total: plan.len(),
+                        written: files.len(),
+                        verified: verified_count,
+                        path: &planned.rel_path,
+                        rendering: None,
+                    });
                 }
             }
-
-            // 4g. Phase 24's disclosures travel to the manifest.
-            for what in &frame.cleanup_disclosures {
-                reasons.push(DeliveryReason::with(
-                    DeliveryCode::CleanupDisclosed,
-                    what.clone(),
-                ));
-            }
-
-            reasons.truncate(aura_core::contract::delivery::MAX_REASONS);
-
-            let file = ExportedFile {
-                image: planned.image,
-                set: planned.set.clone(),
-                path: planned.rel_path.clone(),
-                bytes: written.bytes,
-                hash: written.hash,
-                width: sharpened.width,
-                height: sharpened.height,
-                render_hash: sharpened.render_hash,
-                verified: written.verified,
-                renamed: planned.renamed,
-                reasons,
-            };
-            self.store.write_file(&job_id, &file)?;
-            *per_set.entry(planned.set.clone()).or_insert(0) += 1;
-            files.push(file);
-        }
-
+            Ok(())
+        })?;
         for (name, count) in &per_set {
             self.store.set_written(&job_id, name, *count)?;
         }

@@ -22,7 +22,7 @@ it('matches only the selected photo and reports remaining differences accurately
   render(<PairedReference photoId="photo" disabled={false} onApply={onApply} />);
   fireEvent.click(screen.getByRole('button', { name: 'Choose finished reference' }));
   await screen.findByText(/Pixels still differ/);
-  expect(pairedReference.match).toHaveBeenCalledWith('photo', 'C:/reference.png', expect.any(String));
+  expect(pairedReference.match).toHaveBeenCalledWith('photo', 'C:/reference.png', expect.any(String), '');
   expect(screen.getByText(/5.300 → 4.800/)).toBeTruthy();
   expect(screen.getByText(/Use Undo to compare/)).toBeTruthy();
   expect(screen.queryByText(/Pixels match exactly/)).toBeNull();
@@ -49,4 +49,13 @@ it('a cancelled picker does not start fitting or change the photo', async () => 
   fireEvent.click(screen.getByRole('button', { name: 'Choose finished reference' }));
   await waitFor(() => expect((screen.getByRole('button', { name: 'Choose finished reference' }) as HTMLButtonElement).disabled).toBe(false));
   expect(pairedReference.match).not.toHaveBeenCalled();
+});
+
+it('keeps the matched look under a name when one is given, and says so', async () => {
+  vi.mocked(pairedReference.match).mockResolvedValue({ ...result, keptLook: 'personal-warm-ivory' });
+  render(<PairedReference photoId="photo" disabled={false} onApply={onApply} />);
+  fireEvent.change(screen.getByLabelText('Keep the matched look as'), { target: { value: 'Warm ivory' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Choose finished reference' }));
+  await screen.findByText(/kept under Presets as a personal look/);
+  expect(pairedReference.match).toHaveBeenCalledWith('photo', 'C:/reference.png', expect.any(String), 'Warm ivory');
 });

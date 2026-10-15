@@ -2,7 +2,6 @@
 //! Reference pixels guide bounded tone/color settings; they never enter the export or recipe.
 use std::io::Read;
 use std::path::Path;
-use std::sync::PoisonError;
 
 use aura_core::progress::CancelToken;
 use aura_core::{AuraResult, PhotoId, ProjectId};
@@ -23,6 +22,11 @@ pub struct PairedReferenceInput {
     pub photo_id: String,
     pub reference_path: String,
     pub cancel_id: String,
+    /// Keep the look this match finds as a personal look of this name, so the rest of a
+    /// shoot can be given it in one click with no finished version of their own. Absent or
+    /// blank keeps nothing.
+    #[serde(default)]
+    pub keep_as: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -42,6 +46,9 @@ pub struct PairedReferenceReport {
     pub height: u32,
     pub subject_errors_before: Vec<f64>,
     pub subject_errors_after: Vec<f64>,
+    /// The personal look that was kept, when one was asked for and the match changed the edit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kept_look: Option<String>,
 }
 
 fn refused(message: &str) -> aura_core::AuraError {
@@ -400,10 +407,7 @@ fn run(
     let expected_hash = aura_recipe::hash::recipe_hash(&current)?;
     let bounds = subject_bounds(&current)?;
     // Includes source/target decode and all renders. Live previews defer while this lane is busy.
-    let _work = state
-        .image_work_gate()
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let _work = state.image_work_gate().acquire();
     check_cancel(cancel)?;
     let (reference, reference_hash) = decode_reference(Path::new(&input.reference_path))?;
     if !known_dimensions {
@@ -526,6 +530,18 @@ fn run(
             &expected_hash,
         )?;
     }
+    let kept_look = match input.keep_as.as_deref().map(str::trim) {
+        Some(name) if !name.is_empty() && !merge.changed.is_empty() => {
+            let source = Path::new(&input.reference_path).file_name().map_or_else(
+                || "chosen as its reference".into(),
+                |n| n.to_string_lossy().into_owned(),
+            );
+            Some(crate::personal_style::keep_look(
+                state, photo, &project, &best, name, &source,
+            )?)
+        }
+        _ => None,
+    };
     Ok(PairedReferenceReport {
         changed: merge.changed.len(),
         probes,
@@ -540,6 +556,7 @@ fn run(
         height: reference.height,
         subject_errors_before: before_subjects,
         subject_errors_after: after_subjects,
+        kept_look,
     })
 }
 

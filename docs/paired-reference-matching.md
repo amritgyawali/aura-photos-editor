@@ -52,6 +52,24 @@ dimensions. Skin defects still require the portrait healing tools and review.
 Matching cannot recover another editor's models, hidden settings or proprietary
 algorithm, and it does not establish full feature parity.
 
+## Keep the look for the rest of the shoot
+
+Type a name under **Keep the look as** before choosing the reference. When the
+match changes the edit, the look it found is kept under Presets as a personal
+look. It holds what the finished version adds beyond AURA's own measured
+correction of that photo: the exposure, contrast, highlight and shadow moves
+beyond the measured ones, the white-balance offset, and the whites, blacks and
+saturation as they stand. No pixels from the reference are stored.
+
+Applied to another photo, the look starts from that photo's own measured
+correction and passes the same scene guards as every preset, so a look kept
+from a bright frame does not brighten a dark one by the same amount. The guards
+can make it gentler than the match was: on the published wedding pair the match
+itself ended 4.75 from the finished image and the kept look, applied again
+through the preset path with its warmth held to a fifth, 5.36 (13.54 untouched).
+It carries tone and colour only; healing is planned on each photo separately.
+Leave the name empty to match this photo and keep nothing.
+
 The paired comparison harness exercises the native command and full
 export/readback. With `--native-pid`, it also exercises the studio button and
 the actual owned Windows file picker; it does not replace Tauri IPC:

@@ -165,12 +165,19 @@ pub(super) fn batch_norm(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<V
 
 fn map<F>(inputs: &[Option<&Value>], op: &str, f: F) -> AuraResult<Vec<Value>>
 where
-    F: Fn(f32) -> f32,
+    F: Fn(f32) -> f32 + Sync,
 {
+    use rayon::prelude::*;
     let input = float_operand(inputs, 0, op)?;
+    // Each sample is its own function of one input, so sharing them out changes nothing.
+    let mapped = if input.data.len() >= 1 << 16 {
+        input.data.par_iter().map(|value| f(*value)).collect()
+    } else {
+        input.data.iter().map(|value| f(*value)).collect()
+    };
     Ok(vec![Value::Float(Tensor {
         shape: input.shape.clone(),
-        data: input.data.iter().map(|value| f(*value)).collect(),
+        data: mapped,
     })])
 }
 

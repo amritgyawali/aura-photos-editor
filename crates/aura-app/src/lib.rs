@@ -81,6 +81,8 @@ pub mod contract {
     pub mod ipc;
 }
 
+pub mod activity;
+pub mod adaptive_look;
 pub mod emotion_commands;
 pub mod explain_commands;
 pub mod geometry_commands;
@@ -96,6 +98,7 @@ pub mod micro_commands;
 pub mod moment_commands;
 pub mod paired_reference;
 pub mod people_commands;
+pub mod perf;
 pub mod photo_enhance;
 mod photo_frames;
 pub mod portrait_auto;
@@ -236,6 +239,7 @@ pub use state::AppState;
 mod auto_edit_commands;
 // ADR-0068. The one-click finish, and its three commands.
 pub mod one_click_commands;
+pub use activity::activity_status;
 pub use auto_edit_commands::{photo_analysis, photo_auto_edit};
 pub use one_click_commands::{
     automatic_start, one_click_cancel, one_click_finish, one_click_status,
