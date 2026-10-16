@@ -158,7 +158,9 @@ that has nothing wrong with it: a little depth, richer colour where the colour i
 warm-highlight, cool-shadow split. None of it is a preset. Each amount is measured from the
 photograph in front of it, so a flat haldi frame, a dark night procession and a vivid stage under
 coloured lights each get a different finish, and a frame that already has all three gets almost
-none.
+none. A black-and-white photograph gets the depth and nothing else: no split tone, no richer
+colour, no vibrance, because any of them would tint it. A sepia or other toned print keeps the one
+colour it was printed in in the same way.
 
 Skin is measured through the look before it is kept: the colour changes are tried on the faces in
 the frame, and scaled back until the skin moves by less than you could see side by side. Orange,

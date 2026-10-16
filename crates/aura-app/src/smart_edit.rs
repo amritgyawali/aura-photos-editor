@@ -78,10 +78,33 @@ impl SceneKind {
     }
 }
 
+/// A photograph whose colour is its look: none at all, or one colour throughout. Nothing in an
+/// automatic edit adds colour to it, enriches it or corrects it away.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Monochrome {
+    /// Black and white.
+    Neutral,
+    /// One colour throughout: sepia, selenium, a cyanotype.
+    Toned,
+}
+
+impl Monochrome {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Neutral => "a black-and-white photograph",
+            Self::Toned => "a toned monochrome",
+        }
+    }
+}
+
 /// Global decisions for one photograph.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GlobalPlan {
     pub kind: SceneKind,
+    /// Set when the frame is black and white or toned; [`crate::adaptive_look`] then adds no
+    /// colour to it.
+    pub monochrome: Option<Monochrome>,
     pub white_balance: Option<(u32, i16)>,
     pub vibrance: i16,
     pub clarity: i16,
@@ -997,6 +1020,13 @@ pub fn analyse_from(
     )];
     // One colour throughout, and visibly not grey: a toned black-and-white print.
     let toned = m.hue_spread < 0.08 && m.saturation > 0.02 && m.saturation < 0.5;
+    let monochrome = if m.saturation <= 0.02 {
+        Some(Monochrome::Neutral)
+    } else if toned {
+        Some(Monochrome::Toned)
+    } else {
+        None
+    };
     // Vibrance: less for already colourful frames, never on skin-heavy portraits past +10.
     let base: f32 = match kind {
         // Vibrance moves skin more than anything else in a portrait; stay very light.
@@ -1268,6 +1298,7 @@ pub fn analyse_from(
         });
     GlobalPlan {
         kind,
+        monochrome,
         white_balance,
         vibrance,
         clarity,
@@ -1883,6 +1914,7 @@ impl Seen {
                 large.as_ref().unwrap_or(&small),
                 &self.faces,
                 plan.kind,
+                plan.monochrome,
                 tone.3,
             )
         });
@@ -2208,7 +2240,7 @@ fn run_with(
             if crate::adaptive_look::enabled() {
                 let look = {
                     let _t = crate::perf::step(state, "edit.look_plan");
-                    crate::adaptive_look::plan(&px, &faces, plan.kind, tone.3)
+                    crate::adaptive_look::plan(&px, &faces, plan.kind, plan.monochrome, tone.3)
                 };
                 if let Some(contrast) = look.contrast {
                     tone.3 = contrast;

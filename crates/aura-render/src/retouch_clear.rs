@@ -74,8 +74,278 @@ const MOLE_SURROUND: f32 = 12.0;
 /// and a spot beside a brow or an eye sits in the feather that keeps smoothing off them.
 const FULLY_SELECTED: f32 = 0.25;
 
-/// What the operation works on: the rectangle, its pixels and the selection inside it.
+/// Packing pays only when the packed plane is at most this share of the whole rectangle.
+const PACK_WHEN_BELOW: f32 = 0.8;
+/// Packed pieces start on multiples of this, so a cell of the working grid never straddles two.
+const PACK_ALIGN: usize = MAX_REDUCTION;
+/// A cell selected more faintly than this would move by less than one level in 255 if it were
+/// rebuilt in full, so it does not join two parts of a selection. A matte's edge refined
+/// against the photograph leaves such a haze for a few dozen pixels around the skin, and
+/// otherwise every arm would join its neighbour.
+const FAINTEST: f32 = 1.0 / 255.0;
+
+/// One part of the frame placed in the plane a pass works on: `frame`'s cells, row for row,
+/// starting at column `x` and row `y` of the plane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Piece {
+    frame: Rect,
+    x: usize,
+    y: usize,
+}
+
+/// The plane a pass works on, and where its cells come from in the frame.
+///
+/// A face is one patch of skin, and the rectangle around it is mostly that skin. A body is
+/// not: a neck, two bare arms and two lower legs inside a body rectangle of five megapixels or
+/// more are a sixth of it, and every blur a pass makes - sixty or so - would otherwise run over
+/// the dress between them. Every quantity a pass measures is either a mean weighted by the
+/// selection, to which an unselected cell adds nothing, or read within fourteen frequency
+/// radii of a selected cell. So the separately selected parts of a selection, each with that
+/// margin of the frame around it, are packed into one compact plane with an unselected gap
+/// between them, and the unchanged pass runs on that. The thresholds are still measured over
+/// the whole selection at once, so a hand and a neck are held to the same skin.
+/// `separate_patches_heal_as_they_do_in_the_whole_rectangle` holds the two to each other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Layout {
+    w: usize,
+    h: usize,
+    pieces: Vec<Piece>,
+    /// The selection's whole rectangle with its margin. The selection's spreads are sampled
+    /// at the cells of it they would be sampled at if it were the plane; see
+    /// [`Layout::sampled`].
+    whole: Rect,
+}
+
+impl Layout {
+    /// The selection's whole rectangle with its margin: the plane every pass used before.
+    fn whole(edit: &Edit, coverage: &Coverage, w: usize, h: usize) -> Option<Self> {
+        let frame = Rect::around(coverage.bounds, margin(edit, w, h), w, h)?;
+        Some(Self {
+            w: frame.w,
+            h: frame.h,
+            pieces: vec![Piece { frame, x: 0, y: 0 }],
+            whole: frame,
+        })
+    }
+
+    /// The selected parts only, packed, when that is clearly smaller than [`Layout::whole`].
+    /// `None` when nothing is selected.
+    fn new(edit: &Edit, coverage: &Coverage, w: usize, h: usize) -> Option<Self> {
+        let whole = Self::whole(edit, coverage, w, h)?;
+        let margin = margin(edit, w, h);
+        let parts = islands(coverage, w, h, margin);
+        if parts.is_empty() {
+            return None;
+        }
+        let packed = pack(&parts, margin, whole.whole);
+        let share = (packed.w * packed.h) as f32 / (whole.w * whole.h).max(1) as f32;
+        Some(if share < PACK_WHEN_BELOW {
+            packed
+        } else {
+            whole
+        })
+    }
+
+    fn len(&self) -> usize {
+        self.w * self.h
+    }
+
+    /// Which cells of this plane, reduced by `factor`, the selection's spreads are sampled at.
+    ///
+    /// A spread is a median over about [`SPREAD_SAMPLES`] cells, taken at every n-th cell of
+    /// the whole rectangle (reduced by the same factor). A packed plane is sampled at the very
+    /// same cells of the frame, so packing changes where the work is done and not what the
+    /// thresholds are measured from - a different set of samples moves a threshold measured on
+    /// a few thousand of them by more than packing moves anything else.
+    fn sampled(&self, factor: usize) -> Vec<bool> {
+        let (cw, ch) = (self.w.div_ceil(factor), self.h.div_ceil(factor));
+        let whole_w = self.whole.w.div_ceil(factor);
+        let step = (whole_w * self.whole.h.div_ceil(factor) / SPREAD_SAMPLES).max(1);
+        let mut out = vec![false; cw * ch];
+        out.par_chunks_mut(cw.max(1))
+            .enumerate()
+            .for_each(|(cy, line)| {
+                let y = cy * factor;
+                for piece in &self.pieces {
+                    if y < piece.y || y >= piece.y + piece.frame.h {
+                        continue;
+                    }
+                    let fy = piece.frame.y0 + y - piece.y;
+                    for (cx, slot) in line.iter_mut().enumerate() {
+                        let x = cx * factor;
+                        if x < piece.x || x >= piece.x + piece.frame.w {
+                            continue;
+                        }
+                        let fx = piece.frame.x0 + x - piece.x;
+                        let at =
+                            (fy - self.whole.y0) / factor * whole_w + (fx - self.whole.x0) / factor;
+                        *slot = at.is_multiple_of(step);
+                    }
+                }
+            });
+        out
+    }
+}
+
+/// How far around a selected cell a pass reads the frame: the widest ring a candidate's
+/// surroundings are read in is about 13.5 frequency radii.
+fn margin(edit: &Edit, w: usize, h: usize) -> usize {
+    px(radius_of(edit, w, h), 14.0) + 2
+}
+
+fn radius_of(edit: &Edit, w: usize, h: usize) -> f32 {
+    (edit.radius * w.min(h) as f32).max(1.0)
+}
+
+/// The separately selected parts of a selection, each grown by `margin` and clipped to the
+/// frame, merged until no two overlap. Found on a grid of `margin`-sized cells, each of which
+/// remembers the exact extent of the selected pixels inside it. In scan order. A cell selected
+/// below [`FAINTEST`] that no part's margin reaches is left as it is.
+fn islands(coverage: &Coverage, w: usize, h: usize, margin: usize) -> Vec<Rect> {
+    let [x0, y0, x1, y1] = coverage.bounds;
+    let (x1, y1) = (x1.min(w), y1.min(h));
+    if x1 <= x0 || y1 <= y0 {
+        return Vec::new();
+    }
+    let g = margin.max(8);
+    let (gw, gh) = ((x1 - x0).div_ceil(g), (y1 - y0).div_ceil(g));
+    // Each grid row is scanned on its own, so the rows are shared across cores.
+    let cells: Vec<Option<[usize; 4]>> = (0..gh)
+        .into_par_iter()
+        .flat_map_iter(|gy| {
+            let mut row: Vec<Option<[usize; 4]>> = vec![None; gw];
+            for y in y0 + gy * g..(y0 + (gy + 1) * g).min(y1) {
+                for x in x0..x1 {
+                    if smoothstep(0.0, FULLY_SELECTED, coverage.at(x, y, w, h)) >= FAINTEST {
+                        let cell = &mut row[(x - x0) / g];
+                        *cell = Some(cell.map_or([x, y, x + 1, y + 1], |[l, t, r, b]| {
+                            [l.min(x), t.min(y), r.max(x + 1), b.max(y + 1)]
+                        }));
+                    }
+                }
+            }
+            row
+        })
+        .collect();
+    let mut seen = vec![false; cells.len()];
+    let mut rects: Vec<Rect> = Vec::new();
+    for start in 0..cells.len() {
+        if seen[start] || cells[start].is_none() {
+            continue;
+        }
+        seen[start] = true;
+        let mut stack = vec![start];
+        let mut bounds = [usize::MAX, usize::MAX, 0, 0];
+        while let Some(i) = stack.pop() {
+            if let Some([l, t, r, b]) = cells[i] {
+                bounds = [
+                    bounds[0].min(l),
+                    bounds[1].min(t),
+                    bounds[2].max(r),
+                    bounds[3].max(b),
+                ];
+            }
+            let (cx, cy) = (i % gw, i / gw);
+            for ny in cy.saturating_sub(1)..=(cy + 1).min(gh - 1) {
+                for nx in cx.saturating_sub(1)..=(cx + 1).min(gw - 1) {
+                    let j = ny * gw + nx;
+                    if !seen[j] && cells[j].is_some() {
+                        seen[j] = true;
+                        stack.push(j);
+                    }
+                }
+            }
+        }
+        if let Some(rect) = Rect::around(bounds, margin, w, h) {
+            rects.push(rect);
+        }
+    }
+    // Two parts whose margins overlap read each other's pixels: they are one part.
+    let overlap = |a: &Rect, b: &Rect| {
+        a.x0 < b.x0 + b.w && b.x0 < a.x0 + a.w && a.y0 < b.y0 + b.h && b.y0 < a.y0 + a.h
+    };
+    let mut merged = true;
+    while merged {
+        merged = false;
+        'outer: for i in 0..rects.len() {
+            for j in i + 1..rects.len() {
+                if overlap(&rects[i], &rects[j]) {
+                    let (a, b) = (rects[i], rects[j]);
+                    let (l, t) = (a.x0.min(b.x0), a.y0.min(b.y0));
+                    let (r, bottom) = ((a.x0 + a.w).max(b.x0 + b.w), (a.y0 + a.h).max(b.y0 + b.h));
+                    rects[i] = Rect {
+                        x0: l,
+                        y0: t,
+                        w: r - l,
+                        h: bottom - t,
+                    };
+                    rects.remove(j);
+                    merged = true;
+                    break 'outer;
+                }
+            }
+        }
+    }
+    rects.sort_by_key(|r| (r.y0, r.x0));
+    rects
+}
+
+/// The smallest of the shelf packings [`shelves`] makes at a few widths: as wide as the
+/// widest part, as wide as a square of the same area, and as wide as one to all of the parts
+/// side by side divided into that many shelves.
+/// `whole` is the selection's whole rectangle, which the layout keeps for sampling.
+fn pack(parts: &[Rect], gap: usize, whole: Rect) -> Layout {
+    let area: usize = parts.iter().map(|r| (r.w + gap) * (r.h + gap)).sum();
+    let widest = parts.iter().map(|r| r.w).max().unwrap_or(0);
+    let row: usize = parts.iter().map(|r| r.w + gap + PACK_ALIGN).sum();
+    let mut widths = vec![(area as f64).sqrt().ceil() as usize];
+    widths.extend((1..=parts.len()).map(|k| row.div_ceil(k)));
+    widths
+        .into_iter()
+        .fold(shelves(parts, gap, widest, whole), |best, target| {
+            let next = shelves(parts, gap, target.max(widest), whole);
+            if (next.len(), next.w) < (best.len(), best.w) {
+                next
+            } else {
+                best
+            }
+        })
+}
+
+/// Shelves of parts no wider than `target`, tallest first, left to right, `gap` unselected
+/// cells apart.
+fn shelves(parts: &[Rect], gap: usize, target: usize, whole: Rect) -> Layout {
+    let align = |v: usize| v.div_ceil(PACK_ALIGN) * PACK_ALIGN;
+    let mut order: Vec<&Rect> = parts.iter().collect();
+    order.sort_by_key(|r| (std::cmp::Reverse(r.h), r.y0, r.x0));
+    let (mut x, mut y, mut shelf, mut width) = (0, 0, 0, 0);
+    let mut pieces = Vec::with_capacity(parts.len());
+    for frame in order {
+        if x > 0 && x + frame.w > target {
+            y = align(y + shelf + gap);
+            x = 0;
+            shelf = 0;
+        }
+        pieces.push(Piece {
+            frame: *frame,
+            x,
+            y,
+        });
+        width = width.max(x + frame.w);
+        shelf = shelf.max(frame.h);
+        x = align(x + frame.w + gap);
+    }
+    Layout {
+        w: width,
+        h: y + shelf,
+        pieces,
+        whole,
+    }
+}
+
+/// What the operation works on: the plane, its pixels and the selection inside it.
 struct Field {
+    /// The plane's size; `x0` and `y0` are zero. [`Layout`] says where its cells come from.
     rect: Rect,
     /// Selection coverage, 0..=1, with the outer part of a soft edge counted as selected.
     alpha: Vec<f32>,
@@ -85,6 +355,8 @@ struct Field {
     red: Vec<f32>,
     /// The frequency radius in pixels.
     radius: f32,
+    /// The cells the selection's spreads are sampled at; see [`Layout::sampled`].
+    sampled: Vec<bool>,
 }
 
 fn px(radius: f32, factor: f32) -> usize {
@@ -92,20 +364,43 @@ fn px(radius: f32, factor: f32) -> usize {
 }
 
 impl Field {
-    fn new(rgb: &[f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) -> Option<Self> {
-        let radius = (edit.radius * w.min(h) as f32).max(1.0);
-        let rect = Rect::around(coverage.bounds, px(radius, 14.0) + 2, w, h)?;
-        // Every cell is read on its own, so the rows are shared across cores.
-        let cells: Vec<(f32, [f32; 3])> = rect
-            .par_cells()
-            .map(|(x, y)| {
-                let i = (y * w + x) * 3;
-                (
-                    smoothstep(0.0, FULLY_SELECTED, coverage.at(x, y, w, h)),
-                    [rgb[i], rgb[i + 1], rgb[i + 2]],
-                )
-            })
-            .collect();
+    fn new(
+        rgb: &[f32],
+        w: usize,
+        h: usize,
+        edit: &Edit,
+        coverage: &Coverage,
+        layout: &Layout,
+    ) -> Option<Self> {
+        let radius = radius_of(edit, w, h);
+        let rect = Rect {
+            x0: 0,
+            y0: 0,
+            w: layout.w,
+            h: layout.h,
+        };
+        // Every row is read on its own, so the rows are shared across cores. A cell no piece
+        // covers is an unselected gap: nothing weighted by the selection reads it.
+        let mut cells = vec![(0.0_f32, [0.0_f32; 3]); layout.len()];
+        cells
+            .par_chunks_mut(layout.w.max(1))
+            .enumerate()
+            .for_each(|(row, line)| {
+                for piece in &layout.pieces {
+                    if row < piece.y || row >= piece.y + piece.frame.h {
+                        continue;
+                    }
+                    let y = piece.frame.y0 + row - piece.y;
+                    for column in 0..piece.frame.w {
+                        let x = piece.frame.x0 + column;
+                        let i = (y * w + x) * 3;
+                        line[piece.x + column] = (
+                            smoothstep(0.0, FULLY_SELECTED, coverage.at(x, y, w, h)),
+                            [rgb[i], rgb[i + 1], rgb[i + 2]],
+                        );
+                    }
+                }
+            });
         let alpha: Vec<f32> = cells.par_iter().map(|(a, _)| *a).collect();
         let channels: [Vec<f32>; 3] =
             std::array::from_fn(|c| cells.par_iter().map(|(_, p)| p[c]).collect());
@@ -124,6 +419,7 @@ impl Field {
             luma: lum,
             red,
             radius,
+            sampled: layout.sampled(1),
         })
     }
 }
@@ -137,7 +433,7 @@ impl Field {
     /// The same selection on a grid `factor` times coarser: every cell the mean of the samples
     /// it covers, colour channels first and the readings derived from them, exactly as
     /// [`Field::new`] derives them from a pixel.
-    fn reduced(&self, factor: usize) -> Self {
+    fn reduced(&self, factor: usize, layout: &Layout) -> Self {
         let Rect { w, h, .. } = self.rect;
         let (cw, ch) = (w.div_ceil(factor), h.div_ceil(factor));
         let mean = |plane: &[f32]| -> Vec<f32> {
@@ -180,6 +476,7 @@ impl Field {
             luma: lum,
             red,
             radius: self.radius / factor as f32,
+            sampled: layout.sampled(factor),
         }
     }
 }
@@ -208,29 +505,25 @@ fn enlarge(plane: &[f32], [cw, ch]: [usize; 2], factor: usize, [w, h]: [usize; 2
 
 /// Median luminance of well-selected cells, the scale the darkness ratio is softened by.
 fn typical_luma(field: &Field) -> f32 {
-    let step = (field.rect.len() / SPREAD_SAMPLES).max(1);
-    let mut samples: Vec<f32> = field
-        .luma
-        .iter()
-        .zip(&field.alpha)
-        .step_by(step)
-        .filter(|(_, a)| **a > 0.5)
-        .map(|(v, _)| *v)
-        .collect();
+    let mut samples = well_selected(&field.luma, &field.alpha, &field.sampled);
     crate::retouch_planes::quantile(&mut samples, 0.5).unwrap_or(0.18)
 }
 
 /// Robust spread of `values` over well-selected cells.
-fn spread(values: &[f32], alpha: &[f32]) -> f32 {
-    let step = (values.len() / SPREAD_SAMPLES).max(1);
-    let mut samples: Vec<f32> = values
+fn spread(values: &[f32], alpha: &[f32], sampled: &[bool]) -> f32 {
+    let mut samples = well_selected(values, alpha, sampled);
+    centre_and_spread(&mut samples).map_or(0.0, |(_, s)| s)
+}
+
+/// `values` at the sampled cells whose weight in `alpha` is over a half.
+fn well_selected(values: &[f32], alpha: &[f32], sampled: &[bool]) -> Vec<f32> {
+    values
         .iter()
         .zip(alpha)
-        .step_by(step)
-        .filter(|(_, a)| **a > 0.5)
-        .map(|(v, _)| *v)
-        .collect();
-    centre_and_spread(&mut samples).map_or(0.0, |(_, s)| s)
+        .zip(sampled)
+        .filter(|((_, a), on)| **on && **a > 0.5)
+        .map(|((v, _), _)| *v)
+        .collect()
 }
 
 /// The skin around a candidate, read in eight directions.
@@ -440,8 +733,8 @@ fn marks(
                 crate::retouch_analysis::darkness(*base, *fine, *red, midpoint, floor)
             })
             .collect();
-        let dark_limit = (spread(&dark, &field.alpha) * k).max(0.03);
-        let red_limit = (spread(&redder, &field.alpha) * k).max(0.006);
+        let dark_limit = (spread(&dark, &field.alpha, &field.sampled) * k).max(0.03);
+        let red_limit = (spread(&redder, &field.alpha, &field.sampled) * k).max(0.006);
         // Where skin glints, the skin between the glints is darker than they are without
         // being a mark. How strongly a region glints raises what counts as dark there.
         let glint: Vec<f32> = dark.par_iter().map(|d| (-d).max(0.0).powi(2)).collect();
@@ -608,26 +901,28 @@ fn soft_limit(v: f32, limit: f32) -> f32 {
     limit * (v / limit).tanh()
 }
 
-/// One find-and-rebuild pass. Returns whether anything was found. `touched`, when given, is a
-/// frame-sized plane that receives the largest weight each pixel was rebuilt with. `reduce`
-/// lets a large selection be measured on the working grid; see [`WORK_RADIUS`].
-#[allow(clippy::too_many_lines)]
+/// One find-and-rebuild pass over the plane `layout` describes. Returns whether anything was
+/// found. `touched`, when given, is a frame-sized plane that receives the largest weight each
+/// pixel was rebuilt with. `reduce` lets a large selection be measured on the working grid;
+/// see [`WORK_RADIUS`].
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 fn pass(
     rgb: &mut [f32],
     w: usize,
     h: usize,
     edit: &Edit,
     coverage: &Coverage,
+    layout: &Layout,
     mut touched: Option<&mut [f32]>,
     reduce: bool,
 ) -> bool {
-    let Some(field) = Field::new(rgb, w, h, edit, coverage) else {
+    let Some(field) = Field::new(rgb, w, h, edit, coverage, layout) else {
         return false;
     };
     let rect = field.rect;
     // Marks are found, and the tone under them rebuilt, on the working grid; see WORK_RADIUS.
     let factor = if reduce { reduction(field.radius) } else { 1 };
-    let small = (factor > 1).then(|| field.reduced(factor));
+    let small = (factor > 1).then(|| field.reduced(factor, layout));
     let work = small.as_ref().unwrap_or(&field);
     let Some(Marks { weight: mark, core }) = marks(
         work,
@@ -702,7 +997,7 @@ fn pass(
         .zip(&mark)
         .map(|(a, m)| if *m > 0.0 { 0.0 } else { *a })
         .collect();
-    let normal = (spread(&relief, &clean) * RELIEF_LIMIT).max(0.01);
+    let normal = (spread(&relief, &clean, &field.sampled) * RELIEF_LIMIT).max(0.01);
     let keep = edit.texture.clamp(0.0, 1.0);
     let smooth_mark = blur(&mark, rect.w, rect.h, 1);
     // What each rebuilt cell becomes, from the planes alone: rows are worked at once and
@@ -739,14 +1034,23 @@ fn pass(
             }),
         ))
     };
-    let rows: Vec<Vec<(usize, f32, [f32; 3])>> = (0..rect.h)
+    let piece_rows: Vec<(&Piece, usize)> = layout
+        .pieces
+        .iter()
+        .flat_map(|piece| (0..piece.frame.h).map(move |row| (piece, row)))
+        .collect();
+    let rows: Vec<Vec<(usize, f32, [f32; 3])>> = piece_rows
         .into_par_iter()
-        .map(|row| {
-            (0..rect.w)
+        .map(|(piece, row)| {
+            (0..piece.frame.w)
                 .filter_map(|column| {
-                    let i = row * rect.w + column;
+                    let i = (piece.y + row) * rect.w + piece.x + column;
                     healed_at(i).map(|(reach, value)| {
-                        ((rect.y0 + row) * w + rect.x0 + column, reach, value)
+                        (
+                            (piece.frame.y0 + row) * w + piece.frame.x0 + column,
+                            reach,
+                            value,
+                        )
                     })
                 })
                 .collect()
@@ -764,8 +1068,11 @@ fn pass(
 /// Find and rebuild, then once more on the result: with the strongest marks gone, the skin
 /// between them is a truer reference, and fainter marks beside them measure as marks.
 pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) {
+    let Some(layout) = Layout::new(edit, coverage, w, h) else {
+        return;
+    };
     for _ in 0..usize::from(edit.repair_passes.unwrap_or(PASSES as u8)) {
-        if !pass(rgb, w, h, edit, coverage, None, true) {
+        if !pass(rgb, w, h, edit, coverage, &layout, None, true) {
             break;
         }
     }
@@ -782,9 +1089,21 @@ pub(crate) fn mark_plane(
     coverage: &Coverage,
 ) -> Vec<f32> {
     let mut touched = vec![0.0; w * h];
+    let Some(layout) = Layout::new(edit, coverage, w, h) else {
+        return touched;
+    };
     let mut scratch = rgb.to_vec();
     for _ in 0..usize::from(edit.repair_passes.unwrap_or(PASSES as u8)) {
-        if !pass(&mut scratch, w, h, edit, coverage, Some(&mut touched), true) {
+        if !pass(
+            &mut scratch,
+            w,
+            h,
+            edit,
+            coverage,
+            &layout,
+            Some(&mut touched),
+            true,
+        ) {
             break;
         }
     }
@@ -889,31 +1208,10 @@ mod tests {
         .encloses(&group, 0.2, 0.15));
     }
 
-    /// A large face at full resolution: pores everywhere and red spots on a lattice, and the
-    /// operation that heals it, at a frequency radius well above WORK_RADIUS.
-    fn large_face(radius: f32) -> (Vec<f32>, usize, aura_recipe::retouch_tools::Edit) {
+    /// A frequency heal over the region, at full amount and tone.
+    fn heal_edit() -> aura_recipe::retouch_tools::Edit {
         use aura_recipe::retouch_tools::Tool;
-        let w = 720_usize;
-        let mut rgb = Vec::with_capacity(w * w * 3);
-        for y in 0..w {
-            for x in 0..w {
-                let mut v =
-                    (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77);
-                v ^= v >> 13;
-                v = v.wrapping_mul(0xC2B2_AE3D);
-                v ^= v >> 16;
-                let pore = 1.0 + ((v >> 8) as f32 / 16_777_216.0 - 0.5) * 0.05;
-                let d = ((x % 120) as f32 - 60.0).hypot((y % 120) as f32 - 60.0);
-                // An inflamed spot: redder, a little darker, fading over its edge.
-                let spot = (1.0 - (d - 8.0).max(0.0) / 4.0).clamp(0.0, 1.0);
-                rgb.extend([
-                    0.40 * pore * (1.0 + 0.05 * spot),
-                    0.29 * pore * (1.0 - 0.22 * spot),
-                    0.23 * pore * (1.0 - 0.22 * spot),
-                ]);
-            }
-        }
-        let edit = aura_recipe::retouch_tools::Edit {
+        aura_recipe::retouch_tools::Edit {
             id: "large".into(),
             tool: Tool::FrequencyHeal,
             enabled: true,
@@ -921,7 +1219,7 @@ mod tests {
             source: None,
             amount: 1.0,
             feather: 0.0,
-            radius: radius / w as f32,
+            radius: 0.01,
             source_scale: 1.0,
             preserve_microtexture: false,
             texture_heal: false,
@@ -942,7 +1240,34 @@ mod tests {
             matte: None,
             mask: None,
             skin: None,
-        };
+        }
+    }
+
+    /// A large face at full resolution: pores everywhere and red spots on a lattice, and the
+    /// operation that heals it, at a frequency radius well above WORK_RADIUS.
+    fn large_face(radius: f32) -> (Vec<f32>, usize, aura_recipe::retouch_tools::Edit) {
+        let w = 720_usize;
+        let mut rgb = Vec::with_capacity(w * w * 3);
+        for y in 0..w {
+            for x in 0..w {
+                let mut v =
+                    (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77);
+                v ^= v >> 13;
+                v = v.wrapping_mul(0xC2B2_AE3D);
+                v ^= v >> 16;
+                let pore = 1.0 + ((v >> 8) as f32 / 16_777_216.0 - 0.5) * 0.05;
+                let d = ((x % 120) as f32 - 60.0).hypot((y % 120) as f32 - 60.0);
+                // An inflamed spot: redder, a little darker, fading over its edge.
+                let spot = (1.0 - (d - 8.0).max(0.0) / 4.0).clamp(0.0, 1.0);
+                rgb.extend([
+                    0.40 * pore * (1.0 + 0.05 * spot),
+                    0.29 * pore * (1.0 - 0.22 * spot),
+                    0.23 * pore * (1.0 - 0.22 * spot),
+                ]);
+            }
+        }
+        let mut edit = heal_edit();
+        edit.radius = radius / w as f32;
         (rgb, w, edit)
     }
 
@@ -986,10 +1311,11 @@ mod tests {
             super::reduction(edit.radius * w as f32) > 1,
             "the test must use the grid"
         );
+        let layout = super::Layout::new(&edit, &coverage, w, w).unwrap();
         let heal = |reduce: bool| {
             let mut out = rgb.clone();
             for _ in 0..super::PASSES {
-                if !super::pass(&mut out, w, w, &edit, &coverage, None, reduce) {
+                if !super::pass(&mut out, w, w, &edit, &coverage, &layout, None, reduce) {
                     break;
                 }
             }
@@ -1041,6 +1367,204 @@ mod tests {
             "radius {radius}: redness left: full {left_exact:.3}, grid {left_quick:.3}; difference mean {mean:.5},              largest {worst:.4}; pore energy ratio {ratio:.4}"
         );
         assert!((ratio - 1.0).abs() < 0.025, "pore energy ratio {ratio:.4}");
+    }
+
+    /// A standing figure's body skin: five separate patches (chest, two arms, two legs) inside a
+    /// large body rectangle, each with inflamed spots on a lattice, and a dress around them.
+    /// Returns the pixels, the heal and its selection.
+    fn patches(
+        w: usize,
+        h: usize,
+    ) -> (
+        Vec<f32>,
+        aura_recipe::retouch_tools::Edit,
+        crate::retouch_mask::Coverage,
+    ) {
+        use aura_recipe::retouch_tools::{Matte, Tool};
+        const PATCHES: [[f32; 4]; 5] = [
+            [0.40, 0.10, 0.60, 0.20],
+            [0.05, 0.22, 0.15, 0.60],
+            [0.85, 0.22, 0.95, 0.60],
+            [0.30, 0.76, 0.42, 0.98],
+            [0.58, 0.76, 0.70, 0.98],
+        ];
+        let inside = |x: usize, y: usize| {
+            let (u, v) = ((x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32);
+            PATCHES
+                .iter()
+                .any(|[l, t, r, b]| u >= *l && u < *r && v >= *t && v < *b)
+        };
+        let mut rgb = Vec::with_capacity(w * h * 3);
+        for y in 0..h {
+            for x in 0..w {
+                let mut v =
+                    (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77);
+                v ^= v >> 13;
+                v = v.wrapping_mul(0xC2B2_AE3D);
+                v ^= v >> 16;
+                let grain = 1.0 + ((v >> 8) as f32 / 16_777_216.0 - 0.5) * 0.05;
+                if inside(x, y) {
+                    let d = ((x % 41) as f32 - 20.0).hypot((y % 37) as f32 - 18.0);
+                    let spot = (1.0 - (d - 3.0).max(0.0) / 2.0).clamp(0.0, 1.0);
+                    rgb.extend([
+                        0.40 * grain * (1.0 + 0.05 * spot),
+                        0.29 * grain * (1.0 - 0.22 * spot),
+                        0.23 * grain * (1.0 - 0.22 * spot),
+                    ]);
+                } else {
+                    rgb.extend([0.05 * grain, 0.07 * grain, 0.20 * grain]);
+                }
+            }
+        }
+        // The segmenter's grid is coarse: four pixels a cell here.
+        let (mw, mh) = (w / 4, h / 4);
+        let alpha: Vec<u8> = (0..mw * mh)
+            .map(|i| {
+                if inside((i % mw) * 4 + 2, (i / mw) * 4 + 2) {
+                    255
+                } else {
+                    0
+                }
+            })
+            .collect();
+        let mut matte = Matte::encode([0.0, 0.0, 1.0, 1.0], mw as u32, mh as u32, &alpha);
+        matte.refine_edges = false;
+        let mut edit = heal_edit();
+        edit.tool = Tool::FrequencyHeal;
+        edit.region = [0.5, 0.5, 0.5, 0.5];
+        edit.feather = 0.0;
+        edit.radius = 2.0 / w.min(h) as f32;
+        edit.sensitivity = Some(0.5);
+        edit.mole_edge = Some(0.0);
+        edit.texture = 0.65;
+        let plane = crate::retouch_matte::MattePlane::render(&matte, &rgb, w, h).unwrap();
+        let coverage = crate::retouch_mask::Coverage::new(&edit, w, h).with_matte(&plane, w, h);
+        (rgb, edit, coverage)
+    }
+
+    /// Separate patches of body skin are packed into a plane a fraction of the body
+    /// rectangle's size, nothing selected is left out of it, and no two pieces overlap.
+    #[test]
+    fn separate_patches_are_packed_and_cover_the_whole_selection() {
+        let (w, h) = (800, 1200);
+        let (_, edit, coverage) = patches(w, h);
+        let whole = super::Layout::whole(&edit, &coverage, w, h).unwrap();
+        let packed = super::Layout::new(&edit, &coverage, w, h).unwrap();
+        assert_eq!(packed.pieces.len(), 5, "{packed:?}");
+        assert!(
+            packed.len() * 2 < whole.len(),
+            "packed {} of {} cells",
+            packed.len(),
+            whole.len()
+        );
+        let mut in_frame = vec![0_u8; w * h];
+        let mut in_plane = vec![0_u8; packed.len()];
+        for piece in &packed.pieces {
+            assert_eq!(piece.x % super::PACK_ALIGN, 0);
+            assert_eq!(piece.y % super::PACK_ALIGN, 0);
+            for row in 0..piece.frame.h {
+                for column in 0..piece.frame.w {
+                    in_frame[(piece.frame.y0 + row) * w + piece.frame.x0 + column] += 1;
+                    in_plane[(piece.y + row) * packed.w + piece.x + column] += 1;
+                }
+            }
+        }
+        assert!(
+            in_frame.iter().all(|n| *n <= 1),
+            "pieces overlap in the frame"
+        );
+        assert!(
+            in_plane.iter().all(|n| *n <= 1),
+            "pieces overlap in the plane"
+        );
+        for y in 0..h {
+            for x in 0..w {
+                if coverage.at(x, y, w, h) > 0.0 {
+                    assert_eq!(in_frame[y * w + x], 1, "selected pixel {x},{y} left out");
+                }
+            }
+        }
+        // One patch is its own rectangle and is not packed.
+        let mut one = coverage.clone();
+        one.bounds = [0, 0, w, (h as f32 * 0.21) as usize];
+        let single = super::Layout::new(&edit, &one, w, h).unwrap();
+        assert_eq!(single.pieces.len(), 1);
+    }
+
+    /// Healing the packed patches heals what healing the whole body rectangle heals, leaves
+    /// everything unselected exactly as it was, and differs from it only by rounding.
+    #[test]
+    fn separate_patches_heal_as_they_do_in_the_whole_rectangle() {
+        let (w, h) = (800, 1200);
+        let (rgb, edit, coverage) = patches(w, h);
+        let heal = |layout: &super::Layout| {
+            let mut out = rgb.clone();
+            for _ in 0..super::PASSES {
+                if !super::pass(&mut out, w, h, &edit, &coverage, layout, None, true) {
+                    break;
+                }
+            }
+            out
+        };
+        let whole = heal(&super::Layout::whole(&edit, &coverage, w, h).unwrap());
+        let packed = heal(&super::Layout::new(&edit, &coverage, w, h).unwrap());
+        let red = |plane: &[f32], x: usize, y: usize| {
+            let i = (y * w + x) * 3;
+            (plane[i] - (plane[i + 1] + plane[i + 2]) * 0.5)
+                / (plane[i] + plane[i + 1] + plane[i + 2])
+        };
+        let (mut spots, mut before, mut left_whole, mut left_packed) = (0, 0.0, 0.0, 0.0);
+        for y in 0..h {
+            for x in 0..w {
+                let selected = coverage.at(x, y, w, h) > 0.0;
+                if !selected {
+                    let i = (y * w + x) * 3;
+                    assert_eq!(&whole[i..i + 3], &rgb[i..i + 3]);
+                    assert_eq!(&packed[i..i + 3], &rgb[i..i + 3]);
+                    continue;
+                }
+                // Spot centres well inside a patch.
+                let inner = (2..=3).all(|k| {
+                    coverage.at(x.saturating_sub(k * 4), y, w, h) > 0.0
+                        && coverage.at((x + k * 4).min(w - 1), y, w, h) > 0.0
+                        && coverage.at(x, y.saturating_sub(k * 4), w, h) > 0.0
+                        && coverage.at(x, (y + k * 4).min(h - 1), w, h) > 0.0
+                });
+                if x % 41 == 20 && y % 37 == 18 && inner {
+                    spots += 1;
+                    before += red(&rgb, x, y);
+                    left_whole += red(&whole, x, y);
+                    left_packed += red(&packed, x, y);
+                }
+            }
+        }
+        assert!(spots > 50, "{spots} spots measured");
+        // The skin's own redness share, from the colour it was painted with.
+        let skin = (0.40 - (0.29 + 0.23) * 0.5) / (0.40 + 0.29 + 0.23);
+        let share = |left: f32| (left / spots as f32 - skin) / (before / spots as f32 - skin);
+        assert!(
+            share(left_whole) < 0.4,
+            "whole left {:.3}",
+            share(left_whole)
+        );
+        assert!(
+            share(left_packed) <= share(left_whole) + 0.02,
+            "packed left {:.3}, whole {:.3}",
+            share(left_packed),
+            share(left_whole)
+        );
+        let mut total = 0.0_f64;
+        let mut worst = 0.0_f32;
+        for (a, b) in whole.iter().zip(&packed) {
+            let d = (a - b).abs() / a.abs().max(0.05);
+            total += f64::from(d);
+            worst = worst.max(d);
+        }
+        let mean = total / whole.len() as f64;
+        // The same pixels, the same thresholds and the same marks: only the order a blur's
+        // running sums meet the gaps in differs, which is rounding.
+        assert!(mean < 1e-5, "mean relative difference {mean:.7}");
+        assert!(worst < 1e-3, "largest relative difference {worst:.6}");
     }
 
     /// Where one frequency heal over a face-sized selection spends its time. By hand:
@@ -1096,7 +1620,8 @@ mod tests {
         };
         let coverage = crate::retouch_mask::Coverage::new(&edit, w, h);
         let t = std::time::Instant::now();
-        let field = super::Field::new(&rgb, w, h, &edit, &coverage).unwrap();
+        let layout = super::Layout::new(&edit, &coverage, w, h).unwrap();
+        let field = super::Field::new(&rgb, w, h, &edit, &coverage, &layout).unwrap();
         println!(
             "field {:?} ({}x{})",
             t.elapsed(),
