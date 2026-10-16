@@ -63,6 +63,7 @@ fn brushes_a_real_photograph() {
         target_color: None,
         sensitivity: Some(0.75),
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 0.25,
         tone: 1.0,
         warmth: 0.0,

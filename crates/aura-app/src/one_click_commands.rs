@@ -25,6 +25,7 @@ struct JobSlot {
     state: AppState,
     project: String,
     child: Option<String>,
+    started_ms: u64,
 }
 /// One entry of the run's `photo-edits.json`.
 #[derive(serde::Serialize)]
@@ -129,23 +130,32 @@ fn measured_cull(
     let times = crate::measured_cull::camera_times(state, project).unwrap_or_default();
     let wanted: BTreeSet<&String> = readable.iter().collect();
     let mut frames = Vec::with_capacity(readable.len());
-    for photo in photos.iter().filter(|photo| wanted.contains(&photo.id)) {
+    let chosen: Vec<&ImageRowLite> = photos
+        .iter()
+        .filter(|photo| wanted.contains(&photo.id))
+        .collect();
+    let lanes = workers(state);
+    // Each frame is measured on its own; the decision over all of them is made afterwards.
+    for chunk in chosen.chunks(lanes.saturating_mul(16).max(1)) {
         if stopped(job) {
             return Ok(None);
         }
-        frames.push(
-            crate::measured_cull::measure_photo(state, project, photo, &times).unwrap_or_else(
-                |_| crate::measured_cull::Frame {
+        let measured = in_order(chunk, lanes, |photo| {
+            let frame = crate::measured_cull::measure_photo(state, project, photo, &times)
+                .unwrap_or_else(|_| crate::measured_cull::Frame {
                     photo_id: photo.id.clone(),
                     file_name: photo.file_name.clone(),
                     measure: None,
                     time_ms: None,
                     edited_by_hand: false,
-                },
-            ),
-        );
-        let done = frames.len() as u64;
-        update(job, |s| s.items_done = done);
+                });
+            update(job, |s| s.items_done = s.items_done.saturating_add(1));
+            frame
+        });
+        frames.extend(measured);
+    }
+    if stopped(job) {
+        return Ok(None);
     }
     let report = crate::measured_cull::decide(&frames);
     let path = destination.join("photo-cull.json");
@@ -267,12 +277,94 @@ fn edit_one(
         recipe,
     })
 }
+/// True when this build cannot render the photograph at full size: a camera file whose
+/// mosaic it does not decode. A developed file, or a file that cannot be read here, is left
+/// to the export, which reports its own failures.
+fn full_size_unsupported(state: &AppState, photo: &str) -> bool {
+    let Ok(Some((path, _))) = state
+        .catalog()
+        .read(|conn| aura_catalog::repo::primary_file_for_photo(conn, photo))
+    else {
+        return false;
+    };
+    let path = Path::new(&path);
+    let developed = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png"));
+    if developed {
+        return false;
+    }
+    let Ok(bytes) = std::fs::read(path) else {
+        return false;
+    };
+    aura_raw::meta::read(&bytes, path).is_ok_and(|meta| {
+        !matches!(
+            meta.format,
+            aura_raw::RawFormat::Jpeg | aura_raw::RawFormat::Png
+        ) && meta.mosaic_support() != aura_raw::format::MosaicSupport::Decodable
+    })
+}
+
 fn error(message: &str) -> IpcError {
     let mut error: IpcError =
         aura_core::errors::render::recipe_invalid("automatic workflow", message).into();
     message.clone_into(&mut error.message);
     error
 }
+/// Run `work` on every item, `workers` at a time, and give the answers back in the items' own
+/// order. Each answer is what that item would produce alone - only the scheduling changes - so
+/// reports, file numbering and every recipe are the same with one worker or with three.
+fn in_order<T: Sync, R: Send>(
+    items: &[T],
+    workers: usize,
+    work: impl Fn(&T) -> R + Sync,
+) -> Vec<R> {
+    if workers <= 1 || items.len() <= 1 {
+        return items.iter().map(&work).collect();
+    }
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let work = &work;
+    let mut answers: Vec<(usize, R)> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers.min(items.len()))
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut mine = Vec::new();
+                    loop {
+                        let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(item) = items.get(index) else {
+                            break;
+                        };
+                        mine.push((index, work(item)));
+                    }
+                    mine
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|handle| {
+                handle
+                    .join()
+                    .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+            })
+            .collect()
+    });
+    answers.sort_by_key(|(index, _)| *index);
+    answers.into_iter().map(|(_, answer)| answer).collect()
+}
+
+/// A decode that ran past its deadline: worth one more try once the machine is quieter.
+fn timed_out(err: &IpcError) -> bool {
+    err.code == "AURA-RAW-2004"
+}
+
+/// How many photographs a folder run works on at once: as many as the image gate lets run
+/// together, so the run never holds more full-size frames than the rest of the app may.
+fn workers(state: &AppState) -> usize {
+    state.image_work_gate().permits()
+}
+
 fn update(job: &str, change: impl FnOnce(&mut OneClickStatusDto)) {
     if let Some(slot) = JOBS.lock().get_mut(job) {
         change(&mut slot.status);
@@ -469,6 +561,7 @@ fn start(state: &AppState, mut input: OneClickFinishInput) -> Result<OneClickFin
             state: state.clone(),
             project: input.project_id.clone(),
             child: input.ingest_job_id.clone(),
+            started_ms: state.clock().monotonic_ms(),
         },
     );
     let worker = state.clone();
@@ -553,6 +646,26 @@ pub fn one_click_status(job_id: &str) -> Result<OneClickStatusDto, IpcError> {
 }
 /// Cancel the pipeline and its active import/model/analysis child.
 #[must_use]
+/// Folder runs in progress, for the status bar.
+pub(crate) fn active_runs(now_ms: u64) -> Vec<crate::activity::ActivityItemDto> {
+    JOBS.lock()
+        .values()
+        .filter(|slot| matches!(slot.status.status.as_str(), "running" | "cancelling"))
+        .map(|slot| crate::activity::ActivityItemDto {
+            id: 0,
+            kind: "folder".into(),
+            label: format!(
+                "Finishing a folder of {} photographs ({})",
+                slot.status.frames, slot.status.phase
+            ),
+            detail: slot.status.phase_label.clone(),
+            done: slot.status.items_done,
+            total: slot.status.items_total,
+            seconds: now_ms.saturating_sub(slot.started_ms) / 1000,
+        })
+        .collect()
+}
+
 pub fn one_click_cancel(job_id: &str) -> bool {
     let active = JOBS
         .lock()
@@ -656,32 +769,59 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     );
     let mut readable = Vec::new();
     let mut analysis = Vec::new();
-    for (index, photo) in photos.iter().enumerate() {
+    let lanes = workers(state);
+    for chunk in photos.chunks(lanes.saturating_mul(16).max(1)) {
         if stopped(job) {
             return Ok(());
         }
-        match crate::photo_analysis(
-            state,
-            &PhotoAutoEditInput {
-                project_id: project.clone(),
-                photo_id: photo.id.clone(),
-                job_id: job.into(),
-            },
-        ) {
-            Ok(row) => {
-                readable.push(photo.id.clone());
-                analysis.push(serde_json::to_value(row).map_err(|e| error(&e.to_string()))?);
-                update(job, |s| s.analyzed += 1);
+        let rows = in_order(chunk, lanes, |photo| {
+            if stopped(job) {
+                return None;
             }
-            Err(err) => {
-                update(job, |s| s.failed_edits += 1);
-                note(
-                    job,
-                    format!("{} could not be analyzed: {}", photo.id, err.message),
-                );
+            let row = {
+                let _t = crate::perf::step(state, "analyze.photo");
+                crate::photo_analysis(
+                    state,
+                    &PhotoAutoEditInput {
+                        project_id: project.clone(),
+                        photo_id: photo.id.clone(),
+                        job_id: job.into(),
+                    },
+                )
+            };
+            update(job, |s| s.items_done = s.items_done.saturating_add(1));
+            Some(row)
+        });
+        for (photo, row) in chunk.iter().zip(rows) {
+            // Several frames decoding at once on a busy machine can push one past its decode
+            // deadline. Try it once more on its own before setting it aside.
+            let row = match row {
+                Some(Err(err)) if timed_out(&err) && !stopped(job) => Some(crate::photo_analysis(
+                    state,
+                    &PhotoAutoEditInput {
+                        project_id: project.clone(),
+                        photo_id: photo.id.clone(),
+                        job_id: job.into(),
+                    },
+                )),
+                other => other,
+            };
+            match row {
+                None => return Ok(()),
+                Some(Ok(row)) => {
+                    readable.push(photo.id.clone());
+                    analysis.push(serde_json::to_value(row).map_err(|e| error(&e.to_string()))?);
+                    update(job, |s| s.analyzed += 1);
+                }
+                Some(Err(err)) => {
+                    update(job, |s| s.failed_edits += 1);
+                    note(
+                        job,
+                        format!("{} could not be analyzed: {}", photo.id, err.message),
+                    );
+                }
             }
         }
-        update(job, |s| s.items_done = (index + 1) as u64);
     }
     let report = Path::new(&input.destination).join("photo-analysis.json");
     std::fs::write(
@@ -901,58 +1041,101 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         .collect();
     let mut edits = EditLog::create(Path::new(&input.destination).join("photo-edits.json"))?;
     let started = state.clock().monotonic_ms();
-    for (index, photo) in targets.iter().enumerate() {
+    let cloud = use_cloud && look.is_none();
+    // A provider call is one child job at a time and its allowance is per minute; a measured
+    // edit is local work the image gate already bounds.
+    let lanes = if cloud { 1 } else { workers(state) };
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    for chunk in targets.chunks(lanes.saturating_mul(16).max(1)) {
         if stopped(job) {
             return Ok(());
         }
-        let left = remaining(started, state.clock().monotonic_ms(), index, targets.len());
-        update(job, |s| {
-            s.phase_label = format!(
-                "Editing and retouching photo {} of {}: {}.{left}",
-                index + 1,
-                targets.len(),
-                names.get(photo.as_str()).copied().unwrap_or("photograph")
-            );
-        });
-        let result = edit_one(
-            state,
-            job,
-            project,
-            photo,
-            look,
-            use_cloud && look.is_none(),
-        );
-        if stopped(job) {
-            return Ok(());
-        }
-        match result {
-            Ok(entry) => {
-                update(job, |s| {
-                    if entry.source == "cloud" || entry.source == "cache" {
-                        s.ai_edited += 1;
-                    } else {
-                        s.local_edited += 1;
-                    }
-                });
-                edits.push(&entry)?;
+        let results = in_order(chunk, lanes, |photo| {
+            if stopped(job) {
+                return None;
             }
-            Err(err) => {
-                update(job, |s| s.failed_edits += 1);
-                note(
-                    job,
-                    format!(
-                        "{} edit or retouch failed; exporting its last saved reversible recipe: {}",
-                        names.get(photo.as_str()).copied().unwrap_or(photo),
-                        err.message
-                    ),
+            let begun = done.load(std::sync::atomic::Ordering::Relaxed);
+            let left = remaining(started, state.clock().monotonic_ms(), begun, targets.len());
+            update(job, |s| {
+                s.phase_label = format!(
+                    "Editing and retouching photo {} of {}: {}.{left}",
+                    begun + 1,
+                    targets.len(),
+                    names.get(photo.as_str()).copied().unwrap_or("photograph")
                 );
+            });
+            let result = edit_one(state, job, project, photo, look, cloud);
+            let finished = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            update(job, |s| s.items_done = finished as u64);
+            Some(result)
+        });
+        if stopped(job) {
+            return Ok(());
+        }
+        for (photo, result) in chunk.iter().zip(results) {
+            let result = match result {
+                Some(Err(err)) if timed_out(&err) && !stopped(job) => {
+                    Some(edit_one(state, job, project, photo, look, cloud))
+                }
+                other => other,
+            };
+            match result {
+                None => return Ok(()),
+                Some(Ok(entry)) => {
+                    update(job, |s| {
+                        if entry.source == "cloud" || entry.source == "cache" {
+                            s.ai_edited += 1;
+                        } else {
+                            s.local_edited += 1;
+                        }
+                    });
+                    edits.push(&entry)?;
+                }
+                Some(Err(err)) => {
+                    update(job, |s| s.failed_edits += 1);
+                    note(
+                        job,
+                        format!(
+                            "{} edit or retouch failed; exporting its last saved reversible recipe: {}",
+                            names.get(photo.as_str()).copied().unwrap_or(photo),
+                            err.message
+                        ),
+                    );
+                }
             }
         }
-        update(job, |s| s.items_done = (index + 1) as u64);
     }
     edits.close()?;
     if stopped(job) {
         return Ok(());
+    }
+    // A camera file whose sensor data this build cannot decode can be previewed and edited
+    // from the picture the camera embedded, but it cannot be rendered at full size. It is
+    // named and left out before the export starts, so the photographs that can be delivered
+    // are delivered as a complete, sealed set rather than a job marked failed. ADR-0061.
+    let (targets, unrenderable): (Vec<String>, Vec<String>) = targets
+        .into_iter()
+        .partition(|photo| !full_size_unsupported(state, photo));
+    if !unrenderable.is_empty() {
+        let shown: Vec<&str> = unrenderable
+            .iter()
+            .take(5)
+            .map(|photo| names.get(photo.as_str()).copied().unwrap_or(photo.as_str()))
+            .collect();
+        note(
+            job,
+            format!(
+                "{} camera file(s) were left out of the delivery because this build cannot decode their sensor data at full size ({}{}). They keep their edits; export the camera's own JPEGs or DNG copies to deliver them.",
+                unrenderable.len(),
+                shown.join(", "),
+                if unrenderable.len() > shown.len() { ", ..." } else { "" }
+            ),
+        );
+    }
+    if targets.is_empty() {
+        return Err(error(
+            "None of the selected photographs can be rendered at full size by this build.",
+        ));
     }
     phase(
         job,
@@ -966,7 +1149,33 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         .find(|p| p.name == "gallery")
         .or_else(|| presets.first())
         .ok_or_else(|| error("No export preset is installed."))?;
-    let report = crate::export_run(
+    let total = targets.len();
+    let exported = |p: aura_export::api::Progress<'_>| {
+        let name = p
+            .path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        update(job, |s| {
+            s.items_done = p.done as u64;
+            s.written = p.written as u64;
+            s.verified = u64::from(p.verified);
+            s.phase_label = if let Some((first, last)) = p.rendering {
+                format!("Rendering and encoding photos {first} to {last} of {total}.")
+            } else if name.is_empty() {
+                format!(
+                    "Exporting photo {} of {total}: one could not be rendered and is left out.",
+                    p.done
+                )
+            } else {
+                format!(
+                    "Exporting photo {} of {total}: {name} written and read back.",
+                    p.done
+                )
+            };
+        });
+    };
+    let report = crate::delivery_commands::export_run_reporting(
         state,
         ExportJobInput {
             project_id: project.clone(),
@@ -992,6 +1201,8 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             strip_camera_serial: true,
             verify: true,
         },
+        None,
+        Some(&exported),
     )?;
     update(job, |s| {
         s.written = u64::from(report.written);

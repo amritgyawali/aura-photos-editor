@@ -88,7 +88,7 @@ impl<'a> Pixels<'a> {
 }
 
 fn decode(v: u8) -> f32 {
-    aura_raw::colour::curve::srgb_decode(f32::from(v) / 255.0)
+    aura_raw::colour::curve::srgb_byte_to_linear(v)
 }
 
 /// Rec.709 luminance of linear RGB.
@@ -364,6 +364,7 @@ fn base_edit(id: String, tool: Tool, amount: f32, px: &Pixels<'_>, region_px: [f
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,

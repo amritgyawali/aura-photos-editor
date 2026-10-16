@@ -213,11 +213,14 @@ export type PairedReferenceReport = {
   exactMatch: boolean; matchingPixels: number; totalPixels: number;
   protectedFields: number; referenceHash: string; width: number; height: number;
   subjectErrorsBefore: number[]; subjectErrorsAfter: number[];
+  /** The personal look that was kept, when a name was given and the match changed the edit. */
+  keptLook?: string;
 };
 
 export const pairedReference = {
-  match: (photoId: string, referencePath: string, cancelId: string) =>
-    invoke<PairedReferenceReport>('match_paired_reference', { input: { photoId, referencePath, cancelId } }),
+  /** `keepAs` keeps the look the match finds as a personal look of that name. */
+  match: (photoId: string, referencePath: string, cancelId: string, keepAs?: string) =>
+    invoke<PairedReferenceReport>('match_paired_reference', { input: { photoId, referencePath, cancelId, keepAs: keepAs?.trim() || null } }),
 };
 
 export async function pickPairedReference(): Promise<string | null> {

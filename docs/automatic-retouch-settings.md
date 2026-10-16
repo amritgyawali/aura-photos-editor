@@ -109,7 +109,9 @@ definition, brow definition.
 **Portrait volumes & make-up** - contour, highlight, blush, face fill light.
 
 **Body** - body smoothing, even body tone, match body to face, body shine, red hands &
-elbows, body blemishes.
+elbows, body blemishes, stretch marks. Stretch marks is off unless you raise it or choose
+**Body skin finish**: it evens long, faint marks out of all the body skin it finds and keeps
+hands, a navel and every other contour as they are.
 
 **Hair, clothes & backdrop** - hair detail, hair shine, fabric creases, clean backdrop.
 
@@ -121,7 +123,9 @@ elbows, body blemishes.
   move them.
 - Remove a mole, a birthmark or a tattoo automatically. Darker marks that are not redder than
   the skin around them are kept and counted; a field of many small marks is treated as
-  freckles and kept unless you switch that off.
+  freckles and kept unless you switch that off. With **Remove dark marks** on, freckles and
+  the diffuse marks old spots leave are healed, and **Keep moles** (on by default) still
+  leaves anything dark with a crisp edge: a mole, a beauty mark.
 - Smooth beard, stubble, brows or lashes: they are outside the skin mask and protected again
   when the photograph is rendered.
 - Invent skin texture. Restore skin texture borrows pore detail from the same face in the

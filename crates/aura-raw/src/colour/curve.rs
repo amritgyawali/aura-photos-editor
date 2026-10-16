@@ -88,6 +88,16 @@ pub fn srgb_decode(encoded: f32) -> f32 {
     }
 }
 
+/// One 8-bit sRGB code as linear light: [`srgb_decode`] of `byte / 255`, read from a table
+/// built once by calling that function on all 256 codes, so the answer is the same value to
+/// the last bit - without a `powf` for every sample of every photograph.
+#[must_use]
+pub fn srgb_byte_to_linear(byte: u8) -> f32 {
+    static TABLE: OnceLock<[f32; 256]> = OnceLock::new();
+    let table = TABLE.get_or_init(|| std::array::from_fn(|i| srgb_decode(i as f32 / 255.0)));
+    table.get(usize::from(byte)).copied().unwrap_or(0.0)
+}
+
 /// Entries in the scene-linear to sRGB-byte lookup table.
 const LUT_SIZE: usize = 4096;
 
@@ -332,6 +342,22 @@ mod pchip_tests {
         for step in 0..=100 {
             let x = step as f32 / 100.0;
             assert!((pchip(&xs, &ys, &tangent, x) - x).abs() < 1e-6);
+        }
+    }
+}
+
+#[cfg(test)]
+mod byte_table_tests {
+    use super::{srgb_byte_to_linear, srgb_decode};
+
+    #[test]
+    fn the_byte_table_is_the_formula_to_the_last_bit() {
+        for byte in 0..=255_u8 {
+            assert_eq!(
+                srgb_byte_to_linear(byte).to_bits(),
+                srgb_decode(f32::from(byte) / 255.0).to_bits(),
+                "{byte}"
+            );
         }
     }
 }

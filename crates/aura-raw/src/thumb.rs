@@ -88,6 +88,33 @@ pub fn tier1(
     })
 }
 
+/// A developed file (JPEG, PNG, a raw's own preview) at full size and upright: what
+/// [`tier1`] returns at an unlimited edge, without the cache JPEG and the two copies it makes
+/// for a thumbnail nobody asked for. The pixels are the same.
+///
+/// # Errors
+///
+/// The same as [`tier1`]: an unreadable file, or one with nothing to show.
+pub fn decode_full(
+    bytes: &[u8],
+    meta: &RawMeta,
+    limits: DecodeLimits,
+    clock: &dyn Clock,
+    path: &std::path::Path,
+) -> AuraResult<PixelBuffer> {
+    let (outcome, decode_ms) = timed(clock, || extract(bytes, meta, limits, path));
+    let Extracted { image, source, .. } = outcome?;
+    let oriented = orient(image, meta.orientation);
+    Ok(PixelBuffer {
+        width: oriented.width,
+        height: oriented.height,
+        data: PixelData::Srgb8(oriented.data),
+        colour_space: ColourSpace::Srgb,
+        source,
+        decode_ms,
+    })
+}
+
 struct Extracted {
     image: Rgb8,
     source: PixelSource,

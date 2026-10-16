@@ -46,6 +46,7 @@ fn operation(tool: Tool) -> Edit {
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 0.25,
         tone: 1.0,
         warmth: 0.0,
@@ -478,4 +479,75 @@ fn the_new_fields_are_optional_bounded_and_absent_from_recipes_that_do_not_use_t
             "{bad} was accepted"
         );
     }
+}
+
+/// Pigment: red goes down with everything else.
+const MOLE: [f32; 3] = [0.25, 0.22, 0.20];
+/// An angry spot: darker than the mole's skin by half in green and blue, red nearly as it was.
+const INFLAMED: [f32; 3] = [0.85, 0.35, 0.35];
+
+#[test]
+fn a_mole_is_kept_while_a_freckle_and_a_dark_inflamed_spot_are_still_healed() {
+    let mut before = skin([0.42, 0.30, 0.22], 1.0);
+    mark(&mut before, [60, 128], 5.0, MOLE);
+    mark(&mut before, [128, 128], 5.0, DARK_MARK);
+    mark(&mut before, [196, 128], 5.0, INFLAMED);
+    let mut keeping = operation(Tool::FrequencyHeal);
+    keeping.mole_edge = Some(1.0);
+    let mut kept = before.clone();
+    apply(&mut kept, W, W, std::slice::from_ref(&keeping));
+    // Not a sample of the mole or of the skin right beside it has moved.
+    for y in 118..=138 {
+        for x in 50..=70 {
+            let i = (y * W + x) * 3;
+            assert_eq!(
+                &kept[i..i + 3],
+                &before[i..i + 3],
+                "the mole moved at {x},{y}"
+            );
+        }
+    }
+    assert!(
+        contrast(&kept, [128, 128], 5.0).abs() < 0.05,
+        "the freckle stayed"
+    );
+    assert!(
+        contrast(&kept, [196, 128], 5.0).abs() < 0.08,
+        "the spot stayed"
+    );
+    // Without the option the mole is a dark mark like any other.
+    let mut all = before.clone();
+    apply(&mut all, W, W, &[operation(Tool::FrequencyHeal)]);
+    assert!(
+        contrast(&all, [60, 128], 5.0) < contrast(&before, [60, 128], 5.0) - 0.3,
+        "the mole was not healed when asked: {}",
+        contrast(&all, [60, 128], 5.0)
+    );
+}
+
+#[test]
+fn a_diffuse_dark_patch_is_healed_on_a_face_and_kept_on_a_body() {
+    // Pigment-dark with no edge: the trace of an old spot on a face, a navel on a body.
+    let mut before = skin([0.42, 0.30, 0.22], 1.0);
+    for y in 0..W {
+        for x in 0..W {
+            let d = (x as f32 - 128.0).hypot(y as f32 - 128.0);
+            let t = (1.0 - d / 14.0).clamp(0.0, 1.0);
+            for c in 0..3 {
+                before[(y * W + x) * 3 + c] *= 1.0 - 0.7 * t * t * (3.0 - 2.0 * t);
+            }
+        }
+    }
+    let run = |edge: Option<f32>| -> Vec<f32> {
+        let mut edit = operation(Tool::FrequencyHeal);
+        edit.mole_edge = edge;
+        let mut out = before.clone();
+        apply(&mut out, W, W, std::slice::from_ref(&edit));
+        out
+    };
+    let centre = (128 * W + 128) * 3;
+    // A body keeps it exactly.
+    assert_eq!(run(Some(0.0))[centre], before[centre]);
+    // A face asks for an edge, finds none, and treats it like any other dark mark.
+    assert_eq!(run(Some(1.0)), run(None));
 }

@@ -379,7 +379,7 @@ impl Inner {
         content_hash: &str,
         edge: u32,
     ) -> AuraResult<PixelBuffer> {
-        let limits = DecodeLimits::tier1();
+        let limits = DecodeLimits::tier1().for_pixels(timeout::declared_pixels(bytes).unwrap_or(0));
         let clock = Arc::clone(&self.clock);
         let owned = bytes.to_vec();
         let owned_path = path.to_path_buf();
@@ -425,7 +425,7 @@ impl Inner {
         path: &Path,
         content_hash: &str,
     ) -> AuraResult<PixelBuffer> {
-        let limits = DecodeLimits::tier2();
+        let limits = DecodeLimits::tier2().for_pixels(timeout::declared_pixels(bytes).unwrap_or(0));
         let clock = Arc::clone(&self.clock);
         let owned = bytes.to_vec();
         let owned_path = path.to_path_buf();
@@ -520,7 +520,7 @@ impl Inner {
     }
 
     fn decode_tier3(&self, bytes: &[u8], path: &Path) -> AuraResult<PixelBuffer> {
-        let limits = DecodeLimits::tier3();
+        let limits = DecodeLimits::tier3().for_pixels(timeout::declared_pixels(bytes).unwrap_or(0));
         let clock = Arc::clone(&self.clock);
         let owned = bytes.to_vec();
         let owned_path = path.to_path_buf();

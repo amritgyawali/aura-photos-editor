@@ -30,6 +30,7 @@ fn edit(id: &str, tool: Tool, region: [f32; 4]) -> Edit {
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,

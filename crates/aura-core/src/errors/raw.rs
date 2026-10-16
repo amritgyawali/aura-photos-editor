@@ -25,6 +25,8 @@ pub const RAW_PROFILE_MISSING: ErrorCode = ErrorCode("AURA-RAW-2006");
 pub const RAW_MOSAIC_UNSUPPORTED: ErrorCode = ErrorCode("AURA-RAW-2007");
 /// The decode worker stopped before returning a result.
 pub const RAW_WORKER_LOST: ErrorCode = ErrorCode("AURA-RAW-2008");
+/// An iPhone HEIC or HEIF photo: a photograph, in a format this build cannot decode.
+pub const RAW_HEIF: ErrorCode = ErrorCode("AURA-RAW-2009");
 
 /// The first bytes of the file match no container we know.
 #[must_use]
@@ -36,6 +38,23 @@ pub fn unsupported(path: &Path, detail: impl Into<String>) -> AuraError {
         detail,
         "AURA does not recognise this file as a photo it can develop. It has been set aside; \
          the rest of the import continues.",
+    )
+    .with_context("path", redact_path(path))
+}
+
+/// A HEIC or HEIF photo. Its pixels are HEVC-coded, and this build carries no HEVC decoder.
+///
+/// Separate from [`unsupported`] because the photographer can do something about it: the
+/// file is a photograph, and the same photograph exported as JPEG opens.
+#[must_use]
+pub fn heif(path: &Path) -> AuraError {
+    AuraError::new(
+        RAW_HEIF,
+        Severity::ItemFailed,
+        Recovery::AskUser,
+        "HEIF decoding is not part of this build; see docs/camera-support.md",
+        "This is an iPhone HEIC photo, which AURA cannot open yet. Export it as JPEG, or set the \
+         iPhone to Camera > Formats > Most Compatible, then import it again.",
     )
     .with_context("path", redact_path(path))
 }

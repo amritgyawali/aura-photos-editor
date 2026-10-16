@@ -148,10 +148,16 @@ pub(super) fn spot_eye_weight(g: &Geometry, point: [f32; 2], include_upper_cheek
 }
 
 pub(super) fn blemish_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
-    let eye = if settings.protect_eye_area {
-        weight(g, point)
-    } else {
+    let eye = if !settings.protect_eye_area {
         1.0
+    } else if settings.deep_blemish_cleanup && settings.remove_dark_marks {
+        // Freckles do not stop at the socket. Frequency healing rebuilds the tone under a
+        // compact mark and pastes nothing, so with dark marks being removed it may work on
+        // the cheek below an eye as the confirmed spot repairs already do; the lids, the
+        // inner corner and everything above the eye stay out.
+        spot_eye_weight(g, point, true)
+    } else {
+        weight(g, point)
     };
     eye.min(nostril_weight(g, point))
 }

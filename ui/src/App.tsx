@@ -1,6 +1,7 @@
 import { AdvancedTools } from './components/AdvancedTools';
 import { AutomaticProgress } from './components/workflow/AutomaticProgress';
 import { FinishFolder } from './components/workflow/FinishFolder';
+import { StatusBar } from './components/workflow/StatusBar';
 import { automaticBusy, useAutomatic } from './state/automaticStore';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -419,6 +420,7 @@ export function App(): JSX.Element {
             {problems.length > 0 && <details className="advanced-tools"><summary>Problems to review ({problems.length})</summary><ProblemsPanel problems={problems} /></details>}
           </>}
         </div>
+        <StatusBar />
       </main>
     </div>
   );

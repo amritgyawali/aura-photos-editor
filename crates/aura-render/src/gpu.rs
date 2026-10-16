@@ -1,9 +1,8 @@
-//! The accelerator port. **This build links no `wgpu`.**
+//! The generic per-stage accelerator port.
 //!
-//! ADR-0029 section 4 has the argument, and it is the same one ADR-0004 made about LibRaw
-//! and ADR-0007 about ONNX Runtime: the build machine has no Windows SDK, a backend that
-//! cannot be run cannot be tested, and an untested renderer is worse than an absent one
-//! because it looks like a shipped feature.
+//! This parameter-free port does not implement arbitrary recipe stages. The qualified GPU
+//! output implementation takes explicit output parameters through `output::transform_gpu`
+//! and is enabled by `CpuEngine::with_gpu`; see ADR-0122.
 //!
 //! # What ships instead
 //!
@@ -63,7 +62,7 @@ impl Absent {
     /// The degradation to report, once per session.
     #[must_use]
     pub fn degradation() -> AuraError {
-        no_gpu_backend("this build links no wgpu backend; see ADR-0029 section 4")
+        no_gpu_backend("no generic per-stage accelerator is selected")
     }
 }
 
@@ -90,8 +89,8 @@ impl GpuBackend for Absent {
 
 /// The backend a caller gets on this machine.
 ///
-/// A function rather than a constant so the day a `wgpu` backend lands it probes here and
-/// every caller keeps working.
+/// The generic stage port remains unavailable; output acceleration is selected separately
+/// because it requires a colour space, bit depth, matrix and raster origin.
 #[must_use]
 pub fn detect() -> Absent {
     Absent

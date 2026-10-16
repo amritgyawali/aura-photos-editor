@@ -154,6 +154,46 @@ pub struct CloudAiGateway {
     sequence: Arc<AtomicU64>,
 }
 
+/// How long a route that did not answer in time is left alone, and the longest a provider's
+/// own pause is honoured for.
+const UNAVAILABLE_REST_MS: u64 = 10 * 60 * 1000;
+/// The rest after any other failure, and after a refusal that named no pause.
+const DEFAULT_REST_MS: u64 = 60_000;
+/// A pause shorter than this is treated as this long: the next photograph is seconds away.
+const SHORTEST_REST_MS: u64 = 5_000;
+
+/// How long a route rests after a failure, from the note its audit row carries.
+///
+/// A provider that did not answer in time is in the same state a minute later, and asking it
+/// again for every photograph makes each one wait for the same silence. So is a model whose
+/// answer could not be used even after the repair: that is the model, not the moment, and the
+/// two round trips it took are the slowest way there is to reach the local answer. A provider
+/// that refused for rate says when to come back: a per-minute allowance is free again in
+/// seconds and a daily one is not, and both are its own words rather than a guess.
+fn rest_after(note: Option<&str>) -> u64 {
+    let note: serde_json::Value = note
+        .and_then(|note| serde_json::from_str(note).ok())
+        .unwrap_or_default();
+    match note.get("errorCode").and_then(serde_json::Value::as_str) {
+        Some("AURA-CLOUD-6003" | "AURA-CLOUD-6005") => UNAVAILABLE_REST_MS,
+        Some("AURA-CLOUD-6004") => note
+            .get("retryAfterMs")
+            .and_then(serde_json::Value::as_u64)
+            // One and two seconds are what the status mapping fills in when no pause was named.
+            .filter(|pause| *pause > 2_000)
+            .map_or(DEFAULT_REST_MS, |pause| {
+                pause.clamp(SHORTEST_REST_MS, UNAVAILABLE_REST_MS)
+            }),
+        _ => DEFAULT_REST_MS,
+    }
+}
+
+/// [`rest_after`], for the routing tests beside the import.
+#[cfg(test)]
+pub(crate) fn rest_after_for_tests(note: Option<&str>) -> u64 {
+    rest_after(note)
+}
+
 impl CloudAiGateway {
     /// Assemble a gateway from its parts.
     #[must_use]
@@ -410,12 +450,13 @@ impl CloudAiGateway {
                 if result.source != Source::LocalFallback {
                     return Ok(result);
                 }
-                let reason = self
+                let row = self
                     .audit
                     .recent(&project, 32)
                     .ok()
-                    .and_then(|rows| rows.into_iter().find(|row| row.id == result.call_id))
-                    .and_then(|row| row.fallback_reason);
+                    .and_then(|rows| rows.into_iter().find(|row| row.id == result.call_id));
+                let rest = rest_after(row.as_ref().and_then(|row| row.scratchpad.as_deref()));
+                let reason = row.and_then(|row| row.fallback_reason);
                 let retryable = reason.as_deref().is_some_and(|reason| {
                     matches!(
                         reason,
@@ -430,7 +471,7 @@ impl CloudAiGateway {
                 if retryable && reason.as_deref() != Some("cost_ceiling") {
                     self.cooldowns
                         .lock()
-                        .insert(index, self.clock.monotonic_ms().saturating_add(60_000));
+                        .insert(index, self.clock.monotonic_ms().saturating_add(rest));
                 }
                 last = Some(result);
                 if !retryable {
@@ -979,7 +1020,17 @@ impl CloudAiGateway {
         record.confidence = confidence;
         if let Some(profile) = &self.profile_id {
             record.provider.clone_from(profile);
-            record.scratchpad = Some(format!("{{\"errorCode\":\"{}\"}}", cause.code.0));
+            let pause = cause
+                .context
+                .iter()
+                .find(|(key, _)| key == "retry_after_ms")
+                .and_then(|(_, value)| value.parse::<u64>().ok());
+            // Both values are a registry code and a number: nothing here needs escaping.
+            record.scratchpad = Some(format!(
+                "{{\"errorCode\":\"{}\",\"retryAfterMs\":{}}}",
+                cause.code.0,
+                pause.map_or_else(|| "null".to_owned(), |ms| ms.to_string())
+            ));
         }
         record.latency_ms = self.clock.monotonic_ms().saturating_sub(started_ms);
         record.status = if reason == FallbackReason::SchemaInvalid {

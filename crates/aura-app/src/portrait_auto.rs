@@ -27,6 +27,7 @@ use crate::retouch_settings::{gain, Settings};
 
 mod body_cleanup;
 mod repair_budget;
+mod skin_sample;
 
 pub const KEY: &str = "studio_portrait_auto_v1";
 /// Stable ID prefix of every automatic portrait operation.
@@ -149,7 +150,8 @@ pub fn group_of(id: &str) -> Option<Group> {
     }
     let rest = id.strip_prefix(PREFIX)?;
     Some(
-        if rest.contains("-spot-") || rest.ends_with("-body-spots") {
+        if rest.contains("-spot-") || rest.ends_with("-body-spots") || rest.ends_with("-body-marks")
+        {
             Group::Blemishes
         } else if rest.contains("-lines-") || rest.contains("-fold-") || rest.contains("-redness-")
         {
@@ -376,6 +378,7 @@ pub fn plan_with_faces(
         .and_then(|(pixels, w, h)| portrait_features::Pixels::new(pixels, w, h))
         .or_else(|| portrait_features::Pixels::new(rgb, width, height));
     // Face and body skin from the bundled person segmenter, measured once for every face.
+    let segmenting = aura_render::perf::step("plan.segment");
     let segmentation = segment(
         rgb,
         width,
@@ -385,20 +388,35 @@ pub fn plan_with_faces(
         &settings,
         options.scope.body(),
     );
+    drop(segmenting);
     report.segmentation = Some(segmentation.summary.clone());
     if report.faces.is_empty() && options.scope.body() {
         let size = [width as f32, height as f32];
-        let edit = store(
+        let used = store(
             &mut mattes,
             segmentation.standalone_body.as_ref(),
             0,
             "body",
-        )
-        .and_then(|m| body_cleanup::spots(0, &m, size, size[0].min(size[1]) * 0.4, &settings));
-        if let Some(mut edit) = edit.filter(|_| manual + scene_ops < retouch_tools::MAX_EDITS) {
-            edit.amount = (edit.amount * options.intensity).clamp(0.0, 1.0);
-            groups.insert(Group::Blemishes, vec![edit]);
-            report.operations = 1;
+        );
+        // Spots first. Its thresholds are multiples of what the skin does everywhere, so on
+        // skin still crossed by marks it heals what stands out and leaves a navel alone;
+        // run after the evening it reads that same navel as the one mark on clean skin.
+        let mut edits: Vec<Edit> = used
+            .iter()
+            .flat_map(|m| {
+                [
+                    body_cleanup::spots(0, m, size, size[0].min(size[1]) * 0.4, &settings),
+                    body_cleanup::stretch_marks(0, m, size, &settings),
+                ]
+            })
+            .flatten()
+            .collect();
+        if !edits.is_empty() && manual + scene_ops + edits.len() <= retouch_tools::MAX_EDITS {
+            for edit in &mut edits {
+                edit.amount = (edit.amount * options.intensity).clamp(0.0, 1.0);
+            }
+            report.operations = edits.len();
+            groups.insert(Group::Blemishes, edits);
             report.message = "Healed detected visible body skin without requiring a face. Skin outside the selection stays unchanged; inspect the saved coverage.".into();
         } else {
             mattes.clear();
@@ -586,6 +604,7 @@ pub fn plan_with_faces(
         if options.scope.face() && landmarks_trusted {
             if let Some(px) = &detail_pixels {
                 // The surface selection frequency healing, the finish and the graft share.
+                let _face_t = aura_render::perf::step("plan.face_detail");
                 let surface = face_matte
                     .as_ref()
                     .filter(|_| settings.frequency_heal > 0.0 || settings.texture_graft > 0.0)
@@ -620,6 +639,7 @@ pub fn plan_with_faces(
                     &settings,
                 )?;
                 // What is left after frequency healing is what the spot repairs are for.
+                let healing = aura_render::perf::step("plan.after_frequency_heal");
                 let healed = clear
                     .as_ref()
                     .and_then(|edit| {
@@ -634,6 +654,7 @@ pub fn plan_with_faces(
                 let healed_px = healed.as_deref().and_then(|bytes| {
                     portrait_features::Pixels::new(bytes, px.width as u32, px.height as u32)
                 });
+                drop(healing);
                 let spot_px = healed_px.as_ref().unwrap_or(px);
                 let mut feature_options = options;
                 // Deep cleanup replaces the sparse four-patch search; never stack both. When the
@@ -641,6 +662,7 @@ pub fn plan_with_faces(
                 if settings.deep_blemish_cleanup && chosen_deep {
                     feature_options.blemishes = false;
                 }
+                let featuring = aura_render::perf::step("plan.features");
                 features = portrait_features::plan(
                     face,
                     index,
@@ -650,7 +672,9 @@ pub fn plan_with_faces(
                     &feature_options,
                     face_matte.as_ref().map(|m| m.id.as_str()),
                 );
+                drop(featuring);
                 if options.blemishes && settings.deep_blemish_cleanup {
+                    let _deep_t = aura_render::perf::step("plan.deep_blemish");
                     let mut deep = portrait_features::deep_blemish::plan(
                         face,
                         index,
@@ -1159,6 +1183,7 @@ fn plan_face(face: &PortraitFace, index: usize, rgb: &[u8], width: u32, height: 
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
+            mole_edge: None,
             texture: if smooth { 0.7 } else { 1.0 },
             tone: if smooth { 0.9 } else { 0.5 },
             warmth: 0.0,
@@ -1291,6 +1316,7 @@ fn plan_body(
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: if tool == Tool::SkinSmooth { 0.75 } else { 1.0 },
         tone: if tool == Tool::SkinSmooth { 0.9 } else { 0.5 },
         warmth: 0.0,
@@ -1347,7 +1373,7 @@ fn body_skin_region(
     if gw < 3 || gh < 3 {
         return None;
     }
-    let decode = |v: u8| aura_raw::colour::curve::srgb_decode(f32::from(v) / 255.0);
+    let decode = |v: u8| aura_raw::colour::curve::srgb_byte_to_linear(v);
     let luma = |p: [f32; 3]| p[0] * 0.2627 + p[1] * 0.678 + p[2] * 0.0593;
     let chroma = |p: [f32; 3]| {
         let s = (p[0] + p[1] + p[2]).max(1e-6);
@@ -1677,15 +1703,22 @@ fn face_skin_mask(f: FaceFrame, [width, height]: [f32; 2]) -> BrushMask {
     clippy::cast_sign_loss
 )]
 fn sample_quality(rgb: &[u8], width: u32, height: u32, [x, y]: [f32; 2]) -> Option<Sample> {
-    if x < 2.0 || y < 2.0 || x >= width as f32 - 2.0 || y >= height as f32 - 2.0 {
+    if !x.is_finite()
+        || !y.is_finite()
+        || x < 2.0
+        || y < 2.0
+        || x >= width as f32 - 2.0
+        || y >= height as f32 - 2.0
+    {
         return None;
     }
     let mut low = 1.0_f32;
     let mut high = 0.0_f32;
     let mut sum = 0.0;
     let mut color = [0.0; 3];
-    for yy in y as usize - 2..=y as usize + 2 {
-        for xx in x as usize - 2..=x as usize + 2 {
+    let mut light = [[0.0; 5]; 5];
+    for (row, yy) in (y as usize - 2..=y as usize + 2).enumerate() {
+        for (column, xx) in (x as usize - 2..=x as usize + 2).enumerate() {
             let start = (yy * width as usize + xx) * 3;
             let pixel = rgb.get(start..start + 3)?;
             if pixel.iter().any(|v| *v > 246) {
@@ -1702,6 +1735,7 @@ fn sample_quality(rgb: &[u8], width: u32, height: u32, [x, y]: [f32; 2]) -> Opti
             low = low.min(l);
             high = high.max(l);
             sum += l;
+            light[row][column] = l;
         }
     }
     let mean = sum / 25.0;
@@ -1713,7 +1747,9 @@ fn sample_quality(rgb: &[u8], width: u32, height: u32, [x, y]: [f32; 2]) -> Opti
     Some(Sample {
         point: [x, y],
         mean,
-        variation,
+        // Keep the raw range above as a contamination guard. Only the texture strength
+        // uses residuals: smooth directional light must not ask for more skin smoothing.
+        variation: skin_sample::texture(&light, mean),
         chroma: color.map(|v| v / total),
     })
 }
@@ -2132,6 +2168,7 @@ fn face_extras(
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
+            mole_edge: None,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,
@@ -2300,6 +2337,7 @@ fn plan_face_from_matte(
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
+            mole_edge: None,
             texture: if smooth { 0.7 } else { 1.0 },
             tone: if smooth { 0.9 } else { 0.5 },
             warmth: 0.0,
@@ -2404,6 +2442,7 @@ fn plan_body_matte(
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
+            mole_edge: None,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,
@@ -2459,6 +2498,7 @@ fn plan_body_matte(
         edits.push(e);
     }
     edits.extend(body_cleanup::spots(index, matte, [w, h], fw, settings));
+    edits.extend(body_cleanup::stretch_marks(index, matte, [w, h], settings));
     if settings.neck_lines > 0.0 {
         let cx = (face.bounds[0] + face.bounds[2]) * 0.5 * w;
         let chin = face.bounds[3] * h;
@@ -2563,6 +2603,7 @@ fn hair_ops(
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 1.0,
         tone: 0.0,
         warmth: 0.0,
@@ -2617,6 +2658,7 @@ fn fabric_op(index: usize, matte: &MatteUse, face: &PortraitFace, settings: &Set
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 1.0,
         tone: 0.85,
         warmth: 0.0,
@@ -2660,6 +2702,7 @@ fn backdrop_op(matte: &MatteUse, faces: &[PortraitFace], settings: &Settings) ->
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,
@@ -3282,6 +3325,7 @@ mod tests {
             target_color: None,
             sensitivity: None,
             keep_dark_marks: false,
+            mole_edge: None,
             texture: 1.0,
             tone: 0.5,
             warmth: 0.0,

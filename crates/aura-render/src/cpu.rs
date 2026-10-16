@@ -18,7 +18,7 @@
 //! it stays that way from the first stage to the output transform. A `f16` working buffer
 //! would round twice per stage and eat the parity tolerance the gate is written against.
 
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
+use std::sync::Arc;
 
 use aura_core::clock::Clock;
 use aura_core::errors::render::tiled_fallback;
@@ -35,6 +35,7 @@ use crate::geometry;
 use crate::graph::{self, Capabilities, InputKind, Plan, Stage};
 use crate::spatial;
 use crate::tonemap::{self, Tone};
+use crate::work_gate::{WorkGate, WorkPermit};
 
 /// The working buffer's bytes per pixel: three `f32`.
 pub const BYTES_PER_PIXEL: u64 = 12;
@@ -127,7 +128,8 @@ pub struct CpuEngine {
     /// Buffers before and after the retouch stack, shared across renders. ADR-0098.
     checkpoints: Option<crate::retouch_cache::Checkpoints>,
     /// Shared with retouch planning by the application, before decoding large frames.
-    image_work_gate: Option<Arc<Mutex<()>>>,
+    image_work_gate: Option<Arc<WorkGate>>,
+    accelerate_output: bool,
 }
 
 impl CpuEngine {
@@ -288,6 +290,7 @@ impl CpuEngine {
             working_bytes: DEFAULT_WORKING_BYTES,
             checkpoints: None,
             image_work_gate: None,
+            accelerate_output: false,
         }
     }
 
@@ -300,18 +303,72 @@ impl CpuEngine {
         self
     }
 
-    /// Serialize decoding and rendering with other expensive image work in the same app.
+    /// Use a qualified hardware output device where it saves work. CPU reference remains
+    /// available for small buffers, absent devices and a failed submission. ADR-0122.
+    #[must_use]
+    pub const fn with_gpu(mut self) -> Self {
+        self.accelerate_output = true;
+        self
+    }
+
+    fn output(
+        &self,
+        rgb: &[f32],
+        width: u32,
+        height: u32,
+        output: &crate::OutputSpec,
+    ) -> (crate::RenderedData, Backend) {
+        // Transfer/setup costs are measured once; small frames stay on the processor.
+        if self.accelerate_output
+            && crate::output::gpu_min_pixels()
+                .is_some_and(|minimum| u64::from(width) * u64::from(height) >= minimum as u64)
+        {
+            if let Ok(pixels) = crate::output::transform_gpu(
+                rgb,
+                width,
+                height,
+                output.colour_space,
+                output.bit_depth,
+                (0, 0),
+            ) {
+                return (pixels, Backend::Wgpu);
+            }
+        }
+        (
+            crate::output::transform(
+                rgb,
+                width,
+                height,
+                output.colour_space,
+                output.bit_depth,
+                (0, 0),
+            ),
+            Backend::Cpu,
+        )
+    }
+
+    fn request_hash(&self, recipe: &Recipe, output: &crate::OutputSpec) -> AuraResult<String> {
+        let base = graph::render_hash(&recipe.image.content_hash, recipe, output)?;
+        if self.accelerate_output {
+            if let Some(identity) = crate::output::gpu_identity() {
+                return Ok(blake3::hash(format!("{base}\0{identity}").as_bytes())
+                    .to_hex()
+                    .to_string());
+            }
+        }
+        Ok(base)
+    }
+
+    /// Bound decoding and rendering together with other expensive image work in the same app.
     /// The gate changes scheduling only; render keys and pixel calculations stay unchanged.
     #[must_use]
-    pub fn with_image_work_gate(mut self, gate: Arc<Mutex<()>>) -> Self {
+    pub fn with_image_work_gate(mut self, gate: Arc<WorkGate>) -> Self {
         self.image_work_gate = Some(gate);
         self
     }
 
-    fn image_work(&self) -> Option<MutexGuard<'_, ()>> {
-        self.image_work_gate
-            .as_ref()
-            .map(|gate| gate.lock().unwrap_or_else(PoisonError::into_inner))
+    fn image_work(&self) -> Option<WorkPermit<'_>> {
+        self.image_work_gate.as_ref().map(|gate| gate.acquire())
     }
 
     /// Override the working-buffer ceiling. Used by the tiling tests and by the phase 03
@@ -377,20 +434,16 @@ impl CpuEngine {
             _ => self.working_buffer(frame, &clamped, &plan, level, None),
         };
 
-        let quantised = crate::output::transform(
-            &rgb,
-            width,
-            height,
-            output.colour_space,
-            output.bit_depth,
-            (0, 0),
-        );
+        let (quantised, backend) = {
+            let _t = crate::perf::step("render.output");
+            self.output(&rgb, width, height, output)
+        };
 
         notes.extend(plan.notes.iter().cloned());
         notes.sort_by(|a, b| a.stage.cmp(&b.stage).then(a.reason.cmp(&b.reason)));
         notes.dedup();
 
-        let hash = graph::render_hash(&clamped.image.content_hash, &clamped, output)?;
+        let hash = self.request_hash(&clamped, output)?;
         let elapsed = self.clock.monotonic_us().saturating_sub(started);
 
         Ok(RenderedImage {
@@ -399,7 +452,7 @@ impl CpuEngine {
             data: quantised,
             colour_space: output.colour_space,
             render_hash: hash,
-            backend: Backend::Cpu.as_str().to_string(),
+            backend: backend.as_str().to_string(),
             notes,
             stages_run: {
                 let mut stages = plan.slugs();
@@ -481,19 +534,25 @@ impl CpuEngine {
         level: RenderLevel,
         stats: Option<spatial::Stats>,
     ) -> (Vec<f32>, u32, u32, Vec<RenderNote>, spatial::Stats) {
+        let _t = crate::perf::step("render.before_retouch (all)");
         let mut notes = Vec::new();
         let g = &recipe.global;
 
         // Resample first when the caller asked for a smaller rung. Everything downstream is
         // then cheaper, and the two spatial radii are expressed in output pixels - which is
         // what makes a clarity setting look the same on a proxy and on an export.
-        let (mut rgb, width, height) = fit(frame, level);
+        let (mut rgb, width, height) = {
+            let _t = crate::perf::step("before.fit");
+            fit(frame, level)
+        };
         // Where this buffer sits in the whole photograph, after any resample. The two
         // position-dependent stages read it; every other stage is either point-wise or
         // protected by the tiler's halo.
         let position = spatial::Position::of(frame, width, height);
-        let stats =
-            stats.unwrap_or_else(|| spatial::measure(&rgb, width as usize, height as usize));
+        let stats = stats.unwrap_or_else(|| {
+            let _t = crate::perf::step("before.measure");
+            spatial::measure(&rgb, width as usize, height as usize)
+        });
 
         let profile = crate::profiles::resolve(&frame.camera);
         if let Some(warning) = &profile.warning {
@@ -568,6 +627,7 @@ impl CpuEngine {
         // fight phase 15's exposure and a distortion correction does not resample a graded
         // frame. `graph::ORDER` put them here in phase 14; phase 23 filled them in.
         if plan.stages.contains(&Stage::LensVignette) {
+            let _t = crate::perf::step("before.vignette");
             spatial::correct_vignette(
                 &mut rgb,
                 width as usize,
@@ -578,6 +638,7 @@ impl CpuEngine {
         }
         let corrections = geometry::coefficients_of(&recipe.lens);
         if plan.stages.contains(&Stage::LensDistortion) {
+            let _t = crate::perf::step("before.distortion");
             if let Some(coefficients) = corrections {
                 geometry::correct_distortion(
                     &mut rgb,
@@ -588,6 +649,7 @@ impl CpuEngine {
             }
         }
         if plan.stages.contains(&Stage::LensCa) {
+            let _t = crate::perf::step("before.ca");
             if let Some(coefficients) = corrections {
                 geometry::correct_ca(
                     &mut rgb,
@@ -600,6 +662,7 @@ impl CpuEngine {
 
         // ---- noise ---------------------------------------------------------------------
         if plan.stages.contains(&Stage::NoiseReduction) {
+            let _t = crate::perf::step("before.denoise");
             spatial::denoise(
                 &mut rgb,
                 width as usize,
@@ -674,6 +737,7 @@ impl CpuEngine {
 
         // ---- local contrast ------------------------------------------------------------
         if plan.stages.contains(&Stage::Clarity) {
+            let _t = crate::perf::step("before.clarity");
             spatial::local_contrast(
                 &mut rgb,
                 width as usize,
@@ -683,6 +747,7 @@ impl CpuEngine {
             );
         }
         if plan.stages.contains(&Stage::Texture) {
+            let _t = crate::perf::step("before.texture");
             spatial::local_contrast(
                 &mut rgb,
                 width as usize,
@@ -692,6 +757,7 @@ impl CpuEngine {
             );
         }
         if plan.stages.contains(&Stage::Dehaze) {
+            let _t = crate::perf::step("before.dehaze");
             spatial::dehaze(
                 &mut rgb,
                 width as usize,
@@ -709,6 +775,7 @@ impl CpuEngine {
             || plan.stages.contains(&Stage::Retouch))
             && crate::portrait::wants_parse(recipe);
         let portrait = if wants_portrait {
+            let _t = crate::perf::step("render.portrait_parse");
             let found = crate::portrait::parse(frame, &crate::portrait::hints(recipe));
             if found.is_none() {
                 notes.push(RenderNote {
@@ -735,6 +802,7 @@ impl CpuEngine {
         // ---- retouch -------------------------------------------------------------------
         if plan.stages.contains(&Stage::Retouch) {
             if let Some(map) = &portrait {
+                let _t = crate::perf::step("render.portrait_operators");
                 notes.extend(crate::portrait::apply_retouch(
                     &mut rgb, width, height, recipe, map,
                 ));
@@ -754,9 +822,13 @@ impl CpuEngine {
         stats: spatial::Stats,
         frame: Option<&Frame>,
     ) -> (Vec<f32>, u32, u32) {
+        let _t = crate::perf::step("render.after_retouch (all)");
         let g = &recipe.global;
         // ---- the Studio's local adjustments (ADR-0102) -----------------------------------
-        crate::local_masks::apply(&mut rgb, width, height, recipe, frame);
+        {
+            let _t = crate::perf::step("render.local_masks");
+            crate::local_masks::apply(&mut rgb, width, height, recipe, frame);
+        }
         // ---- sharpening ----------------------------------------------------------------
         if plan.stages.contains(&Stage::Sharpen) {
             spatial::unsharp(
@@ -966,10 +1038,9 @@ impl CpuEngine {
         // A carried preview is optional. Keep the displayed frame while a full
         // render or retouch plan owns the buffers, rather than queue more work.
         let _image_work = if let Some(gate) = &self.image_work_gate {
-            match gate.try_lock() {
-                Ok(guard) => Some(guard),
-                Err(TryLockError::Poisoned(error)) => Some(error.into_inner()),
-                Err(TryLockError::WouldBlock) => return Ok(None),
+            match gate.try_acquire() {
+                Some(permit) => Some(permit),
+                None => return Ok(None),
             }
         } else {
             None
@@ -1001,22 +1072,15 @@ impl CpuEngine {
         crate::retouch_cache::carry_over(&mut rgb, &last);
         let (rgb, width, height) =
             Self::after_retouch(rgb, width, height, &clamped, &plan, stats, Some(&frame));
-        let pixels = crate::output::transform(
-            &rgb,
-            width,
-            height,
-            req.output.colour_space,
-            req.output.bit_depth,
-            (0, 0),
-        );
+        let (pixels, backend) = self.output(&rgb, width, height, &req.output);
         let elapsed = self.clock.monotonic_us().saturating_sub(started);
         Ok(Some(RenderedImage {
             width,
             height,
             data: pixels,
             colour_space: req.output.colour_space,
-            render_hash: graph::render_hash(&clamped.image.content_hash, &clamped, &req.output)?,
-            backend: Backend::Cpu.as_str().to_string(),
+            render_hash: self.request_hash(&clamped, &req.output)?,
+            backend: backend.as_str().to_string(),
             notes,
             stages_run: plan.slugs(),
             ms: u32::try_from(elapsed / 1_000).unwrap_or(u32::MAX),
@@ -1189,7 +1253,11 @@ impl RenderService for CpuEngine {
     fn render(&self, req: RenderRequest) -> AuraResult<RenderedImage> {
         aura_recipe::schema::Validation::check(&req.recipe)?;
         let _image_work = self.image_work();
-        let frame = self.source.frame(&req.image_id, req.level)?;
+        let _total = crate::perf::step("render.total");
+        let frame = {
+            let _t = crate::perf::step("render.source_frame");
+            self.source.frame(&req.image_id, req.level)?
+        };
 
         let mut image = if let Some(warning) = self.budget_warning(frame.pixels()) {
             let mut rendered = crate::tiles::render_streamed(
@@ -1224,26 +1292,45 @@ impl RenderService for CpuEngine {
 
     fn render_hash(&self, req: &RenderRequest) -> AuraResult<String> {
         let clamped = req.recipe.clamped();
-        graph::render_hash(&clamped.image.content_hash, &clamped, &req.output)
+        self.request_hash(&clamped, &req.output)
     }
 
     fn capabilities(&self) -> RenderCaps {
+        let gpu = self
+            .accelerate_output
+            .then(crate::output::gpu_identity)
+            .flatten();
         RenderCaps {
-            backend: Backend::Cpu,
+            backend: if gpu.is_some() {
+                Backend::Wgpu
+            } else {
+                Backend::Cpu
+            },
             // The reference path has no texture limit; the number is the working-buffer
             // ceiling expressed as a square edge, so a caller sizing a request against it
             // gets an honest answer rather than a hardware constant that does not apply.
             max_texture: ((self.working_bytes / BYTES_PER_PIXEL) as f64).sqrt() as u32,
             precision_bits: 24,
             max_working_bytes: self.working_bytes,
-            engine: graph::engine_string(),
+            engine: gpu.map_or_else(graph::engine_string, |identity| {
+                format!("{}+{identity}", graph::engine_string())
+            }),
         }
     }
 
     fn degradation(&self) -> Option<AuraError> {
-        Some(aura_core::errors::render::no_gpu_backend(
-            "this build links no wgpu backend; see ADR-0029 section 4",
-        ))
+        if self.accelerate_output && crate::output::gpu_identity().is_some() {
+            None
+        } else {
+            Some(aura_core::errors::render::no_gpu_backend(
+                if self.accelerate_output {
+                    crate::output::gpu_unavailable_reason()
+                        .unwrap_or_else(|| "Using the CPU reference pipeline".into())
+                } else {
+                    "Reference CPU output selected".into()
+                },
+            ))
+        }
     }
 }
 
@@ -1310,7 +1397,7 @@ mod tests {
         let expected = engine(fixtures::StaticSource::shared(frame))
             .render(request.clone())
             .unwrap();
-        let gate = Arc::new(Mutex::new(()));
+        let gate = Arc::new(WorkGate::new(1));
         let start = Arc::new(std::sync::Barrier::new(3));
         let workers: Vec<_> = (0..2)
             .map(|_| {
@@ -1342,7 +1429,7 @@ mod tests {
             peak: AtomicUsize::new(0),
             calls: AtomicUsize::new(0),
         });
-        let gate = Arc::new(Mutex::new(()));
+        let gate = Arc::new(WorkGate::new(1));
         let engine = engine(source.clone())
             .with_image_work_gate(Arc::clone(&gate))
             .with_checkpoints(crate::retouch_cache::Checkpoints::new());
@@ -1354,7 +1441,7 @@ mod tests {
             purpose: RenderPurpose::Export,
         };
         engine.render(request.clone()).unwrap();
-        let held = gate.lock().unwrap();
+        let held = gate.acquire();
         assert!(engine.render_live(&request).unwrap().is_none());
         assert_eq!(source.calls.load(Ordering::SeqCst), 1);
         drop(held);

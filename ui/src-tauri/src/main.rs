@@ -3269,6 +3269,15 @@ async fn one_click_status(job_id: String) -> IpcResult<OneClickStatusDto> {
         .map_err(|_| background_request_failed())?
 }
 
+/// Everything the application is busy with right now, for the status bar. ADR-0123.
+#[tauri::command]
+async fn activity_status(state: State<'_, AppState>) -> IpcResult<aura_app::activity::ActivityDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || Ok(aura_app::activity_status(&app)))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn one_click_cancel(job_id: String) -> IpcResult<bool> {
     let found = tauri::async_runtime::spawn_blocking(move || {
@@ -3818,6 +3827,7 @@ fn main() {
             one_click_finish,
             one_click_status,
             one_click_cancel,
+            activity_status,
             analyse_portrait,
             portrait_retouch,
             set_portrait_retouch,

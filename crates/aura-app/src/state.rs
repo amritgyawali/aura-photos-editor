@@ -154,8 +154,9 @@ pub struct AppState {
     /// Buffers before and after each photograph's retouch stack, shared by every render this
     /// process makes. ADR-0098.
     retouch_checkpoints: aura_render::retouch_cache::Checkpoints,
-    /// One expensive image pass at a time, shared by planners and every renderer.
-    image_work_gate: Arc<std::sync::Mutex<()>>,
+    /// How many expensive image passes run at once, shared by planners and every renderer:
+    /// one on a small machine, a few on a large one. `aura_render::work_gate`.
+    image_work_gate: Arc<aura_render::WorkGate>,
     cache_root: PathBuf,
     /// Where `models.lock`, its signature and the model files live.
     ///
@@ -290,7 +291,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
-            image_work_gate: Arc::default(),
+            image_work_gate: Arc::new(aura_render::WorkGate::for_this_machine()),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -317,7 +318,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
-            image_work_gate: Arc::default(),
+            image_work_gate: Arc::new(aura_render::WorkGate::for_this_machine()),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -1475,7 +1476,7 @@ impl AppState {
         &self.edited_previews
     }
 
-    pub(crate) fn image_work_gate(&self) -> &Arc<std::sync::Mutex<()>> {
+    pub(crate) fn image_work_gate(&self) -> &Arc<aura_render::WorkGate> {
         &self.image_work_gate
     }
 
@@ -3046,9 +3047,9 @@ impl AppState {
 
     /// The develop engine for this catalog. PHASE-14.
     ///
-    /// The processor reference path, over a frame source that reads phase 02's proxies. When
-    /// a `wgpu` backend lands it is constructed here and nothing else changes; the port is
-    /// `aura_render::gpu::GpuBackend` and it is deliberately not frozen (ADR-0029 section 4).
+    /// Qualified GPU output is enabled here over the catalog frame source, with the CPU
+    /// reference for the remaining stages
+    /// and for absent, slower or failing devices (ADR-0122).
     ///
     /// # Errors
     ///
@@ -3059,6 +3060,7 @@ impl AppState {
             Arc::new(crate::photo_frames::CatalogFrames::new(self.clone()));
         Ok(Arc::new(
             aura_render::CpuEngine::new(source, Arc::clone(&self.clock))
+                .with_gpu()
                 .with_checkpoints(self.retouch_checkpoints.clone())
                 .with_image_work_gate(Arc::clone(&self.image_work_gate)),
         ))
@@ -3150,6 +3152,17 @@ impl AppState {
             .lock()
             .get(job_id)
             .map(|watch| (watch.counter.done(), watch.counter.total(), watch.running))
+    }
+
+    /// Imports still running, for the status bar: units done and units expected.
+    #[must_use]
+    pub(crate) fn running_imports(&self) -> Vec<(u64, u64)> {
+        self.imports
+            .lock()
+            .values()
+            .filter(|watch| watch.running)
+            .map(|watch| (watch.counter.done(), watch.counter.total()))
+            .collect()
     }
 
     /// Signal cancellation. Returns false when the job is already gone.

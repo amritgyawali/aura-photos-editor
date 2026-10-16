@@ -73,6 +73,61 @@ impl DecodeLimits {
     }
 }
 
+/// Wall-clock allowance per megapixel the file declares, above the tier's own deadline.
+const TIMEOUT_PER_MEGAPIXEL_MS: u64 = 400;
+/// The longest any one decode is waited for, however large the file says it is.
+const LONGEST_TIMEOUT_MS: u64 = 60_000;
+
+impl DecodeLimits {
+    /// These limits with the deadline grown for an image of `pixels`: a file nine times the
+    /// size is nine times the work, and the fixed deadline that suits a 5-megapixel JPEG
+    /// turns a 45-megapixel one into a "took too long" on a slow machine. The memory limits
+    /// are unchanged and still checked before anything is allocated, so a header claiming
+    /// an absurd size is refused there rather than waited for here.
+    #[must_use]
+    pub fn for_pixels(self, pixels: u64) -> Self {
+        let scaled = TIMEOUT_PER_MEGAPIXEL_MS.saturating_mul(pixels / 1_000_000);
+        Self {
+            timeout_ms: self.timeout_ms.max(scaled.min(LONGEST_TIMEOUT_MS)),
+            ..self
+        }
+    }
+}
+
+/// The pixel count a JPEG or PNG declares in its header, read without decoding anything.
+///
+/// Bounded by the bytes it is given and by a fixed number of JPEG segments, so a malformed
+/// file costs a few comparisons. `None` for anything else, including camera files, whose
+/// own tiers already account for their size.
+#[must_use]
+pub fn declared_pixels(bytes: &[u8]) -> Option<u64> {
+    let be16 = |at: usize| -> Option<u64> {
+        Some(u64::from(*bytes.get(at)?) << 8 | u64::from(*bytes.get(at + 1)?))
+    };
+    let be32 = |at: usize| -> Option<u64> { Some(be16(at)? << 16 | be16(at + 2)?) };
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Some(be32(16)?.saturating_mul(be32(20)?));
+    }
+    if !bytes.starts_with(&[0xFF, 0xD8]) {
+        return None;
+    }
+    let mut at = 2_usize;
+    for _ in 0..256 {
+        if *bytes.get(at)? != 0xFF {
+            return None;
+        }
+        let marker = *bytes.get(at + 1)?;
+        // Start of frame, any process, except the three codes that are not frames.
+        if (0xC0..=0xCF).contains(&marker) && !matches!(marker, 0xC4 | 0xC8 | 0xCC) {
+            return Some(be16(at + 5)?.saturating_mul(be16(at + 7)?));
+        }
+        at = at
+            .checked_add(2)?
+            .checked_add(usize::try_from(be16(at + 2)?).ok()?)?;
+    }
+    None
+}
+
 impl Default for DecodeLimits {
     fn default() -> Self {
         Self::tier2()
@@ -145,4 +200,37 @@ pub fn check_dimensions(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod declared_tests {
+    use super::*;
+
+    #[test]
+    fn a_large_image_is_given_time_in_proportion_and_no_more_than_a_minute() {
+        let base = DecodeLimits::tier1();
+        assert_eq!(base.for_pixels(2_000_000).timeout_ms, base.timeout_ms);
+        assert_eq!(base.for_pixels(45_000_000).timeout_ms, 18_000);
+        assert_eq!(base.for_pixels(u64::MAX).timeout_ms, 60_000);
+        assert_eq!(base.for_pixels(45_000_000).max_pixels, base.max_pixels);
+    }
+
+    #[test]
+    fn declared_pixels_reads_the_header_and_refuses_what_it_cannot() {
+        let rgb = crate::codec::Rgb8 {
+            width: 40,
+            height: 30,
+            data: vec![128; 40 * 30 * 3],
+        };
+        let jpeg = crate::codec::encode_jpeg(&rgb, 80).expect("jpeg");
+        assert_eq!(declared_pixels(&jpeg), Some(1_200));
+        let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        png.extend_from_slice(&7_000_u32.to_be_bytes());
+        png.extend_from_slice(&5_000_u32.to_be_bytes());
+        assert_eq!(declared_pixels(&png), Some(35_000_000));
+        assert_eq!(declared_pixels(b"II*\0"), None);
+        assert_eq!(declared_pixels(&[0xFF, 0xD8, 0xFF]), None);
+        assert_eq!(declared_pixels(&[0xFF, 0xD8, 0xFF, 0xE0, 0xFF, 0xFF]), None);
+    }
 }

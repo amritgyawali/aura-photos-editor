@@ -95,33 +95,77 @@ pub(crate) fn retouch_with_cancel(
 
 // Both online and offline automation must enable visible body healing. Keep
 // protection and texture defaults together so the two paths cannot drift.
+//
+// The finish is the one calibrated per detail band against published retouching of the same
+// photographs (ADR-0118): very little smoothing, pores refined rather than blurred, no
+// dodge and burn. It is what Portrait skin finish applies, with one difference that is not
+// a matter of finish: freckles and dark marks are kept. Removing them is a decision about
+// somebody's face, and one click is not that decision; the preset is.
 pub(crate) fn fresh_skin_options(
     advice: Option<&aura_cloud::skin_advice::Advice>,
 ) -> crate::portrait_features::Options {
     let mut settings = crate::retouch_settings::Settings {
         deep_blemish_cleanup: true,
-        smoothing: 0.15,
-        body_smoothing: 0.15,
-        body_blemishes: 0.75,
-        texture: 0.85,
-        frequency_heal: 0.75,
-        max_spots: 512,
         keep_freckles: true,
         remove_dark_marks: false,
+        max_spots: 900,
+        blemish_sensitivity: 1.0,
+        frequency_heal: 1.0,
+        cleanup_passes: 4,
+        smoothing: 0.05,
+        texture: 0.9,
+        pore_refine: 0.8,
+        tone_evenness: 0.6,
+        light_evenness: 0.1,
+        micro_dodge_burn: 0.0,
+        shine: 0.35,
+        redness: 0.5,
+        dark_circles: 0.75,
+        body_smoothing: 0.25,
+        body_tone: 0.35,
+        match_body_to_face: 0.25,
+        body_shine: 0.25,
+        body_redness: 0.3,
+        body_blemishes: 1.0,
         ..crate::retouch_settings::Settings::default()
     };
     if let Some(advice) = advice {
-        settings.cleanup_passes = advice.cleanup_passes;
-        settings.blemish_sensitivity = advice.blemish_sensitivity;
-        settings.frequency_heal = advice.frequency_heal;
-        settings.pore_refine = advice.pore_refine;
+        // A model says how hard to look for marks on this skin, within limits: it reads a
+        // small preview, and "the skin looks clean" from there has meant leaving marks a
+        // full-size render shows. How texture is handled is the calibrated finish's.
+        settings.cleanup_passes = advice.cleanup_passes.clamp(2, 4);
+        settings.blemish_sensitivity = advice.blemish_sensitivity.clamp(0.5, 1.0);
     }
+    crate::portrait_features::Options {
+        scope: crate::portrait_features::Scope::FaceAndBody,
+        eyes: true,
+        teeth: false,
+        refine: true,
+        settings,
+        ..crate::portrait_features::Options::default()
+    }
+}
+
+/// What one click applied before the finish was calibrated. A photograph retouched then
+/// still carries these, and they were never anybody's choice.
+fn earlier_skin_options() -> crate::portrait_features::Options {
     crate::portrait_features::Options {
         scope: crate::portrait_features::Scope::FaceAndBody,
         eyes: false,
         teeth: false,
         refine: false,
-        settings,
+        settings: crate::retouch_settings::Settings {
+            deep_blemish_cleanup: true,
+            smoothing: 0.15,
+            body_smoothing: 0.15,
+            body_blemishes: 0.75,
+            texture: 0.85,
+            frequency_heal: 0.75,
+            max_spots: 512,
+            keep_freckles: true,
+            remove_dark_marks: false,
+            ..crate::retouch_settings::Settings::default()
+        },
         ..crate::portrait_features::Options::default()
     }
 }
@@ -147,6 +191,7 @@ pub(crate) fn has_custom_skin_preferences(base: &aura_recipe::Recipe) -> bool {
                     encoded
                         != serde_json::to_value(crate::portrait_features::Options::default()).ok()
                         && encoded != serde_json::to_value(fresh_skin_options(None)).ok()
+                        && encoded != serde_json::to_value(earlier_skin_options()).ok()
                 })
             })
 }
@@ -204,6 +249,41 @@ pub fn status(state: &AppState) -> AuraResult<Status> {
     })
 }
 
+/// The file a photographer keeps their provider addresses and keys in.
+const CONFIG_NAME: &str = "AI-CONFIG.md";
+
+/// Where that file is looked for, first match wins.
+///
+/// `AURA_AI_CONFIG_FILE` names one file and nothing else is tried: an explicit choice is not
+/// second-guessed, and an isolated test never picks up somebody's real keys. Otherwise it is
+/// `AI-CONFIG.md` in the folder AURA was started from, then beside the application or in one
+/// of the few folders above it, which is where it sits both for a build inside a checkout and
+/// for an installed copy, and last the original fixed location.
+fn config_candidates(
+    explicit: Option<std::ffi::OsString>,
+    started_in: Option<std::path::PathBuf>,
+    application: Option<std::path::PathBuf>,
+) -> Vec<std::path::PathBuf> {
+    if let Some(explicit) = explicit {
+        return vec![std::path::PathBuf::from(explicit)];
+    }
+    let mut found: Vec<std::path::PathBuf> = Vec::new();
+    found.extend(started_in.map(|folder| folder.join(CONFIG_NAME)));
+    if let Some(application) = application {
+        found.extend(
+            application
+                .ancestors()
+                .skip(1)
+                .take(5)
+                .map(|folder| folder.join(CONFIG_NAME)),
+        );
+    }
+    found.push(std::path::PathBuf::from(
+        r"D:\AI-Company\HERMES-AI-CONFIG.md",
+    ));
+    found
+}
+
 /// Import the supplied local file on startup and refresh discovery once daily.
 /// The environment override is useful for another machine or an isolated test.
 /// # Errors
@@ -221,13 +301,22 @@ pub fn initialize(state: &AppState, refresh: bool) -> AuraResult<Status> {
     if !refresh && previous.source_available && previous.checked_day == day {
         return Ok(previous);
     }
-    let path = std::env::var_os("AURA_AI_CONFIG_FILE").map_or_else(
-        || std::path::PathBuf::from(r"D:\AI-Company\HERMES-AI-CONFIG.md"),
-        std::path::PathBuf::from,
-    );
-    if !path.is_file() {
+    // Only the desktop application looks beside itself. A test binary or a command-line tool
+    // built in the same checkout sits just as close to a photographer's real key file, and
+    // must never import it or call a provider with it because of where it was built.
+    let desktop = std::env::current_exe().ok().filter(|application| {
+        application
+            .file_stem()
+            .is_some_and(|name| name == "aura-desktop")
+    });
+    let started_in = desktop.as_ref().and_then(|_| std::env::current_dir().ok());
+    let Some(path) =
+        config_candidates(std::env::var_os("AURA_AI_CONFIG_FILE"), started_in, desktop)
+            .into_iter()
+            .find(|path| path.is_file())
+    else {
         return Ok(previous);
-    }
+    };
     let bytes = std::fs::metadata(&path)
         .map_err(|_| payload_refused("Could not inspect AI configuration file"))?
         .len();
@@ -369,6 +458,43 @@ pub fn authorize_new_project(state: &AppState, project: &str) -> AuraResult<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_provider_file_is_looked_for_beside_the_work_before_the_fixed_location() {
+        use std::path::PathBuf;
+        let found = config_candidates(
+            None,
+            Some(PathBuf::from("work")),
+            Some(
+                [
+                    "studio",
+                    "target",
+                    "desktop-launch",
+                    "debug",
+                    "aura-desktop.exe",
+                ]
+                .iter()
+                .collect(),
+            ),
+        );
+        assert_eq!(
+            found.first(),
+            Some(&PathBuf::from("work").join(CONFIG_NAME))
+        );
+        // A build four folders down inside a checkout finds the checkout's own file.
+        assert!(found.contains(&PathBuf::from("studio").join(CONFIG_NAME)));
+        assert_eq!(
+            found.last(),
+            Some(&PathBuf::from(r"D:\AI-Company\HERMES-AI-CONFIG.md"))
+        );
+        // An explicit file is the only one tried, so a test never reads real keys.
+        let explicit = config_candidates(
+            Some("chosen.md".into()),
+            Some(PathBuf::from("work")),
+            Some(PathBuf::from("studio/aura-desktop.exe")),
+        );
+        assert_eq!(explicit, vec![PathBuf::from("chosen.md")]);
+    }
     #[test]
     fn repeated_ratings_replace_one_record_and_remain_project_scoped() {
         assert_eq!(

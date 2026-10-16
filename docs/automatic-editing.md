@@ -21,6 +21,18 @@ photo saves nothing new.
 
 ### Every photo gets its own settings
 
+Skin sampling separates smooth directional light from fine texture before choosing smoothing
+strength. A lit cheek is therefore not treated as rougher skin merely because its brightness
+changes across the sample. The original brightness and skin colour are kept for the other decisions.
+
+When a connected vision model proposes an edit, AURA also bounds white balance, tint, vibrance
+and saturation around its measurement of the original. The explanation shows any values that
+were limited. Repeating the same proposal does not accumulate a white-balance shift.
+
+Batch progress has one shared monitor across workspaces. If a status request fails, the saved
+progress and Stop control remain available while AURA retries. After three failed requests,
+press **Retry status** to reconnect. Completed edits remain saved throughout.
+
 Before a face is retouched AURA measures it: how large it is in the frame, how even its skin
 texture and colour are, how directional the light is, how much of it is shiny, how many small
 marks it has, and how noisy the frame is. The retouch settings you chose are then turned up
@@ -68,15 +80,38 @@ and each body operation has an ordinary brush mask you can erase.
   brightest tones stop more than half a stop short of white and the frame is not a night
   scene, it is lifted by most of that room, at most one stop. With people in frame the lift
   stops before any face would clip; without people it is smaller.
-- The faces: skin at or near clipping is overexposure whatever else is in the frame, and is
-  brought back by 0.2 to 0.7 EV. A subject already brighter than a bright frame around it is
-  a low-key portrait and keeps its mood.
+- The faces: with people in the frame, how bright the rest of it is says nothing about them,
+  so the histogram on its own never moves their exposure. Skin at or near white on 6% of a
+  face is overexposure whatever else is in the frame, and is brought back by 0.2 to 0.7 EV. A subject already brighter than a bright frame around it is
+  a low-key portrait and keeps its mood. A dark complexion in a dark room is not lightened
+  because the room is dark - but when the brightest things in the frame are not the people
+  (a shirt, a blanket, a page, a wall) and they are still well short of white, the whole
+  frame was exposed too low, and it is lifted.
+- A photograph whose very brightest tones already come near white is exposed correctly,
+  however dark its midtones are. Its exposure is not lifted, and its shadows only lightly.
+
+**Highlights** come down only as far as something says detail was lost: the people's skin
+when there are people, how much of the frame sits at white when there are not, and an open
+sky is left to the histogram. A white blanket, a dress or a studio wall is the photograph's
+own brightness, and lowering it only turns it grey.
+
+**A veiled frame** - haze, flare, a flat picture profile, a scan of a faded print - lifts its
+blacks and lowers its whites together, and no slider takes that off. When the darkest tones
+sit above about a sixth of the range and the brightest stop short of white, AURA sets the
+black and white points on every colour channel alike, which puts back contrast and colour
+together without moving the white balance. A lifted black on its own is a matte or soft
+finish and is left to the photograph; so is a top that never reaches white in a frame whose
+blacks are black.
 
 **White balance** is corrected only when independent readings agree: the near-neutral areas,
 the average colour of edges, and the brightest unclipped tones. If the brightest tones are
-neutral, the light is neutral and the colour elsewhere belongs to the scene. A cast is removed
-only when all three show it - most of it, and a little less of a strong one, so warm rooms
-stay warm. When only the first two agree, the colour is kept: one large coloured surface - a
+neutral, the light is neutral and the colour elsewhere belongs to the scene. From a camera file the colour is the camera's guess rather than anybody's choice, so a
+smaller cast is corrected, a smaller neutral area will do, and under mixed light the whites
+may settle which of the other two readings to follow. A cast is removed in a finished
+photograph only when all three show it, and only the part of it beyond what a finished
+photograph carries by choice: a warm backdrop, a cool studio grey and the hour all read as a faint cast,
+and a faint cast is left alone. What is left after a correction is as much colour as a
+choice would be, so warm rooms stay warm. When only the first two agree, the colour is kept: one large coloured surface - a
 pink backdrop, a painted wall, golden-hour light - moves both of them the same way. A strong
 colour with no people in frame is kept as the light's mood, and so is a toned monochrome.
 
@@ -84,6 +119,11 @@ What this cannot know: a blouse that is pale pink rather than white, a wall that
 rather than lit warm, or a matte look that keeps its whites low on purpose. When such a
 surface is the brightest neutral thing in the frame, it is read as light and corrected. Check
 coloured backdrops and deliberate looks before delivery.
+
+**Skin**, when one click retouches it, gets the finish calibrated against published
+retouching of the same photographs: very little smoothing, pores refined rather than
+blurred, marks and blemishes healed, and freckles and dark marks kept. Removing those is a
+decision about somebody's face; the **Portrait skin finish** preset makes it when you ask.
 
 ## Going back and editing by hand
 
@@ -110,3 +150,22 @@ coloured backdrops and deliberate looks before delivery.
   skin retouch only, not blemish, eye or teeth finishing.
 - The measurements can be wrong on unusual images — a red birthmark, stage lighting, heavy
   make-up. Every result is a proposal you can undo.
+
+## The finishing look
+
+After the corrections, Auto enhance adds the part of an edit a photographer adds to a photograph
+that has nothing wrong with it: a little depth, richer colour where the colour is dull, and a light
+warm-highlight, cool-shadow split. None of it is a preset. Each amount is measured from the
+photograph in front of it, so a flat haldi frame, a dark night procession and a vivid stage under
+coloured lights each get a different finish, and a frame that already has all three gets almost
+none.
+
+Skin is measured through the look before it is kept: the colour changes are tried on the faces in
+the frame, and scaled back until the skin moves by less than you could see side by side. Orange,
+the band skin of every tone falls in, is never pushed. Every value lands in the ordinary curve,
+HSL, vibrance and colour grading controls, in the same undoable "Light & colour" step, so you can
+see it, change it or take it out.
+
+Colourful clothing and decor are not treated as a colour cast. When the colour every estimate
+reads lines up with what fills the frame - pink saris, a pale pink wall, a crowd in yellow - the
+white balance is left as it was shot.

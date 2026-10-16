@@ -95,6 +95,7 @@ pub fn apply_with_mattes(
     edits: &[Edit],
     mattes: &BTreeMap<String, Matte>,
 ) {
+    let _t = crate::perf::step("render.retouch_stack");
     apply_observed(rgb, width, height, edits, mattes, None);
 }
 
@@ -138,6 +139,7 @@ pub(crate) fn apply_resumed(
     start: usize,
     before: &[f32],
 ) {
+    let _t = crate::perf::step("render.retouch_stack (resumed)");
     if before.len() != rgb.len() {
         return;
     }
@@ -172,7 +174,10 @@ fn apply_from(
     // The frame before any operation ran: the given one when resuming, else this buffer as
     // it is now. Only read here, before the first operation writes.
     let before: &[f32] = before.unwrap_or(&*rgb);
-    let planes = matte_planes(before, width, height, edits, mattes);
+    let planes = {
+        let _t = crate::perf::step("retouch.matte_planes");
+        matte_planes(before, width, height, edits, mattes)
+    };
     // A texture graft measures the texture the skin had from the frame as it is now, before
     // any operation has run - not from whatever the operations before it left behind.
     let capture =
@@ -194,7 +199,10 @@ fn apply_from(
                 })
                 .collect()
         };
-    let mut references = capture(before, false);
+    let mut references = {
+        let _t = crate::perf::step("retouch.texture_capture");
+        capture(before, false)
+    };
     let mut selections: BTreeMap<String, Coverage> = BTreeMap::new();
     for edit in edits
         .iter()
@@ -221,7 +229,10 @@ fn apply_from(
         let Some(coverage) = memo_key
             .as_ref()
             .and_then(|key| selections.get(key).cloned())
-            .or_else(|| coverage_of(edit, width, height, rgb, &planes))
+            .or_else(|| {
+                let _t = crate::perf::step("retouch.coverage");
+                coverage_of(edit, width, height, rgb, &planes)
+            })
         else {
             continue;
         };
@@ -253,6 +264,7 @@ fn apply_from(
                 }
             }
         }
+        let _t = crate::perf::step(tool_label(edit.tool));
         if matches!(
             edit.tool,
             Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
@@ -262,6 +274,8 @@ fn apply_from(
             crate::retouch_reshape::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::PatchHeal {
             crate::retouch_heal::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::StretchMarks {
+            crate::retouch_striae::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::FrequencyHeal {
             crate::retouch_clear::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::AcneClear {
@@ -293,6 +307,22 @@ fn apply_from(
                 .is_none_or(|matte| matte.refine_edges);
             apply_one(rgb, width, height, edit, &coverage, None, refine_edges);
         }
+    }
+}
+
+/// The name a tool's time is recorded under when `AURA_PERF=1`.
+fn tool_label(tool: Tool) -> &'static str {
+    match tool {
+        Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn => "retouch.skin",
+        Tool::Reshape => "retouch.reshape",
+        Tool::PatchHeal => "retouch.patch_heal",
+        Tool::StretchMarks => "retouch.striae",
+        Tool::FrequencyHeal => "retouch.frequency_heal",
+        Tool::AcneClear => "retouch.acne",
+        Tool::TextureGraft => "retouch.texture",
+        Tool::AutoBlemish => "retouch.auto_blemish",
+        Tool::UnderEye => "retouch.under_eye",
+        _ => "retouch.local",
     }
 }
 
@@ -407,45 +437,6 @@ fn apply_one(
             | Tool::EyeDetail
             | Tool::UnderEye
     );
-    let mut narrow = Vec::new();
-    let mut wide = Vec::new();
-    let mut fine = Vec::new();
-    let separate_pores = edit.tool == Tool::Frequency && edit.preserve_microtexture;
-    // A protected surface finish averages only selected skin. Hair, lips and eyes
-    // must not darken the blur near its boundary or be selected by a colour gate.
-    let weights: Option<Vec<f32>> = (!refine_matte_edges).then(|| {
-        (by..by + bh)
-            .flat_map(|y| (bx..bx + bw).map(move |x| coverage.at(x, y, w, h)))
-            .collect()
-    });
-    let weighted_blur = |plane: &[f32], r: usize| {
-        if let Some(weights) = &weights {
-            let values: Vec<_> = plane.iter().zip(weights).map(|(v, a)| v * a).collect();
-            let values = crate::bands::blur(&values, bw, bh, r);
-            let blurred_weights = crate::bands::blur(weights, bw, bh, r);
-            values
-                .iter()
-                .zip(blurred_weights)
-                .zip(plane)
-                .map(|((v, a), old)| if a > 1e-5 { v / a } else { *old })
-                .collect()
-        } else {
-            crate::bands::blur(plane, bw, bh, r)
-        }
-    };
-    if needs_bands {
-        for c in 0..3 {
-            let plane: Vec<f32> = (by..by + bh)
-                .flat_map(|y| (bx..bx + bw).map(move |x| (y * w + x) * 3 + c))
-                .map(|i| rgb[i])
-                .collect();
-            narrow.push(weighted_blur(&plane, radius));
-            wide.push(weighted_blur(&plane, radius * 3));
-            if separate_pores {
-                fine.push(weighted_blur(&plane, (radius / 5).max(1)));
-            }
-        }
-    }
     let center = sample(rgb, w, h, [cx, cy]);
     let mut source = edit.source;
     if edit.tool == Tool::Heal && source.is_none() {
@@ -491,6 +482,75 @@ fn apply_one(
                 | Tool::BackgroundColor
         ))
     .then_some(donor_mean);
+    let mut narrow = Vec::new();
+    let mut wide = Vec::new();
+    let mut fine = Vec::new();
+    let separate_pores = edit.tool == Tool::Frequency && edit.preserve_microtexture;
+    // How much of the operation a pixel far darker than the region's own reference takes: a
+    // matte is coarser than a lash or a beard hair, and those are never worked on.
+    let guard = |p: [f32; 3]| {
+        guard_reference.map_or(1.0, |reference| {
+            let ratio = luma(p) / luma(reference).max(1e-6);
+            let t = ((ratio - 0.3) / 0.2).clamp(0.0, 1.0);
+            t * t * (3.0 - 2.0 * t)
+        })
+    };
+    // Every band averages only what the operation selects. Hair, lips, eyes and whatever
+    // lies beyond a segmented edge must not colour the blur beside them: a plain blur there
+    // moves the tone of the skin along the whole outline of a face, which reads as a pale
+    // rim round the jaw and a shadow under the lip that the photograph never had.
+    let weights: Vec<f32> = if needs_bands {
+        (by..by + bh)
+            .flat_map(|y| (bx..bx + bw).map(move |x| (x, y)))
+            .map(|(x, y)| {
+                let cover = coverage.at(x, y, w, h);
+                if cover > 0.0 {
+                    cover * guard(pixel(rgb, w, x, y))
+                } else {
+                    0.0
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let weighted_blur = |plane: &[f32], r: usize| -> Vec<f32> {
+        let values: Vec<_> = plane.iter().zip(&weights).map(|(v, a)| v * a).collect();
+        let values = crate::bands::blur(&values, bw, bh, r);
+        let blurred_weights = crate::bands::blur(&weights, bw, bh, r);
+        values
+            .iter()
+            .zip(blurred_weights)
+            .zip(plane)
+            .map(|((v, a), old)| if a > 1e-5 { v / a } else { *old })
+            .collect()
+    };
+    // Where the wide band leans further inward than the narrow one, their difference holds
+    // the photograph's own shading as well as the band. That share is taken back out of the
+    // wide band, so evening runs right up to a jaw or a lip without flattening either.
+    if needs_bands {
+        let near = crate::retouch_planes::Lean::new(&weights, bw, bh, radius, crate::bands::blur);
+        let far =
+            crate::retouch_planes::Lean::new(&weights, bw, bh, radius * 3, crate::bands::blur);
+        for c in 0..3 {
+            let plane: Vec<f32> = (by..by + bh)
+                .flat_map(|y| (bx..bx + bw).map(move |x| (y * w + x) * 3 + c))
+                .map(|i| rgb[i])
+                .collect();
+            narrow.push(weighted_blur(&plane, radius));
+            let mut broad = weighted_blur(&plane, radius * 3);
+            if edit.tool != Tool::Backdrop {
+                let shading = far.shading_between(&near, &broad, bw, bh);
+                for (value, leaked) in broad.iter_mut().zip(shading) {
+                    *value -= leaked;
+                }
+            }
+            wide.push(broad);
+            if separate_pores {
+                fine.push(weighted_blur(&plane, (radius / 5).max(1)));
+            }
+        }
+    }
     // Match donor tone to a ring outside the target, not to the blemish itself.
     let mut ring = [0.0; 3];
     let mut ring_n = 0.0;
@@ -518,13 +578,7 @@ fn apply_one(
                 if a <= 0.0 {
                     continue;
                 }
-                if let Some(reference) = guard_reference {
-                    // A matte is coarser than a lash or a beard hair; never work on pixels far
-                    // darker than the region's own reference.
-                    let ratio = luma(pixel(rgb, w, x, y)) / luma(reference).max(1e-6);
-                    let t = ((ratio - 0.3) / 0.2).clamp(0.0, 1.0);
-                    a *= t * t * (3.0 - 2.0 * t);
-                }
+                a *= guard(pixel(rgb, w, x, y));
                 if a <= 0.0 {
                     continue;
                 }
@@ -561,17 +615,27 @@ fn apply_one(
                     }
                     Tool::Frequency | Tool::Wrinkle | Tool::Fabric => {
                         let amount = if edit.tool == Tool::Wrinkle { 0.5 } else { 1.0 };
+                        // Blotchy skin differs from the skin around it by a few per cent; a
+                        // lip edge, a nostril or a fold by a fifth or more. Evening the second
+                        // spreads a shadow under the lip and beside the nose that is not there.
+                        let structure = if edit.tool == Tool::Frequency {
+                            let step = (luma(broad) - luma(low)).abs() / luma(low).max(1e-5);
+                            1.0 - crate::retouch_planes::smoothstep(0.05, 0.15, step)
+                        } else {
+                            1.0
+                        };
+                        let tone = edit.tone * structure;
                         for c in 0..3 {
                             value[c] = if separate_pores {
                                 // Keep the real fine-detail band while attenuating larger
                                 // irregularities. Both corrections have zero response to
                                 // constant colour and preserve broad face illumination.
-                                old[c] + edit.tone * (broad[c] - low[c])
-                                    - edit.tone * 0.8 * (fine[c][i] - low[c])
+                                old[c] + tone * (broad[c] - low[c])
+                                    - tone * 0.8 * (fine[c][i] - low[c])
                                     + (edit.texture - 1.0) * (old[c] - fine[c][i])
                             } else {
                                 old[c]
-                                    + edit.tone * amount * (broad[c] - low[c])
+                                    + tone * amount * (broad[c] - low[c])
                                     + (edit.texture - 1.0) * (old[c] - low[c])
                             };
                         }
@@ -658,6 +722,7 @@ fn apply_one(
                     | Tool::AcneClear
                     | Tool::TextureGraft
                     | Tool::AutoBlemish
+                    | Tool::StretchMarks
                     | Tool::SkinSmooth
                     | Tool::SkinUniformity
                     | Tool::PortraitDodgeBurn => {}

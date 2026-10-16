@@ -2,6 +2,189 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## A different look on every photograph, a live status bar, and a folder run in two hours rather than eight - 2026-10-16
+
+- **Every photograph gets its own finishing look** (ADR-0123): tone curve, colour bands, vibrance
+  and split tone measured from the frame, with the skin in it simulated through the look and held
+  within 1.5 dE. Scene colour (saris, painted walls, stage light) is no longer read as a cast, and
+  a colour-channel clipping guard stops brightening from flattening saturated backdrops.
+- **A status bar says what the app is doing**, every second: each running job, its photo, its
+  step, done of total, elapsed time and how many image workers are busy.
+- **Folder runs and exports use the whole machine.** Photographs are analysed, edited and
+  rendered several at a time (four on a 12-thread machine, `AURA_IMAGE_WORKERS` to override),
+  and export renders ahead of the writer so the disk and the processor work at the same time.
+  Results are identical with one worker or eight.
+- **Much less arithmetic per photograph** (ADR-0123 section 10): the interpreter's convolutions
+  are parallel by work and run 1x1 layers as a blocked matrix product (segmentation 912 ms to
+  257 ms an inference, bit-identical); box blurs keep every core busy on tall faces; clarity's
+  blur is vectorised (bit-identical); frequency healing on a large face finds marks on a coarser
+  grid while keeping pores at full resolution (2.2 MP face: 3.1 s to 0.4 s, held to the exact
+  result by a test).
+- **Measured on 1,000 Indian wedding photographs in the real app** (optimised build, 12-thread
+  i7-8700, no AI): import 50 s, analysis 70 s, edit and retouch 29 min, export 89 min - 2 h 1 min
+  in all, against 7-8 hours before. 1,000 of 1,000 JPEGs were written and read back verified.
+  The one-hour goal is not met: full-length portraits spend about 11 s each healing body skin at
+  full resolution, which is the next thing to make faster.
+- **Camera files this build cannot decode at full size** (Canon CR2) are edited from their
+  embedded preview and then named and left out of the delivery, instead of failing the run.
+
+## Qualified automatic GPU output - 2026-10-14
+
+- Edited previews, live previews and whole-frame exports can use a qualified hardware GPU
+  for highlight roll-off, gamut conversion, display encoding and quantization.
+- Startup qualification checks actual shader colour and transfer-inclusive speed. Small
+  frames, absent/slower hardware and failed devices use the CPU reference automatically.
+- Reused row-stripe buffers bound GPU scratch to 72 MiB. GPU identities include the adapter,
+  driver and measured crossover; CPU and GPU preview caches remain separate.
+- `AURA_DISABLE_GPU=1` forces CPU output. The renderer reports actual GPU execution and
+  diagnostics instead of claiming the build has no GPU backend. ADR-0122 records evidence.
+
+## Measured colour, natural skin sampling and batch recovery - 2026-10-14
+
+- AI white balance, tint and colour refinements are bounded around original-pixel measurements,
+  with requested and accepted values recorded in the reasons. Manual settings remain protected.
+- Skin samples remove a smooth lighting plane from the texture measurement, so directional
+  light does not increase automatic smoothing. Colour and contamination checks are retained.
+- The shell owns a single batch-status poll. Transient errors keep the cancellation handle,
+  last progress and busy lock; bounded retries and a Retry status control reconnect monitoring.
+- Regression evidence and limits are recorded in ADR-0121. These changes do not establish
+  superiority over Evoto or add trained models to the placeholder analysis stages.
+
+## The measurement decides, the AI refines; camera files and iPhone photos - 2026-10-14
+
+- **AI proposals start from AURA's measurement.** Tested on 22 photographs and the same frames
+  overexposed, the vision models asked to darken good and overexposed photos about equally
+  often; the measurement told them apart. A model now moves exposure at most 0.15 EV from what
+  the measurement found, so "leave it" no longer undoes a detected overexposure.
+- **Camera files get the base contrast every rendering of one carries** (+15) when nothing asks
+  for more. Checked on real camera files with a professional's finished version: better on
+  the 16 used before and on 12 new ones.
+- **iPhone HEIC photos are refused with a message that says what to do** (`AURA-RAW-2009`:
+  export as JPEG, or set the camera to Most Compatible) instead of "not a photo".
+- The pair harness records a file it cannot open and continues; `aura-raw`'s `probe_file`
+  test prints the decoder's own reason for one file.
+- Final check on 30 photographs nothing had seen: 2815 untouched, 1826 after. ADR-0120
+  section 6, which also lists what is still weak.
+
+## Exposure on evidence, and any size of file - 2026-10-14
+
+- **Finished portraits are left at the exposure they were given.** With people in the frame
+  the histogram alone no longer moves exposure; skin near white or a frame whose brightest
+  non-skin tones stop well short of white does. Unchanged photographs on a held-out set of 22
+  now move 1.7 on average, from 3.4.
+- **Large files open.** JPEG, PNG and TIFF decodes are given time in proportion to their
+  size (a 35-megapixel JPEG had failed as "took too long to open"), and the image decoder is
+  optimised in development builds as the desktop shell already had it.
+- Measured: held-out 2020 untouched to 1124 (1233 before), real camera files against an
+  expert 300 to 212 (220), ten other subjects 937 to 547 (588), the six published pairs 680
+  to 444 (411; one underexposed newborn moved back). Eleven awkward files - tiny, 35 MP,
+  panorama, greyscale, transparent, 16-bit, CMYK, black, white, flat, noise - all edit and
+  render. ADR-0120 section 5.
+
+## Auto edit across shooting conditions, and the calibrated finish in one click - 2026-10-14
+
+- **Flat and veiled photographs get their black and white points back**, on every colour
+  channel alike, so contrast and colour return together. Over the flat variants of the six
+  published pairs the error against the finished photograph fell from 158.6 to 60.0 (it was
+  worse than doing nothing before).
+- **Highlights come down only where detail was lost**: a white blanket, dress or studio wall
+  is no longer greyed.
+- **Underexposed portraits are lifted** when a neutral shirt, page or wall is brighter than the
+  people and well short of white; a dark complexion in a dark room still is not.
+- **Camera files get their white balance corrected more readily** than finished photographs:
+  a camera's guess is nobody's choice, and under mixed light the whites settle which reading
+  to follow.
+- **A faint colour is the photograph's own.** Casts up to a measured size are kept, and a
+  larger one is reduced by the part beyond it; a cool studio group no longer moves 600 K.
+- **Dark but finished photographs are not brightened** once their brightest tones reach near
+  white, and frames with nothing white in them are not stretched to fill the range.
+- **One click retouches with the calibrated Portrait skin finish**, keeping freckles and dark
+  marks. A vision model's skin advice now sets only how hard marks are looked for.
+- Measured in seven conditions (`scripts/make-condition-variants.py`, harness mode `light`):
+  the published pairs 680 untouched to 411, ten other subjects 937 to 588, and 22 held-out
+  photographs nothing was tuned on 2020 to 1233. On ten real camera files from MIT-Adobe
+  FiveK, against a professional's finished version, 300 to 220. A clipped skin channel was
+  tried as an overexposure witness and dropped when the held-out set showed it darkening
+  correctly exposed bright portraits. ADR-0120 lists what is still weak.
+
+## AI providers from your own file, checked before they are used - 2026-10-14
+
+- **`AI-CONFIG.md` beside the project is imported.** AURA looks for it in the folder it was
+  started from, beside the application and in the folders above, before the original fixed
+  path. Only the desktop application looks; tests and tools never read a real key file. The
+  file is in `.gitignore`.
+- **A photo route is offered only after it read a test picture.** Each image-capable route
+  is shown a generated yellow-and-blue card at import and must name the colours within 15
+  seconds. The settings now say why a route is not used (the provider did not accept this
+  key, over its quota today, did not answer in time) instead of "catalogue ready". With a
+  real file of eleven providers, seven routes were listed as available and none answered;
+  after the check, three are offered and they answer. No photograph is sent to check a
+  provider.
+- **Two image models the catalogues do not declare** are recognised: Llama 3.2 11B vision
+  on NVIDIA's endpoint and Qwen 3.8 27B on Groq's. Up to three alternatives are tried when
+  the configured model does not read images.
+- **A failed route rests for as long as its failure says:** the provider's own pause when
+  rate limited, ten minutes when it did not answer or its answer could not be used.
+- **When no AI answers, Auto edit is AURA's own measured correction.** The stand-in it
+  replaced aimed every photograph at middle grey and darkened bright studio frames by up
+  to three quarters of a stop (error against the finished photograph 2.3 to 29.1 on one).
+- **A model's proposal is held to the photograph.** It goes through the same face and
+  intent guards as AURA's own measurement, and a change of exposure is taken only as far
+  as that measurement agrees, plus 0.15 EV. The reasons say when a proposal was adjusted.
+- Live in the desktop window with real providers (`scripts/test-ai-config-gui.py`): five
+  of six photographs graded by a model, five retouches using a model's skin advice, no
+  grade leaving a photograph more than 4 further from its finished version. ADR-0119.
+
+## One grid row per photograph, including copied and renamed files - 2026-10-14
+
+- Identical file copies no longer repeat a photograph in the grid or inflate the automatic
+  run's image count. Timeline and filename sorting page over unique photographs.
+- The grid and renderer prefer the recorded original while it is available, then an available
+  copy if the original was renamed or disconnected. Missing files remain in the catalogue.
+- The desktop reference audit waits for Undo's saved recipe rather than assuming it completes
+  within three seconds, avoiding a false failure behind a full-quality render.
+
+## Stretch marks, moles kept, and a skin finish that leaves texture - 2026-10-13
+
+- **Stretch marks** are evened out of body skin by a filter that flows across a mark and is
+  stopped by structure: hands, a navel, knuckle creases and the hem of a garment stay as they
+  are. Off unless the new Stretch marks control or the **Body skin finish** preset turns it on.
+- Body skin entirely enclosed by a body's own skin joins the selection even where the
+  segmenter is sure it is an object, so a marked abdomen is selected whole.
+- **Keep moles** (on by default): a dark, crisp-edged mark is left alone by healing, while
+  freckles, inflamed spots and the diffuse marks old spots leave are still healed. On body
+  skin every pigment-dark patch is kept, which is what keeps a navel.
+- Spot repairs are refused where the skin around them is not plain. A flat patch across a
+  nasolabial fold, a smeared corner of a mouth and a blue-grey streak beside a nose are gone.
+  The spot threshold is never under a multiple of the skin's own spread.
+- With dark marks being removed, frequency healing reaches the cheek below an eye. Lids and
+  inner corners stay protected.
+- **Portrait skin finish** is recalibrated per detail band: face smoothing 5%, light evenness
+  10%, micro dodge and burn off, pore refinement 80%. It was removing more texture than the
+  published results it was compared with; saved settings are not changed, the preset is.
+- **Keep the look as**: Choose finished reference with a name keeps the matched look as a
+  personal look, applied to other photos over their own measured correction.
+- `scripts/compare-reference-pairs.py` measures whether a pair is one frame instead of assuming
+  it. The published Events pair is aligned to 0.01 px; the earlier note that it is not was wrong,
+  as was the note that the published results are smoother overall. ADR-0118.
+
+## An untouched photo is the photo, and evening that respects a face's shading - 2026-10-13
+
+- A JPEG, a PNG and a rendered proxy are no longer tone-mapped a second time. With every
+  control at zero a white wall at 239 was delivered at 230; the untouched render is now
+  the file to within the 8-bit dither. Cached previews are invalidated by the engine string.
+- Skin evening, surface finish, dodge and burn average only what they select and take the
+  photograph's own shading back out at a selection's edge. The pale rim along a jaw and the
+  lifted shadow under a lip are gone; smoothing still runs right up to the hairline.
+- Body skin the segmenter was unsure of joins the body it sits in when it is that body's own
+  colour and no other label is sure of it. Body spot healing no longer re-paints the warm
+  side of an abdomen as a pale patch. Stretch marks are not removed.
+- Auto enhance keeps a white studio wall white when there are people in front of it.
+- A **Smooth portrait finish** preset softens forehead lines, crow's feet, smile lines and
+  under-eye bags on top of Portrait skin finish. Eyes, teeth and face shape are untouched.
+- `crates/aura-app/tests/reference_pairs.rs` and `scripts/compare-reference-pairs.py` run a
+  before/after pair through the native commands and score it without a window. ADR-0117.
+
 ## Collection cleanup settings and current studio integration - 2026-10-11
 
 - Apply cleanup settings to every photo in a collection with fresh native skin
