@@ -45,7 +45,7 @@ use aura_recipe::{
     retouch_tools::{self, Edit, Gradient, LuminanceRange, Selection, Tool},
     schema, EditSource, Recipe,
 };
-use aura_render::{FrameSource, RenderLevel};
+use aura_render::{retouch_tools as retouch_tools_render, FrameSource, RenderLevel};
 use aura_vision::portrait::PortraitFace;
 use std::collections::BTreeMap;
 
@@ -105,6 +105,11 @@ pub struct GlobalPlan {
     /// Set when the frame is black and white or toned; [`crate::adaptive_look`] then adds no
     /// colour to it.
     pub monochrome: Option<Monochrome>,
+    /// The lens's colour fringing as measured on the renderer's own frame, when there was one.
+    /// [`apply_fringing`] writes a correction it confirmed. ADR-0125.
+    pub fringing: Option<crate::lateral_ca::Fringing>,
+    /// A purple-fringe removal, when rims were measured along bright edges. ADR-0125.
+    pub defringe: Option<Edit>,
     pub white_balance: Option<(u32, i16)>,
     pub vibrance: i16,
     pub clarity: i16,
@@ -1296,9 +1301,40 @@ pub fn analyse_from(
                 }),
             }
         });
+    // Lateral chromatic aberration: measured in the working space the renderer corrects it in,
+    // so only on the renderer's own frame.
+    let fringing = frame
+        .filter(|f| f.kind == aura_render::InputKind::Working)
+        .map(|f| crate::lateral_ca::decide(&f.rgb, f.width as usize, f.height as usize));
+    if let Some(found) = &fringing {
+        decisions.push(found.sentence());
+    }
+    let defringe = frame
+        .filter(|f| f.kind == aura_render::InputKind::Working)
+        .and_then(|f| {
+            let (w, h) = (f.width as usize, f.height as usize);
+            let edit = defringe_edit();
+            let rims = retouch_tools_render::defringe_rims(&f.rgb, w, h, &edit);
+            let enough = (DEFRINGE_PER_MILLION * (w * h) as f32 / 1e6).max(DEFRINGE_FEWEST);
+            if (rims as f32) < enough {
+                if rims > 0 {
+                    decisions.push(format!(
+                        "Purple fringes: {rims} pixels along bright edges read as a lens's rim, too few to correct."
+                    ));
+                }
+                return None;
+            }
+            decisions.push(format!(
+                "Purple fringes removed: {rims} pixels on the dark side of bright edges ({:.2}% of the frame) take the colour of their calm surroundings; purple things and the glow of purple lights are kept.",
+                rims as f32 / (w * h) as f32 * 100.0
+            ));
+            Some(edit)
+        });
     GlobalPlan {
         kind,
         monochrome,
+        fringing,
+        defringe,
         white_balance,
         vibrance,
         clarity,
@@ -1491,6 +1527,86 @@ fn apply_global(recipe: &mut Recipe, tone: (f32, i16, i16, i16), plan: &GlobalPl
         g.noise.colour = colour;
         g.noise.detail = 50;
     }
+    apply_fringing(recipe, plan);
+}
+
+/// The automatic purple-fringe removal: a scene operation a person can weaken, disable or
+/// remove like any other. Green rims are left to a person, because the edge of every leaf
+/// against a bright sky is green too. ADR-0125.
+pub const DEFRINGE_ID: &str = "auto-scene-v1-defringe";
+/// How far from a bright area a rim may reach, as a share of the shorter side.
+const DEFRINGE_REACH: f32 = 0.003;
+/// Rim pixels per million of the frame, and in all, before the removal is proposed.
+const DEFRINGE_PER_MILLION: f32 = 40.0;
+const DEFRINGE_FEWEST: f32 = 80.0;
+
+fn defringe_edit() -> Edit {
+    Edit {
+        id: DEFRINGE_ID.to_owned(),
+        tool: Tool::Defringe,
+        enabled: true,
+        // The whole photograph, corners included: what "Select entire photo" selects.
+        region: [0.5, 0.5, 1.0, 1.0],
+        source: None,
+        amount: 1.0,
+        feather: 0.0,
+        radius: DEFRINGE_REACH,
+        source_scale: 1.0,
+        preserve_microtexture: false,
+        texture: 1.0,
+        texture_heal: false,
+        clean_ring_fit: false,
+        curved_heal: false,
+        heal_samples: Vec::new(),
+        texture_sources: Vec::new(),
+        repair_passes: None,
+        target_color: None,
+        sensitivity: None,
+        keep_dark_marks: false,
+        mole_edge: None,
+        tone: 0.5,
+        warmth: 1.0,
+        tint: 0.0,
+        mask: None,
+        skin: None,
+        matte: None,
+        selection: None,
+    }
+}
+
+/// Write a confirmed fringing correction into the lens block: the renderer's `ca_red` and
+/// `ca_blue`, with nothing else about the lens changed. Chromatic scales a lens profile or a
+/// person already set are kept; distortion coefficients already there are kept beside the new
+/// scales. Returns whether anything was written. ADR-0125.
+pub(crate) fn apply_fringing(recipe: &mut Recipe, plan: &GlobalPlan) -> bool {
+    let Some([red, blue]) = plan
+        .fringing
+        .as_ref()
+        .and_then(crate::lateral_ca::Fringing::scales)
+    else {
+        return false;
+    };
+    let lens = &mut recipe.lens;
+    match lens.coefficients.as_mut() {
+        None => {
+            lens.coefficients = Some(aura_recipe::LensCoefficients {
+                k1: 0.0,
+                k2: 0.0,
+                k3: 0.0,
+                ca_red: red,
+                ca_blue: blue,
+            });
+        }
+        Some(c)
+            if (c.ca_red - 1.0).abs() < f32::EPSILON && (c.ca_blue - 1.0).abs() < f32::EPSILON =>
+        {
+            c.ca_red = red;
+            c.ca_blue = blue;
+        }
+        Some(_) => return false,
+    }
+    lens.ca = true;
+    true
 }
 
 /// Hold a proposed exposure, highlight, shadow and contrast move to what the photograph
@@ -2252,7 +2368,14 @@ fn run_with(
             if let Some(note) = exposure_note.take() {
                 plan.decisions.insert(1, note);
             }
-            groups.insert(Group::Scene, plan.sky.clone().into_iter().collect());
+            groups.insert(
+                Group::Scene,
+                plan.sky
+                    .clone()
+                    .into_iter()
+                    .chain(plan.defringe.clone())
+                    .collect(),
+            );
             report.scene = Some(SceneSummary {
                 kind: plan.kind.label().into(),
                 decisions: plan.decisions.clone(),
@@ -2300,12 +2423,23 @@ fn run_with(
             }),
             operations: 0,
         });
-        if plan.sky.is_some() {
+        let scene: Vec<(&str, &str)> = [
+            plan.sky.as_ref().map(|_| ("Sky balance", "Feathered gradient over bright sky pixels only.")),
+            plan.defringe.as_ref().map(|_| ("Purple fringes", "Purple rims on the dark side of bright edges take the colour of their surroundings.")),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if !scene.is_empty() {
             steps.push(Step {
                 group: Some(Group::Scene),
-                title: "Sky balance".into(),
-                detail: "Feathered gradient over bright sky pixels only.".into(),
-                operations: 1,
+                title: scene
+                    .iter()
+                    .map(|(t, _)| *t)
+                    .collect::<Vec<_>>()
+                    .join(" & "),
+                detail: scene.iter().map(|(_, d)| *d).collect::<Vec<_>>().join(" "),
+                operations: scene.len(),
             });
         }
     } else {
@@ -2474,6 +2608,133 @@ fn run_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A working frame with a bright neutral window in a dark room; round its edge, `rim`
+    /// pixels of `fringe`, and the rest of the room `room`.
+    fn room_with_window(rim: usize, fringe: [f32; 3], room: [f32; 3]) -> aura_render::Frame {
+        let (w, h) = (300_usize, 200_usize);
+        let (x0, x1, y0, y1) = (w / 3, 2 * w / 3, h / 3, 2 * h / 3);
+        let mut rgb = Vec::with_capacity(w * h * 3);
+        for y in 0..h {
+            for x in 0..w {
+                let inside = (x0..x1).contains(&x) && (y0..y1).contains(&y);
+                let out_by = [
+                    x0.saturating_sub(x),
+                    x.saturating_sub(x1 - 1),
+                    y0.saturating_sub(y),
+                    y.saturating_sub(y1 - 1),
+                ]
+                .into_iter()
+                .max()
+                .unwrap_or(0);
+                rgb.extend(if inside {
+                    [0.9, 0.9, 0.9]
+                } else if out_by <= rim {
+                    fringe
+                } else {
+                    room
+                });
+            }
+        }
+        aura_render::Frame::working(rgb, w as u32, h as u32, "")
+    }
+
+    fn planned_for(frame: &aura_render::Frame) -> GlobalPlan {
+        let bytes: Vec<u8> = frame
+            .rgb
+            .iter()
+            .map(|v| {
+                (aura_raw::colour::curve::srgb_encode(v.clamp(0.0, 1.0)) * 255.0).round() as u8
+            })
+            .collect();
+        let px = Pixels::new(&bytes, frame.width, frame.height).unwrap();
+        analyse(&px, Some(frame), &[], 0.0)
+    }
+
+    #[test]
+    fn purple_rims_round_a_bright_window_are_proposed_for_removal() {
+        let plan = planned_for(&room_with_window(2, [0.07, 0.03, 0.09], [0.04, 0.04, 0.04]));
+        let op = plan.defringe.clone().expect("a defringe");
+        assert_eq!(op.id, DEFRINGE_ID);
+        assert!(op.id.starts_with(portrait_auto::SCENE_PREFIX));
+        assert!(op.warmth > 0.0 && op.tint == 0.0, "purple only: {op:?}");
+        assert_eq!(
+            op.region,
+            [0.5, 0.5, 1.0, 1.0],
+            "the corners are selected too"
+        );
+        retouch_tools::validate(std::slice::from_ref(&op)).unwrap();
+        assert!(plan
+            .decisions
+            .iter()
+            .any(|d| d.starts_with("Purple fringes removed")));
+    }
+
+    #[test]
+    fn the_planned_defringe_removes_the_rim_in_the_rendered_photograph() {
+        use aura_render::{CpuEngine, Frame, FrameSource, OutputSpec, RenderPurpose, RenderedData};
+        #[derive(Debug)]
+        struct Source(Frame);
+        impl FrameSource for Source {
+            fn frame(&self, _: &PhotoId, _: RenderLevel) -> aura_core::AuraResult<Frame> {
+                Ok(self.0.clone())
+            }
+        }
+        let frame = room_with_window(2, [0.07, 0.03, 0.09], [0.04, 0.04, 0.04]);
+        let op = planned_for(&frame).defringe.expect("a defringe");
+        let base = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "");
+        let mut recipe = base.clone();
+        retouch_tools::write_with_mattes(&mut recipe, &[op], &BTreeMap::new()).unwrap();
+        let engine = CpuEngine::new(
+            std::sync::Arc::new(Source(frame.clone())),
+            aura_core::clock::FixedClock::at(time::OffsetDateTime::UNIX_EPOCH),
+        );
+        let render = |r: &Recipe| -> Vec<u8> {
+            let image = engine
+                .render_frame(
+                    &frame,
+                    r,
+                    RenderLevel::Full,
+                    RenderPurpose::Analysis,
+                    &OutputSpec::default(),
+                )
+                .unwrap();
+            let RenderedData::Eight(data) = image.data else {
+                panic!("an 8-bit render")
+            };
+            data
+        };
+        let spread =
+            |p: &[u8]| i32::from(*p.iter().max().unwrap()) - i32::from(*p.iter().min().unwrap());
+        // On the rim, just outside the window's left edge.
+        let at = (100 * 300 + 99) * 3;
+        let (as_shot, cleaned) = (render(&base), render(&recipe));
+        assert!(
+            spread(&as_shot[at..at + 3]) > 20,
+            "{:?}",
+            &as_shot[at..at + 3]
+        );
+        assert!(
+            spread(&cleaned[at..at + 3]) <= 3,
+            "{:?}",
+            &cleaned[at..at + 3]
+        );
+        // Away from the edge the room is exactly as it was.
+        let room = (20 * 300 + 20) * 3;
+        assert_eq!(&cleaned[room..room + 3], &as_shot[room..room + 3]);
+    }
+
+    #[test]
+    fn a_purple_room_or_a_clean_edge_proposes_nothing() {
+        let purple = [0.07, 0.03, 0.09];
+        assert!(planned_for(&room_with_window(0, purple, purple))
+            .defringe
+            .is_none());
+        let grey = [0.04, 0.04, 0.04];
+        assert!(planned_for(&room_with_window(0, grey, grey))
+            .defringe
+            .is_none());
+    }
 
     fn pixels(rgb: &[u8], w: u32, h: u32) -> Pixels<'_> {
         Pixels::new(rgb, w, h).unwrap()

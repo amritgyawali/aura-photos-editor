@@ -168,6 +168,18 @@ it('saves frequency healing with its own sensitivity and dark-mark protection', 
     expect.objectContaining({ tool: 'frequency_heal', sensitivity: .8, keepDarkMarks: true }),
   ]));
 });
+it('saves a defringe over the whole photo, purple on and green off by default', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), { target: { value: 'defringe' } });
+  expect(screen.getByText(/the edge of every leaf against a bright sky is green too/)).toBeTruthy();
+  expect((screen.getByLabelText('Purple fringe removal') as HTMLInputElement).value).toBe('1');
+  expect((screen.getByLabelText('Green fringe removal') as HTMLInputElement).value).toBe('0');
+  fireEvent.change(screen.getByLabelText('Green fringe removal'), { target: { value: '.4' } });
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ tool: 'defringe', warmth: 1, tint: .4, amount: 1, region: [.5, .5, 1, 1], radius: .003 }),
+  ]));
+});
 it('saves a texture graft with its level and glint limit, with no source required', async () => {
   open(); await screen.findByAltText('Retouched photograph');
   fireEvent.change(screen.getByLabelText('Tool'), { target: { value: 'texture_graft' } });

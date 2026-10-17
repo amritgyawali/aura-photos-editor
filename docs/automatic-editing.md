@@ -8,8 +8,8 @@ back through. Nothing leaves your computer and your original file is never chang
 
 | Step | What AURA measures | What it changes |
 |---|---|---|
-| 1. Light & colour | Brightness spread, neutral areas (faces ignored), how colourful the frame already is, haze, noise, whether it is a portrait, landscape, low-light or general scene | Exposure, highlights, shadows, contrast, white balance (only a cast the whites confirm, and only part of it, so warm rooms stay warm), vibrance, clarity (never on portraits), dehaze, noise reduction, sharpening (skin masked on portraits) |
-| 2. Sky balance | A bright sky above a measured horizon | A soft gradient that darkens only the bright sky pixels |
+| 1. Light & colour | Brightness spread, neutral areas (faces ignored), how colourful the frame already is, haze, noise, whether it is a portrait, landscape, low-light or general scene; how far the lens put red and blue out of register with green at the corners | Exposure, highlights, shadows, contrast, white balance (only a cast the whites confirm, and only part of it, so warm rooms stay warm), vibrance, clarity (never on portraits), dehaze, noise reduction, sharpening (skin masked on portraits), and the lens's colour fringing when it is visible |
+| 2. Sky balance & purple fringes | A bright sky above a measured horizon; purple rims on the dark side of bright edges | A soft gradient that darkens only the bright sky pixels; each purple rim pixel given the colour of its surroundings |
 | 3. Skin | Each face's own skin, sampled from its cheeks and forehead | Texture smoothing that keeps fine detail, tone evening, gentle local light |
 | 4. Blemishes | Small spots that are **redder** than the skin around them | Each spot healed separately with nearby skin. Darker marks that are not redder — moles, freckles, beauty marks — are kept and counted |
 | 5. Lines & redness | Line texture beside the eyes and on the forehead compared with the same person's cheek; smile-line depth compared with the cheek beside it; redness beside the nose compared with the cheek | Fine lines softened with fine skin texture kept; smile lines lifted, never erased; redness evened toward the person's own cheek colour |
@@ -137,6 +137,24 @@ decision about somebody's face; the **Portrait skin finish** preset makes it whe
   moved or a retouch stack you edited.
 - **Why these settings** and **Automatic decisions by face** explain every decision, with
   the numbers AURA measured.
+
+## Colour fringing from the lens
+
+Away from the middle of the frame a lens can image red, green and blue at slightly different
+sizes, which leaves a red rim on one side of every edge and a blue or cyan one on the other. AURA
+reads that from the photograph itself - how far apart the three colours of the same edges are,
+toward the corners and in every direction round the frame - and when the shift is visible and
+the same all the way round, it brings the colours back into register (most of the way, never
+past it), then checks the corrected photograph the same way before keeping the change. No lens
+profile is needed. A camera's own JPEG has usually been corrected already, and is then left as it
+is. The correction is in the lens settings in Develop, where you can switch it off.
+
+Purple rims on the dark side of a bright edge - a branch against a bright sky, a backlit veil, a
+dark suit beside a white shirt - are a different fault, and they are removed by colour: each rim
+pixel takes the colour of the calm area around it, at its own brightness. A purple dress, a
+magenta flower and the glow round a purple uplight are purple where nothing is near an edge too,
+and keep their colour. Green rims are left alone automatically, because the edge of every leaf
+against a bright sky is green as well; the **Defringe** tool in Retouch removes them when you ask.
 
 ## What it will not do
 

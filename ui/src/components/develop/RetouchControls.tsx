@@ -56,6 +56,18 @@ export function RetouchControls(props: Props) {
       </label>)}
       <p className="lr-hint">Choose an ellipse around the area. The warp tapers to zero at its boundary. Undo restores the source geometry.</p>
     </>}
+    {draft.tool === 'defringe' && <>
+      <label>Purple fringe removal ({Math.round(Math.max(draft.warmth, 0) * 100)}%)
+        <input type="range" aria-label="Purple fringe removal" min="0" max="1" step=".01" value={Math.max(draft.warmth, 0)} onChange={event=>onChange({warmth:Number(event.target.value)})}/>
+      </label>
+      <label>Green fringe removal ({Math.round(Math.max(draft.tint, 0) * 100)}%)
+        <input type="range" aria-label="Green fringe removal" min="0" max="1" step=".01" value={Math.max(draft.tint, 0)} onChange={event=>onChange({tint:Number(event.target.value)})}/>
+      </label>
+      <label>Fringe reach (% of short edge)
+        <input type="number" aria-label="Fringe reach" min="0.05" max="5" step="0.05" value={Number((draft.radius * 100).toFixed(2))} onChange={event => onChange({ radius: Number(event.target.value) / 100 })}/>
+      </label>
+      <p className="lr-hint">Green is off by default: the edge of every leaf against a bright sky is green too. Raise the reach for wide fringes on large files.</p>
+    </>}
     {['colorize', 'background_color'].includes(draft.tool) && <label>Target color
       <input type="color" aria-label="Target color" value={colorHex(draft.targetColor ?? [0.45,0.2,0.1])} onChange={event => onChange({targetColor:colorRgb(event.target.value)})}/>
     </label>}
