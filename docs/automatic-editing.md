@@ -95,6 +95,32 @@ when there are people, how much of the frame sits at white when there are not, a
 sky is left to the histogram. A white blanket, a dress or a studio wall is the photograph's
 own brightness, and lowering it only turns it grey.
 
+**Shadows and Highlights work on regions, not pixels.** AURA first finds the regions of the
+photograph - a wall, a sky, a window, a face in shadow - by smoothing its brightness while keeping
+the edges between them, and each slider then moves a whole region by one amount. The grain of a
+lifted wall, the clouds in a recovered sky and the detail in a shadowed face are carried along
+unchanged, so nothing flattens and a white cloud never ends up darker than the blue around it. A
+region that is clipped - a blown-out sky in a JPEG - has nothing in it to recover and is left white
+rather than turned grey.
+
+Auto enhance sizes the two sliders from the same regions:
+
+- A photograph that is **mostly shadow** - an interior exposed for its windows, a backlit scene
+  exposed for the sky - is opened up firmly. A **dark background or black fur** is opened only
+  lightly, so it stays a dark background. A **black backdrop** is left black.
+- **Bright regions that still carry detail** are brought down most when they are a sky, a window
+  or a cloud, and least when they are the subject itself: pulling a white building or a bright room
+  down only turns it grey.
+- A night scene keeps its darkness and a bright-by-design frame keeps its white.
+- Where the histogram and the regions both ask for something, the stronger answer is used, never
+  the two added together. **Why these settings** gives the shares and depths measured.
+
+**Clarity** strengthens the texture inside each region and steps aside at strong edges, so it
+leaves no glow round branches against a sky or a dark line along a building. **Dehaze** measures
+the colour of the haze and how thick it is in each part of the frame, so the distance is cleared
+more than the foreground; a negative value adds atmosphere. All four look the same in a preview
+and in a full-size export. ADR-0126.
+
 **A veiled frame** - haze, flare, a flat picture profile, a scan of a faded print - lifts its
 blacks and lowers its whites together, and no slider takes that off. When the darkest tones
 sit above about a sixth of the range and the brightest stop short of white, AURA sets the

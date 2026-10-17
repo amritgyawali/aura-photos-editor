@@ -2,6 +2,30 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Shadows, Highlights, Clarity and Dehaze rebuilt to work on regions, and Auto enhance sized from them - 2026-10-17
+
+- **Shadows and Highlights act on regions** (ADR-0126). Each pixel takes the gain its *region*
+  asks for - read from an edge-aware guided-filter base - so a lifted shadow keeps its texture and
+  a recovered sky keeps its clouds white. The old per-pixel curve turned white clouds into grey
+  blobs darker than the sky at Highlights -80. +100 now lifts a shadow region 1.5 stops; -100
+  brings a bright region down 1.1. Clipped regions (a blown JPEG sky) are protected and stay white
+  instead of turning grey and blocky.
+- **Clarity has no halos.** It raises each region's detail against an edge-aware base and steps
+  aside at strong edges: at +100 on a hard four-stop edge it moves no pixel by more than 0.09
+  stops, where the blur it replaces drew a two-stop glow round branches and building edges.
+- **Dehaze is the dark channel prior**: the haze colour and a per-pixel haze map, so the distance
+  is cleared more than the foreground and a blue sky deepens while its clouds stay white. Negative
+  Dehaze adds atmosphere.
+- **A preview and an export look the same.** The bases are measured once on a 512-pixel reduction
+  of the whole frame, so their reach is a share of the photograph rather than a count of render
+  pixels; a tiled export stays bit-identical to a whole one. About 90 ms per preview on a 4-core
+  machine. The engine string gains `+local.1`, so cached previews refresh.
+- **Auto enhance sizes Shadows and Highlights from the photograph's regions**: a frame that is
+  mostly shadow (an interior exposed for its windows) is opened up firmly, a dark background or
+  black fur only lightly, a black backdrop not at all; bright regions with detail are recovered
+  most when they are a sky or a window and least when they are the subject. Night keeps its
+  darkness and high-key frames their white. The reason is written in the plan.
+
 ## The lens, corrected the way a professional starts: colour fringing measured, purple rims removed - 2026-10-17
 
 - **Lateral chromatic aberration is measured from the photograph** (ADR-0125) - Lightroom's
