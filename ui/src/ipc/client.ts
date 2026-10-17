@@ -95,6 +95,9 @@ if (typeof window !== 'undefined') {
 }
 void relayTimer;
 
+/** What happened when a provider's key page was asked for (ADR-0108). */
+export type ProviderPageDto = { url: string | null; opened: boolean; message: string };
+
 export const photoAutoEdit = (input: PhotoAutoEditInput): Promise<PhotoAutoEditDto> =>
   invoke<PhotoAutoEditDto>('photo_auto_edit', { input });
 
@@ -719,6 +722,13 @@ export const api = {
   checkAiKey: (): Promise<KeyCheckDto> => invoke<KeyCheckDto>('check_ai_key'),
   openAiProviderPage: (provider: string): Promise<string> =>
     invoke<string>('open_ai_provider_page', { provider }),
+
+  /**
+   * "Connect Claude" / "Connect ChatGPT": open the provider's own key page in the default
+   * browser. The address comes from the catalogue in the backend, never from here.
+   */
+  openProviderPage: (provider: string): Promise<ProviderPageDto> =>
+    invoke<ProviderPageDto>('open_provider_page', { input: { provider } }),
 
   /** Every provider AURA knows how to reach. Static, and cheap to ask for. */
   listAiProviders: (): Promise<AiProviderDto[]> =>

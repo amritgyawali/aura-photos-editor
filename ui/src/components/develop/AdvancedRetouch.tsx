@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ADVANCED_STAGES, advancedRetouch, readAdvancedReport, type AdvancedRetouchReport, type StageOutcome } from '../../ipc/advancedRetouch';
+import { ADVANCED_STAGES, advancedRetouch, readAdvancedReport, type AdvancedPreset, type AdvancedRetouchReport, type StageOutcome } from '../../ipc/advancedRetouch';
 import type { RecipeDto } from '../../ipc/types';
 
 type Live = Record<number, { state: 'running' | 'done'; outcome: StageOutcome | null }>;
@@ -27,6 +27,7 @@ export function AdvancedRetouch({ projectId, photoId, recipe, disabled, onRun }:
   const [running, setRunning] = useState(false);
   const [live, setLive] = useState<Live>({});
   const [report, setReport] = useState<AdvancedRetouchReport | null>(null);
+  const [preset, setPreset] = useState<AdvancedPreset>('professional');
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { setReport(null); setLive({}); }, [photoId]);
@@ -39,7 +40,7 @@ export function AdvancedRetouch({ projectId, photoId, recipe, disabled, onRun }:
       stop = await advancedRetouch.onProgress(event => {
         if (event.photoId === photoId && mounted.current) setLive(prev => ({ ...prev, [event.number]: { state: event.state, outcome: event.outcome } }));
       }).catch(() => null);
-      const result = await advancedRetouch.run(projectId, photoId);
+      const result = await advancedRetouch.run(projectId, photoId, undefined, preset);
       if (mounted.current) setReport(result.report);
     } finally {
       stop?.();
@@ -52,6 +53,13 @@ export function AdvancedRetouch({ projectId, photoId, recipe, disabled, onRun }:
         <span className="eyebrow">AUTO ADVANCED RETOUCH</span>
         <h3>The full professional workflow, one step at a time.</h3>
         <p className="lr-hint">Eighteen steps in the order a high-end retoucher works - RAW foundation first, the look last - with none skipped. Every step is inspected and reported; each one that changes the photo is saved as its own history step, so you can go back to any point. Nobody is reshaped, moles and freckles stay, and pores are kept.</p>
+      </div>
+      <div className="advanced-retouch-modes" role="radiogroup" aria-label="Retouch style">
+        {([['professional', 'Professional', 'The full high-end workflow; the backdrop keeps its own light.'],
+          ['beauty_fashion', 'Beauty & Fashion (Evoto-style)', 'Campaign-ready in one pass: high-end skin, clothing creases softened, stray hair faded, and a plain grey studio backdrop lifted to a clean bright grey.']] as const)
+          .map(([value, label, hint]) => <label key={value} title={hint}>
+            <input type="radio" name={`advanced-preset-${photoId}`} value={value} checked={preset === value} disabled={disabled || running} onChange={() => setPreset(value)} /> {label}
+          </label>)}
       </div>
       <button type="button" className="retouch-primary" disabled={disabled || running} onClick={start}>
         {running ? (current ? `Step ${current} of 18 · ${ADVANCED_STAGES[current - 1]?.[1] ?? ''}…` : 'Starting…') : shown ? 'Run Auto advanced retouch again' : 'Auto advanced retouch'}

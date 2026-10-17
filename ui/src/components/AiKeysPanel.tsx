@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../ipc/client';
+import { ConnectProviders } from './ConnectProvider';
 import { InternalAiStatus } from './InternalAiStatus';
 import type {
   AiProviderDto,
@@ -317,6 +318,14 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
         AURA works completely without this. A key adds extra reasoning on top of the models that
         ship with the app, and you pay your provider directly for what it uses.
       </p>
+
+      <ConnectProviders
+        onError={onError}
+        onConnect={(id) => {
+          setProvider(id);
+          setCheckResult(null);
+        }}
+      />
 
       {onOpenSetup ? (
         <button type="button" className="ai-keys-open-setup" onClick={onOpenSetup}>

@@ -68,8 +68,8 @@ describe('automatic retouch settings', () => {
   });
   it('offers every fine control exactly once', () => {
     const keys = SETTING_GROUPS.flatMap(([, controls]) => controls.map(([key]) => key));
-    expect(keys.length).toBe(61);
-    expect(new Set(keys).size).toBe(61);
+    expect(keys.length).toBe(62);
+    expect(new Set(keys).size).toBe(62);
     expect([...keys].sort()).toEqual(Object.keys(DEFAULT_RETOUCH_SETTINGS).sort());
   });
   it('runs deep cleanup as one native pass and exposes dark-mark removal', () => {
@@ -153,7 +153,7 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
   expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
   expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
   for (const [id, , values] of PRESETS) {
-    if (id === 'pro' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin' || id === 'portrait_finish' || id === 'smooth_finish' || id === 'body_finish') continue;
+    if (id === 'pro' || id === 'beauty_fashion' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin' || id === 'portrait_finish' || id === 'smooth_finish' || id === 'body_finish') continue;
     expect(values.frequencyHeal ?? 0).toBe(0);
     expect(values.textureGraft ?? 0).toBe(0);
   }
