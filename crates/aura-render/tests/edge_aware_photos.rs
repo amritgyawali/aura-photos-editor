@@ -9,7 +9,8 @@
 //! by side. Each result is written beside its source as `NAME_WxH.LABEL.rgb`.
 //!
 //! The images are for a person to look at. The assertions are that every render completes,
-//! that a tiled render of the first variant matches the whole one, and that the edge-aware
+//! that a tiled render of the first variant matches the whole one (skipped when
+//! `AURA_LOCAL_NO_TILES` is set, for timing), and that the edge-aware
 //! Shadows keeps more of a lifted region's texture than the per-pixel curve does.
 #![allow(
     clippy::unwrap_used,
@@ -172,6 +173,18 @@ fn edge_aware_stages_on_real_photographs() {
         let bytes = std::fs::read(&path).unwrap();
         assert_eq!(bytes.len(), width * height * 3, "{stem}");
         let frame = Frame::working(working(&bytes), width as u32, height as u32, "photo");
+        let r = aura_render::edge_aware::regions(&frame.rgb, width, height, 0.0);
+        eprintln!(
+            "{stem} regions: low {:.1} median {:.1} high {:.1} spread {:.1} | dark {:.0}% at {:.1} | bright {:.0}% | clipped {:.0}%",
+            r.low,
+            r.median,
+            r.high,
+            r.spread(),
+            r.dark_share * 100.0,
+            r.dark_depth,
+            r.bright_share * 100.0,
+            r.clipped_share * 100.0
+        );
         for (index, variant) in variants.split(';').filter(|v| !v.is_empty()).enumerate() {
             let (label, spec) = variant.split_once(':').unwrap_or((variant, ""));
             let recipe = recipe_of(spec);
@@ -189,7 +202,7 @@ fn edge_aware_stages_on_real_photographs() {
                 )
             } else {
                 let out = render(&frame, &recipe);
-                if index == 0 {
+                if index == 0 && std::env::var_os("AURA_LOCAL_NO_TILES").is_none() {
                     let engine = engine(frame.clone());
                     let streamed = aura_render::tiles::render_streamed(
                         &engine,
@@ -205,6 +218,11 @@ fn edge_aware_stages_on_real_photographs() {
                 }
                 out
             };
+            if aura_render::perf::enabled() {
+                for (step, ms) in aura_render::perf::take() {
+                    eprintln!("  {step}: {ms} ms");
+                }
+            }
             eprintln!(
                 "{stem} {label}: shadow texture {:.4} (original {:.4})",
                 shadow_texture(&out, &bytes, width),

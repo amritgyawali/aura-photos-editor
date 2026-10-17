@@ -52,7 +52,7 @@ use crate::tonemap::{curve_domain_encode, MID_GREY};
 pub const LOCAL_VER: u32 = 1;
 
 /// Long edge of the reduction every grid is measured on.
-pub const BASE_EDGE: usize = 1024;
+pub const BASE_EDGE: usize = 512;
 
 /// The tone base's radius, as a fraction of the reduction's long edge.
 ///
@@ -206,61 +206,59 @@ pub fn reduce(rgb: &[f32], width: usize, height: usize, edge: usize) -> (Vec<f32
     (out, out_w, out_h)
 }
 
-/// A summed-area table, for box means in constant time per pixel.
+/// The mean of every `(2r + 1)`-square window, truncated at the plane's edges and divided by
+/// the samples actually inside it.
 ///
-/// Built sequentially in `f64`, so the same plane always produces the same table.
-struct Integral {
-    width: usize,
-    height: usize,
-    sums: Vec<f64>,
-}
-
-impl Integral {
-    fn new(plane: &[f64], width: usize, height: usize) -> Self {
-        let stride = width + 1;
-        let mut sums = vec![0.0f64; stride * (height + 1)];
-        for y in 0..height {
-            let mut row = 0.0f64;
-            for x in 0..width {
-                row += plane.get(y * width + x).copied().unwrap_or(0.0);
-                let above = sums.get(y * stride + x + 1).copied().unwrap_or(0.0);
-                if let Some(slot) = sums.get_mut((y + 1) * stride + x + 1) {
-                    *slot = above + row;
-                }
+/// Constant time per pixel: horizontal window sums from one prefix sum per row (rows in
+/// parallel), then a running prefix down the rows, added a whole row at a time. Every sum is
+/// accumulated in the same order whatever the thread count, so the same plane always gives
+/// the same means.
+fn box_mean(plane: &[f64], width: usize, height: usize, r: usize) -> Vec<f64> {
+    let n = width * height;
+    if n == 0 {
+        return Vec::new();
+    }
+    let window = |i: usize, len: usize| (i.saturating_sub(r), (i + r + 1).min(len));
+    let mut rows = vec![0.0f64; n];
+    rows.par_chunks_mut(width)
+        .zip(plane.par_chunks(width))
+        .for_each(|(out, src)| {
+            let mut prefix = Vec::with_capacity(width + 1);
+            let mut acc = 0.0f64;
+            prefix.push(acc);
+            for v in src {
+                acc += v;
+                prefix.push(acc);
+            }
+            for (x, slot) in out.iter_mut().enumerate() {
+                let (x0, x1) = window(x, width);
+                *slot =
+                    prefix.get(x1).copied().unwrap_or(0.0) - prefix.get(x0).copied().unwrap_or(0.0);
+            }
+        });
+    // Column prefix sums: row y + 1 of `prefix` is the sum of rows 0 ..= y.
+    let mut prefix = vec![0.0f64; width * (height + 1)];
+    for y in 0..height {
+        let (done, rest) = prefix.split_at_mut((y + 1) * width);
+        let previous = done.get(y * width..).unwrap_or(&[]);
+        let current = rows.get(y * width..(y + 1) * width).unwrap_or(&[]);
+        if let Some(next) = rest.get_mut(..width) {
+            for ((slot, above), add) in next.iter_mut().zip(previous).zip(current) {
+                *slot = above + add;
             }
         }
-        Self {
-            width,
-            height,
-            sums,
+    }
+    let mut out = vec![0.0f64; n];
+    out.par_chunks_mut(width).enumerate().for_each(|(y, row)| {
+        let (y0, y1) = window(y, height);
+        for (x, slot) in row.iter_mut().enumerate() {
+            let (x0, x1) = window(x, width);
+            let total = prefix.get(y1 * width + x).copied().unwrap_or(0.0)
+                - prefix.get(y0 * width + x).copied().unwrap_or(0.0);
+            *slot = total / ((x1 - x0) * (y1 - y0)).max(1) as f64;
         }
-    }
-
-    /// The mean over the window of radius `r` around `(x, y)`, truncated at the frame's
-    /// edges and divided by the samples actually inside it.
-    fn mean(&self, x: usize, y: usize, r: usize) -> f64 {
-        let stride = self.width + 1;
-        let x0 = x.saturating_sub(r);
-        let y0 = y.saturating_sub(r);
-        let x1 = (x + r + 1).min(self.width);
-        let y1 = (y + r + 1).min(self.height);
-        let at = |xx: usize, yy: usize| self.sums.get(yy * stride + xx).copied().unwrap_or(0.0);
-        let total = at(x1, y1) - at(x0, y1) - at(x1, y0) + at(x0, y0);
-        let count = ((x1 - x0) * (y1 - y0)).max(1) as f64;
-        total / count
-    }
-
-    fn means(&self, r: usize) -> Vec<f64> {
-        let mut out = vec![0.0f64; self.width * self.height];
-        out.par_chunks_mut(self.width.max(1))
-            .enumerate()
-            .for_each(|(y, row)| {
-                for (x, slot) in row.iter_mut().enumerate() {
-                    *slot = self.mean(x, y, r);
-                }
-            });
-        out
-    }
+    });
+    out
 }
 
 /// A low-resolution field of guided-filter coefficients covering the whole frame.
@@ -351,30 +349,49 @@ impl Sampler<'_> {
 }
 
 /// The guided filter: the coefficients that make `a * guide + b` the edge-preserving
-/// smoothing of `src`, averaged over every window that contains each pixel.
-fn guided(guide: &[f32], src: &[f32], width: usize, height: usize, r: usize, eps: f64) -> Grid {
+/// smoothing of `src`, averaged over every window that contains each pixel. `None` filters
+/// the guide against itself, which needs half the window sums.
+fn guided(
+    guide: &[f32],
+    src: Option<&[f32]>,
+    width: usize,
+    height: usize,
+    r: usize,
+    eps: f64,
+) -> Grid {
     let n = width * height;
     let g: Vec<f64> = guide.iter().take(n).map(|v| f64::from(*v)).collect();
-    let p: Vec<f64> = src.iter().take(n).map(|v| f64::from(*v)).collect();
     let gg: Vec<f64> = g.iter().map(|v| v * v).collect();
-    let gp: Vec<f64> = g.iter().zip(p.iter()).map(|(a, b)| a * b).collect();
-    let mean_g = Integral::new(&g, width, height).means(r);
-    let mean_p = Integral::new(&p, width, height).means(r);
-    let mean_gg = Integral::new(&gg, width, height).means(r);
-    let mean_gp = Integral::new(&gp, width, height).means(r);
+    let mean_g = box_mean(&g, width, height, r);
+    let mean_gg = box_mean(&gg, width, height, r);
+    let (mean_p, mean_gp) = if let Some(src) = src {
+        let p: Vec<f64> = src.iter().take(n).map(|v| f64::from(*v)).collect();
+        let gp: Vec<f64> = g.iter().zip(p.iter()).map(|(a, b)| a * b).collect();
+        (
+            Some(box_mean(&p, width, height, r)),
+            Some(box_mean(&gp, width, height, r)),
+        )
+    } else {
+        (None, None)
+    };
+    let mean_p = mean_p.as_ref().unwrap_or(&mean_g);
+    let mean_gp = mean_gp.as_ref().unwrap_or(&mean_gg);
 
     let mut a = vec![0.0f64; n];
     let mut b = vec![0.0f64; n];
-    for (i, (sa, sb)) in a.iter_mut().zip(b.iter_mut()).enumerate() {
-        let mg = mean_g.get(i).copied().unwrap_or(0.0);
-        let mp = mean_p.get(i).copied().unwrap_or(0.0);
-        let var = (mean_gg.get(i).copied().unwrap_or(0.0) - mg * mg).max(0.0);
-        let cov = mean_gp.get(i).copied().unwrap_or(0.0) - mg * mp;
-        *sa = cov / (var + eps);
-        *sb = mp - *sa * mg;
-    }
-    let mean_a = Integral::new(&a, width, height).means(r);
-    let mean_b = Integral::new(&b, width, height).means(r);
+    a.par_iter_mut()
+        .zip(b.par_iter_mut())
+        .enumerate()
+        .for_each(|(i, (sa, sb))| {
+            let mg = mean_g.get(i).copied().unwrap_or(0.0);
+            let mp = mean_p.get(i).copied().unwrap_or(0.0);
+            let var = (mean_gg.get(i).copied().unwrap_or(0.0) - mg * mg).max(0.0);
+            let cov = mean_gp.get(i).copied().unwrap_or(0.0) - mg * mp;
+            *sa = cov / (var + eps);
+            *sb = mp - *sa * mg;
+        });
+    let mean_a = box_mean(&a, width, height, r);
+    let mean_b = box_mean(&b, width, height, r);
     Grid {
         width,
         height,
@@ -412,6 +429,19 @@ pub struct ToneSampler<'a> {
 }
 
 impl ToneSampler<'_> {
+    /// The base of the region the pixel at `(x, y)` belongs to, in log2 luminance.
+    #[must_use]
+    pub fn base_at(&self, x: usize, y: usize, rgb: [f32; 3]) -> f32 {
+        self.base.at(x, y, log_luma(rgb))
+    }
+
+    /// How clipped the region the pixel at `(x, y)` belongs to is, `0 ..= 1`.
+    #[must_use]
+    pub fn clipped_at(&self, x: usize, y: usize, rgb: [f32; 3]) -> f32 {
+        self.clipped
+            .map_or(0.0, |s| s.at(x, y, log_luma(rgb)).clamp(0.0, 1.0))
+    }
+
     /// Local Shadows and Highlights on the pixel at `(x, y)`.
     #[must_use]
     pub fn apply(
@@ -446,7 +476,7 @@ pub fn tone_grid(rgb: &[f32], width: usize, height: usize, exposure: f32) -> Ton
     let n = width * height;
     let guide: Vec<f32> = (0..n).map(|i| log_luma(px(rgb, i)) + exposure).collect();
     let r = radius_for(width, height, TONE_RADIUS);
-    let grid = guided(&guide, &guide, width, height, r, TONE_EPS);
+    let grid = guided(&guide, None, width, height, r, TONE_EPS);
 
     // Clipping is a spike at the frame's own maximum: a share of pixels at the ceiling the
     // file could record. Between CLIP_FROM and CLIP_FULL of it a pixel counts as progressively
@@ -466,9 +496,99 @@ pub fn tone_grid(rgb: &[f32], width: usize, height: usize, exposure: f32) -> Ton
                 step(share, CLIP_FROM, CLIP_FULL)
             })
             .collect();
-        guided(&guide, &near, width, height, (r / 2).max(1), 0.05)
+        guided(&guide, Some(&near), width, height, (r / 2).max(1), 0.05)
     });
     ToneBase { grid, clipped }
+}
+
+/// How a frame's tones are distributed over its *regions* rather than its pixels.
+///
+/// A histogram counts pixels, so a bright window and the grain of a dark wall look alike.
+/// Read through the tone base, each pixel reports the brightness of the region it belongs
+/// to, which is what Shadows and Highlights act on - so these are the numbers an automatic
+/// edit should size them from. All brightnesses are stops from middle grey.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Regions {
+    /// The 3rd percentile of region brightness.
+    pub low: f32,
+    /// The median region brightness.
+    pub median: f32,
+    /// The 97th percentile of region brightness.
+    pub high: f32,
+    /// Share of the frame in regions more than [`DEEP_SHADOW`] stops below middle grey.
+    pub dark_share: f32,
+    /// The median brightness of those regions.
+    pub dark_depth: f32,
+    /// Share of the frame in bright regions that still carry detail: above
+    /// [`BRIGHT_REGION`] stops and not clipped.
+    pub bright_share: f32,
+    /// Share of the frame in regions that are clipped.
+    pub clipped_share: f32,
+}
+
+impl Regions {
+    /// Stops between the darkest and brightest regions.
+    #[must_use]
+    pub fn spread(&self) -> f32 {
+        self.high - self.low
+    }
+}
+
+/// Regions this far below middle grey are deep shadow: about sRGB 22% and darker.
+pub const DEEP_SHADOW: f32 = -3.0;
+/// Regions this far above middle grey are bright: about sRGB 82% and brighter.
+pub const BRIGHT_REGION: f32 = 1.3;
+
+/// Measure how a working-space frame's tones fall into regions, after `exposure`.
+#[must_use]
+pub fn regions(rgb: &[f32], width: usize, height: usize, exposure: f32) -> Regions {
+    let (small, w, h) = reduce(rgb, width, height, BASE_EDGE);
+    let n = w * h;
+    if n == 0 {
+        return Regions::default();
+    }
+    let base = tone_grid(&small, w, h, exposure);
+    let sampler = base.sampler(Position::whole(w as u32, h as u32));
+    let gain = exposure.exp2();
+    let grey = MID_GREY.log2();
+    let mut stops = Vec::with_capacity(n);
+    let mut dark = Vec::new();
+    let (mut bright, mut clipped) = (0usize, 0usize);
+    for y in 0..h {
+        for x in 0..w {
+            let p = px(&small, y * w + x).map(|v| v * gain);
+            let b = sampler.base_at(x, y, p) - grey;
+            let c = sampler.clipped_at(x, y, p);
+            if c >= 0.5 {
+                clipped += 1;
+            } else if b > BRIGHT_REGION {
+                bright += 1;
+            }
+            if b < DEEP_SHADOW {
+                dark.push(b);
+            }
+            stops.push(b);
+        }
+    }
+    let at = |v: &mut Vec<f32>, q: f32| -> f32 {
+        if v.is_empty() {
+            return 0.0;
+        }
+        v.sort_by(f32::total_cmp);
+        let i = ((v.len() - 1) as f32 * q).round() as usize;
+        v.get(i).copied().unwrap_or(0.0)
+    };
+    let share = |k: usize| k as f32 / n as f32;
+    let dark_share = share(dark.len());
+    Regions {
+        low: at(&mut stops, 0.03),
+        median: at(&mut stops, 0.5),
+        high: at(&mut stops, 0.97),
+        dark_share,
+        dark_depth: at(&mut dark, 0.5),
+        bright_share: share(bright),
+        clipped_share: share(clipped),
+    }
 }
 
 /// Clarity's base of a reduced frame: the same filter at a smaller radius.
@@ -476,7 +596,7 @@ pub fn tone_grid(rgb: &[f32], width: usize, height: usize, exposure: f32) -> Ton
 pub fn clarity_grid(rgb: &[f32], width: usize, height: usize) -> Grid {
     let guide: Vec<f32> = (0..width * height).map(|i| log_luma(px(rgb, i))).collect();
     let r = radius_for(width, height, CLARITY_RADIUS);
-    guided(&guide, &guide, width, height, r, CLARITY_EPS)
+    guided(&guide, None, width, height, r, CLARITY_EPS)
 }
 
 /// Histogram resolution for finding the densest share of the dark channel.
@@ -628,7 +748,7 @@ pub fn haze(rgb: &[f32], width: usize, height: usize) -> Option<Haze> {
     let r = radius_for(width, height, HAZE_RADIUS);
     Some(Haze {
         airlight,
-        density: guided(&guide, &density, width, height, r, HAZE_EPS),
+        density: guided(&guide, Some(&density), width, height, r, HAZE_EPS),
     })
 }
 

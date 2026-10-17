@@ -1237,12 +1237,14 @@ pub fn frame_base(
     if !(wants_tone || wants_clarity || wants_haze) {
         return None;
     }
+    let reduce_step = crate::perf::step("base.reduce");
     let (mut small, w, h) = ea::reduce(
         &frame.rgb,
         frame.width as usize,
         frame.height as usize,
         ea::BASE_EDGE,
     );
+    drop(reduce_step);
     if w == 0 || h == 0 {
         return None;
     }
@@ -1277,12 +1279,16 @@ pub fn frame_base(
         0.0
     };
     let mut base = ea::FrameBase {
-        tone: wants_tone.then(|| ea::tone_grid(&small, w, h, exposure)),
+        tone: wants_tone.then(|| {
+            let _t = crate::perf::step("base.tone");
+            ea::tone_grid(&small, w, h, exposure)
+        }),
         ..ea::FrameBase::default()
     };
     if wants_clarity || wants_haze {
         creative_pass(&mut small, w32, position, recipe, plan, base.tone.as_ref());
         if wants_clarity {
+            let _t = crate::perf::step("base.clarity");
             let grid = ea::clarity_grid(&small, w, h);
             if wants_haze {
                 ea::clarity(
@@ -1296,6 +1302,7 @@ pub fn frame_base(
             base.clarity = Some(grid);
         }
         if wants_haze {
+            let _t = crate::perf::step("base.haze");
             base.haze = ea::haze(&small, w, h);
         }
     }
