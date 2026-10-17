@@ -117,6 +117,7 @@ pub mod output;
 pub mod parity;
 pub mod perf;
 pub mod portrait;
+pub mod portrait_light;
 pub mod profiles;
 pub mod restore;
 pub mod retouch;

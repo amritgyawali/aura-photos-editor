@@ -287,7 +287,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
         </div></details>
         <details className="lr-section" open={liquifyTool !== null}><summary>Portrait studio: face, body, background, makeup</summary><div className="lr-section-body">
           <PortraitFinishPanel finish={finish} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
-            liquify={liquifyTool} onSave={saveFinish}
+            liquify={liquifyTool} onSave={saveFinish} subject={`${projectId}/${photoId}`}
+            onSuggestLight={() => studioFinish.suggestLight(projectId, photoId)}
             onLiquify={tool => { setLiquifyTool(tool); if (tool) { setMaskTool(null); setView('edited'); setPicking(false); } }} />
         </div></details>
         {render && edited && <Histogram render={render} />}

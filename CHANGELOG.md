@@ -2,6 +2,24 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Portrait light: relight a face, open its shadows, add catchlights and a glow, or press Auto light - 2026-10-17
+
+- **A key light shaped by the head** (ADR-0127), in a new **Light** tab of the Portrait studio. Each
+  face is given a 3-D shape from its own landmarks and a virtual soft light shades it by which way
+  each part of it faces, so the near cheek rises and the far cheek and jaw fall into shadow along the
+  curve of the face - not a gradient laid over somebody. Direction and height place the light; one
+  click puts it to the left, the front, the right or behind (a rim light). Brightness moves, colour
+  never does, so nobody's skin tone changes.
+- **Fill light** reads where the shadow on each face actually is and opens it, up to a stop, leaving
+  the lit side, the eyes, the brows and the lips their depth.
+- **Catchlights** go in the side of each iris facing the light, the same place in both eyes, sized to
+  the iris and coloured like the white of that eye. An eye that already has one is left alone.
+- **Glow**: a soft bloom from the brightest parts of the photograph; needs no face.
+- **Auto light** measures how the largest face is lit and proposes a light - a fill for harsh side
+  light, a soft key for flat light, catchlights for dull eyes - saves it as one undoable step, and
+  shows its reasons. Nothing runs automatically; a recipe without a light keeps its exact hash.
+- Presets *Studio portrait light* and *Dreamy glow*. New command `suggest_portrait_light`.
+
 ## Shadows, Highlights, Clarity and Dehaze rebuilt to work on regions, and Auto enhance sized from them - 2026-10-17
 
 - **Shadows and Highlights act on regions** (ADR-0126). Each pixel takes the gain its *region*

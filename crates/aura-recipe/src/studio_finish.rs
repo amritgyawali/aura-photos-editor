@@ -9,6 +9,8 @@
 //! * **Background** - replace everything behind the people with a colour, a gradient or a
 //!   blur, or replace only the sky with a gradient sky.
 //! * **Feature colour and makeup** - hair, eye, lip, blush and eyeshadow colour.
+//! * **Portrait light** - a key light shaped by each head, a fill on the shadow side,
+//!   catchlights in eyes that have none, and a soft glow. ADR-0127.
 //!
 //! Every slider is `-100..=100` (or `0..=100` for an amount) and zero means untouched, so an
 //! absent block and a block of zeroes render the same photograph. Colours are stored as sRGB
@@ -174,6 +176,64 @@ pub struct Colours {
     pub eyebrows: Option<Tint>,
 }
 
+/// Portrait light: a virtual light on every detected face, and the finishing touches that go
+/// with light. ADR-0127.
+///
+/// Every amount is `0..=100` and zero means untouched; the direction and height only say where
+/// the key light is, so they change nothing while `key` and `catchlights` are zero.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields, rename_all = "camelCase")]
+pub struct Light {
+    /// `0..=100`: how strong the key light added to each face is.
+    pub key: f32,
+    /// `-180..=180` degrees: where the key light comes from, seen from the camera. `0` is from
+    /// the camera, `-90` from the photograph's left, `90` from its right.
+    pub direction: f32,
+    /// `-30..=80` degrees: how far above the eyes the key light is.
+    pub height: f32,
+    /// `0..=100`: how far the shadow side of each face is opened.
+    pub fill: f32,
+    /// `0..=100`: catchlights added to open eyes that have none, placed from the key light.
+    pub catchlights: f32,
+    /// `0..=100`: a soft glow from the brightest parts of the photograph.
+    pub glow: f32,
+}
+
+impl Default for Light {
+    /// No light added; a key light, when one is, starts where a portrait light usually is: to
+    /// the camera's left and a little above the eyes.
+    fn default() -> Self {
+        Self {
+            key: 0.0,
+            direction: -45.0,
+            height: 35.0,
+            fill: 0.0,
+            catchlights: 0.0,
+            glow: 0.0,
+        }
+    }
+}
+
+impl Light {
+    /// True when rendering this changes no pixel.
+    #[must_use]
+    pub fn is_identity(&self) -> bool {
+        self.key <= 0.0 && self.fill <= 0.0 && self.catchlights <= 0.0 && self.glow <= 0.0
+    }
+
+    /// True when this is exactly the default, so it need not be stored.
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// True when the renderer needs the faces for this.
+    #[must_use]
+    pub fn needs_faces(&self) -> bool {
+        self.key > 0.0 || self.fill > 0.0 || self.catchlights > 0.0
+    }
+}
+
 /// Everything the finishing tools can do to one photograph.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
@@ -185,6 +245,10 @@ pub struct StudioFinish {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<Background>,
     pub colours: Colours,
+    /// Not stored while it is the default, so a recipe made before ADR-0127 serializes - and
+    /// hashes - exactly as it did.
+    #[serde(skip_serializing_if = "Light::is_default")]
+    pub light: Light,
 }
 
 impl FaceShape {
@@ -269,6 +333,7 @@ impl StudioFinish {
             && self.liquify.iter().all(|s| s.strength <= 0.0)
             && self.background.is_none_or(|b| b.amount <= 0.0)
             && self.colours.is_empty()
+            && self.light.is_identity()
     }
 
     /// True when the renderer needs the portrait parse for this.
@@ -278,6 +343,7 @@ impl StudioFinish {
             || !self.body.is_identity()
             || self.background.is_some_and(|b| b.amount > 0.0)
             || !self.colours.is_empty()
+            || self.light.needs_faces()
     }
 }
 
@@ -346,6 +412,21 @@ pub fn validate(finish: &StudioFinish) -> AuraResult<()> {
                 "colours must be 0..=1 and amounts 0..=100",
             ));
         }
+    }
+    let l = finish.light;
+    let light_ok = amount(l.key)
+        && amount(l.fill)
+        && amount(l.catchlights)
+        && amount(l.glow)
+        && l.direction.is_finite()
+        && (-180.0..=180.0).contains(&l.direction)
+        && l.height.is_finite()
+        && (-30.0..=80.0).contains(&l.height);
+    if !light_ok {
+        return Err(recipe_invalid(
+            &format!("{KEY}.light"),
+            "amounts must be 0..=100, direction -180..=180 and height -30..=80",
+        ));
     }
     for (name, tint) in finish.colours.all() {
         if let Some(t) = tint {
@@ -429,6 +510,46 @@ mod tests {
         assert!(read(&r).unwrap().needs_parse());
         write(&mut r, &StudioFinish::default()).unwrap();
         assert!(!r.extra.contains_key(KEY));
+    }
+
+    #[test]
+    fn a_light_round_trips_and_a_default_light_is_not_stored() {
+        let mut r = recipe();
+        let mut finish = StudioFinish::default();
+        finish.light.key = 40.0;
+        finish.light.direction = 30.0;
+        finish.light.catchlights = 50.0;
+        write(&mut r, &finish).unwrap();
+        let back = read(&r).unwrap();
+        assert_eq!(back, finish);
+        assert!(back.needs_parse());
+        // A glow alone needs no faces.
+        let mut glow = StudioFinish::default();
+        glow.light.glow = 30.0;
+        assert!(!glow.is_identity());
+        assert!(!glow.needs_parse());
+        // A finish without light serializes without the key, as it did before ADR-0127.
+        let mut shape = StudioFinish::default();
+        shape.face.slim = 10.0;
+        let json = serde_json::to_value(&shape).unwrap();
+        assert!(json.get("light").is_none(), "{json}");
+        // The direction alone changes nothing.
+        let mut aimed = StudioFinish::default();
+        aimed.light.direction = 90.0;
+        assert!(aimed.is_identity());
+    }
+
+    #[test]
+    fn out_of_range_light_is_refused() {
+        let mut finish = StudioFinish::default();
+        finish.light.key = 120.0;
+        assert!(validate(&finish).is_err());
+        let mut finish = StudioFinish::default();
+        finish.light.height = 90.0;
+        assert!(validate(&finish).is_err());
+        let mut finish = StudioFinish::default();
+        finish.light.direction = f32::NAN;
+        assert!(validate(&finish).is_err());
     }
 
     #[test]

@@ -1,4 +1,5 @@
-//! The Studio's finishing tools, end to end through the application layer. ADR-0108.
+//! The Studio's finishing tools, end to end through the application layer. ADR-0108, and
+//! Auto light (ADR-0127).
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -11,6 +12,7 @@ use aura_app::AppState;
 use aura_core::progress::{CancelToken, NullProgress};
 use aura_core::{ImportId, ProjectId};
 use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
+use aura_portrait::fixtures::{portrait, PortraitSpec};
 use aura_raw::codec::{encode_jpeg, Rgb8};
 use aura_recipe::studio_finish::{LiquifyMode, LiquifyStroke, StudioFinish};
 use std::sync::Arc;
@@ -180,4 +182,62 @@ fn a_liquify_is_saved_as_one_undoable_edit_and_changes_the_render() {
             .finish,
         finish
     );
+}
+
+#[test]
+fn auto_light_measures_the_face_proposes_a_light_and_stores_nothing() {
+    let dir = tempfile::tempdir().expect("temp");
+    let path = dir.path().join("portrait.jpg");
+    let p = portrait(&PortraitSpec::default());
+    let rgb = Rgb8 {
+        width: p.width,
+        height: p.height,
+        data: p.rgb.clone(),
+    };
+    std::fs::write(&path, encode_jpeg(&rgb, 95).expect("jpeg")).expect("write");
+    let f = import(&path, dir);
+    let ids = StudioFinishInput {
+        project_id: f.project.clone(),
+        photo_id: f.photo.clone(),
+    };
+    let suggestion = finish_commands::suggest_portrait_light(&f.state, &ids).expect("suggest");
+    assert_eq!(suggestion.faces, 1, "{suggestion:?}");
+    assert!(!suggestion.reasons.is_empty());
+    // The painted face is evenly lit, so it is given a soft key light and no fill.
+    assert!(suggestion.light.key > 0.0, "{suggestion:?}");
+    assert!(suggestion.light.fill <= 0.0, "{suggestion:?}");
+    assert!(
+        suggestion.light.glow <= 0.0,
+        "glow is a look and is never proposed"
+    );
+    // Asking stores nothing.
+    assert_eq!(
+        finish_commands::studio_finish(&f.state, &ids)
+            .expect("read")
+            .finish,
+        StudioFinish::default()
+    );
+    // Saving the proposal is one edit, and it reaches the render.
+    let before = render(&f);
+    let finish = StudioFinish {
+        light: suggestion.light,
+        ..StudioFinish::default()
+    };
+    finish_commands::save_studio_finish(
+        &f.state,
+        &SaveStudioFinishInput {
+            project_id: f.project.clone(),
+            photo_id: f.photo.clone(),
+            finish: finish.clone(),
+            label: Some("Auto light".into()),
+        },
+    )
+    .expect("save");
+    assert_eq!(
+        finish_commands::studio_finish(&f.state, &ids)
+            .expect("read")
+            .finish,
+        finish
+    );
+    assert_ne!(render(&f), before, "the light did not reach the render");
 }

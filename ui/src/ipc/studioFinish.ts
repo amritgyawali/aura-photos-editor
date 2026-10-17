@@ -19,8 +19,16 @@ export type BackgroundMode = 'colour' | 'gradient' | 'blur' | 'sky';
 export type Background = { mode: BackgroundMode; colour: [number, number, number]; colour2: [number, number, number]; amount: number; feather: number };
 export type Tint = { colour: [number, number, number]; amount: number };
 export type FeatureColours = { hair: Tint | null; eyes: Tint | null; lips: Tint | null; blush: Tint | null; eyeshadow: Tint | null; eyebrows: Tint | null };
-export type StudioFinish = { face: FaceShape; body: BodyShape; liquify?: LiquifyStroke[]; background?: Background | null; colours: FeatureColours };
+/**
+ * Portrait light (ADR-0127): a key light shaped by each head, a fill on the shadow side,
+ * catchlights in eyes without them and a soft glow. Amounts are 0..100 and zero means untouched;
+ * direction (-180..180, negative is the photograph's left) and height (-30..80) place the key light.
+ */
+export type PortraitLight = { key: number; direction: number; height: number; fill: number; catchlights: number; glow: number };
+export type StudioFinish = { face: FaceShape; body: BodyShape; liquify?: LiquifyStroke[]; background?: Background | null; colours: FeatureColours; light: PortraitLight };
 export type StudioFinishDto = { finish: StudioFinish; recipe: RecipeDto };
+/** What Auto light measured and proposes. Nothing is stored until the photographer saves it. */
+export type LightSuggestion = { light: PortraitLight; faces: number; contrast: number | null; reasons: string[] };
 
 export const FACE_SLIDERS: ReadonlyArray<readonly [keyof FaceShape, string]> = [
   ['slim', 'Face slim'], ['jaw', 'Jawline'], ['chin', 'Chin length'], ['forehead', 'Forehead height'],
@@ -39,11 +47,18 @@ export const COLOUR_FEATURES: ReadonlyArray<readonly [keyof FeatureColours, stri
   ['blush', 'Blush', '#e48a8a'], ['eyeshadow', 'Eyeshadow', '#8a5a7a'], ['eyebrows', 'Brow colour', '#3a2a20'],
 ] as const;
 
+export const LIGHT_SLIDERS: ReadonlyArray<readonly [keyof PortraitLight, string, number, number]> = [
+  ['key', 'Key light', 0, 100], ['direction', 'Light direction', -180, 180], ['height', 'Light height', -30, 80],
+  ['fill', 'Fill light', 0, 100], ['catchlights', 'Catchlights', 0, 100], ['glow', 'Glow', 0, 100],
+] as const;
+
+export const NEUTRAL_LIGHT: PortraitLight = { key: 0, direction: -45, height: 35, fill: 0, catchlights: 0, glow: 0 };
 export const NEUTRAL_FACE: FaceShape = { slim: 0, jaw: 0, chin: 0, forehead: 0, cheekbones: 0, eyeSize: 0, eyeDistance: 0, noseWidth: 0, noseLength: 0, mouthWidth: 0, lips: 0, smile: 0, headSize: 0 };
 export const NEUTRAL_BODY: BodyShape = { slim: 0, waist: 0, hips: 0, arms: 0, shoulders: 0, legs: 0, neck: 0 };
 export const NEUTRAL_FINISH: StudioFinish = {
   face: NEUTRAL_FACE, body: NEUTRAL_BODY, liquify: [], background: null,
   colours: { hair: null, eyes: null, lips: null, blush: null, eyeshadow: null, eyebrows: null },
+  light: NEUTRAL_LIGHT,
 };
 
 /** `#rrggbb` to sRGB 0..1. */
@@ -66,6 +81,7 @@ export function normaliseFinish(value: Partial<StudioFinish> | null | undefined)
     liquify: value?.liquify ?? [],
     background: value?.background ?? null,
     colours: { ...NEUTRAL_FINISH.colours, ...(value?.colours ?? {}) },
+    light: { ...NEUTRAL_LIGHT, ...(value?.light ?? {}) },
   };
 }
 
@@ -74,6 +90,9 @@ export const studioFinish = {
     invoke<StudioFinishDto>('studio_finish', { input: { projectId, photoId } }),
   save: (projectId: string, photoId: string, finish: StudioFinish, label: string) =>
     invoke<StudioFinishDto>('save_studio_finish', { input: { projectId, photoId, finish, label } }),
+  /** Auto light: measure how each face is lit and propose a light. Stores nothing. */
+  suggestLight: (projectId: string, photoId: string) =>
+    invoke<LightSuggestion>('suggest_portrait_light', { input: { projectId, photoId } }),
 };
 
 /** The finish a recipe carries, read from its body; neutral when absent or unreadable. */
@@ -100,6 +119,10 @@ export const FINISH_PRESETS: ReadonlyArray<{ id: string; name: string; hint: str
     apply: f => ({ ...f, background: { mode: 'blur', colour: [1, 1, 1], colour2: [1, 1, 1], amount: 60, feather: 30 } }) },
   { id: 'blue-sky', name: 'Blue sky', hint: 'Replace a blown or grey sky with a clear blue one.',
     apply: f => ({ ...f, background: { mode: 'sky', colour: [0.26, 0.5, 0.86], colour2: [0.72, 0.84, 0.96], amount: 100, feather: 40 } }) },
+  { id: 'studio-light', name: 'Studio portrait light', hint: 'A soft key light from the left with catchlights, as a studio softbox gives.',
+    apply: f => ({ ...f, light: { ...f.light, key: 35, direction: -45, height: 35, fill: 10, catchlights: 60 } }) },
+  { id: 'dreamy-glow', name: 'Dreamy glow', hint: 'A soft bloom from the brightest parts of the photograph.',
+    apply: f => ({ ...f, light: { ...f.light, glow: 40 } }) },
   { id: 'sunset-sky', name: 'Sunset sky', hint: 'A warm golden-hour sky.',
     apply: f => ({ ...f, background: { mode: 'sky', colour: [0.36, 0.33, 0.6], colour2: [0.98, 0.66, 0.4], amount: 100, feather: 40 } }) },
 ];

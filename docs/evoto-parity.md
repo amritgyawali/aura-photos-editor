@@ -5,7 +5,7 @@ automatically. Where AURA does not have something, this page says so rather than
 
 **Where to find things.** *Studio* is the Photo editor (Develop). *Retouch* is the **Retouch**
 button inside it. *Portrait studio* is the **Portrait studio: face, body, background, makeup**
-section in the Studio's right-hand panel (ADR-0108). *Automatic* means Auto enhance or Auto
+section in the Studio's right-hand panel (ADR-0108); its **Light** tab is ADR-0127. *Automatic* means Auto enhance or Auto
 advanced retouch sets it without anybody touching a control.
 
 ## Evoto's homepage before/after, measured
@@ -42,6 +42,17 @@ screenshots of them and each one gets the same treatment.
 | Body skin smoothing | Retouch on the body-skin selection | Advanced workflow |
 | Face lighting / 3D contour, dodge and burn | Retouch → Dodge, Burn, Micro dodge & burn, Skin dodge and burn | Advanced workflow |
 | Skin tone changer (lighten / darken) | **Not provided, deliberately.** AURA never moves a person's skin tone. | - |
+
+## Light on a face
+
+All manual, with one button that proposes. ADR-0127.
+
+| Evoto | AURA | Automatic |
+|---|---|---|
+| Relight a face (move a soft light round the head) | Portrait studio → Light → Key light, Light direction, Light height; *From the left / front / right*, *Rim from behind*; the *Studio portrait light* preset | No - **Auto light** proposes one, as one undoable step |
+| Open a harsh shadow side | Portrait studio → Light → Fill light (measured from the face's own skin) | Proposed by Auto light for side-lit faces |
+| Eye sparkle / catchlights | Portrait studio → Light → Catchlights (placed from the light, left alone where the eye already has one) | Proposed by Auto light for eyes without one |
+| Soft glow / bloom | Portrait studio → Light → Glow, or the *Dreamy glow* preset | No - never proposed |
 
 ## Eyes, teeth, lips, hair
 

@@ -3782,6 +3782,21 @@ async fn save_studio_finish(
     .map_err(|_| background_request_failed())?
 }
 
+/// Auto light: measure how each face is lit and propose a portrait light. Stores nothing.
+/// ADR-0127.
+#[tauri::command]
+async fn suggest_portrait_light(
+    state: State<'_, AppState>,
+    input: aura_app::finish_commands::StudioFinishInput,
+) -> IpcResult<aura_app::finish_commands::LightSuggestionDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::finish_commands::suggest_portrait_light(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 /// "Connect Claude" / "Connect ChatGPT": open the provider's own key page in the browser.
 /// The address comes from the catalogue, never from the window. ADR-0108 section 5.
 #[tauri::command]
@@ -3885,6 +3900,7 @@ fn main() {
             local_mask_coverage,
             studio_finish,
             save_studio_finish,
+            suggest_portrait_light,
             open_provider_page,
             native_retouch_preview,
             photo_original,
