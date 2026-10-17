@@ -133,6 +133,11 @@ pub enum Tool {
     /// they are. `radius` is the reach of the evening and `texture` how much of the clean
     /// skin's own grain is put back. ADR-0118.
     StretchMarks,
+    /// Removes the purple (`warmth`) and green (`tint`) rims a lens leaves on the dark side of a
+    /// bright edge, `radius` from it; each rim pixel takes the colour of its calm surroundings
+    /// at its own luminance. A colour its calm surroundings share, or the glow of a coloured
+    /// light, is kept. ADR-0125.
+    Defringe,
 }
 
 // Each flag is an independent opt-in that old recipes read as off; none of them is a state

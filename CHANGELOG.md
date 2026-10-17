@@ -2,6 +2,38 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## The lens, corrected the way a professional starts: colour fringing measured, purple rims removed - 2026-10-17
+
+- **Lateral chromatic aberration is measured from the photograph** (ADR-0125) - Lightroom's
+  "Remove Chromatic Aberration", without a lens profile. Clean edges round the frame are read in
+  all three channels to a quarter of a pixel; a fringe that is visible, consistent in every
+  direction and statistically clear is corrected 85 % of the way and then measured again on the
+  corrected pixels before it is kept. Auto enhance applies it in "Light & colour", Auto advanced
+  retouch in "Lens & perspective". On a painted lens it measured 1.07 px of the 1.08 px drawn.
+- **The CA correction no longer leaves a coloured line round the frame**: a channel scaled up
+  read black beyond the border. It reads the edge pixel now, on every core.
+- **Defringe**, a new Retouch tool under Cleanup: purple (and, when asked, green) rims on the
+  dark side of bright edges take the colour of their calm surroundings at their own brightness.
+  Purple things, and the glow round purple lights, keep their colour. Auto enhance and Auto
+  advanced retouch remove purple rims when they measure them; green is left to a person. 1.1 s
+  over a 24-megapixel export.
+
+## Body skin healed where the skin is, and black-and-white photographs left without colour - 2026-10-16
+
+- **Full-length portraits export faster** (ADR-0124): body-skin spot healing works on the
+  separate patches of skin - neck, arms, legs - packed into one compact plane, instead of on the
+  whole body rectangle around them. Thresholds are still measured over the whole selection, at
+  the very same samples, so the result matches the old one to rounding (largest relative
+  difference 2e-6 in the test that holds them together). On a synthetic 13.5 MP figure whose skin
+  is 15 % of the body rectangle the operation went from 6.3-6.7 s to 2.8 s (four threads,
+  development build).
+- **Matte edges refine on every core** (agreeing with the old result to about 3e-8) and each
+  brush stroke is painted over its own reach only (bit-identical): about 900 ms to 650 ms for a
+  body matte, and less sweeping for every automatic retouch selection.
+- **Auto enhance no longer tints a black-and-white or sepia photograph.** The finishing look added
+  a warm/cool split tone and vibrance to frames the planner had already recognised as monochrome
+  or toned. They now get depth only, and the explanation says why.
+
 ## A different look on every photograph, a live status bar, and a folder run in two hours rather than eight - 2026-10-16
 
 - **Every photograph gets its own finishing look** (ADR-0123): tone curve, colour bands, vibrance

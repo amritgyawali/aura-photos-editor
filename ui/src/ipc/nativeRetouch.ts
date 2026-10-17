@@ -28,6 +28,7 @@ export const RETOUCH_TOOLS = [
   ['red_eye', 'Flash red-eye correction', 'Details', 'Reduces dominant red inside the selected pupil.'],
   ['fabric', 'Fabric crease softening', 'Cleanup', 'Reduces broad texture variations; keep seams outside the selection.'],
   ['backdrop', 'Backdrop smoothing', 'Cleanup', 'Smooths a selected backdrop patch. Avoid subject edges.'],
+  ['defringe', 'Defringe · purple and green edges', 'Cleanup', 'Removes the purple or green rims a lens leaves on the dark side of bright edges: branches against a sky, a veil against the light, a dark suit beside a white shirt. Each rim pixel takes the colour of its calm surroundings at its own brightness. Purple or green things, and the glow of coloured lights, keep their colour.'],
   ['glare', 'Glare softening', 'Details', 'Reduces bright reflections; cannot reconstruct detail hidden by glare.'],
   ['makeup', 'Local cosmetic tint', 'Color', 'Applies a controlled warm or magenta tint to a chosen region.'],
   ['colorize', 'Hair, clothes & makeup color', 'Color', 'Choose any color, then select hair, clothing, lips or another area. Preserves the photographed light and fine detail. Reuse a saved hair or clothes selection, or paint and refine your own.'],

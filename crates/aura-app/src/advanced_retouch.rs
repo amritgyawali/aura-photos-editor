@@ -174,6 +174,10 @@ impl Stage {
 #[must_use]
 pub fn stage_of(edit: &Edit) -> Option<Stage> {
     portrait_auto::group_of(&edit.id)?;
+    // Purple fringes are cleaned off the frame with the dust, before any skin is touched.
+    if edit.id == smart_edit::DEFRINGE_ID {
+        return Some(Stage::Background);
+    }
     if edit.id.starts_with(SCENE_PREFIX) {
         return Some(Stage::BackgroundToning);
     }
@@ -233,7 +237,7 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         }
         Tool::Fabric => Stage::Clothing,
         Tool::Glare => Stage::Jewellery,
-        Tool::Backdrop | Tool::Heal | Tool::Clone => Stage::Background,
+        Tool::Backdrop | Tool::Heal | Tool::Clone | Tool::Defringe => Stage::Background,
         Tool::PortraitDodgeBurn | Tool::Mattify | Tool::Dodge | Tool::Burn => {
             Stage::MediumDodgeBurn
         }
@@ -557,6 +561,8 @@ pub fn plan(
                         && !d.starts_with("Clarity")
                         && !d.starts_with("Sharpening")
                         && !d.starts_with("Sky")
+                        && !d.starts_with("Colour fringing")
+                        && !d.starts_with("Purple fringes")
                 })
                 .cloned(),
         );
@@ -658,10 +664,20 @@ pub fn plan(
             )),
             Tilt::Unsure(why) => r.checks.push(format!("Horizon left as shot: {why}.")),
         }
+        // Colour fringing is measured from the photograph's own edges, not looked up: the
+        // misregistration of the three channels is in the pixels. ADR-0125.
+        let has_scales = base.lens.coefficients.is_some_and(|c| {
+            (c.ca_red - 1.0).abs() >= f32::EPSILON || (c.ca_blue - 1.0).abs() >= f32::EPSILON
+        });
+        if has_scales {
+            r.checks.push("Colour fringing: this photograph already carries chromatic scales; they are kept as set.".into());
+        } else if let Some(found) = &global.fringing {
+            r.checks.push(found.sentence());
+        }
         r.checks.push(if base.lens.coefficients.is_some() {
             "Lens: this photograph already carries lens coefficients; they are kept as set.".into()
         } else {
-            "Lens: no measured profile for this lens, so distortion, vignetting and chromatic aberration are left as shot rather than guessed.".into()
+            "Lens: no measured profile for this lens, so distortion and vignetting are left as shot rather than guessed.".into()
         });
         r.checks.push("Structure: correct photographic distortion, never redesign the person - this workflow has no liquify and reshapes no face or body.".into());
     }
@@ -750,6 +766,13 @@ pub fn plan(
             _ => r.checks.push(format!("Dust search skipped: {no_person}")),
         }
         r.checks.push("Distracting objects and people are never removed automatically: what belongs to the story is a person's decision.".into());
+        if let Some(op) = global.defringe.take() {
+            r.changes.push("Purple fringes on the dark side of bright edges given the colour of their surroundings; purple things and coloured lights kept.".into());
+            stages.entry(Stage::Background).or_default().push(op);
+        } else if frame.is_some() {
+            r.checks
+                .push("Purple fringes: none to correct along the bright edges.".into());
+        }
     }
 
     // 4. Hair: silhouette strays, then the hair's own detail and shine.
@@ -1266,6 +1289,9 @@ fn apply_globals(stage: Stage, recipe: &mut Recipe, planned: &Planned) {
                 recipe.geometry.rotate = rotate;
                 recipe.geometry.crop = crop;
             }
+            if let Some(global) = &planned.global {
+                crate::smart_edit::apply_fringing(recipe, global);
+            }
         }
         Stage::ColourGrade => {
             g.vibrance = plan.vibrance;
@@ -1337,6 +1363,23 @@ fn describe_globals(stage: Stage, before: &Recipe, after: &Recipe) -> Vec<String
                 .any(|(x, y)| (x - y).abs() > 1e-6)
             {
                 out.push("Cropped just enough to hide the corners the rotation opened.".into());
+            }
+            let scales = |r: &Recipe| {
+                r.lens
+                    .coefficients
+                    .filter(|_| r.lens.ca)
+                    .map_or([1.0, 1.0], |c| [c.ca_red, c.ca_blue])
+            };
+            let (was, now) = (scales(before), scales(after));
+            if was
+                .iter()
+                .zip(now)
+                .any(|(x, y)| (x - y).abs() > f32::EPSILON)
+            {
+                out.push(format!(
+                    "Colour fringing corrected: red scaled {:.4}, blue {:.4} against green, from the photograph's own edges.",
+                    now[0], now[1]
+                ));
             }
         }
         Stage::ColourGrade => {
@@ -1818,6 +1861,28 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_fringing_correction_is_described_in_the_lens_step() {
+        let before = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "");
+        let mut after = before.clone();
+        after.lens.ca = true;
+        after.lens.coefficients = Some(aura_recipe::LensCoefficients {
+            k1: 0.0,
+            k2: 0.0,
+            k3: 0.0,
+            ca_red: 1.0004,
+            ca_blue: 0.9997,
+        });
+        let lines = describe_globals(Stage::LensPerspective, &before, &after);
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.starts_with("Colour fringing corrected")),
+            "{lines:?}"
+        );
+        assert!(describe_globals(Stage::LensPerspective, &after, &after).is_empty());
+    }
 
     fn edit(id: &str, tool: Tool) -> Edit {
         base_edit(id.into(), tool, [0.5, 0.5, 0.1, 0.1], 0.5)

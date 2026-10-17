@@ -89,6 +89,7 @@ pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
+pub mod lateral_ca;
 pub mod local_commands;
 pub mod local_mask_commands;
 pub mod look_commands;
