@@ -8,6 +8,20 @@ the history, so you can go back to any point - "after the skin cleanup", "before
 and carry on by hand from there. Your original file is never changed and nothing leaves your
 computer.
 
+## Two styles
+
+Next to the button you choose a style:
+
+- **Professional** - the workflow's own defaults, below. The backdrop keeps the light it was shot
+  in.
+- **Beauty & Fashion (Evoto-style)** - the same eighteen steps, set up to finish the way Evoto's
+  homepage "Beauty & Fashion" example does in one automated pass: high-end skin work with pores
+  kept, clothing creases softened, stray hair faded against the backdrop, face and body - and a
+  plain grey studio backdrop lifted to a clean bright grey. The lift is the same on red, green and
+  blue so it stays neutral, it keeps the backdrop's own fall-off, and it stops short of white. A
+  backdrop that is a scene, a colour or deliberately dark is never lifted, and the report says
+  which it was.
+
 ## The eighteen steps
 
 | # | Step | What AURA checks | What it may change |
@@ -25,7 +39,7 @@ computer.
 | 11 | Eyes, lips & teeth | Dark circles against the cheek just below them, red eye whites, iris, teeth colour, lips | Dark circles lifted most of the way toward that cheek - their purple or brown cast too - never lighter than the cheek, with the pores and lashes untouched. Redness out of the whites (not painted white), iris and catchlight lifted a little, teeth less yellow (not white), lip texture kept. Brows and lashes are not filled |
 | 12 | Clothing | Creases, lint, threads and small stains on the clothes | Creases softened, small marks healed from the fabric beside them. Patterned fabric and hair ends lying on it are left alone |
 | 13 | Jewellery & reflections | Burnt-out reflections on the outfit and in the necklace and earring area | Tamed so the metal or stone shows again; sparkle and sequins are kept |
-| 14 | Background toning | Whether the background is brighter than the person's face; a bright sky | A background that pulls the eye away is lowered gently; a bright sky balanced. A white backdrop stays white |
+| 14 | Background toning | Whether the background is brighter than the person's face; a bright sky; in Beauty & Fashion, whether the backdrop is plain neutral studio paper | A background that pulls the eye away is lowered gently; a bright sky balanced. A white backdrop stays white. In Beauty & Fashion a plain grey seamless is lifted to a clean bright grey (about sRGB 233 from 206), neutrally |
 | 15 | Colour grade | - | Vibrance (and clarity on scenes without people), only now that the photo is corrected. AURA does not invent a signature look: add yours with an edit profile in Develop |
 | 16 | Grain | Whether the photo is clean and parts were smoothed or healed | A fine, even grain that ties retouched and untouched areas together |
 | 17 | Output sharpening | - | Sharpening with skin masked out, after every retouch |

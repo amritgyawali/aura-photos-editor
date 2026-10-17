@@ -38,7 +38,7 @@ it('shows each step as it runs, then what every step checked and changed', async
   vi.mocked(advancedRetouch.run).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
   render(<AdvancedRetouch projectId="p" photoId="a" recipe={null} disabled={false} onRun={task => void task()} />);
   fireEvent.click(screen.getByRole('button', { name: 'Auto advanced retouch' }));
-  await waitFor(() => expect(advancedRetouch.run).toHaveBeenCalledWith('p', 'a'));
+  await waitFor(() => expect(advancedRetouch.run).toHaveBeenCalledWith('p', 'a', undefined, 'professional'));
   act(() => {
     push?.({ photoId: 'a', number: 1, total: 18, title: 'RAW foundation', state: 'done', outcome: 'applied' });
     push?.({ photoId: 'a', number: 2, total: 18, title: 'Lens & perspective', state: 'running', outcome: null });
@@ -54,6 +54,15 @@ it('shows each step as it runs, then what every step checked and changed', async
   expect(screen.getByText(/Not applicable to this photo/)).toBeTruthy();
   expect(screen.getByText('Acne clear on 1 face', { selector: 'summary' })).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Run Auto advanced retouch again' })).toBeTruthy();
+});
+
+it('runs the Evoto-style Beauty & Fashion pass when that style is chosen', async () => {
+  vi.mocked(advancedRetouch.onProgress).mockResolvedValue(() => {});
+  vi.mocked(advancedRetouch.run).mockResolvedValue({ recipe: { photoId: 'a' } as RecipeDto, report });
+  render(<AdvancedRetouch projectId="p" photoId="b" recipe={null} disabled={false} onRun={task => void task()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /Beauty & Fashion/ }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Auto advanced retouch' })[0]!);
+  await waitFor(() => expect(advancedRetouch.run).toHaveBeenCalledWith('p', 'b', undefined, 'beauty_fashion'));
 });
 
 it('reads the last run back from the recipe and ignores what it does not understand', () => {

@@ -78,6 +78,7 @@ fn the_full_quality_preview_is_the_original_size_and_cached() {
             project_id: project.id.clone(),
             photo_id: photo.clone(),
             options: None,
+            preset: None,
         },
         &|_| {},
     )

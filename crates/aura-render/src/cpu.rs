@@ -751,6 +751,11 @@ impl CpuEngine {
     ) -> (Vec<f32>, u32, u32) {
         let _t = crate::perf::step("render.after_retouch (all)");
         let g = &recipe.global;
+        // ---- the Studio's finishing tools (ADR-0108) -------------------------------------
+        //
+        // Feature colour, background replacement and reshaping, on the whole frame before the
+        // local masks, so a mask drawn on the finished face lands on the finished face.
+        crate::studio_finish::apply(&mut rgb, width, height, recipe, frame);
         // ---- the Studio's local adjustments (ADR-0102) -----------------------------------
         {
             let _t = crate::perf::step("render.local_masks");
@@ -830,6 +835,7 @@ impl CpuEngine {
         before.extra.remove(aura_recipe::retouch_tools::MATTE_KEY);
         before.extra.remove(aura_recipe::local_masks::KEY);
         before.extra.remove(aura_recipe::local_masks::MATTE_KEY);
+        before.extra.remove(aura_recipe::studio_finish::KEY);
         before.global.sharpen.amount = 0;
         before.global.effects = aura_recipe::Effects::default();
         before.geometry = aura_recipe::Geometry::default();

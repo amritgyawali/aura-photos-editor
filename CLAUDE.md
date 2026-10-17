@@ -192,6 +192,9 @@ Never load two phase files into one session.
 | Branching, landing and merging a phase | `scripts/phase-branch.sh`, `scripts/phase-land.sh`, `docs/runbooks/phase-landing.md` |
 | One studio, the unattended run and the measured cull | `docs/adr/ADR-0088-one-studio-and-the-unattended-wedding-run.md`, `crates/aura-app/src/one_click_commands.rs`, `crates/aura-app/src/measured_cull.rs`, `ui/src/components/workflow/FinishFolder.tsx` |
 | Finishing a folder in the real app, scored against ground truth | `scripts/test-wedding-run.py`, results in `docs/unified-studio-validation.md` |
+| Evoto-style finishing: face/body reshape, liquify, background replace, makeup; Connect Claude / ChatGPT | `docs/adr/ADR-0108-portrait-finishing-and-connecting-an-ai-account.md`, `crates/aura-recipe/src/studio_finish.rs`, `crates/aura-render/src/studio_finish.rs`, `crates/aura-app/src/finish_commands.rs`, `crates/aura-cloud/src/browser.rs`, `ui/src/components/develop/PortraitFinishPanel.tsx`, `ui/src/components/ConnectProvider.tsx` |
+| Every Evoto tool and where it lives in AURA | `docs/evoto-parity.md` |
+| Evoto's Beauty & Fashion pass, measured from its homepage: the bright-backdrop lift and the preset | `docs/adr/ADR-0109-evoto-beauty-and-fashion-pass.md`, `crates/aura-app/src/advanced_retouch/measure.rs` (`backdrop_lift`), `crates/aura-app/src/advanced_retouch.rs` (`beauty_fashion_options`), `crates/aura-app/tests/beauty_fashion.rs` |
 | Portrait parsing and portrait retouch decisions | `docs/adr/ADR-0065-measured-portrait-parsing-and-portrait-retouch.md` |
 | Faces, landmarks and the nineteen portrait regions | `crates/aura-portrait/` |
 | The vendored Haar cascades, their converter and their card | `crates/aura-portrait/data/`, `docs/model-cards/haar_cascades.md` |
