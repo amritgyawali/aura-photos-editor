@@ -520,7 +520,7 @@ impl CpuEngine {
         let whole =
             (frame.origin == (0, 0) && frame.full == (frame.width, frame.height)).then_some(frame);
         let (rgb, width, height) =
-            Self::after_retouch(rgb, width, height, recipe, plan, stats, whole);
+            Self::after_retouch(rgb, width, height, recipe, plan, &stats, whole);
         (rgb, width, height, notes)
     }
 
@@ -564,62 +564,33 @@ impl CpuEngine {
             });
         }
 
-        let multipliers = white_balance(g.temperature as f32, f32::from(g.tint));
-        let curve = crate::creative::luminance_lut(&g.curve, &g.parametric);
-        let channels = crate::creative::ChannelLuts::build(&g.channel_curves);
-        let grade = crate::creative::GradePlan::new(&g.colour_grade);
-        let calibration = crate::creative::CalibrationPlan::new(&g.calibration);
-        let tone = Tone {
-            highlights: f32::from(g.highlights) / 100.0,
-            shadows: f32::from(g.shadows) / 100.0,
-            whites: f32::from(g.whites) / 100.0,
-            blacks: f32::from(g.blacks) / 100.0,
-        };
-        let recovery = (-f32::from(g.highlights) / 100.0).max(0.0);
+        // ---- the edge-aware base layers, measured once over the whole frame (ADR-0126) ---
+        //
+        // A tile receives them from the tiler, measured on the whole frame; a whole-frame render
+        // measures them here. Either way every pixel reads the same coefficients.
+        let base = stats.base.clone().or_else(|| {
+            let whole = frame.origin == (0, 0) && frame.full == (frame.width, frame.height);
+            if whole {
+                let _t = crate::perf::step("before.frame_base");
+                frame_base(frame, recipe, plan).map(Arc::new)
+            } else {
+                None
+            }
+        });
+        let mut stats = stats;
+        stats.base.clone_from(&base);
 
         // ---- the point-wise input half, fused into one pass over the pixels -------------
-        let wants_recovery = plan.stages.contains(&Stage::HighlightRecovery);
-        let wants_wb = plan.stages.contains(&Stage::WhiteBalance);
-        let wants_matrix = plan.stages.contains(&Stage::CameraMatrix);
-        if wants_recovery || wants_wb || wants_matrix {
-            let clip = frame.clip;
-            let matrix = profile.camera_to_working;
-            rgb.par_chunks_mut(3).for_each(|pixel| {
-                let mut value = [
-                    pixel.first().copied().unwrap_or(0.0),
-                    pixel.get(1).copied().unwrap_or(0.0),
-                    pixel.get(2).copied().unwrap_or(0.0),
-                ];
-                if wants_recovery {
-                    value = recover_highlights(value, clip, recovery);
-                }
-                if wants_wb {
-                    for (slot, m) in value.iter_mut().zip(multipliers.iter()) {
-                        *slot *= m;
-                    }
-                }
-                if wants_matrix {
-                    value = apply_f32(matrix, value);
-                }
-                for (slot, out) in pixel.iter_mut().zip(value.iter()) {
-                    *slot = *out;
-                }
-            });
-        }
+        input_pass(
+            &mut rgb,
+            recipe,
+            plan,
+            frame.clip,
+            profile.camera_to_working,
+        );
 
         // ---- calibration: the primaries every later colour control works on -----------
-        if plan.stages.contains(&Stage::Calibration) {
-            rgb.par_chunks_mut(3).for_each(|pixel| {
-                let value = calibration.apply([
-                    pixel.first().copied().unwrap_or(0.0),
-                    pixel.get(1).copied().unwrap_or(0.0),
-                    pixel.get(2).copied().unwrap_or(0.0),
-                ]);
-                for (slot, out) in pixel.iter_mut().zip(value.iter()) {
-                    *slot = *out;
-                }
-            });
-        }
+        calibration_pass(&mut rgb, recipe, plan);
 
         // ---- lens ----------------------------------------------------------------------
         //
@@ -675,76 +646,30 @@ impl CpuEngine {
         }
 
         // ---- the point-wise creative half, fused into one pass -------------------------
-        let wants_exposure = plan.stages.contains(&Stage::Exposure);
-        let wants_tone = plan.stages.contains(&Stage::Tone);
-        let wants_contrast = plan.stages.contains(&Stage::Contrast);
-        let wants_curve = plan.stages.contains(&Stage::Curve);
-        let wants_hsl = plan.stages.contains(&Stage::Hsl);
-        let wants_vibrance = plan.stages.contains(&Stage::Vibrance);
-        let wants_bw = plan.stages.contains(&Stage::Monochrome);
-        let wants_grade = plan.stages.contains(&Stage::ColourGrade);
-
-        if wants_exposure
-            || wants_tone
-            || wants_contrast
-            || wants_curve
-            || wants_hsl
-            || wants_vibrance
-            || wants_bw
-            || wants_grade
-        {
-            let vibrance = f32::from(g.vibrance) / 100.0;
-            let saturation = f32::from(g.saturation) / 100.0;
-            let contrast_amount = f32::from(g.contrast) / 100.0;
-            rgb.par_chunks_mut(3).for_each(|pixel| {
-                let mut value = [
-                    pixel.first().copied().unwrap_or(0.0),
-                    pixel.get(1).copied().unwrap_or(0.0),
-                    pixel.get(2).copied().unwrap_or(0.0),
-                ];
-                if wants_exposure {
-                    value = tonemap::exposure(value, g.exposure);
-                }
-                if wants_tone {
-                    value = tonemap::tone(value, tone);
-                }
-                if wants_contrast {
-                    value = tonemap::contrast(value, contrast_amount);
-                }
-                if wants_curve {
-                    value = tonemap::apply_curve(value, &curve);
-                    value = channels.apply(value);
-                }
-                if wants_hsl {
-                    value = tonemap::hsl(value, &g.hsl);
-                }
-                if wants_vibrance {
-                    value = tonemap::vibrance_saturation(value, vibrance, saturation);
-                }
-                if wants_bw {
-                    if let Some(bw) = &recipe.bw {
-                        value = tonemap::monochrome(value, bw);
-                    }
-                }
-                if wants_grade {
-                    value = grade.apply(value);
-                }
-                for (slot, out) in pixel.iter_mut().zip(value.iter()) {
-                    *slot = *out;
-                }
-            });
-        }
+        creative_pass(
+            &mut rgb,
+            width,
+            position,
+            recipe,
+            plan,
+            base.as_ref().and_then(|b| b.tone.as_ref()),
+        );
 
         // ---- local contrast ------------------------------------------------------------
+        //
+        // Clarity reads the frame-wide edge-aware base, so it boosts a region's detail
+        // without the halo a blur leaves around a hard edge. ADR-0126.
         if plan.stages.contains(&Stage::Clarity) {
             let _t = crate::perf::step("before.clarity");
-            spatial::local_contrast(
-                &mut rgb,
-                width as usize,
-                height as usize,
-                16,
-                f32::from(g.clarity) / 100.0,
-            );
+            if let Some(grid) = base.as_ref().and_then(|b| b.clarity.as_ref()) {
+                crate::edge_aware::clarity(
+                    &mut rgb,
+                    width,
+                    position,
+                    grid,
+                    f32::from(g.clarity) / 100.0,
+                );
+            }
         }
         if plan.stages.contains(&Stage::Texture) {
             let _t = crate::perf::step("before.texture");
@@ -758,13 +683,15 @@ impl CpuEngine {
         }
         if plan.stages.contains(&Stage::Dehaze) {
             let _t = crate::perf::step("before.dehaze");
-            spatial::dehaze(
-                &mut rgb,
-                width as usize,
-                height as usize,
-                f32::from(g.dehaze) / 100.0,
-                &stats,
-            );
+            if let Some(haze) = base.as_ref().and_then(|b| b.haze.as_ref()) {
+                crate::edge_aware::dehaze(
+                    &mut rgb,
+                    width,
+                    position,
+                    haze,
+                    f32::from(g.dehaze) / 100.0,
+                );
+            }
         }
 
         // ---- the portrait parse ----------------------------------------------------------
@@ -819,7 +746,7 @@ impl CpuEngine {
         mut height: u32,
         recipe: &Recipe,
         plan: &Plan,
-        stats: spatial::Stats,
+        stats: &spatial::Stats,
         frame: Option<&Frame>,
     ) -> (Vec<f32>, u32, u32) {
         let _t = crate::perf::step("render.after_retouch (all)");
@@ -844,7 +771,7 @@ impl CpuEngine {
                 f32::from(g.sharpen.amount) / 100.0,
                 f32::from(g.sharpen.detail) / 100.0,
                 f32::from(g.sharpen.masking) / 100.0,
-                &stats,
+                stats,
             );
         }
 
@@ -945,7 +872,7 @@ impl CpuEngine {
                     width: u32,
                     height: u32,
                     notes: &[RenderNote],
-                    stats: spatial::Stats| {
+                    stats: &spatial::Stats| {
             key.map(|key| {
                 checkpoints.put(
                     key.clone(),
@@ -954,7 +881,9 @@ impl CpuEngine {
                         width,
                         height,
                         notes: notes.to_vec(),
-                        stats,
+                        // Nothing after the stack reads a base layer; a cached checkpoint
+                        // should not hold one.
+                        stats: stats.without_base(),
                     },
                 )
             })
@@ -990,7 +919,7 @@ impl CpuEngine {
                     found.width,
                     found.height,
                     &found.notes,
-                    found.stats,
+                    &found.stats,
                 );
                 remember(Some(base), after);
             } else {
@@ -1004,12 +933,12 @@ impl CpuEngine {
                 found.width,
                 found.height,
                 found.notes.clone(),
-                found.stats,
+                found.stats.clone(),
             )
         } else {
             let (mut rgb, width, height, notes, stats) =
                 Self::before_retouch(frame, recipe, plan, level, None);
-            let before = keep(keys.first(), &rgb, width, height, &notes, stats);
+            let before = keep(keys.first(), &rgb, width, height, &notes, &stats);
             let after = if last > 0 {
                 crate::retouch_tools::apply_with_mattes(
                     &mut rgb,
@@ -1018,7 +947,7 @@ impl CpuEngine {
                     &edits,
                     &mattes,
                 );
-                keep(keys.get(last), &rgb, width, height, &notes, stats)
+                keep(keys.get(last), &rgb, width, height, &notes, &stats)
             } else {
                 before.clone()
             };
@@ -1026,7 +955,7 @@ impl CpuEngine {
             (rgb, width, height, notes, stats)
         };
         let (rgb, width, height) =
-            Self::after_retouch(rgb, width, height, recipe, plan, stats, Some(frame));
+            Self::after_retouch(rgb, width, height, recipe, plan, &stats, Some(frame));
         Ok((rgb, width, height, notes))
     }
 
@@ -1077,7 +1006,7 @@ impl CpuEngine {
         }
         crate::retouch_cache::carry_over(&mut rgb, &last);
         let (rgb, width, height) =
-            Self::after_retouch(rgb, width, height, &clamped, &plan, stats, Some(&frame));
+            Self::after_retouch(rgb, width, height, &clamped, &plan, &stats, Some(&frame));
         let (pixels, backend) = self.output(&rgb, width, height, &req.output);
         let elapsed = self.clock.monotonic_us().saturating_sub(started);
         Ok(Some(RenderedImage {
@@ -1122,6 +1051,268 @@ pub fn apply_post_crop(
     if plan.stages.contains(&Stage::Grain) {
         crate::creative::grain(rgb, width as usize, position, &effects.grain);
     }
+}
+
+/// The point-wise input half: highlight recovery, white balance and the camera matrix.
+fn input_pass(
+    rgb: &mut [f32],
+    recipe: &Recipe,
+    plan: &Plan,
+    clip: [f32; 3],
+    matrix: [[f32; 3]; 3],
+) {
+    let g = &recipe.global;
+    let wants_recovery = plan.stages.contains(&Stage::HighlightRecovery);
+    let wants_wb = plan.stages.contains(&Stage::WhiteBalance);
+    let wants_matrix = plan.stages.contains(&Stage::CameraMatrix);
+    if !(wants_recovery || wants_wb || wants_matrix) {
+        return;
+    }
+    let multipliers = white_balance(g.temperature as f32, f32::from(g.tint));
+    let recovery = (-f32::from(g.highlights) / 100.0).max(0.0);
+    rgb.par_chunks_mut(3).for_each(|pixel| {
+        let mut value = [
+            pixel.first().copied().unwrap_or(0.0),
+            pixel.get(1).copied().unwrap_or(0.0),
+            pixel.get(2).copied().unwrap_or(0.0),
+        ];
+        if wants_recovery {
+            value = recover_highlights(value, clip, recovery);
+        }
+        if wants_wb {
+            for (slot, m) in value.iter_mut().zip(multipliers.iter()) {
+                *slot *= m;
+            }
+        }
+        if wants_matrix {
+            value = apply_f32(matrix, value);
+        }
+        for (slot, out) in pixel.iter_mut().zip(value.iter()) {
+            *slot = *out;
+        }
+    });
+}
+
+/// Calibration: the primaries every later colour control works on.
+fn calibration_pass(rgb: &mut [f32], recipe: &Recipe, plan: &Plan) {
+    if !plan.stages.contains(&Stage::Calibration) {
+        return;
+    }
+    let calibration = crate::creative::CalibrationPlan::new(&recipe.global.calibration);
+    rgb.par_chunks_mut(3).for_each(|pixel| {
+        let value = calibration.apply([
+            pixel.first().copied().unwrap_or(0.0),
+            pixel.get(1).copied().unwrap_or(0.0),
+            pixel.get(2).copied().unwrap_or(0.0),
+        ]);
+        for (slot, out) in pixel.iter_mut().zip(value.iter()) {
+            *slot = *out;
+        }
+    });
+}
+
+/// The point-wise creative half, fused into one pass: exposure, tone, contrast, curves,
+/// HSL, vibrance, black and white, colour grading.
+///
+/// With a tone base, Shadows and Highlights are local: each pixel takes the gain its region
+/// asks for, read from the edge-aware base at its position in the whole frame. Whites and
+/// Blacks stay per-pixel - they set where the range ends, which is a property of a value
+/// rather than of a region. ADR-0126.
+#[allow(clippy::too_many_lines)]
+fn creative_pass(
+    rgb: &mut [f32],
+    width: u32,
+    position: spatial::Position,
+    recipe: &Recipe,
+    plan: &Plan,
+    tone_base: Option<&crate::edge_aware::ToneBase>,
+) {
+    let g = &recipe.global;
+    let wants_exposure = plan.stages.contains(&Stage::Exposure);
+    let wants_tone = plan.stages.contains(&Stage::Tone);
+    let wants_contrast = plan.stages.contains(&Stage::Contrast);
+    let wants_curve = plan.stages.contains(&Stage::Curve);
+    let wants_hsl = plan.stages.contains(&Stage::Hsl);
+    let wants_vibrance = plan.stages.contains(&Stage::Vibrance);
+    let wants_bw = plan.stages.contains(&Stage::Monochrome);
+    let wants_grade = plan.stages.contains(&Stage::ColourGrade);
+    if !(wants_exposure
+        || wants_tone
+        || wants_contrast
+        || wants_curve
+        || wants_hsl
+        || wants_vibrance
+        || wants_bw
+        || wants_grade)
+    {
+        return;
+    }
+    let curve = crate::creative::luminance_lut(&g.curve, &g.parametric);
+    let channels = crate::creative::ChannelLuts::build(&g.channel_curves);
+    let grade = crate::creative::GradePlan::new(&g.colour_grade);
+    let tone = Tone {
+        highlights: f32::from(g.highlights) / 100.0,
+        shadows: f32::from(g.shadows) / 100.0,
+        whites: f32::from(g.whites) / 100.0,
+        blacks: f32::from(g.blacks) / 100.0,
+    };
+    // Shadows and Highlights go local when there is a base; Whites and Blacks never do.
+    let local = tone_base.filter(|_| tone.shadows != 0.0 || tone.highlights != 0.0);
+    let point_tone = if local.is_some() {
+        Tone {
+            highlights: 0.0,
+            shadows: 0.0,
+            ..tone
+        }
+    } else {
+        tone
+    };
+    let sampler = local.map(|base| base.sampler(position));
+    let vibrance = f32::from(g.vibrance) / 100.0;
+    let saturation = f32::from(g.saturation) / 100.0;
+    let contrast_amount = f32::from(g.contrast) / 100.0;
+    let width = width.max(1) as usize;
+    rgb.par_chunks_mut(width * 3)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, pixel) in row.chunks_mut(3).enumerate() {
+                let mut value = [
+                    pixel.first().copied().unwrap_or(0.0),
+                    pixel.get(1).copied().unwrap_or(0.0),
+                    pixel.get(2).copied().unwrap_or(0.0),
+                ];
+                if wants_exposure {
+                    value = tonemap::exposure(value, g.exposure);
+                }
+                if wants_tone {
+                    if let Some(sampler) = &sampler {
+                        value = sampler.apply(x, y, value, tone.shadows, tone.highlights);
+                    }
+                    value = tonemap::tone(value, point_tone);
+                }
+                if wants_contrast {
+                    value = tonemap::contrast(value, contrast_amount);
+                }
+                if wants_curve {
+                    value = tonemap::apply_curve(value, &curve);
+                    value = channels.apply(value);
+                }
+                if wants_hsl {
+                    value = tonemap::hsl(value, &g.hsl);
+                }
+                if wants_vibrance {
+                    value = tonemap::vibrance_saturation(value, vibrance, saturation);
+                }
+                if wants_bw {
+                    if let Some(bw) = &recipe.bw {
+                        value = tonemap::monochrome(value, bw);
+                    }
+                }
+                if wants_grade {
+                    value = grade.apply(value);
+                }
+                for (slot, out) in pixel.iter_mut().zip(value.iter()) {
+                    *slot = *out;
+                }
+            }
+        });
+}
+
+/// The edge-aware base layers for a whole frame. ADR-0126.
+///
+/// Measured on a [`crate::edge_aware::BASE_EDGE`] reduction of the *source* frame taken
+/// through the same stages the full-resolution buffer goes through before each base is
+/// read: the input half, calibration, vignette and distortion, then exposure for the tone
+/// base, then the whole creative half for clarity's base, then clarity for the haze. Noise
+/// reduction is left out because an area reduction is already a stronger one.
+///
+/// Measured from the source frame rather than from the render buffer so that the tiler,
+/// which has the whole frame and renders tiles of it, measures exactly what a whole-frame
+/// render measures. `None` when no stage reads a base.
+#[must_use]
+pub fn frame_base(
+    frame: &Frame,
+    recipe: &Recipe,
+    plan: &Plan,
+) -> Option<crate::edge_aware::FrameBase> {
+    use crate::edge_aware as ea;
+    let g = &recipe.global;
+    let wants_tone = plan.stages.contains(&Stage::Tone) && (g.shadows != 0 || g.highlights != 0);
+    let wants_clarity = plan.stages.contains(&Stage::Clarity) && g.clarity != 0;
+    let wants_haze = plan.stages.contains(&Stage::Dehaze) && g.dehaze != 0;
+    if !(wants_tone || wants_clarity || wants_haze) {
+        return None;
+    }
+    let reduce_step = crate::perf::step("base.reduce");
+    let (mut small, w, h) = ea::reduce(
+        &frame.rgb,
+        frame.width as usize,
+        frame.height as usize,
+        ea::BASE_EDGE,
+    );
+    drop(reduce_step);
+    if w == 0 || h == 0 {
+        return None;
+    }
+    let (w32, h32) = (w as u32, h as u32);
+    let position = spatial::Position::whole(w32, h32);
+    let profile = crate::profiles::resolve(&frame.camera);
+    input_pass(
+        &mut small,
+        recipe,
+        plan,
+        frame.clip,
+        profile.camera_to_working,
+    );
+    calibration_pass(&mut small, recipe, plan);
+    if plan.stages.contains(&Stage::LensVignette) {
+        spatial::correct_vignette(
+            &mut small,
+            w,
+            h,
+            f32::from(recipe.lens.vignette) / 100.0,
+            position,
+        );
+    }
+    if plan.stages.contains(&Stage::LensDistortion) {
+        if let Some(coefficients) = geometry::coefficients_of(&recipe.lens) {
+            geometry::correct_distortion(&mut small, w, h, coefficients.k);
+        }
+    }
+    let exposure = if plan.stages.contains(&Stage::Exposure) {
+        g.exposure
+    } else {
+        0.0
+    };
+    let mut base = ea::FrameBase {
+        tone: wants_tone.then(|| {
+            let _t = crate::perf::step("base.tone");
+            ea::tone_grid(&small, w, h, exposure)
+        }),
+        ..ea::FrameBase::default()
+    };
+    if wants_clarity || wants_haze {
+        creative_pass(&mut small, w32, position, recipe, plan, base.tone.as_ref());
+        if wants_clarity {
+            let _t = crate::perf::step("base.clarity");
+            let grid = ea::clarity_grid(&small, w, h);
+            if wants_haze {
+                ea::clarity(
+                    &mut small,
+                    w32,
+                    position,
+                    &grid,
+                    f32::from(g.clarity) / 100.0,
+                );
+            }
+            base.clarity = Some(grid);
+        }
+        if wants_haze {
+            let _t = crate::perf::step("base.haze");
+            base.haze = ea::haze(&small, w, h);
+        }
+    }
+    Some(base)
 }
 
 /// Resample a frame to the requested rung.

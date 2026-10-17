@@ -12,8 +12,9 @@ your setting and no automatic pass changes it again.
 
 | Lightroom | AURA | Automatic |
 |---|---|---|
-| **Basic**: white balance (temp, tint), exposure, contrast, highlights, shadows, whites, blacks | Develop → Basic. Recipe `global.*` | Yes: exposure, highlights, shadows and contrast are measured per photo; the rest come from the chosen profile |
-| Basic: texture, clarity, dehaze, vibrance, saturation | Develop → Basic | Yes, from the profile |
+| **Basic**: white balance (temp, tint), exposure, contrast, highlights, shadows, whites, blacks | Develop → Basic. Recipe `global.*` | Yes: exposure, highlights, shadows and contrast are measured per photo; Shadows and Highlights are also sized from the photo's regions (ADR-0126); the rest come from the chosen profile |
+| Highlights and Shadows act locally, like Lightroom's since Process Version 2012 | Each pixel takes the gain of its region from an edge-aware base, so texture is kept and clipped regions stay white (ADR-0126) | - |
+| Basic: texture, clarity, dehaze, vibrance, saturation | Develop → Basic. Clarity is edge-aware (no halos); Dehaze is a dark-channel haze model that clears the distance more than the foreground (ADR-0126) | Yes, from the profile |
 | Auto (Basic panel) | **Auto** button, and every one-click edit | Yes |
 | Profile browser / creative profiles | 21 edit profiles on the start screen and in Develop → Presets | Yes, the chosen profile |
 | Presets, preset amount slider | Develop → Presets with a 0-150 % strength | Yes |

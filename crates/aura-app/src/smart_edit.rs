@@ -124,7 +124,20 @@ pub struct GlobalPlan {
     /// Luminance and colour noise reduction, when the measured noise needs any.
     pub noise: Option<(i16, i16)>,
     pub sky: Option<Edit>,
+    /// Shadows and Highlights sized from the frame's regions. ADR-0126.
+    pub range: crate::local_range::RangePlan,
     pub decisions: Vec<String>,
+}
+
+impl GlobalPlan {
+    /// The Highlights and Shadows this plan writes, given the histogram's
+    /// `(exposure, highlights, shadows, contrast)`: the stronger of the histogram's answer and
+    /// the regions' for each, never their sum. ADR-0126.
+    #[must_use]
+    pub fn highlights_shadows(&self, tone: (f32, i16, i16, i16)) -> (i16, i16) {
+        self.range
+            .merged(tone.1, (tone.2 + self.extra_shadows).clamp(-100, 100))
+    }
 }
 
 /// Measurements of the display-referred frame, with faces excluded where it matters.
@@ -1170,6 +1183,13 @@ pub fn analyse_from(
     } else {
         0
     };
+    // Shadows and Highlights act on regions in the renderer, so they are sized from the
+    // frame's regions too: how much of it is deep shadow, how much is bright with detail
+    // left, and how much is clipped. ADR-0126.
+    let range = crate::local_range::plan(px, exposure, kind);
+    if let Some(sentence) = range.sentence() {
+        decisions.push(sentence);
+    }
     let noise = if m.noise > 0.008 {
         let luminance = ((m.noise - 0.006) * 2000.0).clamp(8.0, 45.0) as i16;
         let colour = (luminance + 10).clamp(15, 50);
@@ -1346,6 +1366,7 @@ pub fn analyse_from(
         sharpen,
         noise,
         sky,
+        range,
         decisions,
     }
 }
@@ -1500,10 +1521,11 @@ pub(crate) fn face_exposure_cap(
 
 fn apply_global(recipe: &mut Recipe, tone: (f32, i16, i16, i16), plan: &GlobalPlan) {
     let g = &mut recipe.global;
-    let (exposure, highlights, shadows, contrast) = tone;
+    let (exposure, _, _, contrast) = tone;
+    let (highlights, shadows) = plan.highlights_shadows(tone);
     g.exposure = exposure;
     g.highlights = highlights;
-    g.shadows = (shadows + plan.extra_shadows).clamp(-100, 100);
+    g.shadows = shadows;
     g.contrast = contrast;
     if let Some((kelvin, tint)) = plan.white_balance {
         g.temperature = kelvin;
@@ -2397,14 +2419,15 @@ fn run_with(
     }
     let mut steps = Vec::new();
     if let Some(plan) = &global_plan {
-        let (exposure, highlights, shadows, contrast) = tone;
+        let (exposure, _, _, contrast) = tone;
+        let (highlights, shadows) = plan.highlights_shadows(tone);
         steps.push(Step {
             group: None,
             title: "Light & colour".into(),
             detail: format!(
                 "{}: exposure {exposure:+.2} EV, highlights {highlights}, shadows {}, whites {:+}, blacks {:+}, contrast {contrast:+}, vibrance {:+}{}",
                 plan.kind.label(),
-                (shadows + plan.extra_shadows).clamp(-100, 100),
+                shadows,
                 plan.whites,
                 plan.blacks,
                 plan.vibrance,

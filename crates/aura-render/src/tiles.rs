@@ -129,8 +129,6 @@ pub fn render_streamed(
         return Ok(whole);
     }
 
-    let stats = spatial::measure(&frame.rgb, frame.width as usize, frame.height as usize);
-
     // The geometry stage must not run inside a tile: the crop *is* the tile grid.
     let mut tile_recipe = clamped.clone();
     tile_recipe.geometry = aura_recipe::Geometry::default();
@@ -144,6 +142,12 @@ pub fn render_streamed(
         graph::Capabilities::default(),
     );
     let halo = tile_plan.halo();
+
+    // The frame-wide numbers every tile reads, measured once: the sharpening normaliser and,
+    // since ADR-0126, the edge-aware base layers. A tile that measured its own base would
+    // light its own regions, and the seams would be the regions' edges.
+    let mut stats = spatial::measure(&frame.rgb, frame.width as usize, frame.height as usize);
+    stats.base = crate::cpu::frame_base(frame, &tile_recipe, &tile_plan).map(std::sync::Arc::new);
 
     // The crop restricts the tile grid rather than being a stage of its own. Crop commutes
     // with every point-wise and local stage in front of it, so this is the same pixels in a
@@ -194,7 +198,7 @@ pub fn render_streamed(
                 &tile_recipe,
                 &tile_plan,
                 RenderLevel::Full,
-                Some(stats),
+                Some(stats.clone()),
             );
 
             // Commit the middle of the tile, which is the part the halo protected.

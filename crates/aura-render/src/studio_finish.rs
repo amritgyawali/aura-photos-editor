@@ -8,9 +8,12 @@
 //! 2. **Background** - everything behind the people (or only the sky) is replaced by a colour, a
 //!    gradient or a blur of itself. The person is kept by the portrait parse's background plane,
 //!    feathered so a stray hair is blended rather than cut.
-//! 3. **Shape** - every face slider, every body slider and every liquify stroke adds into one
+//! 3. **Light** - a key light shaped by each head, a fill on its shadow side and catchlights
+//!    (ADR-0127, `crate::portrait_light`), before any reshape, so the light follows the face.
+//! 4. **Shape** - every face slider, every body slider and every liquify stroke adds into one
 //!    displacement field, and the frame is resampled through it once. One resample rather than
 //!    one per slider, so twenty moves cost the same softness as one.
+//! 5. **Glow** - a soft bloom from the finished frame's highlights.
 //!
 //! The regions and landmarks come from `aura_portrait` and the frame as it arrived, exactly as
 //! the portrait operators' do, so the four values a delivered file is re-created from still
@@ -77,6 +80,10 @@ pub(crate) fn apply(
         if let Some(background) = finish.background.filter(|b| b.amount > 0.0) {
             apply_background(rgb, w, h, background, map);
         }
+        // Light follows the face as photographed, so it goes on before any reshape moves it.
+        if finish.light.needs_faces() {
+            crate::portrait_light::apply(rgb, w, h, &finish.light, map);
+        }
     }
     let mut field = Field::new(w, h);
     if let Some(map) = map.as_deref() {
@@ -97,6 +104,8 @@ pub(crate) fn apply(
         let source = rgb.to_vec();
         field.resample(&source, rgb);
     }
+    // The glow blooms from the finished frame's highlights.
+    crate::portrait_light::apply_glow(rgb, w, h, finish.light.glow);
 }
 
 // ---- colour -----------------------------------------------------------------------------
@@ -135,7 +144,7 @@ fn tint_ratio(srgb: [f32; 3]) -> [f32; 3] {
 }
 
 /// A region resolved onto the buffer.
-fn region(map: &PortraitMap, region: Region, w: usize, h: usize) -> Vec<f32> {
+pub(crate) fn region(map: &PortraitMap, region: Region, w: usize, h: usize) -> Vec<f32> {
     crate::portrait::resolve(map, region, w as u32, h as u32)
 }
 
@@ -601,30 +610,30 @@ fn scaling(c: [f32; 2], r: [f32; 2], angle: f32, a: [f32; 2]) -> Warp {
 // ---- faces ------------------------------------------------------------------------------
 
 /// The analysis grid onto the buffer.
-struct Scale {
+pub(crate) struct Scale {
     sx: f32,
     sy: f32,
 }
 
 /// One face in buffer pixels, in its own upright frame: `u` across, `v` down, in units of
 /// the distance between the eyes.
-struct Face {
-    mid: [f32; 2],
-    u: [f32; 2],
-    v: [f32; 2],
-    io: f32,
+pub(crate) struct Face {
+    pub(crate) mid: [f32; 2],
+    pub(crate) u: [f32; 2],
+    pub(crate) v: [f32; 2],
+    pub(crate) io: f32,
     roll: f32,
-    left_eye: [f32; 2],
-    right_eye: [f32; 2],
+    pub(crate) left_eye: [f32; 2],
+    pub(crate) right_eye: [f32; 2],
     /// Eye line to nose and to mouth, in interocular units.
     nose: f32,
-    mouth: f32,
+    pub(crate) mouth: f32,
     /// Mouth width in interocular units.
     mouth_width: f32,
 }
 
 impl Scale {
-    fn of(map: &PortraitMap, w: usize, h: usize) -> Self {
+    pub(crate) fn of(map: &PortraitMap, w: usize, h: usize) -> Self {
         Self {
             sx: w as f32 / map.width.max(1) as f32,
             sy: h as f32 / map.height.max(1) as f32,
@@ -635,7 +644,7 @@ impl Scale {
         [p[0] * self.sx, p[1] * self.sy]
     }
 
-    fn face(&self, g: &FaceGeometry) -> Face {
+    pub(crate) fn face(&self, g: &FaceGeometry) -> Face {
         let k = (self.sx + self.sy) * 0.5;
         let left_eye = self.point(g.left_eye);
         let right_eye = self.point(g.right_eye);

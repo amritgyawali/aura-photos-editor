@@ -100,6 +100,9 @@ it says so.
 - **Nobody is reshaped automatically.** Portrait retouch never slims, liquifies, enlarges or moves a
   feature. Those tools exist only in the Studio's *Portrait studio* section, where you move them
   yourself (ADR-0108), and no automatic pass can apply them.
+- **The light on a face is moved only when you ask.** The Portrait studio's *Light* tab adds a key
+  light, a fill, catchlights and a glow (ADR-0127). *Auto light* proposes one when you press it, says
+  why, and saves it as one step you can undo; nothing else ever relights a face.
 - **Nobody's skin tone is changed.** Smoothing, evening and fill light work on blotches, shadows
   and shine, never on the tone of a person's skin.
 - **Nothing is invented.** Every adjustment changes the tone or colour of a pixel that was already

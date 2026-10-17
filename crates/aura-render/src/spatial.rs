@@ -88,12 +88,30 @@ impl Position {
 /// reduction of the frame rather than on the frame itself, for two reasons: it costs the
 /// same on a 24 MP file and a 100 MP one, and it makes the numbers independent of the render
 /// level, so a proxy and an export sharpen identically.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Stats {
     /// The largest Sobel gradient magnitude in the frame. Sharpening's normaliser.
     pub gradient_peak: f32,
-    /// The fifth percentile of the blurred dark channel. Dehaze's floor.
+    /// The fifth percentile of the blurred dark channel. A haze reading for callers that
+    /// want one number; the Dehaze stage itself reads [`Stats::base`] since ADR-0126.
     pub dark_floor: f32,
+    /// The edge-aware base layers - local tone, clarity and haze - measured once over the
+    /// whole frame. `None` when no stage needs them. The tiler fills this in before the
+    /// first tile, for the reason the two numbers above exist. ADR-0126.
+    pub base: Option<std::sync::Arc<crate::edge_aware::FrameBase>>,
+}
+
+impl Stats {
+    /// The same statistics without the base layers, for a checkpoint taken after the stages
+    /// that read them: nothing downstream of the retouch stack needs a base, and a cached
+    /// checkpoint should not hold one.
+    #[must_use]
+    pub fn without_base(&self) -> Self {
+        Self {
+            base: None,
+            ..self.clone()
+        }
+    }
 }
 
 impl Default for Stats {
@@ -102,6 +120,7 @@ impl Default for Stats {
         Self {
             gradient_peak: 1.0,
             dark_floor: 0.0,
+            base: None,
         }
     }
 }
@@ -152,6 +171,7 @@ pub fn measure(rgb: &[f32], width: usize, height: usize) -> Stats {
     Stats {
         gradient_peak,
         dark_floor,
+        base: None,
     }
 }
 

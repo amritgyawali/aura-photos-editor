@@ -93,6 +93,7 @@ pub mod integrity_commands;
 pub mod lateral_ca;
 pub mod local_commands;
 pub mod local_mask_commands;
+pub mod local_range;
 pub mod look_commands;
 pub mod mask_commands;
 pub mod measured_cull;
