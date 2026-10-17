@@ -1,5 +1,6 @@
 import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import type { InternalAiStatus } from './internalAi';
 import type { AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
 
 import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
@@ -209,6 +210,29 @@ export const referenceStyle = {
   apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null) => invoke<ApplyReport>('apply_reference_style', {
     input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null } }),
 };
+
+export type PairedReferenceReport = {
+  changed: number; probes: number; beforeError: number; afterError: number;
+  exactMatch: boolean; matchingPixels: number; totalPixels: number;
+  protectedFields: number; referenceHash: string; width: number; height: number;
+  subjectErrorsBefore: number[]; subjectErrorsAfter: number[];
+  /** The personal look that was kept, when a name was given and the match changed the edit. */
+  keptLook?: string;
+};
+
+export const pairedReference = {
+  /** `keepAs` keeps the look the match finds as a personal look of that name. */
+  match: (photoId: string, referencePath: string, cancelId: string, keepAs?: string) =>
+    invoke<PairedReferenceReport>('match_paired_reference', { input: { photoId, referencePath, cancelId, keepAs: keepAs?.trim() || null } }),
+};
+
+export async function pickPairedReference(): Promise<string | null> {
+  const result: string | string[] | null = await invoke('plugin:dialog|open', {
+    options: { directory: false, multiple: false, title: 'Choose the finished version of this same photo',
+      filters: [{ name: 'Finished photo', extensions: ['jpg', 'jpeg', 'png'] }] },
+  });
+  return Array.isArray(result) ? result[0] ?? null : result;
+}
 
 // Portrait retouching: what AURA found in a photograph, and what a photographer asks for.
 export type PortraitFace = {
@@ -607,6 +631,8 @@ export const asIpcError = (error: unknown): IpcError => {
 };
 
 export const api = {
+  internalAiStatus: (refresh = false): Promise<InternalAiStatus> => invoke<InternalAiStatus>('internal_ai_status', { refresh }),
+  internalAiFeedback: (projectId: string, callId: string, accepted: boolean): Promise<void> => invoke<void>('internal_ai_feedback', { projectId, callId, accepted }),
   createProject: (input: CreateProjectInput): Promise<ProjectHandle> =>
     invoke<ProjectHandle>('create_project', { input }),
 
@@ -694,6 +720,8 @@ export const api = {
     invoke<CloudStatusDto>('clear_ai_key', { provider }),
 
   checkAiKey: (): Promise<KeyCheckDto> => invoke<KeyCheckDto>('check_ai_key'),
+  openAiProviderPage: (provider: string): Promise<string> =>
+    invoke<string>('open_ai_provider_page', { provider }),
 
   /**
    * "Connect Claude" / "Connect ChatGPT": open the provider's own key page in the default

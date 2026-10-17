@@ -2,6 +2,7 @@
 //! `linear`/`half_pixel` (TensorFlow's `half_pixel_centers` bilinear, used by the skin
 //! segmenter's decoder - ADR-0082).
 use aura_core::AuraResult;
+use rayon::prelude::*;
 
 use super::{float_operand, nchw, optional_float};
 use crate::{
@@ -68,41 +69,45 @@ pub(super) fn resize(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<V
         .and_then(|v| v.checked_mul(ow))
         .filter(|v| *v <= 16_777_216)
         .ok_or_else(|| invalid_graph("Resize output exceeds tensor limit"))?;
-    let mut samples = Vec::with_capacity(count);
+    // The buffer was checked against its shape above, so every read is in range. Each
+    // output plane is computed by one task from its own input plane: the same arithmetic
+    // on every machine, whatever the core count.
+    let at = |plane: usize, y: usize, x: usize| -> f32 {
+        input
+            .data
+            .get((plane * h + y) * w + x)
+            .copied()
+            .unwrap_or(0.0)
+    };
+    let mut samples = vec![0.0_f32; count];
     if linear {
         let ys: Vec<(usize, usize, f32)> = (0..oh).map(|y| linear_tap(y, *sy, h)).collect();
         let xs: Vec<(usize, usize, f32)> = (0..ow).map(|x| linear_tap(x, *sx, w)).collect();
-        let at = |plane: usize, y: usize, x: usize| -> AuraResult<f32> {
-            input
-                .data
-                .get((plane * h + y) * w + x)
-                .copied()
-                .ok_or_else(|| invalid_graph("Resize input buffer is truncated"))
-        };
-        for plane in 0..n * c {
-            for &(y0, y1, ty) in &ys {
-                for &(x0, x1, tx) in &xs {
-                    let top = at(plane, y0, x0)? * (1.0 - tx) + at(plane, y0, x1)? * tx;
-                    let bottom = at(plane, y1, x0)? * (1.0 - tx) + at(plane, y1, x1)? * tx;
-                    samples.push(top * (1.0 - ty) + bottom * ty);
+        samples
+            .par_chunks_mut(oh * ow)
+            .enumerate()
+            .for_each(|(plane, out)| {
+                for (row, &(y0, y1, ty)) in out.chunks_mut(ow).zip(&ys) {
+                    for (slot, &(x0, x1, tx)) in row.iter_mut().zip(&xs) {
+                        let top = at(plane, y0, x0) * (1.0 - tx) + at(plane, y0, x1) * tx;
+                        let bottom = at(plane, y1, x0) * (1.0 - tx) + at(plane, y1, x1) * tx;
+                        *slot = top * (1.0 - ty) + bottom * ty;
+                    }
                 }
-            }
-        }
+            });
     } else {
-        for plane in 0..n * c {
-            for y in 0..oh {
-                let iy = source_index(y, *sy, h);
-                for x in 0..ow {
-                    let ix = source_index(x, *sx, w);
-                    samples.push(
-                        *input
-                            .data
-                            .get((plane * h + iy) * w + ix)
-                            .ok_or_else(|| invalid_graph("Resize input buffer is truncated"))?,
-                    );
+        let ys: Vec<usize> = (0..oh).map(|y| source_index(y, *sy, h)).collect();
+        let xs: Vec<usize> = (0..ow).map(|x| source_index(x, *sx, w)).collect();
+        samples
+            .par_chunks_mut(oh * ow)
+            .enumerate()
+            .for_each(|(plane, out)| {
+                for (row, &iy) in out.chunks_mut(ow).zip(&ys) {
+                    for (slot, &ix) in row.iter_mut().zip(&xs) {
+                        *slot = at(plane, iy, ix);
+                    }
                 }
-            }
-        }
+            });
     }
     Ok(vec![Value::Float(Tensor {
         shape: vec![n, c, oh, ow],

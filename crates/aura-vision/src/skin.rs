@@ -36,7 +36,8 @@
     clippy::doc_markdown
 )]
 
-use std::sync::{Mutex, OnceLock};
+use rayon::prelude::*;
+use std::sync::OnceLock;
 
 use aura_core::AuraResult;
 use aura_infer::{
@@ -50,7 +51,11 @@ use crate::portrait::PortraitFace;
 #[path = "skin_orientation.rs"]
 mod orientation;
 
-pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v3";
+#[path = "skin_body.rs"]
+mod body;
+pub use body::analyse_body;
+
+pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v4";
 pub const MODEL_HASH: &str = "10eee962bb85d9f5d0b292376f595ce70d810becfcef17feeb4762e62d8a7754";
 const SIDE: usize = 256;
 const CLASSES: usize = 6;
@@ -200,17 +205,17 @@ fn invalid(message: impl Into<String>) -> aura_core::AuraError {
     error
 }
 
-fn graph() -> AuraResult<&'static Mutex<Executable>> {
-    static GRAPH: OnceLock<Result<Mutex<Executable>, String>> = OnceLock::new();
+/// The compiled network. Running it only reads it, so every photograph being worked on at
+/// once segments at the same time rather than queueing behind one lock.
+fn graph() -> AuraResult<&'static Executable> {
+    static GRAPH: OnceLock<Result<Executable, String>> = OnceLock::new();
     GRAPH
         .get_or_init(|| {
             if blake3::hash(MODEL).to_hex().as_str() != MODEL_HASH {
                 return Err("Skin segmentation model checksum mismatch".into());
             }
             let model = aura_infer::onnx::parse(MODEL).map_err(|e| e.to_string())?;
-            Executable::compile(&model, Precision::Fp32)
-                .map(Mutex::new)
-                .map_err(|e| e.to_string())
+            Executable::compile(&model, Precision::Fp32).map_err(|e| e.to_string())
         })
         .as_ref()
         .map_err(|message| invalid(message.clone()))
@@ -316,10 +321,7 @@ fn infer_region(image: &Image, left: f32, top: f32, side: f32) -> AuraResult<Vec
             }
         }
     }
-    let graph = graph()?
-        .lock()
-        .map_err(|_| invalid("Skin segmentation lock failed"))?;
-    let outputs = graph.run(&[TensorView::new(vec![1, 3, SIDE, SIDE], &input)?])?;
+    let outputs = graph()?.run(&[TensorView::new(vec![1, 3, SIDE, SIDE], &input)?])?;
     let logits = outputs
         .first()
         .ok_or_else(|| invalid("Missing skin segmentation output"))?;
@@ -849,7 +851,9 @@ fn analyse_upright(
             .min_by(|a, b| a.1.total_cmp(&b.1))
     };
 
-    let body_regions = assign_regions(field.plane(Class::BodySkin), w, h, &boxes, 7.0);
+    // Clothing can disconnect hands and legs from the neck. Their distance from
+    // a face does not make confidently segmented body skin cease to be skin.
+    let body_regions = assign_regions(field.plane(Class::BodySkin), w, h, &boxes, f32::INFINITY);
     let hair_regions = assign_regions(field.plane(Class::Hair), w, h, &boxes, 2.5);
     let clothes_regions = assign_regions(field.plane(Class::Clothes), w, h, &boxes, 6.0);
 
@@ -868,105 +872,112 @@ fn analyse_upright(
             .collect()
     };
 
-    let mut people = Vec::with_capacity(faces.len());
-    for k in 0..boxes.len() {
-        let [l, t, r, b] = boxes[k];
-        let (fw, fh) = (r - l, b - t);
-        // Forehead and jaw reach past the detector's box.
-        let ex = [l - fw * 0.3, t - fh * 0.55, r + fw * 0.3, b + fh * 0.25];
-        let face_plane = field.plane(Class::FaceSkin);
-        let mut face = vec![0.0_f32; w * h];
-        let mut confident = Vec::new();
-        let (x0, y0) = (ex[0].max(0.0) as usize, ex[1].max(0.0) as usize);
-        let (x1, y1) = (
-            (ex[2].ceil().max(0.0) as usize).min(w),
-            (ex[3].ceil().max(0.0) as usize).min(h),
-        );
-        for y in y0..y1 {
-            for x in x0..x1 {
-                let i = y * w + x;
-                let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
-                if owner(px, py).map(|(o, _)| o) != Some(k) {
-                    continue;
-                }
-                face[i] = face_plane[i];
-                let inner = px > l + fw * 0.1 && px < r - fw * 0.1 && py > t && py < b;
-                if inner && face_plane[i] > 0.85 && argmax[i] == Class::FaceSkin as u8 {
-                    confident.push(i);
-                }
-            }
-        }
-        let face_model = colour_model(image, &confident);
-        let gate: Option<Vec<f32>> = face_model.as_ref().map(|model| {
-            (0..w * h)
-                .map(|i| {
-                    if face[i] > 0.0 {
-                        model.likeness(image.pixel(i % w, i / w), precision, dark)
-                    } else {
-                        0.0
+    // Every person reads the same field and frame and writes only their own mattes, so the
+    // people are worked at once and collected in face order.
+    let people: Vec<Person> = (0..boxes.len())
+        .into_par_iter()
+        .map(|k| {
+            let [l, t, r, b] = boxes[k];
+            let (fw, fh) = (r - l, b - t);
+            // Forehead and jaw reach past the detector's box.
+            let ex = [l - fw * 0.3, t - fh * 0.55, r + fw * 0.3, b + fh * 0.25];
+            let face_plane = field.plane(Class::FaceSkin);
+            let mut face = vec![0.0_f32; w * h];
+            let mut confident = Vec::new();
+            let (x0, y0) = (ex[0].max(0.0) as usize, ex[1].max(0.0) as usize);
+            let (x1, y1) = (
+                (ex[2].ceil().max(0.0) as usize).min(w),
+                (ex[3].ceil().max(0.0) as usize).min(h),
+            );
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let i = y * w + x;
+                    let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
+                    if owner(px, py).map(|(o, _)| o) != Some(k) {
+                        continue;
                     }
-                })
-                .collect()
-        });
-        if let Some(gate) = &gate {
-            for (v, g) in face.iter_mut().zip(gate) {
-                *v *= g;
-            }
-        }
-        // Refine the edges, then gate again: the guided filter would otherwise fill thin
-        // structures such as lashes, brow hairs and stubble back in.
-        let mut refined = refine(face);
-        if let Some(gate) = &gate {
-            for (v, g) in refined.iter_mut().zip(gate) {
-                *v *= g;
-            }
-        }
-        let face_matte = to_matte(&refined, w, h, 0.03);
-
-        let body_support = grow(&body_regions[k], radius + 1);
-        let body_plane = field.plane(Class::BodySkin);
-        let body_confident: Vec<usize> = (0..w * h)
-            .filter(|&i| body_regions[k][i] && body_plane[i] > 0.85)
-            .collect();
-        let body_model = colour_model(image, &body_confident).or(face_model);
-        let mut body: Vec<f32> = (0..w * h)
-            .map(|i| body_plane[i] * body_support[i])
-            .collect();
-        if let Some(model) = &body_model {
-            // Body skin varies more than a face (hands, elbows, light), so it is judged
-            // half as strictly.
-            for (i, v) in body.iter_mut().enumerate() {
-                if *v > 0.0 {
-                    *v *=
-                        model.likeness(image.pixel(i % w, i / w), precision * 0.5, precision * 0.5);
+                    face[i] = face_plane[i];
+                    let inner = px > l + fw * 0.1 && px < r - fw * 0.1 && py > t && py < b;
+                    if inner && face_plane[i] > 0.85 && argmax[i] == Class::FaceSkin as u8 {
+                        confident.push(i);
+                    }
                 }
             }
-        }
-        let body_matte = to_matte(&refine(body), w, h, 0.03);
+            let face_model = colour_model(image, &confident);
+            let gate: Option<Vec<f32>> = face_model.as_ref().map(|model| {
+                (0..w * h)
+                    .map(|i| {
+                        if face[i] > 0.0 {
+                            model.likeness(image.pixel(i % w, i / w), precision, dark)
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect()
+            });
+            if let Some(gate) = &gate {
+                for (v, g) in face.iter_mut().zip(gate) {
+                    *v *= g;
+                }
+            }
+            // Refine the edges, then gate again: the guided filter would otherwise fill thin
+            // structures such as lashes, brow hairs and stubble back in.
+            let mut refined = refine(face);
+            if let Some(gate) = &gate {
+                for (v, g) in refined.iter_mut().zip(gate) {
+                    *v *= g;
+                }
+            }
+            let face_matte = to_matte(&refined, w, h, 0.03);
 
-        let hair_support = grow(&hair_regions[k], radius + 1);
-        let hair: Vec<f32> = field
-            .plane(Class::Hair)
-            .iter()
-            .zip(&hair_support)
-            .map(|(p, s)| p * s)
-            .collect();
-        let clothes_support = grow(&clothes_regions[k], radius + 1);
-        let clothes: Vec<f32> = field
-            .plane(Class::Clothes)
-            .iter()
-            .zip(&clothes_support)
-            .map(|(p, s)| p * s)
-            .collect();
-        people.push(Person {
-            face: face_matte,
-            body: body_matte,
-            hair: to_matte(&refine(hair), w, h, 0.05),
-            clothes: to_matte(&refine(clothes), w, h, 0.05),
-            face_colour: face_model.map(|m| m.report()),
-            body_colour: body_model.map(|m| m.report()),
-        });
-    }
+            let body_support = grow(&body_regions[k], radius + 1);
+            let body_plane = field.plane(Class::BodySkin);
+            let body_confident: Vec<usize> = (0..w * h)
+                .filter(|&i| body_regions[k][i] && body_plane[i] > 0.85)
+                .collect();
+            let body_model = colour_model(image, &body_confident).or(face_model);
+            let mut body: Vec<f32> = (0..w * h)
+                .map(|i| body_plane[i] * body_support[i])
+                .collect();
+            if let Some(model) = &body_model {
+                // Body skin varies more than a face (hands, elbows, light), so it is judged
+                // half as strictly.
+                for (i, v) in body.iter_mut().enumerate() {
+                    if *v > 0.0 {
+                        *v *= model.likeness(
+                            image.pixel(i % w, i / w),
+                            precision * 0.5,
+                            precision * 0.5,
+                        );
+                    }
+                }
+            }
+            let body_matte = to_matte(&refine(body), w, h, 0.03);
+
+            let hair_support = grow(&hair_regions[k], radius + 1);
+            let hair: Vec<f32> = field
+                .plane(Class::Hair)
+                .iter()
+                .zip(&hair_support)
+                .map(|(p, s)| p * s)
+                .collect();
+            let clothes_support = grow(&clothes_regions[k], radius + 1);
+            let clothes: Vec<f32> = field
+                .plane(Class::Clothes)
+                .iter()
+                .zip(&clothes_support)
+                .map(|(p, s)| p * s)
+                .collect();
+            Person {
+                face: face_matte,
+                body: body_matte,
+                hair: to_matte(&refine(hair), w, h, 0.05),
+                clothes: to_matte(&refine(clothes), w, h, 0.05),
+                face_colour: face_model.map(|m| m.report()),
+                body_colour: body_model.map(|m| m.report()),
+            }
+        })
+        .collect();
     let background = to_matte(&refine(field.plane(Class::Background).to_vec()), w, h, 0.05);
     Ok(Analysis {
         people,
@@ -979,6 +990,26 @@ fn analyse_upright(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn detached_hands_and_legs_are_assigned_even_far_from_faces() {
+        let (w, h) = (80, 220);
+        let mut plane = vec![0.0; w * h];
+        for (x, y) in [(10, 110), (60, 190)] {
+            for yy in y..y + 10 {
+                for xx in x..x + 8 {
+                    plane[yy * w + xx] = 1.0;
+                }
+            }
+        }
+        let boxes = [[25.0, 5.0, 35.0, 15.0]];
+        assert!(assign_regions(&plane, w, h, &boxes, 7.0)[0]
+            .iter()
+            .all(|v| !v));
+        let regions = assign_regions(&plane, w, h, &boxes, f32::INFINITY);
+        for (selected, probability) in regions[0].iter().zip(plane) {
+            assert_eq!(*selected, probability > 0.5);
+        }
+    }
 
     #[test]
     fn touching_people_do_not_share_one_body_owner() {
@@ -1027,7 +1058,7 @@ mod tests {
                 }
             }
         }
-        let graph = graph().unwrap().lock().unwrap();
+        let graph = graph().unwrap();
         let out = graph
             .run(&[TensorView::new(vec![1, 3, SIDE, SIDE], &input).unwrap()])
             .unwrap();
@@ -1133,5 +1164,101 @@ mod tests {
         let analysis = analyse(&vec![128; 64 * 48 * 3], 64, 48, &[], Options::default()).unwrap();
         assert!(analysis.people.is_empty());
         assert_eq!(analysis.passes, 1);
+    }
+
+    /// Where segmentation spends its time. Run by hand with `--ignored --nocapture`.
+    #[test]
+    #[ignore = "timing, by hand"]
+    #[allow(clippy::disallowed_methods, clippy::print_stdout)]
+    fn segmentation_timing() {
+        let (w, h) = (2048_usize, 1365_usize);
+        let rgb: Vec<u8> = (0..w * h * 3).map(|i| ((i * 7919) % 251) as u8).collect();
+        let image = working(&rgb, w, h, WORKING_EDGE);
+        let t = std::time::Instant::now();
+        let _ = infer_region(&image, 0.0, -170.0, 1024.0).unwrap();
+        println!("first inference {:?}", t.elapsed());
+        let t = std::time::Instant::now();
+        for _ in 0..3 {
+            let _ = infer_region(&image, 0.0, -170.0, 1024.0).unwrap();
+        }
+        println!("inference {:?} each", t.elapsed() / 3);
+        // One operator at a time, summed by kind and shape.
+        let model = aura_infer::onnx::parse(MODEL).unwrap();
+        let exe = Executable::compile(&model, Precision::Fp32).unwrap();
+        let (nodes, weights, precision) = exe.parts();
+        let mut values = weights.clone();
+        let input = vec![0.1_f32; 3 * SIDE * SIDE];
+        values.insert(
+            exe.inputs()[0].name.clone(),
+            aura_infer::onnx::graph::Value::Float(aura_infer::contract::infer::Tensor {
+                shape: vec![1, 3, SIDE, SIDE],
+                data: input,
+            }),
+        );
+        let mut table: std::collections::BTreeMap<String, (u32, std::time::Duration)> =
+            std::collections::BTreeMap::new();
+        for node in nodes {
+            let operands: Vec<Option<&aura_infer::onnx::graph::Value>> = node
+                .inputs
+                .iter()
+                .map(|n| if n.is_empty() { None } else { values.get(n) })
+                .collect();
+            let shape = match operands.first().copied().flatten() {
+                Some(aura_infer::onnx::graph::Value::Float(t)) => format!("{:?}", t.shape),
+                _ => String::new(),
+            };
+            let kernel = match (node.op_type.as_str(), operands.get(1).copied().flatten()) {
+                ("Conv", Some(aura_infer::onnx::graph::Value::Float(t))) => {
+                    format!(" w{:?} g{}", t.shape, node.attr_int("group", 1))
+                }
+                _ => String::new(),
+            };
+            let t = std::time::Instant::now();
+            let produced = aura_infer::onnx::ops::eval(node, &operands, precision).unwrap();
+            let spent = t.elapsed();
+            let entry = table
+                .entry(format!("{} {shape}{kernel}", node.op_type))
+                .or_default();
+            entry.0 += 1;
+            entry.1 += spent;
+            for (name, value) in node.outputs.iter().zip(produced) {
+                values.insert(name.clone(), value);
+            }
+        }
+        let mut rows: Vec<_> = table.into_iter().collect();
+        rows.sort_by_key(|row| std::cmp::Reverse(row.1 .1));
+        for (label, (count, spent)) in rows.iter().take(40) {
+            println!(
+                "{:>8.1} ms {count:>3}x {label}",
+                spent.as_secs_f64() * 1000.0
+            );
+        }
+        let by_op = rows
+            .iter()
+            .fold(std::collections::BTreeMap::new(), |mut m, (l, (_, s))| {
+                *m.entry(l.split(' ').next().unwrap_or("").to_owned())
+                    .or_insert(0.0) += s.as_secs_f64() * 1000.0;
+                m
+            });
+        println!("{by_op:?}");
+        for faces in [1_usize, 4, 12] {
+            let list: Vec<PortraitFace> = (0..faces)
+                .map(|k| {
+                    let x = 0.05 + 0.9 * k as f32 / faces as f32;
+                    PortraitFace {
+                        bounds: [x, 0.3, x + 0.04, 0.36],
+                        landmarks: [[x + 0.02, 0.33]; 5],
+                        confidence: 0.9,
+                    }
+                })
+                .collect();
+            let t = std::time::Instant::now();
+            let a = analyse(&rgb, w as u32, h as u32, &list, Options::default()).unwrap();
+            println!(
+                "analyse with {faces} faces: {:?} ({} passes)",
+                t.elapsed(),
+                a.passes
+            );
+        }
     }
 }

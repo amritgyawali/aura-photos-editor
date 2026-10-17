@@ -523,6 +523,9 @@ pub fn list_photos(
     limit: i64,
     order: PhotoOrder,
 ) -> AuraResult<Vec<PhotoGridRow>> {
+    // Copies share a photo_id and may all have the primary role. Select one file
+    // before paging: keep the original while present, otherwise use an available
+    // copy. The file locator below uses the same preference for rendering.
     let sql = match order {
         PhotoOrder::Timeline => {
             "SELECT p.photo_id,
@@ -533,13 +536,20 @@ pub fn list_photos(
                     COALESCE(p.height_px, 0),
                     CASE WHEN COALESCE(f.is_present, 1) = 0 THEN 'missing' ELSE 'indexed' END
                FROM photo p
-               LEFT JOIN photo_file f ON f.photo_id = p.photo_id AND f.role = 'primary'
+               LEFT JOIN photo_file f ON f.file_id = (
+                    SELECT candidate.file_id FROM photo_file candidate
+                      JOIN photo owner ON owner.photo_id = candidate.photo_id
+                     WHERE candidate.photo_id = p.photo_id AND candidate.role = 'primary'
+                     ORDER BY candidate.is_present DESC,
+                              CASE WHEN candidate.file_id = owner.primary_file_id THEN 0 ELSE 1 END,
+                              candidate.rel_path, candidate.root_id, candidate.file_id
+                     LIMIT 1)
                LEFT JOIN camera c ON c.project_id = p.project_id AND c.body_serial = p.camera_serial
               WHERE p.project_id = ?1
               ORDER BY COALESCE(p.timeline_time, p.capture_time) IS NULL,
                        COALESCE(p.timeline_time, p.capture_time),
                        COALESCE(p.sub_sec, 0),
-                       f.file_name
+                       f.file_name, p.photo_id
               LIMIT ?2 OFFSET ?3"
         }
         PhotoOrder::FileName => {
@@ -551,7 +561,14 @@ pub fn list_photos(
                     COALESCE(p.height_px, 0),
                     CASE WHEN COALESCE(f.is_present, 1) = 0 THEN 'missing' ELSE 'indexed' END
                FROM photo p
-               LEFT JOIN photo_file f ON f.photo_id = p.photo_id AND f.role = 'primary'
+               LEFT JOIN photo_file f ON f.file_id = (
+                    SELECT candidate.file_id FROM photo_file candidate
+                      JOIN photo owner ON owner.photo_id = candidate.photo_id
+                     WHERE candidate.photo_id = p.photo_id AND candidate.role = 'primary'
+                     ORDER BY candidate.is_present DESC,
+                              CASE WHEN candidate.file_id = owner.primary_file_id THEN 0 ELSE 1 END,
+                              candidate.rel_path, candidate.root_id, candidate.file_id
+                     LIMIT 1)
                LEFT JOIN camera c ON c.project_id = p.project_id AND c.body_serial = p.camera_serial
               WHERE p.project_id = ?1
               ORDER BY f.file_name, p.photo_id
@@ -972,10 +989,13 @@ pub fn primary_file_for_photo(
         "SELECT CASE WHEN f.rel_path = '' THEN r.abs_path
                      ELSE r.abs_path || '/' || f.rel_path END, f.content_hash
            FROM photo_file f
+           JOIN photo p ON p.photo_id = f.photo_id
            JOIN source_root r ON r.root_id = f.root_id
           WHERE f.photo_id = ?1
           ORDER BY CASE f.role WHEN 'primary' THEN 0 WHEN 'companion_jpeg' THEN 1 ELSE 2 END,
-                   f.rel_path
+                   f.is_present DESC,
+                   CASE WHEN f.file_id = p.primary_file_id THEN 0 ELSE 1 END,
+                   f.rel_path, f.root_id, f.file_id
           LIMIT 1",
         params![photo_id],
         |row| Ok((row.get(0)?, row.get(1)?)),

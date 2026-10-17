@@ -8,8 +8,8 @@ import {
 
 const SCOPES: [RetouchScope, string, string][] = [
   ['face', 'Face', 'Skin, blemishes, lines, eyes and teeth on each detected face.'],
-  ['body', 'Body skin', 'Neck, shoulders, chest and arms below each face. The face is left as it is.'],
-  ['face_and_body', 'Face + body skin', 'Everything on the face, plus matching body skin.'],
+  ['body', 'Body skin', 'All detected visible body skin, including neck, shoulders, arms, hands and legs. Body-only photos can be healed without a visible face.'],
+  ['face_and_body', 'Face + body skin', 'All detected visible face and body skin, including forehead, cheeks, nose skin, neck, arms, hands and legs. Inspect the saved selection to check coverage.'],
 ];
 
 const FEATURES: [keyof Pick<AutoRetouchOptions, 'blemishes' | 'refine' | 'eyes' | 'teeth'>, string, string][] = [
@@ -29,8 +29,8 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['maskPrecision', 'Skin mask precision', 'unit', 'Higher keeps beard, brows, lips and make-up further out of the skin selection.'],
     ['edgeSoftness', 'Mask edge softness', 'unit', 'How gradually the retouch fades out at the edge of the skin.'],
     ['protectFacialHair', 'Protect beard and stubble', 'toggle', 'Never smooth facial hair.'],
-    ['protectNoseDetail', 'Preserve nose detail', 'toggle', 'Keeps the nose bridge, nostril edges, pores and natural shading out of automatic face corrections.'],
-    ['protectEyeArea', 'Protect eyes and surrounding skin', 'toggle', 'Keeps eyelids, inner corners and natural eye shadows unchanged by automatic retouch. Turn off only when you want the eye controls to work there. Manual retouch is always available.'],
+    ['protectNoseDetail', 'Preserve nose detail', 'toggle', 'Protects nose shape and shading from broad finishing. Measured local spot repair treats nose skin while excluding nostril openings and the underside crease.'],
+    ['protectEyeArea', 'Protect eyes and surrounding skin', 'toggle', 'Protects eyelids and inner corners from automatic retouch. Measured dark-circle correction can treat skin below the lashes; other automatic tools avoid the surrounding eye area. Manual retouch is available.'],
   ]],
   ['Skin', [
     ['smoothing', 'Skin smoothing', 'unit', 'Mid-scale unevenness between pores and facial form. 50% is the measured amount.'],
@@ -51,10 +51,12 @@ export const SETTING_GROUPS: [string, Control[]][] = [
   ['Blemishes', [
     ['deepBlemishCleanup', 'Deep blemish cleanup', 'toggle', 'Search the complete segmented face at multiple spot sizes. Eyes, brows, lips and creases remain protected.'],
     ['removeDarkMarks', 'Remove dark marks', 'toggle', 'Include compact dark spots in deep cleanup. This may also remove freckles or beauty marks; review the result.'],
-    ['frequencyHeal', 'Acne clear', 'unit', 'Runs first: measures every pimple, red and brown mark against the clean skin around it - in clusters, on the nose and between the brows too - and rebuilds it from that skin, keeping the pores; then evens leftover redness. Off at 0%.'],
+    ['frequencyHeal', 'Frequency healing', 'unit', 'Runs first: rebuilds the tone under measured compact marks from nearby clean skin while retaining pore texture. Local donor repairs follow for remaining detected spots. Off at 0%.'],
     ['blemishSensitivity', 'Blemish sensitivity', 'unit', 'How small a departure still counts as a spot.'],
-    ['maxSpots', 'Most spots per face', 'count', 'A face with more is left for you to judge.'],
+    ['cleanupPasses', 'Residual healing passes', 'count', 'Re-check compact marks after each measured heal. Bounded to four passes; inspect texture and protected features after cleanup.'],
+    ['maxSpots', 'Most spots per face', 'count', 'Raise this for dense acne. Larger passes take longer; remaining measured candidates are reported for review.'],
     ['keepFreckles', 'Keep freckles', 'toggle', 'A field of many small marks is treated as freckles and kept.'],
+    ['keepMoles', 'Keep moles', 'toggle', 'A dark, crisp-edged mark is a mole or a beauty mark and is left alone. Freckles, inflamed spots and the diffuse marks spots leave are not affected.'],
   ]],
   ['Lines & wrinkles', [
     ['foreheadLines', 'Forehead lines', 'unit', 'Softened, never erased.'],
@@ -94,6 +96,7 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['bodyShine', 'Body shine', 'unit', 'Shine on shoulders and arms softened.'],
     ['bodyRedness', 'Red hands & elbows', 'unit', 'Redness on hands, knuckles and elbows evened.'],
     ['bodyBlemishes', 'Body blemishes', 'unit', 'Small spots on body skin healed.'],
+    ['stretchMarks', 'Stretch marks', 'unit', 'Long, faint marks evened out of body skin. Hands, a navel and every other contour are kept. Off at 0%.'],
   ]],
   ['Hair, clothes & backdrop', [
     ['hairDetail', 'Hair detail', 'unit', 'Strand definition inside the segmented hair.'],
@@ -105,12 +108,21 @@ export const SETTING_GROUPS: [string, Control[]][] = [
 ];
 
 type Preset = [string, string, Partial<RetouchSettings>, number?];
+const ACNE_ONLY: Partial<RetouchSettings> = { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 900, blemishSensitivity: .85, frequencyHeal: 1, textureGraft: 0, smoothing: 0, toneEvenness: 0, lightEvenness: 0, microDodgeBurn: 0, shine: 0, redness: 0, foreheadLines: 0, crowsFeet: 0, smileLines: 0, underEyeLines: 0, darkCircles: 0, eyeBags: 0, eyeWhitening: 0, eyeVessels: 0, irisDetail: 0, redEye: false, teethWhitening: 0, bodySmoothing: 0, bodyTone: 0, matchBodyToFace: 0, bodyShine: 0, bodyRedness: 0, bodyBlemishes: 1, protectEyeArea: true, protectNoseDetail: true };
+// Calibrated per detail band against published retouching of the same photographs (ADR-0118): mid-scale
+// smoothing and dodge and burn took out more of every band from 4 px up than the finished results did.
+const PORTRAIT_FINISH: Partial<RetouchSettings> = { ...ACNE_ONLY, cleanupPasses: 4, blemishSensitivity: 1, poreRefine: .8, smoothing: .05, texture: .9, toneEvenness: .6, lightEvenness: .1, microDodgeBurn: 0, redness: .5, shine: .35, darkCircles: .75, bodySmoothing: .25, bodyTone: .35, matchBodyToFace: .25, bodyRedness: .3, bodyShine: .25 };
 /** Starting points modelled on common retouching looks; every control stays adjustable. */
 export const PRESETS: Preset[] = [
   ['natural', 'Natural', {}],
-  ['acne_only', 'Acne only · preserve detail', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 80, blemishSensitivity: .7, frequencyHeal: 1, textureGraft: 0, smoothing: 0, toneEvenness: 0, lightEvenness: 0, microDodgeBurn: 0, shine: 0, redness: 0, foreheadLines: 0, crowsFeet: 0, smileLines: 0, underEyeLines: 0, darkCircles: 0, eyeBags: 0, eyeWhitening: 0, eyeVessels: 0, irisDetail: 0, redEye: false, teethWhitening: 0, protectEyeArea: true, protectNoseDetail: true }],
-  ['acne', 'Deep acne cleanup', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 220, blemishSensitivity: .9, frequencyHeal: 1, smoothing: .8, texture: .85, toneEvenness: .7, microDodgeBurn: .65, poreRefine: .3, shine: .85, hairDetail: .4, hairShine: .2 }],
-  ['pro', 'Professional retouch', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 220, blemishSensitivity: .8, frequencyHeal: 1, textureGraft: .8, smoothing: .35, texture: .9, toneEvenness: .6, microDodgeBurn: .55, shine: .7, hairDetail: .4, hairShine: .2 }],
+  ['acne_only', 'Acne only · preserve detail', ACNE_ONLY],
+  ['detailed_skin', 'Detailed skin repair and review', { ...ACNE_ONLY, cleanupPasses: 4, blemishSensitivity: 1, poreRefine: .4, smoothing: .25, bodySmoothing: .25, texture: .85 }],
+  ['portrait_finish', 'Portrait skin finish', PORTRAIT_FINISH],
+  ['smooth_finish', 'Smooth portrait finish', { ...PORTRAIT_FINISH, smoothing: .5, texture: .75, poreRefine: .45, foreheadLines: .6, crowsFeet: .6, smileLines: .35, underEyeLines: .9, eyeBags: .75, protectEyeArea: false }],
+  ['body_finish', 'Body skin finish · stretch marks', { ...PORTRAIT_FINISH, stretchMarks: 1 }],
+  ['skin_cleanup', 'Skin cleanup · refine pores', { ...ACNE_ONLY, smoothing: .3, texture: .85, poreRefine: .3, redness: .15, bodySmoothing: .25 }],
+  ['acne', 'Deep acne cleanup', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 512, blemishSensitivity: .9, smoothing: .8, texture: .85, toneEvenness: .7, microDodgeBurn: .65, poreRefine: .3, shine: .85, hairDetail: .4, hairShine: .2 }],
+  ['pro', 'Professional retouch', { deepBlemishCleanup: true, removeDarkMarks: true, keepFreckles: false, maxSpots: 512, blemishSensitivity: .8, frequencyHeal: 1, textureGraft: .8, smoothing: .35, texture: .9, toneEvenness: .6, microDodgeBurn: .55, shine: .7, hairDetail: .4, hairShine: .2 }],
   ['subtle', 'Subtle', { smoothing: .35, toneEvenness: .4, microDodgeBurn: .15, eyeWhitening: .1, underEyeLines: .15 }, .8],
   ['soft', 'Soft glow', { smoothing: .75, texture: .4, glow: .4, eyeWhitening: .4, darkCircles: .7, blush: .2 }],
   ['beauty', 'Polished beauty', { smoothing: .85, toneEvenness: .75, microDodgeBurn: .6, poreRefine: .4, contour: .5, highlight: .5, lipColour: .35, lashDefinition: .5, browDefinition: .4, irisBrightness: .4, eyeWhitening: .4, hairDetail: .4, hairShine: .3 }],
@@ -122,14 +134,25 @@ export const PRESETS: Preset[] = [
   ['beauty_fashion', 'Beauty & Fashion (Evoto-style)', { deepBlemishCleanup: true, removeDarkMarks: false, keepFreckles: true, maxSpots: 220, blemishSensitivity: .75, frequencyHeal: 1, textureGraft: .8, smoothing: .35, texture: .9, toneEvenness: .6, microDodgeBurn: .5, shine: .6, hairDetail: .3, hairShine: .2, fabric: .5, backdrop: .5, backdropLift: 1, bodySmoothing: .4 }],
 ];
 
+/**
+ * The preset whose values these options are, or `custom`. A photo's saved options are read
+ * back when its panel opens again, so a retouch made with a preset still shows that preset
+ * selected rather than Custom with nothing chosen.
+ */
+export function presetOf(options: AutoRetouchOptions): string {
+  const keys = Object.keys(DEFAULT_RETOUCH_SETTINGS) as (keyof RetouchSettings)[];
+  const settings = options.settings ?? DEFAULT_RETOUCH_SETTINGS;
+  const match = PRESETS.find(([, , values, intensity]) => options.intensity === (intensity ?? 1) &&
+    keys.every(key => settings[key] === ({ ...DEFAULT_RETOUCH_SETTINGS, ...values })[key]));
+  return match?.[0] ?? 'custom';
+}
+
 const percent = (v: number) => `${Math.round(v * 100)}%`;
 
 /** Choose what the automatic retouch works on and how strongly, then run it. */
-export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: { disabled: boolean; busy?: boolean; onRun: (options: AutoRetouchOptions) => void; recipe?: RecipeDto | null }) {
+export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollection, recipe }: { disabled: boolean; busy?: boolean; onRun: (options: AutoRetouchOptions) => void; onRunCollection?: (options: AutoRetouchOptions) => void; recipe?: RecipeDto | null }) {
   const [options, setOptions] = useState<AutoRetouchOptions>(() => readRetouchPreferences(recipe));
-  const [preset, setPreset] = useState(() => options.intensity === 1 &&
-    (Object.keys(DEFAULT_RETOUCH_SETTINGS) as (keyof RetouchSettings)[]).every(key =>
-      options.settings?.[key] === DEFAULT_RETOUCH_SETTINGS[key]) ? 'natural' : 'custom');
+  const [preset, setPreset] = useState(() => presetOf(options));
   const settings = options.settings ?? DEFAULT_RETOUCH_SETTINGS;
   const label = options.intensity < 0.8 ? 'Subtle' : options.intensity > 1.2 ? 'Polished' : 'Natural';
   const faceFeatures = options.scope !== 'body';
@@ -143,7 +166,8 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
   const choose = ([id, , values, intensity]: Preset) => {
     setPreset(id);
     setOptions({ ...options, intensity: intensity ?? 1, settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values },
-      ...(id === 'acne_only' ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face' as const } : {}),
+      ...(['acne_only', 'skin_cleanup', 'detailed_skin'].includes(id) ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face_and_body' as const } : {}),
+      ...(['portrait_finish', 'smooth_finish', 'body_finish'].includes(id) ? { eyes: true, teeth: false, refine: true, blemishes: true, scope: 'face_and_body' as const } : {}),
     });
   };
   return <fieldset className="auto-retouch-settings" disabled={disabled}>
@@ -165,11 +189,16 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
     </label>
     <p className="lr-hint">{options.adaptive !== false ? 'Each face is measured and gets its own amounts; the report lists what was changed and why.' : 'The settings below are used exactly as set on every face.'}</p>
     <p className="lr-hint">{scope?.[2]} Skin is found by AI segmentation and measured against the same person's own skin; every result becomes an ordinary operation you can adjust, disable or remove below.</p>
-    {settings.deepBlemishCleanup && <p className="lr-hint">Deep cleanup searches the full detected face. {settings.removeDarkMarks ? 'Dark-mark removal is on and can also remove freckles or beauty marks. Review the before/after.' : 'Dark marks are protected.'}</p>}
-    {(settings.frequencyHeal > 0 || settings.textureGraft > 0) && <p className="lr-hint">{settings.frequencyHeal > 0 ? 'Acne clear rebuilds every mark from the clean skin around it first and keeps the pores. ' : ''}{settings.textureGraft > 0 ? 'Texture restore runs last and restores the original pores within the selected skin. Protected details stay unchanged.' : ''}</p>}
-    {settings.protectEyeArea && options.scope !== 'body' && <p className="lr-hint">Eye protection is on. Automatic face retouch leaves eyelids, inner corners and natural eye shadows alone, including when eye controls are enabled. Use Show retouched areas to inspect the saved selection. You can change this under Skin detection.</p>}
-    {settings.protectNoseDetail && options.scope !== 'body' && <p className="lr-hint">Nose detail is protected: its pores, shape and shading stay out of smoothing and toning. Acne marks on the nose are still cleared, and the nostrils are never touched.</p>}
+    {preset === 'portrait_finish' && <p className="lr-hint">Detailed healing, pore refinement, skin tone, redness and measured under-eye correction on each person. Eyes, teeth and face shape keep their original appearance. Review before exporting; each photo needs its own settings.</p>}
+    {preset === 'smooth_finish' && <p className="lr-hint">Portrait skin finish with more of the smoothing a polished headshot carries: forehead lines, crow’s feet, smile lines and under-eye bags are softened and pores refined, each measured on that person. The dedicated under-eye controls are allowed to work here; eyes, teeth and face shape keep their original appearance. Review before exporting.</p>}
+    {preset === 'body_finish' && <p className="lr-hint">Portrait skin finish, with stretch marks evened out of body skin. For a maternity or body photograph: an abdomen, hips, shoulders. Hands resting on the skin, a navel and every other contour are kept as they are. It works on all the body skin it finds, so leave it off for photographs that have none to clear.</p>}
+    {settings.deepBlemishCleanup && <p className="lr-hint">Deep cleanup searches the full detected face. {settings.removeDarkMarks ? (settings.keepMoles ? 'Dark-mark removal is on: freckles and the marks spots leave are healed. Moles and beauty marks are kept. Review the before/after.' : 'Dark-mark removal is on and Keep moles is off: freckles, moles and beauty marks can all be removed. Review the before/after.') : 'Dark marks are protected.'}</p>}
+    {(settings.frequencyHeal > 0 || settings.textureGraft > 0) && <p className="lr-hint">{settings.frequencyHeal > 0 ? 'Frequency healing rebuilds the tone under each mark first and keeps the pores. ' : ''}{settings.textureGraft > 0 ? 'Texture restore runs last and restores the original pores within the selected skin. Protected details stay unchanged.' : ''}</p>}
+    {settings.protectEyeArea && options.scope !== 'body' && <p className="lr-hint">Eye protection is on. Eyelids and inner corners stay protected. Measured dark-circle correction can treat skin below the lashes; other automatic tools avoid the surrounding eye area. Use Show retouched areas to inspect the saved selection.</p>}
+    {settings.protectNoseDetail && options.scope !== 'body' && <p className="lr-hint">Local spot repair includes nose skin. Nostril openings and the underside crease stay protected; broad healing and finishing preserve the wings and nose shading.</p>}
     <button type="button" className="retouch-primary" disabled={disabled || busy} onClick={() => onRun(options)}>{busy ? 'Detecting and retouching…' : `Auto retouch: ${scope?.[1] ?? 'Face'}`}</button>
+    {onRunCollection && <><button type="button" disabled={disabled || busy} onClick={()=>onRunCollection(options)}>Apply cleanup settings to this collection</button>
+      <p className="lr-hint">Uses these settings on each photo, with a fresh skin selection and repairs for that photo. Manual edits and exposure remain saved.</p></>}
     <details>
       <summary>Strength and details</summary>
       <label>Strength: {label} ({Math.round(options.intensity * 100)}%)
@@ -191,7 +220,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, recipe }: {
           </label>;
         }
         const n = Number(value);
-        const [min, max, scale] = kind === 'signed' ? [-100, 100, 100] : kind === 'count' ? [1, settings.deepBlemishCleanup ? 220 : 24, 1] : [0, 100, 100];
+        const [min, max, scale] = kind === 'signed' ? [-100, 100, 100] : kind === 'count' ? [1, key === 'cleanupPasses' ? 4 : settings.deepBlemishCleanup ? 900 : 24, 1] : [0, 100, 100];
         const shown = kind === 'count' ? String(n) : kind === 'signed' ? `${n > 0 ? '+' : ''}${Math.round(n * 100)}` : percent(n);
         return <label key={key} title={hint}>{name}: {shown}
           <input type="range" min={min} max={max} step={1} value={Math.round(n * scale)} aria-label={name}

@@ -19,7 +19,7 @@ type Entry = { image: RenderDto; quality: PreviewQuality; size: number };
  * them, about the same size again - least recently used out first. A 24-megapixel photograph
  * is about 200 MB of the budget; a 6-megapixel portrait about 50 MB.
  */
-const BUDGET = 640_000_000;
+const BUDGET = 128_000_000;
 const entries = new Map<string, Entry>();
 let used = 0;
 type Pixels = Pick<RenderDto, 'width' | 'height' | 'rgbBase64'>;

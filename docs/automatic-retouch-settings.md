@@ -20,18 +20,23 @@ below; change any of them and it becomes *Custom*.
 
 The order a retoucher works in, as one press:
 
-1. **Acne clear** measures every pimple, red mark and brown mark against the clean skin
-   around it - in clusters, on the nose and between the brows too - and rebuilds its tone and
-   colour from that skin, leaving the pores where they are; then it evens leftover redness. It
-   runs first, on the photograph as taken. [ADR-0092](adr/ADR-0092-acne-clear-and-the-blemish-brush.md).
+1. **Frequency healing** rebuilds the tone under measured compact marks from nearby clean
+   skin while retaining pore texture. It runs first on the original photograph, with
+   eye and nose exclusions applied before planning residual repairs.
 2. **Skin smoothing, tone and light evening, micro dodge & burn** - gentle: 35 % smoothing
-   and no pore refinement, because the healing has already removed the blemishes.
-3. No donor spot repairs: a borrowed patch on skin acne clear has evened shows as a disk.
+   and no pore refinement. Healing does not guarantee every blemish was removed.
+3. **Local donor spot repairs** address remaining supported marks. Donors, lighting fits,
+   full skin clearance and protected structures are checked before a repair is saved.
 4. **The frequency-separation finish**, which evens mid-scale unevenness and keeps the
    fine band.
-5. **Restore skin texture** last: this face's own pores - as they are after acne clear, not
-   the crusts of the marks - put back where smoothing removed them, nose included, with oily
-   glints and deep pits limited. Nothing is borrowed over a healed mark.
+5. **Restore skin texture** last: original pore detail is restored where smoothing removed
+   it, with glints and deep pits limited. Healed blemishes can borrow clean donor texture.
+
+The manual **Blemish brush** uses the newer Acne Clear renderer for painted selections.
+The automatic planner currently retains the independently validated frequency-healing and
+local-donor route. Historical Acne Clear automatic benchmark results describe a different
+planner revision. See [current workflow status](evoto-style-workflows.md) and the
+[native validation record](retouch-recovery-validation.md).
 
 Steps 1, 4 and 5 work on the whole face, including the side in shadow. A segmenter is often
 unsure of skin in deep shadow - most often on darker skin - so where it left skin out, any
@@ -104,7 +109,9 @@ definition, brow definition.
 **Portrait volumes & make-up** - contour, highlight, blush, face fill light.
 
 **Body** - body smoothing, even body tone, match body to face, body shine, red hands &
-elbows, body blemishes.
+elbows, body blemishes, stretch marks. Stretch marks is off unless you raise it or choose
+**Body skin finish**: it evens long, faint marks out of all the body skin it finds and keeps
+hands, a navel and every other contour as they are.
 
 **Hair, clothes & backdrop** - hair detail, hair shine, fabric creases, clean backdrop, bright
 backdrop (lifts a plain grey studio backdrop to a clean bright grey, as Evoto does; off unless a
@@ -118,7 +125,9 @@ preset such as *Beauty & Fashion (Evoto-style)* or you turn it on - ADR-0109).
   move them.
 - Remove a mole, a birthmark or a tattoo automatically. Darker marks that are not redder than
   the skin around them are kept and counted; a field of many small marks is treated as
-  freckles and kept unless you switch that off.
+  freckles and kept unless you switch that off. With **Remove dark marks** on, freckles and
+  the diffuse marks old spots leave are healed, and **Keep moles** (on by default) still
+  leaves anything dark with a crisp edge: a mole, a beauty mark.
 - Smooth beard, stubble, brows or lashes: they are outside the skin mask and protected again
   when the photograph is rendered.
 - Invent skin texture. Restore skin texture borrows pore detail from the same face in the

@@ -1,5 +1,14 @@
 # Third-party notices
 
+## GPU output runtime
+
+AURA uses the wgpu 27.0.1 graphics runtime and its wgpu-core, wgpu-hal, wgpu-types and
+Naga shader components under MIT OR Apache-2.0, along with pollster (MIT OR Apache-2.0)
+and bytemuck (MIT OR Apache-2.0 OR Zlib). Their original licence texts are included by
+the existing release notice generator, `scripts/third-party-notices.py`, which resolves
+all compiled Windows dependencies. GPU output uses the installed graphics driver;
+no proprietary GPU SDK or separately downloaded driver is bundled by this change.
+
 ## MediaPipe Selfie Multiclass segmentation weights
 
 AURA bundles a conversion of Google's MediaPipe Selfie Multiclass image segmenter

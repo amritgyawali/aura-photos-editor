@@ -36,6 +36,12 @@ selected pixel changed. It excludes unsaved drafts. Viewing, zooming and panning
 edits. Responses are keyed to the photo, recipe revision and operation; obsolete responses
 cannot be drawn over another photo. Overlay strength is local display state only.
 
+On photo or recipe reload, the workspace clears the saved preview, recipe, operation
+list and history before requesting replacements. A failed reload leaves editing and
+history actions disabled instead of displaying stale coverage. Reload and navigation
+remain available. The recovery regression simulates a native preview failure during
+undo, reloads, then redoes and checks the restored recipe hash (2026-10-08).
+
 The **Acne only: preserve detail** preset disables broad smoothing, color and light
 evening, shine changes, lines, eye/teeth and hair finishing. It uses frequency healing
 and a bounded residual spot pass. Residual repairs after frequency healing use partial

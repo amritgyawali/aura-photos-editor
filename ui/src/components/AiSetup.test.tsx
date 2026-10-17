@@ -62,6 +62,7 @@ describe('filterProviders', () => {
 
   it('matches a name', () => {
     expect(filterProviders(catalogue, 'groq').map((entry) => entry.id)).toEqual(['groq']);
+    expect(filterProviders([provider({id:'openai',label:'OpenAI (GPT)'})], 'ChatGPT').map(p=>p.id)).toEqual(['openai']);
   });
 
   // Somebody who knows they want "the fast one" should not have to already know

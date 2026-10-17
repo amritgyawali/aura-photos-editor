@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { api, asIpcError, inTauri } from '../ipc/client';
 import { ConnectProviders } from './ConnectProvider';
+import { InternalAiStatus } from './InternalAiStatus';
 import type {
   AiProviderDto,
   AiSetupStatusDto,
@@ -154,6 +155,8 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
   const [checking, setChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ratings, setRatings] = useState<Record<string, string>>({});
+  const [ratingBusy, setRatingBusy] = useState<string | null>(null);
 
   const report = useCallback(
     (error: unknown) => {
@@ -335,7 +338,7 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
         <select
           disabled={busy}
           value={provider}
-          onChange={(event) => setProvider(event.currentTarget.value)}
+          onChange={(event) => { setProvider(event.currentTarget.value); setKeyText(''); setEndpoint(''); setCheckResult(null); }}
         >
           {providerOptions(catalogue, setup?.keyedProviders ?? []).map((choice) => (
             <option key={choice.id} value={choice.id}>
@@ -344,6 +347,8 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
           ))}
         </select>
       </label>
+
+      <InternalAiStatus />
 
       {selected?.endpointEditable ?? provider === 'compat' ? (
         <label className="ai-keys-endpoint">
@@ -364,7 +369,7 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
           type="password"
           autoComplete="off"
           spellCheck={false}
-          placeholder={status?.keyPresent ? status.keyFingerprint : 'paste your key'}
+          placeholder={status?.provider === provider && status.keyPresent ? status.keyFingerprint : 'paste your key'}
           value={keyText}
           disabled={busy}
           onChange={(event) => setKeyText(event.currentTarget.value)}
@@ -372,7 +377,7 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
       </label>
 
       <p className="ai-keys-storage">
-        {status?.keyPresent
+        {status?.provider === provider && status.keyPresent
           ? `Saved as ${status.keyFingerprint} in this computer's secure key store (${status.keyStore}).`
           : "Keys are stored in this computer's secure key store, never in your catalog and never in a log."}
       </p>
@@ -381,10 +386,10 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
         <button type="button" disabled={busy || keyText.trim().length === 0} onClick={() => void save()}>
           Save key
         </button>
-        <button type="button" disabled={busy || checking || !status?.keyPresent} onClick={() => void check()}>
+        <button type="button" disabled={busy || checking || status?.provider !== provider || !status?.keyPresent} onClick={() => void check()}>
           Check
         </button>
-        <button type="button" disabled={busy || !status?.keyPresent} onClick={() => void forget()}>
+        <button type="button" disabled={busy || status?.provider !== provider || !status?.keyPresent} onClick={() => void forget()}>
           Forget key
         </button>
       </div>
@@ -462,7 +467,19 @@ export function AiKeysPanel({ projectId, onError, onOpenSetup }: AiKeysPanelProp
       <h3>What the AI was asked</h3>
       <ul className="ai-keys-audit">
         {calls.map((call) => (
-          <li key={call.id}>{callSummary(call)}</li>
+          <li key={call.id}>{callSummary(call)}
+            {call.source === 'cloud' && (call.status === 'ok' || call.status === 'repaired') && projectId && <>
+              <button type="button" disabled={ratingBusy !== null} onClick={() => {
+                setRatingBusy(call.id);
+                void api.internalAiFeedback(projectId, call.id, true).then(() => setRatings(old => ({ ...old, [call.id]: 'Useful result saved' }))).catch(report).finally(() => setRatingBusy(null));
+              }}>Useful result</button>
+              <button type="button" disabled={ratingBusy !== null} onClick={() => {
+                setRatingBusy(call.id);
+                void api.internalAiFeedback(projectId, call.id, false).then(() => setRatings(old => ({ ...old, [call.id]: 'Needs improvement saved' }))).catch(report).finally(() => setRatingBusy(null));
+              }}>Needs improvement</button>
+              {ratings[call.id] && <span role="status">{ratings[call.id]}</span>}
+            </>}
+          </li>
         ))}
       </ul>
       {calls.length === 0 ? <p className="ai-keys-audit-empty">No AI decisions yet.</p> : null}

@@ -760,14 +760,16 @@ pub fn render_hash(
 ///
 /// `aura-render/1.0.0+profiles.1`. The profile version is part of the engine rather than a
 /// fifth input, because from a caller's point of view a changed colour matrix *is* a
-/// different renderer.
+/// different renderer. So is a changed reading of a display-referred file: the same JPEG
+/// under the same recipe is a different picture, and a cached preview of it is stale.
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}",
+        "{}+profiles.{}+portrait.{}+display.{}",
         ENGINE,
         crate::profiles::PROFILES_VER,
-        aura_portrait::PARSE_VER
+        aura_portrait::PARSE_VER,
+        crate::output::DISPLAY_INPUT_VER
     )
 }
 
@@ -1004,7 +1006,9 @@ mod tests {
         assert!(engine.contains(&format!("+profiles.{}+", crate::profiles::PROFILES_VER)));
         // The portrait parse decides the pixels of every masked or retouched render, so its
         // version is part of the engine as the profile table's is.
-        assert!(engine.ends_with(&format!("+portrait.{}", aura_portrait::PARSE_VER)));
+        assert!(engine.contains(&format!("+portrait.{}+", aura_portrait::PARSE_VER)));
+        // And so is how a display-referred file is read: it decides every JPEG's pixels.
+        assert!(engine.ends_with(&format!("+display.{}", crate::output::DISPLAY_INPUT_VER)));
     }
 
     #[test]

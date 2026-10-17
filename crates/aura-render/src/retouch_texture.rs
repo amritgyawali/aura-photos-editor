@@ -23,6 +23,7 @@
 use crate::retouch_mask::Coverage;
 use crate::retouch_planes::{centre_and_spread, luma, quantile, smoothstep, Rect, Weighted};
 use aura_recipe::retouch_tools::Edit;
+use rayon::prelude::*;
 
 /// Bright relief beyond this many robust spreads is a glint rather than a pore.
 const GLINT_LIMIT: f32 = 2.0;
@@ -63,7 +64,7 @@ fn margin(radius: f32) -> usize {
 }
 
 fn log_luma(rgb: &[f32], w: usize, rect: Rect) -> Vec<f32> {
-    rect.cells()
+    rect.par_cells()
         .map(|(x, y)| {
             let i = (y * w + x) * 3;
             luma([rgb[i], rgb[i + 1], rgb[i + 2]]).max(1e-5).ln()
@@ -398,6 +399,7 @@ fn plan(
     });
     let wanted = edit.texture.clamp(0.0, 2.0);
     (0..n)
+        .into_par_iter()
         .map(|i| {
             let own = limit(fine_original[i]) * wanted;
             let target = match &donors {
@@ -425,7 +427,10 @@ pub(crate) fn apply(
     let Some(rect) = Rect::around(coverage.bounds, margin(radius), w, h) else {
         return;
     };
-    let alpha: Vec<f32> = rect.cells().map(|(x, y)| coverage.at(x, y, w, h)).collect();
+    let alpha: Vec<f32> = rect
+        .par_cells()
+        .map(|(x, y)| coverage.at(x, y, w, h))
+        .collect();
     if !alpha.iter().any(|a| *a > 0.0) {
         return;
     }

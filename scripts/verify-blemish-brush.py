@@ -58,14 +58,25 @@ def main():
         expect.set_options(timeout=300000)
         first = page.evaluate(READ, COLLECTION)
         edits_before = json.loads(first['recipe']['body']).get('studio_retouch_v1', [])
-        if not page.get_by_role('button', name='Blemish brush', exact=True).count():
-            page.get_by_role('button', name=f'{COLLECTION} 1', exact=True).click()
-            page.get_by_role('button', name='Auto edit One click, start to finish', exact=True).click()
-            page.get_by_role('button', name='Retouch', exact=True).click()
+        close = page.get_by_role('button', name='Back to Develop', exact=True)
+        if close.count():
+            close.click()
+        page.get_by_role('button', name=f'{COLLECTION} 1', exact=True).click()
+        page.get_by_role('button', name='Auto edit One click, start to finish', exact=True).click()
+        page.get_by_role('button', name='Retouch', exact=True).click()
         brush = page.get_by_role('button', name='Blemish brush', exact=True)
         expect(brush).to_be_enabled()
         brush.click()
-        page.get_by_label('Brush radius (% of short edge)').fill(str(args.radius))
+        radius = page.get_by_label('Brush radius (% of short edge)')
+        minimum = float(radius.get_attribute('min'))
+        step = float(radius.get_attribute('step'))
+        assert minimum <= args.radius <= float(radius.get_attribute('max'))
+        increments = round((args.radius - minimum) / step)
+        assert abs(minimum + increments * step - args.radius) < 1e-6
+        radius.focus()
+        radius.press('Home')
+        for _ in range(increments):
+            radius.press('ArrowRight')
         for spot in args.at:
             x, y = (float(v) for v in spot.split(','))
             page.get_by_label('Center X (%)').fill(f'{x * 100:.2f}')

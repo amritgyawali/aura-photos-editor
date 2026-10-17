@@ -22,12 +22,12 @@ export function readRetouchPreferences(recipe?: RecipeDto | null): AutoRetouchOp
       if (typeof saved[key] === 'boolean') options[key] = saved[key];
     }
     if (record(saved.settings)) {
-      const spotLimit = saved.settings.deepBlemishCleanup === true ? 220 : 24;
+      const spotLimit = saved.settings.deepBlemishCleanup === true ? 900 : 24;
       for (const key of Object.keys(settings) as (keyof RetouchSettings)[]) {
         const value = saved.settings[key];
         if (typeof settings[key] === 'boolean' && typeof value === 'boolean') Object.assign(settings, { [key]: value });
         else if (typeof settings[key] === 'number' && typeof value === 'number' && Number.isFinite(value)) {
-          const bounded = key === 'maxSpots' ? Math.round(Math.max(1, Math.min(spotLimit, value)))
+          const bounded = key === 'cleanupPasses' ? Math.round(Math.max(1, Math.min(4, value))) : key === 'maxSpots' ? Math.round(Math.max(1, Math.min(spotLimit, value)))
             : Math.max(signed.has(key) ? -1 : 0, Math.min(1, value));
           Object.assign(settings, { [key]: bounded });
         }

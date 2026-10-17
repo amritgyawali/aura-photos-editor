@@ -53,6 +53,7 @@ pub mod advanced_retouch;
 pub mod ai_settings;
 pub mod autopilot_commands;
 pub mod biometric_keys;
+pub mod blemish_review;
 pub mod camera_commands;
 pub mod cleanup_commands;
 pub mod cloud_commands;
@@ -65,11 +66,13 @@ pub mod delivery_commands;
 pub mod develop_commands;
 pub mod edit_profiles;
 pub mod gallery_commands;
+pub mod internal_ai;
 pub mod learn_commands;
 pub mod licensing;
 pub mod lightroom;
 pub mod native_retouch;
 pub mod personal_style;
+pub mod provider_links;
 pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
@@ -78,6 +81,8 @@ pub mod contract {
     pub mod ipc;
 }
 
+pub mod activity;
+pub mod adaptive_look;
 pub mod emotion_commands;
 pub mod explain_commands;
 pub mod finish_commands;
@@ -85,6 +90,7 @@ pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
+pub mod lateral_ca;
 pub mod local_commands;
 pub mod local_mask_commands;
 pub mod look_commands;
@@ -92,7 +98,9 @@ pub mod mask_commands;
 pub mod measured_cull;
 pub mod micro_commands;
 pub mod moment_commands;
+pub mod paired_reference;
 pub mod people_commands;
+pub mod perf;
 pub mod photo_enhance;
 mod photo_frames;
 pub mod portrait_auto;
@@ -233,6 +241,7 @@ pub use state::AppState;
 mod auto_edit_commands;
 // ADR-0068. The one-click finish, and its three commands.
 pub mod one_click_commands;
+pub use activity::activity_status;
 pub use auto_edit_commands::{photo_analysis, photo_auto_edit};
 pub use one_click_commands::{
     automatic_start, one_click_cancel, one_click_finish, one_click_status,

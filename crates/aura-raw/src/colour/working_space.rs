@@ -72,6 +72,31 @@ pub fn working_to_linear_srgb(rgb: Vec3) -> Vec3 {
     apply(rec2020_to_srgb(), rgb)
 }
 
+/// Convert linear display RGB to the working space with renderer precision.
+/// Keep the primaries and multiplication order here so selected-color effects
+/// agree with the input transform, including neutral and HDR values.
+#[must_use]
+pub fn linear_srgb_to_working_f32(rgb: [f32; 3]) -> [f32; 3] {
+    static CACHE: OnceLock<Mat3> = OnceLock::new();
+    let matrix = CACHE.get_or_init(|| mul(xyz_d65_to_rec2020(), SRGB_TO_XYZ_D65));
+    (*matrix).map(|row| {
+        row.iter()
+            .zip(rgb)
+            .map(|(coefficient, value)| *coefficient as f32 * value)
+            .sum()
+    })
+}
+
+/// Luminance in the one working space, with renderer precision.
+#[must_use]
+pub fn working_luminance_f32(rgb: [f32; 3]) -> f32 {
+    REC2020_TO_XYZ_D65[1]
+        .iter()
+        .zip(rgb)
+        .map(|(coefficient, value)| *coefficient as f32 * value)
+        .sum()
+}
+
 /// Convert one triple from the working space into CIE XYZ (D65), the input of
 /// the dE2000 comparison used by the golden suite.
 #[must_use]

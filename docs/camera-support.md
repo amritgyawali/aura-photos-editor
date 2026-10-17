@@ -46,7 +46,7 @@ than AURA's, which is recorded in the sidecar (`source: embedded`), flagged with
 | Fujifilm RAF, compressed | yes | no | no | Fujifilm's own entropy coder is not implemented. |
 | TIFF | yes | if CFA and supported compression | same | |
 | JPEG | yes | from the JPEG itself | no | A camera JPEG has no mosaic to render. |
-| HEIF / HEIC | no | no | no | Refused with `AURA-RAW-2001`. |
+| HEIF / HEIC | no | no | no | Refused with `AURA-RAW-2009`, which tells the photographer to export as JPEG or set the iPhone to Most Compatible. The pixels are HEVC-coded and this build has no HEVC decoder. |
 
 **Caveat on the untested rows.** Every "yes" above is exercised two ways: a
 generated file in that exact encoding, written by an encoder that walks the

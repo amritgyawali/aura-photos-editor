@@ -2,84 +2,35 @@
 //! Applied after planning to every automatic face operation, including texture restoration.
 use super::{Geometry, Pixels};
 use aura_core::AuraResult;
-use aura_recipe::retouch_tools::{Edit, Matte, Tool};
+use aura_recipe::retouch_tools::{Edit, Matte};
 use aura_vision::portrait::PortraitFace;
 use std::collections::BTreeMap;
 
 /// Rotation-aware eye sockets, including the tear trough and inner-corner shadow.
 /// The zero core has a sampling margin; the smooth transition lies outside that core.
 pub(super) fn weight(g: &Geometry, point: [f32; 2]) -> f32 {
-    socket(g, point, 0.30)
+    eye_weight(g, point, 0.40, 0.30, 0.4)
 }
 
-/// [`weight`] with the socket's upper half `up` eye distances tall. Mark repairs use a lower
-/// one: the upper lid stays protected, while the brow bone and the skin just above and
-/// between the brows - where acne is common and a mark is as visible as on a cheek - can be
-/// repaired. Brow hair is left out of the heal selection where it actually is.
-fn socket(g: &Geometry, point: [f32; 2], up: f32) -> f32 {
+fn eye_weight(g: &Geometry, point: [f32; 2], rx: f32, ry: f32, feather: f32) -> f32 {
     g.eyes.iter().fold(1.0_f32, |weight, eye| {
         let dx = point[0] - eye[0];
         let dy = point[1] - eye[1];
         let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
         let down = (dx * g.v[0] + dy * g.v[1]) / g.d - 0.035;
-        let distance = (across / 0.40).hypot(down / if down < 0.0 { up } else { 0.30 });
-        let t = ((distance - 1.0) / 0.4).clamp(0.0, 1.0);
+        let distance = (across / rx).hypot(down / ry);
+        let t = ((distance - 1.0) / feather).clamp(0.0, 1.0);
         weight.min(t * t * (3.0 - 2.0 * t))
     })
-}
-
-/// The eye opening, its lids and lashes only - without the tear trough and the skin below,
-/// which a dark-circle correction exists to reach. The opening is centred a little above the
-/// landmark; the zero core reaches just below the lower lashes and the transition ends a
-/// tenth of the eye distance below the landmark.
-pub(super) fn lid(g: &Geometry, point: [f32; 2]) -> f32 {
-    g.eyes.iter().fold(1.0_f32, |weight, eye| {
-        let dx = point[0] - eye[0];
-        let dy = point[1] - eye[1];
-        let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
-        let down = (dx * g.v[0] + dy * g.v[1]) / g.d + 0.03;
-        let distance = (across / 0.26).hypot(down / if down < 0.0 { 0.24 } else { 0.095 });
-        let t = ((distance - 1.0) / 0.4).clamp(0.0, 1.0);
-        weight.min(t * t * (3.0 - 2.0 * t))
-    })
-}
-
-/// A measured dark-circle correction: it works on the skin under the eye, so it is kept off
-/// the eye itself by [`lid`] rather than out of the whole socket.
-pub(crate) fn is_dark_circle(edit: &Edit) -> bool {
-    edit.tool == Tool::UnderEye && edit.source.is_some()
 }
 
 pub(super) fn feature_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
-    weight_for(g, point, settings, settings.protect_nose_detail, false)
-}
-
-/// Repairs of marks - acne clear, frequency healing, spot repairs - and the texture restore,
-/// which only puts the nose's own pores back, may work on the nose: *Preserve nose detail*
-/// keeps its pores, shape and shading out of smoothing and toning, and acne on a nose is as
-/// visible as acne anywhere. The nostrils are left out of the heal selection itself.
-pub(super) fn repairs(tool: Tool) -> bool {
-    matches!(
-        tool,
-        Tool::AcneClear | Tool::FrequencyHeal | Tool::PatchHeal | Tool::Heal | Tool::TextureGraft
-    )
-}
-
-fn weight_for(
-    g: &Geometry,
-    point: [f32; 2],
-    settings: &super::Settings,
-    nose: bool,
-    repair: bool,
-) -> f32 {
-    let eyes = if !settings.protect_eye_area {
-        1.0
-    } else if repair {
-        socket(g, point, 0.19)
-    } else {
+    let eyes = if settings.protect_eye_area {
         weight(g, point)
+    } else {
+        1.0
     };
-    if !nose {
+    if !settings.protect_nose_detail {
         return eyes;
     }
     let dx = point[0] - g.nose[0];
@@ -89,33 +40,146 @@ fn weight_for(
     let distance = (across / 0.29).hypot(down / 0.53);
     let t = ((distance - 1.0) / 0.32).clamp(0.0, 1.0);
     eyes.min(t * t * (3.0 - 2.0 * t))
+        .min(nostril_weight(g, point))
 }
 
-/// Which exclusion a guarded selection gets.
-#[derive(Debug, Clone, Copy)]
+/// Protect nostril openings, wings and the underside crease, without excluding
+/// bridge and tip skin from spot repair. Coordinates rotate with the landmarks.
+pub(super) fn nostril_weight(g: &Geometry, point: [f32; 2]) -> f32 {
+    nostril_exclusion(g, point, true)
+}
+
+pub(super) fn nostril_opening_weight(g: &Geometry, point: [f32; 2]) -> f32 {
+    if let Some(openings) = g.nostrils {
+        let dx = point[0] - g.nose[0];
+        let dy = point[1] - g.nose[1];
+        let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
+        let down = (dx * g.v[0] + dy * g.v[1]) / g.d;
+        let mut safe = openings.into_iter().fold(1.0_f32, |safe, opening| {
+            let distance =
+                ((across - opening.across) / opening.rx).hypot((down - opening.down) / opening.ry);
+            let t = ((distance - 1.0) / 0.35).clamp(0.0, 1.0);
+            safe.min(t * t * (3.0 - 2.0 * t))
+        });
+        // The original underside crease remains protected independently of the
+        // cavity positions. Broad healing/finishing retains its original guard.
+        let distance = (across / 0.13).hypot((down - 0.22) / 0.06);
+        let t = ((distance - 1.0) / 0.35).clamp(0.0, 1.0);
+        safe = safe.min(t * t * (3.0 - 2.0 * t));
+        return safe;
+    }
+    nostril_exclusion(g, point, false)
+}
+
+fn nostril_exclusion(g: &Geometry, point: [f32; 2], wings: bool) -> f32 {
+    let dx = point[0] - g.nose[0];
+    let dy = point[1] - g.nose[1];
+    let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
+    let down = (dx * g.v[0] + dy * g.v[1]) / g.d;
+    [
+        (-0.18, 0.12, 0.15, 0.10),
+        (0.18, 0.12, 0.15, 0.10),
+        (0.0, 0.22, 0.13, 0.06),
+        // Openings alone miss the curved outer wing, especially in a turned
+        // face. Keep both its highlight and shadow out of healing/finishing.
+        (-0.30, 0.12, 0.21, 0.20),
+        (0.30, 0.12, 0.21, 0.20),
+    ]
+    .into_iter()
+    .take(if wings { 5 } else { 3 })
+    .fold(1.0_f32, |safe, (x, y, rx, ry)| {
+        let distance = ((across - x) / rx).hypot((down - y) / ry);
+        let t = ((distance - 1.0) / 0.35).clamp(0.0, 1.0);
+        safe.min(t * t * (3.0 - 2.0 * t))
+    })
+}
+
+/// A measured, compact spot can sit on wing skin without being the wing contour.
+/// Its surrounding-light and donor checks run before this precise mask is used.
+pub(super) fn spot_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
+    let eyes = if settings.protect_eye_area {
+        spot_eye_weight(g, point, false)
+    } else {
+        1.0
+    };
+    eyes.min(nostril_opening_weight(g, point))
+}
+
+pub(super) fn cheek_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
+    let eyes = if settings.protect_eye_area {
+        spot_eye_weight(
+            g,
+            point,
+            settings.deep_blemish_cleanup && settings.remove_dark_marks,
+        )
+    } else {
+        1.0
+    };
+    eyes.min(nostril_opening_weight(g, point))
+}
+
+/// Only confirmed compact cleanup can reach the lower orbital skin. The lid,
+/// inner-corner shadow and existing upper-eye exclusion remain protected.
+pub(super) fn spot_eye_weight(g: &Geometry, point: [f32; 2], include_upper_cheek: bool) -> f32 {
+    if !include_upper_cheek {
+        return eye_weight(g, point, 0.34, 0.23, 0.25);
+    }
+    let smooth = |t: f32| {
+        let t = t.clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
+    let lids = lid(g, point);
+    g.eyes
+        .iter()
+        .enumerate()
+        .fold(1.0_f32, |safe, (index, eye)| {
+            let dx = point[0] - eye[0];
+            let dy = point[1] - eye[1];
+            let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
+            let below = (dx * g.v[0] + dy * g.v[1]) / g.d;
+            let distance = (across / 0.34).hypot((below - 0.035) / 0.23);
+            let existing = smooth((distance - 1.0) / 0.25);
+            let inward = if index == 0 { across } else { -across };
+            // No new coverage above 0.14 eye distances below the centre or on the
+            // nose-facing inner corner. Full eligibility starts below 0.20.
+            let cheek = smooth((below - 0.14) / 0.06) * smooth((0.28 - inward) / 0.08);
+            safe.min(existing.max(cheek.min(lids)))
+        })
+}
+
+pub(super) fn blemish_weight(g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
+    let eye = if !settings.protect_eye_area {
+        1.0
+    } else if settings.deep_blemish_cleanup && settings.remove_dark_marks {
+        // Freckles do not stop at the socket. Frequency healing rebuilds the tone under a
+        // compact mark and pastes nothing, so with dark marks being removed it may work on
+        // the cheek below an eye as the confirmed spot repairs already do; the lids, the
+        // inner corner and everything above the eye stay out.
+        spot_eye_weight(g, point, true)
+    } else {
+        weight(g, point)
+    };
+    eye.min(nostril_weight(g, point))
+}
+
+fn is_blemish(tool: super::Tool) -> bool {
+    matches!(
+        tool,
+        super::Tool::FrequencyHeal
+            | super::Tool::AcneClear
+            | super::Tool::PatchHeal
+            | super::Tool::Heal
+            | super::Tool::AutoBlemish
+    )
+}
+
+#[derive(Clone, Copy)]
 enum Guard {
-    /// The whole socket, and the nose when asked; `repair` uses the lower brow-side socket.
-    Face { nose: bool, repair: bool },
-    /// The eye opening, lids and lashes only.
-    Lid,
-}
-
-impl Guard {
-    fn weight(self, g: &Geometry, point: [f32; 2], settings: &super::Settings) -> f32 {
-        match self {
-            Self::Face { nose, repair } => weight_for(g, point, settings, nose, repair),
-            Self::Lid => lid(g, point),
-        }
-    }
-
-    fn suffix(self) -> &'static str {
-        match self {
-            Self::Face { nose: true, .. } => "feature-safe",
-            Self::Face { repair: false, .. } => "eye-safe",
-            Self::Face { repair: true, .. } => "repair-safe",
-            Self::Lid => "lid-safe",
-        }
-    }
+    Finish,
+    Blemish,
+    Compact,
+    UpperCheek,
+    DarkCircle,
 }
 
 fn guarded(
@@ -123,7 +187,7 @@ fn guarded(
     px: &Pixels<'_>,
     original: &Matte,
     settings: &super::Settings,
-    guard: Guard,
+    mode: Guard,
 ) -> Option<Matte> {
     let mut alpha = original.decode()?;
     let [l, t, r, b] = original.bounds;
@@ -141,9 +205,16 @@ fn guarded(
         let safe = [-margin, 0.0, margin]
             .into_iter()
             .flat_map(|dy| {
-                [-margin, 0.0, margin]
-                    .into_iter()
-                    .map(move |dx| guard.weight(g, [point[0] + dx, point[1] + dy], settings))
+                [-margin, 0.0, margin].into_iter().map(move |dx| {
+                    let at = [point[0] + dx, point[1] + dy];
+                    match mode {
+                        Guard::DarkCircle => lid(g, at),
+                        Guard::UpperCheek => cheek_weight(g, at, settings),
+                        Guard::Compact => spot_weight(g, at, settings),
+                        Guard::Blemish => blemish_weight(g, at, settings),
+                        Guard::Finish => feature_weight(g, at, settings),
+                    }
+                })
             })
             .fold(1.0_f32, f32::min);
         *value = (f32::from(*value) * safe).round() as u8;
@@ -174,20 +245,49 @@ pub(crate) fn protect<'a>(
     let g = Geometry::new(face, px).ok_or_else(invalid)?;
     let mut created = BTreeMap::new();
     for edit in edits {
-        let guard = if is_dark_circle(edit) {
-            Guard::Lid
+        let dark_circle = is_dark_circle(edit);
+        let upper_cheek = edit.id.contains("-spot-deep-cheek-");
+        let blemish = is_blemish(edit.tool);
+        let precise = matches!(edit.tool, super::Tool::PatchHeal | super::Tool::Heal)
+            || (edit.tool == super::Tool::SkinUniformity && edit.id.contains("-spot-deep-"));
+        let mode = if dark_circle {
+            Guard::DarkCircle
+        } else if upper_cheek {
+            Guard::UpperCheek
+        } else if precise {
+            Guard::Compact
+        } else if blemish {
+            Guard::Blemish
         } else {
-            // Only acne clear and frequency healing tell a mark from a lid crease or a brow
-            // hair; a patch heal copies whatever its donor holds, so it keeps the full socket.
-            Guard::Face {
-                nose: settings.protect_nose_detail && !repairs(edit.tool),
-                repair: matches!(edit.tool, Tool::AcneClear | Tool::FrequencyHeal),
-            }
+            Guard::Finish
         };
-        let suffix = guard.suffix();
         let id = edit.matte.as_ref().map_or_else(
-            || format!("{guard_id}-{suffix}"),
-            |id| format!("{id}-{suffix}"),
+            || {
+                if dark_circle {
+                    format!("{guard_id}-lid-safe")
+                } else if upper_cheek {
+                    format!("{guard_id}-cheek-feature-guard")
+                } else if precise {
+                    format!("{guard_id}-spot-feature-guard")
+                } else if blemish {
+                    format!("{guard_id}-blemish-feature-guard")
+                } else {
+                    guard_id.to_owned()
+                }
+            },
+            |id| {
+                if dark_circle {
+                    format!("{id}-lid-safe")
+                } else if upper_cheek {
+                    format!("{id}-cheek-feature-safe")
+                } else if precise {
+                    format!("{id}-spot-feature-safe")
+                } else if blemish {
+                    format!("{id}-blemish-feature-safe")
+                } else {
+                    format!("{id}-feature-safe")
+                }
+            },
         );
         if !created.contains_key(&id) {
             let full;
@@ -199,13 +299,31 @@ pub(crate) fn protect<'a>(
             };
             created.insert(
                 id.clone(),
-                guarded(&g, px, source, settings, guard).ok_or_else(invalid)?,
+                guarded(&g, px, source, settings, mode).ok_or_else(invalid)?,
             );
         }
         edit.matte = Some(id);
     }
     mattes.extend(created);
     Ok(())
+}
+
+pub(super) fn lid(g: &Geometry, point: [f32; 2]) -> f32 {
+    g.eyes.iter().fold(1.0_f32, |weight, eye| {
+        let dx = point[0] - eye[0];
+        let dy = point[1] - eye[1];
+        let across = (dx * g.u[0] + dy * g.u[1]) / g.d;
+        let down = (dx * g.v[0] + dy * g.v[1]) / g.d + 0.03;
+        let distance = (across / 0.26).hypot(down / if down < 0.0 { 0.24 } else { 0.095 });
+        let t = ((distance - 1.0) / 0.4).clamp(0.0, 1.0);
+        weight.min(t * t * (3.0 - 2.0 * t))
+    })
+}
+
+/// A measured dark-circle correction: it works on the skin under the eye, so it is kept off
+/// the eye itself by [`lid`] rather than out of the whole socket.
+pub(crate) fn is_dark_circle(edit: &Edit) -> bool {
+    edit.tool == super::Tool::UnderEye && edit.source.is_some()
 }
 
 #[cfg(test)]
@@ -216,6 +334,48 @@ pub(crate) fn protect<'a>(
 )]
 mod tests {
     use super::*;
+    use aura_recipe::retouch_tools::Tool;
+
+    #[test]
+    fn actual_openings_are_protected_without_hiding_adjacent_nose_skin() {
+        let mut rgb = [150_u8, 100, 75].repeat(256 * 256);
+        let original = Pixels::new(&rgb, 256, 256).unwrap();
+        let g = Geometry::new(&face(), &original).unwrap();
+        for y in 0..256 {
+            for x in 0..256 {
+                let across = (x as f32 + 0.5 - g.nose[0]) / g.d;
+                let down = (y as f32 + 0.5 - g.nose[1]) / g.d;
+                if [-0.12, 0.12]
+                    .into_iter()
+                    .any(|u| ((across - u) / 0.075).powi(2) + ((down - 0.11) / 0.03).powi(2) <= 1.0)
+                {
+                    rgb[(y * 256 + x) * 3..(y * 256 + x) * 3 + 3].copy_from_slice(&[20, 13, 10]);
+                }
+            }
+        }
+        let px = Pixels::new(&rgb, 256, 256).unwrap();
+        let measured = Geometry::new(&face(), &px).unwrap();
+        let point = [g.nose[0] - g.d * 0.22, g.nose[1]];
+        assert_eq!(
+            spot_weight(&measured, point, &super::super::Settings::default()),
+            1.0,
+            "Landmark fallback hides skin above the actual opening"
+        );
+        for y in 0..256 {
+            for x in 0..256 {
+                if rgb[(y * 256 + x) * 3] == 20 {
+                    assert_eq!(
+                        spot_weight(
+                            &measured,
+                            [x as f32 + 0.5, y as f32 + 0.5],
+                            &super::super::Settings::default()
+                        ),
+                        0.0
+                    );
+                }
+            }
+        }
+    }
 
     fn face() -> PortraitFace {
         PortraitFace {
@@ -228,6 +388,165 @@ mod tests {
                 [0.4, 0.72],
                 [0.6, 0.72],
             ],
+        }
+    }
+
+    #[test]
+    fn measured_dark_circle_mask_keeps_lids_safe_with_detail_switches_off() {
+        let photo = [150_u8, 100, 75].repeat(256 * 256);
+        let px = Pixels::new(&photo, 256, 256).unwrap();
+        let mut edits = [super::super::base_edit(
+            "dark-circle".into(),
+            Tool::UnderEye,
+            1.0,
+            &px,
+            [128., 128., 256., 256.],
+        )];
+        edits[0].source = Some([0.3, 0.7]);
+        let settings = super::super::Settings {
+            protect_eye_area: false,
+            protect_nose_detail: false,
+            ..Default::default()
+        };
+        let mut mattes = BTreeMap::new();
+        protect(
+            &face(),
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "safe",
+            &settings,
+        )
+        .unwrap();
+        let matte = &mattes[edits[0].matte.as_ref().unwrap()];
+        let alpha = matte.decode().unwrap();
+        for x in [0.35, 0.65] {
+            for y in [0.38, 0.40, 0.415] {
+                let index = (y * 256.) as usize * 256 + (x * 256.) as usize;
+                assert_eq!(alpha[index], 0, "lid or lashes were selected");
+            }
+            assert!(
+                alpha[(0.46 * 256.) as usize * 256 + (x * 256.) as usize] > 0,
+                "safe under-eye skin must remain available"
+            );
+        }
+        assert!(!matte.refine_edges);
+    }
+
+    #[test]
+    fn compact_spots_can_reach_wing_skin_without_selecting_nostril_openings() {
+        let photo = [150_u8, 100, 75].repeat(256 * 256);
+        let px = Pixels::new(&photo, 256, 256).unwrap();
+        let g = Geometry::new(&face(), &px).unwrap();
+        let settings = super::super::Settings::default();
+        for p in [[0.368, 0.637], [0.632, 0.637]] {
+            let point = p.map(|v| v * 256.0);
+            assert!(spot_weight(&g, point, &settings) > 0.8);
+            assert!(blemish_weight(&g, point, &settings) < f32::EPSILON);
+        }
+        for p in [[0.446, 0.616], [0.554, 0.616], [0.5, 0.646]] {
+            assert!(spot_weight(&g, p.map(|v| v * 256.0), &settings) < f32::EPSILON);
+        }
+    }
+
+    #[test]
+    fn blemish_selection_reaches_nose_skin_but_finishing_still_protects_it() {
+        let photo = [150_u8, 100, 75].repeat(256 * 256);
+        let px = Pixels::new(&photo, 256, 256).unwrap();
+        let mut edits = [
+            super::super::base_edit(
+                "heal".into(),
+                Tool::FrequencyHeal,
+                1.0,
+                &px,
+                [128., 128., 256., 256.],
+            ),
+            super::super::base_edit(
+                "finish".into(),
+                Tool::Frequency,
+                1.0,
+                &px,
+                [128., 128., 256., 256.],
+            ),
+            super::super::base_edit(
+                "spot".into(),
+                Tool::PatchHeal,
+                1.0,
+                &px,
+                [128., 128., 256., 256.],
+            ),
+        ];
+        for edit in &mut edits {
+            edit.feather = 0.;
+        }
+        let mut mattes = BTreeMap::new();
+        protect(
+            &face(),
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "guard",
+            &super::super::Settings::default(),
+        )
+        .unwrap();
+        assert_ne!(
+            edits[0].matte, edits[1].matte,
+            "spot and broad tools must not share a guard"
+        );
+        assert_ne!(
+            edits[0].matte, edits[2].matte,
+            "compact and broad healing need different wing guards"
+        );
+        for size in [128, 512] {
+            let pixels = [0.3_f32, 0.2, 0.1].repeat(size * size);
+            let heal = aura_render::retouch_tools::selection_mask_with_mattes(
+                &pixels, size, size, &edits[0], &mattes,
+            );
+            let finish = aura_render::retouch_tools::selection_mask_with_mattes(
+                &pixels, size, size, &edits[1], &mattes,
+            );
+            let spot = aura_render::retouch_tools::selection_mask_with_mattes(
+                &pixels, size, size, &edits[2], &mattes,
+            );
+            for [x, y] in [[0.5, 0.53], [0.48, 0.55]] {
+                let i = (y * size as f32) as usize * size + (x * size as f32) as usize;
+                assert!(
+                    heal[i] > 0.8,
+                    "nose skin must be eligible at {size}: {x},{y}"
+                );
+                assert_eq!(finish[i], 0., "broad finishing must preserve nose shading");
+            }
+            for [x, y] in [
+                [0.35, 0.4],
+                [0.65, 0.4],
+                [0.446, 0.616],
+                [0.554, 0.616],
+                [0.5, 0.646],
+                // Outer nostril wings, which lie beyond the openings on a
+                // turned face. Healing these can flatten the nose contour.
+                [0.368, 0.637],
+                [0.632, 0.637],
+            ] {
+                let i = (y * size as f32) as usize * size + (x * size as f32) as usize;
+                assert_eq!(
+                    heal[i], 0.,
+                    "eye or nostril core selected at {size}: {x},{y}"
+                );
+                assert_eq!(
+                    finish[i], 0.,
+                    "finishing must preserve eye and nostril wings at {size}: {x},{y}"
+                );
+                if (0.38..=0.62).contains(&x) {
+                    assert_eq!(
+                        spot[i], 0.0,
+                        "compact healing must exclude nostril openings"
+                    );
+                } else if y > 0.6 {
+                    assert!(spot[i] > 0.8, "compact wing repair is masked at {size}");
+                } else {
+                    assert_eq!(spot[i], 0.0);
+                }
+            }
         }
     }
 
@@ -344,55 +663,6 @@ mod tests {
     }
 
     #[test]
-    fn mark_repairs_reach_the_nose_and_brow_bone_and_never_the_eyes() {
-        let photo = [150_u8, 100, 75].repeat(256 * 256);
-        let px = Pixels::new(&photo, 256, 256).unwrap();
-        let full = |id: &str, tool: Tool| {
-            let mut edit =
-                super::super::base_edit(id.into(), tool, 1.0, &px, [128., 128., 256., 256.]);
-            edit.feather = 0.;
-            edit
-        };
-        let mut edits = [
-            full("clear", Tool::AcneClear),
-            full("smooth", Tool::SkinSmooth),
-        ];
-        let mut mattes = BTreeMap::new();
-        protect(
-            &face(),
-            &px,
-            edits.iter_mut(),
-            &mut mattes,
-            "guard",
-            &super::super::Settings::default(),
-        )
-        .unwrap();
-        let [clear, smooth] = edits.map(|e| e.matte.unwrap());
-        assert_ne!(clear, smooth, "repairs and smoothing share one guard");
-        let at = |id: &str, [x, y]: [f32; 2]| {
-            let m = &mattes[id];
-            let [l, t, r, b] = m.bounds;
-            let col = (((x - l) / (r - l)) * m.width as f32) as usize;
-            let row = (((y - t) / (b - t)) * m.height as f32) as usize;
-            m.decode().unwrap()[row * m.width as usize + col]
-        };
-        // The nose tip: smoothing keeps out, acne clear works there.
-        assert_eq!(at(&smooth, [0.5, 0.56]), 0);
-        assert!(at(&clear, [0.5, 0.56]) > 200);
-        // The brow bone a third of the eye distance above an eye: repairs reach it.
-        assert!(
-            at(&clear, [0.35, 0.29]) > 200,
-            "{}",
-            at(&clear, [0.35, 0.29])
-        );
-        // The eyes, their inner corners and the skin under them stay out of both.
-        for point in [[0.35, 0.4], [0.445, 0.42], [0.35, 0.47]] {
-            assert_eq!(at(&clear, point), 0, "{point:?}");
-            assert_eq!(at(&smooth, point), 0, "{point:?}");
-        }
-    }
-
-    #[test]
     fn eye_geometry_rotates_with_the_face() {
         let photo = [150_u8, 100, 75].repeat(256 * 256);
         let px = Pixels::new(&photo, 256, 256).unwrap();
@@ -401,7 +671,27 @@ mod tests {
         rotated.landmarks = rotated.landmarks.map(|[x, y]| [1.0 - y, x]);
         let a = Geometry::new(&original, &px).unwrap();
         let b = Geometry::new(&rotated, &px).unwrap();
-        for [x, y] in [[0.445, 0.42], [0.35, 0.49], [0.3, 0.65], [0.5, 0.23]] {
+        let compact = super::super::Settings {
+            deep_blemish_cleanup: true,
+            remove_dark_marks: true,
+            ..Default::default()
+        };
+        let cheek = [0.35 * 256.0, 0.472 * 256.0];
+        assert_eq!(cheek_weight(&a, cheek, &compact), 1.0);
+        assert_eq!(
+            spot_weight(&a, cheek, &super::super::Settings::default()),
+            0.0
+        );
+        for p in [[0.35, 0.4], [0.65, 0.4], [0.445, 0.42], [0.555, 0.42]] {
+            assert_eq!(cheek_weight(&a, p.map(|v| v * 256.0), &compact), 0.0);
+        }
+        for [x, y] in [
+            [0.445, 0.42],
+            [0.35, 0.472],
+            [0.35, 0.49],
+            [0.3, 0.65],
+            [0.5, 0.23],
+        ] {
             assert!(
                 (feature_weight(&a, [x * 256., y * 256.], &super::super::Settings::default())
                     - feature_weight(
@@ -409,6 +699,12 @@ mod tests {
                         [(1. - y) * 256., x * 256.],
                         &super::super::Settings::default()
                     ))
+                .abs()
+                    < 1e-5
+            );
+            assert!(
+                (cheek_weight(&a, [x * 256., y * 256.], &compact)
+                    - cheek_weight(&b, [(1. - y) * 256., x * 256.], &compact))
                 .abs()
                     < 1e-5
             );

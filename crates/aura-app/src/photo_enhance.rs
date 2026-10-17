@@ -21,7 +21,7 @@ pub fn enhance_photo(state: &AppState, input: &DevelopImageInput) -> IpcResult<R
 /// # Errors
 /// Returns a typed analysis, decode or recipe storage error.
 pub fn enhance_portrait(state: &AppState, input: &DevelopImageInput) -> IpcResult<RecipeDto> {
-    crate::smart_edit::run(state, input, false)
+    crate::internal_ai::retouch(state, input)
 }
 
 #[cfg(test)]
@@ -51,7 +51,7 @@ pub fn correction(rgb: &[u8]) -> aura_core::AuraResult<(f32, i16, i16, i16)> {
         let linear: f32 = pixel
             .iter()
             .zip([0.2126, 0.7152, 0.0722])
-            .map(|(v, weight)| aura_raw::colour::curve::srgb_decode(f32::from(*v) / 255.0) * weight)
+            .map(|(v, weight)| aura_raw::colour::curve::srgb_byte_to_linear(*v) * weight)
             .sum();
         let bin =
             aura_raw::colour::curve::quantise_u8(aura_raw::colour::curve::srgb_encode(linear));

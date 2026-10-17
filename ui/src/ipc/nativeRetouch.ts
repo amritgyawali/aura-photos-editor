@@ -1,3 +1,4 @@
+export const MAX_NATIVE_RETOUCH_EDITS = 1024;
 import { invoke } from '@tauri-apps/api/core';
 import type { RecipeDto, RenderDto } from './types';
 
@@ -27,8 +28,12 @@ export const RETOUCH_TOOLS = [
   ['red_eye', 'Flash red-eye correction', 'Details', 'Reduces dominant red inside the selected pupil.'],
   ['fabric', 'Fabric crease softening', 'Cleanup', 'Reduces broad texture variations; keep seams outside the selection.'],
   ['backdrop', 'Backdrop smoothing', 'Cleanup', 'Smooths a selected backdrop patch. Avoid subject edges.'],
+  ['defringe', 'Defringe · purple and green edges', 'Cleanup', 'Removes the purple or green rims a lens leaves on the dark side of bright edges: branches against a sky, a veil against the light, a dark suit beside a white shirt. Each rim pixel takes the colour of its calm surroundings at its own brightness. Purple or green things, and the glow of coloured lights, keep their colour.'],
   ['glare', 'Glare softening', 'Details', 'Reduces bright reflections; cannot reconstruct detail hidden by glare.'],
   ['makeup', 'Local cosmetic tint', 'Color', 'Applies a controlled warm or magenta tint to a chosen region.'],
+  ['colorize', 'Hair, clothes & makeup color', 'Color', 'Choose any color, then select hair, clothing, lips or another area. Preserves the photographed light and fine detail. Reuse a saved hair or clothes selection, or paint and refine your own.'],
+  ['background_color', 'Solid background color', 'Cleanup', 'Replace only the selected background with a chosen solid color. Use a saved background selection or paint it; inspect subject edges before applying.'],
+  ['reshape', 'Local face & body proportions', 'Shape', 'Explicitly change width and height inside an ellipse. Use on a face, nose, waist, arm or leg. This changes photographed structure and is never part of automatic skin cleanup. Start with small changes and inspect the edges.'],
 ] as const;
 export type RetouchTool = typeof RETOUCH_TOOLS[number][0];
 export type BrushPoint = [number, number, number];
@@ -54,7 +59,9 @@ export type RetouchSettings = {
   aiSkinDetection: boolean; mainSubjectOnly: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean; protectEyeArea: boolean; protectNoseDetail: boolean;
   smoothing: number; texture: number; smoothingSize: number; toneEvenness: number; lightEvenness: number; microDodgeBurn: number;
   poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
-  blemishSensitivity: number; maxSpots: number; keepFreckles: boolean;
+  blemishSensitivity: number; cleanupPasses: number; maxSpots: number; keepFreckles: boolean;
+  /** Moles and beauty marks are left alone (ADR-0118); on by default. */
+  keepMoles: boolean;
   deepBlemishCleanup: boolean; removeDarkMarks: boolean;
   /** Frequency healing and the texture graft (ADR-0090); 0 is off. */
   frequencyHeal: number; textureGraft: number;
@@ -64,6 +71,8 @@ export type RetouchSettings = {
   teethWhitening: number; lipColour: number; lipDefinition: number;
   contour: number; highlight: number; blush: number; faceLight: number;
   bodySmoothing: number; bodyTone: number; matchBodyToFace: number; bodyShine: number; bodyRedness: number; bodyBlemishes: number;
+  /** Stretch marks evened out of body skin (ADR-0118); 0 is off. */
+  stretchMarks: number;
   hairDetail: number; hairShine: number; fabric: number; backdrop: number;
   /** Lift a plain neutral studio backdrop to a clean bright grey, as Evoto does (ADR-0109). */
   backdropLift: number;
@@ -72,7 +81,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
   smoothing: .5, texture: .85, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
-  blemishSensitivity: .5, maxSpots: 12, keepFreckles: true,
+  blemishSensitivity: .5, cleanupPasses: 2, maxSpots: 12, keepFreckles: true, keepMoles: true,
   deepBlemishCleanup: false, removeDarkMarks: false,
   frequencyHeal: 0, textureGraft: 0,
   foreheadLines: .5, crowsFeet: .5, smileLines: .5, underEyeLines: .25, neckLines: 0,
@@ -80,7 +89,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   eyeWhitening: .2, eyeVessels: .5, irisDetail: .5, irisBrightness: 0, redEye: true, lashDefinition: 0, browDefinition: 0,
   teethWhitening: .5, lipColour: 0, lipDefinition: 0,
   contour: 0, highlight: 0, blush: 0, faceLight: 0,
-  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0,
+  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0, stretchMarks: 0,
   hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0, backdropLift: 0,
 };
 /** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */
@@ -94,11 +103,20 @@ export type NativeRetouchEdit = {
   sourceScale?: number;
   preserveMicrotexture?: boolean;
   textureHeal?: boolean;
-  /** Frequency healing and acne clear: how readily a deviation counts as a mark (default 0.5). */
+  cleanRingFit?: boolean;
+  curvedHeal?: boolean;
+  healSamples?: [number, number][];
+  textureSources?: [number, number][];
+  /** Frequency healing only: how readily a compact deviation counts as a mark (default 0.5). */
   sensitivity?: number | null;
   /** Frequency healing and acne clear: leave marks that are darker but not redder or browner. */
   keepDarkMarks?: boolean;
+  /** How crisp a pigment-dark patch must be for frequency healing to keep it (ADR-0118); absent heals it. */
+  moleEdge?: number;
   texture: number; tone: number; warmth: number; tint: number;
+  /** Chosen display sRGB, normalized 0..1. Required by explicit color tools. */
+  targetColor?: [number, number, number] | null;
+  repairPasses?: number;
   mask?: BrushMask | null;
   skin?: SkinSettings | null;
   selection?: RetouchSelection | null;
@@ -127,7 +145,12 @@ export const blemishBrush = (region: NativeRetouchEdit['region']): NativeRetouch
 export const freshRetouch = (): NativeRetouchEdit => ({id:'draft',tool:'heal',enabled:true,region:[0.5,0.45,0.035,0.035],source:null,amount:0.65,feather:0.65,radius:0.003,texture:1,tone:0.5,warmth:0,tint:0});
 /** How sharp a preview is: the original's own resolution, or a screen-sized first look. */
 export type PreviewQuality = 'full' | 'fast';
+export type BlemishReview = {
+  recipeHash: string; width: number; height: number;
+  review: { regions: { region: [number, number, number, number]; pixels: number }[]; measuredAreas: number; selectedMarkPixels: number };
+};
 export const nativeRetouch = {
+  review: (projectId: string, photoId: string, recipeHash: string, selection: NativeRetouchEdit, quality: PreviewQuality = 'full') => invoke<BlemishReview>('native_retouch_blemish_review',{input:{projectId,photoId,recipeHash,selection,quality}}),
   autoPortrait: (photoId: string) => invoke<RecipeDto>('enhance_portrait', { input: { photoId } }),
   autoRetouch: (projectId: string, photoId: string, options: AutoRetouchOptions, global = false) => invoke<RecipeDto>('auto_retouch', { input: { projectId, photoId, global, options } }),
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),

@@ -966,6 +966,127 @@ pub fn learn_from_lightroom(state: &AppState, input: &LearnInput) -> IpcResult<L
     Ok(learned)
 }
 
+/// What one finished photograph adds beyond AURA's own measured correction of it, as a look.
+///
+/// The exposure, contrast, highlights and shadows a photograph needs are measured on every
+/// photograph, so only what the finished version does beyond them is kept; white balance is
+/// kept as its offset from the neutral develop, and everything else as it stands. Applied to
+/// another photograph the look therefore starts from that photograph's own correction, and
+/// goes through the scene guards every profile goes through.
+///
+/// # Errors
+/// When the result is not a valid profile.
+pub fn look_of(
+    finished: &aura_recipe::Recipe,
+    auto: AutoCorrection,
+    name: &str,
+    source: &str,
+) -> AuraResult<EditProfile> {
+    let neutral =
+        aura_recipe::fixtures::neutral(&finished.image.content_hash, &finished.image.camera);
+    let (g, n) = (&finished.global, &neutral.global);
+    let slide = |value: i16, base: i16| value.saturating_sub(base).clamp(-100, 100);
+    let adjust = ProfileAdjust {
+        exposure: (g.exposure - auto.exposure).clamp(-2.0, 2.0),
+        contrast: slide(g.contrast, auto.contrast),
+        highlights: slide(g.highlights, auto.highlights),
+        shadows: slide(g.shadows, auto.shadows),
+        whites: slide(g.whites, 0),
+        blacks: slide(g.blacks, 0),
+        temperature: (i64::from(g.temperature) - i64::from(n.temperature)).clamp(-3000, 3000)
+            as i32,
+        tint: slide(g.tint, n.tint),
+        clarity: slide(g.clarity, 0),
+        texture: slide(g.texture, 0),
+        dehaze: slide(g.dehaze, 0),
+        vibrance: slide(g.vibrance, 0),
+        saturation: slide(g.saturation, 0),
+        curve: if g.curve == n.curve {
+            Vec::new()
+        } else {
+            g.curve.points.clone()
+        },
+        hsl: g
+            .hsl
+            .iter()
+            .filter(|(_, shift)| **shift != aura_recipe::HslShift::default())
+            .map(|(band, shift)| (band.clone(), *shift))
+            .collect(),
+        ..ProfileAdjust::default()
+    };
+    let name = if name.trim().is_empty() {
+        "Kept look"
+    } else {
+        name.trim()
+    };
+    let signed = |v: i16| format!("{v:+}");
+    let profile = EditProfile {
+        id: slug(name),
+        name: name.to_string(),
+        category: "Personal".into(),
+        tagline: "Kept from the finished version of one photograph".into(),
+        description: "The tone and colour one finished photograph has beyond AURA's own measured correction of it. On another photograph it starts from that photograph's own correction, so the look carries over and the exposure of the photograph it came from does not.".into(),
+        best_for: vec!["Photographs from the same shoot or in the same light".into()],
+        technique: vec![
+            format!("Exposure {:+.2} stops beyond the measured correction", adjust.exposure),
+            format!(
+                "Contrast {}, highlights {}, shadows {}, whites {}, blacks {}",
+                signed(adjust.contrast),
+                signed(adjust.highlights),
+                signed(adjust.shadows),
+                signed(adjust.whites),
+                signed(adjust.blacks)
+            ),
+            format!(
+                "White balance {:+} K and tint {}; saturation {}",
+                adjust.temperature,
+                signed(adjust.tint),
+                signed(adjust.saturation)
+            ),
+        ],
+        origin: "personal".into(),
+        sources: vec![ProfileSource {
+            title: format!("The finished photograph {source}"),
+            url: String::new(),
+        }],
+        evidence: None,
+        swatch: vec!["#8c7a6a".into(), "#eed8c4".into()],
+        adjust,
+        adaptive: None,
+    };
+    crate::edit_profiles::check(&profile).map_err(invalid)?;
+    Ok(profile)
+}
+
+/// Keep the look of a photograph's saved edit as a personal profile, replacing one of the
+/// same name. Returns the profile's id.
+///
+/// # Errors
+/// A preview that cannot be measured, an invalid profile, a full list, or a storage failure.
+pub fn keep_look(
+    state: &AppState,
+    photo: aura_core::PhotoId,
+    project_key: &str,
+    finished: &aura_recipe::Recipe,
+    name: &str,
+    source: &str,
+) -> AuraResult<String> {
+    let (auto, _) = crate::edit_profiles::measure_photo(state, photo, project_key)?;
+    let profile = look_of(finished, auto, name, source)?;
+    let id = profile.id.clone();
+    let now = aura_catalog::rfc3339(state.clock().now_utc());
+    state.catalog().writer().with(move |conn| {
+        let mut all = stored(conn)?;
+        all.retain(|p| p.id != profile.id);
+        if all.len() >= MAX_PROFILES {
+            return Err(invalid("Delete a personal style before keeping another."));
+        }
+        all.push(profile);
+        store(conn, &all, &now)
+    })?;
+    Ok(id)
+}
+
 /// Delete a personal profile.
 ///
 /// # Errors
@@ -979,6 +1100,50 @@ pub fn delete(state: &AppState, id: &str) -> IpcResult<()> {
         store(conn, &all, &now)
     })?;
     Ok(())
+}
+
+#[cfg(test)]
+mod kept_look_tests {
+    use super::*;
+
+    #[test]
+    fn a_kept_look_is_what_the_finish_adds_beyond_the_measured_correction() {
+        let mut finished = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
+        let neutral_kelvin = finished.global.temperature;
+        finished.global.exposure = 0.55;
+        finished.global.shadows = 30;
+        finished.global.blacks = 27;
+        finished.global.temperature = neutral_kelvin + 440;
+        finished.global.tint = 9;
+        let auto = AutoCorrection {
+            exposure: 0.75,
+            highlights: -15,
+            shadows: 20,
+            contrast: 0,
+        };
+        let look = look_of(&finished, auto, "  Warm ivory  ", "wedding-after.png").unwrap();
+        assert_eq!(look.id, "personal-warm-ivory");
+        assert_eq!(look.origin, "personal");
+        let a = &look.adjust;
+        // The photograph's own exposure and shadow needs are not part of the look.
+        assert!((a.exposure + 0.20).abs() < 1e-6);
+        assert_eq!((a.shadows, a.highlights, a.blacks), (10, 15, 27));
+        assert_eq!((a.temperature, a.tint), (440, 9));
+        // Applying it to a different photograph starts from that photograph's correction.
+        let other = AutoCorrection {
+            exposure: -0.3,
+            highlights: 0,
+            shadows: 0,
+            contrast: 5,
+        };
+        let stats = SceneStats::measure(&[128; 96]).unwrap();
+        let current = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
+        let (applied, _, _) =
+            crate::edit_profiles::build(&current, Some(&look), 1.0, other, stats).unwrap();
+        assert!((applied.global.exposure + 0.5).abs() < 1e-6);
+        assert_eq!(applied.global.blacks, 27);
+        assert!(applied.global.temperature > neutral_kelvin);
+    }
 }
 
 /// Build a settings map from `(key, value)` pairs, for tests.

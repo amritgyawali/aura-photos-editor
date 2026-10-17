@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 pub const KEY: &str = "studio_retouch_v1";
 /// Segmentation mattes that retouch operations refer to by id. ADR-0082.
 pub const MATTE_KEY: &str = "studio_retouch_mattes_v1";
-pub const MAX_EDITS: usize = 256;
+pub const MAX_EDITS: usize = 1024;
 pub const MAX_MATTES: usize = 64;
 /// At most this many cells per matte; the renderer refines its edges at full resolution.
 /// 512 a side, for the learned masking selections (ADR-0103); the segmenter's own mattes stay
@@ -107,6 +107,12 @@ pub enum Tool {
     Backdrop,
     Glare,
     Makeup,
+    /// Set chroma from a chosen sRGB color, preserving the photographed luminance.
+    Colorize,
+    /// Composite a solid chosen sRGB color inside the saved selection.
+    BackgroundColor,
+    /// Explicit local width/height change. Warmth/tint are signed horizontal/vertical amounts.
+    Reshape,
     SkinSmooth,
     SkinUniformity,
     PortraitDodgeBurn,
@@ -122,6 +128,16 @@ pub enum Tool {
     /// pores. With `preserve_microtexture` it also evens flat redness. Without a matte it is
     /// a brush: paint over what is left. ADR-0092.
     AcneClear,
+    /// Evens long, faint marks out of an expanse of skin with a filter that flows across
+    /// them and stops at structure: a hand resting on an abdomen and a navel are left as
+    /// they are. `radius` is the reach of the evening and `texture` how much of the clean
+    /// skin's own grain is put back. ADR-0118.
+    StretchMarks,
+    /// Removes the purple (`warmth`) and green (`tint`) rims a lens leaves on the dark side of a
+    /// bright edge, `radius` from it; each rim pixel takes the colour of its calm surroundings
+    /// at its own luminance. A colour its calm surroundings share, or the glow of a coloured
+    /// light, is kept. ADR-0125.
+    Defringe,
 }
 
 // Each flag is an independent opt-in that old recipes read as off; none of them is a state
@@ -133,6 +149,9 @@ pub struct Edit {
     pub id: String,
     pub tool: Tool,
     pub enabled: bool,
+    /// Bounded repeated residual healing. Absent keeps the original two-pass rendering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repair_passes: Option<u8>,
     /// Center x/y and ellipse radii x/y in normalized full-frame coordinates.
     pub region: [f32; 4],
     /// Normalized donor/reference point; mandatory for clone and color matching.
@@ -157,6 +176,22 @@ pub struct Edit {
     /// Transfer real donor texture over a robust local lighting fit. Old heals stay unchanged.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub texture_heal: bool,
+    /// Trim neighboring blemishes from donor-heal tone fitting. Old recipes
+    /// retain their original fit; this explicit flag versions the new behavior.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub clean_ring_fit: bool,
+    /// Reconstruct smooth curved illumination under a repair. Default-off keeps
+    /// existing flat-lighting heals unchanged.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub curved_heal: bool,
+    /// Healthy selected-skin lighting samples in target-ellipse coordinates.
+    /// Empty preserves the original circular-ring fit of existing recipes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub heal_samples: Vec<[f32; 2]>,
+    /// Additional measured clean donors for blending fine texture without a
+    /// mirrored pore grid. Empty preserves the original single-donor rendering.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub texture_sources: Vec<[f32; 2]>,
     /// How readily frequency healing calls a compact deviation a mark, 0..=1. Absent means
     /// 0.5. Only read by [`Tool::FrequencyHeal`] and [`Tool::AcneClear`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -165,9 +200,22 @@ pub struct Edit {
     /// them, so a mole or a freckle is never removed by default-off automation.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub keep_dark_marks: bool,
+    /// Healing leaves pigment: a connected patch whose red channel is under half that of the
+    /// skin around it. The value is the step its edge must have, as a share of the skin's red
+    /// across one frequency radius, to count. `1` keeps what has a crisp edge - a mole, a
+    /// beauty mark - and still heals the diffuse trace of an old spot, which is what a face
+    /// wants. `0` keeps every such patch, which is what a body wants: it has no landmarks,
+    /// and a navel is pigment-dark with no edge at all. Absent heals pigment like any other
+    /// mark, as recipes written before it existed do. Only read by [`Tool::FrequencyHeal`].
+    /// ADR-0118.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mole_edge: Option<f32>,
     pub tone: f32,
     pub warmth: f32,
     pub tint: f32,
+    /// Display-referred sRGB in 0..=1, only for explicit color tools. Absent on old edits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_color: Option<[f32; 3]>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mask: Option<BrushMask>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -324,6 +372,29 @@ impl Matte {
     }
 }
 
+fn valid_heal_support(edit: &Edit) -> bool {
+    let samples = edit.heal_samples.is_empty()
+        || ((58..=224).contains(&edit.heal_samples.len())
+            && edit.heal_samples.iter().all(|p| {
+                p.iter().all(|v| v.is_finite()) && (1.0..=3.1).contains(&p[0].hypot(p[1]))
+            })
+            && edit.tool == Tool::PatchHeal
+            && edit.texture_heal
+            && edit.curved_heal
+            && edit.source.is_some());
+    let donors = edit.texture_sources.is_empty()
+        || ((3..=8).contains(&edit.texture_sources.len())
+            && edit
+                .texture_sources
+                .iter()
+                .all(|p| p.iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v)))
+            && edit.tool == Tool::PatchHeal
+            && edit.texture_heal
+            && edit.source.is_some()
+            && edit.source_scale < 1.0);
+    samples && donors
+}
+
 /// Validate retouch parameters and aggregate authoring limits.
 ///
 /// # Errors
@@ -355,9 +426,22 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || !edit.tint.is_finite()
             || !(-1.0..=1.0).contains(&edit.tint)
             || edit.source.is_some_and(|p| !p.iter().all(|v| unit(*v)))
+            || !valid_heal_support(edit)
+            || edit.repair_passes.is_some_and(|n| {
+                !(1..=4).contains(&n) || !matches!(edit.tool, Tool::AcneClear | Tool::FrequencyHeal)
+            })
+            || edit
+                .target_color
+                .is_some_and(|rgb| !rgb.iter().all(|v| unit(*v)))
+            || (matches!(edit.tool, Tool::Colorize | Tool::BackgroundColor)
+                && edit.target_color.is_none())
+            || (edit.tool == Tool::Reshape && edit.selection.as_ref().is_some_and(|s| s.inverted))
             || !edit.source_scale.is_finite()
             || !(0.2..=1.0).contains(&edit.source_scale)
             || edit.sensitivity.is_some_and(|v| !unit(v))
+            || edit
+                .mole_edge
+                .is_some_and(|v| !v.is_finite() || !(0.0..=4.0).contains(&v))
             || (edit.source_scale < 1.0 && edit.tool == Tool::PatchHeal && edit.source.is_none())
             || (matches!(
                 edit.tool,
@@ -557,6 +641,79 @@ fn validate_selection(edit: &Edit) -> AuraResult<()> {
 #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod matte_tests {
     use super::*;
+
+    #[test]
+    fn healthy_context_is_opt_in_bounded_and_invalid_updates_preserve_the_recipe() {
+        let mut edit: Edit = serde_json::from_value(serde_json::json!({
+            "id":"context", "tool":"patch_heal", "enabled":true,
+            "region":[0.5,0.5,0.01,0.01], "source":[0.3,0.3],
+            "amount":1.0,"feather":0.25,"radius":0.01,
+            "texture":1.0,"tone":0.5,"warmth":0.0,"tint":0.0
+        }))
+        .unwrap();
+        assert!(edit.heal_samples.is_empty());
+        assert!(!serde_json::to_string(&edit)
+            .unwrap()
+            .contains("healSamples"));
+        edit.texture_heal = true;
+        edit.curved_heal = true;
+        edit.heal_samples = (0..96)
+            .map(|n| {
+                let a = std::f32::consts::TAU * n as f32 / 96.0;
+                [2.0 * a.cos(), 2.0 * a.sin()]
+            })
+            .collect();
+        let mut recipe = crate::fixtures::neutral(crate::fixtures::FIXTURE_HASH, "test");
+        write(&mut recipe, std::slice::from_ref(&edit)).unwrap();
+        assert_eq!(read(&recipe).unwrap(), vec![edit.clone()]);
+        let saved = recipe.clone();
+        let mut invalid = edit.clone();
+        invalid.heal_samples[0] = [f32::NAN, 0.0];
+        assert!(write(&mut recipe, &[invalid]).is_err());
+        let mut invalid = edit.clone();
+        invalid.heal_samples[0] = [0.5, 0.0];
+        assert!(write(&mut recipe, &[invalid]).is_err());
+        let mut invalid = edit.clone();
+        invalid.heal_samples.resize(225, [2.0, 0.0]);
+        assert!(write(&mut recipe, &[invalid]).is_err());
+        let mut invalid = edit.clone();
+        invalid.heal_samples.truncate(57);
+        assert!(write(&mut recipe, &[invalid]).is_err());
+        let mut invalid = edit.clone();
+        invalid.tool = Tool::Dodge;
+        assert!(write(&mut recipe, &[invalid]).is_err());
+        let mut invalid = edit;
+        invalid.source = None;
+        assert!(write(&mut recipe, &[invalid]).is_err());
+        assert_eq!(recipe.extra, saved.extra);
+    }
+
+    #[test]
+    fn dense_repair_recipes_round_trip_and_over_budget_writes_preserve_the_recipe() {
+        let template: Edit = serde_json::from_value(serde_json::json!({
+            "id": "repair", "tool": "dodge", "enabled": true,
+            "region": [0.5, 0.5, 0.01, 0.01], "source": null,
+            "amount": 0.5, "feather": 0.25, "radius": 0.01,
+            "texture": 1.0, "tone": 0.5, "warmth": 0.0, "tint": 0.0
+        }))
+        .unwrap();
+        let mut recipe = crate::fixtures::neutral(crate::fixtures::FIXTURE_HASH, "test");
+        let mut edits: Vec<_> = (0..MAX_EDITS)
+            .map(|i| Edit {
+                id: format!("repair-{i}"),
+                ..template.clone()
+            })
+            .collect();
+        write(&mut recipe, &edits).unwrap();
+        assert_eq!(read(&recipe).unwrap(), edits);
+        let saved = recipe.clone();
+        edits.push(Edit {
+            id: "one-too-many".into(),
+            ..template
+        });
+        assert!(write(&mut recipe, &edits).is_err());
+        assert_eq!(recipe.extra, saved.extra);
+    }
 
     #[test]
     fn writing_a_missing_or_corrupt_matte_never_expands_the_selection() {

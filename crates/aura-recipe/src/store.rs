@@ -94,6 +94,35 @@ impl RecipeStore {
         changed: &[String],
         label: &str,
     ) -> AuraResult<()> {
+        self.save_checked(project, photo, recipe, changed, label, None)
+    }
+
+    /// Save only while the recipe used to measure the proposal remains current.
+    /// The check and history write share a transaction, so a concurrent manual edit wins.
+    /// # Errors
+    /// Serialization/storage failure or a changed/missing baseline recipe.
+    pub fn save_if_current(
+        &self,
+        project: &ProjectId,
+        photo: &PhotoId,
+        recipe: &Recipe,
+        changed: &[String],
+        label: &str,
+        expected_hash: &str,
+    ) -> AuraResult<()> {
+        self.save_checked(project, photo, recipe, changed, label, Some(expected_hash))
+    }
+
+    #[allow(clippy::too_many_lines)] // Baseline check and four-table history update stay atomic.
+    fn save_checked(
+        &self,
+        project: &ProjectId,
+        photo: &PhotoId,
+        recipe: &Recipe,
+        changed: &[String],
+        label: &str,
+        expected_hash: Option<&str>,
+    ) -> AuraResult<()> {
         let body = canonical(recipe)?;
         let hash = recipe_hash(recipe)?;
         let now = self.clock.now_utc();
@@ -113,8 +142,22 @@ impl RecipeStore {
         let changed_json = serde_json::to_string(changed).unwrap_or_else(|_| "[]".to_string());
         let label = label.to_string();
         let record_step = !changed.is_empty();
+        let expected_hash = expected_hash.map(str::to_owned);
 
         self.catalog.writer().transact(move |conn| {
+            if let Some(expected) = expected_hash {
+                let actual: Option<String> = conn.query_row(
+                    "SELECT recipe_hash FROM edit_recipes WHERE photo_id = ?1",
+                    params![photo_key], |row| row.get(0),
+                ).optional().map_err(|e| statement_failed("read calibration baseline", &e))?;
+                if actual.as_deref() != Some(expected.as_str()) {
+                    let mut error = aura_core::errors::ml::look_reference_refused(
+                        "The photo changed during reference matching. Your newer edit was kept.",
+                    );
+                    error.user_message = "The photo changed during reference matching. Your newer edit was kept. Try matching again.".to_string();
+                    return Err(error);
+                }
+            }
             conn.execute(
                 "INSERT INTO edit_recipes (
                      photo_id, project_id, schema_ver, engine, body, recipe_hash,
@@ -614,6 +657,36 @@ mod tests {
         assert_eq!(
             recipe_hash(&back).expect("back"),
             recipe_hash(&recipe).expect("original")
+        );
+    }
+
+    #[test]
+    fn a_measured_save_cannot_overwrite_a_newer_edit_or_append_stale_history() {
+        let (_dir, catalog, clock) = catalog();
+        let project = ProjectId::new();
+        let photo = PhotoId::new();
+        seed(&catalog, &project, &photo);
+        let store = RecipeStore::new(catalog, clock);
+        let baseline = fixtures::reference();
+        store
+            .save(&project, &photo, &baseline, &[], "initial")
+            .unwrap();
+        let expected = recipe_hash(&baseline).unwrap();
+        let mut measured = baseline.clone();
+        measured.global.exposure += 0.1;
+        let changed = vec!["global.exposure".to_string()];
+        store
+            .save_if_current(&project, &photo, &measured, &changed, "measured", &expected)
+            .unwrap();
+        let accepted = store.load(&photo).unwrap().unwrap();
+        let history = store.history(&photo, baseline.clone()).unwrap();
+        assert!(store
+            .save_if_current(&project, &photo, &baseline, &changed, "stale", &expected)
+            .is_err());
+        assert_eq!(store.load(&photo).unwrap().unwrap(), accepted);
+        assert_eq!(
+            store.history(&photo, baseline).unwrap().entries(),
+            history.entries()
         );
     }
 

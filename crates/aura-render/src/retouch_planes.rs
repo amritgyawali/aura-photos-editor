@@ -16,7 +16,7 @@ pub(crate) fn luma(p: [f32; 3]) -> f32 {
 }
 
 /// A rectangle of the frame, padded so a blur near the selection's edge sees real pixels.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Rect {
     pub x0: usize,
     pub y0: usize,
@@ -53,6 +53,17 @@ impl Rect {
         (self.y0..self.y0 + self.h)
             .flat_map(move |y| (self.x0..self.x0 + self.w).map(move |x| (x, y)))
     }
+
+    /// [`Rect::cells`], with the rows shared across cores. Collecting it gives the same order.
+    pub(crate) fn par_cells(
+        self,
+    ) -> impl rayon::iter::IndexedParallelIterator<Item = (usize, usize)> {
+        use rayon::prelude::*;
+        let Self { x0, y0, w, .. } = self;
+        (0..self.len())
+            .into_par_iter()
+            .map(move |i| (x0 + i % w, y0 + i / w))
+    }
 }
 
 /// Three box passes: a close approximation of a Gaussian whose standard deviation is about
@@ -64,6 +75,14 @@ pub(crate) fn blur(values: &[f32], w: usize, h: usize, radius: usize) -> Vec<f32
         return values.to_vec();
     }
     crate::bands::blur(values, w, h, radius)
+}
+
+/// [`blur`], over a buffer the caller hands over: blurred in place rather than copied.
+pub(crate) fn blur_owned(values: Vec<f32>, w: usize, h: usize, radius: usize) -> Vec<f32> {
+    if w == 0 || h == 0 || radius == 0 || values.len() != w * h {
+        return values;
+    }
+    crate::bands::blur_owned(values, w, h, radius)
 }
 
 /// A blur that averages weighted samples only: `blur(v * weight) / blur(weight)`.
@@ -98,16 +117,139 @@ impl<'a> Weighted<'a> {
     /// The weighted mean of `values`. Where nothing nearby carried weight the original value
     /// is returned, so an unsupported cell is never a made-up colour.
     pub(crate) fn mean(&self, values: &[f32]) -> Vec<f32> {
+        use rayon::prelude::*;
         let scaled: Vec<f32> = values
-            .iter()
+            .par_iter()
             .zip(self.weights)
             .map(|(v, a)| v * a)
             .collect();
-        blur(&scaled, self.w, self.h, self.radius)
-            .iter()
+        blur_owned(scaled, self.w, self.h, self.radius)
+            .par_iter()
             .zip(&self.spread)
             .zip(values)
             .map(|((sum, weight), old)| if *weight > 1e-4 { sum / weight } else { *old })
+            .collect()
+    }
+}
+
+/// Where the weight around each cell is centred, as an offset from the cell in cells.
+///
+/// An operation that evens a band takes the difference of a wide and a narrow weighted mean.
+/// Inside a selection both are centred on the cell and the shading across it cancels. At the
+/// selection's edge both lean inward, the wide one further, and each then reports the skin at
+/// the centre of its own weight rather than at the cell. Their difference is the shading
+/// between those two points: skin that darkens toward a jaw is "corrected" into a pale rim
+/// along it, and a shadow under a lip is lifted.
+#[derive(Debug)]
+pub(crate) struct Lean {
+    dx: Vec<f32>,
+    dy: Vec<f32>,
+}
+
+impl Lean {
+    pub(crate) fn new(
+        weights: &[f32],
+        w: usize,
+        h: usize,
+        radius: usize,
+        mean: fn(&[f32], usize, usize, usize) -> Vec<f32>,
+    ) -> Self {
+        let along = |axis: fn(usize, usize) -> usize| -> Vec<f32> {
+            let moment: Vec<f32> = weights
+                .iter()
+                .enumerate()
+                .map(|(i, a)| a * axis(i, w) as f32)
+                .collect();
+            mean(&moment, w, h, radius)
+        };
+        let total = mean(weights, w, h, radius);
+        let offset = |moments: Vec<f32>, axis: fn(usize, usize) -> usize| -> Vec<f32> {
+            moments
+                .iter()
+                .zip(&total)
+                .enumerate()
+                .map(|(i, (moment, total))| {
+                    if *total > 1e-5 {
+                        moment / total - axis(i, w) as f32
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
+        };
+        Self {
+            dx: offset(along(|i, w| i % w), |i, w| i % w),
+            dy: offset(along(|i, w| i / w), |i, w| i / w),
+        }
+    }
+
+    /// A lean measured by the caller: where each cell's value was actually read, as planes
+    /// of absolute cell coordinates. This is how a filter that is not one plain mean reports
+    /// its own lean - by being run on the coordinates themselves.
+    pub(crate) fn from_positions(xs: &[f32], ys: &[f32], w: usize) -> Self {
+        Self {
+            dx: xs
+                .iter()
+                .enumerate()
+                .map(|(i, x)| x - (i % w) as f32)
+                .collect(),
+            dy: ys
+                .iter()
+                .enumerate()
+                .map(|(i, y)| y - (i / w) as f32)
+                .collect(),
+        }
+    }
+
+    /// What `wide` (a plane averaged over this neighbourhood) differs from the same plane
+    /// averaged over `narrow` by through leaning alone: the photograph's shading between the
+    /// two centres of weight. Subtracting it leaves the band the two means were taken to find.
+    ///
+    /// The wide mean at a cell is the shading at the cell plus this lean, so its own slope is
+    /// the shading's slope seen through how the lean changes from cell to cell; that is undone
+    /// here before the slope is used. Exact for shading that is locally a plane.
+    pub(crate) fn shading_between(
+        &self,
+        narrow: &Self,
+        wide: &[f32],
+        w: usize,
+        h: usize,
+    ) -> Vec<f32> {
+        // Central differences, and at the frame's own border the three-point one-sided
+        // form: a lean changes fastest exactly there, and a two-point slope is half a cell out.
+        let along = |at: usize, len: usize, value: &dyn Fn(usize) -> f32| -> f32 {
+            if len < 3 {
+                0.0
+            } else if at == 0 {
+                (-3.0 * value(0) + 4.0 * value(1) - value(2)) * 0.5
+            } else if at == len - 1 {
+                (3.0 * value(at) - 4.0 * value(at - 1) + value(at - 2)) * 0.5
+            } else {
+                (value(at + 1) - value(at - 1)) * 0.5
+            }
+        };
+        let slope = |plane: &[f32], x: usize, y: usize| -> [f32; 2] {
+            [
+                along(x, w, &|x| plane[y * w + x]),
+                along(y, h, &|y| plane[y * w + x]),
+            ]
+        };
+        (0..w * h)
+            .map(|i| {
+                let (x, y) = (i % w, i / w);
+                let lean = [self.dx[i] - narrow.dx[i], self.dy[i] - narrow.dy[i]];
+                if lean[0].abs() + lean[1].abs() < 1e-3 {
+                    return 0.0;
+                }
+                let seen = slope(wide, x, y);
+                let [xx, xy] = slope(&self.dx, x, y);
+                let [yx, yy] = slope(&self.dy, x, y);
+                // The seen slope is (I + J)^T times the shading's, J being the lean's Jacobian.
+                let det = ((1.0 + xx) * (1.0 + yy) - xy * yx).max(0.05);
+                let gx = ((1.0 + yy) * seen[0] - yx * seen[1]) / det;
+                let gy = ((1.0 + xx) * seen[1] - xy * seen[0]) / det;
+                gx * lean[0] + gy * lean[1]
+            })
             .collect()
     }
 }
@@ -341,8 +483,9 @@ impl Grid {
     fn spread(self, levels: &[f32], supports: &[f32], own: &[f32]) -> Percentile {
         // Where every column falls between grid samples is the same on every row, so it is
         // worked out once; rows are independent and are written in place in parallel.
-        let columns: Vec<(usize, usize, f32)> =
-            (0..self.w).map(|x| self.locate(x, self.w, self.cols)).collect();
+        let columns: Vec<(usize, usize, f32)> = (0..self.w)
+            .map(|x| self.locate(x, self.w, self.cols))
+            .collect();
         let mut level = vec![0.0_f32; self.w * self.h];
         let mut support = vec![0.0_f32; self.w * self.h];
         level

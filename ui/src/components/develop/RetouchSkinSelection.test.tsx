@@ -3,6 +3,34 @@ import { expect, it, vi } from 'vitest';
 import { freshRetouch } from '../../ipc/nativeRetouch';
 import { RetouchSkinSelection } from './RetouchSkinSelection';
 
+it('reuses the hair selection for color without copying an automatic repair', () => {
+  const change = vi.fn();
+  const hair = {...freshRetouch(),matte:'auto-portrait-v20-0-hair',id:'hair'};
+  render(<RetouchSkinSelection draft={{...freshRetouch(),tool:'colorize',targetColor:[1,0,0]}} edits={[hair]} onChange={change}/>);
+  fireEvent.change(screen.getByLabelText('Use detected region'), {target:{value:hair.matte}});
+  expect(change).toHaveBeenCalledWith(expect.objectContaining({matte:hair.matte}));
+  expect(change.mock.calls[0]?.[0]).not.toHaveProperty('tool');
+  expect(change.mock.calls[0]?.[0]).not.toHaveProperty('targetColor');
+});
+
+it('offers the nose-inclusive blemish selection for the correct person',()=>{
+  const edit={...freshRetouch(),id:'clear',matte:'auto-portrait-v1-2-blemish-surface-blemish-feature-safe'};
+  const change=vi.fn();
+  render(<RetouchSkinSelection draft={freshRetouch()} edits={[edit]} onChange={change}/>);
+  expect(screen.getByRole('option',{name:/Blemish cleanup skin.*Person 3.*protected details/})).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Use detected skin'),{target:{value:edit.matte}});
+  expect(change).toHaveBeenCalledWith(expect.objectContaining({matte:edit.matte}));
+});
+
+it('reuses body skin while retaining exclusions for all faces',()=>{
+  const edit={...freshRetouch(),id:'body-spots',matte:'auto-portrait-v1-1-body-outside-faces'};
+  const change=vi.fn();
+  render(<RetouchSkinSelection draft={freshRetouch()} edits={[edit]} onChange={change}/>);
+  expect(screen.getByRole('option',{name:/Body skin.*Person 2.*protected details/})).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Use detected skin'),{target:{value:edit.matte}});
+  expect(change).toHaveBeenCalledWith(expect.objectContaining({matte:edit.matte}));
+});
+
 it('reuses the protected cleanup matte without dropping eye and nose exclusions',()=>{
   const edit={...freshRetouch(),id:'clear',matte:'auto-portrait-v1-0-surface-feature-safe'};
   const change=vi.fn();

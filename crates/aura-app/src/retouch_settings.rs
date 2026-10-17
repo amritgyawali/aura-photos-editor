@@ -79,10 +79,17 @@ pub struct Settings {
     /// Rebuild the tone under every compact mark from the clean skin around it, leaving the
     /// pores where they are (frequency healing). 0 is off. ADR-0090.
     pub frequency_heal: f32,
-    /// At most this many spots healed per face (1..=220 in deep cleanup).
-    pub max_spots: u8,
+    /// Re-check compact residual marks after each heal, at most four passes.
+    #[serde(skip_serializing_if = "default_cleanup_passes")]
+    pub cleanup_passes: u8,
+    /// At most this many spots healed per face (1..=900 in deep cleanup).
+    pub max_spots: u16,
     /// Treat a field of many small marks as freckles and keep all of them.
     pub keep_freckles: bool,
+    /// Keep moles and beauty marks: a patch whose red channel is under half that of the
+    /// skin around it, with a crisp edge. Freckles, inflamed spots and the diffuse marks
+    /// spots leave are not affected. On by default. ADR-0118.
+    pub keep_moles: bool,
 
     // -- Lines -----------------------------------------------------------------------------
     pub forehead_lines: f32,
@@ -139,6 +146,9 @@ pub struct Settings {
     pub body_redness: f32,
     /// Small spots on body skin healed.
     pub body_blemishes: f32,
+    /// Stretch marks evened out of body skin: long, faint lines the spot healing leaves.
+    /// Hands, a navel and every other contour on the skin are kept. 0 is off. ADR-0118.
+    pub stretch_marks: f32,
 
     // -- Hair, clothes and backdrop --------------------------------------------------------
     pub hair_detail: f32,
@@ -151,6 +161,11 @@ pub struct Settings {
     /// kept - the high-key finish Evoto's automatic pass gives a grey seamless (ADR-0109).
     /// Textured, coloured and low-key backdrops are never lifted.
     pub backdrop_lift: f32,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // Serde skip_serializing_if requires a reference.
+fn default_cleanup_passes(value: &u8) -> bool {
+    *value == 2
 }
 
 impl Default for Settings {
@@ -181,8 +196,10 @@ impl Default for Settings {
             deep_blemish_cleanup: false,
             remove_dark_marks: false,
             frequency_heal: 0.0,
+            cleanup_passes: 2,
             max_spots: 12,
             keep_freckles: true,
+            keep_moles: true,
             forehead_lines: 0.5,
             crows_feet: 0.5,
             smile_lines: 0.5,
@@ -210,6 +227,7 @@ impl Default for Settings {
             body_shine: 0.25,
             body_redness: 0.0,
             body_blemishes: 0.0,
+            stretch_marks: 0.0,
             hair_detail: 0.0,
             hair_shine: 0.0,
             fabric: 0.0,
@@ -220,7 +238,7 @@ impl Default for Settings {
 }
 
 /// Number of named settings in [`Settings`], for documentation and the UI's own check.
-pub const COUNT: usize = 59;
+pub const COUNT: usize = 61;
 
 fn unit(v: f32, fallback: f32) -> f32 {
     if v.is_finite() {
@@ -269,10 +287,12 @@ impl Settings {
             deep_blemish_cleanup: self.deep_blemish_cleanup,
             remove_dark_marks: self.remove_dark_marks,
             frequency_heal: unit(self.frequency_heal, 0.0),
+            cleanup_passes: self.cleanup_passes.clamp(1, 4),
             max_spots: self
                 .max_spots
-                .clamp(1, if self.deep_blemish_cleanup { 220 } else { 24 }),
+                .clamp(1, if self.deep_blemish_cleanup { 900 } else { 24 }),
             keep_freckles: self.keep_freckles,
+            keep_moles: self.keep_moles,
             forehead_lines: unit(self.forehead_lines, d.forehead_lines),
             crows_feet: unit(self.crows_feet, d.crows_feet),
             smile_lines: unit(self.smile_lines, d.smile_lines),
@@ -300,6 +320,7 @@ impl Settings {
             body_shine: unit(self.body_shine, 0.0),
             body_redness: unit(self.body_redness, 0.0),
             body_blemishes: unit(self.body_blemishes, 0.0),
+            stretch_marks: unit(self.stretch_marks, 0.0),
             hair_detail: unit(self.hair_detail, 0.0),
             hair_shine: unit(self.hair_shine, 0.0),
             fabric: unit(self.fabric, 0.0),
@@ -355,7 +376,11 @@ mod tests {
         assert_eq!(parsed.frequency_heal, 0.0);
         assert_eq!(parsed.texture_graft, 0.0);
         assert_eq!(parsed.backdrop_lift, 0.0);
+        // So is clearing stretch marks.
+        assert_eq!(parsed.stretch_marks, 0.0);
         assert!(parsed.protect_eye_area && parsed.protect_nose_detail);
+        // Options saved before moles were told apart keep them from now on.
+        assert!(parsed.keep_moles);
     }
 
     #[test]
@@ -374,11 +399,11 @@ mod tests {
         assert_eq!(wild.max_spots, 24);
         let deep = Settings {
             deep_blemish_cleanup: true,
-            max_spots: 255,
+            max_spots: 1200,
             ..Settings::default()
         }
         .sanitised();
-        assert_eq!(deep.max_spots, 220);
+        assert_eq!(deep.max_spots, 900);
         assert_eq!(gain(0.5), 1.0);
         assert!(threshold(1.0, 1.0) < threshold(1.0, 0.5));
         assert!(threshold(1.0, 0.0) > 1.0);

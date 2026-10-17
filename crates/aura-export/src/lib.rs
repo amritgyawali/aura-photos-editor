@@ -112,6 +112,7 @@
 //! keeps "did the bytes survive the write" and "did the bytes survive the wire" two questions with
 //! two answers.
 
+mod ahead;
 pub mod api;
 pub mod errors;
 pub mod fixtures;

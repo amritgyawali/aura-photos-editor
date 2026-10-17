@@ -324,10 +324,7 @@ pub fn read(bytes: &[u8], path: &std::path::Path) -> AuraResult<RawMeta> {
         RawFormat::Raf => read_raf(bytes),
         RawFormat::Cr3 => read_cr3(bytes),
         format if format.is_tiff_family() => read_tiff_family(bytes, format),
-        RawFormat::Heif => Err(unsupported(
-            path,
-            "HEIF decoding is not part of this build; see docs/camera-support.md",
-        )),
+        RawFormat::Heif => Err(aura_core::errors::raw::heif(path)),
         _ => Err(unsupported(path, "no recognised container magic")),
     }
 }

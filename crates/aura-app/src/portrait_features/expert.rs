@@ -375,7 +375,7 @@ pub fn tune(chosen: &Settings, c: &Condition, ctx: &Context) -> Tuned {
     //    protected - choosing to remove a mole is the photographer's decision, never this one.
     if c.marks >= 26.0 && c.eye_px >= 100.0 && !s.deep_blemish_cleanup {
         s.deep_blemish_cleanup = true;
-        s.max_spots = ramp(c.marks, 26.0, 70.0, 60.0, 120.0).round() as u8;
+        s.max_spots = ramp(c.marks, 26.0, 70.0, 60.0, 120.0).round() as u16;
         s.blemish_sensitivity = s.blemish_sensitivity.max(0.65);
         s.texture = s.texture.max(0.7);
         notes.push(format!(

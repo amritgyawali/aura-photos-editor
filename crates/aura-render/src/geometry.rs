@@ -32,6 +32,7 @@
 
 use aura_raw::colour::lens::{self, Coefficients};
 use aura_recipe::{Lens, Perspective};
+use rayon::prelude::*;
 
 /// How many samples the resampler takes per output pixel, per axis.
 ///
@@ -89,8 +90,14 @@ pub fn correct_distortion(rgb: &mut [f32], width: usize, height: usize, k: [f32;
 /// Per-channel radial scaling about the frame's centre. Green is never scaled - it is the
 /// channel the sensor has twice as many of and the one a focus system was aimed with, so
 /// scaling it would move the whole image rather than register the other two against it.
+///
+/// A channel scaled up samples a pixel or two beyond the frame at its border. That sample is
+/// the nearest edge pixel's, not black: the distortion and keystone resamplers scale so that
+/// nothing samples outside and black there means a hole, but here a black sample is one
+/// channel missing along the border, which is a red or blue line round the photograph.
+/// ADR-0125. Rows are shared across cores; every pixel is the same arithmetic as one core's.
 pub fn correct_ca(rgb: &mut [f32], width: usize, height: usize, ca: [f32; 2]) {
-    if width == 0 || height == 0 {
+    if width == 0 || height == 0 || rgb.len() < width * height * 3 {
         return;
     }
     let scales = [
@@ -103,26 +110,28 @@ pub fn correct_ca(rgb: &mut [f32], width: usize, height: usize, ca: [f32; 2]) {
     }
     let aspect = width as f32 / height as f32;
     let source = rgb.to_vec();
-    for (channel, scale) in scales.iter().enumerate() {
-        if (scale - 1.0).abs() < f32::EPSILON {
-            continue;
-        }
-        for y in 0..height {
-            for x in 0..width {
+    rgb.par_chunks_mut(width * 3)
+        .take(height)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, pixel) in row.chunks_exact_mut(3).enumerate() {
                 let point = [
                     (x as f32 + 0.5) / width as f32,
                     (y as f32 + 0.5) / height as f32,
                 ];
-                // A pure radial scale about the centre: sample the channel from `scale` times
-                // its own radius, which is the whole model for lateral CA.
-                let from = radial_scale(point, *scale, aspect);
-                let value = sample_channel(&source, width, height, from, channel);
-                if let Some(slot) = rgb.get_mut((y * width + x) * 3 + channel) {
-                    *slot = value;
+                for (channel, scale) in scales.iter().enumerate() {
+                    if (scale - 1.0).abs() < f32::EPSILON {
+                        continue;
+                    }
+                    // A pure radial scale about the centre: sample the channel from `scale`
+                    // times its own radius, which is the whole model for lateral CA.
+                    let from = radial_scale(point, *scale, aspect);
+                    if let Some(slot) = pixel.get_mut(channel) {
+                        *slot = sample_channel_clamped(&source, width, height, from, channel);
+                    }
                 }
             }
-        }
-    }
+        });
 }
 
 /// Apply a keystone in place, scaling so the opened corners fall outside the frame.
@@ -179,6 +188,29 @@ fn radial_scale(point: [f32; 2], scale: f32, aspect: f32) -> [f32; 2] {
     let dx = (x - 0.5) * aspect;
     let dy = y - 0.5;
     [0.5 + dx * scale / aspect, 0.5 + dy * scale]
+}
+
+/// [`sample_channel`], with a position beyond the frame read from the nearest edge pixel.
+fn sample_channel_clamped(
+    source: &[f32],
+    width: usize,
+    height: usize,
+    at: [f32; 2],
+    channel: usize,
+) -> f32 {
+    let half_x = 0.5 / width as f32;
+    let half_y = 0.5 / height as f32;
+    let x = at
+        .first()
+        .copied()
+        .unwrap_or(0.5)
+        .clamp(half_x, 1.0 - half_x);
+    let y = at
+        .get(1)
+        .copied()
+        .unwrap_or(0.5)
+        .clamp(half_y, 1.0 - half_y);
+    sample_channel(source, width, height, [x, y], channel)
 }
 
 /// Bilinear sample of one channel at a normalised position.
@@ -274,6 +306,54 @@ mod tests {
             !green_moved,
             "green was scaled, which moves the whole image"
         );
+    }
+
+    #[test]
+    fn a_ca_correction_leaves_no_line_of_a_missing_channel_round_the_frame() {
+        // An even grey: whatever the scales, every channel of every pixel stays grey. Red
+        // scaled up reads a pixel or two beyond the border and must read the edge, not black.
+        let (width, height) = (300, 200);
+        let mut pixels = vec![0.5_f32; width * height * 3];
+        correct_ca(&mut pixels, width, height, [1.004, 0.996]);
+        let worst = pixels
+            .iter()
+            .map(|v| (v - 0.5).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            worst < 1e-5,
+            "a channel changed by {worst} on an even frame"
+        );
+    }
+
+    #[test]
+    fn a_ca_correction_inside_the_frame_is_the_one_core_arithmetic() {
+        // Away from the border the shared rows give exactly what a pixel-by-pixel walk gives.
+        let (width, height) = (96, 64);
+        let mut pixels = plate(width, height);
+        for (i, v) in pixels.iter_mut().enumerate() {
+            *v += (i % 7) as f32 * 0.01;
+        }
+        let source = pixels.clone();
+        correct_ca(&mut pixels, width, height, [1.003, 0.997]);
+        let aspect = width as f32 / height as f32;
+        for y in 4..height - 4 {
+            for x in 4..width - 4 {
+                let point = [
+                    (x as f32 + 0.5) / width as f32,
+                    (y as f32 + 0.5) / height as f32,
+                ];
+                for (channel, scale) in [(0, 1.003_f32), (2, 0.997)] {
+                    let from = radial_scale(point, scale, aspect);
+                    let expected = sample_channel(&source, width, height, from, channel);
+                    let got = pixels[(y * width + x) * 3 + channel];
+                    assert_eq!(
+                        got.to_bits(),
+                        expected.to_bits(),
+                        "{x},{y} channel {channel}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

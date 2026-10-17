@@ -33,9 +33,9 @@ use serde::{Deserialize, Serialize};
 
 /// The size of the fast first look.
 const FAST_EDGE: u32 = 1600;
-/// Memory kept for finished previews: about twenty full-resolution 24 MP photographs or
-/// several dozen of the size most portraits are.
-const MEMORY_BYTES: usize = 384 * 1024 * 1024;
+/// Finished previews compete with active rendering, model inference and the `WebView`.
+/// Keep a modest memory budget; larger and older previews remain available on disk.
+const MEMORY_BYTES: usize = 128 * 1024 * 1024;
 const MEMORY_ENTRIES: usize = 48;
 /// Disk kept for finished previews. The oldest are removed first.
 const DISK_BYTES: u64 = 3 * 1024 * 1024 * 1024;
@@ -304,11 +304,12 @@ pub(crate) fn render(
     let content = state
         .photo_content_hash(request.image_id)
         .unwrap_or_default();
+    let request_hash = engine.render_hash(&request)?;
     let key = blake3::hash(
         format!(
             "{}|{content}|{level}|{purpose}|{}",
             request.image_id.to_db(),
-            engine.render_hash(&request)?
+            request_hash
         )
         .as_bytes(),
     )
@@ -334,6 +335,12 @@ pub(crate) fn render(
     }
     // The cache lock is never held while rendering.
     let image = engine.render(request)?;
+    // A device failure can change the backend after the key was computed. Return the
+    // CPU fallback, but never save its pixels under the preceding GPU identity.
+    if image.render_hash != request_hash {
+        tracing::warn!(target: "cache.stats", "render backend changed; keeping fallback preview out of the previous backend cache");
+        return Ok(image);
+    }
     state
         .edited_previews()
         .lock()

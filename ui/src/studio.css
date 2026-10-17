@@ -123,6 +123,8 @@ summary { cursor: pointer; padding: 12px 0; color: var(--muted); }
 .view-switch button { font-size: 12px; padding: 7px 11px; }
 .view-switch button[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
 .studio-layout { display: grid; grid-template-columns: minmax(0,1fr) 238px; gap: 24px; }
+.studio-adjustments-column { min-width: 0; display: grid; align-content: start; gap: 20px; }
+.studio-adjustments-column > .lr-panel { border-top: 1px solid var(--line); padding-top: 16px; }
 .studio-canvas { position: relative; background: #111015; min-height: 360px; height: min(65vh,720px); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: grid; place-items: center; }
 .studio-canvas img { position: absolute; width: 100%; height: 100%; object-fit: contain; }
 .studio-canvas p { color: var(--muted); }
@@ -361,3 +363,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .portrait-finish-colour { display: grid; gap: 2px; padding-bottom: 4px; border-bottom: 1px solid rgba(127, 127, 127, 0.2); }
 .portrait-finish input[type="color"] { width: 36px; height: 22px; padding: 0; margin-left: 8px; vertical-align: middle; }
 .portrait-finish-reset { justify-self: start; }
+.status-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 8px 36px; background: #1e1c24f2; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.status-bar.is-busy { border-top-color: #594768; }
+.status-bar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-width: 0; flex: 1; }
+.status-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.status-kind { padding: 1px 8px; border-radius: 10px; background: #383040; color: #ddc9ff; font-size: 11px; }
+.status-label { color: var(--text); }
+.status-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 52ch; }
+.status-count, .status-time, .status-workers { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.status-item progress { width: 120px; height: 6px; }
+.status-idle { color: var(--muted); }
+@media (max-width: 720px) { .status-bar { padding: 8px 16px; flex-direction: column; } .status-detail { max-width: 100%; } }

@@ -63,7 +63,7 @@
 //! | [`graph`] | Which stages run, in what order, and what a changed parameter costs. |
 //! | [`cpu`] | The reference pipeline. The ground truth. |
 //! | [`tiles`] | Streaming, so a 100 MP export never has to fit in memory. |
-//! | [`gpu`] | The accelerator port. This build ships none. |
+//! | [`gpu`] | The generic per-stage accelerator port. |
 //! | [`parity`] | The harness that compares an accelerator with the reference. |
 //! | [`shaders`] | The WGSL sources, checked against the reference by a test. |
 //! | [`golden`] | Digests and dE2000, for the regression gate. |
@@ -85,12 +85,11 @@
 //! through [`cpu::FrameSource`] and leave as a buffer; there is no path type in scope.
 //! Invariant 1 as a property of the dependency list.
 //!
-//! # What this build does not have
+//! # Hardware acceleration
 //!
-//! No `wgpu` backend. `docs/adr/ADR-0029-render-pipeline.md` section 4 has the argument, the
-//! WGSL sources ship and are gated anyway, and `AURA-RENDER-8001` is raised once per session
-//! so the absence is visible rather than silent. The section 11 GPU budgets are waived with
-//! an expiry rather than relabelled as processor numbers.
+//! The application can enable a qualified GPU for the terminal [`output`] transform with
+//! [`CpuEngine::with_gpu`]. Other stages retain their CPU references. Missing, slower or
+//! failing hardware automatically uses CPU output; ADR-0122 records parity and speed gates.
 
 /// Frozen contracts. Changing anything in here requires an ADR.
 pub mod contract {
@@ -98,6 +97,7 @@ pub mod contract {
 }
 
 pub mod bands;
+pub mod blemish_review;
 pub mod cleanup;
 pub mod colour;
 pub mod cpu;
@@ -107,24 +107,31 @@ pub mod fixtures;
 pub mod geometry;
 pub mod golden;
 pub mod gpu;
+mod gpu_output;
 pub mod graph;
 pub mod local;
 pub mod local_masks;
 pub mod micro;
 pub mod output;
 pub mod parity;
+pub mod perf;
 pub mod portrait;
 pub mod profiles;
 pub mod restore;
 pub mod retouch;
 mod retouch_acne;
+pub mod retouch_analysis;
 pub mod retouch_cache;
 mod retouch_clear;
+mod retouch_color;
+mod retouch_defringe;
 mod retouch_heal;
 mod retouch_mask;
 mod retouch_matte;
 mod retouch_planes;
+mod retouch_reshape;
 mod retouch_skin;
+mod retouch_striae;
 mod retouch_texture;
 pub mod retouch_tools;
 mod retouch_undereye;
@@ -133,6 +140,7 @@ pub mod spatial;
 pub mod studio_finish;
 pub mod tiles;
 pub mod tonemap;
+pub mod work_gate;
 
 pub use contract::render::{
     Backend, OutputColour, OutputSpec, RenderCaps, RenderLevel, RenderNote, RenderPurpose,
@@ -141,3 +149,4 @@ pub use contract::render::{
 pub use cpu::{CpuEngine, Frame, FrameSource};
 pub use graph::{engine_string, render_hash, Capabilities, InputKind, Plan, Stage};
 pub use parity::TOLERANCE as PARITY_TOLERANCE;
+pub use work_gate::{WorkGate, WorkPermit};

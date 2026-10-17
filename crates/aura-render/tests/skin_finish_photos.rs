@@ -8,6 +8,7 @@
 //! | Token | Operations |
 //! |---|---|
 //! | `base` | every operation in the recipe |
+//! | `saved` | the exact saved operations, including frequency healing and texture graft |
 //! | `skin` | the recipe without its spot repairs and without its surface finish |
 //! | `spots` | the recipe's spot repairs |
 //! | `finish` | the recipe's surface finish |
@@ -125,6 +126,7 @@ fn finishes_real_photographs() {
         let surface = planned
             .iter()
             .find(|e| e.id.ends_with("-surface-finish"))
+            .or_else(|| planned.iter().find(|e| e.tool == Tool::FrequencyHeal))
             .expect("a surface finish to take the selection from");
         let is_spot = |e: &&Edit| e.id.contains("-spot-");
         let is_finish = |e: &&Edit| e.id.ends_with("-surface-finish");
@@ -156,6 +158,7 @@ fn finishes_real_photographs() {
                     .collect()
             };
             match name {
+                "saved" => stack.extend(planned.iter().cloned()),
                 "base" => stack.extend(planned_with(&|_| true)),
                 "skin" => stack.extend(planned_with(&|e| !is_spot(e) && !is_finish(e))),
                 "spots" => stack.extend(planned_with(&is_spot)),

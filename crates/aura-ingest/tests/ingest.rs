@@ -308,6 +308,63 @@ fn existing_source_root_ids_are_preserved_on_reimport() {
 }
 
 #[test]
+fn copied_files_appear_once_in_both_grid_orders_and_pages() {
+    let harness = harness_with_files(&[
+        ("m-original.JPG", b"one photograph"),
+        ("z-other.JPG", b"another photograph"),
+    ]);
+    run(&harness);
+    std::fs::copy(
+        harness.root.join("m-original.JPG"),
+        harness.root.join("a-copy.JPG"),
+    )
+    .expect("copy original to an earlier-sorting path");
+    run(&harness);
+
+    assert_eq!(harness.catalog.count("photo").expect("photos"), 2);
+    assert_eq!(harness.catalog.count("photo_file").expect("files"), 3);
+    for order in [repo::PhotoOrder::Timeline, repo::PhotoOrder::FileName] {
+        let rows = harness
+            .catalog
+            .read(|conn| repo::list_photos(conn, &harness.project_id.to_db(), 0, 10, order))
+            .expect("list photographs");
+        assert_eq!(rows.len(), 2, "a file copy must not add a grid row");
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.file_name.as_str())
+                .collect::<Vec<_>>(),
+            ["m-original.JPG", "z-other.JPG"],
+            "the original remains the displayed file when a copy sorts earlier"
+        );
+        assert_ne!(rows[0].id, rows[1].id);
+        for (offset, expected) in rows.iter().enumerate() {
+            let page = harness
+                .catalog
+                .read(|conn| {
+                    repo::list_photos(conn, &harness.project_id.to_db(), offset as i64, 1, order)
+                })
+                .expect("list one-photo page");
+            assert_eq!(page.len(), 1);
+            assert_eq!(
+                page[0].id, expected.id,
+                "pagination must visit each photo once"
+            );
+        }
+        let beyond = harness
+            .catalog
+            .read(|conn| repo::list_photos(conn, &harness.project_id.to_db(), 2, 1, order))
+            .expect("page after the last photo");
+        assert!(beyond.is_empty());
+        let (path, _) = harness
+            .catalog
+            .read(|conn| repo::primary_file_for_photo(conn, &rows[0].id))
+            .expect("locate photograph")
+            .expect("primary file");
+        assert_eq!(Path::new(&path), harness.root.join("m-original.JPG"));
+    }
+}
+
+#[test]
 fn renaming_a_file_does_not_duplicate_the_photo() {
     let harness = harness_with_files(&[("day1/IMG_1.JPG", b"identical bytes for one photo")]);
     run(&harness);
@@ -331,6 +388,59 @@ fn renaming_a_file_does_not_duplicate_the_photo() {
         2,
         "the new path is a second file row"
     );
+    for order in [repo::PhotoOrder::Timeline, repo::PhotoOrder::FileName] {
+        let rows = harness
+            .catalog
+            .read(|conn| repo::list_photos(conn, &harness.project_id.to_db(), 0, 10, order))
+            .expect("list renamed photograph");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].file_name, "RENAMED.JPG");
+        assert_eq!(rows[0].status, "indexed", "the renamed copy is available");
+        let (path, _) = harness
+            .catalog
+            .read(|conn| repo::primary_file_for_photo(conn, &rows[0].id))
+            .expect("locate renamed photograph")
+            .expect("primary file");
+        assert_eq!(Path::new(&path), harness.root.join("day1/RENAMED.JPG"));
+    }
+}
+
+#[test]
+fn missing_original_uses_an_available_copy_and_all_missing_files_keep_one_row() {
+    let harness = harness_with_files(&[("m-original.JPG", b"one photograph")]);
+    run(&harness);
+    std::fs::copy(
+        harness.root.join("m-original.JPG"),
+        harness.root.join("a-copy.JPG"),
+    )
+    .expect("copy original");
+    run(&harness);
+    std::fs::remove_file(harness.root.join("m-original.JPG")).expect("remove original fixture");
+    run(&harness);
+
+    for (file_name, status) in [("a-copy.JPG", "indexed"), ("m-original.JPG", "missing")] {
+        for order in [repo::PhotoOrder::Timeline, repo::PhotoOrder::FileName] {
+            let rows = harness
+                .catalog
+                .read(|conn| repo::list_photos(conn, &harness.project_id.to_db(), 0, 10, order))
+                .expect("list photograph with missing files");
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].file_name, file_name);
+            assert_eq!(rows[0].status, status);
+            let (path, _) = harness
+                .catalog
+                .read(|conn| repo::primary_file_for_photo(conn, &rows[0].id))
+                .expect("locate photograph")
+                .expect("recorded primary file");
+            assert_eq!(Path::new(&path), harness.root.join(file_name));
+        }
+        if status == "indexed" {
+            std::fs::remove_file(harness.root.join("a-copy.JPG")).expect("remove copy fixture");
+            run(&harness);
+        }
+    }
+    assert_eq!(harness.catalog.count("photo").expect("photos"), 1);
+    assert_eq!(harness.catalog.count("photo_file").expect("files"), 2);
 }
 
 // ----------------------------------------------------------------------- pairing

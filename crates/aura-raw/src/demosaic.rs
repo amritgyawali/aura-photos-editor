@@ -378,14 +378,20 @@ fn bilinear(source: &RgbF32, target_width: u32, target_height: u32) -> RgbF32 {
 #[must_use]
 pub fn from_srgb8(encoded: &[u8], width: u32, height: u32) -> RgbF32 {
     let mut out = RgbF32::black(width, height);
-    for (index, sample) in encoded
-        .iter()
-        .take(width as usize * height as usize * 3)
-        .enumerate()
-    {
-        if let Some(slot) = out.data.get_mut(index) {
-            *slot = crate::colour::curve::srgb_decode(f32::from(*sample) / 255.0);
-        }
+    let count = (width as usize * height as usize * 3).min(encoded.len());
+    let (Some(target), Some(source)) = (out.data.get_mut(..count), encoded.get(..count)) else {
+        return out;
+    };
+    let decode = |(slot, sample): (&mut f32, &u8)| {
+        *slot = crate::colour::curve::srgb_byte_to_linear(*sample);
+    };
+    if count >= PARALLEL_MIN {
+        target
+            .par_iter_mut()
+            .zip(source.par_iter())
+            .for_each(decode);
+    } else {
+        target.iter_mut().zip(source.iter()).for_each(decode);
     }
     out
 }
@@ -393,11 +399,14 @@ pub fn from_srgb8(encoded: &[u8], width: u32, height: u32) -> RgbF32 {
 /// Encode a linear image back to 8-bit sRGB, without the preview curve.
 #[must_use]
 pub fn to_srgb8(image: &RgbF32) -> Vec<u8> {
-    image
-        .data
-        .iter()
-        .map(|sample| crate::colour::curve::quantise_u8(crate::colour::curve::srgb_encode(*sample)))
-        .collect()
+    let encode = |sample: &f32| {
+        crate::colour::curve::quantise_u8(crate::colour::curve::srgb_encode(*sample))
+    };
+    if image.data.len() >= PARALLEL_MIN {
+        image.data.par_iter().map(encode).collect()
+    } else {
+        image.data.iter().map(encode).collect()
+    }
 }
 
 /// Multiply every pixel by a 3x3 matrix, the one place a colour rotation

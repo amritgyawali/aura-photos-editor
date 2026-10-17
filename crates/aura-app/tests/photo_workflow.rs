@@ -8,8 +8,22 @@ use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 use aura_raw::codec::{decode_jpeg, encode_jpeg, Rgb8};
 use std::sync::Arc;
 
-#[test]
-fn imported_pixels_are_edited_protected_and_exported_without_changing_originals() {
+/// The rest of the round trip reads `project.id`, as it did when the project was made inline.
+struct CreatedProject {
+    id: String,
+}
+
+/// One JPEG imported into a fresh catalogue with no AI provider configured.
+struct Imported {
+    dir: tempfile::TempDir,
+    state: AppState,
+    project: String,
+    photo: String,
+    path: std::path::PathBuf,
+    original: Vec<u8>,
+}
+
+fn imported(rgb: &Rgb8) -> Imported {
     let dir = tempfile::tempdir().expect("temp");
     let state = AppState::open(&dir.path().join("catalog.aura"))
         .expect("state")
@@ -25,20 +39,7 @@ fn imported_pixels_are_edited_protected_and_exported_without_changing_originals(
     )
     .expect("project");
     let path = dir.path().join("original.jpg");
-    let rgb = Rgb8 {
-        width: 96,
-        height: 64,
-        data: (0..96 * 64)
-            .flat_map(|i| {
-                [
-                    35 + (i % 55) as u8,
-                    40 + (i % 60) as u8,
-                    45 + (i % 50) as u8,
-                ]
-            })
-            .collect(),
-    };
-    let original = encode_jpeg(&rgb, 95).expect("JPEG");
+    let original = encode_jpeg(rgb, 95).expect("JPEG");
     std::fs::write(&path, &original).expect("write fixture");
     let report = aura_ingest::run(
         state.catalog(),
@@ -66,7 +67,87 @@ fn imported_pixels_are_edited_protected_and_exported_without_changing_originals(
         },
     )
     .expect("photos");
-    let photo = &photos[0].id;
+    Imported {
+        photo: photos[0].id.clone(),
+        project: project.id,
+        state,
+        path,
+        original,
+        dir,
+    }
+}
+
+/// With no provider to ask, the automatic edit is AURA's own measured correction. The
+/// stand-in it replaced aimed every median at middle grey and took a bright studio frame
+/// down by three quarters of a stop.
+#[test]
+fn a_bright_frame_is_not_darkened_when_no_ai_provider_answers() {
+    let (w, h) = (96_u32, 64_u32);
+    let frame = imported(&Rgb8 {
+        width: w,
+        height: h,
+        // A white backdrop with a mid-toned subject in the middle third.
+        data: (0..w * h)
+            .flat_map(|i| {
+                let (x, y) = (i % w, i / w);
+                let texture = ((x * 7 + y * 13) % 9) as u8;
+                if (w / 3..2 * w / 3).contains(&x) && y > h / 4 {
+                    [150 + texture, 120 + texture, 105 + texture]
+                } else {
+                    [232 + texture, 232 + texture, 230 + texture]
+                }
+            })
+            .collect(),
+    });
+    let edited = photo_auto_edit(
+        &frame.state,
+        &PhotoAutoEditInput {
+            project_id: frame.project.clone(),
+            photo_id: frame.photo.clone(),
+            job_id: "test-bright".into(),
+        },
+    )
+    .expect("local auto edit");
+    assert_eq!(edited.source, "local_fallback");
+    assert!(
+        edited.reasons[0].contains("AURA's own measured correction"),
+        "{:?}",
+        edited.reasons
+    );
+    let body: serde_json::Value = serde_json::from_str(&edited.recipe.body).expect("recipe");
+    let exposure = body["global"]["exposure"].as_f64().expect("exposure");
+    assert!(
+        exposure > -0.2,
+        "a bright backdrop is not overexposure: {exposure} ({:?})",
+        edited.reasons
+    );
+}
+
+#[test]
+fn imported_pixels_are_edited_protected_and_exported_without_changing_originals() {
+    let frame = imported(&Rgb8 {
+        width: 96,
+        height: 64,
+        data: (0..96 * 64)
+            .flat_map(|i| {
+                [
+                    35 + (i % 55) as u8,
+                    40 + (i % 60) as u8,
+                    45 + (i % 50) as u8,
+                ]
+            })
+            .collect(),
+    });
+    let Imported {
+        dir,
+        state,
+        project,
+        photo,
+        path,
+        original,
+    } = frame;
+    let project = CreatedProject { id: project };
+    let photo = &photo;
     let request = RenderImageInput {
         photo_id: photo.clone(),
         level: Some("full".into()),

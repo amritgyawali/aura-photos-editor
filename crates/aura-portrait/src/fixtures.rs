@@ -97,7 +97,7 @@ impl Portrait {
     pub fn linear_srgb(&self) -> Vec<f32> {
         self.rgb
             .iter()
-            .map(|b| aura_raw::colour::curve::srgb_decode(f32::from(*b) / 255.0))
+            .map(|b| aura_raw::colour::curve::srgb_byte_to_linear(*b))
             .collect()
     }
 }
