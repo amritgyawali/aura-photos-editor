@@ -102,6 +102,7 @@ pub mod cleanup;
 pub mod colour;
 pub mod cpu;
 pub mod creative;
+pub mod edge_aware;
 pub mod errors;
 pub mod fixtures;
 pub mod geometry;
