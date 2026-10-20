@@ -688,7 +688,9 @@ pub fn stage_for(path: &str) -> Option<Stage> {
         "geometry.rotate" | "geometry.crop" => Some(Stage::Geometry),
         "image.camera" | "image.profile" => Some(Stage::CameraMatrix),
         _ => {
-            if path.starts_with("cleanup") {
+            if path.starts_with("studio_color_v1") || path.starts_with("extra.studio_color_v1") {
+                Some(Stage::Sharpen)
+            } else if path.starts_with("cleanup") {
                 Some(Stage::Cleanup)
             } else if path.starts_with("global.hsl") {
                 Some(Stage::Hsl)

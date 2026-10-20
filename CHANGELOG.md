@@ -2,6 +2,19 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Fifty studio capabilities - 2026-10-20
+
+- Add native Levels, luminosity Levels, selective CMYK and sampled endpoints;
+  extend masks with curves, HSL, colour grading, sharpening and dehaze.
+- Add twelve composed-selection workflows, including whole inversion,
+  duplication, saved-mask combinations, morphology and connected-area cleanup.
+- Add durable empty reference groups, ordering, transactional batch management
+  and bounded descriptor-library import/export.
+- Add free/exact/custom framing, physical print sizing/export, measured placement
+  and alignment, reusable templates, linked regional strengths and RGB/Lab inspection.
+- Keep originals, manual work and history; distinguish documented counterparts
+  from AURA extensions in the [50-item report](docs/reports/AURA-fifty-capabilities-2026-10-20.md).
+
 ## Adjustable automatic finishing and reference library - 2026-10-20
 
 - Add genuine regional reference-colour fitting with independent skin, hair,

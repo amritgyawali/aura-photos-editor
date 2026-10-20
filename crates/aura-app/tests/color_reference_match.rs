@@ -60,6 +60,115 @@ fn job() -> String {
 }
 
 #[test]
+fn framing_context_and_color_only_preview_preserve_saved_recipe_history_and_originals() {
+    let directory = tempfile::tempdir().expect("isolated framing");
+    let path = directory.path().join("framing-source.png");
+    image::RgbImage::from_fn(128, 96, |x, y| {
+        let l = (40 + x / 3 + y / 4) as u8;
+        image::Rgb([l, l.saturating_add(12), l.saturating_add(22)])
+    })
+    .save(&path)
+    .expect("fixture");
+    let original = std::fs::read(&path).expect("original");
+    let (state, project, photo) = setup(&path, directory.path());
+    let mut recipe = state
+        .recipe_store()
+        .load(&photo)
+        .expect("load")
+        .expect("initial");
+    recipe.global.exposure = 0.25;
+    state
+        .recipe_store()
+        .save(
+            &project,
+            &photo,
+            &recipe,
+            &["global.exposure".into()],
+            "Colour baseline",
+        )
+        .expect("colour");
+    let baseline =
+        aura_app::native_retouch::preview(&state, &project.to_db(), &photo.to_db(), false)
+            .expect("preview")
+            .rgb_base64;
+    let edit = serde_json::from_str(
+        r#"{"id":"manual-light","tool":"dodge","enabled":true,
+        "region":[0.5,0.5,0.5,0.5],"source":null,"amount":0.65,"feather":0.1,"radius":0.01,
+        "texture":1.0,"tone":0.5,"warmth":0.0,"tint":0.0}"#,
+    )
+    .expect("operation");
+    aura_recipe::retouch_tools::write(&mut recipe, &[edit]).expect("write retouch");
+    state
+        .recipe_store()
+        .save(
+            &project,
+            &photo,
+            &recipe,
+            &[aura_recipe::retouch_tools::KEY.into()],
+            "Manual light",
+        )
+        .expect("manual");
+    let input = aura_app::framing_workflows::Input {
+        project_id: project.to_db(),
+        photo_id: photo.to_db(),
+        recipe_hash: aura_recipe::hash::recipe_hash(&recipe).expect("hash"),
+    };
+    let edited = aura_app::native_retouch::preview(&state, &project.to_db(), &photo.to_db(), false)
+        .expect("edited")
+        .rgb_base64;
+    assert_ne!(edited, baseline);
+    let before_history = aura_app::image_history(
+        &state,
+        &aura_app::contract::ipc::DevelopImageInput {
+            photo_id: photo.to_db(),
+        },
+    )
+    .expect("history")
+    .entries
+    .len();
+    let stored_before = state
+        .recipe_store()
+        .load(&photo)
+        .expect("read before")
+        .expect("saved before");
+    let output = aura_app::framing_workflows::color_only(&state, &input).expect("colour only");
+    assert_eq!(
+        output.rgb_base64, baseline,
+        "temporary view omits the retouch but keeps colour exposure"
+    );
+    let measured = aura_app::framing_workflows::context(&state, &input).expect("framing evidence");
+    assert_eq!((measured.width, measured.height), (128, 96));
+    assert!(!measured.reasons.is_empty());
+    assert_eq!(
+        state
+            .recipe_store()
+            .load(&photo)
+            .expect("read")
+            .expect("saved"),
+        stored_before
+    );
+    assert_eq!(
+        aura_app::image_history(
+            &state,
+            &aura_app::contract::ipc::DevelopImageInput {
+                photo_id: photo.to_db()
+            }
+        )
+        .expect("history")
+        .entries
+        .len(),
+        before_history
+    );
+    let stale = aura_app::framing_workflows::Input {
+        recipe_hash: "stale".into(),
+        ..input
+    };
+    assert!(aura_app::framing_workflows::context(&state, &stale).is_err());
+    assert!(aura_app::framing_workflows::color_only(&state, &stale).is_err());
+    assert_eq!(std::fs::read(&path).expect("read original"), original);
+}
+
+#[test]
 fn regional_reference_masks_restore_history_reopen_and_preserve_manual_masks_and_originals() {
     use aura_recipe::local_masks::{self, Component, LocalMask, Mode, Source};
     use std::collections::BTreeMap;

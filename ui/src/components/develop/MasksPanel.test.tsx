@@ -61,3 +61,35 @@ it('reads masks from the recipe body and describes components', () => {
   expect(masksOf({ body: '{' } as RecipeDto)).toEqual([]);
   expect(describeComponent({ mode: 'subtract', invert: true, source: { type: 'matte', matte: 'x', what: 'subject' } })).toBe('− not Subject');
 });
+
+it('exposes twelve native selection actions and keeps the other mask explicit', () => {
+  const props = panel({ masks: [sky, { ...sky, id: 'm2', name: 'Other selection' }], selected: 'm1', onWorkflow: vi.fn() });
+  const cases = [
+    ['Duplicate whole mask', { action: 'duplicate' }], ['Invert whole selection', { action: 'invert' }],
+    ['Freeze composed selection', { action: 'freeze' }],
+    ['Union with saved mask', { action: 'union', otherMaskId: 'm2' }],
+    ['Intersect with saved mask', { action: 'intersection', otherMaskId: 'm2' }],
+    ['Subtract saved mask', { action: 'subtraction', otherMaskId: 'm2' }],
+    ['Feather saved selection', { action: 'feather', value: 3 }], ['Expand selection', { action: 'expand', value: 3 }],
+    ['Contract selection', { action: 'contract', value: 3 }], ['Refine edge contrast', { action: 'edge_contrast', value: 25 }],
+    ['Remove small selection islands', { action: 'remove_islands', value: 16 }], ['Fill small selection holes', { action: 'fill_holes', value: 16 }],
+  ] as const;
+  for (const [label, request] of cases) {
+    fireEvent.click(screen.getByText(label));
+    expect(props.onWorkflow).toHaveBeenLastCalledWith(request);
+  }
+  expect(props.onSave).not.toHaveBeenCalled();
+});
+
+it('disables selection operations while saving', () => {
+  panel({ masks: [sky], selected: 'm1', disabled: true, onWorkflow: vi.fn() });
+  expect(screen.getByText('Invert whole selection').matches(':disabled')).toBe(true);
+  expect(screen.getByLabelText('Second saved mask').matches(':disabled')).toBe(true);
+});
+
+it('does not offer a refinement with zero radius or a second mask that no longer exists', () => {
+  panel({ masks: [sky], selected: 'm1', onWorkflow: vi.fn() });
+  fireEvent.change(screen.getByLabelText('Selection refinement radius'), { target: { value: '0' } });
+  expect(screen.getByText('Expand selection').matches(':disabled')).toBe(true);
+  expect(screen.getByText('Union with saved mask').matches(':disabled')).toBe(true);
+});

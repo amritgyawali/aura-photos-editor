@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { asIpcError, develop, editProfiles, inTauri, syncSettings, pickWhiteBalance, type EditProfile } from '../../ipc/client';
+import { api, asIpcError, develop, editProfiles, inTauri, syncSettings, pickWhiteBalance, type EditProfile } from '../../ipc/client';
 import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { nativeRetouch } from '../../ipc/nativeRetouch';
 import { previewSource, useProgressivePreview } from '../../state/previewCache';
@@ -19,6 +19,11 @@ import type { BrushStroke } from '../../ipc/nativeRetouch';
 import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
 import { finishOf, studioFinish, type StudioFinish } from '../../ipc/studioFinish';
 import { AutomaticFinishControls } from './AutomaticFinishControls';
+import { StudioColorPanel } from './StudioColorPanel';
+import { FramingPanel } from './FramingPanel';
+import { probePixel } from './framingMath';
+import { framingWorkflows } from '../../ipc/framingWorkflows';
+import { maskWorkflows } from '../../ipc/maskWorkflows';
 import './editorPanels.css';
 
 const EDITOR_PANELS = [
@@ -50,7 +55,12 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const writing = useRef(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'essentials' | 'advanced'>('essentials');
-  const [view, setView] = useState<'edited' | 'original' | 'split'>('edited');
+  const [view, setView] = useState<'edited' | 'original' | 'split' | 'color'>('edited');
+  const [colorPreview, setColorPreview] = useState<RenderDto | null>(null);
+  const [colorError, setColorError] = useState<string | null>(null);
+  const [probing, setProbing] = useState(false);
+  const [probe, setProbe] = useState<ReturnType<typeof probePixel> | null>(null);
+  const maskJob = useRef<string | null>(null);
   const [split, setSplit] = useState(50);
   const [refresh, setRefresh] = useState(0);
   const [profiles, setProfiles] = useState<EditProfile[]>([]);
@@ -96,12 +106,23 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const render: RenderDto | null = editedPreview.image;
   const edited = useMemo(() => previewSource(render), [render]);
   const original = useMemo(() => previewSource(originalPreview.image), [originalPreview.image]);
-  const proof = useMemo(() => render && clipping !== 'off' ? clippingPreview(render, clipping) : edited, [render, edited, clipping]);
+  const displayedRender = view === 'color' ? colorPreview : view === 'original' ? originalPreview.image : render;
+  const colorSource = useMemo(() => previewSource(colorPreview), [colorPreview]);
+  const proof = useMemo(() => displayedRender && clipping !== 'off' ? clippingPreview(displayedRender, clipping) : view === 'color' ? colorSource : edited, [displayedRender, edited, clipping, view, colorSource]);
+  useEffect(() => {
+    if (view !== 'color' || !recipe?.recipeHash) { setColorPreview(null); setColorError(null); return; }
+    let active = true; setColorPreview(null); setColorError(null);
+    void framingWorkflows.colorOnly(projectId, photoId, recipe.recipeHash).then(value => { if (active) setColorPreview(value); })
+      .catch(cause => { if (active) setColorError(asIpcError(cause).message); });
+    return () => { active = false; };
+  }, [view, projectId, photoId, recipe?.recipeHash]);
+  useEffect(() => () => { const id = maskJob.current; if (id) void api.cancelJob(id).catch(() => undefined); }, [photoId]);
   const problem = error ?? editedPreview.error ?? (render && !edited ? 'The renderer returned incomplete image data. Retry the preview.' : null);
   // Clear only when changing photographs; keep the last preview during a save.
   useEffect(() => {
     setRecipe(null); setHistory(null); setAspect(null); setNotice(null);
     setWriteError(null);
+    setProbe(null); setProbing(false); setColorPreview(null);
     setPicking(false); setPosition(null);
     setSelectedMask(null); setMaskMessage(null); setMaskTool(null); setCoverage(null); setLiquifyTool(null);
   }, [photoId, projectId]);
@@ -223,7 +244,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
     <div className="studio-toolbar">
       <div><span className="eyebrow">PHOTO STUDIO</span><h2>Make it yours.</h2></div>
       <div className="view-switch" aria-label="Preview mode">
-        {(['edited', 'original', 'split'] as const).map(mode => <button type="button" key={mode} aria-pressed={view === mode} disabled={!edited || !original} onClick={() => { setView(mode); setPicking(false); }}>{mode === 'split' ? 'Compare' : mode === 'edited' ? 'Edited' : 'Original'}</button>)}
+        {(['edited', 'original', 'split', 'color'] as const).map(mode => <button type="button" key={mode} aria-pressed={view === mode} disabled={!edited || !original} onClick={() => { setView(mode); setPicking(false); setProbe(null); }}>{mode === 'split' ? 'Compare' : mode === 'edited' ? 'Edited' : mode === 'color' ? 'Colour only' : 'Original'}</button>)}
       </div>
     </div>
     {problem && <p role="alert">{problem} <button type="button" onClick={() => setRefresh(value => value + 1)}>Retry preview</button></p>}
@@ -232,6 +253,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
       {EDITOR_PANELS.map(([value, label]) => <button type="button" key={value} aria-pressed={panel === value}
         disabled={busy || disabled} onClick={() => {
           setPanel(value); setPicking(false); setMaskTool(null); setLiquifyTool(null);
+          setProbing(false);
           drag.current = null; setSketch(null);
         }}>{label}</button>)}
       <button type="button" disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
@@ -262,13 +284,19 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           onPointerUp={event => finishDrawing(framePoint(event))}
           onPointerCancel={() => { drag.current = null; setSketch(null); }}
           onClick={event => {
+            if (probing && displayedRender) {
+              const box = event.currentTarget.getBoundingClientRect();
+              const point = imagePoint(event.clientX - box.left, event.clientY - box.top, box.width, box.height, displayedRender.width / displayedRender.height);
+              if (point) { try { setProbe(probePixel(displayedRender, point)); } catch (cause) { setNotice(cause instanceof Error ? cause.message : asIpcError(cause).message); } }
+              return;
+            }
             if (!picking || !aspect) return;
             const box = event.currentTarget.getBoundingClientRect();
             const point = imagePoint(event.clientX - box.left, event.clientY - box.top, box.width, box.height, aspect);
             if (point) pick(...point);
           }}>
           {edited && original ? <>
-            <img src={view === 'original' ? original : (view === 'edited' && overlaid) || (proof ?? edited)} alt={view === 'original' ? 'Original photograph' : 'Edited photograph'} />
+            <img src={view === 'original' ? original : (view === 'edited' && overlaid) || (proof ?? edited)} alt={view === 'original' ? 'Original photograph' : view === 'color' ? 'Colour-only photograph' : 'Edited photograph'} />
             {sketch && liquifyTool && <svg className="studio-sketch" aria-hidden="true"><polyline points={sketch.map(p => p.join(',')).join(' ')} fill="none" stroke="#fc5" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" opacity={0.8} /></svg>}
             {sketch && maskTool && <svg className="studio-sketch" aria-hidden="true">
               {maskTool.kind === 'brush' ? <polyline points={sketch.map(p => p.join(',')).join(' ')} fill="none" stroke={drag.current?.erase ? '#6cf' : '#f55'} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
@@ -279,10 +307,14 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             <img src={original} alt="" hidden onLoad={event => { const img = event.currentTarget; if (img.naturalHeight) setAspect(img.naturalWidth / img.naturalHeight); }} />
             {view === 'split' && <img className="studio-original-overlay" src={original} alt="Original side of comparison" style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }} />}
             {view === 'split' && <div className="studio-divider" style={{ left: `${split}%` }} aria-hidden="true" />}
-            <span className="studio-caption">{view === 'split' ? 'Original / Edited' : view === 'original' ? 'Original' : 'Edited'}</span>
+            <span className="studio-caption">{view === 'split' ? 'Original / Edited' : view === 'original' ? 'Original' : view === 'color' ? colorPreview ? 'Colour only' : 'Preparing colour-only preview…' : 'Edited'}</span>
             {(busy || loading || waiting) && <span className="studio-updating" role="status">Updating preview…</span>}
           </> : <p>{problem ? 'Photo preview unavailable' : 'Loading your photograph…'}</p>}
         </div>
+        {colorError && <p role="alert">Colour-only preview: {colorError}</p>}
+        <button type="button" aria-pressed={probing} disabled={!displayedRender || view === 'split'} onClick={() => { setProbing(!probing); setPicking(false); setMaskTool(null); setLiquifyTool(null); }}>Inspect RGB / Lab point</button>
+        {probing && <p className="lr-hint">Click the displayed photograph. Readout measures rendered sRGB and CIE Lab D65, not source RAW sensor values.</p>}
+        {probe && <output aria-label="Photo colour readout">RGB {probe.rgb.join(', ')} · Lab {probe.lab.map(v => v.toFixed(2)).join(', ')}</output>}
         {view === 'split' && <label className="compare-control">Before / after<input type="range" min={0} max={100} value={split} onChange={event => setSplit(Number(event.target.value))} aria-label="Before and after divider" /></label>}
         <label className="compare-control">Clipping warnings<select value={clipping} onChange={event => setClipping(event.target.value as ClippingMode)}>
           <option value="off">Off</option><option value="shadows">Shadows</option><option value="highlights">Highlights</option><option value="both">Both</option>
@@ -306,6 +338,13 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             message={maskMessage} tool={maskTool} brush={brush} overlay={maskOverlay}
             onSelect={setSelectedMask} onTool={tool => { setMaskTool(tool); if (tool) { setLiquifyTool(null); setView('edited'); setPicking(false); } }}
             onBrush={setBrush} onOverlay={setMaskOverlay}
+            onWorkflow={request => void write(async () => {
+              if (!selectedMask || !recipe) return;
+              const cancelId = crypto.randomUUID(); maskJob.current = cancelId;
+              try { const made = await maskWorkflows.apply(projectId, photoId, selectedMask, recipe.recipeHash, request, cancelId);
+                setMaskMessage(made.message); if (made.maskId) setSelectedMask(made.maskId);
+              } finally { maskJob.current = null; }
+            })}
             onCreate={request => void write(async () => {
               const made = await localMasks.create(projectId, photoId, request);
               setMaskMessage(made.message);
@@ -329,6 +368,9 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <button type="button" disabled={![pickX, pickY].every(value => Number.isFinite(value) && value >= 0 && value <= 100)} onClick={() => pick(pickX / 100, pickY / 100)}>Sample this position</button>
         </div></details>
         <div hidden={!shows('develop')}>
+        <StudioColorPanel projectId={projectId} photoId={photoId} recipe={recipe} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={async () => { setRefresh(value => value + 1); }}/>
+        <FramingPanel key={`framing:${photoId}`} projectId={projectId} photoId={photoId} recipe={recipe} original={original}
+          disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onSave={async (geometry, label) => { await write(() => develop.setParam({ projectId, photoId, path: 'geometry', value: geometry, label })); }}/>
         <LightroomPanel recipe={recipe} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} aspect={aspect} profiles={profiles} mode={mode}
           syncControls={<SyncSettingsPanel key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId} disabled={disabled || busy || loading || waiting}
             onSync={(targets, groups) => void write(async () => {

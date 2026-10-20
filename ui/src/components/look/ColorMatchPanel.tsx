@@ -6,6 +6,7 @@ import { matchColorCollection, type ColorMatchOutcome } from './matchColorCollec
 import { FINE_MATCH_FIELDS } from '../../ipc/colorMatchDetails';
 import { ColorReferenceLibrary } from './ColorReferenceLibrary';
 import { RegionalColorMatchPanel } from './RegionalColorMatchPanel';
+import { ReferenceLibraryManager } from './ReferenceLibraryManager';
 
 const SLIDERS = [
   ['amount', 'Match amount'], ['tone', 'Tone match'], ['color', 'Colour match'], ['whiteBalance', 'Warmth match'],
@@ -192,6 +193,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       {outcomes.length > 0 && <ol aria-label="Collection colour matching results">{outcomes.map((item, index) =>
         <li key={`${item.photoId}:${index}`}>{item.name}: {item.outcome}. {item.detail}</li>)}</ol>}
     </details>}
+    <ReferenceLibraryManager disabled={locked} controls={controls} onUpdated={setReferences}/>
     <RegionalColorMatchPanel key={`regions:${photoId}:${selected}`} photoId={photoId} referenceId={selected}
       referenceAvailable={libraryReference} revision={revision} disabled={disabled || busy || !inTauri()}
       onApply={onApply} onBusyChange={setRegionalBusy}/>
