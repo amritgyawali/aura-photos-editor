@@ -40,9 +40,11 @@ pub(super) fn apply(rgb: &mut [f32], frame: Frame, edit: &Edit, coverage: &Cover
             let e = encode(luma(old));
             let (px, py) = (x as f32, y as f32);
             // Three hatch directions that join in as the tone darkens.
+            // A line is the outer fifth of each period, soft-edged: thin ink on paper. The first
+            // version inked three quarters of every period, so dark areas went solid black.
             let line = |u: f32| {
                 let t = (u / spacing).rem_euclid(1.0);
-                smoothstep(0.18, 0.05, (t - 0.5).abs() - 0.32)
+                smoothstep(0.36, 0.44, (t - 0.5).abs())
             };
             let mut ink = 0.0_f32;
             if e < 0.75 {
@@ -98,5 +100,11 @@ mod tests {
                 .count()
         };
         assert!(ink(8) > ink(50) * 2, "{} vs {}", ink(8), ink(50));
+        // Even the darkest tone is hatched, not filled: paper shows between the lines.
+        assert!(
+            ink(8) < 20 * 20 * 3 / 4,
+            "{} of 400 inked in the dark",
+            ink(8)
+        );
     }
 }
