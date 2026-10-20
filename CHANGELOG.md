@@ -2,6 +2,16 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Twenty more effects: colour looks, light and lens, art, repair - 2026-10-20
+
+- **Colour looks** (ADR-0134): split tone, film fade, bleach bypass, teal and orange that holds
+  skin, colour splash, and a sky-blue restore that leaves skin and cloud alone.
+- **Light and lens**: spotlight, rim light along a selected subject's edge, chromatic aberration,
+  fisheye, anamorphic streaks, kaleidoscope.
+- **Art**: watercolour, stained glass, cartoon and neon edges that follow colour edges, thermal.
+- **Repair**: blown highlights given back the colour of their surroundings at their own
+  brightness, dehaze measured on the selection, and the iris's limbal ring.
+
 ## Twenty more tools, a whole-app test, and two fixes it found - 2026-10-20
 
 - **Eight practical repairs** (ADR-0132): dust and scratches, JPEG artifact cleanup, banding

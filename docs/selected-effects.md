@@ -68,6 +68,25 @@ sketch**, **Oil paint**, **Cross-process**, **Infrared**, **Mirror symmetry**, *
 **God rays** from a light you pick, and **Snow & rain**. Each works only inside the area you
 select, and each is a saved step you can change or undo.
 
+## Colour looks
+
+**Split tone** (two colours for shadows and highlights), **Film fade** (milky blacks),
+**Bleach bypass** (gritty, desaturated contrast), **Teal & orange** (skin keeps its own colour),
+**Colour splash** (pick one colour to keep; the rest of the area turns black and white) and
+**Restore blue sky** (clouds stay white, skin is left alone).
+
+## Light, lens and art
+
+**Spotlight**, **Rim light** (select the subject; its edge catches light from the side you choose),
+**Chromatic aberration**, **Fisheye**, **Anamorphic streaks**, **Kaleidoscope**, **Watercolour**,
+**Stained glass**, **Cartoon**, **Neon edges** and **Thermal camera**.
+
+## More repairs
+
+**Repair blown highlights** gives a yellow forehead or a cyan sky the colour of the area around it,
+keeping its brightness. **Dehaze (selection)** clears haze from just the area you select.
+**Limbal ring** - draw the ellipse around an iris; its outer ring is darkened for clearer eyes.
+
 ## Shortcuts
 
 Under **Shortcuts** in each effect: enlarge eyes, add hair volume, slim a nose, lift a jawline,

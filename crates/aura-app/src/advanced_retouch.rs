@@ -270,7 +270,27 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         | Tool::MirrorSymmetry
         | Tool::LensFlare
         | Tool::GodRays
-        | Tool::Weather => return None,
+        | Tool::Weather
+        | Tool::SplitTone
+        | Tool::FilmFade
+        | Tool::BleachBypass
+        | Tool::TealOrange
+        | Tool::ColourSplash
+        | Tool::SkyBlue
+        | Tool::Spotlight
+        | Tool::RimLight
+        | Tool::ChromaticAberration
+        | Tool::Fisheye
+        | Tool::AnamorphicStreak
+        | Tool::Kaleidoscope
+        | Tool::Watercolor
+        | Tool::StainedGlass
+        | Tool::Cartoon
+        | Tool::NeonEdges
+        | Tool::Thermal
+        | Tool::ClippedHighlightRepair
+        | Tool::LocalDehaze
+        | Tool::LimbalRing => return None,
         Tool::AutoBlemish
         | Tool::PatchHeal
         | Tool::FrequencyHeal

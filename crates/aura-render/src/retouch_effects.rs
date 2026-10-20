@@ -13,12 +13,16 @@
     clippy::cast_sign_loss,
     clippy::cast_possible_wrap
 )]
+mod art;
 mod colour;
 mod creative;
+mod lens;
 mod light;
+mod looks;
 mod optics;
 mod portrait;
 mod practical;
+mod repair;
 mod warp;
 
 use crate::retouch_mask::Coverage;
@@ -35,6 +39,10 @@ pub(crate) fn supports(tool: Tool) -> bool {
         || portrait::supports(tool)
         || practical::supports(tool)
         || creative::supports(tool)
+        || looks::supports(tool)
+        || lens::supports(tool)
+        || art::supports(tool)
+        || repair::supports(tool)
 }
 
 /// Render one effect operation into `rgb`.
@@ -68,6 +76,14 @@ pub(crate) fn apply(
         practical::apply(rgb, frame, edit, coverage);
     } else if creative::supports(edit.tool) {
         creative::apply(rgb, frame, edit, coverage);
+    } else if looks::supports(edit.tool) {
+        looks::apply(rgb, frame, edit, coverage);
+    } else if lens::supports(edit.tool) {
+        lens::apply(rgb, frame, edit, coverage);
+    } else if art::supports(edit.tool) {
+        art::apply(rgb, frame, edit, coverage);
+    } else if repair::supports(edit.tool) {
+        repair::apply(rgb, frame, edit, coverage);
     }
 }
 
@@ -385,7 +401,7 @@ mod tests {
     use super::testing::*;
     use super::*;
 
-    const ALL: [Tool; 48] = [
+    const ALL: [Tool; 68] = [
         Tool::LiquifyPush,
         Tool::LiquifyBloat,
         Tool::LiquifyPucker,
@@ -434,6 +450,26 @@ mod tests {
         Tool::LensFlare,
         Tool::GodRays,
         Tool::Weather,
+        Tool::SplitTone,
+        Tool::FilmFade,
+        Tool::BleachBypass,
+        Tool::TealOrange,
+        Tool::ColourSplash,
+        Tool::SkyBlue,
+        Tool::Spotlight,
+        Tool::RimLight,
+        Tool::ChromaticAberration,
+        Tool::Fisheye,
+        Tool::AnamorphicStreak,
+        Tool::Kaleidoscope,
+        Tool::Watercolor,
+        Tool::StainedGlass,
+        Tool::Cartoon,
+        Tool::NeonEdges,
+        Tool::Thermal,
+        Tool::ClippedHighlightRepair,
+        Tool::LocalDehaze,
+        Tool::LimbalRing,
     ];
 
     /// A busy, colourful frame every tool has something to do on.
@@ -467,7 +503,10 @@ mod tests {
         e.tone = 0.6;
         e.radius = 0.04;
         e.texture = 1.5;
-        if matches!(tool, Tool::ChromaKey | Tool::LocalWhiteBalance) {
+        if matches!(
+            tool,
+            Tool::ChromaKey | Tool::LocalWhiteBalance | Tool::ColourSplash
+        ) {
             e.source = Some([0.5, 0.5]);
         }
         if tool == Tool::DropShadow {

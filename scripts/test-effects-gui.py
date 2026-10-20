@@ -50,12 +50,32 @@ DEFAULTS = {
     'eye_glow_fix': (1, .6, 0, 0, 1, .01, .3), 'lip_gloss': (.6, .5, 0, 0, 1, .004, .5),
     'freckles': (.7, .5, 0, 0, 1, .004, .6), 'floor_reflection': (.5, .4, 0, 0, 1, .01, .1),
     'drop_shadow': (.6, .5, .4, .4, 1, .015, .2),
+    'split_tone': (0.8, 0.5, 0, 0, 1, 0.01, 0.4),
+    'film_fade': (0.8, 0.4, 0.3, 0, 1, 0.01, 0.4),
+    'bleach_bypass': (0.8, 0.5, 0, 0, 1, 0.01, 0.4),
+    'teal_orange': (0.8, 0.5, 0, 0, 1, 0.01, 0.4),
+    'colour_splash': (1, 0.3, 0, 0, 1, 0.01, 0.3),
+    'sky_blue': (0.8, 0.5, 0, 0, 1, 0.01, 0.6),
+    'spotlight': (0.9, 0.5, 0, 0, 1, 0.015, 0.5),
+    'rim_light': (0.8, 0.5, 0.7, -0.4, 1, 0.006, 0.2),
+    'chromatic_aberration': (1, 0.5, 0, 0, 1, 0.02, 0.4),
+    'fisheye': (0.6, 0.5, 0, 0, 1, 0.01, 0.4),
+    'anamorphic_streak': (0.8, 0.5, 0, 0, 1, 0.02, 0.4),
+    'kaleidoscope': (1, 0.5, 0, 0, 1, 0.01, 0.3),
+    'watercolor': (1, 0.5, 0, 0, 1, 0.004, 0.3),
+    'stained_glass': (1, 0.5, 0, 0, 1, 0.02, 0.2),
+    'cartoon': (1, 0.4, 0, 0, 1, 0.003, 0.2),
+    'neon_edges': (1, 0.6, 0, 0, 1, 0.01, 0.2),
+    'thermal': (1, 0.5, 0, 0, 1, 0.01, 0.2),
+    'clipped_highlight_repair': (1, 0.5, 0, 0, 1, 0.01, 0.4),
+    'local_dehaze': (0.8, 0.6, 0, 0, 1, 0.01, 0.5),
+    'limbal_ring': (0.6, 0.4, 0, 0, 1, 0.01, 0.2),
 }
 COLOURS = {'chroma_key': [.2, .45, .85], 'light_leak': [1, .55, .25], 'haze': [.82, .84, .87],
            'starburst': [1, .97, .9], 'catchlight': [1, 1, 1]}
 # Tools whose change is subtle on a photograph that has nothing for them to fix: they only
 # have to leave everything outside their region alone.
-QUIET = {'eye_glow_fix', 'vein_reduce', 'local_white_balance', 'chroma_key', 'lip_gloss', 'halation'}
+QUIET = {'clipped_highlight_repair', 'sky_blue', 'anamorphic_streak', 'eye_glow_fix', 'vein_reduce', 'local_white_balance', 'chroma_key', 'lip_gloss', 'halation'}
 
 
 def launch(exe, port):
@@ -83,7 +103,7 @@ def pixels(dto):
 def operation(tool, region):
     amount, tone, warmth, tint, texture, radius, feather = DEFAULTS[tool]
     source = None
-    if tool in ('chroma_key', 'local_white_balance'):
+    if tool in ('chroma_key', 'local_white_balance', 'colour_splash'):
         source = [region[0], region[1]]
     return {'id': 'draft', 'tool': tool, 'enabled': True, 'region': region, 'source': source,
             'amount': amount, 'feather': feather, 'radius': radius, 'texture': texture, 'tone': tone,

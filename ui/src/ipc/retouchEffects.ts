@@ -53,6 +53,27 @@ export const EFFECT_TOOLS = [
   ['lens_flare', 'Lens flare', 'Creative looks', 'A lens flare from a light you pick, with coloured ghosts along the line through the frame.'],
   ['god_rays', 'God rays', 'Creative looks', 'Beams of light streaming from a point you pick through the bright gaps in front of it - trees, windows, a doorway.'],
   ['weather', 'Snow & rain', 'Creative looks', 'Adds falling snow, or rain streaks at the angle you set.'],
+  // Colour looks, light and lens, artistic and repair (ADR-0134).
+  ['split_tone', 'Split tone', 'Colour looks', 'Tints the shadows and the highlights of the selection with two different colours, keeping its brightness.'],
+  ['film_fade', 'Film fade · matte', 'Colour looks', 'Lifted, milky blacks and softer colour, like faded film or a matte print.'],
+  ['bleach_bypass', 'Bleach bypass', 'Colour looks', 'A gritty, desaturated, high-contrast cinema look.'],
+  ['teal_orange', 'Teal & orange', 'Colour looks', 'Cool teal shadows and warm highlights, the blockbuster look, with skin held at its own colour.'],
+  ['colour_splash', 'Colour splash', 'Colour looks', 'Pick one colour on the photo - a red rose, a bridal lehenga - and everything else in the selection turns black and white.'],
+  ['sky_blue', 'Restore blue sky', 'Fix & clean up', 'Brings blue back to a washed-out sky. Clouds stay white and warm colours such as skin are left alone.'],
+  ['spotlight', 'Spotlight', 'Light & effects', 'A pool of light on a point you pick, with everything around it falling into shadow.'],
+  ['rim_light', 'Rim light', 'Light & effects', 'Select the subject: its edge on the side you choose catches a glow of light, as if lit from behind.'],
+  ['chromatic_aberration', 'Chromatic aberration (creative)', 'Light & effects', 'Splits red and blue apart toward the edges of the ellipse, like a vintage lens.'],
+  ['fisheye', 'Fisheye', 'Liquify', 'Bulges the ellipse like a fisheye lens; its edge stays where it was.'],
+  ['anamorphic_streak', 'Anamorphic streaks', 'Light & effects', 'Long horizontal streaks from lights and bright points, the cinema lens look.'],
+  ['kaleidoscope', 'Kaleidoscope', 'Creative looks', 'Mirrors the ellipse into four to twelve segments around its centre.'],
+  ['watercolor', 'Watercolour', 'Creative looks', 'Soft colour washes with pigment pooled at the edges and paper grain.'],
+  ['stained_glass', 'Stained glass', 'Creative looks', 'Panes of colour joined by dark leading.'],
+  ['cartoon', 'Cartoon', 'Creative looks', 'Flat colours with ink lines on the edges.'],
+  ['neon_edges', 'Neon edges', 'Creative looks', 'Edges glow in their own colours over a darkened picture.'],
+  ['thermal', 'Thermal camera', 'Creative looks', 'The false colours of a heat camera, from cold blue to white hot.'],
+  ['clipped_highlight_repair', 'Repair blown highlights', 'Fix & clean up', 'Gives a highlight that blew out in one or two colour channels - a yellow forehead, a cyan sky - the colour of the area around it, keeping its brightness.'],
+  ['local_dehaze', 'Dehaze (selection)', 'Fix & clean up', 'Removes haze from just the area you select - a distant hill, a window, a misty background - measured on that area.'],
+  ['limbal_ring', 'Limbal ring', 'Details', 'Draw the ellipse around the iris: its outer ring is darkened, which makes eyes look clearer and more defined.'],
 ] as const;
 
 export type EffectTool = typeof EFFECT_TOOLS[number][0];
@@ -117,6 +138,26 @@ export const EFFECT_PARAMS: Record<EffectTool, EffectParam[]> = {
   lens_flare: [radius('Ghost size'), unit('tone', 'Brightness')],
   god_rays: [unit('tone', 'Length and reach')],
   weather: [radius('Flake or drop size'), unit('tone', 'Density'), { key: 'tint', label: 'Rain instead of snow', min: -1, max: 1, step: 2, show: v => v > 0 ? 'on' : 'off', toggle: true }, both('warmth', 'Rain angle', deg(45))],
+  split_tone: [both('warmth', 'Shadow colour turn', deg(180)), unit('tone', 'Balance')],
+  film_fade: [unit('tone', 'Fade'), both('warmth', 'Warm (+) or cool (−)')],
+  bleach_bypass: [unit('tone', 'Contrast')],
+  teal_orange: [unit('tone', 'Strength')],
+  colour_splash: [unit('tone', 'Colour tolerance')],
+  sky_blue: [unit('tone', 'Strength')],
+  spotlight: [{ ...radius('Pool of light'), show: (v: number) => `${(v * 1000).toFixed(1)}% of short edge` }, unit('tone', 'Darkness around')],
+  rim_light: [both('warmth', 'Light from the right (+) or left (−)'), both('tint', 'Light from below (+) or above (−)'), radius('Rim width')],
+  chromatic_aberration: [radius('Separation')],
+  fisheye: [],
+  anamorphic_streak: [radius('Streak length'), unit('tone', 'Reaches dimmer lights')],
+  kaleidoscope: [{ ...unit('tone', 'Segments'), show: (v: number) => String(4 + Math.round(v * 4) * 2) }],
+  watercolor: [radius('Wash size')],
+  stained_glass: [radius('Pane size')],
+  cartoon: [radius('Smoothing'), { ...unit('tone', 'Colour levels'), show: (v: number) => String(2 + Math.round(v * 8)) }],
+  neon_edges: [unit('tone', 'Darken the rest')],
+  thermal: [],
+  clipped_highlight_repair: [radius('How far to look for colour')],
+  local_dehaze: [unit('tone', 'Haze removed')],
+  limbal_ring: [unit('tone', 'Ring width')],
 };
 
 /** Tools that read a point on the photo: required for the first two, optional for the rest. */
@@ -128,6 +169,8 @@ export const EFFECT_SOURCE: Partial<Record<EffectTool, { required: boolean; labe
   starburst: { required: false, label: 'Pick the light source (default: the ellipse centre)' },
   lens_flare: { required: false, label: 'Pick the light causing the flare (default: the ellipse centre)' },
   god_rays: { required: false, label: 'Pick where the light comes from (default: the ellipse centre)' },
+  colour_splash: { required: true, label: 'Pick the colour to keep' },
+  spotlight: { required: false, label: 'Pick where the light falls (default: the ellipse centre)' },
 };
 
 /** Tools with a chosen colour, and the colour they start with. */
@@ -140,6 +183,10 @@ export const EFFECT_COLOR: Partial<Record<EffectTool, { label: string; initial: 
   duotone: { label: 'Highlight colour', initial: [.95, .82, .6], optional: false },
   halftone: { label: 'Ink colour', initial: [.05, .05, .08], optional: true },
   god_rays: { label: 'Light colour', initial: [1, .88, .65], optional: true },
+  split_tone: { label: 'Highlight colour', initial: [1, .78, .5], optional: true },
+  sky_blue: { label: 'Sky colour', initial: [.35, .6, 1], optional: true },
+  rim_light: { label: 'Light colour', initial: [1, .93, .82], optional: true },
+  anamorphic_streak: { label: 'Streak colour', initial: [.35, .55, 1], optional: true },
 };
 
 /** Where each tool starts when chosen. */
@@ -192,6 +239,26 @@ export const EFFECT_DEFAULTS: Record<EffectTool, { amount: number; tone: number;
   lens_flare: { amount: .7, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .6 },
   god_rays: { amount: .8, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .6 },
   weather: { amount: 1, tone: .4, warmth: .2, tint: -1, texture: 1, radius: .004, feather: .5 },
+  split_tone: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .4 },
+  film_fade: { amount: .8, tone: .4, warmth: .3, tint: 0, texture: 1, radius: .01, feather: .4 },
+  bleach_bypass: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .4 },
+  teal_orange: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .4 },
+  colour_splash: { amount: 1, tone: .3, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  sky_blue: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .6 },
+  spotlight: { amount: .9, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .015, feather: .5 },
+  rim_light: { amount: .8, tone: .5, warmth: .7, tint: -.4, texture: 1, radius: .006, feather: .2 },
+  chromatic_aberration: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .02, feather: .4 },
+  fisheye: { amount: .6, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .4 },
+  anamorphic_streak: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .02, feather: .4 },
+  kaleidoscope: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  watercolor: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .004, feather: .3 },
+  stained_glass: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .02, feather: .2 },
+  cartoon: { amount: 1, tone: .4, warmth: 0, tint: 0, texture: 1, radius: .003, feather: .2 },
+  neon_edges: { amount: 1, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .2 },
+  thermal: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .2 },
+  clipped_highlight_repair: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .4 },
+  local_dehaze: { amount: .8, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .5 },
+  limbal_ring: { amount: .6, tone: .4, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .2 },
 };
 
 /** Named starting points for common jobs; each one is just one of the tools above, set up. */
@@ -203,9 +270,12 @@ export const EFFECT_SHORTCUTS: { label: string; tool: EffectTool; patch: Partial
   { label: 'Hide a face or plate', tool: 'pixelate', patch: { radius: .03 } },
   { label: 'Dreamy glow', tool: 'orton_glow', patch: { amount: .6, tone: .5 } },
   { label: 'Sharpen the eyes', tool: 'local_sharpen', patch: { texture: 1.2, radius: .0015 } },
+  { label: 'Define the irises', tool: 'limbal_ring', patch: { amount: .5, tone: .3 } },
+  { label: 'Cinematic', tool: 'teal_orange', patch: { amount: .7, tone: .45 } },
+  { label: 'Keep one colour', tool: 'colour_splash', patch: { tone: .3 } },
 ];
 
 const EFFECT_IDS = new Set<string>(EFFECT_TOOLS.map(t => t[0]));
 export const isEffectTool = (tool: string): tool is EffectTool => EFFECT_IDS.has(tool);
 /** The warps move pixels, so an inverted selection would warp the whole photo. */
-export const isWarpTool = (tool: string) => tool === 'reshape' || tool.startsWith('liquify_');
+export const isWarpTool = (tool: string) => tool === 'reshape' || tool === 'fisheye' || tool.startsWith('liquify_');
