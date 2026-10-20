@@ -1,7 +1,9 @@
 # Effects you place yourself
 
 Open **Retouch**, choose a tool from the **Tool** list, place it with the ellipse, the brush, a
-gradient or an AI selection, and click **Apply retouch**. Every effect is a saved operation:
+gradient or an AI selection, and click **Apply retouch**. Or open **Effects** in the sidebar to
+search all 119 tools by what they do, star the ones you use most, and click **Use on this photo**
+to open Retouch with that tool chosen; nothing changes until you apply it. Every effect is a saved operation:
 it can be selected again, changed, turned off, reordered, undone, and given its own strength.
 
 ## Liquify
@@ -87,10 +89,29 @@ select, and each is a saved step you can change or undo.
 keeping its brightness. **Dehaze (selection)** clears haze from just the area you select.
 **Limbal ring** - draw the ellipse around an iris; its outer ring is darkened for clearer eyes.
 
+## Grooming, colour and texture
+
+**Darken lashes & liner** deepens only what is darker than its surroundings, so the lid stays as it
+was. **Fill thin hair or brows** fills the lighter gaps with the hair's own colour. **Match grain**
+measures the grain of your photograph and gives the same grain back to an area smoothed too far.
+
+## Stylised looks and distortion
+
+**Channel swap**, **Sunset glow**, **Day to night** (lamps and windows stay lit), **Lomo**,
+**Instant film**, **Pop art**, **Iris blur**, **Double exposure echo**, **Ripple**,
+**Frosted glass**, **Pixel sort**, **VHS tape**, **Emboss** and **Crosshatch**.
+
+## Sparkle and light
+
+**Sparkle** puts a star on every real glint in the area - a ring, sequins, a glass - and none on a
+flat area. **Fairy lights** scatters soft orbs of light; **Rainbow prism** throws a band of spectrum
+light at the angle you set.
+
 ## Shortcuts
 
 Under **Shortcuts** in each effect: enlarge eyes, add hair volume, slim a nose, lift a jawline,
-hide a face or plate, dreamy glow, sharpen the eyes. Each one chooses one of the tools above and
+hide a face or plate, dreamy glow, sharpen the eyes, define the irises, cinematic, keep one
+colour, make jewellery sparkle, undo plastic skin, fuller brows. Each one chooses one of the tools above and
 sets it up; adjust it afterwards like any other.
 
 None of these tools finds the area on its own, and none of them creates new picture content: they

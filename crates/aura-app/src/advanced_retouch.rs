@@ -290,7 +290,27 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         | Tool::Thermal
         | Tool::ClippedHighlightRepair
         | Tool::LocalDehaze
-        | Tool::LimbalRing => return None,
+        | Tool::LimbalRing
+        | Tool::LashDarken
+        | Tool::HairFill
+        | Tool::MatchGrain
+        | Tool::ChannelSwap
+        | Tool::SunsetGlow
+        | Tool::DayToNight
+        | Tool::Lomo
+        | Tool::InstantFilm
+        | Tool::PopArt
+        | Tool::IrisBlur
+        | Tool::EchoDouble
+        | Tool::Ripple
+        | Tool::FrostedGlass
+        | Tool::PixelSort
+        | Tool::VhsRetro
+        | Tool::Emboss
+        | Tool::Crosshatch
+        | Tool::Sparkle
+        | Tool::FairyLights
+        | Tool::RainbowPrism => return None,
         Tool::AutoBlemish
         | Tool::PatchHeal
         | Tool::FrequencyHeal

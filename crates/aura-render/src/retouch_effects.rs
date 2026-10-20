@@ -16,6 +16,9 @@
 mod art;
 mod colour;
 mod creative;
+mod distort;
+mod engrave;
+mod grooming;
 mod lens;
 mod light;
 mod looks;
@@ -23,6 +26,8 @@ mod optics;
 mod portrait;
 mod practical;
 mod repair;
+mod sparkle;
+mod stylise;
 mod warp;
 
 use crate::retouch_mask::Coverage;
@@ -43,6 +48,11 @@ pub(crate) fn supports(tool: Tool) -> bool {
         || lens::supports(tool)
         || art::supports(tool)
         || repair::supports(tool)
+        || distort::supports(tool)
+        || engrave::supports(tool)
+        || grooming::supports(tool)
+        || sparkle::supports(tool)
+        || stylise::supports(tool)
 }
 
 /// Render one effect operation into `rgb`.
@@ -84,6 +94,16 @@ pub(crate) fn apply(
         art::apply(rgb, frame, edit, coverage);
     } else if repair::supports(edit.tool) {
         repair::apply(rgb, frame, edit, coverage);
+    } else if distort::supports(edit.tool) {
+        distort::apply(rgb, frame, edit, coverage);
+    } else if engrave::supports(edit.tool) {
+        engrave::apply(rgb, frame, edit, coverage);
+    } else if grooming::supports(edit.tool) {
+        grooming::apply(rgb, frame, edit, coverage);
+    } else if sparkle::supports(edit.tool) {
+        sparkle::apply(rgb, frame, edit, coverage);
+    } else if stylise::supports(edit.tool) {
+        stylise::apply(rgb, frame, edit, coverage);
     }
 }
 
@@ -401,7 +421,7 @@ mod tests {
     use super::testing::*;
     use super::*;
 
-    const ALL: [Tool; 68] = [
+    const ALL: [Tool; 88] = [
         Tool::LiquifyPush,
         Tool::LiquifyBloat,
         Tool::LiquifyPucker,
@@ -470,6 +490,26 @@ mod tests {
         Tool::ClippedHighlightRepair,
         Tool::LocalDehaze,
         Tool::LimbalRing,
+        Tool::LashDarken,
+        Tool::HairFill,
+        Tool::MatchGrain,
+        Tool::ChannelSwap,
+        Tool::SunsetGlow,
+        Tool::DayToNight,
+        Tool::Lomo,
+        Tool::InstantFilm,
+        Tool::PopArt,
+        Tool::IrisBlur,
+        Tool::EchoDouble,
+        Tool::Ripple,
+        Tool::FrostedGlass,
+        Tool::PixelSort,
+        Tool::VhsRetro,
+        Tool::Emboss,
+        Tool::Crosshatch,
+        Tool::Sparkle,
+        Tool::FairyLights,
+        Tool::RainbowPrism,
     ];
 
     /// A busy, colourful frame every tool has something to do on.

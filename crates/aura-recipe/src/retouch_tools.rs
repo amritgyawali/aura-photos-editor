@@ -277,6 +277,47 @@ pub enum Tool {
     LocalDehaze,
     /// Darkens the iris's outer ring, the band just inside the ellipse; `tone` is its width.
     LimbalRing,
+    // Twenty more selected effects (ADR-0135): grooming, colour, distortion, art and light.
+    /// Darkens thin dark strokes (lashes, liner) against their surroundings by `amount`.
+    LashDarken,
+    /// Fills the light gaps between hairs of a brow or beard with the hair's own darker colour; `tone` is how full.
+    HairFill,
+    /// Adds grain matching the photograph's own measured noise, for a smoothed area that looks too clean; `tone` scales it.
+    MatchGrain,
+    /// Swaps colour channels; `warmth` chooses which.
+    ChannelSwap,
+    /// A warm glow falling from the top of the region, in `target_color` or sunset orange.
+    SunsetGlow,
+    /// Night: darker by `tone`, blue, with the brightest lights kept warm.
+    DayToNight,
+    /// Lomography: saturated, contrasty, shifted colour and a dark ring at the region edge.
+    Lomo,
+    /// Instant film: cyan shadows, creamy highlights, soft contrast.
+    InstantFilm,
+    /// Four bold flat colours by brightness, the first `target_color`.
+    PopArt,
+    /// Sharp at the region centre, blurring toward its edge; `tone` is the sharp area's size.
+    IrisBlur,
+    /// A faint copy offset by (`warmth`, `tint`) region radii, screened over the photograph.
+    EchoDouble,
+    /// Water ripples of wavelength `radius`, fading at the ellipse edge.
+    Ripple,
+    /// Each pixel scattered by up to `radius`, as through frosted glass.
+    FrostedGlass,
+    /// Sorts runs of pixels in each row by brightness, between thresholds `tone` sets.
+    PixelSort,
+    /// VHS: scanlines, colour bleeding sideways, soft and a little noisy.
+    VhsRetro,
+    /// A relief lit from the top left; `tone` keeps the colour.
+    Emboss,
+    /// Pen hatching that thickens in the darker tones.
+    Crosshatch,
+    /// Four-point stars on the brightest points - jewellery, sequins, water.
+    Sparkle,
+    /// Soft warm orbs of light scattered over the selection; `tone` is the density.
+    FairyLights,
+    /// A prism rainbow band through the region centre at `warmth` times 180 degrees.
+    RainbowPrism,
     /// Removes the purple (`warmth`) and green (`tint`) rims a lens leaves on the dark side of a
     /// bright edge, `radius` from it; each rim pixel takes the colour of its calm surroundings
     /// at its own luminance. A colour its calm surroundings share, or the glow of a coloured
@@ -312,6 +353,8 @@ impl Tool {
                 | Self::LiquifyPucker
                 | Self::LiquifyTwirl
                 | Self::Fisheye
+                | Self::Ripple
+                | Self::FrostedGlass
         )
     }
 }

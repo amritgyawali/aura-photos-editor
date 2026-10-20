@@ -4,6 +4,7 @@ import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { nativeRetouch, freshRetouch } from '../../ipc/nativeRetouch';
 import { api, develop } from '../../ipc/client';
 import { forgetPreviews } from '../../state/previewCache';
+import { useEffectRequest } from '../../state/effectRequest';
 
 vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
 vi.mock('../../ipc/client',()=>({api:{listImages:vi.fn()},asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
@@ -59,7 +60,8 @@ it('keeps manual repair available after more than 256 saved acne repairs',async(
   expect((screen.getByRole('button',{name:'Polished skin in selection'}) as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(duplicate);
   await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','duplicate',[],'saved-299'));
-});
+// Three hundred saved operations take seconds to render; the suite's 5 s default is for ordinary tests.
+},15_000);
 it('uses grayscale contrast review for both sides without changing the recipe or filtering coverage',async()=>{
   vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
   open();
@@ -486,4 +488,15 @@ it('runs Auto advanced retouch through the workspace and reloads the stack after
   fireEvent.click(button);
   await waitFor(() => expect(run).toHaveBeenCalledWith('project', 'photo', undefined, 'professional'));
   await waitFor(() => expect(vi.mocked(nativeRetouch.edit).mock.calls.length).toBeGreaterThan(loads));
+});
+it('opens with the tool chosen in the Effects library, set up as the quick job asked, and takes it once',async()=>{
+  useEffectRequest.setState({request:null,sequence:0,recent:[],favourites:[]});
+  useEffectRequest.getState().ask('sparkle',{amount:.7,radius:.006});
+  open();await screen.findByAltText('Retouched photograph');
+  await waitFor(()=>expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('sparkle'));
+  expect(useEffectRequest.getState().request).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'sparkle',amount:.7,radius:.006})
+  ]));
 });

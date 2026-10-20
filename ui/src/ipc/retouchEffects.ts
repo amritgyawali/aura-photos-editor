@@ -74,6 +74,27 @@ export const EFFECT_TOOLS = [
   ['clipped_highlight_repair', 'Repair blown highlights', 'Fix & clean up', 'Gives a highlight that blew out in one or two colour channels - a yellow forehead, a cyan sky - the colour of the area around it, keeping its brightness.'],
   ['local_dehaze', 'Dehaze (selection)', 'Fix & clean up', 'Removes haze from just the area you select - a distant hill, a window, a misty background - measured on that area.'],
   ['limbal_ring', 'Limbal ring', 'Details', 'Draw the ellipse around the iris: its outer ring is darkened, which makes eyes look clearer and more defined.'],
+  // Grooming, stylised colour, distortion, engraving and sparkle (ADR-0135).
+  ['lash_darken', 'Darken lashes & liner', 'Details', 'Draw the ellipse along the lash line: lashes and liner, which are darker than what surrounds them, get deeper; the lid and the skin stay as they were.'],
+  ['hair_fill', 'Fill thin hair or brows', 'Details', 'Fills the lighter gaps in a thin brow, a beard or a parting with the colour of the hair itself, measured from the darkest third of the selection.'],
+  ['match_grain', 'Match grain', 'Skin', 'Measures the grain of the photograph itself and adds the same amount back to an area that was smoothed too far, so a retouched cheek stops looking plastic beside the rest.'],
+  ['channel_swap', 'Channel swap', 'Colour looks', 'Swaps the red, green and blue channels inside the selection: a surreal, otherworldly colour in one move.'],
+  ['sunset_glow', 'Sunset glow', 'Light & effects', 'A warm glow strongest at the top of the selection, fading downward, like low evening sun.'],
+  ['day_to_night', 'Day to night', 'Scene', 'Turns the selection into moonlight - darker, cooler and quieter - while lamps and bright windows stay lit.'],
+  ['lomo', 'Lomo', 'Colour looks', 'Toy-camera colour: saturated, contrasty, cross-processed, with dark corners.'],
+  ['instant_film', 'Instant film', 'Colour looks', 'The soft contrast, lifted shadows and creamy highlights of an instant print.'],
+  ['pop_art', 'Pop art', 'Creative looks', 'Four flat poster colours by brightness, one of which you choose.'],
+  ['iris_blur', 'Iris blur', 'Blur & optics', 'Keeps the centre of the ellipse sharp and blurs smoothly toward its edge, like a fast lens with a shallow depth of field.'],
+  ['echo_double', 'Double exposure echo', 'Creative looks', 'Lays a shifted ghost of the selection over itself, the way two exposures on one frame add their light.'],
+  ['ripple', 'Ripple', 'Liquify', 'Rings spreading from the centre of the ellipse, like a stone dropped in water.'],
+  ['frosted_glass', 'Frosted glass', 'Blur & optics', 'Scatters the pixels a little, as if seen through frosted or rain-streaked glass.'],
+  ['pixel_sort', 'Pixel sort', 'Creative looks', 'Sorts runs of mid-tone pixels along each row by brightness - a glitch-art smear that keeps the darkest and brightest parts in place.'],
+  ['vhs_retro', 'VHS tape', 'Creative looks', 'Scanlines, colour that bleeds sideways, and tape noise.'],
+  ['emboss', 'Emboss', 'Creative looks', 'Raises the edges of the selection as if pressed into metal or paper, lit from the top left.'],
+  ['crosshatch', 'Crosshatch', 'Creative looks', 'An ink engraving: hatched lines that grow denser in the shadows.'],
+  ['sparkle', 'Sparkle', 'Light & effects', 'A four-pointed star on every glint in the selection - jewellery, sequins, a ring, a glass.'],
+  ['fairy_lights', 'Fairy lights', 'Light & effects', 'Scatters soft out-of-focus orbs of light, like string lights behind a couple. Moving the selection makes a different pattern.'],
+  ['rainbow_prism', 'Rainbow prism', 'Light & effects', 'A soft band of spectrum light, as a prism held to the lens throws across a frame.'],
 ] as const;
 
 export type EffectTool = typeof EFFECT_TOOLS[number][0];
@@ -158,6 +179,26 @@ export const EFFECT_PARAMS: Record<EffectTool, EffectParam[]> = {
   clipped_highlight_repair: [radius('How far to look for colour')],
   local_dehaze: [unit('tone', 'Haze removed')],
   limbal_ring: [unit('tone', 'Ring width')],
+  lash_darken: [radius('Lash thickness')],
+  hair_fill: [unit('tone', 'Fullness')],
+  match_grain: [unit('tone', 'Grain strength')],
+  channel_swap: [{ key: 'warmth', label: 'Which swap', min: -1, max: 1, step: 1, show: v => v < -.33 ? 'blue, red, green' : v > .33 ? 'green, blue, red' : 'red and blue swapped' }],
+  sunset_glow: [unit('tone', 'Glow')],
+  day_to_night: [unit('tone', 'Darkness')],
+  lomo: [unit('tone', 'Dark corners')],
+  instant_film: [],
+  pop_art: [],
+  iris_blur: [radius('Blur'), unit('tone', 'Sharp centre size')],
+  echo_double: [both('warmth', 'Ghost right (+) or left (−)'), both('tint', 'Ghost down (+) or up (−)')],
+  ripple: [radius('Ring spacing')],
+  frosted_glass: [radius('Scatter')],
+  pixel_sort: [unit('tone', 'How much is sorted')],
+  vhs_retro: [unit('tone', 'Tape noise')],
+  emboss: [unit('tone', 'Keep colour')],
+  crosshatch: [radius('Line spacing')],
+  sparkle: [radius('Star size'), unit('tone', 'Reaches dimmer glints')],
+  fairy_lights: [radius('Light size'), unit('tone', 'Density')],
+  rainbow_prism: [both('warmth', 'Band angle', deg(180)), radius('Band width'), unit('tone', 'Strength')],
 };
 
 /** Tools that read a point on the photo: required for the first two, optional for the rest. */
@@ -187,6 +228,9 @@ export const EFFECT_COLOR: Partial<Record<EffectTool, { label: string; initial: 
   sky_blue: { label: 'Sky colour', initial: [.35, .6, 1], optional: true },
   rim_light: { label: 'Light colour', initial: [1, .93, .82], optional: true },
   anamorphic_streak: { label: 'Streak colour', initial: [.35, .55, 1], optional: true },
+  sunset_glow: { label: 'Glow colour', initial: [1, .5, .25], optional: true },
+  pop_art: { label: 'Third poster colour', initial: [.1, .7, .9], optional: true },
+  fairy_lights: { label: 'Light colour', initial: [1, .75, .4], optional: true },
 };
 
 /** Where each tool starts when chosen. */
@@ -259,6 +303,26 @@ export const EFFECT_DEFAULTS: Record<EffectTool, { amount: number; tone: number;
   clipped_highlight_repair: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .4 },
   local_dehaze: { amount: .8, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .5 },
   limbal_ring: { amount: .6, tone: .4, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .2 },
+  lash_darken: { amount: .6, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .002, feather: .3 },
+  hair_fill: { amount: .7, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  match_grain: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  channel_swap: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  sunset_glow: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .4 },
+  day_to_night: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  lomo: { amount: .8, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  instant_film: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  pop_art: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .1 },
+  iris_blur: { amount: 1, tone: .3, warmth: 0, tint: 0, texture: 1, radius: .006, feather: .2 },
+  echo_double: { amount: .7, tone: .5, warmth: .08, tint: 0, texture: 1, radius: .01, feather: .3 },
+  ripple: { amount: .6, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .008, feather: .3 },
+  frosted_glass: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .004, feather: .3 },
+  pixel_sort: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .1 },
+  vhs_retro: { amount: .9, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .2 },
+  emboss: { amount: 1, tone: .2, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .2 },
+  crosshatch: { amount: 1, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .004, feather: .2 },
+  sparkle: { amount: .8, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .008, feather: .2 },
+  fairy_lights: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
+  rainbow_prism: { amount: .6, tone: .5, warmth: .15, tint: 0, texture: 1, radius: .02, feather: .4 },
 };
 
 /** Named starting points for common jobs; each one is just one of the tools above, set up. */
@@ -273,9 +337,12 @@ export const EFFECT_SHORTCUTS: { label: string; tool: EffectTool; patch: Partial
   { label: 'Define the irises', tool: 'limbal_ring', patch: { amount: .5, tone: .3 } },
   { label: 'Cinematic', tool: 'teal_orange', patch: { amount: .7, tone: .45 } },
   { label: 'Keep one colour', tool: 'colour_splash', patch: { tone: .3 } },
+  { label: 'Make jewellery sparkle', tool: 'sparkle', patch: { amount: .7, radius: .006 } },
+  { label: 'Undo plastic skin', tool: 'match_grain', patch: { amount: 1, tone: .5 } },
+  { label: 'Fuller brows', tool: 'hair_fill', patch: { amount: .6, tone: .5 } },
 ];
 
 const EFFECT_IDS = new Set<string>(EFFECT_TOOLS.map(t => t[0]));
 export const isEffectTool = (tool: string): tool is EffectTool => EFFECT_IDS.has(tool);
 /** The warps move pixels, so an inverted selection would warp the whole photo. */
-export const isWarpTool = (tool: string) => tool === 'reshape' || tool === 'fisheye' || tool.startsWith('liquify_');
+export const isWarpTool = (tool: string) => ['reshape', 'fisheye', 'ripple', 'frosted_glass'].includes(tool) || tool.startsWith('liquify_');
