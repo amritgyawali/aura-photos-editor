@@ -20,6 +20,31 @@ use crate::state::AppState;
 /// Result type every command returns.
 pub type IpcResult<T> = Result<T, crate::contract::ipc::IpcError>;
 
+struct IngestProgress {
+    counter: crate::state::CountingProgress,
+    events: Arc<dyn Fn(IngestEvent) + Send + Sync>,
+}
+
+impl std::fmt::Debug for IngestProgress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IngestProgress")
+            .field("counter", &self.counter)
+            .finish_non_exhaustive()
+    }
+}
+
+impl aura_core::progress::ProgressSink for IngestProgress {
+    fn report(&self, update: aura_core::progress::ProgressUpdate) {
+        let event = IngestEvent::Progress {
+            done: update.done,
+            total: update.total,
+            current: String::new(),
+        };
+        self.counter.report(update);
+        (self.events)(event);
+    }
+}
+
 /// Create a wedding project with consent denied by default.
 ///
 /// # Errors
@@ -128,57 +153,101 @@ pub fn start_ingest_with_events(
     std::thread::Builder::new()
         .name("aura-ingest".into())
         .spawn(move || {
-            let progress = crate::state::CountingProgress::new(counter);
-            let outcome = aura_ingest::run(worker_state.catalog(), &plan, &cancel, &progress);
-            // Finished before the event goes out, so a panel that polls `ingest_progress` on
-            // hearing it sees a run that is over rather than one still marked running.
-            worker_state.finish_import(&worker_job_id);
-            worker_state.finish_job(&worker_job_id);
-            match outcome {
-                Ok(report) => {
-                    tracing::info!(
-                    target: "ingest",
-                    imported = report.files_imported,
-                    duplicates = report.files_already_present,
-                    quarantined = report.files_quarantined,
-                    elapsed_ms = report.duration_ms,
-                    "import finished"
-                    );
-                    events(IngestEvent::Finished {
-                        inserted: report.files_imported,
-                        skipped: report.files_already_present,
-                        failed: report.files_quarantined,
-                        elapsed_ms: report.duration_ms,
-                    });
-                }
-                Err(err) => {
-                    tracing::error!(
-                    target: "ingest",
-                    code = err.code.0,
-                    detail = err.detail,
-                    "import failed"
-                    );
-                    events(IngestEvent::Warning {
-                        code: err.code.0.to_string(),
-                        message: err.user_message,
-                    });
-                    events(IngestEvent::Finished {
-                        inserted: 0,
-                        skipped: 0,
-                        failed: 1,
-                        elapsed_ms: 0,
-                    });
-                }
-            }
+            let progress = IngestProgress {
+                counter: crate::state::CountingProgress::new(counter),
+                events: Arc::clone(&events),
+            };
+            run_ingest_worker(
+                &worker_state,
+                &worker_job_id,
+                &plan,
+                &cancel,
+                &progress,
+                &events,
+            );
         })
         .map_err(|e| {
-            crate::contract::ipc::IpcError::from(aura_core::errors::db::statement_failed(
-                "could not start the import thread",
-                &e,
-            ))
+            let error = crate::contract::ipc::IpcError::from(
+                aura_core::errors::db::statement_failed("could not start the import thread", &e),
+            );
+            state.fail_import(&job_id, error.clone());
+            state.finish_job(&job_id);
+            error
         })?;
 
     Ok(JobHandle { job_id })
+}
+
+fn run_ingest_worker(
+    state: &AppState,
+    job_id: &str,
+    plan: &ImportPlan,
+    cancel: &CancelToken,
+    progress: &dyn aura_core::progress::ProgressSink,
+    events: &Arc<dyn Fn(IngestEvent) + Send + Sync>,
+) {
+    let outcome = aura_ingest::run(state.catalog(), plan, cancel, progress);
+    // Finished before the event goes out, so a panel that polls `ingest_progress` on
+    // hearing it sees a run that is over rather than one still marked running.
+    match &outcome {
+        Err(err) => state.fail_import(
+            job_id,
+            crate::contract::ipc::IpcError {
+                code: err.code.0.to_string(),
+                message: err.user_message.clone(),
+                runbook_url: err.code.runbook_url(),
+                retryable: err.is_retryable(),
+            },
+        ),
+        Ok(_) if cancel.is_cancelled() => {
+            state.fail_import(job_id, aura_core::errors::job::cancelled("ingest").into());
+        }
+        Ok(_) => state.finish_import(job_id),
+    }
+    state.finish_job(job_id);
+    match outcome {
+        Ok(report) => {
+            if cancel.is_cancelled() {
+                let error = aura_core::errors::job::cancelled("ingest");
+                events(IngestEvent::Warning {
+                    code: error.code.0.to_string(),
+                    message: error.user_message,
+                });
+            }
+            tracing::info!(
+            target: "ingest",
+            imported = report.files_imported,
+            duplicates = report.files_already_present,
+            quarantined = report.files_quarantined,
+            elapsed_ms = report.duration_ms,
+            "import finished"
+            );
+            events(IngestEvent::Finished {
+                inserted: report.files_imported,
+                skipped: report.files_already_present,
+                failed: report.files_quarantined,
+                elapsed_ms: report.duration_ms,
+            });
+        }
+        Err(err) => {
+            tracing::error!(
+            target: "ingest",
+            code = err.code.0,
+            detail = err.detail,
+            "import failed"
+            );
+            events(IngestEvent::Warning {
+                code: err.code.0.to_string(),
+                message: err.user_message,
+            });
+            events(IngestEvent::Finished {
+                inserted: 0,
+                skipped: 0,
+                failed: 1,
+                elapsed_ms: 0,
+            });
+        }
+    }
 }
 
 /// How far one import has got.
@@ -188,16 +257,17 @@ pub fn start_ingest_with_events(
 /// number that will never be corrected, and the last event is the one that says the run is
 /// over. Asking is dull and cannot get stuck.
 ///
-/// `running` false with `done == total` is a finished import; `running` false with `done`
-/// short of `total` is one that was stopped or failed. `known` false means this process never
+/// `running` false means a successfully finished import. Failure and cancellation return
+/// a typed error. `known` false means this process never
 /// started that job - after a window reload, say - and the panel should stop drawing a bar
 /// rather than show a run it cannot see the end of.
 ///
 /// # Errors
 ///
-/// Never. The signature matches the rest of the surface.
+/// Returns the worker's terminal error, including cancellation, so polling clients
+/// cannot automatically process an incomplete import as a finished collection.
 pub fn ingest_progress(state: &AppState, job_id: &str) -> IpcResult<IngestProgressDto> {
-    Ok(match state.import_watch(job_id) {
+    Ok(match state.import_watch(job_id)? {
         Some((done, total, running)) => IngestProgressDto {
             known: true,
             done,

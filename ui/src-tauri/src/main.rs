@@ -3342,6 +3342,56 @@ async fn match_paired_reference(
 }
 
 #[tauri::command]
+async fn import_color_reference(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::ImportInput,
+) -> IpcResult<aura_app::color_match::ReferenceSummary> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::import_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn list_color_references(
+    state: State<'_, AppState>,
+) -> IpcResult<Vec<aura_app::color_match::ReferenceSummary>> {
+    aura_app::color_match::list_references(state.inner())
+}
+
+#[tauri::command]
+async fn prepare_color_match(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::PrepareInput,
+) -> IpcResult<aura_app::color_match::MatchReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::color_match::prepare(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn apply_color_match(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::ApplyInput,
+) -> IpcResult<aura_app::color_match::MatchReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::color_match::apply(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn color_match_status(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<aura_app::color_match::MatchReport>> {
+    aura_app::color_match::status(state.inner(), &photo_id)
+}
+
+#[tauri::command]
 async fn analyse_portrait(
     state: State<'_, AppState>,
     input: aura_app::portrait_commands::PortraitInput,
@@ -3918,6 +3968,11 @@ fn main() {
             analyse_reference_style,
             apply_reference_style,
             match_paired_reference,
+            import_color_reference,
+            list_color_references,
+            prepare_color_match,
+            apply_color_match,
+            color_match_status,
             enhance_photo,
             enhance_portrait,
             auto_retouch,
@@ -4164,7 +4219,6 @@ fn main() {
             story_status,
             undo_moment_edit,
             warmup_models,
-            within_moment,
             autopilot_status,
             autopilot_preflight,
             autopilot_start,

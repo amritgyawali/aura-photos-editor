@@ -36,6 +36,9 @@ use rayon::prelude::*;
 
 use crate::meta::CfaPattern;
 
+mod detail;
+pub use detail::{full_malvar, full_malvar_region};
+
 /// Output samples below which the loops stay on one thread.
 const PARALLEL_MIN: usize = 1 << 18;
 
@@ -128,6 +131,13 @@ impl Levels {
     /// Readings below black become zero rather than negative: a negative
     /// radiance is not a colour, and letting one through produces bright
     /// speckles once the colour matrix rotates it.
+    ///
+    /// Readings are capped where the channel with the smallest white-balance
+    /// gain saturates. A photosite the sensor clipped holds 1.0 in every
+    /// channel, and white balance would turn that into (1.97, 1, 1.45) on a
+    /// typical daylight frame: red and blue overshooting a green that could not
+    /// rise any further, which renders every blown highlight magenta. Capped,
+    /// a clipped highlight is neutral white - the reference decoders' default.
     #[must_use]
     pub fn normalise(&self, raw: u16, colour: u8) -> f32 {
         let span = self.white.saturating_sub(self.black).max(1) as f32;
@@ -137,7 +147,14 @@ impl Levels {
             .get(colour as usize)
             .copied()
             .unwrap_or(1.0);
-        (value * gain).max(0.0)
+        let ceiling = self
+            .white_balance
+            .iter()
+            .copied()
+            .filter(|g| *g > 0.0)
+            .fold(f32::INFINITY, f32::min);
+        let ceiling = if ceiling.is_finite() { ceiling } else { 1.0 };
+        (value * gain).clamp(0.0, ceiling)
     }
 }
 

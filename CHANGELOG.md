@@ -2,6 +2,54 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Sampled colour selection and local saturation - 2026-10-19
+
+- Sample a colour on the photo to refine any retouch selection, with tolerance,
+  smooth falloff and lightness sensitivity. Combine it with brushes, gradients,
+  brightness ranges and saved subject/material masks.
+- Add local saturation and adaptive vibrance, preserving working luminance and
+  neutral colours with a uniform chroma limit for negative-channel protection.
+- Keep colour sample coordinates separate from clone sources and zoom centres;
+  preserve the range when attaching a saved region mask.
+- See [ADR-0129](docs/adr/ADR-0129-sampled-colour-range-and-local-saturation.md) and
+  the [validation report](docs/reports/AURA-sampled-colour-tools-2026-10-19.md).
+
+## Selected optical and colour tools - 2026-10-19
+
+- Add native directional motion blur and radial zoom blur with a movable centre.
+  Selected-only sampling protects excluded subjects; prefiltered long trails
+  avoid sparse repeated copies.
+- Add hue-selective colour-spill suppression and a smooth highlight compression
+  shoulder, with dedicated controls and recipe validation.
+- Use existing masks, presets, editable history, preview and export. The zoom
+  centre can be positioned on the photo or entered numerically.
+- See [ADR-0128](docs/adr/ADR-0128-selected-optical-and-colour-tools.md) and the
+  [validation report](docs/reports/AURA-optical-and-colour-tools-2026-10-19.md).
+
+## Selected material and light tools - 2026-10-19
+
+- Add native fabric chroma moiré reduction, sampled fabric stain correction,
+  bounded shadow balancing, selected background blur and highlight glow.
+- Reuse manual and saved selections, strength controls, persisted history and
+  export. Require a clean fabric sample for stain correction.
+- Search executable retouch tools by name, purpose and material.
+- Record tested behavior and remaining feature gaps in the
+  [material and light report](docs/reports/AURA-material-and-light-tools-2026-10-19.md)
+  and [ADR-0127](docs/adr/ADR-0127-selected-material-and-light-effects.md).
+
+## Import recovery and responsive retouch review - 2026-10-19
+
+- Fix duplicate selected files stopping mixed imports. Individual file selections
+  retain sibling availability; progress covers the whole selection, including skips.
+- Seal failed/cancelled import journals and retain terminal errors for polling and
+  automatic-workflow callers. Commit imported rows and their counters together.
+- Validate whole-number edit fields locally and recover failed writes without
+  requiring a preview retry.
+- Search and filter saved retouch operations, with 24 rows per page and every
+  operation still editable by its stable ID. Remove duplicate command registration.
+- See [ADR-0126](docs/adr/ADR-0126-import-recovery-and-responsive-retouch-review.md)
+  and the [validation report](docs/reports/AURA-workflow-improvements-2026-10-19.md).
+
 ## Portrait light: relight a face, open its shadows, add catchlights and a glow, or press Auto light - 2026-10-17
 
 - **A key light shaped by the head** (ADR-0127), in a new **Light** tab of the Portrait studio. Each

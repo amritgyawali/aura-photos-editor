@@ -504,6 +504,7 @@ fn advanced_masks_protect_excluded_pixels_for_every_tool() {
             op.source = Some([0.1, 0.1]);
             op.selection = Some(Selection {
                 inverted,
+                color: None,
                 gradient: Some(Gradient {
                     start: [0.3, 0.5],
                     end: [0.7, 0.5],

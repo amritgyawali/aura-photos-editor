@@ -60,6 +60,39 @@ it('keeps a curve valid for the recipe', () => {
   expect(normaliseCurve([[0, 10], [0, 30], [255, 250]])).toEqual([[0, 10], [255, 250]]);
 });
 
+it('rejects fractional integer values locally and accepts a correction without reloading', () => {
+  const onSetParam = vi.fn();
+  render(<LightroomPanel {...props({ onSetParam })} />);
+  const input = screen.getByLabelText('Sharpening value');
+  fireEvent.change(input, { target: { value: '22.5' } });
+  fireEvent.blur(input);
+  expect(onSetParam).not.toHaveBeenCalled();
+  expect(input.getAttribute('aria-invalid')).toBe('true');
+  expect(screen.getByRole('alert').textContent).toContain('Sharpening needs a whole number');
+  expect((screen.getByLabelText('Exposure value') as HTMLInputElement).disabled).toBe(false);
+  fireEvent.change(input, { target: { value: '23' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  fireEvent.blur(input);
+  expect(onSetParam).toHaveBeenCalledOnce();
+  expect(onSetParam).toHaveBeenCalledWith('global.sharpen.amount', 23, 'Sharpening');
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+it('allows precise decimal controls and lets Escape discard an invalid integer draft', () => {
+  const onSetParam = vi.fn();
+  render(<LightroomPanel {...props({ onSetParam })} />);
+  const radius = screen.getByLabelText('Radius value');
+  fireEvent.change(radius, { target: { value: '1.375' } });
+  fireEvent.blur(radius);
+  expect(onSetParam).toHaveBeenCalledWith('global.sharpen.radius', 1.375, 'Radius');
+  const sharpening = screen.getByLabelText('Sharpening value');
+  fireEvent.change(sharpening, { target: { value: '22.5' } });
+  fireEvent.blur(sharpening);
+  fireEvent.keyDown(sharpening, { key: 'Escape' });
+  expect((sharpening as HTMLInputElement).value).toBe('0');
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
 it('offers essentials without hiding access to the original advanced controls', () => {
   const onAuto = vi.fn();
   const { rerender } = render(<LightroomPanel {...props({ mode: 'essentials', onAuto })} />);

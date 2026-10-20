@@ -764,12 +764,18 @@ pub fn render_hash(
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}+display.{}+local.{}",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}",
         ENGINE,
         crate::profiles::PROFILES_VER,
         aura_portrait::PARSE_VER,
         crate::output::DISPLAY_INPUT_VER,
-        crate::edge_aware::LOCAL_VER
+        crate::edge_aware::LOCAL_VER,
+        aura_raw::full::DEMOSAIC_VER,
+        crate::retouch_clear::VERSION,
+        crate::retouch_matte::VERSION,
+        crate::retouch_undereye::VERSION,
+        crate::retouch_boundary::VERSION,
+        crate::retouch_skin::REFERENCE_VERSION
     )
 }
 
@@ -1011,7 +1017,12 @@ mod tests {
         assert!(engine.contains(&format!("+display.{}+", crate::output::DISPLAY_INPUT_VER)));
         // And so are the edge-aware base layers: they decide every pixel that Shadows,
         // Highlights, Clarity or Dehaze touches. ADR-0126.
-        assert!(engine.ends_with(&format!("+local.{}", crate::edge_aware::LOCAL_VER)));
+        assert!(engine.contains(&format!("+local.{}", crate::edge_aware::LOCAL_VER)));
+        // Full-size reconstruction changes pixels too, even though the model proxy is fixed.
+        assert!(engine.contains(&format!("+raw.{}", aura_raw::full::DEMOSAIC_VER)));
+        assert!(engine.ends_with(&format!("+skin.{}", crate::retouch_skin::REFERENCE_VERSION)));
+        assert!(engine.contains(&format!("+clear.{}+", crate::retouch_clear::VERSION)));
+        assert!(engine.contains(&format!("+undereye.{}+", crate::retouch_undereye::VERSION)));
     }
 
     #[test]

@@ -96,12 +96,22 @@ pub(crate) fn retouch_with_cancel(
 // Both online and offline automation must enable visible body healing. Keep
 // protection and texture defaults together so the two paths cannot drift.
 //
-// The finish is the one calibrated per detail band against published retouching of the same
-// photographs (ADR-0118): very little smoothing, pores refined rather than blurred, no
-// dodge and burn. It is what Portrait skin finish applies, with one difference that is not
-// a matter of finish: freckles and dark marks are kept. Removing them is a decision about
-// somebody's face, and one click is not that decision; the preset is.
+// Fresh photographs use the selected polished wedding finish. Keep this in sync with
+// POLISHED_WEDDING_SETTINGS in the UI; saved explicit choices keep their own controls.
 pub(crate) fn fresh_skin_options(
+    advice: Option<&aura_cloud::skin_advice::Advice>,
+) -> crate::portrait_features::Options {
+    let mut options = crate::portrait_features::Options::polished_wedding();
+    if let Some(advice) = advice {
+        options.settings.cleanup_passes = advice.cleanup_passes.clamp(2, 4);
+        options.settings.blemish_sensitivity = advice.blemish_sensitivity.clamp(0.5, 1.0);
+    }
+    options
+}
+
+// The previous automatic natural finish must remain recognisable during an upgrade.
+// Explicitly chosen natural settings still win through `explicitOptions` below.
+fn natural_skin_options(
     advice: Option<&aura_cloud::skin_advice::Advice>,
 ) -> crate::portrait_features::Options {
     let mut settings = crate::retouch_settings::Settings {
@@ -191,6 +201,7 @@ pub(crate) fn has_custom_skin_preferences(base: &aura_recipe::Recipe) -> bool {
                     encoded
                         != serde_json::to_value(crate::portrait_features::Options::default()).ok()
                         && encoded != serde_json::to_value(fresh_skin_options(None)).ok()
+                        && encoded != serde_json::to_value(natural_skin_options(None)).ok()
                         && encoded != serde_json::to_value(earlier_skin_options()).ok()
                 })
             })
@@ -458,6 +469,42 @@ pub fn authorize_new_project(state: &AppState, project: &str) -> AuraResult<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn automatic_natural_finish_upgrades_but_explicit_or_manual_choices_stay_owned() {
+        let mut recipe = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
+        recipe.extra.insert(
+            crate::portrait_auto::KEY.into(),
+            serde_json::json!({
+                "options": natural_skin_options(None), "explicitOptions": false
+            }),
+        );
+        assert!(!has_custom_skin_preferences(&recipe));
+        let finish = fresh_skin_options(None);
+        let natural = natural_skin_options(None);
+        assert!(finish.settings.face_light > natural.settings.face_light);
+        assert!(finish.settings.smoothing > natural.settings.smoothing);
+        assert!(
+            finish.settings.texture >= 0.65 && finish.settings.texture < natural.settings.texture
+        );
+        assert!(!finish.settings.keep_freckles && finish.settings.keep_moles);
+        assert!(finish.settings.remove_dark_marks);
+        assert!(finish.settings.portrait_only_advanced);
+
+        recipe.extra.insert(
+            crate::portrait_auto::KEY.into(),
+            serde_json::json!({
+                "options": natural, "explicitOptions": true
+            }),
+        );
+        assert!(has_custom_skin_preferences(&recipe));
+        recipe.extra.clear();
+        recipe
+            .provenance
+            .user_edited_fields
+            .push(aura_recipe::retouch_tools::KEY.into());
+        assert!(has_custom_skin_preferences(&recipe));
+    }
 
     #[test]
     fn the_provider_file_is_looked_for_beside_the_work_before_the_fixed_location() {

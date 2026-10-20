@@ -117,6 +117,10 @@ pub fn scan_root(root: &Path, plan: &ImportPlan, now_ms: i64) -> AuraResult<Scan
     }
 
     let mut out = ScanOutcome::default();
+    // A picked file is stored relative to its containing directory. Using the
+    // file itself as the base produced an empty path for every picked file,
+    // making byte-identical copies collide in the catalogue.
+    let base = crate::util::source_directory(root);
     let allowed: Vec<String> = if plan.extensions.is_empty() {
         RAW_EXT
             .iter()
@@ -225,7 +229,7 @@ pub fn scan_root(root: &Path, plan: &ImportPlan, now_ms: i64) -> AuraResult<Scan
 
         out.bytes_total += meta.len();
         out.files.push(ScannedFile {
-            rel_path: crate::util::rel_path_forward_slash(root, &path),
+            rel_path: crate::util::rel_path_forward_slash(base, &path),
             file_name,
             kind: classify(&ext),
             ext,

@@ -171,7 +171,9 @@ pub struct TiffFile<'a> {
 }
 
 /// Size in bytes of one value of each TIFF type, indexed by type code.
-const TYPE_SIZES: [usize; 13] = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8];
+/// Type 13 is `IFD`: a 32-bit offset to a sub-directory, which Fujifilm uses
+/// inside every RAF to point at its raw directory.
+const TYPE_SIZES: [usize; 14] = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8, 4];
 
 impl<'a> TiffFile<'a> {
     /// Parse a TIFF whose header starts at the beginning of `bytes`.
@@ -227,7 +229,14 @@ impl<'a> TiffFile<'a> {
             }
             visited.push(offset);
 
-            let (ifd, next) = self.read_ifd(offset)?;
+            // The first directory must read; a later one that does not - a
+            // garbage next-directory pointer, which Canon's CR3 metadata
+            // records carry - is skipped rather than failing the whole file.
+            let (ifd, next) = match self.read_ifd(offset) {
+                Ok(found) => found,
+                Err(err) if visited.len() == 1 => return Err(err),
+                Err(_) => continue,
+            };
 
             // Sub-directories and the EXIF directory are directories too.
             for tag in [tag::SUB_IFDS, tag::EXIF_IFD] {
@@ -280,6 +289,31 @@ impl<'a> TiffFile<'a> {
         }
         let next = self.u32_at(start + 2 + count * 12).unwrap_or(0);
         Ok((Ifd { offset, entries }, next))
+    }
+
+    /// A view of `bytes` whose offsets count from `base`, in the given byte
+    /// order, with no directories walked. Manufacturers' MakerNotes that carry
+    /// their own header and offset base - Olympus's `OLYMPUS\0II` - are read
+    /// through one of these and [`Self::directory_at`].
+    #[must_use]
+    pub const fn bare(bytes: &'a [u8], base: usize, little: bool) -> Self {
+        Self {
+            bytes,
+            little,
+            base,
+            ifds: Vec::new(),
+        }
+    }
+
+    /// Read one directory that starts at absolute `position` in the buffer, with
+    /// this file's byte order and offset base.
+    ///
+    /// A manufacturer's MakerNote is usually exactly that - a bare directory with
+    /// no TIFF header of its own - so this is how its entries are reached.
+    #[must_use]
+    pub fn directory_at(&self, position: usize) -> Option<Ifd> {
+        let offset = u32::try_from(position.checked_sub(self.base)?).ok()?;
+        self.read_ifd(offset).ok().map(|(ifd, _)| ifd)
     }
 
     /// Every directory found in the file, ordered by file offset.
@@ -387,6 +421,15 @@ impl<'a> TiffFile<'a> {
         }
     }
 
+    /// The entry's first four value bytes as one 32-bit word in the file's byte
+    /// order, whatever type the entry declares. Private pointers such as Sony's
+    /// `DNGPrivateData` are written as four bytes rather than one long.
+    #[must_use]
+    pub fn raw_u32(&self, entry: &Entry) -> Option<u32> {
+        let position = self.payload_position(entry)?;
+        self.u32_at(position).ok()
+    }
+
     /// Read an entry as unsigned integers. Signed and floating types are
     /// converted, so a caller asking for a count never has to know the encoding.
     #[must_use]
@@ -423,7 +466,7 @@ impl<'a> TiffFile<'a> {
                 1 | 7 => self.bytes.get(at).map(|b| f64::from(*b)),
                 2 => self.bytes.get(at).map(|b| f64::from(*b)),
                 3 => self.u16_at(at).ok().map(f64::from),
-                4 => self.u32_at(at).ok().map(f64::from),
+                4 | 13 => self.u32_at(at).ok().map(f64::from),
                 5 => {
                     let numerator = self.u32_at(at).ok();
                     let denominator = self.u32_at(at + 4).ok();

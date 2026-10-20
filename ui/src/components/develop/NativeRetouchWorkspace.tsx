@@ -10,6 +10,7 @@ import { previewSource, useProgressivePreview } from '../../state/previewCache';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
 import { RetouchCanvas, type RetouchMode, type SkinInspectionView } from './RetouchCanvas';
 import { RetouchControls, validRetouch } from './RetouchControls';
+import { RetouchOperationList } from './RetouchOperationList';
 import { BlemishReview } from './BlemishReview';
 import { useRetouchDraftPreview } from './useRetouchDraftPreview';
 import { retouchCollection, type RetouchOutcome } from './batchRetouch';
@@ -49,6 +50,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const displayedCoverageOpacity = useDeferredValue(coverageOpacity);
   const [overlay,setOverlay] = useState(true);
   const [sourceMode,setSourceMode] = useState(false);
+  const [sampleKind,setSampleKind] = useState<'source'|'color'>('source');
   const [history,setHistory] = useState<HistoryDto|null>(null);
   const [refresh,setRefresh] = useState(0);
   const [busy,setBusy] = useState(true);
@@ -139,10 +141,17 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   });
   const chooseTool=(tool:RetouchTool)=>{
     if(selected&&dirty){setError('Apply or discard your changes before choosing another tool.');return;}
-    // Fringes run along every bright edge in the photograph: the whole frame, purple at full strength.
     const defringe=tool==='defringe';
-    setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:defringe?1:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:defringe?1:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null,
-      ...(defringe?{region:[.5,.5,1,1] as [number,number,number,number],feather:0,radius:.003,mask:null,selection:null,matte:null}:{})});
+    setSourceMode(false);
+      setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:defringe?1:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:defringe?1:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null,
+        ...(defringe?{region:[.5,.5,1,1] as [number,number,number,number],feather:0,radius:.003,mask:null,selection:null,matte:null}:{}),
+        ...(tool==='fabric_stain'?{source:null}:{}),
+          ...(tool==='zoom_blur'?{source:[.5,.5] as [number,number],radius:.02}:{}),
+          ...(tool==='motion_blur'?{radius:.02}:{}),
+          ...(tool==='color_despill'?{targetColor:[0,1,0] as [number,number,number]}:{}),
+          ...(tool==='color_saturation'?{warmth:0,tint:.25}:{}),
+        ...(['fabric_moire','fabric_stain','shadow_balance','background_blur','highlight_glow'].includes(tool)?{radius:.02}:{}),
+      });
   };
   const chooseMode=(next:RetouchMode)=>{
     setMode(next);setSourceMode(false);setMaskView(false);
@@ -224,7 +233,12 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           draft={draft} mode={mode} radius={brushRadius} opacity={brushOpacity} overlay={overlay} sourceMode={sourceMode} inspectionView={inspectionView}
           onTarget={point=>change({region:[...point,draft.region[2],draft.region[3]]})}
           onGradient={(start,end)=>change({mask:null,selection:{...draft.selection,gradient:{start,end}}})}
-          onSource={point=>{change({source:point});setSourceMode(false);}} onStroke={addStroke} onNotice={setError}/>
+          onSource={point=>{
+            if(sourceMode&&sampleKind==='color') {
+              if(draft.selection?.color) change({selection:{...draft.selection,color:{...draft.selection.color,sample:point}}});
+            } else change({source:point});
+            setSourceMode(false);
+          }} onStroke={addStroke} onNotice={setError}/>
         <div className="studio-history">
           <button type="button" disabled={blocked||!before} aria-pressed={compare} onClick={()=>{setCoverageView(false);setMaskView(false);setCompare(v=>!v);}}>{compare?'Show retouched':'Show before retouch'}</button>
           <button type="button" disabled={!comparisonReady||blocked} aria-pressed={split&&!compare&&!maskView&&!coverageView} onClick={()=>{setCoverageView(false);setCompare(false);setSplit(v=>compare||!v);}}>Split comparison</button>
@@ -267,18 +281,11 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         <p className="lr-hint">Detects face and body skin locally. Reuse detected skin selections in any retouch tool, preview the mask, or refine it with the brush. All steps can be edited or undone.</p>
         <PortraitAutoReport recipe={recipe}/>
         {dirty&&<p className="lr-hint">{draftNotice}</p>}
-        <details open><summary>Saved retouch operations ({edits.length})</summary>
-          <ol>{edits.map((edit,index)=><li key={edit.id}>
-            <button type="button" disabled={stackBlocked} aria-pressed={selected===edit.id} onClick={()=>{setSelected(edit.id);setDirty(false);setMode(edit.selection?.gradient?'gradient':edit.mask?'paint':'ellipse');setDraft({...edit,region:[...edit.region],source:edit.source?[...edit.source]:null});setCompare(false);}}>{index+1}. {RETOUCH_TOOLS.find(t=>t[0]===edit.tool)?.[1]} · {Math.round(edit.amount*100)}%{automaticLabel(edit.id)}</button>
-            <label><input type="checkbox" checked={edit.enabled} disabled={stackBlocked} onChange={event=>void save(()=>nativeRetouch.edit(projectId,photoId,'update',[{...edit,enabled:event.target.checked}]))}/>Enabled</label>
-            <div className="retouch-operation-actions">
-              <button type="button" disabled={stackBlocked||index===0} aria-label={`Move retouch ${index+1} earlier`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'earlier',[],edit.id))}>↑</button>
-              <button type="button" disabled={stackBlocked||index===edits.length-1} aria-label={`Move retouch ${index+1} later`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'later',[],edit.id))}>↓</button>
-              <button type="button" disabled={stackBlocked||edits.length>=MAX_NATIVE_RETOUCH_EDITS} aria-label={`Duplicate retouch ${index+1}`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'duplicate',[],edit.id))}>Duplicate</button>
-            </div>
-            <button type="button" disabled={stackBlocked} aria-label={`Remove retouch ${index+1}`} onClick={()=>void save(()=>nativeRetouch.edit(projectId,photoId,'remove',[],edit.id))}>Remove</button>
-          </li>)}</ol>
-        </details>
+        <RetouchOperationList edits={edits} selected={selected} disabled={stackBlocked} automaticLabel={automaticLabel}
+          onSelect={edit=>{setSelected(edit.id);setDirty(false);setMode(edit.selection?.gradient?'gradient':edit.mask?'paint':'ellipse');setDraft({...edit,region:[...edit.region],source:edit.source?[...edit.source]:null});setCompare(false);}}
+          onUpdate={edit=>void save(()=>nativeRetouch.edit(projectId,photoId,'update',[edit]))}
+          onAction={(action,id)=>void save(()=>nativeRetouch.edit(projectId,photoId,action,[],id))}/>
+
       </div>
       <BlemishReview projectId={projectId} photoId={photoId} recipeHash={retouchRecipe?.recipeHash ?? ''}
         selection={draft} imageSrc={previewSource(preview)} disabled={blocked} canPrepare={!dirty}
@@ -291,8 +298,9 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
           setDraft({...blemishBrush(region),region,matte:draft.matte,skin:draft.skin,source:draft.skin?draft.source:null,amount:1,tone:1,texture:.25,repairPasses:4,
             keepDarkMarks:draft.keepDarkMarks??false,mask:{strokes:[{erase:false,radius,opacity:1,points:[[region[0],region[1],1]]}]}});
         }}/>
-      <RetouchControls draft={draft} edits={edits} selected={selected} count={edits.length} disabled={blocked||!preview} sourceMode={sourceMode} live={live} dirty={dirty}
-        onChange={change} onTool={chooseTool} onSourceMode={()=>{setSourceMode(v=>!v);setCompare(false);setMaskView(false);setSplit(false);}} onLive={setLive} onApply={apply}
+      <RetouchControls draft={draft} edits={edits} selected={selected} count={edits.length} disabled={blocked||!preview} sourceMode={sourceMode&&sampleKind==='source'} live={live} dirty={dirty}
+        colorPicking={sourceMode&&sampleKind==='color'} onColorPick={()=>{setSourceMode(!sourceMode||sampleKind!=='color');setSampleKind('color');setMode(v=>v==='pan'?'ellipse':v);setCompare(false);setMaskView(false);setCoverageView(false);setSplit(false);}}
+        onChange={patch=>{if(patch.selection && !patch.selection.color && sampleKind==='color')setSourceMode(false);change(patch);}} onTool={chooseTool} onSourceMode={()=>{setSourceMode(!sourceMode||sampleKind!=='source');setSampleKind('source');setMode(v=>v==='pan'?'ellipse':v);setCompare(false);setMaskView(false);setCoverageView(false);setSplit(false);}} onLive={setLive} onApply={apply}
         onSelectAll={()=>{setMode('ellipse');change({region:[.5,.5,1,1],mask:null,matte:null,feather:0,selection:{...draft.selection,inverted:false,gradient:null}});}}
         onNew={()=>{if(dirty){setError(draftNotice);return;}setSelected(null);change({id:'draft',enabled:true});}} onDiscard={discard} onPreset={preset}/>
 

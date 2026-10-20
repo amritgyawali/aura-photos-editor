@@ -5,7 +5,11 @@ use crate::retouch_mask::Coverage;
 use aura_recipe::retouch_tools::{Edit, Tool};
 use rayon::prelude::*;
 
+mod connectivity;
+
 const EPSILON: f32 = 1e-6;
+/// Included in persistent render-cache identities whenever sampled-skin pixels change.
+pub(crate) const REFERENCE_VERSION: &str = "robust-patch-v3-pixel-connectivity";
 const MAX_EXPOSURE_STOPS: f32 = 0.5;
 const MAX_COLOR_DELTA: f32 = 0.35;
 
@@ -152,17 +156,77 @@ fn reference(rgb: &[f32], w: usize, h: usize, point: [f32; 2]) -> [f32; 3] {
     let cx = ((point[0] * w as f32) as usize).min(w - 1);
     let cy = ((point[1] * h as f32) as usize).min(h - 1);
     let radius = ((w.min(h) as f32 * 0.002).round() as usize).max(1);
-    let mut sum = [0.0; 3];
-    let mut count = 0.0;
+    let mut samples = Vec::new();
     for y in cy.saturating_sub(radius)..=(cy + radius).min(h - 1) {
         for x in cx.saturating_sub(radius)..=(cx + radius).min(w - 1) {
-            for c in 0..3 {
-                sum[c] += rgb[(y * w + x) * 3 + c];
+            let i = (y * w + x) * 3;
+            let p = [rgb[i], rgb[i + 1], rgb[i + 2]];
+            if p.iter().all(|v| v.is_finite()) && luma(p) > EPSILON {
+                samples.push(p);
             }
-            count += 1.0;
         }
     }
-    sum.map(|v| v / count)
+    robust_reference(&samples)
+}
+
+/// A sample is a patch, not a single perfect pixel. Reject sparse hair, dark
+/// marks and specular glints with robust luminance/chroma distances before
+/// averaging. All thresholds are relative to this patch's own signal; there is
+/// no preferred complexion or fixed skin-brightness threshold.
+fn robust_reference(samples: &[[f32; 3]]) -> [f32; 3] {
+    if samples.is_empty() {
+        return [0.0; 3];
+    }
+    let median = |mut values: Vec<f32>| {
+        values.sort_by(f32::total_cmp);
+        values[values.len() / 2]
+    };
+    let logs: Vec<f32> = samples.iter().map(|p| luma(*p).max(EPSILON).ln()).collect();
+    let centre = median(logs.clone());
+    let spread = median(logs.iter().map(|v| (v - centre).abs()).collect());
+    let colours: Vec<[f32; 3]> = samples.iter().map(|p| chroma(*p)).collect();
+    let colour: [f32; 3] = std::array::from_fn(|c| median(colours.iter().map(|p| p[c]).collect()));
+    let distances: Vec<f32> = colours
+        .iter()
+        .map(|p| {
+            p.iter()
+                .zip(colour)
+                .map(|(a, b)| (a - b).powi(2))
+                .sum::<f32>()
+                .sqrt()
+        })
+        .collect();
+    let colour_spread = median(distances.clone());
+    // Floors keep a clean, slightly textured patch continuous rather than
+    // accepting just its median pixel when MAD happens to be zero.
+    let light_limit = (4.685 * 1.4826 * spread).max(0.12);
+    let colour_limit = (4.685 * 1.4826 * colour_spread).max(0.025);
+    let mut sum = [0.0_f64; 3];
+    let mut total = 0.0_f64;
+    for ((p, log), distance) in samples.iter().zip(logs).zip(distances) {
+        let light = ((log - centre).abs() / light_limit).min(1.0);
+        let colour = (distance / colour_limit).min(1.0);
+        let weight = f64::from((1.0 - light * light).powi(2) * (1.0 - colour * colour).powi(2));
+        for c in 0..3 {
+            sum[c] += f64::from(p[c]) * weight;
+        }
+        total += weight;
+    }
+    if total > 1e-9 {
+        sum.map(|v| (v / total) as f32)
+    } else {
+        // Contradictory neighbourhood: choose an actual median-luminance
+        // photographed pixel instead of manufacturing an unsupported colour.
+        samples
+            .iter()
+            .min_by(|a, b| {
+                (luma(**a).ln() - centre)
+                    .abs()
+                    .total_cmp(&(luma(**b).ln() - centre).abs())
+            })
+            .copied()
+            .unwrap_or([0.0; 3])
+    }
 }
 
 fn correction(
@@ -219,8 +283,9 @@ fn uses_colour(edit: &Edit) -> bool {
 ///
 /// A flood fill on a coarse grid of cell means: a cell joins when its colour is close to the
 /// sample and the step from its neighbour is not a strong edge in brightness or colour.
-/// That separates a person from a skin-coloured background, which almost always meets the
-/// skin at an edge, and from skin-coloured areas that do not touch the person at all.
+/// A second traversal on original pixels rejects thin contours and protected gaps hidden
+/// by cell averages. Neither pass can add support beyond the authored coverage. Identical
+/// touching surfaces without a measurable boundary still require a tighter authored mask.
 /// Returns `None` when the selection is not limited to connected skin.
 #[allow(clippy::too_many_lines)]
 pub(crate) fn connected_weight(
@@ -253,18 +318,18 @@ pub(crate) fn connected_weight(
             let mut n = 0.0_f32;
             for y in cy0..cy1 {
                 for x in cx0..cx1 {
+                    let weight = coverage.at(x, y, w, h);
                     let i = (y * w + x) * 3;
                     for c in 0..3 {
-                        sum[c] += rgb[i + c];
+                        sum[c] += rgb[i + c] * weight;
                     }
-                    n += 1.0;
+                    n += weight;
                 }
             }
-            let mean = sum.map(|v| v / n.max(1.0));
+            let mean = sum.map(|v| v / n.max(EPSILON));
             let k = gy * gw + gx;
             means[k] = mean;
-            let centre = coverage.at(usize::midpoint(cx0, cx1), usize::midpoint(cy0, cy1), w, h);
-            usable[k] = centre > 0.0 && affinity(mean, sample, settings.tolerance) >= 0.3;
+            usable[k] = n > EPSILON && affinity(mean, sample, settings.tolerance) >= 0.3;
         }
     }
     // Seed at the sample, or at the nearest usable cell within a few cells of it.
@@ -294,17 +359,7 @@ pub(crate) fn connected_weight(
                     return;
                 }
                 let there = means[n];
-                let (la, lb) = (luma(here), luma(there));
-                let step = (la - lb).abs() / la.max(lb).max(EPSILON);
-                let a = chroma(here);
-                let b = chroma(there);
-                let hue = a
-                    .iter()
-                    .zip(b)
-                    .map(|(p, q)| (p - q).powi(2))
-                    .sum::<f32>()
-                    .sqrt();
-                if step < 0.22 && hue < settings.tolerance * 0.6 {
+                if connectivity::can_cross(here, there, settings.tolerance) {
                     reached[n] = true;
                     stack.push(n);
                 }
@@ -323,6 +378,20 @@ pub(crate) fn connected_weight(
             }
         }
     }
+    let fine = connectivity::refine(
+        rgb,
+        w,
+        h,
+        edit,
+        coverage,
+        sample,
+        connectivity::Coarse {
+            cell,
+            width: gw,
+            reached: &reached,
+            seed,
+        },
+    );
     // Soften the cell edges: a 3x3 mean of the reached map, sampled bilinearly per pixel.
     let mut soft = vec![0.0_f32; gw * gh];
     for gy in 0..gh {
@@ -356,7 +425,14 @@ pub(crate) fn connected_weight(
             let top = soft[gy0 * gw + gx0] * (1.0 - tx) + soft[gy0 * gw + gx1] * tx;
             let bottom = soft[gy1 * gw + gx0] * (1.0 - tx) + soft[gy1 * gw + gx1] * tx;
             let v = top * (1.0 - ty) + bottom * ty;
-            out.push((v * 2.0 - 0.5).clamp(0.0, 1.0));
+            // Feather inward only. Interpolation must not select a cell the flood
+            // rejected across a jaw/background boundary.
+            let selected = fine[(y - y0) * bw + x - x0] == 2;
+            out.push(if selected {
+                (v * 2.0 - 0.5).clamp(0.0, 1.0)
+            } else {
+                0.0
+            });
         }
     }
     Some(out)
@@ -470,6 +546,7 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
     let bw = (x1 + margin).min(w) - bx;
     let bh = (y1 + margin).min(h) - by;
     let colour = uses_colour(edit);
+    let connected = connected_weight(rgb, w, h, edit, coverage);
     // Only what the operation selects is averaged: its coverage, and within that the pixels
     // that are this skin rather than a lash, a brow hair or the lip beside it.
     let frame: &[f32] = rgb;
@@ -483,7 +560,14 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
             }
             let i = (y * w + x) * 3;
             let p = [frame[i], frame[i + 1], frame[i + 2]];
+            let reach = connected.as_ref().map_or(1.0, |weights| {
+                if x < x0 || x >= x1 || y < y0 || y >= y1 {
+                    return 0.0;
+                }
+                weights[(y - y0) * (x1 - x0) + x - x0]
+            });
             cover
+                * reach
                 * if colour {
                     affinity(p, sample, settings.tolerance)
                 } else {
@@ -499,7 +583,6 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
         radius,
         (edit.tool != Tool::SkinUniformity).then_some(settings.edge_protection),
     );
-    let connected = connected_weight(rgb, w, h, edit, coverage);
     // Every pixel reads only itself and the bands, so the rows are worked at once.
     rgb.par_chunks_exact_mut(w * 3)
         .enumerate()
@@ -553,4 +636,46 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
                 }
             }
         });
+}
+
+#[cfg(test)]
+#[allow(clippy::float_cmp)] // Empty and unmodified samples must keep exact reference values.
+mod reference_tests {
+    use super::*;
+    #[test]
+    fn sparse_hair_glints_and_coloured_spots_do_not_change_the_skin_reference() {
+        for exposure in [0.04, 0.2, 1.0, 3.0] {
+            let skin = [0.38, 0.23, 0.16].map(|v| v * exposure);
+            let mut samples = vec![skin; 75];
+            samples.extend(vec![[0.002 * exposure; 3]; 10]);
+            samples.extend(vec![[1.5 * exposure; 3]; 10]);
+            samples.extend(vec![[0.4 * exposure, 0.03 * exposure, 0.02 * exposure]; 5]);
+            let found = robust_reference(&samples);
+            for c in 0..3 {
+                assert!((found[c] - skin[c]).abs() < 1e-5 * exposure);
+            }
+        }
+    }
+    #[test]
+    fn continuous_skin_gradient_keeps_its_midpoint_and_finite_hdr_values() {
+        let samples: Vec<[f32; 3]> = (0..101)
+            .map(|i| {
+                let gain = 0.9 + i as f32 * 0.002;
+                [2.0 * gain, 1.2 * gain, 0.8 * gain]
+            })
+            .collect();
+        let found = robust_reference(&samples);
+        for (a, b) in found.into_iter().zip([2.0, 1.2, 0.8]) {
+            assert!((a - b).abs() < 0.006);
+        }
+        assert_eq!(robust_reference(&[]), [0.0; 3]);
+    }
+    #[test]
+    fn nonfinite_and_black_source_pixels_cannot_poison_a_render() {
+        let mut pixels = [0.3, 0.2, 0.1].repeat(9);
+        pixels[0] = f32::NAN;
+        pixels[4] = f32::INFINITY;
+        assert_eq!(reference(&pixels, 3, 3, [0.5, 0.5]), [0.3, 0.2, 0.1]);
+        assert_eq!(reference(&[0.0; 27], 3, 3, [0.5, 0.5]), [0.0; 3]);
+    }
 }

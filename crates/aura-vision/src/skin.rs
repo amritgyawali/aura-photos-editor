@@ -55,14 +55,14 @@ mod orientation;
 mod body;
 pub use body::analyse_body;
 
-pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v4";
+pub const VERSION: &str = "mediapipe-selfie-multiclass-256-aura-v5-bounded-skin";
 pub const MODEL_HASH: &str = "10eee962bb85d9f5d0b292376f595ce70d810becfcef17feeb4762e62d8a7754";
 const SIDE: usize = 256;
 const CLASSES: usize = 6;
 /// Longest edge of the working grid every matte is measured on.
 pub const WORKING_EDGE: usize = 1024;
 /// Longest edge of a stored matte, in cells. The renderer refines edges at full resolution.
-pub const MATTE_EDGE: usize = 256;
+pub const MATTE_EDGE: usize = 512;
 static MODEL: &[u8] =
     include_bytes!("../../../assets/models/selfie_multiclass/selfie_multiclass_256x256.onnx");
 
@@ -681,6 +681,24 @@ fn to_matte(plane: &[f32], w: usize, h: usize, floor: f32) -> Option<Matte> {
     })
 }
 
+/// Competing semantic classes constrain soft skin edges, including skin-coloured
+/// fabric/background. Do not use brightness or an assumed human skin colour here.
+fn skin_evidence(field: &Field, i: usize) -> f32 {
+    let skin = field.plane(Class::FaceSkin)[i].max(field.plane(Class::BodySkin)[i]);
+    let other = [Class::Background, Class::Hair, Class::Clothes, Class::Other]
+        .into_iter()
+        .map(|class| field.plane(class)[i])
+        .fold(0.0_f32, f32::max);
+    let t = ((skin - other + 0.15) / 0.3).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+fn bounded_refinement(refined: &mut [f32], gate: &[f32]) {
+    for (v, g) in refined.iter_mut().zip(gate) {
+        *v *= g;
+    }
+}
+
 // A component can contain touching people. Keep detached hands with the nearest
 // person, but partition a shared component between all faces it reaches. Choosing
 // one owner for the entire component retouched somebody else's arms in group photos.
@@ -904,30 +922,23 @@ fn analyse_upright(
                 }
             }
             let face_model = colour_model(image, &confident);
-            let gate: Option<Vec<f32>> = face_model.as_ref().map(|model| {
-                (0..w * h)
-                    .map(|i| {
-                        if face[i] > 0.0 {
-                            model.likeness(image.pixel(i % w, i / w), precision, dark)
-                        } else {
-                            0.0
-                        }
-                    })
-                    .collect()
-            });
-            if let Some(gate) = &gate {
-                for (v, g) in face.iter_mut().zip(gate) {
-                    *v *= g;
-                }
-            }
+            let gate: Vec<f32> = (0..w * h)
+                .map(|i| {
+                    if face[i] > 0.0 {
+                        skin_evidence(&field, i)
+                            * face_model.as_ref().map_or(1.0, |model| {
+                                model.likeness(image.pixel(i % w, i / w), precision, dark)
+                            })
+                    } else {
+                        0.0
+                    }
+                })
+                .collect();
+            bounded_refinement(&mut face, &gate);
             // Refine the edges, then gate again: the guided filter would otherwise fill thin
             // structures such as lashes, brow hairs and stubble back in.
             let mut refined = refine(face);
-            if let Some(gate) = &gate {
-                for (v, g) in refined.iter_mut().zip(gate) {
-                    *v *= g;
-                }
-            }
+            bounded_refinement(&mut refined, &gate);
             let face_matte = to_matte(&refined, w, h, 0.03);
 
             let body_support = grow(&body_regions[k], radius + 1);
@@ -939,20 +950,25 @@ fn analyse_upright(
             let mut body: Vec<f32> = (0..w * h)
                 .map(|i| body_plane[i] * body_support[i])
                 .collect();
-            if let Some(model) = &body_model {
-                // Body skin varies more than a face (hands, elbows, light), so it is judged
-                // half as strictly.
-                for (i, v) in body.iter_mut().enumerate() {
-                    if *v > 0.0 {
-                        *v *= model.likeness(
-                            image.pixel(i % w, i / w),
-                            precision * 0.5,
-                            precision * 0.5,
-                        );
-                    }
-                }
-            }
-            let body_matte = to_matte(&refine(body), w, h, 0.03);
+            // Body skin varies more than a face. Reapply both colour and semantic
+            // support after filtering so hair, jewellery and cloth cannot be filled back in.
+            let body_gate: Vec<f32> = (0..w * h)
+                .map(|i| {
+                    body_support[i]
+                        * skin_evidence(&field, i)
+                        * body_model.as_ref().map_or(1.0, |model| {
+                            model.likeness(
+                                image.pixel(i % w, i / w),
+                                precision * 0.5,
+                                precision * 0.5,
+                            )
+                        })
+                })
+                .collect();
+            bounded_refinement(&mut body, &body_gate);
+            let mut body = refine(body);
+            bounded_refinement(&mut body, &body_gate);
+            let body_matte = to_matte(&body, w, h, 0.03);
 
             let hair_support = grow(&hair_regions[k], radius + 1);
             let hair: Vec<f32> = field
@@ -990,6 +1006,49 @@ fn analyse_upright(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[allow(clippy::float_cmp)] // Vetoed pixels and accepted samples must remain exactly unchanged.
+    fn non_skin_classes_veto_skin_coloured_fabric_and_guided_spill() {
+        let mut field = Field {
+            planes: vec![vec![0.0; 4]; CLASSES],
+        };
+        field.planes[Class::BodySkin as usize] = vec![0.04, 0.95, 0.5, 0.0];
+        field.planes[Class::Clothes as usize] = vec![0.94, 0.03, 0.5, 0.0];
+        field.planes[Class::Hair as usize][3] = 0.9;
+        let gate: Vec<f32> = (0..4).map(|i| skin_evidence(&field, i)).collect();
+        assert_eq!(gate[0], 0.0);
+        assert_eq!(gate[1], 1.0);
+        assert!((gate[2] - 0.5).abs() < 1e-6);
+        assert_eq!(gate[3], 0.0);
+        let mut softened = vec![0.2, 0.95, 0.5, 0.1];
+        bounded_refinement(&mut softened, &gate);
+        assert_eq!(softened[0], 0.0);
+        assert_eq!(softened[3], 0.0);
+        assert_eq!(softened[1], 0.95);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)] // Storage must preserve exactly zero support between islands.
+    fn small_detached_skin_islands_survive_storage_without_joining() {
+        let (w, h) = (1024, 1024);
+        let mut plane = vec![0.0; w * h];
+        // Distant small hands force a large common bounding box.
+        for (x, y) in [(20, 20), (998, 998)] {
+            for yy in y..y + 2 {
+                for xx in x..x + 2 {
+                    plane[yy * w + xx] = 1.0;
+                }
+            }
+        }
+        let matte = to_matte(&plane, w, h, 0.03).unwrap();
+        assert!(matte.width <= 512 && matte.height <= 512);
+        let selected = matte.alpha.iter().filter(|a| **a >= 128).count();
+        assert!(
+            selected >= 2,
+            "small skin islands were averaged away: {selected}"
+        );
+        assert_eq!(matte.at(0.5, 0.5), 0.0);
+    }
     #[test]
     fn detached_hands_and_legs_are_assigned_even_far_from_faces() {
         let (w, h) = (80, 220);

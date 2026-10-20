@@ -3,6 +3,8 @@ import { RetouchSelectionControls } from './RetouchSelectionControls';
 import { RetouchPresets } from './RetouchPresets';
 import { RetouchSkinSelection } from './RetouchSkinSelection';
 import { colorHex, colorRgb } from './retouchColor';
+import { RetouchToolPicker } from './RetouchToolPicker';
+import { RetouchOpticsControls } from './RetouchOpticsControls';
 
 export function validRetouch(draft: NativeRetouchEdit): boolean {
   return [...draft.region, draft.amount, draft.feather, draft.radius, draft.texture, draft.tone, draft.warmth, draft.tint, ...(draft.source ?? [])].every(Number.isFinite)
@@ -16,7 +18,8 @@ export function validRetouch(draft: NativeRetouchEdit): boolean {
     && validRetouchSelection(draft)
     && (draft.repairPasses == null || (Number.isInteger(draft.repairPasses) && draft.repairPasses >= 1 && draft.repairPasses <= 4 && ['acne_clear','frequency_heal'].includes(draft.tool)))
     && (!draft.targetColor || (draft.targetColor.length === 3 && draft.targetColor.every(v => Number.isFinite(v) && v >= 0 && v <= 1)))
-    && (!['colorize', 'background_color'].includes(draft.tool) || Boolean(draft.targetColor))
+    && (!['colorize', 'background_color', 'color_despill'].includes(draft.tool) || Boolean(draft.targetColor))
+    && !(draft.tool === 'color_despill' && draft.targetColor && Math.max(...draft.targetColor) - Math.min(...draft.targetColor) < .02)
     && !(draft.tool === 'reshape' && draft.selection?.inverted)
     // A blemish brush with nothing painted would save an operation that does nothing.
     && !(draft.tool === 'acne_clear' && draft.mask && draft.mask.strokes.length === 0)
@@ -31,6 +34,7 @@ type Props = {
   onSourceMode: () => void; onLive: (live: boolean) => void; onApply: () => void;
   onNew: () => void; onDiscard: () => void; onPreset: (polished: boolean) => void;
   onSelectAll: () => void;
+  colorPicking: boolean; onColorPick: () => void;
   edits: NativeRetouchEdit[];
 };
 
@@ -44,12 +48,19 @@ export function RetouchControls(props: Props) {
   const canApply = validRetouch(draft) && (selected !== null || count < MAX_NATIVE_RETOUCH_EDITS);
   return <fieldset className="studio-adjustments lr-adjustments" disabled={disabled}>
     <legend>{selected ? 'Refine saved operation' : 'Create a retouch'}</legend>
-    <label>Tool<select aria-label="Tool" value={draft.tool} onChange={event => props.onTool(event.target.value as RetouchTool)}>
-      {Array.from(new Set(RETOUCH_TOOLS.map(t => t[2]))).map(group => <optgroup label={group} key={group}>
-        {RETOUCH_TOOLS.filter(t => t[2] === group).map(t => <option value={t[0]} key={t[0]}>{t[1]}</option>)}
-      </optgroup>)}
-    </select></label>
+    <RetouchToolPicker value={draft.tool} onChange={props.onTool} />
     <p className="lr-hint">{info[3]}</p>
+    <RetouchOpticsControls draft={draft} onChange={onChange} sourceMode={props.sourceMode} onSourceMode={props.onSourceMode} />
+    {['fabric_moire', 'fabric_stain', 'shadow_balance', 'background_blur', 'highlight_glow'].includes(draft.tool) && <>
+      <label>Effect radius (% of short edge)<input aria-label="Effect radius" type="number" min="0.05" max="5" step="0.05"
+        value={Number((draft.radius * 100).toFixed(2))} onChange={event => onChange({ radius: Number(event.target.value) / 100 })} /></label>
+      {draft.tool === 'fabric_stain' && <label>Stain correction ({Math.round(draft.tone * 100)}%)<input type="range" aria-label="Stain correction" min="0" max="1" step=".01" value={draft.tone}
+        onChange={event => onChange({ tone: Number(event.target.value) })} /></label>}
+      {draft.tool === 'shadow_balance' && <label>Maximum shadow lift ({(draft.tone * 2).toFixed(2)} stops)<input type="range" aria-label="Maximum shadow lift" min="0" max="2" step=".05" value={draft.tone * 2}
+        onChange={event => onChange({ tone: Number(event.target.value) / 2 })} /></label>}
+      {draft.tool === 'highlight_glow' && <label>Highlight threshold ({(draft.tone * 4).toFixed(2)} stops above middle gray)<input type="range" aria-label="Highlight threshold" min="0" max="4" step=".05" value={draft.tone * 4}
+        onChange={event => onChange({ tone: Number(event.target.value) / 4 })} /></label>}
+    </>}
     {draft.tool === 'reshape' && <>
       {(['warmth','tint'] as const).map((key,index) => <label key={key}>{index ? 'Local height' : 'Local width'} ({Math.round(draft[key]*25)}%)
         <input type="range" aria-label={index ? 'Local height' : 'Local width'} min="-1" max="1" step=".01" value={draft[key]} onChange={event=>onChange({[key]:Number(event.target.value)})}/>
@@ -68,7 +79,7 @@ export function RetouchControls(props: Props) {
       </label>
       <p className="lr-hint">Green is off by default: the edge of every leaf against a bright sky is green too. Raise the reach for wide fringes on large files.</p>
     </>}
-    {['colorize', 'background_color'].includes(draft.tool) && <label>Target color
+    {['colorize', 'background_color', 'color_despill'].includes(draft.tool) && <label>{draft.tool === 'color_despill' ? 'Spill color' : 'Target color'}
       <input type="color" aria-label="Target color" value={colorHex(draft.targetColor ?? [0.45,0.2,0.1])} onChange={event => onChange({targetColor:colorRgb(event.target.value)})}/>
     </label>}
     {draft.tool === 'colorize' && <label>Color brightness ({(draft.warmth*4).toFixed(2)} stops)
@@ -86,8 +97,8 @@ export function RetouchControls(props: Props) {
       {selected && <button type="button" disabled={props.dirty} onClick={props.onNew}>Start another operation</button>}
     </div>
     {sampled && <details open><summary>Sampled skin range</summary>
-      <p className="lr-hint">Sample a clean skin patch. Matching colors are selected inside your ellipse or brush mask. Use Preview selection mask to see exactly which pixels change.</p>
-      <label className="retouch-toggle"><input type="checkbox" checked={skin.connected ?? false} onChange={event => onChange({ skin: { ...skin, connected: event.target.checked } })}/>Only skin connected to the sample (never a same-coloured background)</label>
+      <p className="lr-hint">Sample a clean skin patch. Matching colors are selected inside your ellipse or brush mask. Use Preview selection mask to inspect eligible pixels. Use a tighter mask when skin and its background blend together.</p>
+      <label className="retouch-toggle"><input type="checkbox" checked={skin.connected ?? false} onChange={event => onChange({ skin: { ...skin, connected: event.target.checked } })}/>Only skin connected to the sample</label>
       <button type="button" onClick={props.onSelectAll}>Use full photo selection</button>
       <label>Skin color tolerance ({Math.round(skin.tolerance * 1000) / 10}%)<input type="range" min="0.015" max="0.3" step="0.005" value={skin.tolerance}
         onChange={event => onChange({ skin: { ...skin, tolerance: Number(event.target.value) } })}/></label>
@@ -97,7 +108,7 @@ export function RetouchControls(props: Props) {
       {draft.tool === 'skin_smooth' && <label>Fine detail ({Math.round(draft.texture * 100)}%)<input type="range" min="0" max="2" step="0.01" value={draft.texture} onChange={event => onChange({ texture: Number(event.target.value) })}/><span className="lr-hint">100% retains the fine-detail band.</span></label>}
     </details>}
     <RetouchSkinSelection draft={draft} edits={props.edits} onChange={onChange}/>
-    <RetouchSelectionControls draft={draft} onChange={onChange}/>
+    <RetouchSelectionControls draft={draft} onChange={onChange} colorPicking={props.colorPicking} onColorPick={props.onColorPick}/>
     {draft.tool === 'reshape' && draft.selection?.inverted && <p role="status">Local proportions changes the selected ellipse. Turn off Invert selection before applying.</p>}
     <button type="button" onClick={props.onSelectAll}>Select entire photo</button>
     <details open><summary>{draft.mask || draft.selection?.gradient ? 'Clone anchor / keyboard target' : 'Target region'}</summary>
@@ -106,7 +117,7 @@ export function RetouchControls(props: Props) {
           onChange={event => { const region = [...draft.region] as NativeRetouchEdit['region']; region[index] = Number(event.target.value) / 100; onChange({ region }); }}/>
       </label>)}
     </details>
-    {(sampled || (['heal', 'patch_heal', 'clone', 'color_match', 'texture_graft'] as RetouchTool[]).includes(draft.tool)) && <details open><summary>{sampled ? 'Skin reference sample' : 'Source sample'}</summary>
+    {(sampled || (['heal', 'patch_heal', 'clone', 'color_match', 'texture_graft', 'fabric_stain'] as RetouchTool[]).includes(draft.tool)) && <details open><summary>{sampled ? 'Skin reference sample' : 'Source sample'}</summary>
       <button type="button" aria-pressed={props.sourceMode} onClick={props.onSourceMode}>{props.sourceMode ? 'Cancel source picker' : sampled ? 'Pick skin sample on photo' : 'Pick source on photo'}</button>
       {['Source X (%)', 'Source Y (%)'].map((label, index) => <label key={label}>{label}
         <input type="number" min="0" max="100" step="0.1" value={draft.source ? Number(((draft.source[index] ?? 0) * 100).toFixed(2)) : ''}
@@ -119,8 +130,12 @@ export function RetouchControls(props: Props) {
       <button type="button" onClick={() => onChange({ source: null, sourceScale: 1 })}>Clear source</button>
       {needsRetouchSource(draft) && !draft.source && <p>{sampled ? 'Choose a clean skin sample before applying this tool.' : draft.tool === 'patch_heal' ? 'Pick a source for painted, gradient, inverted or large patch repairs.' : 'Choose a source before applying this tool.'}</p>}
     </details>}
-    {(sampled || bands || ['micro_dodge_burn', 'eye_detail', 'under_eye', 'backdrop', 'frequency_heal', 'acne_clear', 'texture_graft'].includes(draft.tool)) && <label>{draft.tool === 'texture_graft' ? 'Pore size' : draft.tool === 'frequency_heal' ? 'Smallest mark size' : draft.tool === 'acne_clear' ? 'Spot size' : 'Frequency radius'} (% of short edge)
+    {(sampled || bands || ['micro_dodge_burn', 'eye_detail', 'under_eye', 'backdrop', 'frequency_heal', 'acne_clear', 'texture_graft', 'stretch_marks'].includes(draft.tool)) && <label>{draft.tool === 'stretch_marks' ? 'Mark smoothing reach' : draft.tool === 'texture_graft' ? 'Pore size' : draft.tool === 'frequency_heal' ? 'Smallest mark size' : draft.tool === 'acne_clear' ? 'Spot size' : 'Frequency radius'} (% of short edge)
       <input type="number" min="0.05" max="5" step="0.05" value={Number((draft.radius * 100).toFixed(2))} onChange={event => onChange({ radius: Number(event.target.value) / 100 })}/>
+    </label>}
+    {draft.tool === 'stretch_marks' && <label>Skin texture retained ({Math.round(Math.min(draft.texture, 1) * 100)}%)
+      <input type="range" aria-label="Skin texture retained" min="0" max="1" step="0.01"
+        value={Math.min(draft.texture, 1)} onChange={event => onChange({ texture: Number(event.target.value) })}/>
     </label>}
       {draft.tool === 'patch_heal' && <label className="retouch-toggle"><input type="checkbox" checked={draft.textureHeal ?? false} onChange={event => onChange({ textureHeal: event.target.checked })}/>Match local lighting with real skin texture</label>}
     {draft.tool === 'frequency_heal' && <>

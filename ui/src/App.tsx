@@ -224,6 +224,7 @@ export function App(): JSX.Element {
           }
           void refreshProjects();
         } else if (event.kind === 'warning') {
+          editAfterImport.current = false;
           setError({ code: event.code, message: event.message });
         }
       })

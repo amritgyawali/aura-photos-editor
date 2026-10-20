@@ -143,6 +143,139 @@ fn scan_files(root: &Path) -> Vec<aura_ingest::scan::ScannedFile> {
 // ------------------------------------------------------------------ idempotence
 
 #[test]
+fn mixed_file_picker_keeps_duplicates_and_continues_to_later_roots() {
+    let harness = harness_with_files(&[
+        ("chart.png", b"chart pixels"),
+        ("chart_copy.png", b"chart pixels"),
+        ("broken.jpg", b"not a jpeg"),
+        ("empty.jpg", b""),
+        ("portrait.jpg", b"portrait pixels"),
+        ("camera.cr3", b"raw fixture"),
+    ]);
+    let mut plan = plan_for(&harness);
+    plan.roots = [
+        "chart.png",
+        "chart_copy.png",
+        "broken.jpg",
+        "empty.jpg",
+        "portrait.jpg",
+        "camera.cr3",
+    ]
+    .iter()
+    .map(|name| harness.root.join(name))
+    .collect();
+    let report = aura_ingest::run(&harness.catalog, &plan, &CancelToken::new(), &NullProgress)
+        .expect("duplicates must not abort later roots");
+    assert_eq!(report.files_imported, 5);
+    assert_eq!(report.photos_created, 4);
+    assert_eq!(report.files_already_present, 1);
+    assert_eq!(report.files_quarantined, 1);
+    let rows: Vec<(String, String, bool)> = harness.catalog.read(|conn| {
+        let mut stmt = conn.prepare("SELECT r.abs_path, f.rel_path, f.is_present FROM photo_file f JOIN source_root r USING(root_id)").expect("prepare");
+        Ok(stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))).expect("query")
+            .collect::<Result<_, _>>().expect("rows"))
+    }).expect("catalog");
+    for (root, relative, present) in rows {
+        assert!(
+            present,
+            "a single-file import must not mark siblings missing"
+        );
+        assert!(
+            Path::new(&root).join(relative).is_file(),
+            "catalog path must reopen the original"
+        );
+    }
+    plan.import_id = ImportId::new();
+    let again = aura_ingest::run(&harness.catalog, &plan, &CancelToken::new(), &NullProgress)
+        .expect("reimport");
+    assert_eq!(again.files_imported, 0);
+    assert_eq!(again.bytes_hashed, 0);
+}
+
+#[derive(Debug, Default)]
+struct RecordedProgress(std::sync::Mutex<Vec<(u64, u64)>>);
+
+impl aura_core::progress::ProgressSink for RecordedProgress {
+    fn report(&self, update: aura_core::progress::ProgressUpdate) {
+        self.0
+            .lock()
+            .expect("progress lock")
+            .push((update.done, update.total));
+    }
+}
+
+#[test]
+fn progress_counts_the_whole_selection_including_fast_skips_and_rejections() {
+    let harness =
+        harness_with_files(&[("one.jpg", b"one"), ("two.jpg", b"two"), ("empty.jpg", b"")]);
+    let mut plan = plan_for(&harness);
+    plan.roots = ["one.jpg", "two.jpg", "empty.jpg"]
+        .iter()
+        .map(|name| harness.root.join(name))
+        .collect();
+    for _ in 0..2 {
+        let progress = RecordedProgress::default();
+        aura_ingest::run(&harness.catalog, &plan, &CancelToken::new(), &progress).expect("import");
+        let updates = progress.0.lock().expect("lock");
+        assert_eq!(updates.first(), Some(&(0, 3)));
+        assert_eq!(updates.last(), Some(&(3, 3)));
+        assert!(updates
+            .iter()
+            .all(|&(done, total)| total == 3 && done <= total));
+        assert!(updates.windows(2).all(|pair| pair[0].0 <= pair[1].0));
+        plan.import_id = ImportId::new();
+    }
+}
+
+#[derive(Debug)]
+struct StopAfterFirst {
+    cancel: CancelToken,
+    remove: Option<PathBuf>,
+}
+
+impl aura_core::progress::ProgressSink for StopAfterFirst {
+    fn report(&self, update: aura_core::progress::ProgressUpdate) {
+        if update.done == 1 {
+            if let Some(path) = &self.remove {
+                if path.exists() {
+                    std::fs::remove_file(path).expect("remove fixture");
+                }
+            } else {
+                self.cancel.cancel();
+            }
+        }
+    }
+}
+
+#[test]
+fn failed_and_cancelled_runs_seal_the_journal_and_keep_committed_files() {
+    for fail in [false, true] {
+        let harness = harness_with_files(&[("one.jpg", b"one"), ("two.jpg", b"two")]);
+        let mut plan = plan_for(&harness);
+        plan.roots = ["one.jpg", "two.jpg"]
+            .iter()
+            .map(|name| harness.root.join(name))
+            .collect();
+        let cancel = CancelToken::new();
+        let progress = StopAfterFirst {
+            cancel: cancel.clone(),
+            remove: fail.then(|| harness.root.join("two.jpg")),
+        };
+        let outcome = aura_ingest::run(&harness.catalog, &plan, &cancel, &progress);
+        assert_eq!(outcome.is_err(), fail);
+        let row: (String, u64, u64, Option<String>, Option<String>) = harness.catalog.read(|conn| {
+            Ok(conn.query_row("SELECT state, files_discovered, files_imported, finished_at, error_code FROM import_run WHERE import_id=?1",
+                [plan.import_id.to_db()], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))).expect("journal"))
+        }).expect("read");
+        assert_eq!(row.0, if fail { "failed" } else { "cancelled" });
+        assert_eq!((row.1, row.2), (2, 1));
+        assert!(row.3.is_some());
+        assert!(row.4.is_some());
+        harness.catalog.integrity_check().expect("valid catalogue");
+    }
+}
+
+#[test]
 fn file_picker_imports_all_five_roots_in_one_run() {
     let harness = harness_with_files(&[
         ("one.jpg", b"first portrait"),

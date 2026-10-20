@@ -13,6 +13,7 @@ import { PortraitAutoReport } from './PortraitAutoReport';
 import { MasksPanel, type BrushSettings, type MaskTool } from './MasksPanel';
 import { coverageDataUrl } from './rgbImage';
 import { PairedReference } from '../look/PairedReference';
+import { ColorMatchPanel } from '../look/ColorMatchPanel';
 import { localMasks, masksOf, type MaskCoverage, type MaskSource } from '../../ipc/localMasks';
 import type { BrushStroke } from '../../ipc/nativeRetouch';
 import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
@@ -33,6 +34,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const [recipe, setRecipe] = useState<RecipeDto | null>(null);
   const [history, setHistory] = useState<HistoryDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [retouchOpen, setRetouchOpen] = useState(false);
   const writing = useRef(false);
@@ -89,6 +91,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   // Clear only when changing photographs; keep the last preview during a save.
   useEffect(() => {
     setRecipe(null); setHistory(null); setAspect(null); setNotice(null);
+    setWriteError(null);
     setPicking(false); setPosition(null);
     setSelectedMask(null); setMaskMessage(null); setMaskTool(null); setCoverage(null); setLiquifyTool(null);
   }, [photoId, projectId]);
@@ -123,9 +126,14 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const write = useCallback(async (action: () => Promise<unknown>) => {
     if (writing.current) return;
     writing.current = true;
-    setBusy(true); setError(null);
+    setBusy(true); setWriteError(null);
     try { await action(); setRefresh(value => value + 1); }
-    catch (cause) { setError(asIpcError(cause).message); }
+    catch (cause) {
+      setWriteError(asIpcError(cause).message);
+      // Reconcile with saved state even if an operation failed after a partial
+      // write. A rejected edit does not make the preview unreadable.
+      setRefresh(value => value + 1);
+    }
     finally { writing.current = false; setBusy(false); }
   }, []);
 
@@ -209,6 +217,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
       </div>
     </div>
     {problem && <p role="alert">{problem} <button type="button" onClick={() => setRefresh(value => value + 1)}>Retry preview</button></p>}
+    {writeError && <p role="alert">Edit could not be saved: {writeError} <button type="button" onClick={() => setWriteError(null)}>Dismiss edit error</button></p>}
     <div className="studio-layout">
       <div>
         <div className={`studio-canvas${picking ? ' studio-picking' : ''}${maskTool || liquifyTool ? ' studio-masking' : ''}`} aria-busy={busy || loading || waiting}
@@ -260,7 +269,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <option value="off">Off</option><option value="shadows">Shadows</option><option value="highlights">Highlights</option><option value="both">Both</option>
         </select></label>
         {clipping !== 'off' && <p className="lr-hint">Edited preview only: blue/black hatching marks near-black pixels; red/white marks a near-clipped channel. Exports are unaffected.</p>}
-        <p className="studio-footnote" role="status">{busy ? 'Saving your edit…' : loading ? 'Rendering your photograph…' : problem ? 'Preview needs attention.' : 'Edits saved. Your original stays untouched.'}{render && (editedPreview.quality === 'live' ? ' · Live preview - finishing the retouch…' : editedPreview.upgrading ? ' · Quick preview - rendering full quality…' : ` · Full quality ${render.width} × ${render.height}`)}</p>
+        <p className="studio-footnote" role="status">{busy ? 'Saving your edit…' : loading ? 'Rendering your photograph…' : problem ? 'Preview needs attention.' : writeError ? 'The last edit failed. Showing saved settings.' : 'Edits saved. Your original stays untouched.'}{render && (editedPreview.quality === 'live' ? ' · Live preview - finishing the retouch…' : editedPreview.upgrading ? ' · Quick preview - rendering full quality…' : ` · Full quality ${render.width} × ${render.height}`)}</p>
         {render?.backend === 'wgpu' && <p className="studio-footnote" title="The graphics card processed the final color conversion for this preview.">GPU output</p>}
         {render?.notes.filter(note => note.isCaveat).map(note => <p className="studio-footnote" key={`${note.stage}:${note.reason}`}>{note.detail ?? note.reason}</p>)}
       </div>
@@ -325,6 +334,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           onTake={name => void write(() => develop.snapshot({ projectId, photoId, action: 'take', name }))}
           onRestore={name => void write(() => develop.snapshot({ projectId, photoId, action: 'restore', name }))} />
       </fieldset>
+      <ColorMatchPanel key={`colour:${projectId}:${photoId}`} projectId={projectId} photoId={photoId} revision={recipe?.recipeHash} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       <PairedReference key={`paired:${projectId}:${photoId}`} photoId={photoId} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       </div>
     </div>

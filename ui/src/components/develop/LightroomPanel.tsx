@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { RecipeDto } from '../../ipc/types';
 import type { EditProfile } from '../../ipc/client';
 import { PointCurveEditor, type CurvePoint } from './PointCurveEditor';
@@ -115,17 +115,25 @@ function Slider({ control, recipe, disabled, onSetParam, background }: {
   const stored = Number(paramValue(recipe, control.path) ?? control.fallback);
   const [draft, setDraft] = useState(stored);
   const [numberText, setNumberText] = useState(String(stored));
+  const [validation, setValidation] = useState<string | null>(null);
+  const errorId = useId();
   const committed = useRef(stored);
   useEffect(() => {
-    setDraft(stored); setNumberText(String(stored)); committed.current = stored;
-  }, [stored, recipe]);
-  const change = (value: number) => { setDraft(value); setNumberText(String(value)); };
+    setDraft(stored); setNumberText(String(stored)); committed.current = stored; setValidation(null);
+  }, [stored, recipe, disabled]);
+  const change = (value: number) => { setDraft(value); setNumberText(String(value)); setValidation(null); };
   const commit = (value: number) => {
     if (disabled || !Number.isFinite(value)) {
       change(stored);
       return;
     }
     const clamped = Math.min(control.max, Math.max(control.min, value));
+    // Integral controls cross an integer-valued native contract. Decimal-step
+    // controls accept precise typed values; the slider step is a convenience.
+    if (Number.isInteger(control.step ?? 1) && !Number.isInteger(clamped)) {
+      setValidation(`${control.label} needs a whole number from ${control.min} to ${control.max}.`);
+      return;
+    }
     change(clamped);
     if (Math.abs(clamped - committed.current) > 1e-9) {
       committed.current = clamped;
@@ -144,11 +152,13 @@ function Slider({ control, recipe, disabled, onSetParam, background }: {
       onPointerUp={() => commit(draft)} onKeyUp={() => commit(draft)} onBlur={() => commit(draft)} />
     <input className="lr-number" type="number" min={control.min} max={control.max} step={control.step ?? 1}
       value={numberText} disabled={disabled}
-      onChange={event => setNumberText(event.target.value)} onBlur={commitNumber}
+      aria-invalid={validation ? true : undefined} aria-describedby={validation ? errorId : undefined}
+      onChange={event => { setNumberText(event.target.value); setValidation(null); }} onBlur={commitNumber}
       onKeyDown={event => {
         if (event.key === 'Enter') commitNumber();
         if (event.key === 'Escape') change(stored);
       }} aria-label={`${control.label} value`} />
+    {validation && <span id={errorId} className="lr-validation" role="alert">{validation}</span>}
   </label>;
 }
 

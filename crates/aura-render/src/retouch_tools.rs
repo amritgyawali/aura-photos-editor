@@ -55,16 +55,29 @@ fn matte_planes(
         .filter(|e| e.enabled && e.amount > 0.0)
         .filter_map(|e| e.matte.as_ref())
         .collect();
-    // Each matte is rendered from the same frame and independently, so they are rendered at
-    // the same time.
-    ids.into_par_iter()
-        .map(|id| {
-            let plane = mattes
-                .get(id)
-                .and_then(|m| MattePlane::render(m, rgb, width, height));
-            (id.clone(), plane)
-        })
-        .collect()
+    // Full-resolution contour refinement has several temporary colour planes.
+    // Bound simultaneous masks rather than allocating scratch space for every
+    // facial exclusion at once. Each mask still parallelizes its own pixel work.
+    let ids: Vec<_> = ids.into_iter().collect();
+    let parallel = if width.saturating_mul(height) > 4_000_000 {
+        2
+    } else {
+        8
+    };
+    let mut planes = BTreeMap::new();
+    for chunk in ids.chunks(parallel) {
+        let rendered: Vec<_> = chunk
+            .par_iter()
+            .map(|id| {
+                let plane = mattes
+                    .get(*id)
+                    .and_then(|m| MattePlane::render(m, rgb, width, height));
+                ((*id).clone(), plane)
+            })
+            .collect();
+        planes.extend(rendered);
+    }
+    planes
 }
 
 /// The operation's selection on the current frame, limited by its matte. `None` when the
@@ -77,13 +90,14 @@ fn coverage_of(
     planes: &BTreeMap<String, Option<MattePlane>>,
 ) -> Option<Coverage> {
     let coverage = Coverage::for_edit(edit, width, height, rgb);
-    match &edit.matte {
+    let coverage = match &edit.matte {
         None => Some(coverage),
         Some(id) => match planes.get(id) {
             Some(Some(plane)) => Some(coverage.with_matte(plane, width, height)),
             _ => None,
         },
-    }
+    }?;
+    Some(coverage.protect_boundary(edit, width, height))
 }
 
 /// [`apply`], with the segmentation mattes operations refer to. An operation whose matte is
@@ -211,11 +225,11 @@ fn apply_from(
     {
         // Several operations often share one selection - the face's evening, light and
         // smoothing all use the same strokes and matte - so it is made once per render. A
-        // brightness limit reads the pixels as they are at that point and is never shared.
+        // brightness or colour limit reads pixels at that point and is never shared.
         let shareable = edit
             .selection
             .as_ref()
-            .is_none_or(|selection| selection.luminance.is_none());
+            .is_none_or(|selection| selection.luminance.is_none() && selection.color.is_none());
         let memo_key = shareable.then(|| {
             serde_json::to_string(&(
                 &edit.region,
@@ -223,6 +237,8 @@ fn apply_from(
                 &edit.mask,
                 &edit.selection,
                 &edit.matte,
+                edit.tool,
+                edit.radius,
             ))
             .unwrap_or_default()
         });
@@ -270,6 +286,10 @@ fn apply_from(
             Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
         ) {
             crate::retouch_skin::apply(rgb, width, height, edit, &coverage);
+        } else if crate::retouch_material::supports(edit.tool) {
+            crate::retouch_material::apply(rgb, width, height, edit, &coverage);
+        } else if crate::retouch_optics::supports(edit.tool) {
+            crate::retouch_optics::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::Reshape {
             crate::retouch_reshape::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::PatchHeal {
@@ -325,6 +345,14 @@ fn tool_label(tool: Tool) -> &'static str {
         Tool::AutoBlemish => "retouch.auto_blemish",
         Tool::UnderEye => "retouch.under_eye",
         Tool::Defringe => "retouch.defringe",
+        Tool::FabricMoire | Tool::FabricStain => "retouch.fabric_material",
+        Tool::ShadowBalance => "retouch.shadow_balance",
+        Tool::BackgroundBlur => "retouch.background_blur",
+        Tool::HighlightGlow => "retouch.highlight_glow",
+        Tool::MotionBlur | Tool::ZoomBlur => "retouch.optical_blur",
+        Tool::ColorDespill | Tool::HighlightCompress | Tool::ColorSaturation => {
+            "retouch.colour_finish"
+        }
         _ => "retouch.local",
     }
 }
@@ -360,6 +388,7 @@ pub fn selection_mask_with_mattes(
     }
     // Sampled skin tools change only skin like the sample (and, when asked, connected to
     // it); show exactly that, so the preview proves no background is selected.
+    let coverage = coverage.protect_boundary(edit, width, height);
     if matches!(
         edit.tool,
         Tool::SkinSmooth | Tool::SkinUniformity | Tool::PortraitDodgeBurn
@@ -739,6 +768,16 @@ fn apply_one(
                         }
                     }
                     Tool::PatchHeal
+                    | Tool::FabricMoire
+                    | Tool::FabricStain
+                    | Tool::ShadowBalance
+                    | Tool::BackgroundBlur
+                    | Tool::HighlightGlow
+                    | Tool::MotionBlur
+                    | Tool::ZoomBlur
+                    | Tool::ColorDespill
+                    | Tool::HighlightCompress
+                    | Tool::ColorSaturation
                     | Tool::Reshape
                     | Tool::FrequencyHeal
                     | Tool::AcneClear

@@ -22,6 +22,13 @@
 //!   a table that would silently shift colour.
 
 pub mod bits;
+pub mod canon;
+pub mod crx;
+pub mod fuji;
 pub mod nikon;
 pub mod olympus;
+pub mod olympus14;
+pub mod pana8;
+pub mod panasonic;
 pub mod sony;
+pub mod sony_notes;

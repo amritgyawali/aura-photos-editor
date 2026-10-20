@@ -19,6 +19,95 @@ fn imported_png_renders_and_exports_without_changing_the_original() {
     photo_roundtrip(true);
 }
 
+#[test]
+fn raw_auto_edit_is_independent_of_the_embedded_camera_jpeg_brightness() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = AppState::open(&dir.path().join("catalog.aura"))
+        .unwrap()
+        .with_cache_root(&dir.path().join("cache"))
+        .with_key_store(Arc::new(aura_cloud::keys::MemoryKeyStore::default()));
+    let project = aura_app::create_project(
+        &state,
+        CreateProjectInput {
+            name: "Same sensor, different camera pictures".into(),
+            couple_names: None,
+            event_date: None,
+        },
+    )
+    .unwrap();
+    let fixture = dir.path().join("fixture.dng");
+    aura_raw::fixtures::write_bench_raw(&fixture, aura_raw::fixtures::FixtureOptions::default())
+        .unwrap();
+    let original = std::fs::read(&fixture).unwrap();
+    let metadata = aura_raw::read_meta(&original, &fixture).unwrap();
+    let preview = *metadata.best_preview().unwrap();
+    let mut paths = Vec::new();
+    for (name, brightness) in [("camera-dark.dng", 35), ("camera-bright.dng", 220)] {
+        let replacement = encode_jpeg(
+            &Rgb8 {
+                width: preview.width,
+                height: preview.height,
+                data: vec![brightness; (preview.width * preview.height * 3) as usize],
+            },
+            85,
+        )
+        .unwrap();
+        assert!(replacement.len() < preview.len);
+        let mut bytes = original.clone();
+        bytes[preview.offset..preview.offset + preview.len].fill(0);
+        bytes[preview.offset..preview.offset + replacement.len()].copy_from_slice(&replacement);
+        let path = dir.path().join(name);
+        std::fs::write(&path, &bytes).unwrap();
+        paths.push((path, bytes));
+    }
+    aura_ingest::run(
+        state.catalog(),
+        &ImportPlan {
+            import_id: ImportId::new(),
+            project_id: ProjectId::from_db(&project.id).unwrap(),
+            roots: paths.iter().map(|(path, _)| path.clone()).collect(),
+            mode: ImportMode::Reference,
+            extensions: Vec::new(),
+            extract_embedded_previews: false,
+            settle_window_ms: 0,
+        },
+        &CancelToken::new(),
+        &NullProgress,
+    )
+    .unwrap();
+    let photos = aura_app::list_images(
+        &state,
+        &ListImagesInput {
+            project_id: project.id,
+            offset: 0,
+            limit: 10,
+            order_by: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(photos.len(), 2);
+    let globals: Vec<serde_json::Value> = photos
+        .iter()
+        .map(|photo| {
+            let recipe = aura_app::photo_enhance::enhance_photo(
+                &state,
+                &DevelopImageInput {
+                    photo_id: photo.id.clone(),
+                },
+            )
+            .unwrap();
+            serde_json::from_str::<serde_json::Value>(&recipe.body).unwrap()["global"].clone()
+        })
+        .collect();
+    assert_eq!(
+        globals[0], globals[1],
+        "camera JPEG tone must not change the edit of identical sensor data"
+    );
+    for (path, bytes) in paths {
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
+    }
+}
+
 fn photo_roundtrip(is_png: bool) {
     let dir = tempfile::tempdir().expect("temp");
     let state = AppState::open(&dir.path().join("catalog.aura"))
@@ -97,6 +186,17 @@ fn photo_roundtrip(is_png: bool) {
     )
     .expect("photos");
     let photo = &photos[0].id;
+    // Naming and metadata must come from the real primary file, rather than silently
+    // falling back to an empty frame when a catalogue column does not exist.
+    let field = aura_app::delivery_commands::ExportField::new(
+        &state,
+        ProjectId::from_db(&project.id).unwrap(),
+    )
+    .unwrap();
+    let facts =
+        aura_export::read::Field::frame(&field, aura_core::PhotoId::from_db(photo).unwrap());
+    assert_eq!(facts.original_stem.as_deref(), Some("original"));
+    assert_eq!(facts.original_path.as_deref(), Some(path.as_path()));
     let request = RenderImageInput {
         photo_id: photo.clone(),
         level: Some("full".into()),

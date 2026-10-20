@@ -16,6 +16,7 @@ vi.mock('../../ipc/client', () => ({
 }));
 
 vi.mock('../../ipc/nativeRetouch', async () => ({ ...await vi.importActual('../../ipc/nativeRetouch'), nativeRetouch: { original: vi.fn() } }));
+vi.mock('../look/ColorMatchPanel', () => ({ ColorMatchPanel: () => null }));
 
 const pixels = { width: 1, height: 1, rgbBase64: btoa(String.fromCharCode(80, 100, 120)), notes: [] } as unknown as RenderDto;
 
@@ -130,6 +131,24 @@ it('offers recovery when a renderer payload cannot be displayed', async () => {
   vi.mocked(develop.renderImage).mockResolvedValue(pixels);
   fireEvent.click(screen.getByRole('button', { name: 'Retry preview' }));
   expect(await screen.findByAltText('Edited photograph')).toBeTruthy();
+});
+
+it('recovers a rejected edit without requiring preview retry and allows the same value again', async () => {
+  const busy = vi.fn();
+  render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={busy} />);
+  await screen.findByAltText('Edited photograph');
+  await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+  vi.mocked(develop.setParam).mockRejectedValueOnce(new Error('The edit was refused')).mockResolvedValue({} as never);
+  const exposure = screen.getByLabelText('Exposure value');
+  fireEvent.change(exposure, { target: { value: '1.25' } });
+  fireEvent.blur(exposure);
+  expect((await screen.findByRole('alert')).textContent).toContain('The edit was refused');
+  await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+  expect(screen.queryByRole('button', { name: 'Retry preview' })).toBeNull();
+  expect((exposure as HTMLInputElement).disabled).toBe(false);
+  fireEvent.change(exposure, { target: { value: '1.25' } });
+  fireEvent.blur(exposure);
+  await waitFor(() => expect(develop.setParam).toHaveBeenCalledTimes(2));
 });
 
 it('jumps back to any saved automatic step and marks where the photo now is', async () => {

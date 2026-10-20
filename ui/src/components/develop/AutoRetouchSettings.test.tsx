@@ -2,13 +2,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AutoRetouchSettings, PRESETS, SETTING_GROUPS, presetOf } from './AutoRetouchSettings';
 import type { RecipeDto } from '../../ipc/types';
-import { DEFAULT_RETOUCH_SETTINGS } from '../../ipc/nativeRetouch';
+import { DEFAULT_AUTO_RETOUCH, DEFAULT_RETOUCH_SETTINGS, POLISHED_WEDDING_RETOUCH } from '../../ipc/nativeRetouch';
 import { automaticLabel } from './NativeRetouchWorkspace';
+
+const naturalRecipe = { body: JSON.stringify({ studio_portrait_auto_v1: { options: { ...DEFAULT_AUTO_RETOUCH, settings: DEFAULT_RETOUCH_SETTINGS } } }) } as RecipeDto;
 
 describe('automatic retouch settings', () => {
   it('limits Acne only to blemishes and preserves eye and nose detail without beauty finishing',()=>{
     const run=vi.fn();
-    render(<AutoRetouchSettings disabled={false} onRun={run}/>);
+    render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run}/>);
     fireEvent.click(screen.getByRole('radio',{name:'Acne only · preserve detail'}));
     fireEvent.click(screen.getByRole('button',{name:'Auto retouch: Face + body skin'}));
     expect(run).toHaveBeenCalledWith(expect.objectContaining({eyes:false,teeth:false,refine:false,blemishes:true,scope:'face_and_body',
@@ -16,7 +18,7 @@ describe('automatic retouch settings', () => {
   });
   it('offers face, body skin and face + body skin, and runs the chosen one', () => {
     const run = vi.fn();
-    render(<AutoRetouchSettings disabled={false} onRun={run} />);
+    render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
     expect(screen.getByRole('radio', { name: 'Face' })).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: 'Body skin' }));
     expect(screen.getByText(/arms, hands and legs/)).toBeTruthy();
@@ -29,7 +31,7 @@ describe('automatic retouch settings', () => {
   });
   it('sends the chosen strength and features', () => {
     const run = vi.fn();
-    render(<AutoRetouchSettings disabled={false} onRun={run} />);
+    render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
     fireEvent.click(screen.getByText('Strength and details'));
     fireEvent.change(screen.getByLabelText('Automatic retouch strength'), { target: { value: '60' } });
     expect(screen.getByText(/Strength: Subtle \(60%\)/)).toBeTruthy();
@@ -39,7 +41,7 @@ describe('automatic retouch settings', () => {
   });
   it('adapts to each face unless the photographer wants the settings used exactly', () => {
     const run = vi.fn();
-    render(<AutoRetouchSettings disabled={false} onRun={run} />);
+    render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
     const adapt = screen.getByLabelText('Adapt to each face') as HTMLInputElement;
     expect(adapt.checked).toBe(true);
     expect(screen.getByText(/Each face is measured and gets its own amounts/)).toBeTruthy();
@@ -49,11 +51,11 @@ describe('automatic retouch settings', () => {
     expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ adaptive: false }));
   });
   it('turns face details off for body skin only and disables everything while busy', () => {
-    const { rerender } = render(<AutoRetouchSettings disabled={false} onRun={vi.fn()} />);
+    const { rerender } = render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={vi.fn()} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Body skin' }));
     expect((screen.getByLabelText('Teeth') as HTMLInputElement).disabled).toBe(true);
     expect(screen.getByTitle(/Repairs measured spots/)).toBeTruthy();
-    rerender(<AutoRetouchSettings disabled busy onRun={vi.fn()} />);
+    rerender(<AutoRetouchSettings recipe={naturalRecipe} disabled busy onRun={vi.fn()} />);
     expect((screen.getByRole('button', { name: 'Detecting and retouching…' }) as HTMLButtonElement).closest('fieldset')?.disabled).toBe(true);
   });
   it('labels automatic operations by face or body', () => {
@@ -68,13 +70,13 @@ describe('automatic retouch settings', () => {
   });
   it('offers every fine control exactly once', () => {
     const keys = SETTING_GROUPS.flatMap(([, controls]) => controls.map(([key]) => key));
-    expect(keys.length).toBe(62);
-    expect(new Set(keys).size).toBe(62);
+    expect(keys.length).toBe(65);
+    expect(new Set(keys).size).toBe(65);
     expect([...keys].sort()).toEqual(Object.keys(DEFAULT_RETOUCH_SETTINGS).sort());
   });
   it('runs deep cleanup as one native pass and exposes dark-mark removal', () => {
     const run = vi.fn();
-    render(<AutoRetouchSettings disabled={false} onRun={run} />);
+    render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
     expect(screen.getByText(/freckles and the marks spots leave are healed. Moles and beauty marks are kept/)).toBeTruthy();
     fireEvent.click(screen.getByText('Blemishes'));
@@ -86,7 +88,7 @@ describe('automatic retouch settings', () => {
   });
   it('applies a preset, then marks a hand change as custom and sends it', () => {
     const run = vi.fn();
-    render(<AutoRetouchSettings disabled={false} onRun={run} />);
+    render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
     fireEvent.click(screen.getByRole('radio', { name: 'Polished beauty' }));
     fireEvent.click(screen.getByText('Skin'));
     expect(screen.getByText('Skin smoothing: 85%')).toBeTruthy();
@@ -103,7 +105,7 @@ describe('automatic retouch settings', () => {
 
 it('adds adjustable pore refinement to face and body cleanup without enabling eye edits', () => {
   const run = vi.fn();
-  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Skin cleanup · refine pores' }));
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ scope: 'face_and_body', eyes: false, teeth: false,
@@ -116,7 +118,7 @@ it('adds adjustable pore refinement to face and body cleanup without enabling ey
 
 it('runs deep cleanup with explicit dark-mark removal and retained fine texture', () => {
   const run = vi.fn();
-  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({
@@ -126,7 +128,7 @@ it('runs deep cleanup with explicit dark-mark removal and retained fine texture'
 
 it('returns the spot limit to the ordinary range when deep cleanup is disabled', () => {
   const run = vi.fn();
-  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Deep acne cleanup' }));
   fireEvent.click(screen.getByLabelText('Deep blemish cleanup'));
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face' }));
@@ -135,7 +137,7 @@ it('returns the spot limit to the ordinary range when deep cleanup is disabled',
 
 it('offers a professional preset: acne clear first, real texture back last', () => {
   const run = vi.fn();
-  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Professional retouch' }));
   expect(screen.getByText(/Frequency healing rebuilds the tone under each mark first/)).toBeTruthy();
   expect(screen.getByText(/restores the original pores within the selected skin/)).toBeTruthy();
@@ -153,12 +155,12 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
   expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
   expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
   for (const [id, , values] of PRESETS) {
-    if (id === 'pro' || id === 'beauty_fashion' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin' || id === 'portrait_finish' || id === 'smooth_finish' || id === 'body_finish') continue;
+    if (id === 'polished_wedding' || id === 'bright_polished' || id === 'beauty_fashion' || id === 'pro' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin' || id === 'portrait_finish' || id === 'smooth_finish' || id === 'body_finish') continue;
     expect(values.frequencyHeal ?? 0).toBe(0);
     expect(values.textureGraft ?? 0).toBe(0);
   }
   const run = vi.fn();
-  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
   expect(screen.queryByText(/Frequency healing rebuilds the tone/)).toBeNull();
   fireEvent.click(screen.getByText('Blemishes'));
   fireEvent.change(screen.getByLabelText('Frequency healing'), { target: { value: '60' } });
@@ -169,7 +171,7 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
 
 it('restores the complete finishing scope after acne-only without enabling iris, teeth or shape changes', () => {
   const run = vi.fn();
-  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Acne only · preserve detail' }));
   fireEvent.click(screen.getByRole('radio', { name: 'Portrait skin finish' }));
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
@@ -186,7 +188,7 @@ it('restores the complete finishing scope after acne-only without enabling iris,
 
 it('offers a smoother portrait finish that softens lines and under-eye bags and still leaves eyes, teeth and shape alone', () => {
   const run = vi.fn();
-  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Smooth portrait finish' }));
   expect(screen.getByText(/more of the smoothing a polished headshot carries/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
@@ -209,7 +211,7 @@ it('keeps moles by default and clears stretch marks only when a preset or a pers
     if (id !== 'body_finish') expect(values.stretchMarks ?? 0).toBe(0);
   }
   const run = vi.fn();
-  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  render(<AutoRetouchSettings recipe={naturalRecipe} disabled={false} onRun={run} />);
   fireEvent.click(screen.getByRole('radio', { name: 'Body skin finish · stretch marks' }));
   expect(screen.getByText(/Moles and beauty marks are kept/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
@@ -236,4 +238,25 @@ it('shows the preset a saved retouch was made with instead of Custom with nothin
   render(<AutoRetouchSettings disabled={false} onRun={vi.fn()} recipe={recipe} />);
   expect((screen.getByRole('radio', { name: body[1] }) as HTMLInputElement).checked).toBe(true);
   expect(screen.queryByText('Custom')).toBeNull();
+});
+
+it('starts a new photo with Polished wedding and sends the complete finish', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  expect((screen.getByRole('radio', { name: 'Polished wedding' }) as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenCalledWith(POLISHED_WEDDING_RETOUCH);
+  fireEvent.click(screen.getByRole('radio', { name: 'Natural' }));
+  expect((screen.getByRole('radio', { name: 'Natural' }) as HTMLInputElement).checked).toBe(true);
+});
+
+it('keeps the portrait-only technique policy adjustable and included in collection settings', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByText('Skin detection'));
+  const control = screen.getByRole('checkbox', { name: 'Advanced techniques only on single-person portraits' });
+  expect((control as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(control);
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ portraitOnlyAdvanced: false }) }));
 });

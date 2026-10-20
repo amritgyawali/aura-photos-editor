@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ADVANCED_STAGES, advancedRetouch, readAdvancedReport, type AdvancedPreset, type AdvancedRetouchReport, type StageOutcome } from '../../ipc/advancedRetouch';
+import { ADVANCED_STAGES, advancedRetouch, readAdvancedReport, type AdvancedPreset, type StageOutcome } from '../../ipc/advancedRetouch';
 import type { RecipeDto } from '../../ipc/types';
 
 type Live = Record<number, { state: 'running' | 'done'; outcome: StageOutcome | null }>;
@@ -14,6 +14,10 @@ const MARK: Record<StageOutcome | 'running' | 'waiting', string> = {
   applied: '✓', unchanged: '○', not_applicable: '–', protected: '🔒', running: '…', waiting: '·',
 };
 const percent = (v: number | null) => v === null ? 'not measured' : `${Math.round(v * 100)}%`;
+const REGION_LABELS = {
+  eye_image_left: 'Image-left eye / under-eye', eye_image_right: 'Image-right eye / under-eye',
+  nose: 'Nose', mouth: 'Mouth', chin_neck: 'Chin / adjacent neck',
+} as const;
 
 /**
  * Auto advanced retouch: every stage of a professional retouch, run automatically and in order
@@ -26,25 +30,32 @@ export function AdvancedRetouch({ projectId, photoId, recipe, disabled, onRun }:
 }) {
   const [running, setRunning] = useState(false);
   const [live, setLive] = useState<Live>({});
-  const [report, setReport] = useState<AdvancedRetouchReport | null>(null);
   const [preset, setPreset] = useState<AdvancedPreset>('professional');
+  const [completed, setCompleted] = useState<{ photoId: string; inputBody: string | undefined; recipe: RecipeDto } | null>(null);
   const mounted = useRef(true);
+  const activePhoto = useRef(photoId);
+  activePhoto.current = photoId;
+  const runVersion = useRef(0);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  useEffect(() => { setReport(null); setLive({}); }, [photoId]);
-  const shown = report ?? readAdvancedReport(recipe);
+  useEffect(() => { setCompleted(null); }, [photoId, recipe?.body]);
+  useEffect(() => { runVersion.current += 1; setLive({}); setRunning(false); }, [photoId]);
+  const shown = readAdvancedReport(completed?.photoId === photoId && completed.inputBody === recipe?.body
+    ? completed.recipe : recipe);
   const current = Object.entries(live).filter(([, v]) => v.state === 'running').map(([n]) => Number(n)).sort((a, b) => b - a)[0];
   const start = () => onRun(async () => {
-    setRunning(true); setLive({}); setReport(null);
+    const version = ++runVersion.current;
+    const currentRun = () => mounted.current && activePhoto.current === photoId && runVersion.current === version;
+    setRunning(true); setLive({}); setCompleted(null);
     let stop: (() => void) | null = null;
     try {
       stop = await advancedRetouch.onProgress(event => {
-        if (event.photoId === photoId && mounted.current) setLive(prev => ({ ...prev, [event.number]: { state: event.state, outcome: event.outcome } }));
+        if (event.photoId === photoId && currentRun()) setLive(prev => ({ ...prev, [event.number]: { state: event.state, outcome: event.outcome } }));
       }).catch(() => null);
       const result = await advancedRetouch.run(projectId, photoId, undefined, preset);
-      if (mounted.current) setReport(result.report);
+      if (currentRun()) setCompleted({ photoId, inputBody: recipe?.body, recipe: result.recipe });
     } finally {
       stop?.();
-      if (mounted.current) setRunning(false);
+      if (currentRun()) setRunning(false);
     }
   });
   return <section className="advanced-retouch" aria-label="Auto advanced retouch">
@@ -88,7 +99,25 @@ export function AdvancedRetouch({ projectId, photoId, recipe, disabled, onRun }:
     </ol>
     {shown && !running && <div className="advanced-retouch-quality" role="status">
       <p>{shown.summary}</p>
+      {shown.revisionStatus !== 'current' && <p>{shown.revisionStatus === 'changed'
+        ? 'These measurements belong to earlier settings. Run the checks again for this edit.'
+        : 'This historical report has no saved settings comparison. Run the checks again to verify this edit.'}</p>}
+      <p>{shown.quality.measurementStatus === 'measured'
+        ? `QC measured at ${shown.quality.analysisWidth} × ${shown.quality.analysisHeight} pixels. Inspect full-resolution output before delivery.`
+        : 'QC is incomplete. Missing measurements and older reports do not verify the final retouch.'}</p>
       <p>Skin texture kept: {percent(shown.quality.textureRetention)} · skin colour drift: {shown.quality.skinShift === null ? 'not measured' : shown.quality.skinShift.toFixed(3)} · clipped pixels: {percent(shown.quality.clippedOriginal)} before, {percent(shown.quality.clippedFinal)} after{shown.quality.corrected ? ' · quality control softened a step and measured again' : ''}.</p>
+      {!!shown.quality.contours?.length && <details>
+        <summary>Inspect checks for each facial region</summary>
+        <p className="lr-hint">These landmark-based areas check for new seams and weakened edges. They do not identify every skin pixel or confirm blemish removal.</p>
+        <table aria-label="Facial region contour checks">
+          <thead><tr><th>Face</th><th>Area</th><th>Result</th><th>New seams</th><th>Weakened edges / source edges</th></tr></thead>
+          <tbody>{shown.quality.contours.flatMap(c => c.regions.map(r => <tr key={`${c.face}-${r.region}`}>
+            <td>{c.face + 1}</td><td>{REGION_LABELS[r.region]}</td>
+            <td>{!r.measured ? 'Not measured' : r.review ? 'Review required' : 'Within pilot limits'}</td>
+            <td>{r.newSeamPairs}</td><td>{r.weakenedEdgePairs} / {r.sourceEdgePairs}</td>
+          </tr>))}</tbody>
+        </table>
+      </details>}
       <p className="lr-hint">Step back through “Auto advanced retouch” entries in the history to compare RAW, corrected, retouched and final. Export the master as 16-bit TIFF in Adobe RGB and web copies in sRGB from the Export step.</p>
     </div>}
   </section>;

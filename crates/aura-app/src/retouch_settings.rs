@@ -25,6 +25,11 @@ pub struct Settings {
     pub ai_skin_detection: bool,
     /// Retouch only the largest face (and its body) instead of everybody.
     pub main_subject_only: bool,
+    /// Restrict broad frequency healing, separation and dodge/burn to a single trusted
+    /// portrait. Compact donor repairs and ordinary skin correction remain available.
+    pub portrait_only_advanced: bool,
+    /// Keep strongly red/magenta forehead decorations out of automatic skin operations.
+    pub protect_ceremonial_marks: bool,
     /// How strictly face skin must match the person's own skin colour (beard, brows, lips and
     /// make-up are left out more as this rises).
     pub mask_precision: f32,
@@ -146,6 +151,9 @@ pub struct Settings {
     pub body_redness: f32,
     /// Small spots on body skin healed.
     pub body_blemishes: f32,
+    /// Include dark body marks separately from facial dark spots. Off protects natural
+    /// neck/body shadows where facial landmarks cannot distinguish structure from a mark.
+    pub body_dark_marks: bool,
     /// Stretch marks evened out of body skin: long, faint lines the spot healing leaves.
     /// Hands, a navel and every other contour on the skin are kept. 0 is off. ADR-0118.
     pub stretch_marks: f32,
@@ -173,6 +181,8 @@ impl Default for Settings {
         Self {
             ai_skin_detection: true,
             main_subject_only: false,
+            portrait_only_advanced: false,
+            protect_ceremonial_marks: false,
             mask_precision: 0.5,
             edge_softness: 0.35,
             protect_facial_hair: true,
@@ -227,6 +237,7 @@ impl Default for Settings {
             body_shine: 0.25,
             body_redness: 0.0,
             body_blemishes: 0.0,
+            body_dark_marks: false,
             stretch_marks: 0.0,
             hair_detail: 0.0,
             hair_shine: 0.0,
@@ -238,7 +249,7 @@ impl Default for Settings {
 }
 
 /// Number of named settings in [`Settings`], for documentation and the UI's own check.
-pub const COUNT: usize = 61;
+pub const COUNT: usize = 65;
 
 fn unit(v: f32, fallback: f32) -> f32 {
     if v.is_finite() {
@@ -264,6 +275,8 @@ impl Settings {
         Self {
             ai_skin_detection: self.ai_skin_detection,
             main_subject_only: self.main_subject_only,
+            portrait_only_advanced: self.portrait_only_advanced,
+            protect_ceremonial_marks: self.protect_ceremonial_marks,
             mask_precision: unit(self.mask_precision, d.mask_precision),
             edge_softness: unit(self.edge_softness, d.edge_softness),
             protect_facial_hair: self.protect_facial_hair,
@@ -320,6 +333,7 @@ impl Settings {
             body_shine: unit(self.body_shine, 0.0),
             body_redness: unit(self.body_redness, 0.0),
             body_blemishes: unit(self.body_blemishes, 0.0),
+            body_dark_marks: self.body_dark_marks,
             stretch_marks: unit(self.stretch_marks, 0.0),
             hair_detail: unit(self.hair_detail, 0.0),
             hair_shine: unit(self.hair_shine, 0.0),
@@ -351,7 +365,14 @@ mod tests {
     #[test]
     fn all_settings_round_trip_and_old_options_get_neutral_values() {
         let value = serde_json::to_value(Settings::default()).unwrap();
-        assert_eq!(value.as_object().unwrap().len(), COUNT);
+        // Default cleanupPasses is omitted on the wire but remains a named control.
+        assert_eq!(value.as_object().unwrap().len(), COUNT - 1);
+        let complete = serde_json::to_value(Settings {
+            cleanup_passes: 4,
+            ..Settings::default()
+        })
+        .unwrap();
+        assert_eq!(complete.as_object().unwrap().len(), COUNT);
         // The wire names the UI sends (ui/src/ipc/nativeRetouch.ts).
         for key in [
             "aiSkinDetection",
@@ -381,6 +402,7 @@ mod tests {
         assert!(parsed.protect_eye_area && parsed.protect_nose_detail);
         // Options saved before moles were told apart keep them from now on.
         assert!(parsed.keep_moles);
+        assert!(!parsed.portrait_only_advanced);
     }
 
     #[test]

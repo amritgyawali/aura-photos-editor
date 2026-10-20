@@ -6,6 +6,15 @@ use std::path::Path;
 use time::OffsetDateTime;
 use unicode_normalization::UnicodeNormalization;
 
+/// Catalogue roots are directories even when the picker supplied one file.
+pub(crate) fn source_directory(root: &Path) -> &Path {
+    if root.is_file() {
+        root.parent().unwrap_or(root)
+    } else {
+        root
+    }
+}
+
 /// Compare-form of a path: NFC-normalised, forward slashes, case preserved.
 ///
 /// Used for duplicate detection only. The catalog always stores the exact bytes

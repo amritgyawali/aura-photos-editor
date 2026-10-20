@@ -8,6 +8,26 @@ examples. The images do not disclose Evoto's proprietary algorithms.
 
 ## Delivered workflows
 
+- Sampled colour selection: pick a point on the photo, set colour tolerance,
+  falloff and lightness sensitivity, and intersect it with existing masks.
+  Local saturation and vibrance can then adjust just the matching colours.
+  The sample follows earlier edits; preview the mask and exclude similarly
+  coloured objects manually. See the
+  [implementation and validation](reports/AURA-sampled-colour-tools-2026-10-19.md).
+
+- Optical and colour tools: directional motion blur, radial zoom blur with a
+  movable centre, hue-selective colour-spill suppression, and highlight
+  compression. Use **Retouch** with a manual selection or saved region mask.
+  Blur sampling excludes protected pixels; highlight compression preserves
+  existing channel ratios. See the
+  [implementation and validation](reports/AURA-optical-and-colour-tools-2026-10-19.md).
+
+- Selected material and light effects: fabric chroma moiré reduction, sampled
+  fabric stain correction, bounded shadow balancing, background blur and
+  highlight glow. Find them through **Retouch → Find a retouch tool**. These are
+  manually targeted native effects with saved selections and Undo, not automatic
+  garment detection, depth estimation or generative reconstruction. See the
+  [implementation and validation](reports/AURA-material-and-light-tools-2026-10-19.md).
 - Paired finished-reference matching: choose a JPEG/PNG export of the same photo
   in the studio to fit nine native tone/colour settings. AURA keeps saved healing
   and manual settings, measures improvement at full resolution before saving,

@@ -1,5 +1,13 @@
 # Third-party notices
 
+## Reference image decoding and colour management
+
+Reference colour matching uses `image` 0.25.10 (MIT OR Apache-2.0) with its JPEG,
+PNG and TIFF codecs, and `moxcms` 0.8.1 (BSD-3-Clause OR Apache-2.0) for ICC
+conversion. These are independent open-source libraries; no Evoto implementation
+or model weights are bundled. The release dependency notice generator includes
+the resolved codecs, mathematical dependencies and their original licence texts.
+
 ## GPU output runtime
 
 AURA uses the wgpu 27.0.1 graphics runtime and its wgpu-core, wgpu-hal, wgpu-types and

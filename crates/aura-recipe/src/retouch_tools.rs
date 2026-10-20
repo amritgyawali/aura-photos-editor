@@ -72,6 +72,19 @@ pub struct Selection {
     pub gradient: Option<Gradient>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub luminance: Option<LuminanceRange>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<ColorRange>,
+}
+
+/// Colour measured at this coordinate immediately before the operation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ColorRange {
+    pub sample: [f32; 2],
+    /// Euclidean D65 Lab distance, used only as a selection metric.
+    pub tolerance: f32,
+    pub softness: f32,
+    pub lightness: f32,
 }
 
 impl Default for SkinSettings {
@@ -104,6 +117,26 @@ pub enum Tool {
     EyeDetail,
     RedEye,
     Fabric,
+    /// Selection-limited chroma filtering; original luminance detail is preserved.
+    FabricMoire,
+    /// Low-frequency fabric correction toward a required clean source sample.
+    FabricStain,
+    /// Lift a smooth shadow field toward selected upper midtones, bounded by `tone * 2` stops.
+    ShadowBalance,
+    /// Blur selected background pixels without mixing excluded subjects into the kernel.
+    BackgroundBlur,
+    /// Spread highlight energy above `0.18 * 2^(tone * 4)` in linear light.
+    HighlightGlow,
+    /// Selected line integration; `warmth * 180` is direction in degrees.
+    MotionBlur,
+    /// Radial integration around `source` or the image centre; travel is `radius * 10`.
+    ZoomBlur,
+    /// Suppress chroma aligned to `target_color`, preserving working luminance.
+    ColorDespill,
+    /// Continuous luminance shoulder above `0.18 * 2^(tone * 4)`.
+    HighlightCompress,
+    /// Local chroma gain: `warmth` is saturation, `tint` is adaptive vibrance.
+    ColorSaturation,
     Backdrop,
     Glare,
     Makeup,
@@ -246,6 +279,10 @@ pub struct Matte {
     /// soft surface selection, so blemishes cannot cut holes in their own correction.
     #[serde(default = "default_refine_edges")]
     pub refine_edges: bool,
+    /// Contract only the external contour against image edges. Protected holes and
+    /// skin texture retain their authored coverage; this mode never adds selection.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub refine_contour: bool,
 }
 
 fn default_refine_edges() -> bool {
@@ -337,6 +374,7 @@ impl Matte {
             height,
             data: base64_encode(&runs),
             refine_edges: true,
+            refine_contour: false,
         }
     }
 
@@ -395,6 +433,24 @@ fn valid_heal_support(edit: &Edit) -> bool {
     samples && donors
 }
 
+fn valid_target_color(edit: &Edit) -> bool {
+    let Some(color) = edit.target_color else {
+        return !matches!(
+            edit.tool,
+            Tool::Colorize | Tool::BackgroundColor | Tool::ColorDespill
+        );
+    };
+    if !color
+        .iter()
+        .all(|v| v.is_finite() && (0.0..=1.0).contains(v))
+    {
+        return false;
+    }
+    let lo = color.into_iter().fold(f32::INFINITY, f32::min);
+    let hi = color.into_iter().fold(f32::NEG_INFINITY, f32::max);
+    edit.tool != Tool::ColorDespill || hi - lo >= 0.02
+}
+
 /// Validate retouch parameters and aggregate authoring limits.
 ///
 /// # Errors
@@ -430,11 +486,7 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || edit.repair_passes.is_some_and(|n| {
                 !(1..=4).contains(&n) || !matches!(edit.tool, Tool::AcneClear | Tool::FrequencyHeal)
             })
-            || edit
-                .target_color
-                .is_some_and(|rgb| !rgb.iter().all(|v| unit(*v)))
-            || (matches!(edit.tool, Tool::Colorize | Tool::BackgroundColor)
-                && edit.target_color.is_none())
+            || !valid_target_color(edit)
             || (edit.tool == Tool::Reshape && edit.selection.as_ref().is_some_and(|s| s.inverted))
             || !edit.source_scale.is_finite()
             || !(0.2..=1.0).contains(&edit.source_scale)
@@ -447,6 +499,7 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
                 edit.tool,
                 Tool::Clone
                     | Tool::ColorMatch
+                    | Tool::FabricStain
                     | Tool::SkinSmooth
                     | Tool::SkinUniformity
                     | Tool::PortraitDodgeBurn
@@ -623,6 +676,16 @@ fn validate_selection(edit: &Edit) -> AuraResult<()> {
                 || !(0.0..=4.0).contains(&r.softness)
         }) {
             return Err(recipe_invalid(KEY, "invalid luminance range"));
+        }
+        if selection.color.as_ref().is_some_and(|r| {
+            !r.sample.iter().all(|v| unit(*v))
+                || !r.tolerance.is_finite()
+                || !(0.0..=100.0).contains(&r.tolerance)
+                || !r.softness.is_finite()
+                || !(0.0..=100.0).contains(&r.softness)
+                || !unit(r.lightness)
+        }) {
+            return Err(recipe_invalid(KEY, "invalid color range"));
         }
         if edit.tool == Tool::Heal
             && edit.source.is_none()

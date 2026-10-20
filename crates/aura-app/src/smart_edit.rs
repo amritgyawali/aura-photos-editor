@@ -695,6 +695,7 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace], developed: 
         Some([p.first().copied()?, p.get(1).copied()?, p.get(2).copied()?])
     };
     let mut samples = Vec::new();
+    let mut tiles: [Vec<(f32, f32, f32)>; 16] = std::array::from_fn(|_| Vec::new());
     let mut edges = [0.0_f64; 3];
     let mut total = 0_usize;
     for y in (0..h - 1).step_by(step) {
@@ -727,6 +728,9 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace], developed: 
             let (lr, lb) = ((r / g).ln(), (b / g).ln());
             if lr.abs() < 0.8 && lb.abs() < 0.8 {
                 samples.push((lr, lb, luma([r, g, b])));
+                if let Some(tile) = tiles.get_mut((y * 4 / h).min(3) * 4 + (x * 4 / w).min(3)) {
+                    tile.push((lr, lb, luma([r, g, b])));
+                }
             }
         }
     }
@@ -884,6 +888,11 @@ fn white_balance(frame: &aura_render::Frame, faces: &[PortraitFace], developed: 
             reason: "the cast points the same way as the colours that fill the frame (clothing, decor, a painted wall), so it is the scene's colour rather than the light's",
         };
     }
+    if !spatial_light_agrees(&tiles, estimate) {
+        return Neutral::Unsure {
+            reason: "bright neutral candidates in different parts of the photograph disagree about the light; a global correction would shift some areas the wrong way",
+        };
+    }
     let strength = ((cast - floor) / cast).min(0.85);
     let virtual_gray = [
         0.18 * (estimate.0 * strength).exp(),
@@ -968,7 +977,34 @@ fn scene_colour_explains(
 /// when there are too few of them, they are not bright, or they do not agree with each other
 /// (coloured lights rather than white things).
 fn white_patch(samples: &[(f32, f32, f32)]) -> Option<(f32, f32)> {
-    if samples.len() < 400 {
+    white_patch_with_minimum(samples, 400, 30)
+}
+
+/// Equal votes from spatially separate bright references. A large backdrop must
+/// not outvote smaller areas under different light just by supplying more pixels.
+fn spatial_light_agrees(tiles: &[Vec<(f32, f32, f32)>], estimate: (f32, f32)) -> bool {
+    let votes: Vec<_> = tiles
+        .iter()
+        .filter_map(|tile| white_patch_with_minimum(tile, 64, 8))
+        .collect();
+    if votes.len() < 3 {
+        // No independent spatial evidence: retain the existing conservative
+        // three-estimator checks rather than inventing a new illuminant.
+        return true;
+    }
+    let agreed = votes
+        .iter()
+        .filter(|p| (p.0 - estimate.0).hypot(p.1 - estimate.1) <= 0.12)
+        .count();
+    agreed * 5 >= votes.len() * 4
+}
+
+fn white_patch_with_minimum(
+    samples: &[(f32, f32, f32)],
+    minimum: usize,
+    bright_minimum: usize,
+) -> Option<(f32, f32)> {
+    if samples.len() < minimum {
         return None;
     }
     let mut lumas: Vec<f32> = samples.iter().map(|sample| sample.2).collect();
@@ -981,7 +1017,7 @@ fn white_patch(samples: &[(f32, f32, f32)]) -> Option<(f32, f32)> {
         .filter(|sample| sample.2 >= floor)
         .map(|sample| (sample.0, sample.1))
         .unzip();
-    if red.len() < 30 {
+    if red.len() < bright_minimum {
         return None;
     }
     let deviation = |values: &[f32]| {
@@ -1308,6 +1344,7 @@ pub fn analyse_from(
                 skin: None,
                 matte: None,
                 selection: Some(Selection {
+                    color: None,
                     inverted: false,
                     gradient: Some(Gradient {
                         start: [0.5, m.horizon.min(0.95)],
@@ -1954,6 +1991,32 @@ pub(crate) struct Seen {
     faces: Vec<PortraitFace>,
 }
 
+/// Meter the rendition that the renderer uses. An embedded camera JPEG can be a stop
+/// brighter, or carry a different white balance, than the neutral sensor rendering.
+/// It is useful for the library, but its histogram must not decide a RAW's exposure.
+fn metering_thumb(
+    thumb: std::sync::Arc<aura_raw::PixelBuffer>,
+    proxy: Option<&std::sync::Arc<aura_raw::PixelBuffer>>,
+) -> std::sync::Arc<aura_raw::PixelBuffer> {
+    let Some(proxy) = proxy.filter(|p| p.source == aura_raw::PixelSource::Demosaiced) else {
+        return thumb;
+    };
+    let Some(rgb) = proxy.as_srgb8() else {
+        return thumb;
+    };
+    let size = aura_raw::demosaic::fit_long_edge(proxy.width, proxy.height, 512);
+    let linear = aura_raw::demosaic::from_srgb8(rgb, proxy.width, proxy.height);
+    let small = aura_raw::demosaic::resize(&linear, size.0, size.1);
+    std::sync::Arc::new(aura_raw::PixelBuffer {
+        width: small.width,
+        height: small.height,
+        data: aura_raw::PixelData::Srgb8(aura_raw::demosaic::to_srgb8(&small)),
+        colour_space: aura_raw::ColourSpace::Srgb,
+        source: aura_raw::PixelSource::Demosaiced,
+        decode_ms: proxy.decode_ms,
+    })
+}
+
 impl Seen {
     /// Decode the previews and find the faces, as Auto enhance does.
     ///
@@ -1970,9 +2033,6 @@ impl Seen {
             aura_raw::PixelLevel::Thumb(512),
             Priority::Interactive,
         )?;
-        let rgb = thumb.as_srgb8().ok_or_else(|| {
-            aura_core::errors::render::recipe_invalid("photo", "An sRGB preview is required")
-        })?;
         let proxy = previews
             .get(
                 photo,
@@ -1980,6 +2040,10 @@ impl Seen {
                 Priority::Interactive,
             )
             .ok();
+        let thumb = metering_thumb(thumb, proxy.as_ref());
+        let rgb = thumb.as_srgb8().ok_or_else(|| {
+            aura_core::errors::render::recipe_invalid("photo", "An sRGB preview is required")
+        })?;
         let found = aura_vision::portrait::detect(rgb, thumb.width, thumb.height)?;
         let faces = match proxy
             .as_ref()
@@ -2047,7 +2111,9 @@ impl Seen {
         if let Some(note) = note {
             plan.decisions.insert(1.min(plan.decisions.len()), note);
         }
-        let look = crate::adaptive_look::enabled().then(|| {
+        // Finished files already contain a rendering choice. Repair measured faults, but
+        // reserve the extra creative grade for RAW development or an explicitly chosen look.
+        let look = (crate::adaptive_look::enabled() && !developed).then(|| {
             crate::adaptive_look::plan(
                 large.as_ref().unwrap_or(&small),
                 &self.faces,
@@ -2261,9 +2327,6 @@ fn run_with(
             Priority::Interactive,
         )?
     };
-    let Some(rgb) = thumb.as_srgb8() else {
-        return Err(invalid("An sRGB preview is required").into());
-    };
     // Fine features (spots, eyes, teeth, noise) need more pixels than the thumbnail has.
     let proxy = {
         let _t = crate::perf::step(state, "edit.preview_proxy");
@@ -2274,6 +2337,10 @@ fn run_with(
                 Priority::Interactive,
             )
             .ok()
+    };
+    let thumb = metering_thumb(thumb, proxy.as_ref());
+    let Some(rgb) = thumb.as_srgb8() else {
+        return Err(invalid("An sRGB preview is required").into());
     };
     let detail = proxy
         .as_ref()
@@ -2375,7 +2442,7 @@ fn run_with(
                 plan.decisions.push(note);
             }
             // The finishing look, measured on this frame after its corrections are decided.
-            if crate::adaptive_look::enabled() {
+            if crate::adaptive_look::enabled() && !developed {
                 let look = {
                     let _t = crate::perf::step(state, "edit.look_plan");
                     crate::adaptive_look::plan(&px, &faces, plan.kind, plan.monochrome, tone.3)
@@ -2759,6 +2826,56 @@ mod tests {
             .is_none());
     }
 
+    #[test]
+    fn raw_metering_ignores_a_brighter_camera_jpeg_and_uses_sensor_colour() {
+        use aura_raw::{ColourSpace, PixelBuffer, PixelData, PixelSource};
+        use std::sync::Arc;
+        let camera = Arc::new(PixelBuffer {
+            width: 512,
+            height: 384,
+            data: PixelData::Srgb8([220, 170, 140].repeat(512 * 384)),
+            colour_space: ColourSpace::Srgb,
+            source: PixelSource::Embedded,
+            decode_ms: 0,
+        });
+        let sensor = Arc::new(PixelBuffer {
+            width: 800,
+            height: 600,
+            data: PixelData::Srgb8([75, 80, 85].repeat(800 * 600)),
+            colour_space: ColourSpace::Srgb,
+            source: PixelSource::Demosaiced,
+            decode_ms: 0,
+        });
+        let metered = metering_thumb(camera, Some(&sensor));
+        assert_eq!((metered.width, metered.height), (512, 384));
+        assert_eq!(metered.source, PixelSource::Demosaiced);
+        let pixels = metered.as_srgb8().unwrap();
+        assert!(pixels.chunks_exact(3).all(|p| p == [75, 80, 85]));
+        assert!(crate::photo_enhance::correction(pixels).unwrap().0 > 0.0);
+    }
+
+    #[test]
+    fn metering_keeps_finished_files_and_unavailable_proxy_fallbacks() {
+        use aura_raw::{ColourSpace, PixelBuffer, PixelData, PixelSource};
+        use std::sync::Arc;
+        let finished = Arc::new(PixelBuffer {
+            width: 32,
+            height: 24,
+            data: PixelData::Srgb8([140, 120, 100].repeat(32 * 24)),
+            colour_space: ColourSpace::Srgb,
+            source: PixelSource::Embedded,
+            decode_ms: 0,
+        });
+        assert!(Arc::ptr_eq(
+            &metering_thumb(finished.clone(), None),
+            &finished
+        ));
+        assert!(Arc::ptr_eq(
+            &metering_thumb(finished.clone(), Some(&finished)),
+            &finished
+        ));
+    }
+
     fn pixels(rgb: &[u8], w: u32, h: u32) -> Pixels<'_> {
         Pixels::new(rgb, w, h).unwrap()
     }
@@ -2887,6 +3004,46 @@ mod tests {
             ),
             "{:?}",
             white_balance(&frame, &[], true)
+        );
+    }
+
+    #[test]
+    fn spatial_white_votes_reject_mixed_light_despite_a_dominant_background() {
+        let patch = |cast: (f32, f32), count: usize| {
+            (0..count)
+                .map(|i| (cast.0, cast.1, 0.35 + (i % 20) as f32 * 0.015))
+                .collect::<Vec<_>>()
+        };
+        // One huge warm object cannot outvote several smaller cool references.
+        let mut tiles = vec![patch((0.15, -0.1), 40_000)];
+        tiles.extend((0..5).map(|_| patch((-0.08, 0.08), 500)));
+        assert!(!spatial_light_agrees(&tiles, (0.15, -0.1)));
+        let uniform: Vec<_> = (0..16).map(|_| patch((0.15, -0.1), 500)).collect();
+        assert!(spatial_light_agrees(&uniform, (0.15, -0.1)));
+        assert!(spatial_light_agrees(&[], (0.15, -0.1)));
+    }
+
+    #[test]
+    fn global_white_balance_defers_when_one_quarter_has_different_light() {
+        let light = [0.16_f32.exp(), 1.0, (-0.08_f32).exp()];
+        let uniform = lit_frame([0.3; 3], Some(0.6), light);
+        assert!(matches!(
+            white_balance(&uniform, &[], true),
+            Neutral::Correct { .. }
+        ));
+        let mut mixed = uniform;
+        for y in 0..mixed.height as usize {
+            for x in mixed.width as usize * 3 / 4..mixed.width as usize {
+                let i = (y * mixed.width as usize + x) * 3;
+                for (c, channel) in light.iter().enumerate() {
+                    mixed.rgb[i + c] /= channel;
+                }
+            }
+        }
+        assert!(
+            matches!(white_balance(&mixed, &[], true), Neutral::Unsure { reason } if reason.contains("different parts")),
+            "{:?}",
+            white_balance(&mixed, &[], true)
         );
     }
 
