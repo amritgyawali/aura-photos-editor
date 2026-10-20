@@ -3641,6 +3641,93 @@ async fn native_retouch_edit(
 }
 
 #[tauri::command]
+async fn prepare_regional_color_match(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::RegionalPrepareInput,
+) -> IpcResult<aura_app::color_match::RegionalMatchReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::prepare_regional(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn regional_color_match_status(
+    state: State<'_, AppState>,
+    photo_id: String,
+) -> IpcResult<Option<aura_app::color_match::RegionalMatchReport>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::regional_status(&app, &photo_id)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn apply_regional_color_match(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::RegionalApplyInput,
+) -> IpcResult<aura_app::color_match::RegionalMatchReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::apply_regional(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn automatic_finish_state(
+    state: State<'_, AppState>,
+    input: aura_app::automatic_strength::Input,
+) -> IpcResult<aura_app::automatic_strength::Report> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::automatic_strength::read(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn manage_color_reference(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::ManageInput,
+) -> IpcResult<Option<aura_app::color_match::ReferenceSummary>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::manage_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn capture_color_reference(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::CaptureInput,
+) -> IpcResult<aura_app::color_match::ReferenceSummary> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::capture_reference(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn adjust_automatic_finish(
+    state: State<'_, AppState>,
+    input: aura_app::automatic_strength::ApplyInput,
+) -> IpcResult<aura_app::automatic_strength::Report> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::automatic_strength::apply(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn native_retouch_preview(
     state: State<'_, AppState>,
     project_id: String,
@@ -3941,6 +4028,8 @@ fn main() {
             sync_settings,
             pick_white_balance,
             native_retouch_edit,
+            automatic_finish_state,
+            adjust_automatic_finish,
             native_retouch_blemish_review,
             native_retouch_selection_preview,
             native_retouch_saved_selection,
@@ -3970,6 +4059,11 @@ fn main() {
             match_paired_reference,
             import_color_reference,
             list_color_references,
+            manage_color_reference,
+            capture_color_reference,
+            prepare_regional_color_match,
+            regional_color_match_status,
+            apply_regional_color_match,
             prepare_color_match,
             apply_color_match,
             color_match_status,
