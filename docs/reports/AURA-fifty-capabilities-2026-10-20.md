@@ -184,3 +184,27 @@ Screenshots use a generated synthetic chart. Synthetic fixtures test mechanics
 and original safety; permissioned native-resolution portrait cohorts,
 three-machine performance, and paired Evoto exports remain separate
 qualification work. Exact Evoto pixel or algorithm parity is unverified.
+
+## PR verification follow-up
+
+PR #62's first remote run passes the lint/model gates, UI type-check/tests/build,
+desktop type-check and phase gates. Its dependency check identifies four RustSec
+advisories against the existing `rustls` 0.23.45 lock and a missing license-policy
+entry for Naga's existing `hexf-parse` 0.2.1 dependency. This is separate from the
+50 capability count.
+
+The workspace minimum and both lockfiles now select `rustls` 0.23.46, the patched
+release for [0346](https://rustsec.org/advisories/RUSTSEC-2026-0346.html),
+[0347](https://rustsec.org/advisories/RUSTSEC-2026-0347.html),
+[0348](https://rustsec.org/advisories/RUSTSEC-2026-0348.html) and
+[0349](https://rustsec.org/advisories/RUSTSEC-2026-0349.html). No new advisory
+exceptions are added. A crate-scoped CC0-1.0 entry documents the parser's
+published license in `deny.toml` and `THIRD-PARTY-NOTICES.md`. The release notice
+generator already recognizes CC0. Local cargo-deny 0.20.2 (the CI version)
+passes advisories, bans, licenses and sources; existing duplicate-version
+warnings remain advisory. IPC definitions, registrations and calls match at
+**342 each**. With the patched locks, all **169 cloud gateway tests** pass (one
+live-only test ignored) and the standalone desktop passes `cargo check --locked`.
+Logs are retained in `.work-checks/fifty/`. Remote platform and benchmark results
+must be read from the latest PR check run; these local results do not certify
+pending remote lanes.

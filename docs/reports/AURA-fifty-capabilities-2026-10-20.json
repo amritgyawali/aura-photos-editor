@@ -974,5 +974,37 @@
       "assets/aura-fifty-selection-tools-2026-10-20.png",
       "assets/aura-fifty-framing-inspection-2026-10-20.png"
     ]
+  },
+  "dependencyFollowUp": {
+    "reason": "First PR 62 CI run failed on existing rustls advisories and the hexf-parse license policy entry",
+    "rustlsVersion": "0.23.46",
+    "workspaceAndDesktopLocksUpdated": true,
+    "resolvedAdvisories": [
+      "RUSTSEC-2026-0346",
+      "RUSTSEC-2026-0347",
+      "RUSTSEC-2026-0348",
+      "RUSTSEC-2026-0349"
+    ],
+    "newAdvisoryExceptions": false,
+    "licenseException": {
+      "crate": "hexf-parse",
+      "publishedVersion": "0.2.1",
+      "license": "CC0-1.0",
+      "scope": "This crate only; existing Naga dependency"
+    },
+    "cargoDenyVersion": "0.20.2",
+    "cargoDenyCategories": {
+      "advisories": "passed",
+      "bans": "passed",
+      "licenses": "passed",
+      "sources": "passed"
+    },
+    "cloudTestsPassed": 169,
+    "cloudTestsIgnored": 1,
+    "desktopLockedCheck": "passed",
+    "ipcDefinitions": 342,
+    "ipcRegistrations": 342,
+    "ipcTypedCalls": 342,
+    "remoteCiStatus": "Follow the latest PR 62 check run; local checks do not certify pending remote lanes"
   }
 }

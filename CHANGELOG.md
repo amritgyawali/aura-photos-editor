@@ -4,6 +4,8 @@ All notable changes to AURA. One entry per phase, newest first.
 
 ## Fifty studio capabilities - 2026-10-20
 
+- Update the workspace and desktop TLS locks to rustls 0.23.46 for four
+  RustSec fixes; record the existing GPU parser's scoped CC0 license exception.
 - Add native Levels, luminosity Levels, selective CMYK and sampled endpoints;
   extend masks with curves, HSL, colour grading, sharpening and dehaze.
 - Add twelve composed-selection workflows, including whole inversion,
