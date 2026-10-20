@@ -124,6 +124,7 @@ pub mod retouch_analysis;
 pub mod retouch_cache;
 mod retouch_clear;
 mod retouch_color;
+mod retouch_effects;
 mod retouch_heal;
 mod retouch_mask;
 mod retouch_matte;

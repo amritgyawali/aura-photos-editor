@@ -432,6 +432,13 @@ fn push_all(
 /// than nine agreeing windows *and* either a skin fraction under 0.65, no eye the eye cascade
 /// agreed with, or no mouth - a clock, a badge, a flag, a table top. Every true face with that
 /// few windows had all three.
+///
+/// The tilted scan needs more at its floor of five windows. Gold silk and gilded carving sit
+/// inside the broad skin prior and their sequins and studs pass as eyes and a mouth, so on 67
+/// wedding photographs both tilted detections at five windows were gold ornament - one on a
+/// bride's dress, which portrait retouch then smoothed as a face. At five windows a tilted face
+/// now needs the eye cascade to agree with both eyes; from six it is accepted as before. Every
+/// frontal and profile detection at eight windows or fewer on the same photographs was a face.
 fn accept(face: &FaceGeometry, colourful: bool) -> bool {
     let skin = if colourful { face.skin_fraction } else { 1.0 };
     let n = face.neighbours;
@@ -444,7 +451,10 @@ fn accept(face: &FaceGeometry, colourful: bool) -> bool {
                     || (n >= 6 && face.eye_hits >= 1 && skin >= 0.75))
         }
         FaceSource::Tilted => {
-            skin >= 0.6 && n >= 5 && face.eyes_measured == 2 && face.mouth_measured
+            skin >= 0.6
+                && face.eyes_measured == 2
+                && face.mouth_measured
+                && (n >= 6 || (n == 5 && face.eye_hits == 2))
         }
         FaceSource::Equalised => skin >= 0.7 && n >= 6 && face.eye_hits >= 1 && face.mouth_measured,
         FaceSource::Profile => {
@@ -967,6 +977,33 @@ mod tests {
         // Turned a quarter clockwise, "right" in the face's frame is "down" on the canvas.
         let p = face.at(1.0, 0.5);
         assert!((p[0] - 100.0).abs() < 1e-3 && (p[1] - 120.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_tilted_face_at_its_window_floor_needs_both_eyes_confirmed() {
+        let face = |neighbours: u32, eye_hits: u8| FaceGeometry {
+            center: [100.0, 100.0],
+            size: 60.0,
+            roll: 0.17,
+            left_eye: [0.0; 2],
+            right_eye: [0.0; 2],
+            nose: [0.0; 2],
+            mouth: [0.0; 2],
+            mouth_width: 10.0,
+            eyes_measured: 2,
+            eye_hits,
+            mouth_measured: true,
+            confidence: 0.76,
+            neighbours,
+            source: FaceSource::Tilted,
+            skin_fraction: 1.0,
+        };
+        // The two gold-ornament false positives: five windows, one or no confirmed eye.
+        assert!(!accept(&face(5, 1), true));
+        assert!(!accept(&face(5, 0), true));
+        assert!(accept(&face(5, 2), true));
+        assert!(accept(&face(6, 0), true));
+        assert!(!accept(&face(4, 2), true));
     }
 
     #[test]

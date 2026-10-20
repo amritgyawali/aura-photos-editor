@@ -41,6 +41,11 @@ either way, turned to one side and the other, and on a locally equalised copy th
 in a dark corner. A candidate becomes a face only with evidence: a skin-coloured centre (unless
 the photograph has no colour) and either many agreeing windows or an eye where an eye should be.
 
+Gold silk, gilded carving and sequins can look like a tilted face to the cascade - skin-coloured,
+with two dark points where eyes would be. A tilted face found by only a few windows therefore has
+to have both of its eyes confirmed by the eye cascade, or it is not treated as a face. If that
+leaves out a real face with its head tilted, draw it with **Draw a face AURA missed**.
+
 It then measures - rather than predicts - everything else, relative to the face it found: the eyes
 from the eye cascade and the darkest compact blob where an iris should be, the mouth from a
 colour map that makes lips stand out, the brows as what is darker than *that person's* forehead,

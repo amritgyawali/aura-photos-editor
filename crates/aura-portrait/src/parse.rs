@@ -35,7 +35,8 @@ use crate::skin::{self, ramp, SkinModel};
 pub const ANALYSIS_EDGE: u32 = 1024;
 
 /// The arithmetic these regions were produced under. Bumping it re-parses every frame.
-pub const PARSE_VER: u16 = 1;
+/// 2: a tilted face at five windows needs both eyes confirmed (ADR-0133).
+pub const PARSE_VER: u16 = 2;
 
 /// How sure the parse is of one region, and how much of the frame it covers.
 #[derive(Debug, Clone, Copy, PartialEq)]

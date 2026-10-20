@@ -293,6 +293,9 @@ fn apply_from(
                 &coverage,
                 references.get(edit.id.as_str()),
             );
+        } else if crate::retouch_effects::supports(edit.tool) {
+            // Liquify, optics, colour, light and portrait effects. ADR-0131.
+            crate::retouch_effects::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::AutoBlemish {
             auto_spots(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::UnderEye && edit.source.is_some() {
@@ -322,6 +325,7 @@ fn tool_label(tool: Tool) -> &'static str {
         Tool::TextureGraft => "retouch.texture",
         Tool::AutoBlemish => "retouch.auto_blemish",
         Tool::UnderEye => "retouch.under_eye",
+        tool if crate::retouch_effects::supports(tool) => "retouch.effects",
         _ => "retouch.local",
     }
 }
@@ -709,23 +713,15 @@ fn apply_one(
                             value[c] += (old[c] - low[c]) * 0.65;
                         }
                     }
-                    Tool::RedEye => {
-                        // Red-eye red has green and blue about equal. Brown irises, skin and lips
-                        // have much less blue than green and are left alone.
-                        if old[0] > old[1].max(old[2]) * 1.5 && old[2] >= old[1] * 0.5 {
-                            value[0] = (old[1] + old[2]) * 0.5;
-                        }
+                    // Red-eye red has green and blue about equal. Brown irises, skin and lips have
+                    // much less blue than green and are left alone.
+                    Tool::RedEye if old[0] > old[1].max(old[2]) * 1.5 && old[2] >= old[1] * 0.5 => {
+                        value[0] = (old[1] + old[2]) * 0.5;
                     }
-                    Tool::PatchHeal
-                    | Tool::Reshape
-                    | Tool::FrequencyHeal
-                    | Tool::AcneClear
-                    | Tool::TextureGraft
-                    | Tool::AutoBlemish
-                    | Tool::StretchMarks
-                    | Tool::SkinSmooth
-                    | Tool::SkinUniformity
-                    | Tool::PortraitDodgeBurn => {}
+                    // Rendered by their own modules before this function is reached: patch heal,
+                    // reshape, frequency heal, acne clear, texture graft, auto blemish, stretch
+                    // marks, the sampled-skin tools, and the effects of `retouch_effects`.
+                    _ => {}
                 }
                 let out = std::array::from_fn::<_, 3, _>(|c| old[c] + a * (value[c] - old[c]));
                 patches.push(((y * w + x) * 3, out));

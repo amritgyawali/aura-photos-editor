@@ -1,0 +1,14 @@
+/* Retouch strength sliders (ADR-0130): one row each, label | slider | value. */
+.retouch-intensity { padding: 14px 16px; margin: 16px 0; border: 1px solid var(--line); border-radius: 10px; display: grid; gap: 6px; }
+.retouch-intensity .lr-hint { margin: 2px 0 6px; }
+.retouch-intensity-row { display: grid; grid-template-columns: minmax(150px, 220px) minmax(120px, 1fr) 48px auto; align-items: center; gap: 12px; min-height: 32px; }
+.retouch-intensity-row > span { min-width: 0; }
+.retouch-intensity-row > span small { color: var(--muted); }
+.retouch-intensity-row input[type='range'] { width: 100%; min-width: 0; accent-color: var(--accent); }
+.retouch-intensity-row output { text-align: right; font-variant-numeric: tabular-nums; }
+.retouch-intensity-row > small.lr-hint { margin: 0; font-size: 11px; }
+.retouch-intensity-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+@media (max-width: 640px) {
+  .retouch-intensity-row { grid-template-columns: 1fr 48px; }
+  .retouch-intensity-row input[type='range'] { grid-column: 1 / -1; grid-row: 2; }
+}

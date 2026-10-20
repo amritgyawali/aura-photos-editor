@@ -5,6 +5,8 @@ import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { AutoRetouchSettings } from './AutoRetouchSettings';
 import { AdvancedRetouch } from './AdvancedRetouch';
+import { RetouchIntensity } from './RetouchIntensity';
+import { EFFECT_COLOR, EFFECT_DEFAULTS, isEffectTool } from '../../ipc/retouchEffects';
 import { changesDataUrl, coverageDataUrl } from './rgbImage';
 import { previewSource, useProgressivePreview } from '../../state/previewCache';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
@@ -139,7 +141,9 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   });
   const chooseTool=(tool:RetouchTool)=>{
     if(selected&&dirty){setError('Apply or discard your changes before choosing another tool.');return;}
-    setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null});
+    setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null,
+      // Each selected effect starts where it is most useful (ADR-0131).
+      ...(isEffectTool(tool)?{...EFFECT_DEFAULTS[tool],targetColor:EFFECT_COLOR[tool]?.initial??null}:{})});
   };
   const chooseMode=(next:RetouchMode)=>{
     setMode(next);setSourceMode(false);setMaskView(false);
@@ -263,6 +267,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         })}/>
         <p className="lr-hint">Detects face and body skin locally. Reuse detected skin selections in any retouch tool, preview the mask, or refine it with the brush. All steps can be edited or undone.</p>
         <PortraitAutoReport recipe={recipe}/>
+        <RetouchIntensity projectId={projectId} photoId={photoId} version={retouchRecipe?.recipeHash ?? null} disabled={stackBlocked||!preview} onRun={task=>void save(task)}/>
         {dirty&&<p className="lr-hint">{draftNotice}</p>}
         <details open><summary>Saved retouch operations ({edits.length})</summary>
           <ol>{edits.map((edit,index)=><li key={edit.id}>
