@@ -113,7 +113,9 @@ elbows, body blemishes, stretch marks. Stretch marks is off unless you raise it 
 **Body skin finish**: it evens long, faint marks out of all the body skin it finds and keeps
 hands, a navel and every other contour as they are.
 
-**Hair, clothes & backdrop** - hair detail, hair shine, fabric creases, clean backdrop.
+**Hair, clothes & backdrop** - hair detail, hair shine, fabric creases, clean backdrop, bright
+backdrop (lifts a plain grey studio backdrop to a clean bright grey, as Evoto does; off unless a
+preset such as *Beauty & Fashion (Evoto-style)* or you turn it on - ADR-0109).
 
 ## What AURA will not do
 

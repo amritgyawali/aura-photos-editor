@@ -154,34 +154,13 @@ fn two_colour(guide: &[[f32; 3]], plane: &[f32], w: usize, h: usize, r: usize) -
         .collect()
 }
 
-/// Mean over a (2r+1)^2 window clipped at the borders, via an integral image.
+/// Mean over a (2r+1)^2 window clipped at the borders.
+///
+/// The renderer's one box mean, [`crate::bands::box_mean`]: a running sum per row and per
+/// column, every core in use, the same result on every machine. An integral image built on one
+/// core did the same job two and a half times slower, and agreed with it to about 3e-8.
 fn box_mean(values: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
-    let stride = w + 1;
-    let mut sum = vec![0.0_f64; stride * (h + 1)];
-    for y in 0..h {
-        let mut row = 0.0_f64;
-        for x in 0..w {
-            row += f64::from(values[y * w + x]);
-            sum[(y + 1) * stride + x + 1] = sum[y * stride + x + 1] + row;
-        }
-    }
-    let mut out = vec![0.0_f32; w * h];
-    // Each output row reads the finished integral image only, so rows run in parallel.
-    {
-        out.par_chunks_exact_mut(w)
-            .enumerate()
-            .for_each(|(y, line)| {
-                let (y0, y1) = (y.saturating_sub(r), (y + r + 1).min(h));
-                for (x, slot) in line.iter_mut().enumerate() {
-                    let (x0, x1) = (x.saturating_sub(r), (x + r + 1).min(w));
-                    let total =
-                        sum[y1 * stride + x1] - sum[y0 * stride + x1] - sum[y1 * stride + x0]
-                            + sum[y0 * stride + x0];
-                    *slot = (total / ((y1 - y0) * (x1 - x0)) as f64) as f32;
-                }
-            });
-    }
-    out
+    crate::bands::box_mean(values, w, h, r)
 }
 
 /// Guided filter (He, Sun and Tang), clamped to 0..1.

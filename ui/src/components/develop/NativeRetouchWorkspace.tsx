@@ -141,7 +141,10 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   });
   const chooseTool=(tool:RetouchTool)=>{
     if(selected&&dirty){setError('Apply or discard your changes before choosing another tool.');return;}
-    setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null,
+    // Fringes run along every bright edge in the photograph: the whole frame, purple at full strength.
+    const defringe=tool==='defringe';
+    setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:defringe?1:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:defringe?1:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null,
+      ...(defringe?{region:[.5,.5,1,1] as [number,number,number,number],feather:0,radius:.003,mask:null,selection:null,matte:null}:{}),
       // Each selected effect starts where it is most useful (ADR-0131).
       ...(isEffectTool(tool)?{...EFFECT_DEFAULTS[tool],targetColor:EFFECT_COLOR[tool]?.initial??null}:{})});
   };

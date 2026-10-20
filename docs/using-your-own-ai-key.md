@@ -21,6 +21,14 @@ screen and pressing it is a complete answer - you will not be asked again, and
 you can come back to it from **Settings > AI keys > Browse all providers**
 whenever you like.
 
+**The quick way for Claude or ChatGPT:** press **Connect Claude** or **Connect ChatGPT** (on the
+first screen, or in **Settings > AI keys**). Your browser opens on Anthropic's or OpenAI's own key
+page. Sign in, create a key, copy it, come back and paste it into the key field. AURA cannot sign
+you in for you - neither company lets another application do that - and a ChatGPT Plus
+subscription is separate from API billing, which is set up on that same OpenAI page.
+
+Or, for any of the nineteen:
+
 1. Pick a provider from the list. Search it if you know what you want.
 2. Paste the key. The screen tells you what that provider's keys look like and
    where they come from.

@@ -185,14 +185,13 @@ impl Stage {
             // estimate of it: the chroma pass runs at r <= 4 and the luminance pass at
             // r <= 3, plus one pixel for the Sobel.
             Self::NoiseReduction => 16,
-            // r = 16.
-            Self::Clarity => 48,
             // Twelve for both, arrived at from different radii: texture blurs at r = 4, and
             // sharpening at r <= 3 plus one pixel for the Sobel. They share an arm because
             // the numbers are equal, not because the stages are.
             Self::Texture | Self::Sharpen => 12,
-            // r = 8 on the dark channel.
-            Self::Dehaze => 24,
+            // Clarity, Dehaze and the local Shadows and Highlights read only the pixel they
+            // write and a frame-wide edge-aware base measured once before the first tile, the
+            // way sharpening's normaliser is. Their reach is the pixel itself. ADR-0126.
             Self::LensDistortion | Self::LensCa | Self::Geometry => 8,
             _ => 0,
         }
@@ -765,11 +764,12 @@ pub fn render_hash(
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}+display.{}",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}",
         ENGINE,
         crate::profiles::PROFILES_VER,
         aura_portrait::PARSE_VER,
-        crate::output::DISPLAY_INPUT_VER
+        crate::output::DISPLAY_INPUT_VER,
+        crate::edge_aware::LOCAL_VER
     )
 }
 
@@ -1008,7 +1008,10 @@ mod tests {
         // version is part of the engine as the profile table's is.
         assert!(engine.contains(&format!("+portrait.{}+", aura_portrait::PARSE_VER)));
         // And so is how a display-referred file is read: it decides every JPEG's pixels.
-        assert!(engine.ends_with(&format!("+display.{}", crate::output::DISPLAY_INPUT_VER)));
+        assert!(engine.contains(&format!("+display.{}+", crate::output::DISPLAY_INPUT_VER)));
+        // And so are the edge-aware base layers: they decide every pixel that Shadows,
+        // Highlights, Clarity or Dehaze touches. ADR-0126.
+        assert!(engine.ends_with(&format!("+local.{}", crate::edge_aware::LOCAL_VER)));
     }
 
     #[test]

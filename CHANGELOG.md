@@ -25,8 +25,8 @@ All notable changes to AURA. One entry per phase, newest first.
 - **Liquify** (ADR-0131): push, enlarge, shrink and twirl, tapering to nothing at the ellipse
   edge so a warp never tears; never used by automatic retouch.
 - **Blur and optics**: spin blur, pixelate and privacy blur, soft focus, Orton glow, local
-  sharpening, edge-preserving local noise reduction, and colour-fringe removal that leaves purple
-  objects alone.
+  sharpening and edge-preserving local noise reduction. (A defringe was also built and then
+  withdrawn on merging `main`, whose measured Defringe of ADR-0125 does the job better.)
 - **Colour**: hue shift and colour unify that keep brightness, green-screen colour replacement
   with spill removal, local white balance from a picked neutral, vein reduction, invert.
 - **Light and portrait**: light leak, glitch, haze, sun rays, film halation, catchlights, a pet-eye
@@ -46,6 +46,79 @@ All notable changes to AURA. One entry per phase, newest first.
   strength can rise, and a slider whose areas are all at full strength stops at 100%.
 - **Apply these strengths to the collection** gives every other auto-retouched photo the same
   strengths over its own measured retouch. Operations made or changed by hand are never scaled.
+## Portrait light: relight a face, open its shadows, add catchlights and a glow, or press Auto light - 2026-10-17
+
+- **A key light shaped by the head** (ADR-0127), in a new **Light** tab of the Portrait studio. Each
+  face is given a 3-D shape from its own landmarks and a virtual soft light shades it by which way
+  each part of it faces, so the near cheek rises and the far cheek and jaw fall into shadow along the
+  curve of the face - not a gradient laid over somebody. Direction and height place the light; one
+  click puts it to the left, the front, the right or behind (a rim light). Brightness moves, colour
+  never does, so nobody's skin tone changes.
+- **Fill light** reads where the shadow on each face actually is and opens it, up to a stop, leaving
+  the lit side, the eyes, the brows and the lips their depth.
+- **Catchlights** go in the side of each iris facing the light, the same place in both eyes, sized to
+  the iris and coloured like the white of that eye. An eye that already has one is left alone.
+- **Glow**: a soft bloom from the brightest parts of the photograph; needs no face.
+- **Auto light** measures how the largest face is lit and proposes a light - a fill for harsh side
+  light, a soft key for flat light, catchlights for dull eyes - saves it as one undoable step, and
+  shows its reasons. Nothing runs automatically; a recipe without a light keeps its exact hash.
+- Presets *Studio portrait light* and *Dreamy glow*. New command `suggest_portrait_light`.
+
+## Shadows, Highlights, Clarity and Dehaze rebuilt to work on regions, and Auto enhance sized from them - 2026-10-17
+
+- **Shadows and Highlights act on regions** (ADR-0126). Each pixel takes the gain its *region*
+  asks for - read from an edge-aware guided-filter base - so a lifted shadow keeps its texture and
+  a recovered sky keeps its clouds white. The old per-pixel curve turned white clouds into grey
+  blobs darker than the sky at Highlights -80. +100 now lifts a shadow region 1.5 stops; -100
+  brings a bright region down 1.1. Clipped regions (a blown JPEG sky) are protected and stay white
+  instead of turning grey and blocky.
+- **Clarity has no halos.** It raises each region's detail against an edge-aware base and steps
+  aside at strong edges: at +100 on a hard four-stop edge it moves no pixel by more than 0.09
+  stops, where the blur it replaces drew a two-stop glow round branches and building edges.
+- **Dehaze is the dark channel prior**: the haze colour and a per-pixel haze map, so the distance
+  is cleared more than the foreground and a blue sky deepens while its clouds stay white. Negative
+  Dehaze adds atmosphere.
+- **A preview and an export look the same.** The bases are measured once on a 512-pixel reduction
+  of the whole frame, so their reach is a share of the photograph rather than a count of render
+  pixels; a tiled export stays bit-identical to a whole one. About 90 ms per preview on a 4-core
+  machine. The engine string gains `+local.1`, so cached previews refresh.
+- **Auto enhance sizes Shadows and Highlights from the photograph's regions**: a frame that is
+  mostly shadow (an interior exposed for its windows) is opened up firmly, a dark background or
+  black fur only lightly, a black backdrop not at all; bright regions with detail are recovered
+  most when they are a sky or a window and least when they are the subject. Night keeps its
+  darkness and high-key frames their white. The reason is written in the plan.
+
+## The lens, corrected the way a professional starts: colour fringing measured, purple rims removed - 2026-10-17
+
+- **Lateral chromatic aberration is measured from the photograph** (ADR-0125) - Lightroom's
+  "Remove Chromatic Aberration", without a lens profile. Clean edges round the frame are read in
+  all three channels to a quarter of a pixel; a fringe that is visible, consistent in every
+  direction and statistically clear is corrected 85 % of the way and then measured again on the
+  corrected pixels before it is kept. Auto enhance applies it in "Light & colour", Auto advanced
+  retouch in "Lens & perspective". On a painted lens it measured 1.07 px of the 1.08 px drawn.
+- **The CA correction no longer leaves a coloured line round the frame**: a channel scaled up
+  read black beyond the border. It reads the edge pixel now, on every core.
+- **Defringe**, a new Retouch tool under Cleanup: purple (and, when asked, green) rims on the
+  dark side of bright edges take the colour of their calm surroundings at their own brightness.
+  Purple things, and the glow round purple lights, keep their colour. Auto enhance and Auto
+  advanced retouch remove purple rims when they measure them; green is left to a person. 1.1 s
+  over a 24-megapixel export.
+
+## Body skin healed where the skin is, and black-and-white photographs left without colour - 2026-10-16
+
+- **Full-length portraits export faster** (ADR-0124): body-skin spot healing works on the
+  separate patches of skin - neck, arms, legs - packed into one compact plane, instead of on the
+  whole body rectangle around them. Thresholds are still measured over the whole selection, at
+  the very same samples, so the result matches the old one to rounding (largest relative
+  difference 2e-6 in the test that holds them together). On a synthetic 13.5 MP figure whose skin
+  is 15 % of the body rectangle the operation went from 6.3-6.7 s to 2.8 s (four threads,
+  development build).
+- **Matte edges refine on every core** (agreeing with the old result to about 3e-8) and each
+  brush stroke is painted over its own reach only (bit-identical): about 900 ms to 650 ms for a
+  body matte, and less sweeping for every automatic retouch selection.
+- **Auto enhance no longer tints a black-and-white or sepia photograph.** The finishing look added
+  a warm/cool split tone and vibrance to frames the planner had already recognised as monochrome
+  or toned. They now get depth only, and the explanation says why.
 
 ## A different look on every photograph, a live status bar, and a folder run in two hours rather than eight - 2026-10-16
 
@@ -328,6 +401,27 @@ All notable changes to AURA. One entry per phase, newest first.
 - Clear old previews, saved steps and coverage when reloading a photo or recipe.
   If loading fails, disable edits and history actions until a successful reload.
   Reload retouch and Back to Develop remain available so the editor can recover.
+## Beauty & Fashion, the Evoto way - 2026-10-11
+
+- **Auto advanced retouch** now has two styles. **Beauty & Fashion (Evoto-style)** finishes a
+  studio portrait the way Evoto's homepage example does in one pass: high-end skin with pores
+  kept, clothing creases softened, stray hair faded, and a plain grey studio backdrop lifted to a
+  clean bright grey (measured from Evoto's own before/after: about +0.4 EV, neutral, not clipped).
+- New automatic setting **Bright backdrop**; scenes, coloured and dark backdrops are never lifted.
+  ADR-0109.
+
+## Evoto-style finishing and Connect Claude / ChatGPT - 2026-10-11
+
+- New **Portrait studio** section in the Photo editor, with Evoto's finishing tools: face reshaping
+  (slim, jawline, chin, forehead, cheekbones, eye size and distance, nose, mouth, lips, smile, head
+  size), body reshaping (slim, waist, hips, arms, shoulders, legs, neck), a liquify brush (push,
+  enlarge, shrink, restore), background replacement (solid colour, gradient, blur, sky), and hair,
+  eye, lip, blush, eyeshadow and brow colour. Seven one-click presets, including a clean white
+  backdrop for headshots. Every change is one undoable step; none of it is ever automatic. ADR-0108.
+- **Connect Claude** and **Connect ChatGPT** open Anthropic's or OpenAI's key page in your browser;
+  paste the key you create there and AURA keeps it in your computer's secure key store.
+- `docs/evoto-parity.md` lists every Evoto tool and where it is in AURA.
+
 ## 1.0.0 - ready to sell - 2026-10-08
 
 - AURA is version 1.0.0.

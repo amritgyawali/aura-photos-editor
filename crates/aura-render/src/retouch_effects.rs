@@ -385,7 +385,7 @@ mod tests {
     use super::testing::*;
     use super::*;
 
-    const ALL: [Tool; 49] = [
+    const ALL: [Tool; 48] = [
         Tool::LiquifyPush,
         Tool::LiquifyBloat,
         Tool::LiquifyPucker,
@@ -397,7 +397,6 @@ mod tests {
         Tool::OrtonGlow,
         Tool::LocalSharpen,
         Tool::LocalDenoise,
-        Tool::Defringe,
         Tool::HueShift,
         Tool::InvertColors,
         Tool::ChromaKey,

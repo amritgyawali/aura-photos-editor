@@ -16,7 +16,7 @@ pub(crate) fn luma(p: [f32; 3]) -> f32 {
 }
 
 /// A rectangle of the frame, padded so a blur near the selection's edge sees real pixels.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Rect {
     pub x0: usize,
     pub y0: usize,

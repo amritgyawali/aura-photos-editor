@@ -157,8 +157,6 @@ pub enum Tool {
     LocalSharpen,
     /// Edge-preserving noise reduction: all colour noise, and luminance noise up to `tone`.
     LocalDenoise,
-    /// Removes purple fringes at high-contrast edges; a positive `tint` also removes green ones.
-    Defringe,
     /// Rotates hue by `warmth * 180` degrees, keeping each pixel's luminance.
     HueShift,
     /// Inverts colours in the display encoding.
@@ -238,6 +236,11 @@ pub enum Tool {
     GodRays,
     /// Falling snow, or rain streaks when `tint` is positive; `tone` is the density.
     Weather,
+    /// Removes the purple (`warmth`) and green (`tint`) rims a lens leaves on the dark side of a
+    /// bright edge, `radius` from it; each rim pixel takes the colour of its calm surroundings
+    /// at its own luminance. A colour its calm surroundings share, or the glow of a coloured
+    /// light, is kept. ADR-0125.
+    Defringe,
 }
 
 impl Tool {

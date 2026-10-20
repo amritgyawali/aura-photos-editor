@@ -102,7 +102,8 @@ build; **model** - missing, and needs a generative or learned model this build c
 Catchlights (Evoto's "AI catchlights" page), freckles (its "freckles filter" page), glitch, light
 leak and colour inversion (its creative-filter pages), plus tools a professional editor expects:
 hue shift, green-screen colour replacement, local white balance, local sharpening, local noise
-reduction, defringing, Orton glow, haze, sun rays, film halation, lip gloss and pixelation.
+reduction, Orton glow, haze, sun rays, film halation, lip gloss and pixelation. (Defringing is
+ADR-0125's measured Defringe.)
 All are placed by hand; [Effects you place yourself](selected-effects.md) lists them.
 
 ## What is still to build without a model

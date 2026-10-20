@@ -45,11 +45,17 @@ export type AdvancedRetouchProgress = {
   state: 'running' | 'done'; outcome: StageOutcome | null;
 };
 export type AdvancedRetouchResult = { recipe: RecipeDto; report: AdvancedRetouchReport };
+/**
+ * A named starting point the backend owns: `professional` is the workflow's own defaults,
+ * `beauty_fashion` is Evoto's homepage "Beauty & Fashion" pass - skin, clothing creases, stray
+ * hair and a plain grey backdrop lifted to a clean bright grey, in one run (ADR-0109).
+ */
+export type AdvancedPreset = 'professional' | 'beauty_fashion';
 
 export const advancedRetouch = {
   /** Runs every stage in order; each stage that changes something is its own history step. */
-  run: (projectId: string, photoId: string, options?: AutoRetouchOptions) =>
-    invoke<AdvancedRetouchResult>('auto_advanced_retouch', { input: { projectId, photoId, options: options ?? null } }),
+  run: (projectId: string, photoId: string, options?: AutoRetouchOptions, preset?: AdvancedPreset) =>
+    invoke<AdvancedRetouchResult>('auto_advanced_retouch', { input: { projectId, photoId, options: options ?? null, preset: preset ?? null } }),
   /** Stage-by-stage progress of a running pass. */
   onProgress: (handler: (event: AdvancedRetouchProgress) => void): Promise<() => void> =>
     listen<AdvancedRetouchProgress>('advanced-retouch', message => handler(message.payload)).then(unlisten => () => { unlisten(); }),

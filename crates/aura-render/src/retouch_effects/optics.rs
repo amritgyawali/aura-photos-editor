@@ -1,9 +1,8 @@
 //! Optical tools: spin blur, pixelate, privacy blur, soft focus, Orton glow, local sharpening,
-//! local noise reduction and defringing.
-use super::{area, each, mix, smoothstep, weight, Frame, Snapshot};
+//! and local noise reduction. Defringing is `retouch_defringe` (ADR-0125).
+use super::{area, each, mix, weight, Frame, Snapshot};
 use crate::bands::blur;
 use crate::retouch_mask::Coverage;
-use crate::retouch_planes::luma;
 use aura_recipe::retouch_tools::{Edit, Tool};
 
 pub(super) fn supports(tool: Tool) -> bool {
@@ -16,7 +15,6 @@ pub(super) fn supports(tool: Tool) -> bool {
             | Tool::OrtonGlow
             | Tool::LocalSharpen
             | Tool::LocalDenoise
-            | Tool::Defringe
     )
 }
 
@@ -26,7 +24,6 @@ pub(super) fn apply(rgb: &mut [f32], frame: Frame, edit: &Edit, coverage: &Cover
         Tool::Pixelate => pixelate(rgb, frame, edit, coverage),
         Tool::LocalSharpen => sharpen(rgb, frame, edit, coverage),
         Tool::LocalDenoise => denoise(rgb, frame, edit, coverage),
-        Tool::Defringe => defringe(rgb, frame, edit, coverage),
         _ => blurred(rgb, frame, edit, coverage),
     }
 }
@@ -253,65 +250,6 @@ fn denoise(rgb: &mut [f32], frame: Frame, edit: &Edit, coverage: &Coverage) {
     });
 }
 
-fn defringe(rgb: &mut [f32], frame: Frame, edit: &Edit, coverage: &Coverage) {
-    let Some(rect) = area(coverage, frame, 0) else {
-        return;
-    };
-    let Some(source) = area(coverage, frame, 6) else {
-        return;
-    };
-    let snapshot = Snapshot::take(rgb, frame, source);
-    let r = snapshot.rect();
-    let lum = snapshot.luma_plane();
-    let soft = blur(&lum, r.w, r.h, 2);
-    // Lateral colour fringes sit beside highlights at or near clipping; the edge of a printed
-    // pattern on purple cloth does not, however sharp it is.
-    let bright = max_filter(&lum, r.w, r.h, 4);
-    let green = edit.tint > 0.0;
-    each(rgb, frame, rect, |x, y, old| {
-        let k = weight(edit, coverage, frame, x, y);
-        if k <= 0.0 {
-            return None;
-        }
-        let i = snapshot.index(x, y);
-        let l = luma(old).max(1e-5);
-        // Fringes live next to high-contrast edges.
-        let edge = smoothstep(0.03, 0.2, (lum[i] - soft[i]).abs() / soft[i].max(1e-4))
-            .max(smoothstep(0.05, 0.3, (lum[i] - soft[i]).abs()));
-        let [nr, ng, nb] = old.map(|v| v / l);
-        let purple = smoothstep(0.05, 0.35, nr.min(nb) - ng);
-        let lime = if green {
-            smoothstep(0.05, 0.35, ng - nr.max(nb))
-        } else {
-            0.0
-        };
-        let fringe = edge * purple.max(lime) * smoothstep(0.55, 0.9, bright[i]);
-        if fringe <= 0.0 {
-            return None;
-        }
-        Some(mix(old, [l, l, l], k * fringe))
-    });
-}
-
-/// The largest value within `radius` of each sample, separably along rows then columns.
-fn max_filter(plane: &[f32], w: usize, h: usize, radius: usize) -> Vec<f32> {
-    let along = |src: &[f32], step: usize, len: usize, lines: usize, stride: usize| {
-        let mut out = vec![0.0; src.len()];
-        for line in 0..lines {
-            for k in 0..len {
-                let lo = k.saturating_sub(radius);
-                let hi = (k + radius).min(len - 1);
-                out[line * stride + k * step] = (lo..=hi)
-                    .map(|j| src[line * stride + j * step])
-                    .fold(f32::MIN, f32::max);
-            }
-        }
-        out
-    };
-    let rows = along(plane, 1, w, h, w);
-    along(&rows, w, h, w, 1)
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::float_cmp)]
 mod tests {
@@ -380,47 +318,6 @@ mod tests {
         assert!(variance(&clean, w, 5..25, 10..50) < variance(&noisy, w, 5..25, 10..50) * 0.5);
         // The edge between the halves is still a step.
         assert!(px(&clean, w, 33, 30)[1] - px(&clean, w, 26, 30)[1] > 0.4);
-    }
-
-    #[test]
-    fn defringe_leaves_a_purple_pattern_edge_with_no_highlight_beside_it() {
-        let (w, h) = (40, 40);
-        // Lavender print on purple cloth: a sharp edge, nothing near clipping.
-        let base = fill(w, h, |x, _| {
-            if (x / 4).is_multiple_of(2) {
-                [0.35, 0.18, 0.4]
-            } else {
-                [0.12, 0.05, 0.15]
-            }
-        });
-        let mut e = edit(Tool::Defringe, [0.5, 0.5, 0.6, 0.6]);
-        e.feather = 0.0;
-        let mut out = base.clone();
-        run(&mut out, w, h, &e);
-        assert_eq!(out, base);
-    }
-
-    #[test]
-    fn defringe_neutralises_purple_at_an_edge_and_leaves_flat_purple_alone() {
-        let (w, h) = (60, 40);
-        let base = fill(w, h, |x, y| {
-            if y > 30 {
-                [0.4, 0.15, 0.4] // a purple object, no edge nearby
-            } else if x < 30 {
-                [0.05, 0.05, 0.05]
-            } else if x < 33 {
-                [0.5, 0.2, 0.55] // fringe on the bright side of an edge
-            } else {
-                [0.9, 0.9, 0.9]
-            }
-        });
-        let mut e = edit(Tool::Defringe, [0.5, 0.5, 0.6, 0.8]);
-        e.feather = 0.0;
-        let mut out = base.clone();
-        run(&mut out, w, h, &e);
-        let fringe = px(&out, w, 31, 15);
-        assert!((fringe[0] - fringe[1]).abs() < 0.12, "{fringe:?}");
-        assert_eq!(px(&out, w, 45, 36), px(&base, w, 45, 36));
     }
 
     #[test]

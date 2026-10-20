@@ -8,8 +8,8 @@ back through. Nothing leaves your computer and your original file is never chang
 
 | Step | What AURA measures | What it changes |
 |---|---|---|
-| 1. Light & colour | Brightness spread, neutral areas (faces ignored), how colourful the frame already is, haze, noise, whether it is a portrait, landscape, low-light or general scene | Exposure, highlights, shadows, contrast, white balance (only a cast the whites confirm, and only part of it, so warm rooms stay warm), vibrance, clarity (never on portraits), dehaze, noise reduction, sharpening (skin masked on portraits) |
-| 2. Sky balance | A bright sky above a measured horizon | A soft gradient that darkens only the bright sky pixels |
+| 1. Light & colour | Brightness spread, neutral areas (faces ignored), how colourful the frame already is, haze, noise, whether it is a portrait, landscape, low-light or general scene; how far the lens put red and blue out of register with green at the corners | Exposure, highlights, shadows, contrast, white balance (only a cast the whites confirm, and only part of it, so warm rooms stay warm), vibrance, clarity (never on portraits), dehaze, noise reduction, sharpening (skin masked on portraits), and the lens's colour fringing when it is visible |
+| 2. Sky balance & purple fringes | A bright sky above a measured horizon; purple rims on the dark side of bright edges | A soft gradient that darkens only the bright sky pixels; each purple rim pixel given the colour of its surroundings |
 | 3. Skin | Each face's own skin, sampled from its cheeks and forehead | Texture smoothing that keeps fine detail, tone evening, gentle local light |
 | 4. Blemishes | Small spots that are **redder** than the skin around them | Each spot healed separately with nearby skin. Darker marks that are not redder — moles, freckles, beauty marks — are kept and counted |
 | 5. Lines & redness | Line texture beside the eyes and on the forehead compared with the same person's cheek; smile-line depth compared with the cheek beside it; redness beside the nose compared with the cheek | Fine lines softened with fine skin texture kept; smile lines lifted, never erased; redness evened toward the person's own cheek colour |
@@ -95,6 +95,32 @@ when there are people, how much of the frame sits at white when there are not, a
 sky is left to the histogram. A white blanket, a dress or a studio wall is the photograph's
 own brightness, and lowering it only turns it grey.
 
+**Shadows and Highlights work on regions, not pixels.** AURA first finds the regions of the
+photograph - a wall, a sky, a window, a face in shadow - by smoothing its brightness while keeping
+the edges between them, and each slider then moves a whole region by one amount. The grain of a
+lifted wall, the clouds in a recovered sky and the detail in a shadowed face are carried along
+unchanged, so nothing flattens and a white cloud never ends up darker than the blue around it. A
+region that is clipped - a blown-out sky in a JPEG - has nothing in it to recover and is left white
+rather than turned grey.
+
+Auto enhance sizes the two sliders from the same regions:
+
+- A photograph that is **mostly shadow** - an interior exposed for its windows, a backlit scene
+  exposed for the sky - is opened up firmly. A **dark background or black fur** is opened only
+  lightly, so it stays a dark background. A **black backdrop** is left black.
+- **Bright regions that still carry detail** are brought down most when they are a sky, a window
+  or a cloud, and least when they are the subject itself: pulling a white building or a bright room
+  down only turns it grey.
+- A night scene keeps its darkness and a bright-by-design frame keeps its white.
+- Where the histogram and the regions both ask for something, the stronger answer is used, never
+  the two added together. **Why these settings** gives the shares and depths measured.
+
+**Clarity** strengthens the texture inside each region and steps aside at strong edges, so it
+leaves no glow round branches against a sky or a dark line along a building. **Dehaze** measures
+the colour of the haze and how thick it is in each part of the frame, so the distance is cleared
+more than the foreground; a negative value adds atmosphere. All four look the same in a preview
+and in a full-size export. ADR-0126.
+
 **A veiled frame** - haze, flare, a flat picture profile, a scan of a faded print - lifts its
 blacks and lowers its whites together, and no slider takes that off. When the darkest tones
 sit above about a sixth of the range and the brightest stop short of white, AURA sets the
@@ -138,6 +164,24 @@ decision about somebody's face; the **Portrait skin finish** preset makes it whe
 - **Why these settings** and **Automatic decisions by face** explain every decision, with
   the numbers AURA measured.
 
+## Colour fringing from the lens
+
+Away from the middle of the frame a lens can image red, green and blue at slightly different
+sizes, which leaves a red rim on one side of every edge and a blue or cyan one on the other. AURA
+reads that from the photograph itself - how far apart the three colours of the same edges are,
+toward the corners and in every direction round the frame - and when the shift is visible and
+the same all the way round, it brings the colours back into register (most of the way, never
+past it), then checks the corrected photograph the same way before keeping the change. No lens
+profile is needed. A camera's own JPEG has usually been corrected already, and is then left as it
+is. The correction is in the lens settings in Develop, where you can switch it off.
+
+Purple rims on the dark side of a bright edge - a branch against a bright sky, a backlit veil, a
+dark suit beside a white shirt - are a different fault, and they are removed by colour: each rim
+pixel takes the colour of the calm area around it, at its own brightness. A purple dress, a
+magenta flower and the glow round a purple uplight are purple where nothing is near an edge too,
+and keep their colour. Green rims are left alone automatically, because the edge of every leaf
+against a bright sky is green as well; the **Defringe** tool in Retouch removes them when you ask.
+
 ## What it will not do
 
 - It does not compare anybody's skin with an "ideal" colour or brightness. Every skin
@@ -158,7 +202,9 @@ that has nothing wrong with it: a little depth, richer colour where the colour i
 warm-highlight, cool-shadow split. None of it is a preset. Each amount is measured from the
 photograph in front of it, so a flat haldi frame, a dark night procession and a vivid stage under
 coloured lights each get a different finish, and a frame that already has all three gets almost
-none.
+none. A black-and-white photograph gets the depth and nothing else: no split tone, no richer
+colour, no vibrance, because any of them would tint it. A sepia or other toned print keeps the one
+colour it was printed in in the same way.
 
 Skin is measured through the look before it is kept: the colour changes are tried on the faces in
 the frame, and scaled back until the skin moves by less than you could see side by side. Orange,

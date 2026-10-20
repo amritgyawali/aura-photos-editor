@@ -85,12 +85,15 @@ pub mod activity;
 pub mod adaptive_look;
 pub mod emotion_commands;
 pub mod explain_commands;
+pub mod finish_commands;
 pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
+pub mod lateral_ca;
 pub mod local_commands;
 pub mod local_mask_commands;
+pub mod local_range;
 pub mod look_commands;
 pub mod mask_commands;
 pub mod measured_cull;
@@ -133,8 +136,8 @@ pub use cleanup_commands::{
 };
 pub use cloud_commands::{
     ai_setup_status, check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend,
-    cloud_status, list_ai_providers, purge_cloud_cache, save_ai_setup, set_ai_key,
-    set_cloud_budget, set_cloud_privacy, skip_ai_setup,
+    cloud_status, list_ai_providers, open_provider_page, purge_cloud_cache, save_ai_setup,
+    set_ai_key, set_cloud_budget, set_cloud_privacy, skip_ai_setup,
 };
 pub use colour_commands::{
     accept_colour, colour_review_queue, colour_status, estimate_colour, image_colour,

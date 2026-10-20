@@ -29,6 +29,7 @@ export const RETOUCH_TOOLS = [
   ['red_eye', 'Flash red-eye correction', 'Details', 'Reduces dominant red inside the selected pupil.'],
   ['fabric', 'Fabric crease softening', 'Cleanup', 'Reduces broad texture variations; keep seams outside the selection.'],
   ['backdrop', 'Backdrop smoothing', 'Cleanup', 'Smooths a selected backdrop patch. Avoid subject edges.'],
+  ['defringe', 'Defringe · purple and green edges', 'Cleanup', 'Removes the purple or green rims a lens leaves on the dark side of bright edges: branches against a sky, a veil against the light, a dark suit beside a white shirt. Each rim pixel takes the colour of its calm surroundings at its own brightness. Purple or green things, and the glow of coloured lights, keep their colour.'],
   ['glare', 'Glare softening', 'Details', 'Reduces bright reflections; cannot reconstruct detail hidden by glare.'],
   ['makeup', 'Local cosmetic tint', 'Color', 'Applies a controlled warm or magenta tint to a chosen region.'],
   ['colorize', 'Hair, clothes & makeup color', 'Color', 'Choose any color, then select hair, clothing, lips or another area. Preserves the photographed light and fine detail. Reuse a saved hair or clothes selection, or paint and refine your own.'],
@@ -76,6 +77,8 @@ export type RetouchSettings = {
   /** Stretch marks evened out of body skin (ADR-0118); 0 is off. */
   stretchMarks: number;
   hairDetail: number; hairShine: number; fabric: number; backdrop: number;
+  /** Lift a plain neutral studio backdrop to a clean bright grey, as Evoto does (ADR-0109). */
+  backdropLift: number;
 };
 export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
@@ -90,7 +93,7 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   teethWhitening: .5, lipColour: 0, lipDefinition: 0,
   contour: 0, highlight: 0, blush: 0, faceLight: 0,
   bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0, stretchMarks: 0,
-  hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0,
+  hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0, backdropLift: 0,
 };
 /** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */
 export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope; settings?: RetouchSettings; adaptive?: boolean };

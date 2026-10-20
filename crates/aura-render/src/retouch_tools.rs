@@ -278,6 +278,8 @@ fn apply_from(
             crate::retouch_striae::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::FrequencyHeal {
             crate::retouch_clear::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::Defringe {
+            crate::retouch_defringe::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::AcneClear {
             crate::retouch_acne::apply(rgb, width, height, edit, &coverage);
             // A restore that leaves healed marks alone measures "the texture this skin had" on
@@ -325,6 +327,7 @@ fn tool_label(tool: Tool) -> &'static str {
         Tool::TextureGraft => "retouch.texture",
         Tool::AutoBlemish => "retouch.auto_blemish",
         Tool::UnderEye => "retouch.under_eye",
+        Tool::Defringe => "retouch.defringe",
         tool if crate::retouch_effects::supports(tool) => "retouch.effects",
         _ => "retouch.local",
     }
@@ -372,6 +375,25 @@ pub fn selection_mask_with_mattes(
         .flat_map(|y| (0..width).map(move |x| (x, y)))
         .map(|(x, y)| coverage.at(x, y, width, height))
         .collect()
+}
+
+/// How many pixels of a whole frame (linear working space) a [`Tool::Defringe`] with these
+/// settings would visibly change: moved at least half way, by a noticeable change of colour,
+/// before its amount. Measured exactly as rendering decides. ADR-0125.
+#[must_use]
+pub fn defringe_rims(rgb: &[f32], width: usize, height: usize, edit: &Edit) -> usize {
+    if width == 0 || height == 0 || rgb.len() != width.saturating_mul(height).saturating_mul(3) {
+        return 0;
+    }
+    let reach = (edit.radius * width.min(height) as f32).round().max(1.0) as usize;
+    crate::retouch_defringe::rims(
+        rgb,
+        width,
+        height,
+        reach,
+        edit.warmth.clamp(0.0, 1.0),
+        edit.tint.clamp(0.0, 1.0),
+    )
 }
 
 /// Where frequency healing would rebuild tone: 0 for untouched skin, 1 inside a compact
@@ -720,7 +742,7 @@ fn apply_one(
                     }
                     // Rendered by their own modules before this function is reached: patch heal,
                     // reshape, frequency heal, acne clear, texture graft, auto blemish, stretch
-                    // marks, the sampled-skin tools, and the effects of `retouch_effects`.
+                    // marks, defringe, the sampled-skin tools, and the effects of `retouch_effects`.
                     _ => {}
                 }
                 let out = std::array::from_fn::<_, 3, _>(|c| old[c] + a * (value[c] - old[c]));

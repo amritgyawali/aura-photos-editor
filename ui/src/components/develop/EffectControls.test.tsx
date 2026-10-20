@@ -16,7 +16,7 @@ const draft = (tool: EffectTool): NativeRetouchEdit & { tool: EffectTool } => ({
 it('names only tools the renderer knows, each once, all offered in the tool list', () => {
   expect(variants.size).toBeGreaterThan(40);
   const ids = EFFECT_TOOLS.map(t => t[0]);
-  expect(new Set(ids).size).toBe(49);
+  expect(new Set(ids).size).toBe(48);
   for (const id of ids) {
     expect(variants.has(id), id).toBe(true);
     expect(RETOUCH_TOOLS.some(t => t[0] === id)).toBe(true);
@@ -63,8 +63,8 @@ it('shows a tool its own sliders and writes what they say', () => {
 
 it('offers a toggle, an optional colour and a source hint where a tool has them', () => {
   const onChange = vi.fn();
-  const { rerender } = render(<EffectControls draft={draft('defringe')} onChange={onChange} onTool={vi.fn()}/>);
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Also remove green fringes' }));
+  const { rerender } = render(<EffectControls draft={draft('weather')} onChange={onChange} onTool={vi.fn()}/>);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Rain instead of snow' }));
   expect(onChange).toHaveBeenCalledWith({ tint: 1 });
   rerender(<EffectControls draft={draft('chroma_key')} onChange={onChange} onTool={vi.fn()}/>);
   expect(screen.getByText(/Pick the screen colour on the photo — needed before applying/)).toBeTruthy();

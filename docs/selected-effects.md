@@ -20,8 +20,8 @@ ellipses and low strength: a little goes a long way. Nothing is ever reshaped au
 - **Soft focus** (a diffusion filter) and **Orton glow** for a dreamy, glowing look.
 - **Sharpen** for eyes, jewellery, lace and hair, without sharpening the skin next to them.
 - **Noise reduction** removes colour speckle and grain while keeping edges sharp.
-- **Remove colour fringes** clears purple (and, if you tick it, green) edges where branches or a
-  window frame meet a bright sky. A purple dress is left alone: only edges are treated.
+- Purple and green fringes on branches and window frames are removed by **Defringe** under
+  Cleanup, which measures the lens's colour fringing from the photograph.
 
 ## Colour
 

@@ -39,7 +39,7 @@ use aura_render::tonemap::{band_weights, hsl, to_hsv, vibrance_saturation};
 use aura_vision::portrait::PortraitFace;
 
 use crate::portrait_features::Pixels;
-use crate::smart_edit::SceneKind;
+use crate::smart_edit::{Monochrome, SceneKind};
 
 /// Largest mean colour difference (CIE76 in the working space) the look may make on this
 /// frame's own skin. Under about 2 a difference is not visible side by side.
@@ -318,9 +318,17 @@ const fn spread_target(kind: SceneKind) -> Option<f32> {
     }
 }
 
-/// Decide the look for one photograph. `contrast` is what the corrections already set.
+/// Decide the look for one photograph. `contrast` is what the corrections already set, and
+/// `monochrome` what they found about the frame's colour: a black-and-white or toned photograph
+/// is given depth and no colour.
 #[must_use]
-pub fn plan(px: &Pixels<'_>, faces: &[PortraitFace], kind: SceneKind, contrast: i16) -> Look {
+pub fn plan(
+    px: &Pixels<'_>,
+    faces: &[PortraitFace],
+    kind: SceneKind,
+    monochrome: Option<Monochrome>,
+    contrast: i16,
+) -> Look {
     let r = read(px, faces);
     let people = !faces.is_empty();
     let mut look = Look::default();
@@ -394,6 +402,15 @@ pub fn plan(px: &Pixels<'_>, faces: &[PortraitFace], kind: SceneKind, contrast: 
     }
 
     // ---- colour ------------------------------------------------------------------------
+    // A black-and-white photograph has no colour to enrich, and a split tone would tint it; a
+    // toned one has exactly the colour it was printed in. Both keep what they have.
+    if let Some(mono) = monochrome {
+        look.decisions.push(format!(
+            "Colour left as it is: {} is not given a split tone, band saturation or vibrance.",
+            mono.label()
+        ));
+        return look;
+    }
     // How much of each band the skin holds: a band that is mostly skin is not the dress.
     let mut skin_in = [0.0_f32; 8];
     for p in &r.skin {
@@ -606,6 +623,7 @@ mod tests {
             &Pixels::new(&flat, 120, 80).unwrap(),
             &[],
             SceneKind::General,
+            None,
             0,
         );
         assert!(
@@ -623,6 +641,7 @@ mod tests {
             &Pixels::new(&hard, 120, 80).unwrap(),
             &[],
             SceneKind::General,
+            None,
             0,
         );
         assert!(look.parametric.lights <= 0, "{look:?}");
@@ -641,6 +660,7 @@ mod tests {
             &Pixels::new(&dark, 120, 80).unwrap(),
             &[],
             SceneKind::LowLight,
+            None,
             7,
         );
         assert_eq!(look.contrast, Some(0));
@@ -656,12 +676,14 @@ mod tests {
             &Pixels::new(&warm, 120, 80).unwrap(),
             &[],
             SceneKind::General,
+            None,
             0,
         );
         let b = plan(
             &Pixels::new(&cool, 120, 80).unwrap(),
             &[],
             SceneKind::General,
+            None,
             0,
         );
         assert_ne!(a.grade, b.grade);
@@ -685,10 +707,68 @@ mod tests {
             &Pixels::new(&px, 160, 120).unwrap(),
             &[f],
             SceneKind::Portrait,
+            None,
             0,
         );
         let shift = look.skin_shift.expect("measured");
         assert!(shift <= SKIN_DE_LIMIT + 1e-3, "{look:?}");
+    }
+
+    /// A soft-contrast print: lightness rising across the frame with a little texture, tinted
+    /// by `tint` (display-encoded channel gains).
+    fn print(w: usize, h: usize, tint: [f32; 3]) -> Vec<u8> {
+        frame(w, h, |x, y| {
+            let v = 0.32 + 0.4 * (x as f32 / w as f32) + 0.03 * ((x * 7 + y * 13) % 5) as f32;
+            tint.map(|t| (v * t * 255.0).round().clamp(0.0, 255.0) as u8)
+        })
+    }
+
+    /// The planner and the look together, as Auto enhance runs them.
+    fn auto_look(rgb: &[u8], w: usize, h: usize) -> (crate::smart_edit::GlobalPlan, Look) {
+        let px = Pixels::new(rgb, w as u32, h as u32).unwrap();
+        let global = crate::smart_edit::analyse(&px, None, &[], 0.0);
+        let look = plan(&px, &[], global.kind, global.monochrome, 0);
+        (global, look)
+    }
+
+    #[test]
+    fn a_black_and_white_photograph_gets_depth_and_no_colour() {
+        let (w, h) = (160, 120);
+        let (global, look) = auto_look(&print(w, h, [1.0, 1.0, 1.0]), w, h);
+        assert_eq!(global.monochrome, Some(Monochrome::Neutral));
+        assert!(look.grade.is_neutral(), "a split tone tints it: {look:?}");
+        assert!(look.hsl.is_empty() && look.vibrance == 0, "{look:?}");
+        assert!(look.parametric.lights > 0, "depth still applies: {look:?}");
+        assert_eq!(global.vibrance, 0);
+    }
+
+    #[test]
+    fn a_sepia_print_keeps_its_one_colour() {
+        let (w, h) = (160, 120);
+        let (global, look) = auto_look(&print(w, h, [1.0, 0.86, 0.66]), w, h);
+        assert_eq!(global.monochrome, Some(Monochrome::Toned));
+        assert!(look.grade.is_neutral(), "cool shadows on sepia: {look:?}");
+        assert!(look.hsl.is_empty() && look.vibrance == 0, "{look:?}");
+        assert_eq!(global.white_balance, None);
+    }
+
+    #[test]
+    fn a_colour_photograph_still_gets_its_look() {
+        // Muted green foliage below, a muted blue wall above, a dull red dress between.
+        let (w, h) = (160, 120);
+        let rgb = frame(w, h, |x, y| {
+            let n = ((x * 7 + y * 13) % 9) as u8;
+            if y < h / 3 {
+                [110 + n, 130 + n, 165 + n]
+            } else if y < 2 * h / 3 {
+                [150 + n, 90 + n, 92 + n]
+            } else {
+                [95 + n, 130 + n, 85 + n]
+            }
+        });
+        let (global, look) = auto_look(&rgb, w, h);
+        assert_eq!(global.monochrome, None);
+        assert!(!look.grade.is_neutral() || !look.hsl.is_empty(), "{look:?}");
     }
 
     #[test]

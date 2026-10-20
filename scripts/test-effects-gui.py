@@ -40,7 +40,7 @@ DEFAULTS = {
     'spin_blur': (1, .5, 0, 0, 1, .01, .4), 'pixelate': (1, .5, 0, 0, 1, .02, 0),
     'privacy_blur': (1, .5, 0, 0, 1, .02, .2), 'soft_focus': (.5, .3, 0, 0, 1, .015, .5),
     'orton_glow': (.5, .4, 0, 0, 1, .02, .5), 'local_sharpen': (.7, .5, 0, 0, .8, .002, .5),
-    'local_denoise': (.8, .5, 0, 0, 1, .004, .5), 'defringe': (1, .5, 0, -1, 1, .01, .3),
+    'local_denoise': (.8, .5, 0, 0, 1, .004, .5),
     'hue_shift': (1, .5, .25, 0, 1, .01, .4), 'invert_colors': (1, .5, 0, 0, 1, .01, .2),
     'chroma_key': (1, .4, 0, 0, 1, .01, .2), 'vein_reduce': (.7, .5, 0, 0, 1, .008, .5),
     'color_unify': (.5, .5, 0, 0, 1, .01, .4), 'local_white_balance': (1, .5, 0, 0, 1, .01, .6),
@@ -55,7 +55,7 @@ COLOURS = {'chroma_key': [.2, .45, .85], 'light_leak': [1, .55, .25], 'haze': [.
            'starburst': [1, .97, .9], 'catchlight': [1, 1, 1]}
 # Tools whose change is subtle on a photograph that has nothing for them to fix: they only
 # have to leave everything outside their region alone.
-QUIET = {'defringe', 'eye_glow_fix', 'vein_reduce', 'local_white_balance', 'chroma_key', 'lip_gloss', 'halation'}
+QUIET = {'eye_glow_fix', 'vein_reduce', 'local_white_balance', 'chroma_key', 'lip_gloss', 'halation'}
 
 
 def launch(exe, port):

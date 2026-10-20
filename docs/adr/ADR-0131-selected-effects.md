@@ -23,7 +23,7 @@ which. No field was added to the recipe and no migration was needed.
 | Group | Tools |
 |---|---|
 | Liquify | push, bloat (enlarge), pucker (shrink), twirl |
-| Blur and optics | spin blur, pixelate, privacy blur, soft focus, Orton glow, local sharpen, local noise reduction, defringe |
+| Blur and optics | spin blur, pixelate, privacy blur, soft focus, Orton glow, local sharpen, local noise reduction (and a defringe, since withdrawn - see the note below) |
 | Colour | hue shift, invert, chroma key (green screen), vein reduction, colour unify, local white balance |
 | Light | light leak, glitch, haze, starburst, film halation |
 | Portrait and scene | catchlight, eye glow fix (pets and red-eye), lip gloss, freckles, floor reflection, drop shadow |
@@ -61,6 +61,14 @@ automatic retouch: `advanced_retouch::stage_of` returns no stage for any effect,
 `docs/retouch-ethics.md` still holds - nobody is reshaped unless a person places the warp.
 
 ## 4. Choices that will be re-argued
+
+**Superseded on merging `main` (2026-10-20):** `main` had meanwhile shipped its own `Tool::Defringe`
+(ADR-0125), which measures the lens's lateral colour from the photograph and gives each rim pixel
+the colour of its calm surroundings. That is the stronger tool and the two could not share a name,
+so this module's defringe was removed; twenty-eight effects remain here. The note below is kept
+because the lesson - a fringe sits beside a near-clipped highlight, not beside any sharp edge -
+is a test for any defringe.
+
 
 - **Defringe acts only beside a highlight.** A purple dress is not a fringe, and neither is the
   sharp edge of a lavender print on it. The fringe test is purple (red and blue both above green,
