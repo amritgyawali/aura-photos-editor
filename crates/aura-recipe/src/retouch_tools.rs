@@ -133,11 +133,129 @@ pub enum Tool {
     /// they are. `radius` is the reach of the evening and `texture` how much of the clean
     /// skin's own grain is put back. ADR-0118.
     StretchMarks,
+    // Selected effects (ADR-0131). Each reads only the fields its comment names; the warps
+    // move pixels, and `amount` is their strength rather than an opacity.
+    /// Push the selection's content by (`warmth`, `tint`) region radii, times `amount`.
+    LiquifyPush,
+    /// Enlarge the content around the region centre (eyes, hair volume).
+    LiquifyBloat,
+    /// Shrink the content toward the region centre.
+    LiquifyPucker,
+    /// Rotate the content around the region centre by up to `warmth * 180` degrees.
+    LiquifyTwirl,
+    /// Rotational blur around `source` or the region centre; `tone` is the sweep (0..30 degrees).
+    SpinBlur,
+    /// Square blocks `radius` of the short edge across; for hiding a face, plate or screen.
+    Pixelate,
+    /// A strong even blur of radius `radius`; for hiding detail or softening a background.
+    PrivacyBlur,
+    /// Diffusion filter: highlights bloom into their surroundings; `tone` is the overall softness.
+    SoftFocus,
+    /// Orton glow: a brightened, blurred copy screened over the photograph; `tone` brightens it.
+    OrtonGlow,
+    /// Unsharp mask on luminance: `radius` is the detail size, `texture` the gain.
+    LocalSharpen,
+    /// Edge-preserving noise reduction: all colour noise, and luminance noise up to `tone`.
+    LocalDenoise,
+    /// Rotates hue by `warmth * 180` degrees, keeping each pixel's luminance.
+    HueShift,
+    /// Inverts colours in the display encoding.
+    InvertColors,
+    /// Replaces the colour sampled at `source` (a green screen) with `target_color`, or removes
+    /// its spill when no colour is given; `tone` is the tolerance.
+    ChromaKey,
+    /// Evens bluish, darker lines (veins) toward the skin around them; `tone` evens the darkness.
+    VeinReduce,
+    /// Pulls every colour in the selection toward the selection's own average (hair, clothing).
+    ColorUnify,
+    /// A coloured leak of light from `source` or the region centre, in `target_color` or warm.
+    LightLeak,
+    /// Channel offsets of `radius` and, with `tone`, horizontal slice displacement.
+    Glitch,
+    /// Atmospheric haze toward `target_color` or a light grey.
+    Haze,
+    /// Rays of light from `source` or the region centre; `tone` sets how many.
+    Starburst,
+    /// White balance for the selection only, from a neutral sampled at `source`.
+    LocalWhiteBalance,
+    /// A soft light in the eye, the shape of the selection, in `target_color` or white.
+    Catchlight,
+    /// Darkens glowing pupils of any colour (flash in animal eyes); `tone` is how dark.
+    EyeGlowFix,
+    /// Lifts the highlights already on the lips; `radius` is the highlight size.
+    LipGloss,
+    /// Adds deterministic freckles: `tone` is the density, `radius` the size.
+    Freckles,
+    /// Mirrors what is above the selection's top edge into it, fading over `tone` of its height.
+    FloorReflection,
+    /// A shadow of the selection offset by (`warmth`, `tint`) region radii, blurred by `radius`.
+    DropShadow,
+    /// Film halation: a red glow around highlights brighter than `tone` sets.
+    Halation,
+    // Practical repairs and creative looks (ADR-0132), read the same fields as above.
+    /// Replaces specks that differ from the median of `radius` around them by more than `tone`.
+    DustScratches,
+    /// Smooths small steps at the 8 x 8 block edges of a compressed JPEG; `tone` is the step
+    /// size still counted as an artefact, so real edges stay.
+    JpegCleanup,
+    /// Removes banding from smooth gradients such as skies, with a fine fixed dither.
+    Deband,
+    /// Stretches the selection's own darkest and brightest tones to a full range.
+    AutoLevels,
+    /// Removes the selection's own average colour cast (grey world).
+    AutoNeutral,
+    /// Evens out a gradient of light across the selection, keeping its detail.
+    FlattenLight,
+    /// Large-scale local contrast in log luminance: `radius` is the structure size,
+    /// `texture` the gain, `tone` lifts shadows.
+    HdrDetail,
+    /// Turns highlights brighter than `tone` sets into round out-of-focus discs of `radius`.
+    BokehHighlights,
+    /// Miniature look: blur that grows away from a sharp band through the region centre.
+    TiltShift,
+    /// Maps luminance between a shadow colour and `target_color`; `warmth` turns the shadows.
+    Duotone,
+    /// Reduces each channel to `2 + tone * 14` levels.
+    Posterize,
+    /// A rotated print screen of dots `radius` across, in `target_color` or black.
+    Halftone,
+    /// A pencil drawing made from the photograph; `tone` keeps some of its colour.
+    PencilSketch,
+    /// Kuwahara oil-paint filter of `radius`.
+    OilPaint,
+    /// Cross-processed film colour.
+    CrossProcess,
+    /// Infrared: foliage goes white; `tone` from monochrome to false colour.
+    Infrared,
+    /// Mirrors one half of the region onto the other: `warmth` chooses the side,
+    /// a positive `tint` mirrors top and bottom instead.
+    MirrorSymmetry,
+    /// Lens flare ghosts on the line from `source` through the frame centre.
+    LensFlare,
+    /// Rays of light streaming from `source` through the highlights between.
+    GodRays,
+    /// Falling snow, or rain streaks when `tint` is positive; `tone` is the density.
+    Weather,
     /// Removes the purple (`warmth`) and green (`tint`) rims a lens leaves on the dark side of a
     /// bright edge, `radius` from it; each rim pixel takes the colour of its calm surroundings
     /// at its own luminance. A colour its calm surroundings share, or the glow of a coloured
     /// light, is kept. ADR-0125.
     Defringe,
+}
+
+impl Tool {
+    /// The warps: they move pixels, so an inverted selection would warp the whole frame.
+    #[must_use]
+    pub fn is_warp(self) -> bool {
+        matches!(
+            self,
+            Self::Reshape
+                | Self::LiquifyPush
+                | Self::LiquifyBloat
+                | Self::LiquifyPucker
+                | Self::LiquifyTwirl
+        )
+    }
 }
 
 // Each flag is an independent opt-in that old recipes read as off; none of them is a state
@@ -435,7 +553,7 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
                 .is_some_and(|rgb| !rgb.iter().all(|v| unit(*v)))
             || (matches!(edit.tool, Tool::Colorize | Tool::BackgroundColor)
                 && edit.target_color.is_none())
-            || (edit.tool == Tool::Reshape && edit.selection.as_ref().is_some_and(|s| s.inverted))
+            || (edit.tool.is_warp() && edit.selection.as_ref().is_some_and(|s| s.inverted))
             || !edit.source_scale.is_finite()
             || !(0.2..=1.0).contains(&edit.source_scale)
             || edit.sensitivity.is_some_and(|v| !unit(v))
@@ -450,6 +568,8 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
                     | Tool::SkinSmooth
                     | Tool::SkinUniformity
                     | Tool::PortraitDodgeBurn
+                    | Tool::ChromaKey
+                    | Tool::LocalWhiteBalance
             ) && edit.source.is_none())
         {
             return Err(recipe_invalid(

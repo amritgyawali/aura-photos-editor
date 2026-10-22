@@ -1,6 +1,7 @@
 export const MAX_NATIVE_RETOUCH_EDITS = 1024;
 import { invoke } from '@tauri-apps/api/core';
 import type { RecipeDto, RenderDto } from './types';
+import { EFFECT_SOURCE, EFFECT_TOOLS, isEffectTool } from './retouchEffects';
 
 export const RETOUCH_TOOLS = [
   ['acne_clear', 'Acne & blemish clear · brush', 'Repair', 'Paint over pimples, red or brown marks and bumps that are left. Each one is measured against the clean skin around it and rebuilt from that skin, keeping the pores. Works on the nose and between the brows too; creases, hair and nostrils are left alone.'],
@@ -34,6 +35,8 @@ export const RETOUCH_TOOLS = [
   ['colorize', 'Hair, clothes & makeup color', 'Color', 'Choose any color, then select hair, clothing, lips or another area. Preserves the photographed light and fine detail. Reuse a saved hair or clothes selection, or paint and refine your own.'],
   ['background_color', 'Solid background color', 'Cleanup', 'Replace only the selected background with a chosen solid color. Use a saved background selection or paint it; inspect subject edges before applying.'],
   ['reshape', 'Local face & body proportions', 'Shape', 'Explicitly change width and height inside an ellipse. Use on a face, nose, waist, arm or leg. This changes photographed structure and is never part of automatic skin cleanup. Start with small changes and inspect the edges.'],
+  // Liquify, optics, colour, light and portrait effects (ADR-0131).
+  ...EFFECT_TOOLS,
 ] as const;
 export type RetouchTool = typeof RETOUCH_TOOLS[number][0];
 export type BrushPoint = [number, number, number];
@@ -125,6 +128,7 @@ export type NativeRetouchEdit = {
 };
 export const extendedRetouchShape = (edit: NativeRetouchEdit) => Boolean(edit.selection?.inverted || edit.selection?.gradient);
 export const needsRetouchSource = (edit: NativeRetouchEdit) => ['clone', 'color_match'].includes(edit.tool)
+  || (isEffectTool(edit.tool) && Boolean(EFFECT_SOURCE[edit.tool]?.required))
   || isSampledSkinTool(edit.tool)
   || (edit.tool === 'heal' && extendedRetouchShape(edit))
   || (edit.tool === 'patch_heal' && (Boolean(edit.mask) || edit.region[2] > .1 || edit.region[3] > .1 || extendedRetouchShape(edit)));

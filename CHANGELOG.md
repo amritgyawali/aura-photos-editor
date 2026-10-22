@@ -2,6 +2,50 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Twenty more tools, a whole-app test, and two fixes it found - 2026-10-20
+
+- **Eight practical repairs** (ADR-0132): dust and scratches, JPEG artifact cleanup, banding
+  removal, auto levels and colour-cast removal measured on the selection, even out uneven
+  lighting, HDR detail, and bokeh highlights.
+- **Twelve creative looks**: tilt-shift, duotone, posterize, halftone print, pencil sketch, oil
+  paint, cross-process, infrared, mirror symmetry, lens flare, god rays, snow and rain.
+- **Matching a finished PNG of the same photo works up to the documented 16 megapixels.** Every
+  PNG reference over 8 megapixels was refused as too large to open, with a message telling the
+  photographer to contact support.
+- **A photo that has not been analysed yet says so**, rather than that it could not be read.
+- **Portrait retouch no longer mistakes gold silk or gilded carving for a tilted face**
+  (ADR-0133). On a photo of a bride's mehndi hands it had smoothed the dress as skin. A tilted face
+  found by only a few windows now needs both eyes confirmed; on 67 wedding photographs every real
+  face is still found.
+- `scripts/test-everything-gui.py` exercises every tool and feature in the real window on real
+  photographs, including RAW, and writes a report.
+
+## Twenty-nine effects you place yourself - 2026-10-20
+
+- **Liquify** (ADR-0131): push, enlarge, shrink and twirl, tapering to nothing at the ellipse
+  edge so a warp never tears; never used by automatic retouch.
+- **Blur and optics**: spin blur, pixelate and privacy blur, soft focus, Orton glow, local
+  sharpening and edge-preserving local noise reduction. (A defringe was also built and then
+  withdrawn on merging `main`, whose measured Defringe of ADR-0125 does the job better.)
+- **Colour**: hue shift and colour unify that keep brightness, green-screen colour replacement
+  with spill removal, local white balance from a picked neutral, vein reduction, invert.
+- **Light and portrait**: light leak, glitch, haze, sun rays, film halation, catchlights, a pet-eye
+  glow fix, lip gloss, freckles, floor reflection and drop shadow, plus seven named shortcuts.
+- Every effect is an ordinary saved retouch operation with its own selection, strength and Undo,
+  deterministic on every machine, and changes nothing outside its selection (the drop shadow
+  falls beside its subject by design).
+
+## Retouch strength sliders after Auto retouch - 2026-10-19
+
+- **Turn each kind of automatic retouch up or down after it has run** (ADR-0130): blemish and
+  acne removal, skin smoothing, even skin tone, dark circles, teeth, shine, body skin, clothing,
+  background and more, one slider each, 100% being exactly what Auto retouch did and 0% removing
+  it. The measured operations are never rewritten, so moving a slider back restores the automatic
+  result bit for bit, and running Auto retouch again keeps the sliders where they were.
+- **Sliders stop where they stop changing anything**: above 100% only operations below full
+  strength can rise, and a slider whose areas are all at full strength stops at 100%.
+- **Apply these strengths to the collection** gives every other auto-retouched photo the same
+  strengths over its own measured retouch. Operations made or changed by hand are never scaled.
 ## Portrait light: relight a face, open its shadows, add catchlights and a glow, or press Auto light - 2026-10-17
 
 - **A key light shaped by the head** (ADR-0127), in a new **Light** tab of the Portrait studio. Each

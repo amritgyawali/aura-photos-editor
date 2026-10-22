@@ -5,6 +5,8 @@ import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { AutoRetouchSettings } from './AutoRetouchSettings';
 import { AdvancedRetouch } from './AdvancedRetouch';
+import { RetouchIntensity } from './RetouchIntensity';
+import { EFFECT_COLOR, EFFECT_DEFAULTS, isEffectTool } from '../../ipc/retouchEffects';
 import { changesDataUrl, coverageDataUrl } from './rgbImage';
 import { previewSource, useProgressivePreview } from '../../state/previewCache';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
@@ -142,7 +144,9 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     // Fringes run along every bright edge in the photograph: the whole frame, purple at full strength.
     const defringe=tool==='defringe';
     setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:defringe?1:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:defringe?1:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null,
-      ...(defringe?{region:[.5,.5,1,1] as [number,number,number,number],feather:0,radius:.003,mask:null,selection:null,matte:null}:{})});
+      ...(defringe?{region:[.5,.5,1,1] as [number,number,number,number],feather:0,radius:.003,mask:null,selection:null,matte:null}:{}),
+      // Each selected effect starts where it is most useful (ADR-0131).
+      ...(isEffectTool(tool)?{...EFFECT_DEFAULTS[tool],targetColor:EFFECT_COLOR[tool]?.initial??null}:{})});
   };
   const chooseMode=(next:RetouchMode)=>{
     setMode(next);setSourceMode(false);setMaskView(false);
@@ -266,6 +270,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         })}/>
         <p className="lr-hint">Detects face and body skin locally. Reuse detected skin selections in any retouch tool, preview the mask, or refine it with the brush. All steps can be edited or undone.</p>
         <PortraitAutoReport recipe={recipe}/>
+        <RetouchIntensity projectId={projectId} photoId={photoId} version={retouchRecipe?.recipeHash ?? null} disabled={stackBlocked||!preview} onRun={task=>void save(task)}/>
         {dirty&&<p className="lr-hint">{draftNotice}</p>}
         <details open><summary>Saved retouch operations ({edits.length})</summary>
           <ol>{edits.map((edit,index)=><li key={edit.id}>

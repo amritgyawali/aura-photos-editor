@@ -3580,6 +3580,19 @@ async fn preview_edit_profile(
 }
 
 #[tauri::command]
+async fn retouch_intensity(
+    state: State<'_, AppState>,
+    input: aura_app::retouch_intensity::IntensityInput,
+) -> IpcResult<aura_app::retouch_intensity::IntensityReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::retouch_intensity::intensity(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn native_retouch_edit(
     state: State<'_, AppState>,
     input: aura_app::native_retouch::RetouchInput,
@@ -3891,6 +3904,7 @@ fn main() {
             sync_settings,
             pick_white_balance,
             native_retouch_edit,
+            retouch_intensity,
             native_retouch_blemish_review,
             native_retouch_selection_preview,
             native_retouch_saved_selection,

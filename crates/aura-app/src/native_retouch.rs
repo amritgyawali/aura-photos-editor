@@ -269,7 +269,13 @@ pub fn draft_preview(state: &AppState, input: &DraftInput) -> IpcResult<RenderDt
             .iter_mut()
             .find(|e| &e.id == id)
             .ok_or_else(|| invalid("Retouch operation no longer exists"))?;
-        draft.id.clone_from(id);
+        // Saving a changed automatic operation makes it the photographer's, which takes it out
+        // of the intensity sliders (ADR-0130); the preview renders it the way it will be saved.
+        draft.id = if crate::portrait_auto::group_of(id).is_some() {
+            format!("manual-{id}")
+        } else {
+            id.clone()
+        };
         *current = draft;
     } else {
         // Stable unused ID keeps repeated draft renders cacheable without colliding with saved IDs.
