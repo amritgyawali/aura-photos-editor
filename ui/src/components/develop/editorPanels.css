@@ -13,6 +13,16 @@
 .framing-canvas button { position: absolute; width: 18px; height: 18px; min-height: 18px; min-width: 18px; padding: 0; border-radius: 50%; background: #d6b4ff; transform: translate(-50%, -50%); cursor: move; touch-action: none; }
 .framing-panel input[type='number'] { width: 95px; }
 .editor-finish-panel fieldset { min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.material-lab, .color-lab, .workflow-lab { display: grid; gap: 12px; min-width: 0; }
+.material-lab fieldset, .color-lab fieldset, .workflow-lab fieldset { min-width: 0; display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.material-lab label, .color-lab label, .workflow-lab label { display: grid; gap: 5px; }
+.material-lab input[type='number'], .color-lab input[type='number'], .workflow-lab input[type='number'] { width: 110px; }
+.material-lab select, .color-lab select, .workflow-lab select, .workflow-lab textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.workflow-lab table { display: block; overflow-x: auto; max-width: 100%; font-size: 12px; }
+.workflow-lab th, .workflow-lab td { padding: 6px; text-align: left; white-space: nowrap; }
+.workflow-lab nav { display: flex; flex-wrap: wrap; gap: 6px; }
+.workflow-lab nav button[aria-pressed='true'] { border-color: var(--accent); background: #443750; }
+.material-stack-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (max-width: 1100px) {
   .editor-panel-layout { grid-template-columns: minmax(0, 1fr) minmax(260px, 310px); gap: 16px; }
 }

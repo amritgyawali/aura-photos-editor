@@ -353,6 +353,9 @@ impl Validation {
         crate::retouch_tools::read(recipe)?;
         crate::studio_finish::read(recipe)?;
         crate::studio_color::read(recipe)?;
+        crate::material_lab::read(recipe)?;
+        crate::spatial_lab::read(recipe)?;
+        crate::color_lab::read(recipe)?;
         if recipe.schema == 0 {
             return Err(recipe_invalid("schema", "must be at least 1"));
         }

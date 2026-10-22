@@ -1,0 +1,344 @@
+{
+  "date": "2026-10-22",
+  "scope": "25 independently authored mathematical selection workflows; no Evoto algorithm or model equivalence claimed",
+  "features": [
+    {
+      "id": "lab_sample_distance",
+      "label": "CIE Lab sampled distance",
+      "mechanism": "Convert source sRGB through D65 XYZ into CIE Lab; select by CIE76 distance to the sample. Tolerance scales to 150 Lab units.",
+      "controls": [
+        "point",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "lab_and_covariance_distances_identify_sample_colour_and_reject_distant_colours"
+    },
+    {
+      "id": "mahalanobis_colour",
+      "label": "Covariance colour distance",
+      "mechanism": "Estimate a regularized RGB covariance in the sample patch and select by Mahalanobis distance. Flat patches remain finite; this measures colour statistics, not subjects.",
+      "controls": [
+        "point",
+        "radius",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "lab_and_covariance_distances_identify_sample_colour_and_reject_distant_colours"
+    },
+    {
+      "id": "geodesic_colour",
+      "label": "Geodesic colour propagation",
+      "mechanism": "Propagate from the sample by minimum accumulated RGB edge cost with deterministic integer Dijkstra traversal. Radius sets cost budget and tolerance sets colour crossing cost.",
+      "controls": [
+        "point",
+        "radius",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "geodesic_colour_cannot_cross_an_expensive_colour_wall"
+    },
+    {
+      "id": "local_otsu",
+      "label": "Local Otsu threshold",
+      "mechanism": "Choose a separate 16-bin between-class variance threshold in each local luminance patch. Flat patches are excluded. Produces hard coverage.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "otsu_sauvola_and_gabor_have_distinct_flat_and_pattern_responses"
+    },
+    {
+      "id": "sauvola_threshold",
+      "label": "Sauvola adaptive threshold",
+      "mechanism": "Compare source luminance with a local mean and standard-deviation threshold. Corner sets the Sauvola coefficient; pure black stays unselected.",
+      "controls": [
+        "radius",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "otsu_sauvola_and_gabor_have_distinct_flat_and_pattern_responses"
+    },
+    {
+      "id": "gabor_response",
+      "label": "Gabor frequency response",
+      "mechanism": "Measure DC-removed Gaussian-windowed cosine response. Angle sets frequency direction; corner maps wavelength from 2 to 16 cells. Select the response with the range.",
+      "controls": [
+        "radius",
+        "corner",
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "otsu_sauvola_and_gabor_have_distinct_flat_and_pattern_responses"
+    },
+    {
+      "id": "directional_ridge",
+      "label": "Directional bright ridges",
+      "mechanism": "Project the source Hessian onto an angle and select negative curvature. This isolates bright ridges rather than first-derivative edges.",
+      "controls": [
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "hessian_ridge_orientation_and_higher_moments_measure_structures"
+    },
+    {
+      "id": "local_skewness",
+      "label": "Local tonal skewness",
+      "mechanism": "Measure the third standardized local luminance moment. Symmetry and flat patches map to 0.5; positive outlier tails map above it.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "hessian_ridge_orientation_and_higher_moments_measure_structures"
+    },
+    {
+      "id": "local_kurtosis",
+      "label": "Local tonal kurtosis",
+      "mechanism": "Measure local excess fourth standardized luminance moment, centered at 0.5 and scaled by 12. Flat patches map to 0.5.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "hessian_ridge_orientation_and_higher_moments_measure_structures"
+    },
+    {
+      "id": "colour_line_residual",
+      "label": "Colour-line residual",
+      "mechanism": "Estimate the dominant RGB covariance direction in a sample patch using power iteration. Select perpendicular distance to that colour line; this can isolate colours outside a shading ramp.",
+      "controls": [
+        "point",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "colour_line_residual_excludes_a_shading_ramp_but_selects_off_axis_colour"
+    },
+    {
+      "id": "coverage_opening",
+      "label": "Grayscale morphological opening",
+      "mechanism": "Erode then dilate coverage with the same square structuring element. Removes thin bright protrusions and retains grayscale values. Outside-frame coverage is transparent.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "opening_reconstruction_and_closing_treat_thin_attachments_and_holes_differently"
+    },
+    {
+      "id": "coverage_closing",
+      "label": "Grayscale morphological closing",
+      "mechanism": "Dilate then erode coverage with the same square structuring element. Bridges small dark gaps. Transparent boundaries can trim coverage at the frame edge.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "opening_reconstruction_and_closing_treat_thin_attachments_and_holes_differently"
+    },
+    {
+      "id": "morphological_reconstruction",
+      "label": "Opening by reconstruction",
+      "mechanism": "Erode coverage to form a marker, then propagate its grayscale maxima under the original coverage ceiling. Connected surviving regions recover their contours.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "opening_reconstruction_and_closing_treat_thin_attachments_and_holes_differently"
+    },
+    {
+      "id": "grayscale_area_opening",
+      "label": "Grayscale area opening",
+      "mechanism": "Build descending upper-level components with a union-find max-tree. Suppress bright structures whose area is below the minimum at each coverage level.",
+      "controls": [
+        "minArea"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "minArea": 16
+        }
+      },
+      "mechanismTest": "grayscale_max_tree_suppresses_small_peaks_without_binary_flattening"
+    },
+    {
+      "id": "border_connected",
+      "label": "Keep border-connected regions",
+      "mechanism": "Retain complete four-connected regions that touch any frame edge at the 50% coverage threshold. Preserves retained grayscale coverage.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "mechanismTest": "border_components_and_hole_bearing_regions_preserve_only_matching_components"
+    },
+    {
+      "id": "geodesic_rings",
+      "label": "Seed geodesic distance bands",
+      "mechanism": "Measure shortest four-neighbor path distance inside the 50% selection from the sample. Range selects distance divided by radius; disconnected islands remain excluded.",
+      "controls": [
+        "point",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "geodesic_rings_follow_selection_connectivity_and_regional_maxima_keep_plateaus"
+    },
+    {
+      "id": "hole_bearing_regions",
+      "label": "Keep regions enclosing holes",
+      "mechanism": "Flood each component complement from a padded exterior to detect enclosed holes. Retain the surrounding component, preserving its coverage; solid regions are excluded.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "mechanismTest": "border_components_and_hole_bearing_regions_preserve_only_matching_components"
+    },
+    {
+      "id": "regional_maxima",
+      "label": "Regional coverage maxima",
+      "mechanism": "Traverse equal-coverage plateaus and retain only nonzero plateaus with no greater four-neighbor coverage. Flat-topped maxima stay connected.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "mechanismTest": "geodesic_rings_follow_selection_connectivity_and_regional_maxima_keep_plateaus"
+    },
+    {
+      "id": "spiral_marquee",
+      "label": "Archimedean spiral ribbon",
+      "mechanism": "Construct a ribbon around a growing Archimedean spiral within elliptical bounds. Radius sets turn count, angle rotates it, and tolerance sets radial half-width.",
+      "controls": [
+        "bounds",
+        "radius",
+        "angle",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "spiral_and_barycentric_constructions_have_real_geometry_and_reject_collinearity"
+    },
+    {
+      "id": "barycentric_triangle",
+      "label": "Barycentric triangle gradient",
+      "mechanism": "Use the first three vertices to construct a triangle with coverage fading from vertex one toward the opposite edge. Corner controls the gradient exponent; collinear vertices are rejected.",
+      "controls": [
+        "vertices",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "spiral_and_barycentric_constructions_have_real_geometry_and_reject_collinearity"
+    },
+    {
+      "id": "coverage_shear",
+      "label": "Affine selection shear",
+      "mechanism": "Inverse-map coverage through a horizontal shear about the bounds center. Angle maps through sine to shear strength from -1.5 to 1.5. Transparent sampling clips outside the frame.",
+      "controls": [
+        "bounds",
+        "angle"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "angle": 30
+        }
+      },
+      "mechanismTest": "nonlinear_warps_and_gradient_displacement_obey_identity_and_change_nontrivial_inputs"
+    },
+    {
+      "id": "coverage_twirl",
+      "label": "Radial selection twirl",
+      "mechanism": "Rotate source sample coordinates with a quadratic radial falloff inside elliptical bounds. Angle sets centre rotation; the ellipse boundary stays fixed.",
+      "controls": [
+        "bounds",
+        "angle"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "angle": 90
+        }
+      },
+      "mechanismTest": "nonlinear_warps_and_gradient_displacement_obey_identity_and_change_nontrivial_inputs"
+    },
+    {
+      "id": "coverage_spherize",
+      "label": "Spherical selection remap",
+      "mechanism": "Inverse-map coverage with a normalized arctangent radial projection inside elliptical bounds. Corner blends projection strength; the bounds boundary stays fixed.",
+      "controls": [
+        "bounds",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "nonlinear_warps_and_gradient_displacement_obey_identity_and_change_nontrivial_inputs"
+    },
+    {
+      "id": "coverage_displace",
+      "label": "Image-gradient displacement",
+      "mechanism": "Move coverage sample coordinates along source luminance gradients. Tolerance sets displacement strength; source pixels remain read-only and out-of-frame coverage is transparent.",
+      "controls": [
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "nonlinear_warps_and_gradient_displacement_obey_identity_and_change_nontrivial_inputs"
+    },
+    {
+      "id": "signed_distance_smooth",
+      "label": "Signed-distance edge smoothing",
+      "mechanism": "Compute graph distance on both sides of the 50% selection interface and remap it with a logistic profile. Radius sets softness; fully selected or empty frames retain exact coverage.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "signed_distance_profiles_extend_both_sides_and_keep_constant_extremes"
+    }
+  ],
+  "verification": {
+    "status": "passed",
+    "uiCatalogTests": {
+      "command": "npm.cmd test -- --run src/components/develop/MaskLabControls.test.tsx",
+      "passed": 6,
+      "workflowsExercised": 75
+    },
+    "typescript": {
+      "command": "npm.cmd run lint",
+      "passed": true
+    },
+    "native": {
+      "command": "CARGO_INCREMENTAL=0 cargo test -p aura-app mask_workflows::photographic::experimental --lib",
+      "status": "passed",
+      "passed": 15,
+      "failed": 0,
+      "filteredOut": 356,
+      "buildSeconds": 295,
+      "testSeconds": 0.0
+    },
+    "limits": "This ledger records synthetic numerical and UI request validation. Desktop save/undo and user-photo qualification are tracked by the parent task reports."
+  },
+  "implementationFiles": [
+    "crates/aura-app/src/mask_workflows.rs",
+    "crates/aura-app/src/mask_workflows/photographic/mod.rs",
+    "crates/aura-app/src/mask_workflows/photographic/experimental/mod.rs",
+    "crates/aura-app/src/mask_workflows/photographic/experimental/pixels.rs",
+    "crates/aura-app/src/mask_workflows/photographic/experimental/topology.rs",
+    "crates/aura-app/src/mask_workflows/photographic/experimental/warp.rs",
+    "crates/aura-app/src/mask_workflows/photographic/experimental/tests.rs",
+    "ui/src/ipc/maskWorkflows.ts",
+    "ui/src/components/develop/MaskLabControls.tsx",
+    "ui/src/components/develop/MaskLabControls.test.tsx"
+  ],
+  "invariants": [
+    "Each operation computes a complete temporary output and checks cancellation before replacing coverage.",
+    "Source RGB and luminance are read-only.",
+    "Coverage grids are limited to 512 cells per edge and source analysis radius to eight cells.",
+    "Nonfinite coordinates, invalid intervals, mismatched source grids and degenerate triangles are rejected.",
+    "Transparent out-of-frame bilinear sampling is explicit; morphology uses transparent frame boundaries.",
+    "Empty and single-cell inputs are covered; geodesic bands require a selected seed."
+  ],
+  "limitations": [
+    "These are mathematical selection tools, not trained or semantic segmentation.",
+    "No claim of Evoto feature, algorithm, model or numerical output equivalence.",
+    "Source measurements use the existing unadjusted preview sampled on the selection grid.",
+    "A selection workflow test establishes its stated numerical behavior, not photographic perfection."
+  ],
+  "sharedNativeTests": [
+    "all_twenty_five_operators_are_deterministic_bounded_and_source_isolated",
+    "every_operator_handles_single_cell_and_transparent_coverage_without_panicking",
+    "cancellation_invalid_geometry_finite_and_frame_checks_preserve_coverage"
+  ]
+}

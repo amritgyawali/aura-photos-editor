@@ -8,7 +8,7 @@ fail=0
 # Files where a panic is acceptable: test code, benches, xtask, and main().
 is_exempt() {
   case "$1" in
-    *"/tests/"*|*"/benches/"*|xtask/*|*"/main.rs") return 0 ;;
+    *"/tests/"*|*"/tests.rs"|*"_tests.rs"|*"/benches/"*|xtask/*|*"/main.rs") return 0 ;;
     *) return 1 ;;
   esac
 }

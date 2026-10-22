@@ -58,6 +58,7 @@ pub mod blemish_review;
 pub mod camera_commands;
 pub mod cleanup_commands;
 pub mod cloud_commands;
+pub mod color_lab_commands;
 pub mod color_match;
 pub mod colour_commands;
 pub mod commands;
@@ -72,11 +73,15 @@ pub mod internal_ai;
 pub mod learn_commands;
 pub mod licensing;
 pub mod lightroom;
+pub mod material_commands;
 pub mod native_retouch;
 pub mod personal_style;
+pub mod photo_analysis;
 pub mod provider_links;
+pub mod spatial_lab_commands;
 pub mod studio_color_commands;
 pub mod studio_tools;
+pub mod workflow_lab;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.

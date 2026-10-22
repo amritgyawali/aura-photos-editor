@@ -1,0 +1,276 @@
+{
+  "date": "2026-10-22",
+  "family": "spatial",
+  "status": "implemented; 11 new native test groups and all 28 spatial regression groups passed; 36 UI tests and TypeScript check passed",
+  "algorithm_origin": "Original analytical implementations; no recovered Evoto code, trained models, or parity claims",
+  "working_resolution": "Maximum 256 pixels on the long edge. Correction interpolation retains full-resolution original detail.",
+  "selection_contract": "All new methods derive neighbours, interpolation taps, airlight, covariance and other statistics only from positive selection coverage. Outside pixels are unchanged. Coverage blends corrections once.",
+  "limits": [
+    "These tools are deterministic analytical operators, not semantic face/body models.",
+    "Dark-channel haze inversion is a selected-region heuristic.",
+    "Connected spot repair operates on components of at most four working-grid cells.",
+    "Adaptive median window expands only through 7x7 cells; apertures use at most 49 samples.",
+    "Notch radius stores cycles per working-grid cell, exposed explicitly in the UI."
+  ],
+  "methods": [
+    {
+      "id": "adaptive_median_impulse",
+      "label": "Adaptive impulse median",
+      "mechanism": "Expand the selected median neighborhood up to seven cells to identify isolated bright or dark impulses.",
+      "controls": [
+        "amount",
+        "threshold"
+      ]
+    },
+    {
+      "id": "sigma_range_mean",
+      "label": "Sigma-gated colour smoothing",
+      "mechanism": "Average only selected neighbours within an explicit RGB distance from the current pixel.",
+      "controls": [
+        "amount",
+        "threshold"
+      ]
+    },
+    {
+      "id": "spatial_weighted_median",
+      "label": "Distance-weighted colour median",
+      "mechanism": "Estimate each channel with a weighted median that favors nearby selected samples.",
+      "controls": [
+        "amount"
+      ]
+    },
+    {
+      "id": "luminance_winsor",
+      "label": "Luminance percentile limiter",
+      "mechanism": "Clamp luminance to the selected neighborhood tenth and ninetieth percentiles while retaining channel ratios.",
+      "controls": [
+        "amount"
+      ]
+    },
+    {
+      "id": "chroma_bilateral",
+      "label": "Chroma range smoothing",
+      "mechanism": "Average colour differences with chroma-distance and spatial weights while preserving luminance.",
+      "controls": [
+        "amount",
+        "threshold"
+      ]
+    },
+    {
+      "id": "chroma_covariance",
+      "label": "Chroma covariance denoising",
+      "mechanism": "Measure two-dimensional chroma covariance and shrink its noisy principal components while preserving luminance.",
+      "controls": [
+        "amount",
+        "threshold"
+      ]
+    },
+    {
+      "id": "rgb_covariance",
+      "label": "Colour covariance denoising",
+      "mechanism": "Diagonalize measured local RGB covariance and suppress components below the chosen noise floor.",
+      "controls": [
+        "amount",
+        "threshold"
+      ]
+    },
+    {
+      "id": "entropy_detail",
+      "label": "Entropy-weighted detail",
+      "mechanism": "Measure an eight-bin local luminance entropy and use it to weight residual detail gain.",
+      "controls": [
+        "amount",
+        "detail"
+      ]
+    },
+    {
+      "id": "rms_contrast",
+      "label": "Local RMS contrast",
+      "mechanism": "Rescale luminance residuals toward a chosen local RMS contrast, with bounded gain.",
+      "controls": [
+        "amount",
+        "threshold"
+      ]
+    },
+    {
+      "id": "log_retinex",
+      "label": "Log-illumination correction",
+      "mechanism": "Estimate geometric mean illumination and move it toward an authored reference while retaining reflectance.",
+      "controls": [
+        "amount",
+        "threshold",
+        "detail"
+      ]
+    },
+    {
+      "id": "periodic_notch",
+      "label": "Oriented periodic notch",
+      "mechanism": "Fit a local sine and cosine at an authored frequency and orientation, then subtract their bounded luminance contribution.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "threshold"
+      ]
+    },
+    {
+      "id": "cross_median",
+      "label": "Cross-footprint median",
+      "mechanism": "Take a selected-only colour median along a cross rather than a square footprint.",
+      "controls": [
+        "amount"
+      ]
+    },
+    {
+      "id": "hessian_ridge",
+      "label": "Curvature ridge detail",
+      "mechanism": "Measure Hessian principal curvature and adjust ridge contrast with a bounded luminance correction.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ]
+    },
+    {
+      "id": "coherence_detail",
+      "label": "Coherent structure detail",
+      "mechanism": "Measure structure-tensor coherence to concentrate detail gain along consistent edges.",
+      "controls": [
+        "amount",
+        "detail"
+      ]
+    },
+    {
+      "id": "directional_median",
+      "label": "Least-dispersion line median",
+      "mechanism": "Choose the colour median of the least dispersed horizontal, vertical, or diagonal selected line.",
+      "controls": [
+        "amount"
+      ]
+    },
+    {
+      "id": "quadratic_residual",
+      "label": "Curved-surface residual detail",
+      "mechanism": "Fit a local six-term quadratic surface and adjust residual detail above smooth curved illumination.",
+      "controls": [
+        "amount",
+        "detail"
+      ]
+    },
+    {
+      "id": "lanczos_shift",
+      "label": "Windowed-sinc selection shift",
+      "mechanism": "Resample an explicit shift with a six-tap Lanczos kernel and clamp ringing to the selected footprint range.",
+      "controls": [
+        "amount",
+        "shift"
+      ]
+    },
+    {
+      "id": "elliptical_aperture",
+      "label": "Elliptical aperture integration",
+      "mechanism": "Integrate a rotated elliptical Gaussian aperture within the selection.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle"
+      ]
+    },
+    {
+      "id": "hexagonal_aperture",
+      "label": "Hexagonal aperture integration",
+      "mechanism": "Integrate a uniform six-sided aperture with selection-aware samples.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle"
+      ]
+    },
+    {
+      "id": "cat_eye_aperture",
+      "label": "Cat-eye aperture integration",
+      "mechanism": "Integrate intersecting discs; aperture clipping increases away from the authored optical centre.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "source"
+      ]
+    },
+    {
+      "id": "highlight_streak",
+      "label": "One-sided highlight streak",
+      "mechanism": "Spread only brighter-than-current highlight energy along a rotated exponential trail.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "threshold"
+      ]
+    },
+    {
+      "id": "bilateral_tone_compress",
+      "label": "Range-aware base compression",
+      "mechanism": "Compress a luminance-range-filtered local base while retaining its fine residual.",
+      "controls": [
+        "amount",
+        "threshold",
+        "detail"
+      ]
+    },
+    {
+      "id": "dark_channel_haze",
+      "label": "Selected dark-channel haze repair",
+      "mechanism": "Estimate selected airlight and local dark-channel transmission for bounded haze inversion. This is a heuristic, not scene-depth inference.",
+      "controls": [
+        "amount",
+        "threshold"
+      ]
+    },
+    {
+      "id": "connected_impulse",
+      "label": "Connected spot repair",
+      "mechanism": "Repair colour-connected components of at most four working cells from their selected boundary median.",
+      "controls": [
+        "amount",
+        "threshold"
+      ]
+    },
+    {
+      "id": "chroma_median",
+      "label": "Luminance-preserving chroma median",
+      "mechanism": "Apply channel-difference medians while retaining luminance and reducing out-of-gamut chroma.",
+      "controls": [
+        "amount"
+      ]
+    }
+  ],
+  "files": [
+    "crates/aura-recipe/src/spatial_lab.rs",
+    "crates/aura-render/src/spatial_lab.rs",
+    "crates/aura-render/src/spatial_lab/advanced.rs",
+    "crates/aura-render/src/spatial_lab/advanced_tests.rs",
+    "ui/src/ipc/spatialLab.ts",
+    "ui/src/components/develop/SpatialLabPanel.tsx",
+    "ui/src/components/develop/SpatialLabPanel.test.tsx"
+  ],
+  "validation": [
+    {
+      "command": "cargo test -p aura-render spatial_lab::advanced_tests --lib",
+      "result": "11 passed; covers every one of the 25 additions plus analytic mechanism fixtures"
+    },
+    {
+      "command": "target/debug/deps/aura_render-bd2a9d2d3d068034.exe spatial_lab",
+      "result": "28 passed using the latest compiled aura-render test binary"
+    },
+    {
+      "command": "npm.cmd test -- --run src/components/develop/SpatialLabPanel.test.tsx",
+      "result": "36 passed"
+    },
+    {
+      "command": "npx.cmd tsc --noEmit",
+      "result": "Passed"
+    }
+  ],
+  "validation_scope": "Synthetic numerical and selected-region invariants; no claim of Evoto visual parity or real-photo perfection. Root qualification handles user photographs."
+}
