@@ -1,0 +1,18 @@
+{
+  "provider": "Ghidra12.1.4 targeted fallback with auto-analysis disabled",
+  "sha256": "94a360e71b7d05763b64aa3010162db6aeeaec0dbb3caacc370fc9b2a6530141",
+  "headlessExit": "0",
+  "functions": [
+    {
+      "address": "180016bd0",
+      "end_inclusive": "180016c60",
+      "disassembled": true,
+      "instruction_count": 38,
+      "decompiled": true
+    }
+  ],
+  "observations": [
+    "The selected preview export checks a non-null context and an SDK state byte before dispatching through vtable offset0x58; otherwise it returns0x50.",
+    "38 decoded instructions cover one145-byte export wrapper only. Internal virtual implementation and physical camera behaviour remain unobserved."
+  ]
+}

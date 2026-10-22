@@ -27,6 +27,59 @@ All notable changes to AURA. One entry per phase, newest first.
   saved finish left out. The portrait parse (version 4) centres the mouth on the line between the lips,
   keeps blush out of the lips and lid shimmer out of the whites of the eyes.
 
+## Advanced methods and existing-tool repairs - 2026-10-22
+
+- Add 25 further colour, 25 spatial and 25 selection mechanisms; each catalogue
+  now contains 100 methods. Add 25 descriptive diagnostics and three review screens.
+- Preserve native local detail for 44 supported spatial methods with bounded
+  stripes and halos. Remove retained full-frame colour stencil targets.
+- Fix hidden selection-parameter validation, resource preflight and valid-pair
+  centring of existing lagged autocorrelation. Version the renderer cache.
+- Record actual qualification separately in the
+  [advanced validation report](docs/reports/AURA-advanced-validation-2026-10-22.md).
+
+## Additional editing methods and delivery inspection - 2026-10-22
+
+- Add 25 colour methods, 25 spatial methods and 25 selection workflows, bringing
+  each catalogue to 75. Add 25 diagnostics across three additional review screens.
+- Qualify all 100 additions through the native desktop on synthetic and real-photo
+  previews. Edit and export all 27 supplied RAW photos without changing originals.
+- Retain REA evidence and report exact Evoto parity and proprietary model recovery
+  as unverified. See the [validation report](docs/reports/AURA-validation-2026-10-22.md).
+
+## Selected lab correctness and fresh qualification - 2026-10-21
+
+- Repair selected-only interpolation, tied rank filtering, incomplete Haar blocks and
+  reference coordinates; version the corrected renderer cache identity.
+- Correct checkpoint ancestors, rollback binding, correction dependencies, boundary
+  selections and first batch edits on unedited imported photos.
+- Keep extension history paths unique and identical saved stacks history-neutral;
+  enforce photo membership inside recipe transactions.
+- Add spatial stack reordering, reliable workflow selection state and stricter
+  photo/export qualification. Preserve the existing 100 distinct additions.
+- Record fresh verification separately in the [current report](docs/reports/AURA-revalidation-2026-10-21.md).
+
+## One hundred colour, spatial, selection and review additions - 2026-10-21
+
+- Add twenty-five selected colour transforms and twenty-five spatial repair methods,
+  each with a native recipe stack, explicit mask binding, stale-save protection and Undo.
+- Add twenty-five selection construction, image-guided refinement and topology workflows.
+- Add twenty-five durable cohort review/checkpoint workflows, including planned transfers,
+  revision-bound signoff, correction dependencies and portable review metadata.
+- Qualify the supplied RAW folder with unchanged-source hashes, edited previews and
+  full-resolution export checks. Record actual Evoto preview edits and its trial export gate.
+- These are independent implementations. Proprietary Evoto models and exact output parity
+  are not claimed. See the [100-item report](docs/reports/AURA-hundred-capabilities-2026-10-21.md).
+
+## Further material, selection and inspection tools - 2026-10-20
+
+- Add a native, selection-bound material stack with fifteen additional repair methods,
+  independent fabric bands, original-safe history and dedicated editing panel.
+- Add fifteen component authoring, placement and selection topology workflows.
+- Add twenty measured scopes/maps/reports in a dedicated read-only Photo inspection panel.
+- Retain fresh REA Evoto evidence with explicit coverage and private-model limits.
+  See the [additional fifty report](docs/reports/AURA-next-fifty-capabilities-2026-10-20.md).
+
 ## Fifty studio capabilities - 2026-10-20
 
 - Update the workspace and desktop TLS locks to rustls 0.23.46 for four

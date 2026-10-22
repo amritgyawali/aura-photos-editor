@@ -1,0 +1,333 @@
+{
+  "date": "2026-10-22",
+  "family": "colour",
+  "status": "implemented; synthetic native and UI validation passed; real-photo and Evoto parity not established",
+  "algorithm_origin": "Original analytical implementations; not recovered Evoto algorithms or models",
+  "methods": [
+    {
+      "id": "sigmoid_contrast",
+      "label": "Normalized sigmoid contrast",
+      "mechanism": "Apply a normalized logistic curve in bounded luminance coordinates, preserving black and HDR output.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "exponential_shoulder",
+      "label": "Exponential highlight rolloff",
+      "mechanism": "Use an exponential absorption shoulder normalized at unit white.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "hermite_tone",
+      "label": "Monotone Hermite contrast",
+      "mechanism": "Shape a cubic Hermite contrast curve with matching endpoint slopes and a continuous HDR extension.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "schlick_bias",
+      "label": "Rational light bias",
+      "mechanism": "Redistribute linear luminance with a rational bias curve and continuous highlight extension.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "solarize_luma",
+      "label": "Luminance solarization",
+      "mechanism": "Fold luminance above an explicit threshold into an exponential creative solarization shoulder.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "zone_exposure",
+      "label": "Stop-zone exposure lift",
+      "mechanism": "Apply a Gaussian exposure lift around a chosen stop-domain luminance anchor.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "black_floor",
+      "label": "Linear black-floor subtraction",
+      "mechanism": "Subtract an explicit linear black floor and rescale the remaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "dark_channel_dehaze",
+      "label": "Selected dark-channel haze removal",
+      "mechanism": "Estimate local transmission from selected dark-channel minima and selected 99th-percentile atmospheric channel values.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "local_wiener_tone",
+      "label": "Variance-guided luminance cleanup",
+      "mechanism": "Shrink local luminance residuals using the Wiener ratio of measured variance to variance plus noise power.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "local_midrange",
+      "label": "Local extrema tone contraction",
+      "mechanism": "Contract luminance toward the midpoint of selected neighbourhood extrema.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "chroma_shear",
+      "label": "Opponent-plane colour shear",
+      "mechanism": "Shear red-opponent chroma by blue-opponent chroma while retaining photographed luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "chroma_spiral",
+      "label": "Radius-dependent hue spiral",
+      "mechanism": "Rotate hue by a continuous angle proportional to colour radius, keeping neutral colours stable.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "tonal_hue_twist",
+      "label": "Luminance-dependent hue twist",
+      "mechanism": "Rotate shadows and highlights in opposing hue directions around a luminance anchor.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "duotone_gradient",
+      "label": "Complementary duotone gradient",
+      "mechanism": "Rebuild chroma along a complementary shadow-to-highlight colour axis at original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "target"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "channel_crossfeed",
+      "label": "Cyclic channel crossfeed",
+      "mechanism": "Mix each linear channel with its cyclic neighbour and restore original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "selective_density",
+      "label": "Subtractive colour density",
+      "mechanism": "Apply Beer-Lambert channel absorption from an explicit density colour and restore original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width",
+        "target"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "bradford_adaptation",
+      "label": "Bradford cone-response adaptation",
+      "mechanism": "Adapt the selected mean illuminant to an explicit target using XYZ Bradford cone responses, retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "channel_ratio_limit",
+      "label": "RGB channel-ratio limiter",
+      "mechanism": "Limit peak channels against the darkest channel with a luminance-based stabilizing floor.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "median_despill",
+      "label": "Median-channel spill suppression",
+      "mechanism": "Reduce only channel excursions above the per-pixel median channel and restore luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "harmonic_hue_snap",
+      "label": "Three-axis hue harmony",
+      "mechanism": "Move hue toward a target-aligned threefold harmonic harmony using a continuous sinusoidal angular field.",
+      "controls": [
+        "amount",
+        "strength",
+        "width",
+        "target"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "chroma_luma_detrend",
+      "label": "Colour-luminance regression removal",
+      "mechanism": "Measure selected chroma-versus-luminance regression and remove its slope around the selected mean.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "guided_chroma",
+      "label": "Luminance-guided colour cleanup",
+      "mechanism": "Fit local chroma to luminance with ridge-regularized selected covariance, preserving aligned colour edges.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "median_chroma",
+      "label": "Weighted median colour repair",
+      "mechanism": "Replace opponent chroma with the weighted selected neighbourhood median, preserving luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "channel_rank_align",
+      "label": "Channel-distribution alignment",
+      "mechanism": "Map each channel rank to the luminance-weighted barycenter of selected channel quantile distributions, preserving luminance.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    },
+    {
+      "id": "bilateral_chroma",
+      "label": "Range-aware bilateral colour cleanup",
+      "mechanism": "Average selected chroma with both spatial and chromatic range weights at constant luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "validation": "Synthetic finite-output, active-output, determinism, distinct-output, exact-zero, selection-isolation, feather-blend tests passed; UI authoring/save test passed."
+    }
+  ],
+  "limitations": [
+    "Dark-channel correction estimates haze and cannot recover clipped data.",
+    "Local extrema, median and bilateral operators use a bounded 7x7 stencil spanning the chosen radius.",
+    "Statistical distributions use a deterministic selected-only sample capped at 65536 pixels.",
+    "No visual equivalence to Evoto is established."
+  ],
+  "validation": [
+    {
+      "command": "CARGO_INCREMENTAL=0 cargo test -p aura-render -p aura-recipe color_lab --lib",
+      "result": "passed",
+      "native_recipe_tests": 3,
+      "native_render_tests": 26,
+      "new_recipe_tests": 1,
+      "new_render_tests": 9
+    },
+    {
+      "command": "npm.cmd test -- ColorLabPanel.test.tsx",
+      "cwd": "ui",
+      "result": "passed",
+      "tests": 56
+    },
+    {
+      "command": "npm.cmd run lint",
+      "cwd": "ui",
+      "result": "passed"
+    },
+    {
+      "check": "25 new ids agree across recipe enum, UI catalog and ledger",
+      "result": "passed"
+    }
+  ],
+  "files": [
+    "crates/aura-recipe/src/color_lab.rs",
+    "crates/aura-render/src/color_lab.rs",
+    "crates/aura-render/src/color_lab/creative.rs",
+    "crates/aura-render/src/color_lab/creative/tests.rs",
+    "ui/src/ipc/colorLab.ts",
+    "ui/src/components/develop/ColorLabPanel.tsx",
+    "ui/src/components/develop/ColorLabPanel.test.tsx"
+  ]
+}

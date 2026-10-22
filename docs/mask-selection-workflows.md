@@ -1,6 +1,10 @@
 # Saved selection tools
 
 In Develop, open **Masks**, select a mask, then open **Selection tools**.
+The additional [authored geometry and topology workflows](mask-authoring-topology-workflows.md)
+include stored stroke editing, component composition, selection placement and region isolation.
+The [selection laboratory](mask-selection-laboratory.md) adds 25 more shape,
+source-sampled, topology, placement and mask-transfer workflows.
 Each action keeps the selected mask's exposure, colour, amount and enabled state.
 Other masks and global edits are preserved. Undo restores the prior recipe.
 

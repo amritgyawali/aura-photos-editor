@@ -8,7 +8,14 @@ use aura_recipe::{
 };
 use serde::Deserialize;
 
+mod advanced;
+mod advanced_geometry;
+mod advanced_pixels;
+mod advanced_topology;
+mod authoring;
+mod photographic;
 mod plane;
+mod refinement;
 #[cfg(test)]
 mod tests;
 
@@ -32,8 +39,124 @@ pub enum Action {
     EdgeContrast,
     RemoveIslands,
     FillHoles,
+    EditLinear,
+    EditRadial,
+    EditBrush,
+    EditLuminance,
+    ComponentMode,
+    ReorderComponent,
+    ExtractComponent,
+    CopyComponent,
+    TransformSelection,
+    BorderSelection,
+    KeepLargest,
+    KeepConnected,
+    MedianCleanup,
+    ExclusiveUnion,
+    ConvexHull,
+    PolygonMarquee,
+    RoundedMarquee,
+    SectorMarquee,
+    SampleColour,
+    ColourWand,
+    SampleLuminance,
+    SaturationRange,
+    TextureRange,
+    ImageEdges,
+    GuidedSmooth,
+    EdgeGrow,
+    InteriorFalloff,
+    NegativeSpace,
+    Skeleton,
+    SplitRegions,
+    AppendStack,
+    ReplaceSelection,
+    SyncAdjustments,
+    AlignCentroid,
+    FitBounds,
+    PerspectiveSelection,
+    AutoThreshold,
+    ChromaKey,
+    VoronoiPartition,
+    FilterRegions,
+    HueArc,
+    OpponentChroma,
+    TemperatureBalance,
+    ChannelClipping,
+    NeutralAxis,
+    LocalContrastPolarity,
+    LocalEntropy,
+    LaplacianDetail,
+    EdgeOrientation,
+    TensorCoherence,
+    HarrisCorners,
+    LocalRank,
+    ChromaticBoundary,
+    SpecularResidual,
+    ShadowChromaDeviation,
+    SuperellipseMarquee,
+    BezierRibbon,
+    StarMarquee,
+    SeedField,
+    BilateralSymmetry,
+    PeriodicSelection,
+    PolarSelection,
+    CoverageQuantiles,
+    HarmonicPatch,
+    RegionAxisStrip,
+    LabSampleDistance,
+    MahalanobisColour,
+    GeodesicColour,
+    LocalOtsu,
+    SauvolaThreshold,
+    GaborResponse,
+    DirectionalRidge,
+    LocalSkewness,
+    LocalKurtosis,
+    ColourLineResidual,
+    CoverageOpening,
+    CoverageClosing,
+    MorphologicalReconstruction,
+    GrayscaleAreaOpening,
+    BorderConnected,
+    GeodesicRings,
+    HoleBearingRegions,
+    RegionalMaxima,
+    SpiralMarquee,
+    BarycentricTriangle,
+    CoverageShear,
+    CoverageTwirl,
+    CoverageSpherize,
+    CoverageDisplace,
+    SignedDistanceSmooth,
+    MedianAbsoluteDeviation,
+    BinaryPatternTransitions,
+    PatchAutocorrelation,
+    PatchSemivariance,
+    LogChromaDistance,
+    EdgeNonmaximum,
+    EdgeHysteresis,
+    LocalMoran,
+    TemplatePatchCorrelation,
+    LocalHueDispersion,
+    ColourPrototypePartition,
+    SelectionArticulations,
+    SelectionKCore,
+    CoverageWatershed,
+    CoverageAnisotropicDiffusion,
+    CoverageCurvatureFlow,
+    RegionInscribedDisk,
+    DirectionalRunWidth,
+    ThinPlateCoverageWarp,
+    MeanValueCageWarp,
+    TriangulatedCageWarp,
+    MobiusCoverageWarp,
+    PathNormalUnwrap,
+    CoverageSeamCarve,
+    LissajousRibbon,
 }
 impl Action {
+    #[allow(clippy::too_many_lines)] // Explicit audit labels correspond one-to-one with the typed actions.
     fn label(self) -> &'static str {
         match self {
             Self::Duplicate => "Duplicate mask",
@@ -48,10 +171,136 @@ impl Action {
             Self::EdgeContrast => "Refine selection contrast",
             Self::RemoveIslands => "Remove selection islands",
             Self::FillHoles => "Fill selection holes",
+            Self::EditLinear => "Edit linear gradient geometry",
+            Self::EditRadial => "Edit radial gradient geometry",
+            Self::EditBrush => "Edit authored brush strokes",
+            Self::EditLuminance => "Edit selection luminance range",
+            Self::ComponentMode => "Change component combination",
+            Self::ReorderComponent => "Reorder mask components",
+            Self::ExtractComponent => "Extract mask component",
+            Self::CopyComponent => "Copy component to mask",
+            Self::TransformSelection => "Transform composed selection",
+            Self::BorderSelection => "Select boundary band",
+            Self::KeepLargest => "Keep largest selection region",
+            Self::KeepConnected => "Keep seed-connected selection",
+            Self::MedianCleanup => "Median selection cleanup",
+            Self::ExclusiveUnion => "Exclusive union of selections",
+            Self::ConvexHull => "Convex hull of selection",
+            Self::PolygonMarquee => "Polygon selection",
+            Self::RoundedMarquee => "Rounded rectangle selection",
+            Self::SectorMarquee => "Angular sector selection",
+            Self::SampleColour => "Sampled colour selection",
+            Self::ColourWand => "Contiguous colour wand",
+            Self::SampleLuminance => "Sampled luminance selection",
+            Self::SaturationRange => "Saturation range selection",
+            Self::TextureRange => "Texture range selection",
+            Self::ImageEdges => "Image edge selection",
+            Self::GuidedSmooth => "Image-guided mask smoothing",
+            Self::EdgeGrow => "Edge-constrained selection growth",
+            Self::InteriorFalloff => "Interior distance falloff",
+            Self::NegativeSpace => "Select enclosed negative space",
+            Self::Skeleton => "Extract selection centreline",
+            Self::SplitRegions => "Split disconnected selection regions",
+            Self::AppendStack => "Append selection component stack",
+            Self::ReplaceSelection => "Replace destination selection",
+            Self::SyncAdjustments => "Synchronize mask adjustments",
+            Self::AlignCentroid => "Align selection centroids",
+            Self::FitBounds => "Fit selection to bounds",
+            Self::PerspectiveSelection => "Perspective selection placement",
+            Self::AutoThreshold => "Automatic selection threshold",
+            Self::ChromaKey => "Chroma-key selection exclusion",
+            Self::VoronoiPartition => "Seed partition of selection",
+            Self::FilterRegions => "Filter selection regions by shape",
+            Self::HueArc => "Circular hue selection",
+            Self::OpponentChroma => "Opponent colourfulness selection",
+            Self::TemperatureBalance => "Red-blue balance selection",
+            Self::ChannelClipping => "Channel clipping selection",
+            Self::NeutralAxis => "Neutral-axis selection",
+            Self::LocalContrastPolarity => "Local contrast polarity selection",
+            Self::LocalEntropy => "Local entropy selection",
+            Self::LaplacianDetail => "Laplacian detail selection",
+            Self::EdgeOrientation => "Oriented image edge selection",
+            Self::TensorCoherence => "Structure coherence selection",
+            Self::HarrisCorners => "Harris corner selection",
+            Self::LocalRank => "Local luminance rank selection",
+            Self::ChromaticBoundary => "Chromatic boundary selection",
+            Self::SpecularResidual => "Specular residual selection",
+            Self::ShadowChromaDeviation => "Shadow chroma deviation selection",
+            Self::SuperellipseMarquee => "Superellipse selection",
+            Self::BezierRibbon => "Cubic Bezier ribbon selection",
+            Self::StarMarquee => "Alternating-radius star selection",
+            Self::SeedField => "Inverse-distance seed field",
+            Self::BilateralSymmetry => "Bilateral symmetry selection",
+            Self::PeriodicSelection => "Periodic selection tiling",
+            Self::PolarSelection => "Polar selection remapping",
+            Self::CoverageQuantiles => "Coverage quantile equalization",
+            Self::HarmonicPatch => "Harmonic selection patch repair",
+            Self::RegionAxisStrip => "Principal-axis region strip",
+            Self::LabSampleDistance => "CIE Lab sampled distance",
+            Self::MahalanobisColour => "Covariance colour distance",
+            Self::GeodesicColour => "Geodesic source colour selection",
+            Self::LocalOtsu => "Local Otsu threshold selection",
+            Self::SauvolaThreshold => "Sauvola adaptive threshold selection",
+            Self::GaborResponse => "Gabor frequency selection",
+            Self::DirectionalRidge => "Directional ridge selection",
+            Self::LocalSkewness => "Local luminance skewness",
+            Self::LocalKurtosis => "Local luminance kurtosis",
+            Self::ColourLineResidual => "Colour-line residual selection",
+            Self::CoverageOpening => "Grayscale coverage opening",
+            Self::CoverageClosing => "Grayscale coverage closing",
+            Self::MorphologicalReconstruction => "Coverage opening by reconstruction",
+            Self::GrayscaleAreaOpening => "Grayscale area opening",
+            Self::BorderConnected => "Border-connected selection regions",
+            Self::GeodesicRings => "Seed geodesic distance bands",
+            Self::HoleBearingRegions => "Hole-bearing selection regions",
+            Self::RegionalMaxima => "Regional coverage maxima",
+            Self::SpiralMarquee => "Archimedean spiral ribbon",
+            Self::BarycentricTriangle => "Barycentric triangle coverage",
+            Self::CoverageShear => "Affine coverage shear",
+            Self::CoverageTwirl => "Radial coverage twirl",
+            Self::CoverageSpherize => "Spherical coverage remap",
+            Self::CoverageDisplace => "Source-gradient coverage displacement",
+            Self::SignedDistanceSmooth => "Signed-distance coverage smoothing",
+            Self::MedianAbsoluteDeviation => "Robust median deviation",
+            Self::BinaryPatternTransitions => "Local binary-pattern transitions",
+            Self::PatchAutocorrelation => "Directional patch autocorrelation",
+            Self::PatchSemivariance => "Directional semivariance",
+            Self::LogChromaDistance => "Log-chromaticity sample distance",
+            Self::EdgeNonmaximum => "Gradient nonmaximum suppression",
+            Self::EdgeHysteresis => "Connected hysteresis edges",
+            Self::LocalMoran => "Local Moran spatial association",
+            Self::TemplatePatchCorrelation => "Sampled patch correlation",
+            Self::LocalHueDispersion => "Circular hue dispersion",
+            Self::ColourPrototypePartition => "Colour prototype partition",
+            Self::SelectionArticulations => "Connectivity articulation cells",
+            Self::SelectionKCore => "Selection graph core",
+            Self::CoverageWatershed => "Seeded coverage watershed",
+            Self::CoverageAnisotropicDiffusion => "Anisotropic coverage diffusion",
+            Self::CoverageCurvatureFlow => "Coverage curvature flow",
+            Self::RegionInscribedDisk => "Region maximum inscribed disk",
+            Self::DirectionalRunWidth => "Directional selected run width",
+            Self::ThinPlateCoverageWarp => "Thin-plate landmark deformation",
+            Self::MeanValueCageWarp => "Mean-value cage deformation",
+            Self::TriangulatedCageWarp => "Triangulated cage deformation",
+            Self::MobiusCoverageWarp => "Conformal Mobius deformation",
+            Self::PathNormalUnwrap => "Path-normal coverage unwrap",
+            Self::CoverageSeamCarve => "Coverage-aware seam compression",
+            Self::LissajousRibbon => "Lissajous ribbon construction",
         }
     }
     fn combines(self) -> bool {
-        matches!(self, Self::Union | Self::Intersection | Self::Subtraction)
+        matches!(
+            self,
+            Self::Union
+                | Self::Intersection
+                | Self::Subtraction
+                | Self::ExclusiveUnion
+                | Self::CopyComponent
+                | Self::AppendStack
+                | Self::ReplaceSelection
+                | Self::SyncAdjustments
+                | Self::AlignCentroid
+        )
     }
     fn parameterized(self) -> bool {
         matches!(
@@ -62,6 +311,8 @@ impl Action {
                 | Self::EdgeContrast
                 | Self::RemoveIslands
                 | Self::FillHoles
+                | Self::BorderSelection
+                | Self::MedianCleanup
         )
     }
 }
@@ -79,6 +330,20 @@ pub struct Input {
     pub other_mask_id: Option<String>,
     #[serde(default)]
     pub value: u32,
+    #[serde(default)]
+    pub component_index: usize,
+    #[serde(default)]
+    pub target_index: usize,
+    #[serde(default)]
+    pub source: Option<Source>,
+    #[serde(default)]
+    pub mode: Option<Mode>,
+    #[serde(default)]
+    pub transform: Option<authoring::Transform>,
+    #[serde(default)]
+    pub point: Option<[f32; 2]>,
+    #[serde(default)]
+    pub advanced: Option<advanced::Options>,
 }
 
 fn invalid(message: &str) -> AuraError {
@@ -95,7 +360,10 @@ fn check(cancel: &CancelToken) -> AuraResult<()> {
 }
 fn validate(input: &Input) -> AuraResult<()> {
     let max = match input.action {
-        Action::Feather | Action::Expand | Action::Contract => MAX_RADIUS_CELLS,
+        Action::Feather | Action::Expand | Action::Contract | Action::BorderSelection => {
+            MAX_RADIUS_CELLS
+        }
+        Action::MedianCleanup => 4,
         Action::EdgeContrast => MAX_EDGE_CONTRAST,
         Action::RemoveIslands | Action::FillHoles => MAX_COMPONENT_AREA,
         _ => 0,
@@ -169,7 +437,11 @@ fn run(
         .ok_or_else(|| invalid("That mask no longer exists."))?;
     let mut changed = original.clone();
     let mut mattes = local_masks::read_mattes(&base)?;
-    if input.action == Action::Duplicate {
+    if advanced::manages(input.action) {
+        changed.id = advanced::manage(state, input, photo, &base, &mut masks, &mut mattes, cancel)?;
+    } else if authoring::is_authored(input.action) {
+        changed.id = authoring::edit(input, &mut masks)?;
+    } else if input.action == Action::Duplicate {
         if masks.len() >= local_masks::MAX_MASKS {
             return Err(invalid(
                 "This photograph already has the maximum number of masks.",
@@ -202,10 +474,28 @@ fn run(
     }
     let mut proposal = base.clone();
     local_masks::write(&mut proposal, &masks, &mattes)?;
-    if input.action == Action::Duplicate {
+    if matches!(
+        input.action,
+        Action::Duplicate
+            | Action::ExtractComponent
+            | Action::SyncAdjustments
+            | Action::SplitRegions
+    ) {
         let mut color = aura_recipe::studio_color::read(&base)?;
         if let Some(local) = color.local.get(&input.mask_id).cloned() {
-            color.local.insert(changed.id.clone(), local);
+            if input.action == Action::SplitRegions {
+                for mask in masks.iter().filter(|mask| {
+                    !local_masks::read(&base)
+                        .is_ok_and(|old| old.iter().any(|old| old.id == mask.id))
+                }) {
+                    color.local.insert(mask.id.clone(), local.clone());
+                }
+            } else {
+                color.local.insert(changed.id.clone(), local);
+            }
+            aura_recipe::studio_color::write(&mut proposal, &color)?;
+        } else if input.action == Action::SyncAdjustments {
+            color.local.remove(&changed.id);
             aura_recipe::studio_color::write(&mut proposal, &color)?;
         }
     }
@@ -241,7 +531,25 @@ fn measured(
     } else {
         None
     };
-    selection.edit(input.action, input.value, second.as_ref(), cancel)?;
+    if photographic::handles(input.action) {
+        photographic::edit(state, input, photo, &mut selection, cancel)?;
+    } else if advanced::handles(input.action) {
+        advanced::edit(state, input, photo, &mut selection, second.as_ref(), cancel)?;
+    } else if input.action == Action::TransformSelection {
+        selection.transform(
+            input
+                .transform
+                .ok_or_else(|| invalid("Enter a selection transform."))?,
+            cancel,
+        )?;
+    } else if input.action == Action::KeepConnected {
+        selection.keep_connected(
+            input.point.ok_or_else(|| invalid("Choose a seed point."))?,
+            cancel,
+        )?;
+    } else {
+        selection.edit(input.action, input.value, second.as_ref(), cancel)?;
+    }
     Ok(selection)
 }
 
@@ -263,7 +571,11 @@ fn save(
     let (mut merged, mut changes) = schema::merge(base, proposal, EditSource::User)?;
     // Generic leaf merging cannot delete obsolete dynamic matte IDs. The explicit
     // selection edit owns just these two blocks, retaining every other manual field.
-    for key in [local_masks::KEY, local_masks::MATTE_KEY] {
+    for key in [
+        local_masks::KEY,
+        local_masks::MATTE_KEY,
+        aura_recipe::studio_color::KEY,
+    ] {
         if merged.extra.get(key) != proposal.extra.get(key) {
             if let Some(value) = proposal.extra.get(key) {
                 merged.extra.insert(key.into(), value.clone());

@@ -20,6 +20,11 @@ import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
 import { finishOf, studioFinish, type StudioFinish } from '../../ipc/studioFinish';
 import { AutomaticFinishControls } from './AutomaticFinishControls';
 import { StudioColorPanel } from './StudioColorPanel';
+import { MaterialLabPanel } from './MaterialLabPanel';
+import { SpatialLabPanel } from './SpatialLabPanel';
+import { ColorLabPanel } from './ColorLabPanel';
+import { WorkflowLabPanel } from './WorkflowLabPanel';
+import { PhotoAnalysisPanel } from './PhotoAnalysisPanel';
 import { FramingPanel } from './FramingPanel';
 import { EvotoWorkflowPanel } from './EvotoWorkflowPanel';
 import { evotoWorkflow } from '../../ipc/evotoWorkflow';
@@ -31,6 +36,11 @@ import './editorPanels.css';
 const EDITOR_PANELS = [
   ['all', 'All tools'], ['develop', 'Color & light'], ['portrait', 'Portrait studio'],
   ['masks', 'Masks'], ['references', 'Reference matching'], ['finish', 'Automatic finish'], ['history', 'History'],
+  ['materials', 'Material & texture'], ['inspect', 'Photo inspection'],
+  ['spatial', 'Spatial repair'], ['colorlab', 'Colour lab'], ['review', 'Review & checkpoints'],
+  ['palette', 'Palette & tone review'], ['detailreview', 'Detail review'], ['composition', 'Composition review'],
+  ['deliveryreview', 'Delivery statistics'], ['surfacereview', 'Surface review'], ['lightingreview', 'Lighting geometry'],
+  ['texturefidelity', 'Texture fidelity'], ['colourstability', 'Colour stability'], ['deliveryintegrity', 'Delivery integrity'],
 ] as const;
 type EditorPanel = typeof EDITOR_PANELS[number][0];
 import { useEffectRequest } from '../../state/effectRequest';
@@ -44,8 +54,8 @@ function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
   return [0, 0, 1, 1];
 }
 
-export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusyChange }: {
-  projectId: string; photoId: string; disabled: boolean; revision?: number; onBusyChange: (busy: boolean) => void;
+export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision = 0, onBusyChange }: {
+  projectId: string; photoId: string; photoIds?: readonly string[]; disabled: boolean; revision?: number; onBusyChange: (busy: boolean) => void;
 }): JSX.Element {
   const [recipe, setRecipe] = useState<RecipeDto | null>(null);
   const [history, setHistory] = useState<HistoryDto | null>(null);
@@ -397,6 +407,18 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             const report = await syncSettings(projectId, photoId, [], includeGeometry);
             setNotice(`Settings synced to ${report.synced} photo${report.synced === 1 ? '' : 's'}.${report.failed.length ? ` ${report.failed.length} could not be updated.` : ''}`);
           })} />
+        </div>
+        <div hidden={!shows('materials')}>
+          <MaterialLabPanel projectId={projectId} photoId={photoId} recipe={recipe}
+            disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={async () => { setRefresh(value => value + 1); }}/>
+        </div>
+        <div hidden={!shows('spatial')}><SpatialLabPanel projectId={projectId} photoId={photoId} recipe={recipe} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={async()=>{setRefresh(value=>value+1);}}/></div>
+        <div hidden={!shows('colorlab')}><ColorLabPanel projectId={projectId} photoId={photoId} recipe={recipe} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={async()=>{setRefresh(value=>value+1);}}/></div>
+        <div hidden={!shows('review')}><WorkflowLabPanel projectId={projectId} photoId={photoId} photoIds={photoIds} recipe={recipe} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onEdited={async()=>{setRefresh(value=>value+1);}}/></div>
+        <div hidden={!shows('inspect') && !shows('palette') && !shows('detailreview') && !shows('composition') && !shows('deliveryreview') && !shows('surfacereview') && !shows('lightingreview') && !shows('texturefidelity') && !shows('colourstability') && !shows('deliveryintegrity')}>
+          <PhotoAnalysisPanel projectId={projectId} photoId={photoId} recipe={recipe}
+            focusGroup={panel === 'palette' ? 'Palette & tone review' : panel === 'detailreview' ? 'Detail review' : panel === 'composition' ? 'Composition review' : panel === 'deliveryreview' ? 'Delivery statistics' : panel === 'surfacereview' ? 'Surface review' : panel === 'lightingreview' ? 'Lighting geometry' : panel === 'texturefidelity' ? 'Texture fidelity' : panel === 'colourstability' ? 'Colour stability' : panel === 'deliveryintegrity' ? 'Delivery integrity' : undefined}
+            disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}/>
         </div>
         <div hidden={!shows('finish')} className="editor-finish-panel" aria-label="Automatic finishing panel">
           <AutomaticFinishControls key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId}

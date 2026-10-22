@@ -103,12 +103,82 @@ fn no_module_defines_its_own_working_space() {
             .to_string();
         let source = production_source(&path);
         if source.contains("REC2020_TO_XYZ") {
-            assert!(
-                name == "colour.rs" || name == "output.rs",
-                "{name} reaches for the working-space primaries; go through aura_raw"
-            );
+            assert!(inherits_working_primaries(&source), "{name} must inherit the working-space primaries from aura_raw and cannot redeclare them");
         }
     }
+}
+
+/// This remains a lexical guard, but checks matrix ownership instead of filenames.
+/// Perceptual coordinates may use the canonical matrix without defining another space.
+fn inherits_working_primaries(source: &str) -> bool {
+    let code = source
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !code.contains("REC2020_TO_XYZ") {
+        return true;
+    }
+    let tokens: Vec<_> = code
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|token| !token.is_empty())
+        .collect();
+    for (index, token) in tokens.iter().enumerate() {
+        if matches!(*token, "const" | "static" | "let") {
+            let mut next = index + 1;
+            if tokens.get(next) == Some(&"mut") {
+                next += 1;
+            }
+            if tokens
+                .get(next)
+                .is_some_and(|name| name.starts_with("REC2020_TO_XYZ"))
+            {
+                return false;
+            }
+        }
+    }
+    let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+    if compact.contains("aura_raw::colour::matrix::REC2020_TO_XYZ_D65") {
+        return true;
+    }
+    compact.split(';').any(|item| {
+        let Some(start) = item.rfind("useaura_raw::colour::") else {
+            return false;
+        };
+        let import = &item[start..];
+        import.contains("REC2020_TO_XYZ_D65")
+            && (import.starts_with("useaura_raw::colour::matrix::{")
+                || (import.starts_with("useaura_raw::colour::{") && import.contains("matrix::{")))
+    })
+}
+
+#[test]
+fn canonical_matrix_imports_are_allowed_in_perceptual_helpers() {
+    for source in [
+        "/// The coefficients come from REC2020_TO_XYZ_D65.\nfn unrelated() {}",
+        "use aura_raw::colour::matrix::{apply, REC2020_TO_XYZ_D65};",
+        "use aura_raw::colour::{matrix::{apply, REC2020_TO_XYZ_D65, WHITE_D65}, working_space::xyz_d65_to_rec2020};",
+        "apply(aura_raw::colour::matrix::REC2020_TO_XYZ_D65, rgb)",
+    ] { assert!(inherits_working_primaries(source), "{source}"); }
+}
+
+#[test]
+fn local_primaries_are_rejected_even_alongside_an_unrelated_canonical_import() {
+    for declaration in [
+        "const REC2020_TO_XYZ_D65: Mat3 = [[0.0; 3]; 3];",
+        "static mut REC2020_TO_XYZ_D65: Mat3 = [[0.0; 3]; 3];",
+        "let mut REC2020_TO_XYZ_D65 = [[0.0; 3]; 3];",
+    ] {
+        assert!(!inherits_working_primaries(&format!(
+            "use aura_raw::colour::matrix::{{REC2020_TO_XYZ_D65}}; {declaration}"
+        )));
+    }
+    assert!(!inherits_working_primaries(
+        "use another_renderer::REC2020_TO_XYZ_D65;"
+    ));
+    assert!(!inherits_working_primaries(
+        "// use aura_raw::colour::matrix::{REC2020_TO_XYZ_D65};\n apply(REC2020_TO_XYZ_D65, rgb)"
+    ));
 }
 
 #[test]

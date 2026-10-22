@@ -404,7 +404,7 @@ export function App(): JSX.Element {
                   preview and an open retouch are exactly where they were on return. ADR-0097. */}
               {focusedPhoto && <>
                 <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
-                <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} disabled={editing || workflowBusy} revision={revision} onBusyChange={setSaving} />
+                <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} photoIds={rows.map(row=>row.id)} disabled={editing || workflowBusy} revision={revision} onBusyChange={setSaving} />
                 <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
               </>}
             </div>

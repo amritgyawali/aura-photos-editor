@@ -3732,6 +3732,61 @@ async fn measure_studio_color(
 }
 
 #[tauri::command]
+async fn save_material_lab(
+    state: State<'_, AppState>,
+    input: aura_app::material_commands::Input,
+) -> IpcResult<aura_app::material_commands::Output> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::material_commands::save(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn save_spatial_lab(
+    state: State<'_, AppState>,
+    input: aura_app::spatial_lab_commands::Input,
+) -> IpcResult<aura_app::spatial_lab_commands::Output> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::spatial_lab_commands::save(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn save_color_lab(
+    state: State<'_, AppState>,
+    input: aura_app::color_lab_commands::Input,
+) -> IpcResult<aura_app::color_lab_commands::Output> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::color_lab_commands::save(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn workflow_lab(
+    state: State<'_, AppState>,
+    input: aura_app::workflow_lab::Input,
+) -> IpcResult<aura_app::workflow_lab::Snapshot> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::workflow_lab::run(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn inspect_photo_diagnostics(
+    state: State<'_, AppState>,
+    input: aura_app::photo_analysis::Input,
+) -> IpcResult<aura_app::photo_analysis::Report> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_analysis::inspect(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn prepare_regional_color_match(
     state: State<'_, AppState>,
     input: aura_app::color_match::RegionalPrepareInput,
@@ -4212,6 +4267,11 @@ fn main() {
             color_reference_library_workflow,
             save_studio_color,
             measure_studio_color,
+            save_material_lab,
+            save_spatial_lab,
+            save_color_lab,
+            workflow_lab,
+            inspect_photo_diagnostics,
             regional_color_match_status,
             apply_regional_color_match,
             prepare_color_match,

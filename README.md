@@ -70,12 +70,21 @@ See [Photo Studio](docs/photo-studio.md) for automatic editing after import,
 reviewing every edit, matching reference colors, and rendering the final photos.
 See [Adjustable finishing and reference colour](docs/adjustable-finishing-and-reference-colour.md)
 for post-edit strength sliders and the reusable edited-photo reference library.
-See [Editing panels](docs/editing-panels.md) for the seven editor sections and
+See [Editing panels](docs/editing-panels.md) for the editor sections and
 [native research](docs/reports/AURA-Evoto-native-research-2026-10-20.md) for regional
 reference matching, REA evidence and remaining qualification work.
 The [fifty-capability continuation](docs/reports/AURA-fifty-capabilities-2026-10-20.md)
 adds native Levels/selective colour, mask refinements, reference-library batch
 management, framing and colour inspection, with a numbered implementation ledger.
+The [2026-10-22 additions](docs/additional-editing-methods-2026-10-22.md) expand
+colour, spatial repair and selection catalogues to 75 methods each and add
+delivery, surface and lighting review screens with 70 inspection measurements.
+See the [validation report](docs/reports/AURA-validation-2026-10-22.md) for
+per-tool results, edited-photo exports and the remaining Evoto parity limits.
+The [advanced continuation](docs/advanced-editing-methods-2026-10-22.md) adds 100
+further capabilities, native local-detail processing for supported spatial tools,
+lower-memory colour stencils and three more review screens. See its
+[validation report](docs/reports/AURA-advanced-validation-2026-10-22.md).
 The app opens on three steps - pick one of 21 [edit profiles](docs/edit-profiles.md)
 (16 researched looks and 5 learned from professional RAW before-and-afters), optionally
 paste an Instagram profile, then upload photos or a folder.

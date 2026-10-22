@@ -90,10 +90,12 @@ impl Plane {
                     *alpha = 255 - *alpha;
                 }
             }
-            Action::Union | Action::Intersection | Action::Subtraction => self.combine(
-                action,
-                other.ok_or_else(|| invalid("Choose a second selection."))?,
-            )?,
+            Action::Union | Action::Intersection | Action::Subtraction | Action::ExclusiveUnion => {
+                self.combine(
+                    action,
+                    other.ok_or_else(|| invalid("Choose a second selection."))?,
+                )?;
+            }
             Action::Feather | Action::Expand | Action::Contract => {
                 self.spatial(action, value as usize, cancel)?;
             }
@@ -108,7 +110,20 @@ impl Plane {
             Action::RemoveIslands | Action::FillHoles => {
                 self.components(action, value as usize, cancel)?;
             }
-            Action::Duplicate | Action::Freeze => {}
+            Action::BorderSelection => {
+                let original = self.alpha.clone();
+                self.spatial(Action::Expand, value as usize, cancel)?;
+                let outer = self.alpha.clone();
+                self.alpha = original;
+                self.spatial(Action::Contract, value as usize, cancel)?;
+                for (a, b) in self.alpha.iter_mut().zip(outer) {
+                    *a = b.saturating_sub(*a);
+                }
+            }
+            Action::MedianCleanup => self.median(value as usize, cancel)?,
+            Action::KeepLargest => self.keep_largest(cancel)?,
+            Action::ConvexHull => self.convex_hull(cancel)?,
+            _ => {}
         }
         check(cancel)
     }
@@ -121,6 +136,7 @@ impl Plane {
                 Action::Union => (*a).max(*b),
                 Action::Intersection => ((u16::from(*a) * u16::from(*b) + 127) / 255) as u8,
                 Action::Subtraction => ((u16::from(*a) * (255 - u16::from(*b)) + 127) / 255) as u8,
+                Action::ExclusiveUnion => a.abs_diff(*b),
                 _ => *a,
             };
         }
