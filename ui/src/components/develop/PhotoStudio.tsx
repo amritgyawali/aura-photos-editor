@@ -31,6 +31,7 @@ const EDITOR_PANELS = [
   ['masks', 'Masks'], ['references', 'Reference matching'], ['finish', 'Automatic finish'], ['history', 'History'],
 ] as const;
 type EditorPanel = typeof EDITOR_PANELS[number][0];
+import { useEffectRequest } from '../../state/effectRequest';
 
 /** The crop a recipe shows, as normalised edges of the whole frame. */
 function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
@@ -52,6 +53,9 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const [retouchOpen, setRetouchOpen] = useState(false);
   const [panel, setPanel] = useState<EditorPanel>('all');
   const shows = (value: EditorPanel) => panel === 'all' || panel === value;
+  // A tool chosen in the Effects library opens Retouch, which then picks the tool up. ADR-0135.
+  const effectRequest = useEffectRequest(state => state.request);
+  useEffect(() => { if (effectRequest) setRetouchOpen(true); }, [effectRequest]);
   const writing = useRef(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'essentials' | 'advanced'>('essentials');
