@@ -75,6 +75,7 @@ pub mod lightroom;
 pub mod native_retouch;
 pub mod personal_style;
 pub mod provider_links;
+pub mod studio_color_commands;
 pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
@@ -88,6 +89,7 @@ pub mod adaptive_look;
 pub mod emotion_commands;
 pub mod explain_commands;
 pub mod finish_commands;
+pub mod framing_workflows;
 pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;
@@ -98,6 +100,7 @@ pub mod local_mask_commands;
 pub mod local_range;
 pub mod look_commands;
 pub mod mask_commands;
+pub mod mask_workflows;
 pub mod measured_cull;
 pub mod micro_commands;
 pub mod moment_commands;

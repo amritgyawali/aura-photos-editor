@@ -3641,6 +3641,84 @@ async fn native_retouch_edit(
 }
 
 #[tauri::command]
+async fn mask_workflow(
+    state: State<'_, AppState>,
+    input: aura_app::mask_workflows::Input,
+) -> IpcResult<aura_app::local_mask_commands::LocalMasksDto> {
+    let app = state.inner().clone();
+    let cancel = aura_core::progress::CancelToken::new();
+    app.register_job(&input.cancel_id, cancel.clone());
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::mask_workflows::apply_with_cancel(&app, &input, cancel)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn framing_context(
+    state: State<'_, AppState>,
+    input: aura_app::framing_workflows::Input,
+) -> IpcResult<aura_app::framing_workflows::Context> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::framing_workflows::context(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn color_only_preview(
+    state: State<'_, AppState>,
+    input: aura_app::framing_workflows::Input,
+) -> IpcResult<aura_app::contract::ipc::RenderDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::framing_workflows::color_only(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn color_reference_library_workflow(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::LibraryWorkflowInput,
+) -> IpcResult<aura_app::color_match::LibraryWorkflowSnapshot> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::library_workflow(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn save_studio_color(
+    state: State<'_, AppState>,
+    input: aura_app::studio_color_commands::SaveStudioColorInput,
+) -> IpcResult<aura_app::studio_color_commands::StudioColorDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::studio_color_commands::save(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn measure_studio_color(
+    state: State<'_, AppState>,
+    input: aura_app::studio_color_commands::MeasureStudioColorInput,
+) -> IpcResult<aura_app::studio_color_commands::StudioColorMeasurement> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::studio_color_commands::measure(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn prepare_regional_color_match(
     state: State<'_, AppState>,
     input: aura_app::color_match::RegionalPrepareInput,
@@ -4062,6 +4140,12 @@ fn main() {
             manage_color_reference,
             capture_color_reference,
             prepare_regional_color_match,
+            mask_workflow,
+            framing_context,
+            color_only_preview,
+            color_reference_library_workflow,
+            save_studio_color,
+            measure_studio_color,
             regional_color_match_status,
             apply_regional_color_match,
             prepare_color_match,

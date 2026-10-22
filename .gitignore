@@ -9,6 +9,8 @@
 graphify-out/
 /ui/node_modules
 /ui/dist
+# Vitest cache when the UI suite is invoked from the workspace root.
+/.vite/
 /tests/fixtures/generated
 /perf/results
 *.sqlite

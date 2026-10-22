@@ -5,6 +5,10 @@ use super::{
     RenderLevel, RenderedData, Rgb8, ENGINE,
 };
 
+mod workflows;
+pub(super) use workflows::ordered_references;
+pub use workflows::{run as workflow, WorkflowInput, WorkflowSnapshot};
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ManageInput {
