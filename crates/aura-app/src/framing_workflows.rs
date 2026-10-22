@@ -190,6 +190,8 @@ pub fn color_only(state: &AppState, input: &Input) -> IpcResult<RenderDto> {
         aura_recipe::retouch_tools::KEY,
         aura_recipe::retouch_tools::MATTE_KEY,
         aura_recipe::studio_finish::KEY,
+        aura_recipe::material_lab::KEY,
+        aura_recipe::spatial_lab::KEY,
     ] {
         recipe.extra.remove(key);
     }

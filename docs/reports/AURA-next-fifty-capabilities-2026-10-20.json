@@ -1,0 +1,445 @@
+{
+  "date": "2026-10-20",
+  "scope": "fifty further original AURA capabilities",
+  "evoto_pixel_parity": "unverified",
+  "proprietary_models_recovered": false,
+  "capabilities": [
+    {
+      "number": 1,
+      "name": "Directional hair smoothing",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 2,
+      "name": "Silver/white hair darkening with local highlight protection",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 3,
+      "name": "Joint independent fine/coarse fabric frequency balance",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 4,
+      "name": "Directional luminance moiré notch",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 5,
+      "name": "Contrast-gated flat-area debanding",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 6,
+      "name": "Selected median chroma repair",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 7,
+      "name": "Isolated impulse-pixel repair",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 8,
+      "name": "Directional thin-line scratch repair",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 9,
+      "name": "Row/column stripe-bias repair",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 10,
+      "name": "Two-pixel checkerboard offset suppression",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 11,
+      "name": "Explicit edge-ringing repair",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 12,
+      "name": "Surrounding-diffuse specular chroma reconstruction",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 13,
+      "name": "Intermediate-scale chroma mottle removal",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 14,
+      "name": "Selected planar backdrop illumination leveling",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 15,
+      "name": "Shared-residual cross-channel detail reconstruction",
+      "group": "material",
+      "modifies_pixels": true,
+      "method": "independent AURA implementation",
+      "effect": "native image operator"
+    },
+    {
+      "number": 16,
+      "name": "Edit existing linear-gradient control points",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 17,
+      "name": "Edit existing radial-gradient geometry and falloff",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 18,
+      "name": "Edit stored brush strokes, points and pressure",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 19,
+      "name": "Edit existing luminance-range endpoints and softness",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 20,
+      "name": "Change an existing component's compositing mode",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 21,
+      "name": "Reorder component composition",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 22,
+      "name": "Extract a component into an independent mask with local settings",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 23,
+      "name": "Copy a component into another existing mask",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 24,
+      "name": "Affine placement of a completed selection",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 25,
+      "name": "Derive a selection boundary band",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 26,
+      "name": "Retain the largest connected selection region",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 27,
+      "name": "Isolate a seed-connected selected region",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 28,
+      "name": "Median cleanup of selected/unselected speckles",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 29,
+      "name": "Symmetric difference of two completed selections",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 30,
+      "name": "Convex-hull selection fill",
+      "group": "selection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "selection mutation"
+    },
+    {
+      "number": 31,
+      "name": "RGB parade",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 32,
+      "name": "Horizontal luminance waveform",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 33,
+      "name": "Opponent-chroma vectorscope",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 34,
+      "name": "Spatial exposure-zone map",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 35,
+      "name": "Spatial working-range excursions",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 36,
+      "name": "Spatial edge-detail map",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 37,
+      "name": "Flat-area noise-residual map",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 38,
+      "name": "Near-neutral channel balance measurement",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 39,
+      "name": "Local contrast map",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 40,
+      "name": "Rendered percentile tonal-range report",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 41,
+      "name": "Fifteen-zone exposure distribution",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 42,
+      "name": "Pre-display sRGB gamut occupancy",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 43,
+      "name": "Joint row/column banding profile",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 44,
+      "name": "Eight-pixel block-boundary profile",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 45,
+      "name": "Edge-direction energy distribution",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 46,
+      "name": "Relative illumination map",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 47,
+      "name": "Neutral-edge channel alignment",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 48,
+      "name": "Channel correlation report",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 49,
+      "name": "Multiscale detail spectrum",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    },
+    {
+      "number": 50,
+      "name": "Highlight chroma retention report",
+      "group": "inspection",
+      "modifies_pixels": false,
+      "method": "independent AURA implementation",
+      "effect": "read-only diagnostic"
+    }
+  ],
+  "verification": {
+    "frontend": {
+      "passed": 891,
+      "files": 107
+    },
+    "native_libraries": {
+      "passed": 669,
+      "ignored": 5
+    },
+    "native_workflows": {
+      "passed": 6,
+      "ignored": 1
+    },
+    "strict_clippy": "passed",
+    "contracts": 83,
+    "ipc_surface": 344,
+    "desktop_smoke": {
+      "passed": 10,
+      "checks": [
+        "Material UI saves through registered native command and changes full-quality pixels",
+        "Unsaved material draft survives panel switching",
+        "All twenty inspection outputs are reachable through the real UI",
+        "Inspection retains the saved recipe revision",
+        "Material Undo restores exact full-quality pixels",
+        "Material Redo restores exact full-quality pixels",
+        "Authored mask component controls are reachable in the desktop",
+        "Inspection refuses stale revisions",
+        "Synthetic imported source stays byte-identical",
+        "No webview page exceptions"
+      ],
+      "page_errors": [],
+      "synthetic_source_sha256": "e9163f2dfcf800c9f513e9c00f48034156bb7ecc3a4ac21dd07459406dc5dc5b"
+    },
+    "ipc_duplicate_regressions": 3,
+    "desktop_build": "passed",
+    "desktop_executable_sha256": "46570acc68fb28971e4d3874ae283a176ddbe081d93b38dcad6862461be662bc"
+  }
+}

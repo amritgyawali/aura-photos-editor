@@ -1,0 +1,515 @@
+{
+  "date": "2026-10-22",
+  "scope": "25 additional independently authored selection mechanisms; laboratory catalog 75 to 100",
+  "features": [
+    {
+      "id": "median_absolute_deviation",
+      "name": "Robust median deviation",
+      "mechanism": "Select source luminance distance from its patch median, normalized by median absolute deviation. Flat neighborhoods remain finite.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "robust_deviation_and_binary_transition_descriptors_have_known_answers"
+    },
+    {
+      "id": "binary_pattern_transitions",
+      "name": "Local binary-pattern transitions",
+      "mechanism": "Count circular bright/dark transitions around an eight-neighbor luminance binary pattern. Measures texture topology rather than brightness.",
+      "controls": [
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "robust_deviation_and_binary_transition_descriptors_have_known_answers"
+    },
+    {
+      "id": "patch_autocorrelation",
+      "name": "Directional patch autocorrelation",
+      "mechanism": "Measure Pearson correlation between each source patch and a one-cell shifted copy along the angle direction. Flat patches map to neutral 0.5.",
+      "controls": [
+        "radius",
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "source_pair_statistics_distinguish_direction_and_flat_patches"
+    },
+    {
+      "id": "patch_semivariance",
+      "name": "Directional semivariance",
+      "mechanism": "Measure mean squared luminance differences across one-cell source pairs along the angle direction. This measures spatial roughness without patch-mean subtraction.",
+      "controls": [
+        "radius",
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "source_pair_statistics_distinguish_direction_and_flat_patches"
+    },
+    {
+      "id": "log_chroma_distance",
+      "name": "Log-chromaticity sample distance",
+      "mechanism": "Compare log red/green and blue/green ratios to the sample. A one-code-value floor bounds near-black ratios.",
+      "controls": [
+        "point",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "logarithmic_colour_ratio_preserves_shading_and_prototypes_resolve_ties"
+    },
+    {
+      "id": "edge_nonmaximum",
+      "name": "Gradient nonmaximum suppression",
+      "mechanism": "Retain source gradient magnitudes that are local maxima along their quantized gradient direction, producing thin edge coverage.",
+      "controls": [
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "nonmaximum_edges_suppress_shallower_neighbors"
+    },
+    {
+      "id": "edge_hysteresis",
+      "name": "Connected hysteresis edges",
+      "mechanism": "Keep weak gradient cells only when eight-connected to a strong gradient cell. Range supplies low and high gradient thresholds.",
+      "controls": [
+        "range"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "range": [
+            0.02,
+            0.12
+          ]
+        }
+      },
+      "mechanismTest": "hysteresis_keeps_connected_weak_edges_and_excludes_disconnected_ones"
+    },
+    {
+      "id": "local_moran",
+      "name": "Local Moran spatial association",
+      "mechanism": "Measure local standardized association between centre luminance and its four neighbors against patch statistics. Neutral or flat association maps to 0.5.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "moran_template_and_circular_hue_measure_different_patch_properties"
+    },
+    {
+      "id": "template_patch_correlation",
+      "name": "Sampled patch correlation",
+      "mechanism": "Compare every source patch with the sampled luminance template using zero-mean normalized correlation. Radius is capped at four cells.",
+      "controls": [
+        "point",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "moran_template_and_circular_hue_measure_different_patch_properties"
+    },
+    {
+      "id": "local_hue_dispersion",
+      "name": "Circular hue dispersion",
+      "mechanism": "Measure one minus the length of the chroma-weighted local hue resultant. Uniform hues are zero and opposing hues approach one.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "moran_template_and_circular_hue_measure_different_patch_properties"
+    },
+    {
+      "id": "colour_prototype_partition",
+      "name": "Colour prototype partition",
+      "mechanism": "Sample RGB prototypes at vertices and retain source cells closest to the selected prototype in RGB space. Ties use input order.",
+      "controls": [
+        "vertices",
+        "seedIndex"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.2,
+              0.3
+            ],
+            [
+              0.7,
+              0.6
+            ]
+          ],
+          "seedIndex": 0
+        }
+      },
+      "mechanismTest": "logarithmic_colour_ratio_preserves_shading_and_prototypes_resolve_ties"
+    },
+    {
+      "id": "selection_articulations",
+      "name": "Connectivity articulation cells",
+      "mechanism": "Use iterative Tarjan traversal to identify selected cells whose removal disconnects a four-connected region. Keeps original coverage at those critical cells.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "mechanismTest": "articulations_and_graph_cores_preserve_only_selected_support"
+    },
+    {
+      "id": "selection_k_core",
+      "name": "Selection graph core",
+      "mechanism": "Repeatedly peel selected cells below the required graph degree. Corner maps the required eight-neighbor graph degree from one to four.",
+      "controls": [
+        "corner"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "corner": 1
+        }
+      },
+      "qualificationNote": "Dense ellipse fixtures can already satisfy the chosen graph degree, so an unchanged output is valid. The known-answer test uses a square with a thin attachment and verifies peeling.",
+      "mechanismTest": "articulations_and_graph_cores_preserve_only_selected_support"
+    },
+    {
+      "id": "coverage_watershed",
+      "name": "Seeded coverage watershed",
+      "mechanism": "Flood from selected seeds with minimax inverse-coverage path cost. Keep the chosen basin; ties follow seed order. Each seed must lie inside selected coverage.",
+      "controls": [
+        "vertices",
+        "seedIndex"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.2,
+              0.5
+            ],
+            [
+              0.3,
+              0.5
+            ]
+          ],
+          "seedIndex": 0
+        }
+      },
+      "mechanismTest": "minimax_watershed_uses_seed_distance_ties_and_rejects_duplicate_seeds_atomically"
+    },
+    {
+      "id": "coverage_anisotropic_diffusion",
+      "name": "Anisotropic coverage diffusion",
+      "mechanism": "Diffuse mask coverage with Perona-Malik gradient conductance. Tolerance controls boundary resistance and radius controls iteration count.",
+      "controls": [
+        "radius",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "nonlinear_diffusion_resists_strong_edges_and_curvature_preserves_straight_ramps"
+    },
+    {
+      "id": "coverage_curvature_flow",
+      "name": "Coverage curvature flow",
+      "mechanism": "Evolve coverage by level-set mean curvature with fixed frame values. Smooths curved interfaces while straight linear ramps remain stationary.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "nonlinear_diffusion_resists_strong_edges_and_curvature_preserves_straight_ramps"
+    },
+    {
+      "id": "region_inscribed_disk",
+      "name": "Region maximum inscribed disk",
+      "mechanism": "Compute exact Euclidean distance to each component complement and retain its largest inscribed disk. Ties select the first maximum in raster order.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "mechanismTest": "exact_inscribed_disks_trim_square_corners_and_keep_component_centres"
+    },
+    {
+      "id": "directional_run_width",
+      "name": "Directional selected run width",
+      "mechanism": "Measure the complete horizontal or vertical selected run through each cell. Angle chooses the closer axis; range selects run length divided by radius.",
+      "controls": [
+        "angle",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "directional_run_width_is_axis_sensitive_and_selection_limited"
+    },
+    {
+      "id": "thin_plate_coverage_warp",
+      "name": "Thin-plate landmark deformation",
+      "mechanism": "Interleave source and destination landmarks. Solve regularized thin-plate radial basis functions to inverse-map coverage. Requires 3-8 noncollinear landmark pairs.",
+      "controls": [
+        "vertices",
+        "corner"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.15,
+              0.15
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.85,
+              0.15
+            ],
+            [
+              0.8,
+              0.25
+            ],
+            [
+              0.85,
+              0.85
+            ],
+            [
+              0.9,
+              0.8
+            ],
+            [
+              0.15,
+              0.85
+            ],
+            [
+              0.1,
+              0.9
+            ]
+          ]
+        }
+      },
+      "mechanismTest": "landmark_deformations_have_identity_and_nonidentity_known_answers"
+    },
+    {
+      "id": "mean_value_cage_warp",
+      "name": "Mean-value cage deformation",
+      "mechanism": "Interleave source and destination convex cage vertices. Mean-value coordinates interpolate source coverage continuously inside the destination cage. Outside coverage is retained.",
+      "controls": [
+        "vertices"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.15,
+              0.15
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.85,
+              0.15
+            ],
+            [
+              0.8,
+              0.25
+            ],
+            [
+              0.85,
+              0.85
+            ],
+            [
+              0.9,
+              0.8
+            ],
+            [
+              0.15,
+              0.85
+            ],
+            [
+              0.1,
+              0.9
+            ]
+          ]
+        }
+      },
+      "mechanismTest": "landmark_deformations_have_identity_and_nonidentity_known_answers"
+    },
+    {
+      "id": "triangulated_cage_warp",
+      "name": "Triangulated cage deformation",
+      "mechanism": "Interleave source and destination convex cage vertices. A triangle fan maps destination barycentric coordinates to source triangles, preserving piecewise straight deformation.",
+      "controls": [
+        "vertices"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.15,
+              0.15
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.85,
+              0.15
+            ],
+            [
+              0.8,
+              0.25
+            ],
+            [
+              0.85,
+              0.85
+            ],
+            [
+              0.9,
+              0.8
+            ],
+            [
+              0.15,
+              0.85
+            ],
+            [
+              0.1,
+              0.9
+            ]
+          ]
+        }
+      },
+      "mechanismTest": "landmark_deformations_have_identity_and_nonidentity_known_answers"
+    },
+    {
+      "id": "mobius_coverage_warp",
+      "name": "Conformal Mobius deformation",
+      "mechanism": "Inverse-map coverage with a complex fractional transformation inside elliptical bounds. Corner controls displacement and angle its direction; the ellipse boundary stays on itself.",
+      "controls": [
+        "bounds",
+        "corner",
+        "angle"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "mobius_and_path_maps_match_identity_and_reject_zero_length_paths"
+    },
+    {
+      "id": "path_normal_unwrap",
+      "name": "Path-normal coverage unwrap",
+      "mechanism": "Unwrap coverage along polyline arc length. Output X follows the path and Y samples its perpendicular strip with tolerance as half-width.",
+      "controls": [
+        "vertices",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "mobius_and_path_maps_match_identity_and_reject_zero_length_paths"
+    },
+    {
+      "id": "coverage_seam_carve",
+      "name": "Coverage-aware seam compression",
+      "mechanism": "Remove the requested number of minimum-coverage vertical seams with dynamic programming, then resample to the original frame width. Radius is capped by width minus one.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "seam_compression_preserves_uniform_coverage_and_changes_nonuniform_support"
+    },
+    {
+      "id": "lissajous_ribbon",
+      "name": "Lissajous ribbon construction",
+      "mechanism": "Construct coverage around a closed sine-parametric path. Radius and radius plus one set crossing frequencies; angle sets phase and tolerance controls ribbon width.",
+      "controls": [
+        "bounds",
+        "radius",
+        "angle",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "lissajous_ribbon_has_bounded_geometric_support"
+    }
+  ],
+  "fixes": [
+    {
+      "id": "hidden_radius_draft_guard",
+      "evidence": "Choosing guided_smooth with radius9 then directional_ridge left Apply disabled even though radius is hidden and requestOptions sends default4.",
+      "change": "Apply the patch radius UI guard only when the chosen workflow actually exposes radius.",
+      "regression": "does not block a workflow because an unrelated hidden patch radius was previously excessive"
+    },
+    {
+      "id": "source_resource_preflight",
+      "evidence": "Existing experimental source radius validation happened after Frame::load in photographic::edit.",
+      "change": "Validate all photographic source radius limits, including template4, before preview loading.",
+      "regression": "source_radius_preflight_runs_independently_of_preview_loading"
+    }
+  ],
+  "verification": {
+    "status": "in_progress",
+    "native": {
+      "passed": 58,
+      "failed": 0,
+      "command": "CARGO_INCREMENTAL=0 cargo test -p aura-app mask_workflows:: --lib",
+      "note": "Final rerun pending after added preflight/star regression and nonmaximum/core tightening.",
+      "pendingExpectedCount": 60
+    },
+    "ui": {
+      "command": "npm.cmd test -- --run src/components/develop/MaskLabControls.test.tsx",
+      "passed": 8,
+      "failed": 0,
+      "workflowsExercised": 100
+    },
+    "typescript": {
+      "command": "npm.cmd run lint",
+      "passed": true
+    },
+    "clippy": {
+      "command": "CARGO_INCREMENTAL=0 cargo clippy -p aura-app --all-targets --no-deps -- -D warnings",
+      "status": "Scoped all-targets check diagnosed two new geometry lints; both fixed. Four unrelated diagnostic lints handled by parent. Final workspace check pending."
+    }
+  },
+  "limits": [
+    "Selection grids are bounded to512 cells per edge.",
+    "Source patches are limited to radius8; sampled template correlation to radius4.",
+    "Thin-plate systems contain3-8 landmark pairs; convex cages validate every edge half-plane, including crossing-star rejection.",
+    "All operations compute temporary output and check cancellation before replacing coverage.",
+    "No semantic models, proprietary model assets, or Evoto output-equivalence claims."
+  ],
+  "files": [
+    "crates/aura-app/src/mask_workflows.rs",
+    "crates/aura-app/src/mask_workflows/photographic/mod.rs",
+    "crates/aura-app/src/mask_workflows/photographic/advanced_selection/mod.rs",
+    "crates/aura-app/src/mask_workflows/photographic/advanced_selection/measurements.rs",
+    "crates/aura-app/src/mask_workflows/photographic/advanced_selection/graphs.rs",
+    "crates/aura-app/src/mask_workflows/photographic/advanced_selection/geometry.rs",
+    "crates/aura-app/src/mask_workflows/photographic/advanced_selection/tests.rs",
+    "ui/src/ipc/maskWorkflows.ts",
+    "ui/src/components/develop/MaskLabControls.tsx",
+    "ui/src/components/develop/MaskLabControls.test.tsx"
+  ],
+  "testNames": [
+    "all_new_operators_are_deterministic_and_leave_readonly_inputs_untouched",
+    "cancellation_nonfinite_and_mismatched_grids_never_commit_partial_output",
+    "single_cell_and_transparent_topology_stay_bounded",
+    "robust_deviation_and_binary_transition_descriptors_have_known_answers",
+    "source_pair_statistics_distinguish_direction_and_flat_patches",
+    "logarithmic_colour_ratio_preserves_shading_and_prototypes_resolve_ties",
+    "nonmaximum_edges_suppress_shallower_neighbors",
+    "hysteresis_keeps_connected_weak_edges_and_excludes_disconnected_ones",
+    "moran_template_and_circular_hue_measure_different_patch_properties",
+    "articulations_and_graph_cores_preserve_only_selected_support",
+    "minimax_watershed_uses_seed_distance_ties_and_rejects_duplicate_seeds_atomically",
+    "nonlinear_diffusion_resists_strong_edges_and_curvature_preserves_straight_ramps",
+    "exact_inscribed_disks_trim_square_corners_and_keep_component_centres",
+    "directional_run_width_is_axis_sensitive_and_selection_limited",
+    "landmark_deformations_have_identity_and_nonidentity_known_answers",
+    "degenerate_and_nonconvex_cages_fail_atomically",
+    "crossing_star_cages_are_rejected_even_when_local_turns_share_a_sign",
+    "mobius_and_path_maps_match_identity_and_reject_zero_length_paths",
+    "seam_compression_preserves_uniform_coverage_and_changes_nonuniform_support",
+    "lissajous_ribbon_has_bounded_geometric_support",
+    "resource_and_finite_geometry_limits_reject_before_output_changes",
+    "source_radius_preflight_runs_independently_of_preview_loading"
+  ]
+}

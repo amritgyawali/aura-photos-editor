@@ -1,0 +1,1038 @@
+{
+  "date": "2026-10-21",
+  "capabilities": [
+    {
+      "id": "spatial_neutral_bridge",
+      "name": "Two-neutral spatial bridge",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 1,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "tonal_neutral_bridge",
+      "name": "Two-neutral tonal bridge",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 2,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "chroma_reject",
+      "name": "Sampled colour-vector rejection",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 3,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "palette_axis",
+      "name": "Measured palette-axis projection",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 4,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "decorrelation_stretch",
+      "name": "Covariance decorrelation stretch",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 5,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "principal_chroma_suppress",
+      "name": "Dominant chroma-axis suppression",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 6,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "soft_gamut",
+      "name": "Soft gamut-ray compression",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 7,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "luma_chroma_compress",
+      "name": "Brightness-weighted chroma compression",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 8,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "chroma_cusp",
+      "name": "Radial chroma cusp compression",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 9,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "neutral_exclusion",
+      "name": "Near-neutral chroma exclusion",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 10,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "histogram_equalize",
+      "name": "Selected luminance equalization",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 11,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "clipped_equalize",
+      "name": "Clipped-histogram equalization",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 12,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "log_equalize",
+      "name": "Log-luminance equalization",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 13,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "rank_gaussian",
+      "name": "Rank logistic normalization",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 14,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "bimodal_separate",
+      "name": "Bimodal tone separation",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 15,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "percentile_remap",
+      "name": "Percentile landmark remapping",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 16,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "photographic_map",
+      "name": "Log-average photographic mapping",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 17,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "asinh_map",
+      "name": "Asinh dynamic-range mapping",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 18,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "log_toe_shoulder",
+      "name": "Logarithmic toe and shoulder",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 19,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "local_log_contrast",
+      "name": "Local log-contrast equalization",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 20,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "retinex_ratio",
+      "name": "Selected Retinex ratio",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 21,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "chroma_edge_protect",
+      "name": "Edge-protected colour enrichment",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 22,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "chroma_winsorize",
+      "name": "Chroma outlier Winsorization",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 23,
+      "runtime": "pass",
+      "fixturePixelsChanged": false
+    },
+    {
+      "id": "opponent_contrast",
+      "name": "Local opponent-colour contrast",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 24,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "sampled_replace",
+      "name": "Sample-bound chroma replacement",
+      "group": "colour",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/colorLab.ts",
+      "number": 25,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "anisotropic_diffusion",
+      "name": "Edge-stopped diffusion",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 26,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "total_variation",
+      "name": "Total variation repair",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 27,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "non_local_means",
+      "name": "Patch similarity denoising",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 28,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "vector_medoid",
+      "name": "Vector medoid cleanup",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 29,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "trimmed_mean",
+      "name": "Trimmed neighborhood repair",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 30,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "adaptive_wiener",
+      "name": "Adaptive Wiener restoration",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 31,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "haar_denoise",
+      "name": "Haar residual thresholding",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 32,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "haar_detail",
+      "name": "Haar detail gain",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 33,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "laplacian_detail",
+      "name": "Laplacian band contrast",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 34,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "kuwahara",
+      "name": "Variance-region smoothing",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 35,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "tensor_flow",
+      "name": "Structure-guided strand smoothing",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 36,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "block_deblock",
+      "name": "Block seam repair",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 37,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "aperture_bokeh",
+      "name": "Disc aperture bokeh",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 38,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "starburst",
+      "name": "Diffraction star filter",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 39,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "rotation_blur",
+      "name": "Rotational motion integration",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 40,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "trajectory_blur",
+      "name": "Drawn-path motion integration",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 41,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "harmonic_fill",
+      "name": "Harmonic selection fill",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 42,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "poisson_donor",
+      "name": "Gradient-domain donor repair",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 43,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "channel_register",
+      "name": "Local channel registration",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 44,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "morphology_clean",
+      "name": "Bright/dark structure cleanup",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 45,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "local_rank_contrast",
+      "name": "Local rank contrast",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 46,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "mosquito_suppress",
+      "name": "Edge-adjacent noise repair",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 47,
+      "runtime": "pass",
+      "fixturePixelsChanged": false
+    },
+    {
+      "id": "edge_directed_smooth",
+      "name": "Directional edge interpolation",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 48,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "donor_bilateral",
+      "name": "Donor-guided low-frequency repair",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 49,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "texture_quilt",
+      "name": "Measured texture patch quilting",
+      "group": "spatial",
+      "provenance": "independent AURA method",
+      "surface": "ui/src/ipc/spatialLab.ts",
+      "number": 50,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "polygon_marquee",
+      "name": "Polygon marquee",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 51,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "rounded_marquee",
+      "name": "Rounded rectangle marquee",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 52,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "sector_marquee",
+      "name": "Angular sector marquee",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 53,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "sample_colour",
+      "name": "Sampled global colour",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 54,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "colour_wand",
+      "name": "Contiguous colour wand",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 55,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "sample_luminance",
+      "name": "Sampled luminance band",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 56,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "saturation_range",
+      "name": "Saturation range",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 57,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "texture_range",
+      "name": "Texture range",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 58,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "image_edges",
+      "name": "Image edge selection",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 59,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "guided_smooth",
+      "name": "Image-guided mask smoothing",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 60,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "edge_grow",
+      "name": "Edge-constrained growth",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 61,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "interior_falloff",
+      "name": "Interior distance falloff",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 62,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "negative_space",
+      "name": "Enclosed negative-space selection",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 63,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "skeleton",
+      "name": "Selection centreline",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 64,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "split_regions",
+      "name": "Split disconnected regions into masks",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 65,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "append_stack",
+      "name": "Append whole component stack",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 66,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "replace_selection",
+      "name": "Replace destination selection",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 67,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "sync_adjustments",
+      "name": "Synchronize local adjustments",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 68,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "align_centroid",
+      "name": "Align selection centroids",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 69,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "fit_bounds",
+      "name": "Fit selection to bounds",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 70,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "perspective_selection",
+      "name": "Four-corner perspective placement",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 71,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "auto_threshold",
+      "name": "Automatic coverage threshold",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 72,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "chroma_key",
+      "name": "Sampled chroma-key exclusion",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 73,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "voronoi_partition",
+      "name": "Seed partition of selection",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 74,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "filter_regions",
+      "name": "Filter regions by shape and area",
+      "group": "selection",
+      "provenance": "independent AURA workflow",
+      "surface": "ui/src/components/develop/MaskLabControls.tsx",
+      "number": 75,
+      "runtime": "pass",
+      "fixturePixelsChanged": true
+    },
+    {
+      "id": "review-1",
+      "name": "Multi-photo recipe checkpoint",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Capture a cohort's complete saved recipes together in one metadata transaction",
+      "number": 76,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-2",
+      "name": "Checkpoint drift comparison",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Show settings sections changed since a selected cohort checkpoint",
+      "number": 77,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-3",
+      "name": "Section-selective checkpoint restoration",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Prepare a restoration from each photo's own checkpoint while retaining other sections and local edits",
+      "number": 78,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-4",
+      "name": "Conflict-aware rollback preview",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Offer checkpoint rollback only for sections still matching the preceding plan's proposed output",
+      "number": 79,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-5",
+      "name": "Relative edit transfer",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Add source changes since the checkpoint to target exposure/tone or saturation/vibrance controls",
+      "number": 80,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-6",
+      "name": "Batch change manifest",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Review exact changed recipe paths and section conflicts before explicitly applying",
+      "number": 81,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-7",
+      "name": "Baseline-aware three-way transfer",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Copy changed source sections only where a target still agrees with the checkpoint ancestor; report divergent sections",
+      "number": 82,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-8",
+      "name": "Batch saved-revision verification",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Verify every loaded photo hash before review, comparison or handoff",
+      "number": 83,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-9",
+      "name": "Edit fingerprint cohorts",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Compare canonical fingerprints of seven settings sections across the cohort",
+      "number": 84,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-10",
+      "name": "Cross-photo settings-section matrix",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Inspect individual section signatures to locate differing settings",
+      "number": 85,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-11",
+      "name": "Durable ordered review queue",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Save cohort order, recall the queue, and schedule its order by due date",
+      "number": 86,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-12",
+      "name": "Revision-bound custom checklist signoff",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Define review criteria and pass/reopen a criterion for selected photos",
+      "number": 87,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-13",
+      "name": "Approval drift tracking",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "A changed saved recipe invalidates earlier signoffs and blocks handoff until reviewed again",
+      "number": 88,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-14",
+      "name": "Photo-coordinate correction issues",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Add bounded correction notes with optional normalized coordinate anchors",
+      "number": 89,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-15",
+      "name": "Correction prerequisite gating",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Resolve predecessor tasks before resolving dependent correction issues",
+      "number": 90,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-16",
+      "name": "Batch correction propagation",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Copy a correction note to other photos while discarding inappropriate source coordinates",
+      "number": 91,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-17",
+      "name": "Local reviewer workload assignment",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Persist a reviewer label per selected photo, with no external messaging",
+      "number": 92,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-18",
+      "name": "Due-date review scheduling",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Validate calendar dates, surface overdue unapproved work and sort saved queue by deadlines",
+      "number": 93,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-19",
+      "name": "Saved-revision pair preference",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Preview two saved edits after revision checks and record left/right/tied/undecided preference",
+      "number": 94,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-20",
+      "name": "Unresolved comparison review",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Find tied, undecided or changed-revision pair comparisons",
+      "number": 95,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-21",
+      "name": "Saved compound review filters",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Find cohort photos by status, reviewer, overdue state and open issues",
+      "number": 96,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-22",
+      "name": "Checklist-gated handoff manifest",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Build JSON indicating whether every selected revision is approved and has no open corrections",
+      "number": 97,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-23",
+      "name": "Portable review metadata export",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Export versioned queue, checklist, notes, reviewer labels and comparison records without recipes or file paths",
+      "number": 98,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-24",
+      "name": "Validated review metadata import",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Replace bounded metadata for explicitly selected member photos; reopen imported corrections and clear approvals",
+      "number": 99,
+      "runtime": "pass"
+    },
+    {
+      "id": "review-25",
+      "name": "Durable workflow activity history",
+      "group": "workflow",
+      "provenance": "original AURA workflow",
+      "surface": "ui/src/components/develop/WorkflowLabPanel.tsx",
+      "operation": "Read the collection's last 128 successful workflow mutations after reopening the catalogue",
+      "number": 100,
+      "runtime": "pass"
+    }
+  ],
+  "evotoFullReconstruction": false,
+  "evotoWeightsRecovered": false,
+  "evotoPixelParity": "unverified",
+  "verification": {
+    "nativeTargets": 291,
+    "nativePassed": 4416,
+    "nativeFailed": 1,
+    "nativeIgnored": 53,
+    "desktopCompleted": true,
+    "desktopChecks": 112,
+    "editedPreviews": 27,
+    "fullResolutionExports": 27,
+    "originalsUnchanged": true,
+    "reviewWindowOpened": true,
+    "desktopExecutableSha256": "ff43ef7ab2f74d87cc698189c5305a116ca06d44701129a1634ed29aa4736a85",
+    "photoExecutableSha256": "ff43ef7ab2f74d87cc698189c5305a116ca06d44701129a1634ed29aa4736a85",
+    "configuredPerformancePassed": 116,
+    "configuredPerformanceFailed": 0,
+    "configuredPerformanceIgnored": 0,
+    "completion": {
+      "nativeWorkspaceExitCode": 1,
+      "configuredPerformanceExitCode": 0,
+      "samePlannerExecutableHost6ExitCode": 0,
+      "strictClippyExitCode": 0,
+      "contractsExitCode": 0,
+      "desktopAuditExitCode": 0,
+      "photoExportExitCode": 0,
+      "nativeFailureClassification": "Only unscaled aura-perf autopilot timing; same executable and configured performance suite passed with documented host scale 6."
+    },
+    "nativeFailingTargets": [
+      "-p aura-perf --test autopilot_budgets"
+    ]
+  }
+}

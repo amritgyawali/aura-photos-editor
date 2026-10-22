@@ -1,0 +1,388 @@
+{
+  "date": "2026-10-22",
+  "family": "spatial",
+  "status": "Implemented and source-frozen. 37 Cargo spatial native test groups, 62 UI tests and TypeScript check passed. Direct production and unit-test Clippy diagnostics are clean; authoritative all-target rerun awaits the shared workspace lock.",
+  "algorithm_origin": "Original implementations of mathematical methods; no recovered Evoto models, algorithms or visual-parity claims",
+  "methods": [
+    {
+      "id": "local_dct_shrink",
+      "label": "Local cosine shrinkage",
+      "name": "Local cosine shrinkage",
+      "mechanism": "Soft-threshold a five-by-five discrete cosine transform and reconstruct its centre while retaining luminance ratios.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Cosine basis across a 5x5 patch differs from Haar block wavelets and scalar residual clipping.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "cdf53_shrink",
+      "label": "Biorthogonal lifting cleanup",
+      "name": "Biorthogonal lifting cleanup",
+      "mechanism": "Apply reversible CDF 5/3 predict-update lifting along both axes and shrink its detail coefficients.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Predict-update biorthogonal lifting differs from Haar coefficient thresholding and DCT analysis.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "geometric_median",
+      "label": "Geometric colour median",
+      "name": "Geometric colour median",
+      "mechanism": "Use eight Weiszfeld iterations to minimize joint RGB distance; unlike a medoid, the result can lie between samples.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Continuous joint-distance minimizer differs from sample medoid and channelwise median estimators.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "mean_shift_colour",
+      "label": "Iterative colour mode",
+      "name": "Iterative colour mode",
+      "mechanism": "Move a Gaussian colour kernel five times toward the measured local colour-density mode.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Kernel centre moves over five density iterations; sigma/bilateral filters retain a fixed range centre.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "hodges_lehmann",
+      "label": "Pairwise robust colour location",
+      "name": "Pairwise robust colour location",
+      "mechanism": "Take the weighted median of all local Walsh pair averages rather than individual samples.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Walsh pair-average distribution is distinct from sample ranks, trimmed means and median-of-means.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "geodesic_range",
+      "label": "Geodesic colour averaging",
+      "name": "Geodesic colour averaging",
+      "mechanism": "Measure shortest four-connected contrast paths and average samples by their path cost.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Shortest contrast paths use connectivity, unlike straight spatial distance or recursive domain smoothing.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "patch_low_rank",
+      "label": "Spatial patch low-rank repair",
+      "name": "Spatial patch low-rank repair",
+      "mechanism": "Measure covariance of overlapping nine-dimensional luminance patches and shrink its principal spatial mode.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Covariance is over nine spatial luminance dimensions rather than three RGB channels.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "mahalanobis_range",
+      "label": "Covariance-distance smoothing",
+      "name": "Covariance-distance smoothing",
+      "mechanism": "Use a regularized inverse RGB covariance to measure range weights before averaging colours.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Inverse covariance defines the range metric; earlier RGB covariance shrinkage reconstructs principal-component amplitudes.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "lee_speckle",
+      "label": "Multiplicative Lee restoration",
+      "name": "Multiplicative Lee restoration",
+      "mechanism": "Estimate multiplicative noise using local relative variance and a signal-dependent gain.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Signal-dependent multiplicative relative-noise variance differs from additive-noise Wiener estimation.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "frost_speckle",
+      "label": "Frost spatial damping",
+      "name": "Frost spatial damping",
+      "mechanism": "Use measured coefficient of variation to set exponential spatial damping for multiplicative-noise smoothing.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Variation-dependent exponential spatial damping differs from Lee gain and Gaussian range weighting.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "gamma_map_speckle",
+      "label": "Gamma-MAP speckle restoration",
+      "name": "Gamma-MAP speckle restoration",
+      "mechanism": "Use homogeneous, Gamma-MAP texture, and strong-edge regimes derived from measured relative variance.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Three-regime Gamma posterior mode includes a quadratic texture solution rather than Lee linear gain.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "qualificationOverrides": {
+        "threshold": 0.8
+      },
+      "qualificationNote": "The low-noise strong-edge regime intentionally returns the source; exercise the homogeneous/texture estimator on the qualification chart."
+    },
+    {
+      "id": "biharmonic_stencil",
+      "label": "Fourth-order surface repair",
+      "name": "Fourth-order surface repair",
+      "mechanism": "Solve the centre of a bounded biharmonic finite-difference stencil rather than a harmonic neighbour mean.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Fourth-order stencil includes signed diagonal and distance-two terms, unlike harmonic averaging.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "fractional_laplacian",
+      "label": "Fractional spatial detail",
+      "name": "Fractional spatial detail",
+      "mechanism": "Adjust a truncated fractional-Laplacian residual with power-law distance weights.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "distinctness": "Truncated power-law nonlocal derivative differs from a difference of two box means.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "parabolic_background",
+      "label": "Parabolic background separation",
+      "name": "Parabolic background separation",
+      "mechanism": "Estimate a non-flat parabolic morphological opening and adjust detail above that background.",
+      "controls": [
+        "amount",
+        "threshold",
+        "detail"
+      ],
+      "distinctness": "Non-flat quadratic structuring function differs from flat morphology or geodesic reconstruction.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "directional_scratch",
+      "label": "Oriented scratch repair",
+      "name": "Oriented scratch repair",
+      "mechanism": "Combine line opening and closing along an authored normal to reduce thin bright and dark scratches.",
+      "controls": [
+        "amount",
+        "angle",
+        "threshold"
+      ],
+      "distinctness": "Line opening/closing is directional and separable from earlier isotropic top-hat cleanup.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "phase_only_detail",
+      "label": "Quadrature phase detail",
+      "name": "Quadrature phase detail",
+      "mechanism": "Normalize a local even residual by truncated Riesz-like quadrature amplitude for bounded phase-sensitive detail.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "distinctness": "Even/odd quadrature normalization differs from Hessian curvature or residual gain alone.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "spectral_residual_detail",
+      "label": "Spectral surprise detail",
+      "name": "Spectral surprise detail",
+      "mechanism": "Remove local log-spectrum averages, reconstruct spectral-residual saliency, and use it to weight detail.",
+      "controls": [
+        "amount",
+        "detail"
+      ],
+      "distinctness": "Log-spectrum residual saliency differs from an authored sinusoidal notch or spatial entropy.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "hampel_impulse",
+      "label": "MAD impulse repair",
+      "name": "MAD impulse repair",
+      "mechanism": "Replace luminance outliers using a median absolute deviation test and an explicit minimum separation.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "MAD scale tests differ from expanding-window extrema or ordinary median replacement.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "circular_hue_smooth",
+      "label": "Circular hue smoothing",
+      "name": "Circular hue smoothing",
+      "mechanism": "Average chroma directions on the unit circle while retaining chroma magnitude and luminance where gamut permits.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Unit-direction averaging preserves chroma strength rather than filtering chroma coordinates.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "chroma_magnitude_median",
+      "label": "Chroma strength median",
+      "name": "Chroma strength median",
+      "mechanism": "Filter chroma magnitude by a weighted median while retaining the original hue direction and luminance.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Scalar chroma magnitude changes while hue direction stays fixed, unlike chroma coordinate medians.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "white_patch_adapt",
+      "label": "Local white-patch adaptation",
+      "name": "Local white-patch adaptation",
+      "mechanism": "Estimate channel illumination from local upper percentiles and adapt colour while retaining luminance.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Upper channel percentiles estimate a local illuminant; this is a colour adaptation heuristic.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "gray_edge_adapt",
+      "label": "Local gray-edge adaptation",
+      "name": "Local gray-edge adaptation",
+      "mechanism": "Estimate channel illumination from local gradient energy and adapt colour while retaining luminance.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Derivative-energy illuminant estimation differs from intensity-percentile white-patch adaptation.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "local_skewness_balance",
+      "label": "Luminance skewness balance",
+      "name": "Luminance skewness balance",
+      "mechanism": "Use the measured third central moment to reduce local luminance asymmetry with a bounded correction.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "distinctness": "Measured third central moment corrects asymmetry rather than variance or histogram rank.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "local_kurtosis_detail",
+      "label": "Tail-weighted detail",
+      "name": "Tail-weighted detail",
+      "mechanism": "Use the measured fourth central moment to adjust detail according to local tail weight.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "distinctness": "Measured fourth central moment adjusts tail response rather than entropy or third-moment balance.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    },
+    {
+      "id": "minmod_edge_limiter",
+      "label": "Monotonic edge limiter",
+      "name": "Monotonic edge limiter",
+      "mechanism": "Reconstruct from slope-limited neighbouring intervals to suppress directional overshoot while retaining linear ramps.",
+      "controls": [
+        "amount",
+        "angle",
+        "threshold"
+      ],
+      "distinctness": "Monotone slope-limited interval reconstruction differs from polynomial residual fits and shock evolution.",
+      "workingResolution": "native, bounded stripe/tile processing"
+    }
+  ],
+  "fixes": [
+    {
+      "id": "native_local_spatial_resolution",
+      "problem": "The fixed 256-edge nearest-cell grid could miss a 3x3 authored selection and sensor-scale features entirely.",
+      "change": "44 finite-footprint local methods (19 existing plus 25 new) now use immutable native-resolution stripes and 192-pixel tiles with four-pixel halos. Every original pixel remains addressable; selection coverage blends once.",
+      "evidence": "Passing native_path_repairs_a_three_pixel_selection_that_coarse_sampling_misses and immutable_native_halos_match_monolithic_processing_across_stripe_and_tile_seams tests.",
+      "memory": "At most 2,097,152 RGB source cells (24 MiB) per stripe, a reused four-row source cache up to approximately 11 MiB, plus bounded tile/evaluator scratch. No full-resolution source clone.",
+      "existingToolsImproved": [
+        "adaptive_median_impulse",
+        "sigma_range_mean",
+        "spatial_weighted_median",
+        "luminance_winsor",
+        "chroma_bilateral",
+        "chroma_covariance",
+        "rgb_covariance",
+        "entropy_detail",
+        "rms_contrast",
+        "log_retinex",
+        "periodic_notch",
+        "cross_median",
+        "hessian_ridge",
+        "coherence_detail",
+        "directional_median",
+        "quadratic_residual",
+        "bilateral_tone_compress",
+        "connected_impulse",
+        "chroma_median"
+      ]
+    }
+  ],
+  "limits": [
+    "56 geometric, donor, iterative and globally conditioned methods retain a maximum 256-edge working grid.",
+    "Native local support reaches at most four pixels; this is not large-area semantic inpainting or learned detail reconstruction.",
+    "For unusually wide selections exceeding the native stripe budget, processing falls back to the 256-edge path rather than exceeding the scratch bound.",
+    "Native selection neighbours must be selected; a single isolated selected pixel lacks a repair reference.",
+    "DCT and spectral residual methods use 5x5 patches; low-rank patches use nine-dimensional luminance descriptors with fixed eight-step leading-mode estimation.",
+    "Lee, Frost and Gamma-MAP assume multiplicative noise; gray-edge and white-patch adaptation are local illuminant heuristics and can alter intended scene colours.",
+    "Rendering runs on the CPU reference; no Evoto-trained data is included."
+  ],
+  "validation": [
+    {
+      "command": "npm.cmd test -- --run src/components/develop/SpatialLabPanel.test.tsx",
+      "result": "62 passed"
+    },
+    {
+      "command": "npx.cmd tsc --noEmit",
+      "result": "Passed"
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 cargo test -p aura-render spatial_lab --lib",
+      "result": "37 passed using CARGO_INCREMENTAL=0; all 25 new methods, existing regressions and native-resolution fixes."
+    },
+    {
+      "command": "CARGO_INCREMENTAL=0 cargo clippy -p aura-render --all-targets -- -D warnings",
+      "result": "Production and unit-test diagnostics clean after exact-bit test assertion fixes. Canonical all-target rerun queued behind shared workspace checks."
+    },
+    {
+      "command": "Direct clippy-driver unit-test metadata check with exact compiled dependency fingerprints and -D warnings",
+      "result": "Exit 0; .work-checks/spatial-advanced-direct/aura_render_tests_final.log. Cargo all-target check remains authoritative."
+    }
+  ],
+  "files": [
+    "crates/aura-recipe/src/spatial_lab.rs",
+    "crates/aura-render/src/spatial_lab.rs",
+    "crates/aura-render/src/spatial_lab/precision.rs",
+    "crates/aura-render/src/spatial_lab/precision_tests.rs",
+    "crates/aura-render/src/spatial_lab/analytical.rs",
+    "crates/aura-render/src/spatial_lab/analytical/estimators.rs",
+    "crates/aura-render/src/spatial_lab/analytical/fields.rs",
+    "crates/aura-render/src/spatial_lab/analytical/transforms.rs",
+    "crates/aura-render/src/spatial_lab/analytical_tests.rs",
+    "ui/src/ipc/spatialLab.ts",
+    "ui/src/components/develop/SpatialLabPanel.tsx",
+    "ui/src/components/develop/SpatialLabPanel.test.tsx"
+  ]
+}

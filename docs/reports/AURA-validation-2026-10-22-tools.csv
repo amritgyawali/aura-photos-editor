@@ -1,0 +1,101 @@
+group,id,name,functionalQualification,syntheticPixelChange,realProxyPixelChange,evotoParity,perfection
+colour,sigmoid_contrast,Normalized sigmoid contrast,pass,True,True,unverified,not established
+colour,exponential_shoulder,Exponential highlight rolloff,pass,True,True,unverified,not established
+colour,hermite_tone,Monotone Hermite contrast,pass,True,True,unverified,not established
+colour,schlick_bias,Rational light bias,pass,True,True,unverified,not established
+colour,solarize_luma,Luminance solarization,pass,True,True,unverified,not established
+colour,zone_exposure,Stop-zone exposure lift,pass,True,True,unverified,not established
+colour,black_floor,Linear black-floor subtraction,pass,True,True,unverified,not established
+colour,dark_channel_dehaze,Selected dark-channel haze removal,pass,True,True,unverified,not established
+colour,local_wiener_tone,Variance-guided luminance cleanup,pass,True,True,unverified,not established
+colour,local_midrange,Local extrema tone contraction,pass,True,True,unverified,not established
+colour,chroma_shear,Opponent-plane colour shear,pass,True,True,unverified,not established
+colour,chroma_spiral,Radius-dependent hue spiral,pass,True,True,unverified,not established
+colour,tonal_hue_twist,Luminance-dependent hue twist,pass,True,True,unverified,not established
+colour,duotone_gradient,Complementary duotone gradient,pass,True,True,unverified,not established
+colour,channel_crossfeed,Cyclic channel crossfeed,pass,True,True,unverified,not established
+colour,selective_density,Subtractive colour density,pass,True,True,unverified,not established
+colour,bradford_adaptation,Bradford cone-response adaptation,pass,True,True,unverified,not established
+colour,channel_ratio_limit,RGB channel-ratio limiter,pass,True,True,unverified,not established
+colour,median_despill,Median-channel spill suppression,pass,True,True,unverified,not established
+colour,harmonic_hue_snap,Three-axis hue harmony,pass,True,True,unverified,not established
+colour,chroma_luma_detrend,Colour-luminance regression removal,pass,True,True,unverified,not established
+colour,guided_chroma,Luminance-guided colour cleanup,pass,True,True,unverified,not established
+colour,median_chroma,Weighted median colour repair,pass,True,True,unverified,not established
+colour,channel_rank_align,Channel-distribution alignment,pass,True,True,unverified,not established
+colour,bilateral_chroma,Range-aware bilateral colour cleanup,pass,True,True,unverified,not established
+spatial,adaptive_median_impulse,Adaptive impulse median,pass,True,True,unverified,not established
+spatial,sigma_range_mean,Sigma-gated colour smoothing,pass,True,True,unverified,not established
+spatial,spatial_weighted_median,Distance-weighted colour median,pass,True,True,unverified,not established
+spatial,luminance_winsor,Luminance percentile limiter,pass,True,True,unverified,not established
+spatial,chroma_bilateral,Chroma range smoothing,pass,True,True,unverified,not established
+spatial,chroma_covariance,Chroma covariance denoising,pass,True,True,unverified,not established
+spatial,rgb_covariance,Colour covariance denoising,pass,True,True,unverified,not established
+spatial,entropy_detail,Entropy-weighted detail,pass,True,True,unverified,not established
+spatial,rms_contrast,Local RMS contrast,pass,True,True,unverified,not established
+spatial,log_retinex,Log-illumination correction,pass,True,True,unverified,not established
+spatial,periodic_notch,Oriented periodic notch,pass,True,True,unverified,not established
+spatial,cross_median,Cross-footprint median,pass,True,True,unverified,not established
+spatial,hessian_ridge,Curvature ridge detail,pass,True,True,unverified,not established
+spatial,coherence_detail,Coherent structure detail,pass,True,True,unverified,not established
+spatial,directional_median,Least-dispersion line median,pass,True,True,unverified,not established
+spatial,quadratic_residual,Curved-surface residual detail,pass,True,True,unverified,not established
+spatial,lanczos_shift,Windowed-sinc selection shift,pass,True,True,unverified,not established
+spatial,elliptical_aperture,Elliptical aperture integration,pass,True,True,unverified,not established
+spatial,hexagonal_aperture,Hexagonal aperture integration,pass,True,True,unverified,not established
+spatial,cat_eye_aperture,Cat-eye aperture integration,pass,True,True,unverified,not established
+spatial,highlight_streak,One-sided highlight streak,pass,True,True,unverified,not established
+spatial,bilateral_tone_compress,Range-aware base compression,pass,True,True,unverified,not established
+spatial,dark_channel_haze,Selected dark-channel haze repair,pass,True,True,unverified,not established
+spatial,connected_impulse,Connected spot repair,pass,True,True,unverified,not established
+spatial,chroma_median,Luminance-preserving chroma median,pass,True,True,unverified,not established
+selection,lab_sample_distance,CIE Lab sampled distance,pass,True,True,unverified,not established
+selection,mahalanobis_colour,Covariance colour distance,pass,True,True,unverified,not established
+selection,geodesic_colour,Geodesic colour propagation,pass,True,True,unverified,not established
+selection,local_otsu,Local Otsu threshold,pass,True,True,unverified,not established
+selection,sauvola_threshold,Sauvola adaptive threshold,pass,True,True,unverified,not established
+selection,gabor_response,Gabor frequency response,pass,True,True,unverified,not established
+selection,directional_ridge,Directional bright ridges,pass,True,True,unverified,not established
+selection,local_skewness,Local tonal skewness,pass,True,True,unverified,not established
+selection,local_kurtosis,Local tonal kurtosis,pass,True,True,unverified,not established
+selection,colour_line_residual,Colour-line residual,pass,True,True,unverified,not established
+selection,coverage_opening,Grayscale morphological opening,pass,True,True,unverified,not established
+selection,coverage_closing,Grayscale morphological closing,pass,True,True,unverified,not established
+selection,morphological_reconstruction,Opening by reconstruction,pass,True,True,unverified,not established
+selection,grayscale_area_opening,Grayscale area opening,pass,True,True,unverified,not established
+selection,border_connected,Keep border-connected regions,pass,True,True,unverified,not established
+selection,geodesic_rings,Seed geodesic distance bands,pass,True,True,unverified,not established
+selection,hole_bearing_regions,Keep regions enclosing holes,pass,True,True,unverified,not established
+selection,regional_maxima,Regional coverage maxima,pass,True,True,unverified,not established
+selection,spiral_marquee,Archimedean spiral ribbon,pass,True,True,unverified,not established
+selection,barycentric_triangle,Barycentric triangle gradient,pass,True,True,unverified,not established
+selection,coverage_shear,Affine selection shear,pass,True,True,unverified,not established
+selection,coverage_twirl,Radial selection twirl,pass,True,True,unverified,not established
+selection,coverage_spherize,Spherical selection remap,pass,True,True,unverified,not established
+selection,coverage_displace,Image-gradient displacement,pass,True,True,unverified,not established
+selection,signed_distance_smooth,Signed-distance edge smoothing,pass,True,True,unverified,not established
+inspection,robust-tone-quantiles,Luminance quantile landmarks,pass,not an edit,not an edit,unverified,not established
+inspection,median-deviation,Robust luminance dispersion,pass,not an edit,not an edit,unverified,not established
+inspection,luminance-inequality,Light energy inequality,pass,not an edit,not an edit,unverified,not established
+inspection,hue-concentration,Circular hue concentration,pass,not an edit,not an edit,unverified,not established
+inspection,tone-hue-drift,Hue drift through light levels,pass,not an edit,not an edit,unverified,not established
+inspection,highlight-headroom,Channel highlight headroom,pass,not an edit,not an edit,unverified,not established
+inspection,chroma-tail,Absolute chroma tails,pass,not an edit,not an edit,unverified,not established
+inspection,exposure-locations,Light averaging models,pass,not an edit,not an edit,unverified,not established
+inspection,local-colour-jumps,Local colour transitions,pass,not an edit,not an edit,unverified,not established
+inspection,highlight-rolloff,Upper quantile spacing,pass,not an edit,not an edit,unverified,not established
+inspection,gamut-excursion-energy,Working range excursion energy,pass,not an edit,not an edit,unverified,not established
+inspection,colour-variogram,Colour spatial variogram,pass,not an edit,not an edit,unverified,not established
+inspection,structure-coherence,Regional structure coherence,pass,not an edit,not an edit,unverified,not established
+inspection,hessian-signature,Surface curvature classes,pass,not an edit,not an edit,unverified,not established
+inspection,gradient-tailedness,Gradient tail weight,pass,not an edit,not an edit,unverified,not established
+inspection,edge-polarity,Signed edge transitions,pass,not an edit,not an edit,unverified,not established
+inspection,normalized-total-variation,Relative total variation,pass,not an edit,not an edit,unverified,not established
+inspection,dct-energy,Cosine frequency energy,pass,not an edit,not an edit,unverified,not established
+inspection,chroma-edge-alignment,Chroma and light edge alignment,pass,not an edit,not an edit,unverified,not established
+inspection,residual-asymmetry,Fine residual polarity,pass,not an edit,not an edit,unverified,not established
+inspection,local-bit-entropy,Regional tone entropy,pass,not an edit,not an edit,unverified,not established
+inspection,illumination-plane,Linear lighting trend,pass,not an edit,not an edit,unverified,not established
+inspection,illumination-curvature,Quadratic lighting trend,pass,not an edit,not an edit,unverified,not established
+inspection,edge-euler,Edge topology,pass,not an edit,not an edit,unverified,not established
+inspection,edge-box-dimension,Edge occupancy scaling,pass,not an edit,not an edit,unverified,not established

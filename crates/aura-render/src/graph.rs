@@ -688,7 +688,15 @@ pub fn stage_for(path: &str) -> Option<Stage> {
         "geometry.rotate" | "geometry.crop" => Some(Stage::Geometry),
         "image.camera" | "image.profile" => Some(Stage::CameraMatrix),
         _ => {
-            if path.starts_with("studio_color_v1") || path.starts_with("extra.studio_color_v1") {
+            if path.starts_with("studio_color_v1")
+                || path.starts_with("extra.studio_color_v1")
+                || path.starts_with("material_lab_v1")
+                || path.starts_with("extra.material_lab_v1")
+                || path.starts_with("color_lab_v1")
+                || path.starts_with("extra.color_lab_v1")
+                || path.starts_with("spatial_lab_v1")
+                || path.starts_with("extra.spatial_lab_v1")
+            {
                 Some(Stage::Sharpen)
             } else if path.starts_with("cleanup") {
                 Some(Stage::Cleanup)
@@ -766,7 +774,7 @@ pub fn render_hash(
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5",
         ENGINE,
         crate::profiles::PROFILES_VER,
         aura_portrait::PARSE_VER,
@@ -1022,7 +1030,8 @@ mod tests {
         assert!(engine.contains(&format!("+local.{}", crate::edge_aware::LOCAL_VER)));
         // Full-size reconstruction changes pixels too, even though the model proxy is fixed.
         assert!(engine.contains(&format!("+raw.{}", aura_raw::full::DEMOSAIC_VER)));
-        assert!(engine.ends_with(&format!("+skin.{}", crate::retouch_skin::REFERENCE_VERSION)));
+        assert!(engine.contains(&format!("+skin.{}", crate::retouch_skin::REFERENCE_VERSION)));
+        assert!(engine.ends_with("+labs.selected-v5"));
         assert!(engine.contains(&format!("+clear.{}+", crate::retouch_clear::VERSION)));
         assert!(engine.contains(&format!("+undereye.{}+", crate::retouch_undereye::VERSION)));
     }

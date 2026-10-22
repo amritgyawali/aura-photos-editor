@@ -1,0 +1,37 @@
+# Evoto skin-tone input and protection evidence, 2026-10-22
+
+This bounded read-only investigation asks what reference and semantic-protection inputs the shipped skin-tone transfer paths represent, beyond the colour-response validity wrapper examined on 2026-10-21. It establishes additional native input contracts and conditional paths. It does not recover Evoto's numerical skin transform or establish matching AURA output.
+
+The current worker is `F:/evoto/Evoto-worker.exe`, 230,489,488 bytes, SHA-256 `add7588f94aed190b97076f949709ba9622aa14f046b661783135d838d3d3bb2`. The current [REA PE-resource evidence](../../.work-checks/evoto-2026-10-22/rea-evidence.json), evidence ID `ev_01eb87daf29b21e756e15269f5e07667d0dd6a7d9aaef6799fd945075d15ed63`, independently binds that artifact identity. The parent's refreshed [file inventory](../../.work-checks/evoto-2026-10-22/file-inventory.json) covers the broader installation; this report's code analysis covers the five ranges below.
+
+Existing exact-SHA evidence was inspected first. The retained 2026-10-20 worker decompilation matches this SHA; the older 2026-10-18 decompilation declares a different SHA (`99edcbb0...`) and was excluded from current-worker proof. The existing report already established separate makeup-protection composition paths. This follow-up instead targets multi-person reference selection, face-parsing dependencies, colour-picker body processing, and optional LUT postprocessing.
+
+The connected REA deep provider was unavailable: `GHIDRA_INSTALL_DIR` was unset, and the provider also reported a Java launch-path issue. See [provider status](../../.work-checks/evoto-2026-10-22/provider-status.json). No tool installation, global configuration change, or repair was attempted. Following the REA skill's fallback boundary, the existing local PE scanner and GNU objdump decoded only selected current-worker ranges. This fallback is separate static evidence, not a successful REA decompiler invocation.
+
+## Fresh bounded findings
+
+| Native unwind range | Confirmed diagnostic/input relationship | Interpretation and boundary |
+| --- | --- | --- |
+| `0x145c0f0a0` to `0x145c1042c` | `MultiPeopleSkinToneUnifyPipeline::getRefFaceData` diagnostics distinguish reference-face ID, face index, landmarks, instance mask, and reference-image dimensions. | Multi-person skin matching represents a selected reference face plus associated geometry/masks. Negative stored reference IDs have a directly decoded rejection branch. Exact landmark layouts and mask labels remain unknown. |
+| `0x145c0da30` to `0x145c0e7f1` | `faceFeatureProtect` references separate invalid `FaceParsingV2` and `FaceParsing` diagnostics. | Semantic face parsing participates in protection within this multi-person path. This does not identify protected facial classes, exact mask algebra, thresholds, or whether both versions are simultaneously required. |
+| `0x145d57080` to `0x145d5811b` | Colour-picker body `postProcess` references `m_lut_image is empty, skip lut process`. | There is a conditional LUT-related postprocessing stage with a bypass. Its data, interpolation, colour space, and relationship to model inference remain unknown. A named LUT stage does not establish recovered LUT values. |
+| `0x145d604a0` to `0x145d61cb8` | Colour-picker body processing distinguishes invalid total-skin mask from empty instance face/body skin masks. | Total-skin and per-instance face/body data are distinct represented inputs. The initial format gate accepts two exact tag values, described below; tag meanings remain unknown. |
+| `0x145e300c0` to `0x145e3115e` | Face skin-tone `initCache` diagnostics separately reject invalid landmarks and invalid `FaceParsingV2` data. | Face skin-tone preparation depends on geometric and semantic inputs. Their tensor shapes, cache contents and learned model behavior are not recovered. |
+
+Range endpoints above are exclusive. See the [validated evidence](../../.work-checks/evoto-2026-10-22/skin-transfer/validated-input-contracts.json) for canonical measured endpoints, instruction counts, hashes and every diagnostic-reference pair.
+
+The reference-size condition has a meaningful qualification. At `0x145c0f37b`, the routine reads a mode byte at object offset `0x28`. With that byte zero, comparisons at `0x145c0f3dc` and `0x145c0f3e7` send either dimension mismatch to the diagnostic path at `0x145c0fd3e`. A nonzero byte takes a separate dimension-handling path. Therefore this evidence supports a same-size requirement in the decoded default branch; it does not support a universal claim that every reference path rejects differently sized images. The mode's UI meaning and helper semantics are unknown.
+
+The colour-picker body entry has an explicit initial format gate. Instructions at `0x145d604ed`–`0x145d60501` load the input tag at offset `0x64`, subtract `0x301`, and test against `0xfffffeff`. This accepts exactly `0x301` and `0x401`; other tags set status `4` before jumping toward the return. This is a mathematical interpretation of decoded integer instructions. It does not identify channel order, bit depth, colour encoding, or all formats accepted elsewhere in Evoto.
+
+The LUT branch also has actual conditional control flow, beyond the diagnostic's existence. A gate at `0x145d5781e` can bypass the block. Helper-result tests at `0x145d57850` and `0x145d57864` lead to the path carrying the skip-LUT diagnostic. Those helpers remain unnamed, so their precise checks are not asserted. This supports optional/skippable LUT processing rather than an unconditional LUT operation on every image.
+
+## Coverage and retained evidence
+
+The fresh ASCII inventory found 114 relevant literals, 93 with candidate references, and 61 bounded candidate ranges. Five ranges were then selected, totalling **23,198 bytes and 5,404 decoded instructions**. All **25 selected RIP-relative LEA associations** matched instruction boundaries and the expected absolute literal targets. Candidate references elsewhere remain unvalidated.
+
+The [scanner](../../.work-checks/evoto-2026-10-22/trace-skin-transfer.py), [decoder validation script](../../.work-checks/evoto-2026-10-22/validate-skin-transfer.py), [full bounded scan](../../.work-checks/evoto-2026-10-22/skin-transfer/static-trace.json), [validated contracts](../../.work-checks/evoto-2026-10-22/skin-transfer/validated-input-contracts.json), five disassembly files, and [artifact manifest](../../.work-checks/evoto-2026-10-22/skin-transfer/evidence-manifest.json) are retained. The manifest hashes the evidence files; the contracts record the decoder identity and hash.
+
+No Evoto process was executed or modified in this follow-up. No model, proprietary shader, numerical LUT, training asset, or decompiled implementation was copied into AURA. Source code remained frozen. The useful design implication is that reference identity, coordinate compatibility, total/per-instance masks and semantic protection must be qualified separately when building an independent skin-transfer system. This implication does not supply Evoto's algorithm.
+
+Coverage remains deliberately partial: selected ASCII strings only, five native unwind ranges, incomplete call graph, no runtime activation proof, no trained-weight or preprocessing recovery, and no exported Evoto comparison. PE unwind records can describe fragments rather than complete source functions. Exact photo-editing equivalence and perfection of individual tools remain unestablished.
