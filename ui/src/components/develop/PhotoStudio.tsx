@@ -18,6 +18,14 @@ import { localMasks, masksOf, type MaskCoverage, type MaskSource } from '../../i
 import type { BrushStroke } from '../../ipc/nativeRetouch';
 import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
 import { finishOf, studioFinish, type StudioFinish } from '../../ipc/studioFinish';
+import { AutomaticFinishControls } from './AutomaticFinishControls';
+import './editorPanels.css';
+
+const EDITOR_PANELS = [
+  ['all', 'All tools'], ['develop', 'Color & light'], ['portrait', 'Portrait studio'],
+  ['masks', 'Masks'], ['references', 'Reference matching'], ['finish', 'Automatic finish'], ['history', 'History'],
+] as const;
+type EditorPanel = typeof EDITOR_PANELS[number][0];
 
 /** The crop a recipe shows, as normalised edges of the whole frame. */
 function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
@@ -37,6 +45,8 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const [writeError, setWriteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [retouchOpen, setRetouchOpen] = useState(false);
+  const [panel, setPanel] = useState<EditorPanel>('all');
+  const shows = (value: EditorPanel) => panel === 'all' || panel === value;
   const writing = useRef(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'essentials' | 'advanced'>('essentials');
@@ -218,8 +228,17 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
     </div>
     {problem && <p role="alert">{problem} <button type="button" onClick={() => setRefresh(value => value + 1)}>Retry preview</button></p>}
     {writeError && <p role="alert">Edit could not be saved: {writeError} <button type="button" onClick={() => setWriteError(null)}>Dismiss edit error</button></p>}
-    <div className="studio-layout">
-      <div>
+    <nav className="editor-panel-navigation" aria-label="Editing panels">
+      {EDITOR_PANELS.map(([value, label]) => <button type="button" key={value} aria-pressed={panel === value}
+        disabled={busy || disabled} onClick={() => {
+          setPanel(value); setPicking(false); setMaskTool(null); setLiquifyTool(null);
+          drag.current = null; setSketch(null);
+        }}>{label}</button>)}
+      <button type="button" disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
+        onClick={() => { setRetouchOpen(true); setPicking(false); }}>Precision retouch</button>
+    </nav>
+    <div className="studio-layout editor-panel-layout">
+      <div className="editor-preview-column">
         <div className={`studio-canvas${picking ? ' studio-picking' : ''}${maskTool || liquifyTool ? ' studio-masking' : ''}`} aria-busy={busy || loading || waiting}
           onPointerDown={event => {
             if ((!maskTool && !liquifyTool) || view !== 'edited' || busy) return;
@@ -275,14 +294,14 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
       </div>
       <div className="studio-adjustments-column">
       <fieldset className="studio-adjustments lr-adjustments" disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}>
-        <legend>Develop</legend>
-        <div className="studio-edit-modes" aria-label="Editing controls">
+        <legend>{panel === 'all' ? 'Develop' : EDITOR_PANELS.find(([value]) => value === panel)?.[1]}</legend>
+        <div className="studio-edit-modes" aria-label="Editing controls" hidden={!shows('develop')}>
           <button type="button" onClick={() => { setRetouchOpen(true); setPicking(false); }}>Retouch</button>
           {(['essentials', 'advanced'] as const).map(value => <button type="button" key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>{value === 'essentials' ? 'Essentials' : 'Advanced'}</button>)}
         </div>
-        <p><strong>Auto enhance</strong> measures light, colour, noise and the scene, detects faces, then retouches skin, heals temporary blemishes and finishes eyes and teeth where it measures a need. Each stage is saved as its own step, so you can go back to any of them and edit by hand; your manual adjustments are protected.</p>
-        <PortraitAutoReport recipe={recipe}/>
-        <details className="lr-section" open={masks.length > 0 || maskTool !== null}><summary>Masking{masks.length ? ` (${masks.length})` : ''}</summary><div className="lr-section-body">
+        <p hidden={!shows('develop')}><strong>Auto enhance</strong> measures light, colour, noise and the scene, detects faces, then retouches skin, heals temporary blemishes and finishes eyes and teeth where it measures a need. Each stage is saved as its own step, so you can go back to any of them and edit by hand; your manual adjustments are protected.</p>
+        <div hidden={!shows('develop') && !shows('finish')}><PortraitAutoReport recipe={recipe}/></div>
+        <details className="lr-section" hidden={!shows('masks')} open={panel === 'masks' || masks.length > 0 || maskTool !== null}><summary>Masking{masks.length ? ` (${masks.length})` : ''}</summary><div className="lr-section-body">
           <MasksPanel masks={masks} selected={selectedMask} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
             message={maskMessage} tool={maskTool} brush={brush} overlay={maskOverlay}
             onSelect={setSelectedMask} onTool={tool => { setMaskTool(tool); if (tool) { setLiquifyTool(null); setView('edited'); setPicking(false); } }}
@@ -294,7 +313,7 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             })}
             onSave={(next, label) => void write(() => localMasks.save(projectId, photoId, next, label))} />
         </div></details>
-        <details className="lr-section" open={liquifyTool !== null}><summary>Portrait studio: face, body, background, makeup</summary><div className="lr-section-body">
+        <details className="lr-section" hidden={!shows('portrait')} open={panel === 'portrait' || liquifyTool !== null}><summary>Portrait studio: face, body, background, makeup</summary><div className="lr-section-body">
           <PortraitFinishPanel finish={finish} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
             liquify={liquifyTool} onSave={saveFinish} subject={`${projectId}/${photoId}`}
             onSuggestLight={() => studioFinish.suggestLight(projectId, photoId)}
@@ -302,13 +321,14 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
         </div></details>
         {render && edited && <Histogram render={render} />}
         {notice && <p role="status" className="lr-notice">{notice}</p>}
-        <details className="lr-section"><summary>White balance picker</summary><div className="lr-section-body" onKeyDown={event => { if (event.key === 'Escape') setPicking(false); }}>
+        <details className="lr-section" hidden={!shows('develop')}><summary>White balance picker</summary><div className="lr-section-body" onKeyDown={event => { if (event.key === 'Escape') setPicking(false); }}>
           <p className="lr-hint">Choose a neutral gray or white midtone in the original. Avoid clipped highlights. Click the photograph or enter a position below.</p>
           <button type="button" aria-pressed={picking} onClick={() => { setPicking(!picking); setView('original'); }}>{picking ? 'Cancel neutral picker' : 'Pick neutral area'}</button>
           <label>Horizontal position (%)<input type="number" min={0} max={100} value={pickX} onChange={event => setPickX(Number(event.target.value))} /></label>
           <label>Vertical position (%)<input type="number" min={0} max={100} value={pickY} onChange={event => setPickY(Number(event.target.value))} /></label>
           <button type="button" disabled={![pickX, pickY].every(value => Number.isFinite(value) && value >= 0 && value <= 100)} onClick={() => pick(pickX / 100, pickY / 100)}>Sample this position</button>
         </div></details>
+        <div hidden={!shows('develop')}>
         <LightroomPanel recipe={recipe} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} aspect={aspect} profiles={profiles} mode={mode}
           syncControls={<SyncSettingsPanel key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId} disabled={disabled || busy || loading || waiting}
             onSync={(targets, groups) => void write(async () => {
@@ -325,20 +345,29 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
             const report = await syncSettings(projectId, photoId, [], includeGeometry);
             setNotice(`Settings synced to ${report.synced} photo${report.synced === 1 ? '' : 's'}.${report.failed.length ? ` ${report.failed.length} could not be updated.` : ''}`);
           })} />
+        </div>
+        <div hidden={!shows('finish')} className="editor-finish-panel" aria-label="Automatic finishing panel">
+          <AutomaticFinishControls key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId}
+            revision={recipe?.recipeHash ?? ''} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write}/>
+        </div>
         <div className="studio-history">
           <button type="button" disabled={!history?.canUndo} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'undo' }); setPosition(null); })}>Undo</button>
           <button type="button" disabled={!history?.canRedo} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'redo' }); setPosition(null); })}>Redo</button>
           <button type="button" onClick={() => void write(() => develop.historyStep({ projectId, photoId, action: 'reset_original' }))}>Reset photo</button>
         </div>
+        <div hidden={!shows('history')}>
         <SnapshotPanel key={photoId} names={history?.snapshots ?? []} disabled={disabled || busy || loading || waiting}
           onTake={name => void write(() => develop.snapshot({ projectId, photoId, action: 'take', name }))}
           onRestore={name => void write(() => develop.snapshot({ projectId, photoId, action: 'restore', name }))} />
+        </div>
       </fieldset>
+      <div hidden={!shows('references')} className="editor-reference-panel" aria-label="Reference matching panel">
       <ColorMatchPanel key={`colour:${projectId}:${photoId}`} projectId={projectId} photoId={photoId} revision={recipe?.recipeHash} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       <PairedReference key={`paired:${projectId}:${photoId}`} photoId={photoId} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       </div>
+      </div>
     </div>
-    {history && <details className="advanced-tools" open={history.entries.some(entry => entry.source !== 'user')}><summary>Review every edit on this photo ({history.entries.length})</summary>
+    {history && <details hidden={!shows('history')} className="advanced-tools" open={history.entries.some(entry => entry.source !== 'user')}><summary>Review every edit on this photo ({history.entries.length})</summary>
       {history.entries.length === 0 ? <p>No edits have been saved yet.</p> : <ol className="photo-edit-history">
         <li key="original" aria-current={position === 0 ? 'step' : undefined}><strong>Original photograph</strong>
           <button type="button" disabled={disabled || busy || loading || waiting} onClick={() => void write(async () => { await develop.historyStep({ projectId, photoId, action: 'goto:0' }); setPosition(0); })}>Go back to here</button></li>

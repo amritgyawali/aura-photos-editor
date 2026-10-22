@@ -11,6 +11,7 @@ import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
 import { RetouchCanvas, type RetouchMode, type SkinInspectionView } from './RetouchCanvas';
 import { RetouchControls, validRetouch } from './RetouchControls';
 import { RetouchOperationList } from './RetouchOperationList';
+import { AutomaticFinishControls } from './AutomaticFinishControls';
 import { BlemishReview } from './BlemishReview';
 import { useRetouchDraftPreview } from './useRetouchDraftPreview';
 import { retouchCollection, type RetouchOutcome } from './batchRetouch';
@@ -280,6 +281,8 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         })}/>
         <p className="lr-hint">Detects face and body skin locally. Reuse detected skin selections in any retouch tool, preview the mask, or refine it with the brush. All steps can be edited or undone.</p>
         <PortraitAutoReport recipe={recipe}/>
+        <AutomaticFinishControls key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId}
+          revision={retouchRecipe?.recipeHash ?? ''} disabled={stackBlocked || !retouchRecipe} onApply={task=>save(task)}/>
         {dirty&&<p className="lr-hint">{draftNotice}</p>}
         <RetouchOperationList edits={edits} selected={selected} disabled={stackBlocked} automaticLabel={automaticLabel}
           onSelect={edit=>{setSelected(edit.id);setDirty(false);setMode(edit.selection?.gradient?'gradient':edit.mask?'paint':'ellipse');setDraft({...edit,region:[...edit.region],source:edit.source?[...edit.source]:null});setCompare(false);}}

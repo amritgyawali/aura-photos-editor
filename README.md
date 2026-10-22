@@ -68,6 +68,11 @@ uses the configured provider; local enhancement works without an API key.
 
 See [Photo Studio](docs/photo-studio.md) for automatic editing after import,
 reviewing every edit, matching reference colors, and rendering the final photos.
+See [Adjustable finishing and reference colour](docs/adjustable-finishing-and-reference-colour.md)
+for post-edit strength sliders and the reusable edited-photo reference library.
+See [Editing panels](docs/editing-panels.md) for the seven editor sections and
+[native research](docs/reports/AURA-Evoto-native-research-2026-10-20.md) for regional
+reference matching, REA evidence and remaining qualification work.
 The app opens on three steps - pick one of 21 [edit profiles](docs/edit-profiles.md)
 (16 researched looks and 5 learned from professional RAW before-and-afters), optionally
 paste an Instagram profile, then upload photos or a folder.

@@ -51,6 +51,7 @@
 
 pub mod advanced_retouch;
 pub mod ai_settings;
+pub mod automatic_strength;
 pub mod autopilot_commands;
 pub mod biometric_keys;
 pub mod blemish_review;

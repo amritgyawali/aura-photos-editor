@@ -5,6 +5,7 @@
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss
 )]
+use image::ImageEncoder;
 use std::path::Path;
 
 use aura_core::contract::colour::HslBand;
@@ -20,8 +21,20 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{commands::IpcResult, AppState};
 
 mod appearance;
+mod fine;
+pub use fine::FineControls;
+mod library;
+pub use library::{
+    capture as capture_reference, manage as manage_reference, CaptureInput, ManageInput,
+};
 mod reference_image;
+mod regional;
 use appearance::Region;
+pub use regional::{
+    apply as apply_regional, prepare as prepare_regional, status as regional_status,
+    ApplyInput as RegionalApplyInput, Controls as RegionalControls, Kind as RegionalKind,
+    MatchReport as RegionalMatchReport, PrepareInput as RegionalPrepareInput,
+};
 
 const ASSET: &str = "colour_reference_v1:";
 const SESSION: &str = "colour_match_v1:";
@@ -41,6 +54,8 @@ pub struct Controls {
     pub tone: f32,
     pub color: f32,
     pub white_balance: f32,
+    #[serde(default)]
+    pub detail: FineControls,
 }
 impl Default for Controls {
     fn default() -> Self {
@@ -49,19 +64,21 @@ impl Default for Controls {
             tone: 1.0,
             color: 1.0,
             white_balance: 1.0,
+            detail: FineControls::default(),
         }
     }
 }
 impl Controls {
     fn check(self) -> AuraResult<()> {
         if [self.amount, self.tone, self.color, self.white_balance]
-            .iter()
-            .all(|v| v.is_finite() && (0.0..=1.0).contains(v))
+            .into_iter()
+            .chain(self.detail.values())
+            .all(|v| v.is_finite() && (0.0..=2.0).contains(&v))
         {
             Ok(())
         } else {
             Err(invalid(
-                "Colour matching strengths must be between 0 and 100%.",
+                "Colour matching strengths must be between 0 and 200%.",
             ))
         }
     }
@@ -84,11 +101,12 @@ impl Controls {
         out.saturation *= self.color;
         for band in HslBand::ALL {
             let mut shift = out.hsl.get(band);
-            shift.h *= self.color;
-            shift.s *= self.color;
+            shift.h *= self.color * self.detail.hue;
+            shift.s *= self.color * self.detail.saturation;
             shift.l *= self.tone;
             out.hsl.set(band, shift);
         }
+        self.detail.apply(&mut out);
         out.clamped()
     }
 }
@@ -102,6 +120,14 @@ pub struct ReferenceSummary {
     pub height: u32,
     pub converted_icc: bool,
     pub regions: Vec<String>,
+    #[serde(default)]
+    pub group: String,
+    #[serde(default)]
+    pub favorite: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_controls: Option<Controls>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbnail: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Reference {
@@ -243,44 +269,95 @@ fn session_key(photo: &str) -> AuraResult<String> {
 pub fn import_reference(state: &AppState, input: &ImportInput) -> IpcResult<ReferenceSummary> {
     job(state, &input.cancel_id, |cancel| {
         let decoded = reference_image::decode(Path::new(&input.path))?;
-        check_cancel(cancel)?;
-        let key = asset_key(&decoded.hash)?;
-        if let Some(existing) = read::<Reference>(state, &key)? {
-            if existing.engine == ENGINE {
+        let name = Path::new(&input.path)
+            .file_name()
+            .map_or_else(|| "Reference".into(), |s| s.to_string_lossy().into_owned());
+        let summary = new_summary(
+            decoded.hash,
+            name,
+            decoded.width,
+            decoded.height,
+            decoded.converted_icc,
+        );
+        persist_reference(state, summary, &decoded.image, cancel)
+    })
+}
+
+fn new_summary(
+    id: String,
+    name: String,
+    width: u32,
+    height: u32,
+    converted_icc: bool,
+) -> ReferenceSummary {
+    ReferenceSummary {
+        id,
+        name,
+        width,
+        height,
+        converted_icc,
+        regions: Vec::new(),
+        group: String::new(),
+        favorite: false,
+        default_controls: None,
+        thumbnail: None,
+    }
+}
+
+fn persist_reference(
+    state: &AppState,
+    mut summary: ReferenceSummary,
+    image: &Rgb8,
+    cancel: &CancelToken,
+) -> AuraResult<ReferenceSummary> {
+    check_cancel(cancel)?;
+    let key = asset_key(&summary.id)?;
+    if let Some(existing) = read::<Reference>(state, &key)? {
+        if existing.engine == ENGINE {
+            if existing.summary.thumbnail.is_some() {
                 return Ok(existing.summary);
             }
+            summary = existing.summary;
         }
-        let mut regions = appearance::analyse(&decoded.image)?;
-        regions.retain(|r| !r.name.starts_with("guard:"));
-        check_cancel(cancel)?;
-        let summary = ReferenceSummary {
-            id: decoded.hash,
-            name: Path::new(&input.path)
-                .file_name()
-                .map_or_else(|| "Reference".into(), |s| s.to_string_lossy().into_owned()),
-            width: decoded.width,
-            height: decoded.height,
-            converted_icc: decoded.converted_icc,
-            regions: regions.iter().map(|r| r.name.clone()).collect(),
-        };
-        let regions = regions
-            .into_iter()
-            .map(|mut r| {
-                r.points.clear();
-                r
-            })
-            .collect();
-        store(
-            state,
-            &key,
-            &Reference {
-                engine: ENGINE.into(),
-                summary: summary.clone(),
-                regions,
-            },
-        )?;
-        Ok(summary)
-    })
+    }
+    let mut regions = appearance::analyse(image)?;
+    regions.retain(|r| !r.name.starts_with("guard:"));
+    check_cancel(cancel)?;
+    summary.regions = regions.iter().map(|r| r.name.clone()).collect();
+    let rgb = image::RgbImage::from_raw(image.width, image.height, image.data.clone())
+        .ok_or_else(|| invalid("Reference preview dimensions are invalid."))?;
+    let small = image::imageops::thumbnail(&rgb, 128, 128);
+    let mut bytes = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut bytes)
+        .write_image(
+            small.as_raw(),
+            small.width(),
+            small.height(),
+            image::ExtendedColorType::Rgb8,
+        )
+        .map_err(|_| invalid("Cannot save the reference thumbnail."))?;
+    summary.thumbnail = Some(format!(
+        "data:image/png;base64,{}",
+        crate::develop_commands::base64(&bytes)
+    ));
+    let regions = regions
+        .into_iter()
+        .map(|mut r| {
+            r.points.clear();
+            r
+        })
+        .collect();
+    check_cancel(cancel)?;
+    store(
+        state,
+        &key,
+        &Reference {
+            engine: ENGINE.into(),
+            summary: summary.clone(),
+            regions,
+        },
+    )?;
+    Ok(summary)
 }
 
 /// List locally saved reference descriptors. Clearing preview caches does not delete these.
@@ -436,6 +513,7 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
                 "The photo changed during analysis. Your newer edit was kept. Analyse it again.",
             ));
         }
+        let default_controls = reference.summary.default_controls.unwrap_or_default();
         let session = Session {
             engine: ENGINE.into(),
             id: uuid::Uuid::new_v4().to_string(),
@@ -449,7 +527,7 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             target_regions,
             before_distance,
             fitted_distance: best_distance,
-            controls: Controls::default(),
+            controls: default_controls,
             checked_hash: None,
             measured_before: None,
             measured_after: None,
@@ -724,7 +802,7 @@ mod tests {
 
     #[test]
     fn invalid_strengths_are_refused_in_the_native_layer() {
-        for amount in [-0.1, 1.1, f32::NAN, f32::INFINITY] {
+        for amount in [-0.1, 2.1, f32::NAN, f32::INFINITY] {
             assert!(Controls {
                 amount,
                 ..Controls::default()
@@ -732,5 +810,46 @@ mod tests {
             .check()
             .is_err());
         }
+    }
+
+    #[test]
+    fn fine_strengths_separate_exposure_and_temperature_from_other_fitted_axes() {
+        let changed = Controls {
+            detail: FineControls {
+                exposure: 0.0,
+                temperature: 0.0,
+                ..FineControls::default()
+            },
+            ..Controls::default()
+        }
+        .delta(&fitted());
+        assert_eq!(changed.exposure, 0.0);
+        assert_eq!(changed.temperature_k, 0.0);
+        assert!(changed.contrast > 0.0 && changed.tint > 0.0 && changed.saturation > 0.0);
+        assert!(Controls {
+            amount: 1.5,
+            ..Controls::default()
+        }
+        .check()
+        .is_ok());
+        assert!(Controls {
+            detail: FineControls {
+                hue: f32::NAN,
+                ..FineControls::default()
+            },
+            ..Controls::default()
+        }
+        .check()
+        .is_err());
+    }
+
+    #[test]
+    fn older_matching_sessions_decode_to_identical_full_detail_strengths() {
+        let old: Controls =
+            serde_json::from_str(r#"{"amount":1,"tone":1,"color":1,"whiteBalance":1}"#).unwrap();
+        assert_eq!(old, Controls::default());
+        let partial: FineControls = serde_json::from_str(r#"{"exposure":0.5}"#).unwrap();
+        assert_eq!(partial.exposure, 0.5);
+        assert_eq!(partial.tint, 1.0);
     }
 }

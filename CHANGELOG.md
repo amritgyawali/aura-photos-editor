@@ -2,6 +2,26 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Adjustable automatic finishing and reference library - 2026-10-20
+
+- Add genuine regional reference-colour fitting with independent skin, hair,
+  clothing and background strengths, frozen masks, native checks and history.
+- Group the editor into seven panels with preserved drafts and a sticky preview;
+  expose automatic finishing directly in Develop.
+- Record current Evoto 8 REA evidence, 24 targeted native traces and a bounded
+  metadata audit. Exact parity and proprietary model recovery remain unestablished.
+- Adjust the overall automatic retouch or individual finishing categories from
+  0–200%, restore original strengths after zero, and retain manual edits and Undo/Redo.
+- Add twelve fine reference-colour strengths, including independent temperature
+  and tint, within the existing native highlight/skin safeguards.
+- Create a reference from a saved edited preview; browse thumbnails, search,
+  groups and favorites; rename/remove entries and remember matching strengths.
+- Import several references with individual outcomes. Keep saved matches
+  adjustable after their reusable reference is removed.
+- See the [workflow guide](docs/adjustable-finishing-and-reference-colour.md),
+  [ADR-0130](docs/adr/ADR-0130-adjustable-automatic-finishing-and-reference-workflows.md)
+  and [research/qualification report](docs/reports/AURA-Evoto-workflows-2026-10-20.md).
+
 ## Sampled colour selection and local saturation - 2026-10-19
 
 - Sample a colour on the photo to refine any retouch selection, with tolerance,

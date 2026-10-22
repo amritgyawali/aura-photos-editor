@@ -177,6 +177,18 @@ pub fn group_of(id: &str) -> Option<Group> {
     )
 }
 
+/// Recover the automatic identity protected by a manual or finishing override.
+fn overridden_origin(mut id: &str) -> Option<&str> {
+    let original = id;
+    while let Some(rest) = id
+        .strip_prefix(crate::automatic_strength::MANAGED)
+        .or_else(|| id.strip_prefix("manual-"))
+    {
+        id = rest;
+    }
+    (id != original && group_of(id).is_some()).then_some(id)
+}
+
 /// The retouch stack after saving every step up to and including `upto`.
 ///
 /// Manual operations keep their order and come first. Each automatic group is either the
@@ -360,7 +372,7 @@ pub fn plan_with_faces(
     let settings = options.settings;
     let overridden: std::collections::BTreeSet<String> = retouch_tools::read(proposal)?
         .iter()
-        .filter_map(|e| e.id.strip_prefix("manual-").map(str::to_owned))
+        .filter_map(|e| overridden_origin(&e.id).map(str::to_owned))
         .collect();
     report.faces = match faces {
         Some(faces) => faces,
@@ -3073,35 +3085,39 @@ mod tests {
 
     #[test]
     fn manually_adjusted_automatic_steps_are_not_planned_again() {
-        let (rgb, face) = person(None);
-        let mut initial = scoped(&rgb, &face, portrait_features::Scope::Face);
-        let mut edited = initial.groups.get_mut(&Group::Skin).unwrap().remove(0);
-        let original_id = edited.id.clone();
-        edited.id = format!("manual-{original_id}");
-        edited.enabled = false;
-        let mut recipe = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
-        retouch_tools::write_with_mattes(&mut recipe, &[edited.clone()], &initial.mattes).unwrap();
-        let options = portrait_features::Options {
-            settings: Settings {
-                ai_skin_detection: false,
-                ..Settings::default()
-            },
-            ..portrait_features::Options::default()
-        };
-        let plan = plan_with_faces(
-            &recipe,
-            &rgb,
-            200,
-            300,
-            None,
-            0.0,
-            Some(vec![face]),
-            &options,
-            true,
-        )
-        .unwrap();
-        assert!(!plan.groups.values().flatten().any(|e| e.id == original_id));
-        assert_eq!(retouch_tools::read(&recipe).unwrap(), vec![edited]);
+        for prefix in ["manual-", "manual-strength-", "manual-manual-strength-"] {
+            let (rgb, face) = person(None);
+            let mut initial = scoped(&rgb, &face, portrait_features::Scope::Face);
+            let mut edited = initial.groups.get_mut(&Group::Skin).unwrap().remove(0);
+            let original_id = edited.id.clone();
+            edited.id = format!("{prefix}{original_id}");
+            edited.enabled = false;
+            let mut recipe =
+                aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "t");
+            retouch_tools::write_with_mattes(&mut recipe, &[edited.clone()], &initial.mattes)
+                .unwrap();
+            let options = portrait_features::Options {
+                settings: Settings {
+                    ai_skin_detection: false,
+                    ..Settings::default()
+                },
+                ..portrait_features::Options::default()
+            };
+            let plan = plan_with_faces(
+                &recipe,
+                &rgb,
+                200,
+                300,
+                None,
+                0.0,
+                Some(vec![face]),
+                &options,
+                true,
+            )
+            .unwrap();
+            assert!(!plan.groups.values().flatten().any(|e| e.id == original_id));
+            assert_eq!(retouch_tools::read(&recipe).unwrap(), vec![edited]);
+        }
     }
 
     #[test]

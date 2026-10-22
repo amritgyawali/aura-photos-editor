@@ -4,6 +4,7 @@ import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { nativeRetouch, freshRetouch } from '../../ipc/nativeRetouch';
 import { api, develop } from '../../ipc/client';
 import { forgetPreviews } from '../../state/previewCache';
+vi.mock('./AutomaticFinishControls', () => ({ AutomaticFinishControls: () => null }));
 
 vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
 vi.mock('../../ipc/client',()=>({api:{listImages:vi.fn()},asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
