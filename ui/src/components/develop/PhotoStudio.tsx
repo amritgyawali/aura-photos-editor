@@ -17,6 +17,7 @@ import { localMasks, masksOf, type MaskCoverage, type MaskSource } from '../../i
 import type { BrushStroke } from '../../ipc/nativeRetouch';
 import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
 import { finishOf, studioFinish, type StudioFinish } from '../../ipc/studioFinish';
+import { useEffectRequest } from '../../state/effectRequest';
 
 /** The crop a recipe shows, as normalised edges of the whole frame. */
 function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
@@ -35,6 +36,9 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [retouchOpen, setRetouchOpen] = useState(false);
+  // A tool chosen in the Effects library opens Retouch, which then picks the tool up. ADR-0135.
+  const effectRequest = useEffectRequest(state => state.request);
+  useEffect(() => { if (effectRequest) setRetouchOpen(true); }, [effectRequest]);
   const writing = useRef(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'essentials' | 'advanced'>('essentials');

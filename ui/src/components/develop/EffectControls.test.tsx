@@ -16,7 +16,7 @@ const draft = (tool: EffectTool): NativeRetouchEdit & { tool: EffectTool } => ({
 it('names only tools the renderer knows, each once, all offered in the tool list', () => {
   expect(variants.size).toBeGreaterThan(40);
   const ids = EFFECT_TOOLS.map(t => t[0]);
-  expect(new Set(ids).size).toBe(48);
+  expect(new Set(ids).size).toBe(88);
   for (const id of ids) {
     expect(variants.has(id), id).toBe(true);
     expect(RETOUCH_TOOLS.some(t => t[0] === id)).toBe(true);

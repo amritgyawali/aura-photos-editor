@@ -2,6 +2,30 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## An Effects screen, and twenty more tools - 2026-10-20
+
+- **Effects in the sidebar** (ADR-0135): all 119 retouch tools and effects in one searchable place,
+  grouped, with quick jobs, favourites and recently used. Each card says what the tool needs (a
+  point, a skin sample, a colour). **Use on this photo** opens Retouch with the tool chosen and
+  never replaces an unsaved draft.
+- **Grooming**: darken lashes and liner, fill thin hair or brows, and match grain, which gives an
+  over-smoothed area the grain the photograph itself measures.
+- **Stylised looks**: channel swap, sunset glow, day to night with lamps kept lit, Lomo, instant
+  film, pop art.
+- **Optics and texture**: iris blur, double exposure echo, ripple, frosted glass, pixel sort, VHS
+  tape, emboss, crosshatch.
+- **Light**: sparkle on real glints, fairy lights, rainbow prism.
+
+## Twenty more effects: colour looks, light and lens, art, repair - 2026-10-20
+
+- **Colour looks** (ADR-0134): split tone, film fade, bleach bypass, teal and orange that holds
+  skin, colour splash, and a sky-blue restore that leaves skin and cloud alone.
+- **Light and lens**: spotlight, rim light along a selected subject's edge, chromatic aberration,
+  fisheye, anamorphic streaks, kaleidoscope.
+- **Art**: watercolour, stained glass, cartoon and neon edges that follow colour edges, thermal.
+- **Repair**: blown highlights given back the colour of their surroundings at their own
+  brightness, dehaze measured on the selection, and the iris's limbal ring.
+
 ## Twenty more tools, a whole-app test, and two fixes it found - 2026-10-20
 
 - **Eight practical repairs** (ADR-0132): dust and scratches, JPEG artifact cleanup, banding

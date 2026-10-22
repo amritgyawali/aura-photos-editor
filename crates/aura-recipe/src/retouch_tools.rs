@@ -236,6 +236,88 @@ pub enum Tool {
     GodRays,
     /// Falling snow, or rain streaks when `tint` is positive; `tone` is the density.
     Weather,
+    // Twenty more selected effects (ADR-0134): colour looks, light and lens, artistic, repair.
+    /// Shadows toward a colour turned from `target_color` by `warmth`, highlights toward `target_color`; `tone` is the balance.
+    SplitTone,
+    /// Faded film: blacks lifted by `tone`, colour muted, a cast of `warmth`.
+    FilmFade,
+    /// Silver retained: desaturated, with contrast raised by `tone`.
+    BleachBypass,
+    /// Shadows toward teal and warm tones toward orange by `tone`, skin hues held.
+    TealOrange,
+    /// Keeps the colour sampled at `source` within `tone` and turns the rest of the selection grey.
+    ColourSplash,
+    /// Restores blue to a washed-out sky: bright, low-colour or bluish pixels move toward `target_color` or sky blue.
+    SkyBlue,
+    /// Light falling on `source` or the region centre: lighter inside `radius`, darker away by `tone`.
+    Spotlight,
+    /// A glow along the selection's own edge on the side facing (`warmth`, `tint`), in `target_color` or warm white.
+    RimLight,
+    /// Creative lateral colour: red and blue scaled apart around the region centre by `radius`.
+    ChromaticAberration,
+    /// Maps the ellipse onto a sphere, bulging its centre; `amount` is the curvature.
+    Fisheye,
+    /// Long horizontal streaks from highlights brighter than `tone` sets, in `target_color` or blue.
+    AnamorphicStreak,
+    /// Mirrors the region into `4 + tone * 8` segments around its centre.
+    Kaleidoscope,
+    /// Watercolour: flattened washes, pigment pooled at edges, paper grain.
+    Watercolor,
+    /// Voronoi cells `radius` across, each one colour, with dark leading between them.
+    StainedGlass,
+    /// Flat smoothed colours in `2 + tone * 8` levels with ink lines at edges.
+    Cartoon,
+    /// Edges glow in their own colour over a background darkened by `tone`.
+    NeonEdges,
+    /// A thermal camera palette mapped from luminance.
+    Thermal,
+    /// Rebuilds the colour of channels clipped in highlights from the unclipped pixels around them.
+    ClippedHighlightRepair,
+    /// Dark-channel haze removal measured on the selection; `tone` is how much haze is removed.
+    LocalDehaze,
+    /// Darkens the iris's outer ring, the band just inside the ellipse; `tone` is its width.
+    LimbalRing,
+    // Twenty more selected effects (ADR-0135): grooming, colour, distortion, art and light.
+    /// Darkens thin dark strokes (lashes, liner) against their surroundings by `amount`.
+    LashDarken,
+    /// Fills the light gaps between hairs of a brow or beard with the hair's own darker colour; `tone` is how full.
+    HairFill,
+    /// Adds grain matching the photograph's own measured noise, for a smoothed area that looks too clean; `tone` scales it.
+    MatchGrain,
+    /// Swaps colour channels; `warmth` chooses which.
+    ChannelSwap,
+    /// A warm glow falling from the top of the region, in `target_color` or sunset orange.
+    SunsetGlow,
+    /// Night: darker by `tone`, blue, with the brightest lights kept warm.
+    DayToNight,
+    /// Lomography: saturated, contrasty, shifted colour and a dark ring at the region edge.
+    Lomo,
+    /// Instant film: cyan shadows, creamy highlights, soft contrast.
+    InstantFilm,
+    /// Four bold flat colours by brightness, the first `target_color`.
+    PopArt,
+    /// Sharp at the region centre, blurring toward its edge; `tone` is the sharp area's size.
+    IrisBlur,
+    /// A faint copy offset by (`warmth`, `tint`) region radii, screened over the photograph.
+    EchoDouble,
+    /// Water ripples of wavelength `radius`, fading at the ellipse edge.
+    Ripple,
+    /// Each pixel scattered by up to `radius`, as through frosted glass.
+    FrostedGlass,
+    /// Sorts runs of pixels in each row by brightness, between thresholds `tone` sets.
+    PixelSort,
+    /// VHS: scanlines, colour bleeding sideways, soft and a little noisy.
+    VhsRetro,
+    /// A relief lit from the top left; `tone` keeps the colour.
+    Emboss,
+    /// Pen hatching that thickens in the darker tones.
+    Crosshatch,
+    /// Four-point stars on the brightest points - jewellery, sequins, water.
+    Sparkle,
+    /// Soft warm orbs of light scattered over the selection; `tone` is the density.
+    FairyLights,
+    /// A prism rainbow band through the region centre at `warmth` times 180 degrees.
+    RainbowPrism,
     /// Removes the purple (`warmth`) and green (`tint`) rims a lens leaves on the dark side of a
     /// bright edge, `radius` from it; each rim pixel takes the colour of its calm surroundings
     /// at its own luminance. A colour its calm surroundings share, or the glow of a coloured
@@ -244,6 +326,22 @@ pub enum Tool {
 }
 
 impl Tool {
+    /// The tools that read a point on the photograph and cannot run without one.
+    #[must_use]
+    pub fn needs_source(self) -> bool {
+        matches!(
+            self,
+            Self::Clone
+                | Self::ColorMatch
+                | Self::SkinSmooth
+                | Self::SkinUniformity
+                | Self::PortraitDodgeBurn
+                | Self::ChromaKey
+                | Self::LocalWhiteBalance
+                | Self::ColourSplash
+        )
+    }
+
     /// The warps: they move pixels, so an inverted selection would warp the whole frame.
     #[must_use]
     pub fn is_warp(self) -> bool {
@@ -254,6 +352,9 @@ impl Tool {
                 | Self::LiquifyBloat
                 | Self::LiquifyPucker
                 | Self::LiquifyTwirl
+                | Self::Fisheye
+                | Self::Ripple
+                | Self::FrostedGlass
         )
     }
 }
@@ -561,16 +662,7 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
                 .mole_edge
                 .is_some_and(|v| !v.is_finite() || !(0.0..=4.0).contains(&v))
             || (edit.source_scale < 1.0 && edit.tool == Tool::PatchHeal && edit.source.is_none())
-            || (matches!(
-                edit.tool,
-                Tool::Clone
-                    | Tool::ColorMatch
-                    | Tool::SkinSmooth
-                    | Tool::SkinUniformity
-                    | Tool::PortraitDodgeBurn
-                    | Tool::ChromaKey
-                    | Tool::LocalWhiteBalance
-            ) && edit.source.is_none())
+            || (edit.tool.needs_source() && edit.source.is_none())
         {
             return Err(recipe_invalid(
                 KEY,

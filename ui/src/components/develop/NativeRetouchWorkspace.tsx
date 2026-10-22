@@ -15,6 +15,7 @@ import { RetouchControls, validRetouch } from './RetouchControls';
 import { BlemishReview } from './BlemishReview';
 import { useRetouchDraftPreview } from './useRetouchDraftPreview';
 import { retouchCollection, type RetouchOutcome } from './batchRetouch';
+import { useEffectRequest } from '../../state/effectRequest';
 import './precision-retouch.css';
 
 /** A short provenance tag for operations the automatic pass wrote. */
@@ -148,6 +149,19 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
       // Each selected effect starts where it is most useful (ADR-0131).
       ...(isEffectTool(tool)?{...EFFECT_DEFAULTS[tool],targetColor:EFFECT_COLOR[tool]?.initial??null}:{})});
   };
+  // A tool chosen in the Effects library (ADR-0135), taken once the saved stack has loaded. An
+  // unsaved draft is never replaced: the request waits and the photographer is told why.
+  const effectRequest=useEffectRequest(state=>state.request);
+  const consumeEffect=useEffectRequest(state=>state.consume);
+  useEffect(()=>{
+    if(!effectRequest||busy||!loaded)return;
+    if(dirty){setError('Apply or discard your draft to open the tool you chose in Effects.');return;}
+    consumeEffect(effectRequest.sequence);
+    setSelected(null);
+    chooseTool(effectRequest.tool);
+    if(Object.keys(effectRequest.patch).length)change(effectRequest.patch);
+  // chooseTool and change are recreated every render; the request is what this reacts to.
+  },[effectRequest,busy,loaded,dirty,consumeEffect]);
   const chooseMode=(next:RetouchMode)=>{
     setMode(next);setSourceMode(false);setMaskView(false);
     if(next==='gradient'){change({mask:null,selection:{...draft.selection,gradient:draft.selection?.gradient??{start:[.2,.5],end:[.8,.5]}}});return;}
