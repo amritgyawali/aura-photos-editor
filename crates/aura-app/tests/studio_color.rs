@@ -132,6 +132,27 @@ fn colour_drafts_are_measured_then_saved_atomically_with_reversible_native_pixel
         aura_recipe::local_masks::read(&baseline).expect("original manual masks")
     );
     assert_eq!(stored.geometry, baseline.geometry);
+    let mut repeated = SaveStudioColorInput {
+        project_id: input.project_id.clone(),
+        photo_id: input.photo_id.clone(),
+        recipe_hash: saved.recipe.recipe_hash.clone(),
+        color: input.color.clone(),
+    };
+    let unchanged = studio_color_commands::save(&state, &repeated).expect("unchanged save");
+    assert_eq!(unchanged.recipe.recipe_hash, saved.recipe.recipe_hash);
+    assert_eq!(
+        count(),
+        2,
+        "repeated colour controls must not append history"
+    );
+    repeated.color.levels.rgb.gamma += 0.000_000_1;
+    let subprecision = studio_color_commands::save(&state, &repeated).expect("subprecision save");
+    assert_eq!(subprecision.recipe.recipe_hash, saved.recipe.recipe_hash);
+    assert_eq!(
+        count(),
+        2,
+        "subprecision colour changes must not append history"
+    );
     assert!(
         studio_color_commands::save(&state, &input).is_err(),
         "stale draft is refused"

@@ -98,6 +98,7 @@ pub mod contract {
 
 pub mod bands;
 pub mod blemish_review;
+pub mod calibrated_look;
 pub mod cleanup;
 mod color_lab;
 pub mod colour;
@@ -121,6 +122,7 @@ pub mod perf;
 pub mod portrait;
 pub mod portrait_light;
 pub mod profiles;
+pub mod reference_grade;
 pub mod restore;
 pub mod retouch;
 mod retouch_acne;

@@ -221,7 +221,11 @@ fn edit_one(
             crate::photo_enhance::enhance_photo(state, &develop)?
         };
         if let Some(reference) = look.reference_id.clone().filter(|id| !id.is_empty()) {
-            let fitted = crate::reference_style::apply_reference(
+            let cancel = JOBS
+                .lock()
+                .get(job)
+                .map_or_else(CancelToken::new, |slot| slot.cancel.clone());
+            let fitted = crate::reference_style::apply_with_cancel(
                 state,
                 &crate::reference_style::ApplyReferenceInput {
                     photo_id: photo.to_owned(),
@@ -229,7 +233,9 @@ fn edit_one(
                     strength: f32::from(look.reference_strength.min(100)) / 100.0,
                     profile_id: profile.clone(),
                     profile_strength: profile.as_ref().map(|_| strength),
+                    cancel_id: None,
                 },
+                &cancel,
             )?;
             reasons.push(format!(
                 "Reference look fitted at {}%: distance to the reference {:.3} before, {:.3} after.",

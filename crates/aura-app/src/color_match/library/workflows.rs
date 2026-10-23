@@ -371,6 +371,10 @@ impl PortableReference {
                 regions: regions.iter().map(|region| region.name.clone()).collect(),
             },
             regions,
+            // Portable libraries retain their descriptor-only format. Reimporting
+            // the source image can supply fresh structure and achromatic evidence.
+            small_rgb: Vec::new(),
+            achromatic: false,
         })
     }
 }

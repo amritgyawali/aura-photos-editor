@@ -80,6 +80,26 @@ it('makes saved automatic strengths reachable directly in Develop and retains th
   expect(automaticStrength.apply).not.toHaveBeenCalled();
 });
 
+it('opens single-image reference matching with the same preview and preserves the previous editing panel', async () => {
+  const busy = vi.fn();
+  const props = { projectId: 'project', photoId: 'portrait', disabled: false, onBusyChange: busy };
+  const view = render(<PhotoStudio {...props}/>);
+  const preview = await screen.findByAltText('Edited photograph');
+  await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+  fireEvent.click(screen.getByRole('button', { name: 'Color & light' }));
+  const renders = vi.mocked(develop.renderImage).mock.calls.length;
+  view.rerender(<PhotoStudio {...props} referenceMode/>);
+  expect(screen.getByRole('textbox', { name: 'Keep the matched look as' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Auto enhance photo' })).toBeNull();
+  expect(screen.queryByRole('navigation', { name: 'Editing panels' })).toBeNull();
+  expect(screen.getByAltText('Edited photograph')).toBe(preview);
+  view.rerender(<PhotoStudio {...props}/>);
+  expect(screen.getByRole('button', { name: 'Auto enhance photo' })).toBeTruthy();
+  expect(screen.getByAltText('Edited photograph')).toBe(preview);
+  expect(develop.renderImage).toHaveBeenCalledTimes(renders);
+  expect(develop.setParam).not.toHaveBeenCalled();
+});
+
 it('saves named snapshots and restores them through the persisted history command', async () => {
   vi.mocked(develop.imageHistory).mockResolvedValue({ entries: [], snapshots: ['First look'], canUndo: true, canRedo: false } as never);
   render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={vi.fn()} />);

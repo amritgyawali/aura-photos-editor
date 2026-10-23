@@ -1,0 +1,5782 @@
+{
+  "existingExports": [
+    {
+      "reference": {
+        "name": "warm-cinematic",
+        "photographer": "Elis S",
+        "page": "https://www.pexels.com/photo/cinematic-portrait-of-woman-in-warm-lighting-36672685/",
+        "url": "https://images.pexels.com/photos/36672685/pexels-photo-36672685.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\warm-cinematic.jpg",
+        "width": 4000,
+        "height": 6000,
+        "format": "JPEG",
+        "bytes": 2543073,
+        "sha256": "d9b26549f50bbe6d33d2318ada74b28d243b076110272e7f06b6035be40c484e",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      "target": "target-0.jpg",
+      "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\ui-qualified\\export-warm-cinematic\\gallery\\downloaded-reference-matching-verification_0001.jpg",
+      "referenceInfo": {
+        "format": "JPEG",
+        "width": 4000,
+        "height": 6000,
+        "embeddedIcc": false,
+        "exifOrientation": 1,
+        "interpretation": "untagged RGB assumed sRGB"
+      },
+      "exportInfo": {
+        "format": "JPEG",
+        "width": 682,
+        "height": 1024,
+        "embeddedIcc": true,
+        "exifOrientation": 1,
+        "interpretation": "embedded ICC converted to sRGB"
+      },
+      "exportVersusSavedRender": {
+        "rgbMae": 1.2623569044782503,
+        "meanDeltaE76": 1.1329281177045556,
+        "p95DeltaE76": 2.8058609783986905,
+        "medianLightnessShift": 0.0,
+        "meanCastShiftA": -0.029593364633487697,
+        "meanCastShiftB": -0.0008064853196436891,
+        "exactPixels": false
+      },
+      "exportedAppearance": {
+        "lightnessQuantiles": [
+          19.46368956906855,
+          33.11276785171301,
+          43.12129422039833,
+          52.70409719458851,
+          62.474976751222755
+        ],
+        "chromaQuantiles": [
+          5.8000427357818305,
+          21.625834190038944,
+          31.056075561890502,
+          43.81799231215698,
+          64.36328098002768
+        ],
+        "meanLab": [
+          42.59858128514984,
+          18.31945247099186,
+          21.49563924775225
+        ],
+        "medianLab": [
+          43.12129422039833,
+          16.24458944428242,
+          23.26690866914008
+        ],
+        "nearNeutralFraction": 0.11206126282991202,
+        "nearNeutralMedianAb": [
+          -1.1099173591448408,
+          4.907375547846082
+        ]
+      },
+      "referenceAppearance": {
+        "lightnessQuantiles": [
+          6.589547620574109,
+          7.913744372364576,
+          10.919592326630966,
+          21.377019825571367,
+          45.213354052967645
+        ],
+        "chromaQuantiles": [
+          0.9388384905926597,
+          5.120682157683601,
+          11.684547738117418,
+          35.97461252445961,
+          65.11167281469828
+        ],
+        "meanLab": [
+          16.998552315701488,
+          12.276576511226526,
+          17.88257949945548
+        ],
+        "medianLab": [
+          10.919592326630966,
+          6.062434659119348,
+          10.180018239317784
+        ],
+        "nearNeutralFraction": 0.0,
+        "nearNeutralMedianAb": null
+      },
+      "referenceDistributionGap": {
+        "toneQuantileMaeL": 23.7727134777765,
+        "chromaQuantileMae": 9.865931144737115,
+        "paletteJensenShannonDistance": 0.7909156109198934,
+        "nearNeutralCastGapAb": null,
+        "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+      },
+      "fileSha256": "cbe95c8df9008f8ff24faccdc18079a0e9e59fe28aa774c836c6ccc61b7143ed"
+    },
+    {
+      "reference": {
+        "name": "warm-cinematic",
+        "photographer": "Elis S",
+        "page": "https://www.pexels.com/photo/cinematic-portrait-of-woman-in-warm-lighting-36672685/",
+        "url": "https://images.pexels.com/photos/36672685/pexels-photo-36672685.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\warm-cinematic.jpg",
+        "width": 4000,
+        "height": 6000,
+        "format": "JPEG",
+        "bytes": 2543073,
+        "sha256": "d9b26549f50bbe6d33d2318ada74b28d243b076110272e7f06b6035be40c484e",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      "target": "target-1.jpg",
+      "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\ui-qualified\\export-warm-cinematic\\gallery\\downloaded-reference-matching-verification_0002.jpg",
+      "referenceInfo": {
+        "format": "JPEG",
+        "width": 4000,
+        "height": 6000,
+        "embeddedIcc": false,
+        "exifOrientation": 1,
+        "interpretation": "untagged RGB assumed sRGB"
+      },
+      "exportInfo": {
+        "format": "JPEG",
+        "width": 682,
+        "height": 1024,
+        "embeddedIcc": true,
+        "exifOrientation": 1,
+        "interpretation": "embedded ICC converted to sRGB"
+      },
+      "exportVersusSavedRender": {
+        "rgbMae": 1.2679742867179864,
+        "meanDeltaE76": 1.1356117691674352,
+        "p95DeltaE76": 2.4042023581473857,
+        "medianLightnessShift": 0.0,
+        "meanCastShiftA": -0.01554433132481568,
+        "meanCastShiftB": -0.008778270269022365,
+        "exactPixels": false
+      },
+      "exportedAppearance": {
+        "lightnessQuantiles": [
+          14.776900126876848,
+          22.193699718418195,
+          34.51219609085957,
+          46.56658825029798,
+          66.7917392691514
+        ],
+        "chromaQuantiles": [
+          11.703304597537336,
+          22.233715219805006,
+          30.120978979113083,
+          38.32548921581158,
+          55.19522811761372
+        ],
+        "meanLab": [
+          36.14842936784593,
+          21.451219521807555,
+          20.052884034841092
+        ],
+        "medianLab": [
+          34.51219609085957,
+          18.708151944447536,
+          18.66484523644723
+        ],
+        "nearNeutralFraction": 0.036651163856304986,
+        "nearNeutralMedianAb": [
+          5.738542535779545,
+          8.866765173839076
+        ]
+      },
+      "referenceAppearance": {
+        "lightnessQuantiles": [
+          6.589547620574109,
+          7.913744372364576,
+          10.919592326630966,
+          21.377019825571367,
+          45.213354052967645
+        ],
+        "chromaQuantiles": [
+          0.9388384905926597,
+          5.120682157683601,
+          11.684547738117418,
+          35.97461252445961,
+          65.11167281469828
+        ],
+        "meanLab": [
+          16.998552315701488,
+          12.276576511226526,
+          17.88257949945548
+        ],
+        "medianLab": [
+          10.919592326630966,
+          6.062434659119348,
+          10.180018239317784
+        ],
+        "nearNeutralFraction": 0.0,
+        "nearNeutralMedianAb": null
+      },
+      "referenceDistributionGap": {
+        "toneQuantileMaeL": 18.565573051499065,
+        "chromaQuantileMae": 11.716250359699655,
+        "paletteJensenShannonDistance": 0.7516775015064067,
+        "nearNeutralCastGapAb": null,
+        "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+      },
+      "fileSha256": "62861a3b613f511b352f883533cbe85e72c639cac93bef1852a8db10d8cd8faf"
+    },
+    {
+      "reference": {
+        "name": "vibrant-teal-orange",
+        "photographer": "BULE",
+        "page": "https://www.pexels.com/photo/dramatic-portrait-of-a-woman-in-vibrant-fashion-29653811/",
+        "url": "https://images.pexels.com/photos/29653811/pexels-photo-29653811.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\vibrant-teal-orange.jpg",
+        "width": 3778,
+        "height": 4723,
+        "format": "JPEG",
+        "bytes": 1887966,
+        "sha256": "30081245e70d70ffeedb65a7e895eb1bda122c10d55c80b5a4fe1a8e554b12c6",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      "target": "target-0.jpg",
+      "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\ui-qualified\\export-vibrant-teal-orange\\gallery\\downloaded-reference-matching-verification_0001.jpg",
+      "referenceInfo": {
+        "format": "JPEG",
+        "width": 3778,
+        "height": 4723,
+        "embeddedIcc": false,
+        "exifOrientation": 1,
+        "interpretation": "untagged RGB assumed sRGB"
+      },
+      "exportInfo": {
+        "format": "JPEG",
+        "width": 682,
+        "height": 1024,
+        "embeddedIcc": true,
+        "exifOrientation": 1,
+        "interpretation": "embedded ICC converted to sRGB"
+      },
+      "exportVersusSavedRender": {
+        "rgbMae": 1.288625290200391,
+        "meanDeltaE76": 1.0809383307790748,
+        "p95DeltaE76": 2.6766531517425243,
+        "medianLightnessShift": 0.0,
+        "meanCastShiftA": -0.00048703619303803016,
+        "meanCastShiftB": -0.010616973500590573,
+        "exactPixels": false
+      },
+      "exportedAppearance": {
+        "lightnessQuantiles": [
+          18.85535536199096,
+          33.19141226076142,
+          45.2124554147086,
+          57.055678795503994,
+          69.58544412721052
+        ],
+        "chromaQuantiles": [
+          3.718216461984211,
+          16.679274923136965,
+          25.379994430359787,
+          38.5063789262154,
+          59.17475242320489
+        ],
+        "meanLab": [
+          45.11343066684344,
+          16.138661050389437,
+          16.732874306189935
+        ],
+        "medianLab": [
+          45.2124554147086,
+          13.005614477046997,
+          18.418978359978627
+        ],
+        "nearNeutralFraction": 0.1605743676686217,
+        "nearNeutralMedianAb": [
+          -1.658755241265908,
+          3.3823535939784266
+        ]
+      },
+      "referenceAppearance": {
+        "lightnessQuantiles": [
+          3.633474375119342,
+          15.344479270378113,
+          24.81208055267273,
+          38.900298108724456,
+          63.76299471957503
+        ],
+        "chromaQuantiles": [
+          0.8555182635315011,
+          2.8337017957763497,
+          5.282791656603324,
+          11.3576533040412,
+          80.50904254033081
+        ],
+        "meanLab": [
+          28.252568197213375,
+          5.406631504564567,
+          10.795485659554556
+        ],
+        "medianLab": [
+          24.81208055267273,
+          1.179511531511801,
+          3.204642974923977
+        ],
+        "nearNeutralFraction": 0.4157107469512195,
+        "nearNeutralMedianAb": [
+          1.5697089967591227,
+          4.667473611315742
+        ]
+      },
+      "referenceDistributionGap": {
+        "toneQuantileMaeL": 15.489403786741164,
+        "chromaQuantileMae": 17.057697967773983,
+        "paletteJensenShannonDistance": 0.8390565775982801,
+        "nearNeutralCastGapAb": 3.474840254625758,
+        "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+      },
+      "fileSha256": "2332e595723080cf2dd5a630f42266fccc4b21b07c7dbd25db48f99490fbf24c"
+    },
+    {
+      "reference": {
+        "name": "vibrant-teal-orange",
+        "photographer": "BULE",
+        "page": "https://www.pexels.com/photo/dramatic-portrait-of-a-woman-in-vibrant-fashion-29653811/",
+        "url": "https://images.pexels.com/photos/29653811/pexels-photo-29653811.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\vibrant-teal-orange.jpg",
+        "width": 3778,
+        "height": 4723,
+        "format": "JPEG",
+        "bytes": 1887966,
+        "sha256": "30081245e70d70ffeedb65a7e895eb1bda122c10d55c80b5a4fe1a8e554b12c6",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      "target": "target-1.jpg",
+      "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\ui-qualified\\export-vibrant-teal-orange\\gallery\\downloaded-reference-matching-verification_0002.jpg",
+      "referenceInfo": {
+        "format": "JPEG",
+        "width": 3778,
+        "height": 4723,
+        "embeddedIcc": false,
+        "exifOrientation": 1,
+        "interpretation": "untagged RGB assumed sRGB"
+      },
+      "exportInfo": {
+        "format": "JPEG",
+        "width": 682,
+        "height": 1024,
+        "embeddedIcc": true,
+        "exifOrientation": 1,
+        "interpretation": "embedded ICC converted to sRGB"
+      },
+      "exportVersusSavedRender": {
+        "rgbMae": 1.3099693380376345,
+        "meanDeltaE76": 1.151898421027408,
+        "p95DeltaE76": 2.419223104481913,
+        "medianLightnessShift": 0.0,
+        "meanCastShiftA": -0.021678147177210647,
+        "meanCastShiftB": -0.013901736929878087,
+        "exactPixels": false
+      },
+      "exportedAppearance": {
+        "lightnessQuantiles": [
+          14.664659976585465,
+          22.72633729557041,
+          35.18767636422376,
+          47.03414043575232,
+          70.32059673837229
+        ],
+        "chromaQuantiles": [
+          12.02020772978775,
+          23.50758134305811,
+          32.62719396740707,
+          42.13353645762845,
+          60.934055561298415
+        ],
+        "meanLab": [
+          36.92372338340691,
+          23.151947749163675,
+          22.005996075002926
+        ],
+        "medianLab": [
+          35.18767636422376,
+          19.947535888889064,
+          20.640387287614836
+        ],
+        "nearNeutralFraction": 0.030007102272727272,
+        "nearNeutralMedianAb": [
+          5.748933256071176,
+          8.860879525285249
+        ]
+      },
+      "referenceAppearance": {
+        "lightnessQuantiles": [
+          3.633474375119342,
+          15.344479270378113,
+          24.81208055267273,
+          38.900298108724456,
+          63.76299471957503
+        ],
+        "chromaQuantiles": [
+          0.8555182635315011,
+          2.8337017957763497,
+          5.282791656603324,
+          11.3576533040412,
+          80.50904254033081
+        ],
+        "meanLab": [
+          28.252568197213375,
+          5.406631504564567,
+          10.795485659554556
+        ],
+        "medianLab": [
+          24.81208055267273,
+          1.179511531511801,
+          3.204642974923977
+        ],
+        "nearNeutralFraction": 0.4157107469512195,
+        "nearNeutralMedianAb": [
+          1.5697089967591227,
+          4.667473611315742
+        ]
+      },
+      "referenceDistributionGap": {
+        "toneQuantileMaeL": 8.696016756806916,
+        "chromaQuantileMae": 21.90676829139228,
+        "paletteJensenShannonDistance": 0.8963020436657115,
+        "nearNeutralCastGapAb": 5.920352064610416,
+        "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+      },
+      "fileSha256": "0da8a334556bf3344f21fe3dc2f780bc0fc9a6974afa0b7ec8e7b303c0c56b1f"
+    }
+  ],
+  "matches": [
+    {
+      "reference": {
+        "name": "warm-cinematic",
+        "photographer": "Elis S",
+        "page": "https://www.pexels.com/photo/cinematic-portrait-of-woman-in-warm-lighting-36672685/",
+        "url": "https://images.pexels.com/photos/36672685/pexels-photo-36672685.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\warm-cinematic.jpg",
+        "width": 4000,
+        "height": 6000,
+        "format": "JPEG",
+        "bytes": 2543073,
+        "sha256": "d9b26549f50bbe6d33d2318ada74b28d243b076110272e7f06b6035be40c484e",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      "target": "target-0.jpg",
+      "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+      "attempts": [
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 1,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 18.17626,
+            "changed": 31,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 0.5,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 0.5,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 19.283262,
+            "changed": 6,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 1.5,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 1.5,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 17.512762,
+            "changed": 6,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 17.317205,
+            "changed": 3,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 0.5,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 0.5,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 17.812271,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1.5,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 16.84648,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 0.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1.5,
+              "whiteBalance": 1.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 16.614697,
+            "changed": 1,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 0.5,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 0.5,
+              "tone": 2,
+              "color": 1.5,
+              "whiteBalance": 1.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 18.543127,
+            "changed": 9,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1.5,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 2,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1.5,
+              "whiteBalance": 1.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 16.614697,
+            "changed": 9,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        }
+      ],
+      "analysis": {
+        "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+        "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+        "reference": {
+          "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+          "name": "warm-cinematic.jpg",
+          "width": 4000,
+          "height": 6000,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "face skin",
+          "body skin",
+          "hair",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 21.979147,
+        "afterDistance": 18.115158,
+        "changed": 0,
+        "protectedFields": 0,
+        "fullResolutionChecked": false,
+        "current": true
+      },
+      "before": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\warm-cinematic-target-0.jpg-before.png",
+      "default": {
+        "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+        "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+        "reference": {
+          "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+          "name": "warm-cinematic.jpg",
+          "width": 4000,
+          "height": 6000,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "face skin",
+          "body skin",
+          "hair",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 22.03143,
+        "afterDistance": 18.17626,
+        "changed": 31,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "best": {
+        "sessionId": "9ebdfa11-48c9-4019-a13a-329daaf9ff75",
+        "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+        "reference": {
+          "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+          "name": "warm-cinematic.jpg",
+          "width": 4000,
+          "height": 6000,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 2,
+          "color": 1.5,
+          "whiteBalance": 1.5,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "face skin",
+          "body skin",
+          "hair",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 22.03143,
+        "afterDistance": 16.614697,
+        "changed": 9,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "bestControls": {
+        "amount": 1,
+        "tone": 2,
+        "color": 1.5,
+        "whiteBalance": 1.5,
+        "detail": {
+          "exposure": 1,
+          "contrast": 1,
+          "highlights": 1,
+          "shadows": 1,
+          "whites": 1,
+          "blacks": 1,
+          "curves": 1,
+          "temperature": 1,
+          "tint": 1,
+          "vibrance": 1,
+          "saturation": 1,
+          "hue": 1
+        }
+      },
+      "render": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\warm-cinematic-target-0.jpg-render.png",
+      "exports": [
+        {
+          "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-warm-cinematic-target-0\\jpeg\\target-0.jpg",
+          "sha256": "fa76f9bdb46e125cc0740ade6090fc3d6c9aa0ce7fed4c0017ee0c014bfe063a",
+          "info": {
+            "format": "JPEG",
+            "width": 682,
+            "height": 1024,
+            "embeddedIcc": true,
+            "exifOrientation": 1,
+            "interpretation": "embedded ICC converted to sRGB"
+          },
+          "versusRender": {
+            "rgbMae": 0.9944608954973119,
+            "meanDeltaE76": 0.986290902056934,
+            "p95DeltaE76": 2.374930887741095,
+            "medianLightnessShift": 0.0,
+            "meanCastShiftA": -0.018088493237862775,
+            "meanCastShiftB": 0.016285426935009315,
+            "exactPixels": false
+          },
+          "referenceDistributionGap": {
+            "toneQuantileMaeL": 21.52421159729817,
+            "chromaQuantileMae": 10.782650035583364,
+            "paletteJensenShannonDistance": 0.7875388997810212,
+            "nearNeutralCastGapAb": null,
+            "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+          },
+          "exportedAppearance": {
+            "lightnessQuantiles": [
+              20.187430683582264,
+              32.11513542797062,
+              40.76233672387653,
+              48.87055544066209,
+              57.698857908508
+            ],
+            "chromaQuantiles": [
+              6.49580799004541,
+              22.91607463535223,
+              32.52010758422156,
+              45.544304552414374,
+              64.95603648796175
+            ],
+            "meanLab": [
+              40.2062428875989,
+              18.55752370145868,
+              23.30072236903374
+            ],
+            "medianLab": [
+              40.76233672387653,
+              16.57183731461978,
+              25.068248945353805
+            ],
+            "nearNeutralFraction": 0.10085227272727272,
+            "nearNeutralMedianAb": [
+              -0.7452143757453455,
+              5.530606405172711
+            ]
+          },
+          "sidecarMatchesRecipe": true,
+          "postRunColourMetadataChecked": true
+        },
+        {
+          "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-warm-cinematic-target-0\\png\\target-0.png",
+          "sha256": "e413c858e73110679f6c21d224aea24585c3a71a0579cce5f89c4994649e6b17",
+          "info": {
+            "format": "PNG",
+            "width": 682,
+            "height": 1024,
+            "embeddedIcc": false,
+            "exifOrientation": 1,
+            "srgbRenderingIntent": 0,
+            "interpretation": "PNG sRGB chunk"
+          },
+          "versusRender": {
+            "rgbMae": 0.0,
+            "meanDeltaE76": 0.0,
+            "p95DeltaE76": 0.0,
+            "medianLightnessShift": 0.0,
+            "meanCastShiftA": 0.0,
+            "meanCastShiftB": 0.0,
+            "exactPixels": true
+          },
+          "referenceDistributionGap": {
+            "toneQuantileMaeL": 21.519805966727763,
+            "chromaQuantileMae": 10.794196725188884,
+            "paletteJensenShannonDistance": 0.7854988664286934,
+            "nearNeutralCastGapAb": null,
+            "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+          },
+          "exportedAppearance": {
+            "lightnessQuantiles": [
+              20.157441730933563,
+              32.12465780937452,
+              40.75917016053634,
+              48.895649289575914,
+              57.67536904132712
+            ],
+            "chromaQuantiles": [
+              6.415033130941116,
+              22.970183016242792,
+              32.531896186862326,
+              45.61473619986248,
+              64.95385681180929
+            ],
+            "meanLab": [
+              40.209255150092304,
+              18.572101574229837,
+              23.287204455543698
+            ],
+            "medianLab": [
+              40.75917016053634,
+              16.539870378950937,
+              25.05534375022822
+            ],
+            "nearNeutralFraction": 0.1010069189882698,
+            "nearNeutralMedianAb": [
+              -0.774290384023324,
+              5.421037925058281
+            ]
+          },
+          "sidecarMatchesRecipe": true,
+          "postRunColourMetadataChecked": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "reference": {
+        "name": "warm-cinematic",
+        "photographer": "Elis S",
+        "page": "https://www.pexels.com/photo/cinematic-portrait-of-woman-in-warm-lighting-36672685/",
+        "url": "https://images.pexels.com/photos/36672685/pexels-photo-36672685.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\warm-cinematic.jpg",
+        "width": 4000,
+        "height": 6000,
+        "format": "JPEG",
+        "bytes": 2543073,
+        "sha256": "d9b26549f50bbe6d33d2318ada74b28d243b076110272e7f06b6035be40c484e",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      "target": "target-1.jpg",
+      "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+      "attempts": [
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 1,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.868753,
+            "changed": 33,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 0.5,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 0.5,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 19.29218,
+            "changed": 7,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 1.5,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 1.5,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.55991,
+            "changed": 7,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.350243,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 0.5,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 0.5,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.41045,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1.5,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.24932,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.218166,
+            "changed": 3,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 0.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 0.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.331625,
+            "changed": 2,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 1.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 1.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.212759,
+            "changed": 2,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.192348,
+            "changed": 1,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 0.5,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 0.5,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.868753,
+            "changed": 11,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1.5,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1.5,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 17.741121,
+            "changed": 11,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 2,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 2,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 17.34585,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 2,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+              "name": "warm-cinematic.jpg",
+              "width": 4000,
+              "height": 6000,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 2,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 17.34585,
+            "changed": 0,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        }
+      ],
+      "analysis": {
+        "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+        "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+        "reference": {
+          "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+          "name": "warm-cinematic.jpg",
+          "width": 4000,
+          "height": 6000,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 20.324583,
+        "afterDistance": 18.828228,
+        "changed": 0,
+        "protectedFields": 0,
+        "fullResolutionChecked": false,
+        "current": true
+      },
+      "before": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\warm-cinematic-target-1.jpg-before.png",
+      "default": {
+        "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+        "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+        "reference": {
+          "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+          "name": "warm-cinematic.jpg",
+          "width": 4000,
+          "height": 6000,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 20.376556,
+        "afterDistance": 18.868753,
+        "changed": 33,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "best": {
+        "sessionId": "09575e4b-8449-4f7d-bc55-1f3dda0eb544",
+        "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+        "reference": {
+          "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+          "name": "warm-cinematic.jpg",
+          "width": 4000,
+          "height": 6000,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 2,
+          "tone": 2,
+          "color": 2,
+          "whiteBalance": 2,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 20.376556,
+        "afterDistance": 17.34585,
+        "changed": 0,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "bestControls": {
+        "amount": 2,
+        "tone": 2,
+        "color": 2,
+        "whiteBalance": 2,
+        "detail": {
+          "exposure": 1,
+          "contrast": 1,
+          "highlights": 1,
+          "shadows": 1,
+          "whites": 1,
+          "blacks": 1,
+          "curves": 1,
+          "temperature": 1,
+          "tint": 1,
+          "vibrance": 1,
+          "saturation": 1,
+          "hue": 1
+        }
+      },
+      "render": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\warm-cinematic-target-1.jpg-render.png",
+      "exports": [
+        {
+          "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-warm-cinematic-target-1\\jpeg\\target-1.jpg",
+          "sha256": "3ee4f3c7489bf40e3e6a0521173506cbc56100b70c7b1aeaad66d71a6418fe6a",
+          "info": {
+            "format": "JPEG",
+            "width": 682,
+            "height": 1024,
+            "embeddedIcc": true,
+            "exifOrientation": 1,
+            "interpretation": "embedded ICC converted to sRGB"
+          },
+          "versusRender": {
+            "rgbMae": 0.9426104861620235,
+            "meanDeltaE76": 0.923163138537329,
+            "p95DeltaE76": 1.8305331922346546,
+            "medianLightnessShift": 0.0,
+            "meanCastShiftA": -0.016225452068972142,
+            "meanCastShiftB": -0.020407598845470158,
+            "exactPixels": false
+          },
+          "referenceDistributionGap": {
+            "toneQuantileMaeL": 14.349625863578803,
+            "chromaQuantileMae": 12.361311044001777,
+            "paletteJensenShannonDistance": 0.677758618108928,
+            "nearNeutralCastGapAb": null,
+            "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+          },
+          "exportedAppearance": {
+            "lightnessQuantiles": [
+              12.128952354351696,
+              18.380315700420297,
+              30.182352783320155,
+              41.835011159210836,
+              61.23475551869968
+            ],
+            "chromaQuantiles": [
+              7.3912607081653965,
+              14.081450475049321,
+              19.70274260854716,
+              25.47113880867647,
+              37.239976715840726
+            ],
+            "meanLab": [
+              31.818431447128894,
+              14.761848840331863,
+              12.212912781768901
+            ],
+            "medianLab": [
+              30.182352783320155,
+              12.779394787414939,
+              11.239745494388597
+            ],
+            "nearNeutralFraction": 0.10930054068914956,
+            "nearNeutralMedianAb": [
+              3.970136634143917,
+              7.196979940365633
+            ]
+          },
+          "sidecarMatchesRecipe": true,
+          "postRunColourMetadataChecked": true
+        },
+        {
+          "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-warm-cinematic-target-1\\png\\target-1.png",
+          "sha256": "698a7603fe00736c32c86c6ce0facf6f21084e0ff448535a52359f4aacc2a90a",
+          "info": {
+            "format": "PNG",
+            "width": 682,
+            "height": 1024,
+            "embeddedIcc": false,
+            "exifOrientation": 1,
+            "srgbRenderingIntent": 0,
+            "interpretation": "PNG sRGB chunk"
+          },
+          "versusRender": {
+            "rgbMae": 0.0,
+            "meanDeltaE76": 0.0,
+            "p95DeltaE76": 0.0,
+            "medianLightnessShift": 0.0,
+            "meanCastShiftA": 0.0,
+            "meanCastShiftB": 0.0,
+            "exactPixels": true
+          },
+          "referenceDistributionGap": {
+            "toneQuantileMaeL": 14.375965339222654,
+            "chromaQuantileMae": 12.326136922963588,
+            "paletteJensenShannonDistance": 0.678821859048772,
+            "nearNeutralCastGapAb": null,
+            "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+          },
+          "exportedAppearance": {
+            "lightnessQuantiles": [
+              12.20184035769169,
+              18.403865437792767,
+              30.19026140699141,
+              41.86183465146787,
+              61.23528304027818
+            ],
+            "chromaQuantiles": [
+              7.224824689507845,
+              14.147225928858148,
+              19.74266938110188,
+              25.503679700253166,
+              37.32257263716098
+            ],
+            "meanLab": [
+              31.83036165748927,
+              14.77746107180891,
+              12.234085188941346
+            ],
+            "medianLab": [
+              30.19026140699141,
+              12.787481909040638,
+              11.262233022359958
+            ],
+            "nearNeutralFraction": 0.10966710960410557,
+            "nearNeutralMedianAb": [
+              4.07228039230878,
+              7.28248923414565
+            ]
+          },
+          "sidecarMatchesRecipe": true,
+          "postRunColourMetadataChecked": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "reference": {
+        "name": "vibrant-teal-orange",
+        "photographer": "BULE",
+        "page": "https://www.pexels.com/photo/dramatic-portrait-of-a-woman-in-vibrant-fashion-29653811/",
+        "url": "https://images.pexels.com/photos/29653811/pexels-photo-29653811.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\vibrant-teal-orange.jpg",
+        "width": 3778,
+        "height": 4723,
+        "format": "JPEG",
+        "bytes": 1887966,
+        "sha256": "30081245e70d70ffeedb65a7e895eb1bda122c10d55c80b5a4fe1a8e554b12c6",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      "target": "target-0.jpg",
+      "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+      "attempts": [
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 1,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 20.83679,
+            "changed": 28,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 0.5,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 0.5,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 21.361166,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 1.5,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 1.5,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 20.445267,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 20.094278,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 0.5,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 0.5,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 20.167536,
+            "changed": 2,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 0.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1,
+              "whiteBalance": 0.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 20.088486,
+            "changed": 3,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 1.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 0.5,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 0.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 0.5,
+              "tone": 2,
+              "color": 1,
+              "whiteBalance": 0.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 20.916458,
+            "changed": 6,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1.5,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 0.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 2,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 0.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": false,
+          "error": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30",
+          "noEditSaved": true
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 0.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1,
+              "whiteBalance": 0.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 20.088486,
+            "changed": 6,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        }
+      ],
+      "analysis": {
+        "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+        "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+        "reference": {
+          "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+          "name": "vibrant-teal-orange.jpg",
+          "width": 3778,
+          "height": 4723,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 22.090279,
+        "afterDistance": 20.860422,
+        "changed": 0,
+        "protectedFields": 0,
+        "fullResolutionChecked": false,
+        "current": true
+      },
+      "before": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\vibrant-teal-orange-target-0.jpg-before.png",
+      "default": {
+        "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+        "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+        "reference": {
+          "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+          "name": "vibrant-teal-orange.jpg",
+          "width": 3778,
+          "height": 4723,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 22.08191,
+        "afterDistance": 20.83679,
+        "changed": 28,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "best": {
+        "sessionId": "6758e150-5eb4-4bf6-b75a-00b119c05009",
+        "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+        "reference": {
+          "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+          "name": "vibrant-teal-orange.jpg",
+          "width": 3778,
+          "height": 4723,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 2,
+          "color": 1,
+          "whiteBalance": 0.5,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 22.08191,
+        "afterDistance": 20.088486,
+        "changed": 6,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "bestControls": {
+        "amount": 1,
+        "tone": 2,
+        "color": 1,
+        "whiteBalance": 0.5,
+        "detail": {
+          "exposure": 1,
+          "contrast": 1,
+          "highlights": 1,
+          "shadows": 1,
+          "whites": 1,
+          "blacks": 1,
+          "curves": 1,
+          "temperature": 1,
+          "tint": 1,
+          "vibrance": 1,
+          "saturation": 1,
+          "hue": 1
+        }
+      },
+      "render": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\vibrant-teal-orange-target-0.jpg-render.png",
+      "exports": [
+        {
+          "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-vibrant-teal-orange-target-0\\jpeg\\target-0.jpg",
+          "sha256": "ded2c554eef21235ef99b9916ef0fb9362aa0e16df5088ae7f29913ea2142092",
+          "info": {
+            "format": "JPEG",
+            "width": 682,
+            "height": 1024,
+            "embeddedIcc": true,
+            "exifOrientation": 1,
+            "interpretation": "embedded ICC converted to sRGB"
+          },
+          "versusRender": {
+            "rgbMae": 0.9732385599951124,
+            "meanDeltaE76": 0.9234884852043309,
+            "p95DeltaE76": 2.0766916873354537,
+            "medianLightnessShift": 0.0,
+            "meanCastShiftA": 0.006860137021772676,
+            "meanCastShiftB": -0.02322858339996149,
+            "exactPixels": false
+          },
+          "referenceDistributionGap": {
+            "toneQuantileMaeL": 12.813933252705784,
+            "chromaQuantileMae": 16.80899101053189,
+            "paletteJensenShannonDistance": 0.8361466368910901,
+            "nearNeutralCastGapAb": 3.20762428779174,
+            "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+          },
+          "exportedAppearance": {
+            "lightnessQuantiles": [
+              17.258694565400972,
+              31.00442900467943,
+              42.607958949167866,
+              54.00172446508505,
+              65.65018630566527
+            ],
+            "chromaQuantiles": [
+              3.4707185917221897,
+              15.889531231796706,
+              24.27884967867343,
+              36.77276885646757,
+              56.546290826378886
+            ],
+            "meanLab": [
+              42.46041671508556,
+              15.652148419013669,
+              15.877011820185503
+            ],
+            "medianLab": [
+              42.607958949167866,
+              12.855663196317632,
+              17.484751922390764
+            ],
+            "nearNeutralFraction": 0.16961831011730205,
+            "nearNeutralMedianAb": [
+              -1.4438939643617033,
+              3.5688149908356337
+            ]
+          },
+          "sidecarMatchesRecipe": true,
+          "postRunColourMetadataChecked": true
+        },
+        {
+          "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-vibrant-teal-orange-target-0\\png\\target-0.png",
+          "sha256": "1fa788ec6fbe8a8473d5fa75e01f8f9a8895bd5b4f3ab95bdd444e00054744ed",
+          "info": {
+            "format": "PNG",
+            "width": 682,
+            "height": 1024,
+            "embeddedIcc": false,
+            "exifOrientation": 1,
+            "srgbRenderingIntent": 0,
+            "interpretation": "PNG sRGB chunk"
+          },
+          "versusRender": {
+            "rgbMae": 0.0,
+            "meanDeltaE76": 0.0,
+            "p95DeltaE76": 0.0,
+            "medianLightnessShift": 0.0,
+            "meanCastShiftA": 0.0,
+            "meanCastShiftB": 0.0,
+            "exactPixels": true
+          },
+          "referenceDistributionGap": {
+            "toneQuantileMaeL": 12.805707113711128,
+            "chromaQuantileMae": 16.82707534522484,
+            "paletteJensenShannonDistance": 0.834915806515755,
+            "nearNeutralCastGapAb": 3.1973926290909853,
+            "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+          },
+          "exportedAppearance": {
+            "lightnessQuantiles": [
+              17.235252854168102,
+              31.004457132880603,
+              42.60181687965711,
+              54.01446730052742,
+              65.62586842779207
+            ],
+            "chromaQuantiles": [
+              3.447325845886032,
+              15.902412423123648,
+              24.28912526945444,
+              36.83099162829508,
+              56.513855961013434
+            ],
+            "meanLab": [
+              42.4610746586894,
+              15.647480350765955,
+              15.90090034167693
+            ],
+            "medianLab": [
+              42.60181687965711,
+              12.835348027123466,
+              17.518357823008667
+            ],
+            "nearNeutralFraction": 0.16905127382697946,
+            "nearNeutralMedianAb": [
+              -1.4842070200937474,
+              3.720416809125471
+            ]
+          },
+          "sidecarMatchesRecipe": true,
+          "postRunColourMetadataChecked": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "reference": {
+        "name": "vibrant-teal-orange",
+        "photographer": "BULE",
+        "page": "https://www.pexels.com/photo/dramatic-portrait-of-a-woman-in-vibrant-fashion-29653811/",
+        "url": "https://images.pexels.com/photos/29653811/pexels-photo-29653811.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\vibrant-teal-orange.jpg",
+        "width": 3778,
+        "height": 4723,
+        "format": "JPEG",
+        "bytes": 1887966,
+        "sha256": "30081245e70d70ffeedb65a7e895eb1bda122c10d55c80b5a4fe1a8e554b12c6",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      "target": "target-1.jpg",
+      "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+      "attempts": [
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 1,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.448633,
+            "changed": 31,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 0.5,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 0.5,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.578186,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 1.5,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 1.5,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.311178,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.202106,
+            "changed": 2,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 0.5,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 0.5,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.324259,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1.5,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 1.5,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.138142,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.038086,
+            "changed": 3,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 0.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 0.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.17781,
+            "changed": 2,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 1.5,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 1.5,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.022932,
+            "changed": 2,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 22.999763,
+            "changed": 1,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 0.5,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 0.5,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.448633,
+            "changed": 8,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 1.5,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 1.5,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 22.691319,
+            "changed": 8,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 2,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 2,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 22.419191,
+            "changed": 4,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        },
+        {
+          "controls": {
+            "amount": 2,
+            "tone": 2,
+            "color": 2,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "accepted": true,
+          "match": {
+            "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "reference": {
+              "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+              "name": "vibrant-teal-orange.jpg",
+              "width": 3778,
+              "height": 4723,
+              "convertedIcc": false,
+              "regions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "group": "",
+              "favorite": false
+            },
+            "controls": {
+              "amount": 2,
+              "tone": 2,
+              "color": 2,
+              "whiteBalance": 2,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 22.419191,
+            "changed": 0,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          }
+        }
+      ],
+      "analysis": {
+        "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+        "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+        "reference": {
+          "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+          "name": "vibrant-teal-orange.jpg",
+          "width": 3778,
+          "height": 4723,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 24.42936,
+        "afterDistance": 23.308537,
+        "changed": 0,
+        "protectedFields": 0,
+        "fullResolutionChecked": false,
+        "current": true
+      },
+      "before": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\vibrant-teal-orange-target-1.jpg-before.png",
+      "default": {
+        "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+        "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+        "reference": {
+          "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+          "name": "vibrant-teal-orange.jpg",
+          "width": 3778,
+          "height": 4723,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 24.57448,
+        "afterDistance": 23.448633,
+        "changed": 31,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "best": {
+        "sessionId": "730e0fe1-0366-49cb-ba2a-ecff756d2f9d",
+        "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+        "reference": {
+          "id": "1e28f4aa08a089a46b1fa93ba5b885a3cdca332ae48a5fc3a12b7fd396efc8ba",
+          "name": "vibrant-teal-orange.jpg",
+          "width": 3778,
+          "height": 4723,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false
+        },
+        "controls": {
+          "amount": 2,
+          "tone": 2,
+          "color": 2,
+          "whiteBalance": 2,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 24.57448,
+        "afterDistance": 22.419191,
+        "changed": 0,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "bestControls": {
+        "amount": 2,
+        "tone": 2,
+        "color": 2,
+        "whiteBalance": 2,
+        "detail": {
+          "exposure": 1,
+          "contrast": 1,
+          "highlights": 1,
+          "shadows": 1,
+          "whites": 1,
+          "blacks": 1,
+          "curves": 1,
+          "temperature": 1,
+          "tint": 1,
+          "vibrance": 1,
+          "saturation": 1,
+          "hue": 1
+        }
+      },
+      "render": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\vibrant-teal-orange-target-1.jpg-render.png",
+      "exports": [
+        {
+          "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-vibrant-teal-orange-target-1\\jpeg\\target-1.jpg",
+          "sha256": "f106746b94065fb9fefa938aaff19c9079f35b331a563554b8df7fc32eb8ad0e",
+          "info": {
+            "format": "JPEG",
+            "width": 682,
+            "height": 1024,
+            "embeddedIcc": true,
+            "exifOrientation": 1,
+            "interpretation": "embedded ICC converted to sRGB"
+          },
+          "versusRender": {
+            "rgbMae": 1.0006734749205768,
+            "meanDeltaE76": 0.9656632659116127,
+            "p95DeltaE76": 1.9495646448300068,
+            "medianLightnessShift": 0.0,
+            "meanCastShiftA": -0.011525721254666034,
+            "meanCastShiftB": -0.01676675435765683,
+            "exactPixels": false
+          },
+          "referenceDistributionGap": {
+            "toneQuantileMaeL": 4.5502647380067405,
+            "chromaQuantileMae": 18.505758119943003,
+            "paletteJensenShannonDistance": 0.8248578159979499,
+            "nearNeutralCastGapAb": 3.288863311047794,
+            "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+          },
+          "exportedAppearance": {
+            "lightnessQuantiles": [
+              12.153780706464318,
+              19.32288032431414,
+              31.18798249193486,
+              42.4972236590979,
+              63.48320590445791
+            ],
+            "chromaQuantiles": [
+              7.478294952535517,
+              16.344517081088686,
+              24.050226143368125,
+              32.12688573623043,
+              47.65051083388616
+            ],
+            "meanLab": [
+              32.75467916826996,
+              18.08506225531714,
+              15.066283875876003
+            ],
+            "medianLab": [
+              31.18798249193486,
+              15.318156959379658,
+              14.04745710540195
+            ],
+            "nearNeutralFraction": 0.09251855755131964,
+            "nearNeutralMedianAb": [
+              4.21357577343881,
+              6.62364087050541
+            ]
+          },
+          "sidecarMatchesRecipe": true,
+          "postRunColourMetadataChecked": true
+        },
+        {
+          "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-vibrant-teal-orange-target-1\\png\\target-1.png",
+          "sha256": "ad5a61b4f3d91c3371770aa3a06080936e7e6c98333957ac159cec943a192280",
+          "info": {
+            "format": "PNG",
+            "width": 682,
+            "height": 1024,
+            "embeddedIcc": false,
+            "exifOrientation": 1,
+            "srgbRenderingIntent": 0,
+            "interpretation": "PNG sRGB chunk"
+          },
+          "versusRender": {
+            "rgbMae": 0.0,
+            "meanDeltaE76": 0.0,
+            "p95DeltaE76": 0.0,
+            "medianLightnessShift": 0.0,
+            "meanCastShiftA": 0.0,
+            "meanCastShiftB": 0.0,
+            "exactPixels": true
+          },
+          "referenceDistributionGap": {
+            "toneQuantileMaeL": 4.546021800656362,
+            "chromaQuantileMae": 18.522251057686816,
+            "paletteJensenShannonDistance": 0.8242379292984263,
+            "nearNeutralCastGapAb": 3.24086042675174,
+            "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+          },
+          "exportedAppearance": {
+            "lightnessQuantiles": [
+              12.139775591484062,
+              19.326149545145697,
+              31.192166375709178,
+              42.4961441806054,
+              63.496789102342916
+            ],
+            "chromaQuantiles": [
+              7.378225363698917,
+              16.312681946640843,
+              24.041709416275268,
+              32.24669592248245,
+              47.547434881041845
+            ],
+            "meanLab": [
+              32.75845798038713,
+              18.096625747716953,
+              15.083829998985982
+            ],
+            "medianLab": [
+              31.192166375709178,
+              15.286570013950785,
+              14.093019595726307
+            ],
+            "nearNeutralFraction": 0.09274766312316715,
+            "nearNeutralMedianAb": [
+              4.18269284016104,
+              6.584630814000492
+            ]
+          },
+          "sidecarMatchesRecipe": true,
+          "postRunColourMetadataChecked": true
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "pageErrors": [],
+  "sources": {
+    "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\warm-cinematic.jpg": "d9b26549f50bbe6d33d2318ada74b28d243b076110272e7f06b6035be40c484e",
+    "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\vibrant-teal-orange.jpg": "30081245e70d70ffeedb65a7e895eb1bda122c10d55c80b5a4fe1a8e554b12c6",
+    "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\ui-qualified\\incoming\\target-0.jpg": "73d455203ff7698a7f0f459fb46b72a855fdb42e1bf0438ab62f76c455bebc45",
+    "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\ui-qualified\\incoming\\target-1.jpg": "e0b5ac077e7b94d67798bdd392d52b368f61614deccb7df42b93639b82730c37"
+  },
+  "sourceRun": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\ui-qualified",
+  "executableSha256": "d77e7351c4e736681ab3f1afb79a343588afd0a94a55f031f405b4b723b0f2c5",
+  "scriptSha256": "f2cc214c082cd65e1b7c79cf91ae6ad095b81b9ee9a4004b013dd78deb33196c",
+  "metricsSha256": "7c221d976587e8b8b06e761e8e1e1197f22c3fbcf59af3b7077be9dc8428ac82",
+  "originalsUnchanged": true,
+  "completed": true,
+  "summary": {
+    "pairs": 4,
+    "candidateApplications": 56,
+    "accepted": 45,
+    "explicitlyRefused": 11,
+    "selectedNativeDescriptorImproved": 4,
+    "exactReferenceGradeVerified": false,
+    "calibratedWhiteBalanceVerified": false,
+    "previewExports": 8,
+    "nativeRawExports": 2
+  },
+  "rawExport": {
+    "raw": "H:\\AURA EDIT\\989A2865.CR3",
+    "reference": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\warm-cinematic.jpg",
+    "rawBeforeSha256": "b0c804647a3b066772ad6fb8f056b0c73894d513a3b7265658ca33a66a28e5ae",
+    "referenceSha256": "d9b26549f50bbe6d33d2318ada74b28d243b076110272e7f06b6035be40c484e",
+    "attempts": [
+      {
+        "amount": 1,
+        "accepted": true
+      }
+    ],
+    "exports": [
+      {
+        "file": "F:\\AURA-verification\\aura-export-colour-raw-2026-10-22\\delivery\\jpeg\\989A2865.jpg",
+        "sha256": "3f40da1b55f8db2e44ffef65e49fe54491d46251b9ea9b6b7b9ed485f172069e",
+        "info": {
+          "format": "JPEG",
+          "width": 4480,
+          "height": 6720,
+          "embeddedIcc": true,
+          "exifOrientation": 1,
+          "interpretation": "embedded ICC converted to sRGB"
+        },
+        "versusRender": {
+          "rgbMae": 1.6411995110544217,
+          "meanDeltaE76": 1.839427184069793,
+          "p95DeltaE76": 3.6655529622834386,
+          "medianLightnessShift": 0.10757922059959668,
+          "meanCastShiftA": -0.027657890079449254,
+          "meanCastShiftB": -0.004798813481798005,
+          "exactPixels": false
+        },
+        "allPixelsCompared": false,
+        "jpegSamplingStride": 4,
+        "appearance": {
+          "lightnessQuantiles": [
+            12.282879356797988,
+            18.845339840992317,
+            30.26725779568867,
+            44.19247950120563,
+            70.24398324670591
+          ],
+          "chromaQuantiles": [
+            10.3204915868145,
+            20.573461868656103,
+            28.792704437246044,
+            36.550082178685926,
+            56.33935711157341
+          ],
+          "meanLab": [
+            33.859027524843334,
+            20.307629872429427,
+            19.38382284642196
+          ],
+          "medianLab": [
+            30.26725779568867,
+            16.963817606523754,
+            17.262659385570586
+          ],
+          "nearNeutralFraction": 0.04650843108504399,
+          "nearNeutralMedianAb": [
+            4.9655312955105835,
+            8.840760128304481
+          ]
+        },
+        "referenceDistributionGap": {
+          "toneQuantileMaeL": 16.76373630865637,
+          "chromaQuantileMae": 10.258074972734832,
+          "paletteJensenShannonDistance": 0.7208991733983271,
+          "nearNeutralCastGapAb": null,
+          "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+        },
+        "sidecarMatchesRecipe": true,
+        "postRunColourMetadataChecked": true
+      },
+      {
+        "file": "F:\\AURA-verification\\aura-export-colour-raw-2026-10-22\\delivery\\png\\989A2865.png",
+        "sha256": "452949af52225d09cd073fe8f1769d9e94ad536e2b03206d3686abb2da281571",
+        "info": {
+          "format": "PNG",
+          "width": 4480,
+          "height": 6720,
+          "embeddedIcc": false,
+          "exifOrientation": 1,
+          "srgbRenderingIntent": 0,
+          "interpretation": "PNG sRGB chunk"
+        },
+        "versusRender": {
+          "rgbMae": 0.0,
+          "meanDeltaE76": 0.0,
+          "p95DeltaE76": 0.0,
+          "medianLightnessShift": 0.0,
+          "meanCastShiftA": 0.0,
+          "meanCastShiftB": 0.0,
+          "exactPixels": true
+        },
+        "allPixelsCompared": true,
+        "jpegSamplingStride": null,
+        "appearance": {
+          "lightnessQuantiles": [
+            12.289015303346698,
+            18.86106524692321,
+            30.273718641334575,
+            44.19301725889806,
+            70.2450646457073
+          ],
+          "chromaQuantiles": [
+            10.308026495712658,
+            20.573461868656103,
+            28.83307388564697,
+            36.59660458843265,
+            56.31073192100789
+          ],
+          "meanLab": [
+            33.86505791185778,
+            20.327212402924623,
+            19.396355393387726
+          ],
+          "medianLab": [
+            30.273718641334575,
+            16.971085894985194,
+            17.289395196004627
+          ],
+          "nearNeutralFraction": 0.0466401667888563,
+          "nearNeutralMedianAb": [
+            5.0155473184640975,
+            8.814081549204488
+          ]
+        },
+        "referenceDistributionGap": {
+          "toneQuantileMaeL": 16.769724579620238,
+          "chromaQuantileMae": 10.278685364257097,
+          "paletteJensenShannonDistance": 0.7208019707242458,
+          "nearNeutralCastGapAb": null,
+          "calibratedWhiteBalance": "unverified: no corresponding known-neutral target or original WB recipe"
+        },
+        "sidecarMatchesRecipe": true,
+        "postRunColourMetadataChecked": true
+      }
+    ],
+    "pageErrors": [],
+    "executableSha256": "d77e7351c4e736681ab3f1afb79a343588afd0a94a55f031f405b4b723b0f2c5",
+    "scriptSha256": "9a173c8c5529edbe03d1db0f6b6a1d02ee713eb4479d4c644def4eae81e3833d",
+    "nativeDimensions": {
+      "width": 4480,
+      "height": 6720
+    },
+    "analysis": {
+      "sessionId": "e0c8bdb5-95b3-4d44-b643-423766f5e5e9",
+      "photoId": "pht_01a1622e-20e8-7441-886d-ff8f2df01b75",
+      "reference": {
+        "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+        "name": "warm-cinematic.jpg",
+        "width": 4000,
+        "height": 6000,
+        "convertedIcc": false,
+        "regions": [
+          "whole image",
+          "face skin",
+          "body skin",
+          "hair",
+          "clothes",
+          "background"
+        ],
+        "group": "",
+        "favorite": false
+      },
+      "controls": {
+        "amount": 1,
+        "tone": 1,
+        "color": 1,
+        "whiteBalance": 1,
+        "detail": {
+          "exposure": 1,
+          "contrast": 1,
+          "highlights": 1,
+          "shadows": 1,
+          "whites": 1,
+          "blacks": 1,
+          "curves": 1,
+          "temperature": 1,
+          "tint": 1,
+          "vibrance": 1,
+          "saturation": 1,
+          "hue": 1
+        }
+      },
+      "matchedRegions": [
+        "whole image",
+        "clothes",
+        "background"
+      ],
+      "beforeDistance": 19.88581,
+      "afterDistance": 18.571362,
+      "changed": 0,
+      "protectedFields": 2,
+      "fullResolutionChecked": false,
+      "current": true
+    },
+    "match": {
+      "sessionId": "e0c8bdb5-95b3-4d44-b643-423766f5e5e9",
+      "photoId": "pht_01a1622e-20e8-7441-886d-ff8f2df01b75",
+      "reference": {
+        "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+        "name": "warm-cinematic.jpg",
+        "width": 4000,
+        "height": 6000,
+        "convertedIcc": false,
+        "regions": [
+          "whole image",
+          "face skin",
+          "body skin",
+          "hair",
+          "clothes",
+          "background"
+        ],
+        "group": "",
+        "favorite": false
+      },
+      "controls": {
+        "amount": 1,
+        "tone": 1,
+        "color": 1,
+        "whiteBalance": 1,
+        "detail": {
+          "exposure": 1,
+          "contrast": 1,
+          "highlights": 1,
+          "shadows": 1,
+          "whites": 1,
+          "blacks": 1,
+          "curves": 1,
+          "temperature": 1,
+          "tint": 1,
+          "vibrance": 1,
+          "saturation": 1,
+          "hue": 1
+        }
+      },
+      "matchedRegions": [
+        "whole image",
+        "clothes",
+        "background"
+      ],
+      "beforeDistance": 19.837267,
+      "afterDistance": 18.58432,
+      "changed": 33,
+      "protectedFields": 0,
+      "fullResolutionChecked": true,
+      "current": true
+    },
+    "exportStatus": {
+      "photos": 27,
+      "selected": 0,
+      "requested": 2,
+      "written": 2,
+      "verified": 2,
+      "unverified": 0,
+      "corrupt": 0,
+      "renderFailed": 0,
+      "renamed": 0,
+      "sidecars": 2,
+      "bytes": 60661874,
+      "manifestSealed": true,
+      "ms": 28794
+    },
+    "referenceInfo": {
+      "format": "JPEG",
+      "width": 4000,
+      "height": 6000,
+      "embeddedIcc": false,
+      "exifOrientation": 1,
+      "interpretation": "untagged RGB assumed sRGB"
+    },
+    "referenceAppearance": {
+      "lightnessQuantiles": [
+        6.589547620574109,
+        7.913744372364576,
+        10.919592326630966,
+        21.377019825571367,
+        45.213354052967645
+      ],
+      "chromaQuantiles": [
+        0.9388384905926597,
+        5.120682157683601,
+        11.684547738117418,
+        35.97461252445961,
+        65.11167281469828
+      ],
+      "meanLab": [
+        16.998552315701488,
+        12.276576511226526,
+        17.88257949945548
+      ],
+      "medianLab": [
+        10.919592326630966,
+        6.062434659119348,
+        10.180018239317784
+      ],
+      "nearNeutralFraction": 0.0,
+      "nearNeutralMedianAb": null
+    },
+    "rawAfterSha256": "b0c804647a3b066772ad6fb8f056b0c73894d513a3b7265658ca33a66a28e5ae",
+    "originalsUnchanged": true,
+    "completed": true,
+    "publishedJpegCopy": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\989A2865-reference-matched-full.jpg"
+  },
+  "exportComparisons": [
+    {
+      "reference": "warm-cinematic",
+      "target": "target-0.jpg",
+      "defaultNativeDistance": 18.17626,
+      "selectedNativeDistance": 16.614697,
+      "originalToneGap": 23.7727134777765,
+      "selectedToneGap": 21.52421159729817,
+      "originalChromaGap": 9.865931144737115,
+      "selectedChromaGap": 10.782650035583364,
+      "selectedPaletteDistance": 0.7875388997810212,
+      "jpegMeanDeltaE76VersusRender": 0.986290902056934,
+      "jpegP95DeltaE76VersusRender": 2.374930887741095,
+      "pngExactVersusRender": true,
+      "calibratedWhiteBalanceVerified": false,
+      "jpeg": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-warm-cinematic-target-0\\jpeg\\target-0.jpg",
+      "png": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-warm-cinematic-target-0\\png\\target-0.png"
+    },
+    {
+      "reference": "warm-cinematic",
+      "target": "target-1.jpg",
+      "defaultNativeDistance": 18.868753,
+      "selectedNativeDistance": 17.34585,
+      "originalToneGap": 18.565573051499065,
+      "selectedToneGap": 14.349625863578803,
+      "originalChromaGap": 11.716250359699655,
+      "selectedChromaGap": 12.361311044001777,
+      "selectedPaletteDistance": 0.677758618108928,
+      "jpegMeanDeltaE76VersusRender": 0.923163138537329,
+      "jpegP95DeltaE76VersusRender": 1.8305331922346546,
+      "pngExactVersusRender": true,
+      "calibratedWhiteBalanceVerified": false,
+      "jpeg": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-warm-cinematic-target-1\\jpeg\\target-1.jpg",
+      "png": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-warm-cinematic-target-1\\png\\target-1.png"
+    },
+    {
+      "reference": "vibrant-teal-orange",
+      "target": "target-0.jpg",
+      "defaultNativeDistance": 20.83679,
+      "selectedNativeDistance": 20.088486,
+      "originalToneGap": 15.489403786741164,
+      "selectedToneGap": 12.813933252705784,
+      "originalChromaGap": 17.057697967773983,
+      "selectedChromaGap": 16.80899101053189,
+      "selectedPaletteDistance": 0.8361466368910901,
+      "jpegMeanDeltaE76VersusRender": 0.9234884852043309,
+      "jpegP95DeltaE76VersusRender": 2.0766916873354537,
+      "pngExactVersusRender": true,
+      "calibratedWhiteBalanceVerified": false,
+      "jpeg": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-vibrant-teal-orange-target-0\\jpeg\\target-0.jpg",
+      "png": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-vibrant-teal-orange-target-0\\png\\target-0.png"
+    },
+    {
+      "reference": "vibrant-teal-orange",
+      "target": "target-1.jpg",
+      "defaultNativeDistance": 23.448633,
+      "selectedNativeDistance": 22.419191,
+      "originalToneGap": 8.696016756806916,
+      "selectedToneGap": 4.5502647380067405,
+      "originalChromaGap": 21.90676829139228,
+      "selectedChromaGap": 18.505758119943003,
+      "selectedPaletteDistance": 0.8248578159979499,
+      "jpegMeanDeltaE76VersusRender": 0.9656632659116127,
+      "jpegP95DeltaE76VersusRender": 1.9495646448300068,
+      "pngExactVersusRender": true,
+      "calibratedWhiteBalanceVerified": false,
+      "jpeg": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-vibrant-teal-orange-target-1\\jpeg\\target-1.jpg",
+      "png": "C:\\Users\\Admin\\Documents\\project\\output\\aura-export-colour-2026-10-22\\export-vibrant-teal-orange-target-1\\png\\target-1.png"
+    }
+  ],
+  "verificationCommand": {
+    "command": [
+      "python",
+      "scripts/verify-aura-exported-colour.py",
+      "--output",
+      "output/aura-export-colour-2026-10-22"
+    ],
+    "cwd": "C:\\Users\\Admin\\Documents\\project",
+    "exitCode": 0,
+    "environment": {
+      "CARGO_INCREMENTAL": "0",
+      "AURA_PERF_HOST_SCALE": "6"
+    },
+    "seconds": 154.797
+  },
+  "rawVerificationCommand": {
+    "command": [
+      "python",
+      "scripts/verify-aura-raw-colour-export.py",
+      "--output",
+      "F:/AURA-verification/aura-export-colour-raw-2026-10-22"
+    ],
+    "cwd": "C:\\Users\\Admin\\Documents\\project",
+    "exitCode": 0,
+    "environment": {
+      "CARGO_INCREMENTAL": "0",
+      "AURA_PERF_HOST_SCALE": "6"
+    },
+    "seconds": 286.547
+  },
+  "metricsCurrentSha256": "d41ff1375460747f048e87384e29a70f0f7de96a20d2b3602393cab1f3f85a39"
+}

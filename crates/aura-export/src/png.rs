@@ -206,6 +206,7 @@ mod tests {
             data,
             colour,
             render_hash: "0".repeat(64),
+            recipe_json: None,
         }
     }
 
@@ -296,6 +297,7 @@ mod tests {
             data: Samples::Eight(vec![0; 3]),
             colour: DeliveryColour::Srgb,
             render_hash: "0".repeat(64),
+            recipe_json: None,
         };
         assert!(encode(&bad, &MetadataPolicy::default()).is_err());
     }

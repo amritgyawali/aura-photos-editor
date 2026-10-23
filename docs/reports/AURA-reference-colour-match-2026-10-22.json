@@ -1,0 +1,2090 @@
+{
+  "date": "2026-10-22",
+  "conclusion": "Approximate appearance transfer works; arbitrary exact grade cloning and Evoto parity are not established.",
+  "totals": {
+    "guiSteps": 15,
+    "guiPassed": 15,
+    "internetTransfers": 4,
+    "verifiedJpegs": 4,
+    "independentControlChecks": 20,
+    "controlsAccepted": 16,
+    "controlsExplicitlyRefused": 4,
+    "controlledTransfers": 18,
+    "closerToKnownGrade": 15,
+    "differentPhotoTransfers": 12,
+    "differentPhotoCloser": 9,
+    "pixelExact": 0
+  },
+  "internetRun": "output\\aura-internet-reference-2026-10-22\\ui-qualified",
+  "gui": {
+    "steps": [
+      {
+        "name": "Create collection, import targets and save initial corrections",
+        "passed": true,
+        "result": [
+          "target-0.jpg",
+          "target-1.jpg"
+        ],
+        "seconds": 0.0
+      },
+      {
+        "name": "Single-image matching is directly available in Match a look",
+        "passed": true,
+        "result": true,
+        "seconds": 0.0
+      },
+      {
+        "name": "Cancel native upload without importing another file",
+        "passed": true,
+        "result": {
+          "libraryUnchanged": true
+        },
+        "seconds": 0.42
+      },
+      {
+        "name": "Upload original 4000 by 6000 reference through the native Windows picker",
+        "passed": true,
+        "result": "Entered and confirmed the reference through the owned native Windows dialog.\n",
+        "seconds": 0.33
+      },
+      {
+        "name": "Upload several references through the native Windows picker",
+        "passed": true,
+        "result": "Entered and confirmed the reference through the owned native Windows dialog.\n",
+        "seconds": 0.44
+      },
+      {
+        "name": "Match vibrant-teal-orange onto target-0.jpg, Undo/Redo and remove/restore",
+        "passed": true,
+        "result": {
+          "reference": "vibrant-teal-orange.jpg",
+          "target": "target-0.jpg",
+          "attempts": [
+            {
+              "ok": true,
+              "result": {
+                "sessionId": "72f23b28-d35e-4381-be97-d79decc6600c",
+                "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+                "controls": {
+                  "amount": 1,
+                  "tone": 1,
+                  "color": 1,
+                  "whiteBalance": 1,
+                  "detail": {
+                    "exposure": 1,
+                    "contrast": 1,
+                    "highlights": 1,
+                    "shadows": 1,
+                    "whites": 1,
+                    "blacks": 1,
+                    "curves": 1,
+                    "temperature": 1,
+                    "tint": 1,
+                    "vibrance": 1,
+                    "saturation": 1,
+                    "hue": 1
+                  }
+                },
+                "matchedRegions": [
+                  "whole image",
+                  "clothes",
+                  "background"
+                ],
+                "beforeDistance": 22.08191,
+                "afterDistance": 20.83679,
+                "protectedFields": 0,
+                "fullResolutionChecked": true,
+                "current": true
+              }
+            }
+          ],
+          "acceptedControls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1
+          },
+          "match": {
+            "sessionId": "72f23b28-d35e-4381-be97-d79decc6600c",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "controls": {
+              "amount": 1,
+              "tone": 1,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.08191,
+            "afterDistance": 20.83679,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          },
+          "pixelSha256": "ab98ba776a404550a8e5b7962cb53ab9e425f068826aa5c5b2b352dd97678a0d",
+          "pixelsChanged": true,
+          "undoRedoExact": true,
+          "zeroRestoresExact": true
+        },
+        "seconds": 0.0
+      },
+      {
+        "name": "Match vibrant-teal-orange onto target-1.jpg, Undo/Redo and remove/restore",
+        "passed": true,
+        "result": {
+          "reference": "vibrant-teal-orange.jpg",
+          "target": "target-1.jpg",
+          "attempts": [
+            {
+              "ok": true,
+              "result": {
+                "sessionId": "bd8620ee-5007-419b-967f-b66c8c77414e",
+                "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+                "controls": {
+                  "amount": 1,
+                  "tone": 1,
+                  "color": 1,
+                  "whiteBalance": 1,
+                  "detail": {
+                    "exposure": 1,
+                    "contrast": 1,
+                    "highlights": 1,
+                    "shadows": 1,
+                    "whites": 1,
+                    "blacks": 1,
+                    "curves": 1,
+                    "temperature": 1,
+                    "tint": 1,
+                    "vibrance": 1,
+                    "saturation": 1,
+                    "hue": 1
+                  }
+                },
+                "matchedRegions": [
+                  "whole image",
+                  "clothes",
+                  "background"
+                ],
+                "beforeDistance": 24.57448,
+                "afterDistance": 23.448633,
+                "protectedFields": 0,
+                "fullResolutionChecked": true,
+                "current": true
+              }
+            }
+          ],
+          "acceptedControls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1
+          },
+          "match": {
+            "sessionId": "bd8620ee-5007-419b-967f-b66c8c77414e",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "controls": {
+              "amount": 1,
+              "tone": 1,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 24.57448,
+            "afterDistance": 23.448633,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          },
+          "pixelSha256": "66eecd4708a13b6481b56805b6d59b1f8bf57336c4ac11db3fc2f2f901911bd3",
+          "pixelsChanged": true,
+          "undoRedoExact": true,
+          "zeroRestoresExact": true
+        },
+        "seconds": 0.0
+      },
+      {
+        "name": "Verified JPEG export: vibrant-teal-orange",
+        "passed": true,
+        "result": {
+          "schema": "aura.delivery-manifest/1",
+          "project": "prj_01a16445-2341-71a1-a390-6a9d0b0c391a",
+          "created_at": 0,
+          "verified": true,
+          "file_count": 2,
+          "total_bytes": 434842,
+          "sets": [
+            {
+              "name": "gallery",
+              "files": 2
+            }
+          ],
+          "files": [
+            {
+              "path": "gallery/downloaded-reference-matching-verification_0001.jpg",
+              "bytes": 205100,
+              "blake3": "86aa7b1f0da448cb29369612cdba10126c815147c88e5f8dd68aeb93ee99152a"
+            },
+            {
+              "path": "gallery/downloaded-reference-matching-verification_0002.jpg",
+              "bytes": 229742,
+              "blake3": "8126d271e30bbe1119715dc1d7fc0e1977a77bbb374f761c6ce723f30d15d7e8"
+            }
+          ],
+          "qc_report": null,
+          "cleanup_disclosures": [],
+          "engine_versions": {
+            "app": "1.0.0",
+            "export": "aura-export/1",
+            "recipe_schema": "1"
+          }
+        },
+        "seconds": 0.0
+      },
+      {
+        "name": "Match warm-cinematic onto target-0.jpg, Undo/Redo and remove/restore",
+        "passed": true,
+        "result": {
+          "reference": "warm-cinematic.jpg",
+          "target": "target-0.jpg",
+          "attempts": [
+            {
+              "ok": true,
+              "result": {
+                "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+                "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+                "controls": {
+                  "amount": 1,
+                  "tone": 1,
+                  "color": 1,
+                  "whiteBalance": 1,
+                  "detail": {
+                    "exposure": 1,
+                    "contrast": 1,
+                    "highlights": 1,
+                    "shadows": 1,
+                    "whites": 1,
+                    "blacks": 1,
+                    "curves": 1,
+                    "temperature": 1,
+                    "tint": 1,
+                    "vibrance": 1,
+                    "saturation": 1,
+                    "hue": 1
+                  }
+                },
+                "matchedRegions": [
+                  "whole image",
+                  "face skin",
+                  "body skin",
+                  "hair",
+                  "clothes",
+                  "background"
+                ],
+                "beforeDistance": 22.03143,
+                "afterDistance": 18.17626,
+                "protectedFields": 0,
+                "fullResolutionChecked": true,
+                "current": true
+              }
+            }
+          ],
+          "acceptedControls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1
+          },
+          "match": {
+            "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+            "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+            "controls": {
+              "amount": 1,
+              "tone": 1,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "face skin",
+              "body skin",
+              "hair",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 22.03143,
+            "afterDistance": 18.17626,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          },
+          "pixelSha256": "ef362bf914902ac26fe7c2633fcda8d10d4d2eb33c74c7c1693c029ac5f2b010",
+          "pixelsChanged": true,
+          "undoRedoExact": true,
+          "zeroRestoresExact": true
+        },
+        "seconds": 0.0
+      },
+      {
+        "name": "Match warm-cinematic onto target-1.jpg, Undo/Redo and remove/restore",
+        "passed": true,
+        "result": {
+          "reference": "warm-cinematic.jpg",
+          "target": "target-1.jpg",
+          "attempts": [
+            {
+              "ok": true,
+              "result": {
+                "sessionId": "9bdfced4-1bc0-48e8-af03-62013a4e7ac8",
+                "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+                "controls": {
+                  "amount": 1,
+                  "tone": 1,
+                  "color": 1,
+                  "whiteBalance": 1,
+                  "detail": {
+                    "exposure": 1,
+                    "contrast": 1,
+                    "highlights": 1,
+                    "shadows": 1,
+                    "whites": 1,
+                    "blacks": 1,
+                    "curves": 1,
+                    "temperature": 1,
+                    "tint": 1,
+                    "vibrance": 1,
+                    "saturation": 1,
+                    "hue": 1
+                  }
+                },
+                "matchedRegions": [
+                  "whole image",
+                  "clothes",
+                  "background"
+                ],
+                "beforeDistance": 20.376556,
+                "afterDistance": 18.868753,
+                "protectedFields": 0,
+                "fullResolutionChecked": true,
+                "current": true
+              }
+            }
+          ],
+          "acceptedControls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1
+          },
+          "match": {
+            "sessionId": "9bdfced4-1bc0-48e8-af03-62013a4e7ac8",
+            "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+            "controls": {
+              "amount": 1,
+              "tone": 1,
+              "color": 1,
+              "whiteBalance": 1,
+              "detail": {
+                "exposure": 1,
+                "contrast": 1,
+                "highlights": 1,
+                "shadows": 1,
+                "whites": 1,
+                "blacks": 1,
+                "curves": 1,
+                "temperature": 1,
+                "tint": 1,
+                "vibrance": 1,
+                "saturation": 1,
+                "hue": 1
+              }
+            },
+            "matchedRegions": [
+              "whole image",
+              "clothes",
+              "background"
+            ],
+            "beforeDistance": 20.376556,
+            "afterDistance": 18.868753,
+            "protectedFields": 0,
+            "fullResolutionChecked": true,
+            "current": true
+          },
+          "pixelSha256": "2ef96ac7176dc18288d2eb3784de416dbdd5896ad58c1460b10e4db6f66697b9",
+          "pixelsChanged": true,
+          "undoRedoExact": true,
+          "zeroRestoresExact": true
+        },
+        "seconds": 0.0
+      },
+      {
+        "name": "Verified JPEG export: warm-cinematic",
+        "passed": true,
+        "result": {
+          "schema": "aura.delivery-manifest/1",
+          "project": "prj_01a16445-2341-71a1-a390-6a9d0b0c391a",
+          "created_at": 0,
+          "verified": true,
+          "file_count": 2,
+          "total_bytes": 421024,
+          "sets": [
+            {
+              "name": "gallery",
+              "files": 2
+            }
+          ],
+          "files": [
+            {
+              "path": "gallery/downloaded-reference-matching-verification_0001.jpg",
+              "bytes": 200734,
+              "blake3": "d62ba5a78ccf917936d1d8ad66c44d292f1a34bc780846d66bb50fa0ffbef97f"
+            },
+            {
+              "path": "gallery/downloaded-reference-matching-verification_0002.jpg",
+              "bytes": 220290,
+              "blake3": "084934d6a99d361a2a620da06201d16aa47b72b6c665b85f21c1919f5d645e97"
+            }
+          ],
+          "qc_report": null,
+          "cleanup_disclosures": [],
+          "engine_versions": {
+            "app": "1.0.0",
+            "export": "aura-export/1",
+            "recipe_schema": "1"
+          }
+        },
+        "seconds": 0.0
+      },
+      {
+        "name": "Saved recipes, references and matching strengths survive UI reload",
+        "passed": true,
+        "result": {
+          "photos": 2,
+          "references": 2
+        },
+        "seconds": 0.01
+      },
+      {
+        "name": "All four main strengths and twelve fine controls save or explicitly refuse unsafe combinations",
+        "passed": true,
+        "result": {
+          "tested": 20,
+          "accepted": 16,
+          "refused": 4
+        },
+        "seconds": 0.0
+      },
+      {
+        "name": "A later manual edit invalidates the previous analysis",
+        "passed": true,
+        "result": {
+          "manualExposure": -0.343,
+          "staleApplyDisabled": true
+        },
+        "seconds": 0.0
+      },
+      {
+        "name": "Collection matching measures both photos and preserves a manual exposure",
+        "passed": true,
+        "result": [
+          "target-0.jpg: matched. Appearance distance 18.17 \u2192 17.53.",
+          "target-1.jpg: matched. Appearance distance 20.38 \u2192 19.54."
+        ],
+        "seconds": 0.0
+      }
+    ],
+    "matches": [
+      {
+        "reference": "vibrant-teal-orange.jpg",
+        "target": "target-0.jpg",
+        "attempts": [
+          {
+            "ok": true,
+            "result": {
+              "sessionId": "72f23b28-d35e-4381-be97-d79decc6600c",
+              "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+              "controls": {
+                "amount": 1,
+                "tone": 1,
+                "color": 1,
+                "whiteBalance": 1,
+                "detail": {
+                  "exposure": 1,
+                  "contrast": 1,
+                  "highlights": 1,
+                  "shadows": 1,
+                  "whites": 1,
+                  "blacks": 1,
+                  "curves": 1,
+                  "temperature": 1,
+                  "tint": 1,
+                  "vibrance": 1,
+                  "saturation": 1,
+                  "hue": 1
+                }
+              },
+              "matchedRegions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "beforeDistance": 22.08191,
+              "afterDistance": 20.83679,
+              "protectedFields": 0,
+              "fullResolutionChecked": true,
+              "current": true
+            }
+          }
+        ],
+        "acceptedControls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1
+        },
+        "match": {
+          "sessionId": "72f23b28-d35e-4381-be97-d79decc6600c",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.08191,
+          "afterDistance": 20.83679,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        },
+        "pixelSha256": "ab98ba776a404550a8e5b7962cb53ab9e425f068826aa5c5b2b352dd97678a0d",
+        "pixelsChanged": true,
+        "undoRedoExact": true,
+        "zeroRestoresExact": true
+      },
+      {
+        "reference": "vibrant-teal-orange.jpg",
+        "target": "target-1.jpg",
+        "attempts": [
+          {
+            "ok": true,
+            "result": {
+              "sessionId": "bd8620ee-5007-419b-967f-b66c8c77414e",
+              "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+              "controls": {
+                "amount": 1,
+                "tone": 1,
+                "color": 1,
+                "whiteBalance": 1,
+                "detail": {
+                  "exposure": 1,
+                  "contrast": 1,
+                  "highlights": 1,
+                  "shadows": 1,
+                  "whites": 1,
+                  "blacks": 1,
+                  "curves": 1,
+                  "temperature": 1,
+                  "tint": 1,
+                  "vibrance": 1,
+                  "saturation": 1,
+                  "hue": 1
+                }
+              },
+              "matchedRegions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "beforeDistance": 24.57448,
+              "afterDistance": 23.448633,
+              "protectedFields": 0,
+              "fullResolutionChecked": true,
+              "current": true
+            }
+          }
+        ],
+        "acceptedControls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1
+        },
+        "match": {
+          "sessionId": "bd8620ee-5007-419b-967f-b66c8c77414e",
+          "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 24.57448,
+          "afterDistance": 23.448633,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        },
+        "pixelSha256": "66eecd4708a13b6481b56805b6d59b1f8bf57336c4ac11db3fc2f2f901911bd3",
+        "pixelsChanged": true,
+        "undoRedoExact": true,
+        "zeroRestoresExact": true
+      },
+      {
+        "reference": "warm-cinematic.jpg",
+        "target": "target-0.jpg",
+        "attempts": [
+          {
+            "ok": true,
+            "result": {
+              "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+              "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+              "controls": {
+                "amount": 1,
+                "tone": 1,
+                "color": 1,
+                "whiteBalance": 1,
+                "detail": {
+                  "exposure": 1,
+                  "contrast": 1,
+                  "highlights": 1,
+                  "shadows": 1,
+                  "whites": 1,
+                  "blacks": 1,
+                  "curves": 1,
+                  "temperature": 1,
+                  "tint": 1,
+                  "vibrance": 1,
+                  "saturation": 1,
+                  "hue": 1
+                }
+              },
+              "matchedRegions": [
+                "whole image",
+                "face skin",
+                "body skin",
+                "hair",
+                "clothes",
+                "background"
+              ],
+              "beforeDistance": 22.03143,
+              "afterDistance": 18.17626,
+              "protectedFields": 0,
+              "fullResolutionChecked": true,
+              "current": true
+            }
+          }
+        ],
+        "acceptedControls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1
+        },
+        "match": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.17626,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        },
+        "pixelSha256": "ef362bf914902ac26fe7c2633fcda8d10d4d2eb33c74c7c1693c029ac5f2b010",
+        "pixelsChanged": true,
+        "undoRedoExact": true,
+        "zeroRestoresExact": true
+      },
+      {
+        "reference": "warm-cinematic.jpg",
+        "target": "target-1.jpg",
+        "attempts": [
+          {
+            "ok": true,
+            "result": {
+              "sessionId": "9bdfced4-1bc0-48e8-af03-62013a4e7ac8",
+              "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+              "controls": {
+                "amount": 1,
+                "tone": 1,
+                "color": 1,
+                "whiteBalance": 1,
+                "detail": {
+                  "exposure": 1,
+                  "contrast": 1,
+                  "highlights": 1,
+                  "shadows": 1,
+                  "whites": 1,
+                  "blacks": 1,
+                  "curves": 1,
+                  "temperature": 1,
+                  "tint": 1,
+                  "vibrance": 1,
+                  "saturation": 1,
+                  "hue": 1
+                }
+              },
+              "matchedRegions": [
+                "whole image",
+                "clothes",
+                "background"
+              ],
+              "beforeDistance": 20.376556,
+              "afterDistance": 18.868753,
+              "protectedFields": 0,
+              "fullResolutionChecked": true,
+              "current": true
+            }
+          }
+        ],
+        "acceptedControls": {
+          "amount": 1,
+          "tone": 1,
+          "color": 1,
+          "whiteBalance": 1
+        },
+        "match": {
+          "sessionId": "9bdfced4-1bc0-48e8-af03-62013a4e7ac8",
+          "photoId": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 20.376556,
+          "afterDistance": 18.868753,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        },
+        "pixelSha256": "2ef96ac7176dc18288d2eb3784de416dbdd5896ad58c1460b10e4db6f66697b9",
+        "pixelsChanged": true,
+        "undoRedoExact": true,
+        "zeroRestoresExact": true
+      }
+    ],
+    "pageErrors": [],
+    "downloadedReferences": [
+      {
+        "name": "warm-cinematic",
+        "photographer": "Elis S",
+        "page": "https://www.pexels.com/photo/cinematic-portrait-of-woman-in-warm-lighting-36672685/",
+        "url": "https://images.pexels.com/photos/36672685/pexels-photo-36672685.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\warm-cinematic.jpg",
+        "width": 4000,
+        "height": 6000,
+        "format": "JPEG",
+        "bytes": 2543073,
+        "sha256": "d9b26549f50bbe6d33d2318ada74b28d243b076110272e7f06b6035be40c484e",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      },
+      {
+        "name": "vibrant-teal-orange",
+        "photographer": "BULE",
+        "page": "https://www.pexels.com/photo/dramatic-portrait-of-a-woman-in-vibrant-fashion-29653811/",
+        "url": "https://images.pexels.com/photos/29653811/pexels-photo-29653811.jpeg?cs=srgb&fm=jpg",
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\vibrant-teal-orange.jpg",
+        "width": 3778,
+        "height": 4723,
+        "format": "JPEG",
+        "bytes": 1887966,
+        "sha256": "30081245e70d70ffeedb65a7e895eb1bda122c10d55c80b5a4fe1a8e554b12c6",
+        "license": "Pexels License",
+        "licenseUrl": "https://www.pexels.com/license/"
+      }
+    ],
+    "executableSha256": "d77e7351c4e736681ab3f1afb79a343588afd0a94a55f031f405b4b723b0f2c5",
+    "scriptSha256": "1fa215b970231e162977d69ae92bdd4dfca0ddec77059a2dd83a3522dc0f1bd0",
+    "selectorSha256": "3d38e128a9791aa2f730e5c5f8cefabf80b23ccd37b9e9e5d73b71a8cd2dc5e3",
+    "projectId": "prj_01a16445-2341-71a1-a390-6a9d0b0c391a",
+    "photos": [
+      {
+        "id": "pht_01a16445-2427-7252-a722-221892aee8c2",
+        "fileName": "target-0.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      },
+      {
+        "id": "pht_01a16445-2427-7252-a722-22354e58b6c7",
+        "fileName": "target-1.jpg",
+        "timelineTs": null,
+        "cameraId": null,
+        "width": 0,
+        "height": 0,
+        "status": "indexed"
+      }
+    ],
+    "controls": [
+      {
+        "control": "amount",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 0,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 22.03143,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "amount",
+        "value": 2,
+        "ok": false,
+        "error": "Edit could not be saved: This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again. Dismiss edit error"
+      },
+      {
+        "control": "tone",
+        "value": 0,
+        "ok": false,
+        "error": "Edit could not be saved: This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again. Dismiss edit error"
+      },
+      {
+        "control": "tone",
+        "value": 2,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 2,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 17.317205,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "color",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 0,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 19.085869,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "color",
+        "value": 2,
+        "ok": false,
+        "error": "Edit could not be saved: This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again. Dismiss edit error"
+      },
+      {
+        "control": "whiteBalance",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 0,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.659643,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "whiteBalance",
+        "value": 2,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 2,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 17.761673,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.exposure",
+        "value": 0,
+        "ok": false,
+        "error": "Edit could not be saved: This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again. Dismiss edit error"
+      },
+      {
+        "control": "detail.contrast",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 0,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.179325,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.highlights",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 0,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.17626,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.shadows",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 0,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.17626,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.whites",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 0,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.27624,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.blacks",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 0,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.264502,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.curves",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 0,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.17626,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.temperature",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 0,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.659643,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.tint",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 0,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.17626,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.vibrance",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 0,
+              "saturation": 1,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.296694,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.saturation",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 0,
+              "hue": 1
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.976221,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      },
+      {
+        "control": "detail.hue",
+        "value": 0,
+        "ok": true,
+        "result": {
+          "sessionId": "9033700f-e010-4111-a0be-4a6eaf935cc4",
+          "photoId": "pht_01a16445-2427-7252-a722-221892aee8c2",
+          "controls": {
+            "amount": 1,
+            "tone": 1,
+            "color": 1,
+            "whiteBalance": 1,
+            "detail": {
+              "exposure": 1,
+              "contrast": 1,
+              "highlights": 1,
+              "shadows": 1,
+              "whites": 1,
+              "blacks": 1,
+              "curves": 1,
+              "temperature": 1,
+              "tint": 1,
+              "vibrance": 1,
+              "saturation": 1,
+              "hue": 0
+            }
+          },
+          "matchedRegions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "beforeDistance": 22.03143,
+          "afterDistance": 18.17626,
+          "protectedFields": 0,
+          "fullResolutionChecked": true,
+          "current": true
+        }
+      }
+    ],
+    "originalsUnchanged": true,
+    "completed": true
+  },
+  "controlledCases": [
+    {
+      "style": "warm",
+      "target": "0.png",
+      "sameImage": true,
+      "beforeMeanCie76": 10.189124107020676,
+      "afterMeanCie76": 6.047526050576415,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "warm",
+      "target": "1.png",
+      "sameImage": false,
+      "beforeMeanCie76": 9.094389483576823,
+      "afterMeanCie76": 7.90307747839786,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "warm",
+      "target": "2.png",
+      "sameImage": false,
+      "beforeMeanCie76": 8.39213554388456,
+      "afterMeanCie76": 5.7953641128684845,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "cool",
+      "target": "0.png",
+      "sameImage": true,
+      "beforeMeanCie76": 11.988337709021998,
+      "afterMeanCie76": 7.614820891561203,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "cool",
+      "target": "1.png",
+      "sameImage": false,
+      "beforeMeanCie76": 10.742176761303853,
+      "afterMeanCie76": 5.567375018608536,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "cool",
+      "target": "2.png",
+      "sameImage": false,
+      "beforeMeanCie76": 10.009693669965545,
+      "afterMeanCie76": 6.797929595168525,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "matte",
+      "target": "0.png",
+      "sameImage": true,
+      "beforeMeanCie76": 5.976155051060538,
+      "afterMeanCie76": 2.8127723040122876,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "matte",
+      "target": "1.png",
+      "sameImage": false,
+      "beforeMeanCie76": 8.075839630733489,
+      "afterMeanCie76": 2.8229953633475353,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "matte",
+      "target": "2.png",
+      "sameImage": false,
+      "beforeMeanCie76": 7.3695347259554085,
+      "afterMeanCie76": 5.657869514977115,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "split-tone",
+      "target": "0.png",
+      "sameImage": true,
+      "beforeMeanCie76": 2.4470439773575126,
+      "afterMeanCie76": 2.2942472200489443,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "split-tone",
+      "target": "1.png",
+      "sameImage": false,
+      "beforeMeanCie76": 3.268039662744154,
+      "afterMeanCie76": 5.629220856092031,
+      "closerToKnownGrade": false,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "split-tone",
+      "target": "2.png",
+      "sameImage": false,
+      "beforeMeanCie76": 2.978437806878396,
+      "afterMeanCie76": 4.0263910653762505,
+      "closerToKnownGrade": false,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "punchy",
+      "target": "0.png",
+      "sameImage": true,
+      "beforeMeanCie76": 7.754446648308695,
+      "afterMeanCie76": 5.018819987119871,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "punchy",
+      "target": "1.png",
+      "sameImage": false,
+      "beforeMeanCie76": 10.467763561097007,
+      "afterMeanCie76": 11.782429921795046,
+      "closerToKnownGrade": false,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "punchy",
+      "target": "2.png",
+      "sameImage": false,
+      "beforeMeanCie76": 8.320260757784526,
+      "afterMeanCie76": 5.635198910847715,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "monochrome",
+      "target": "0.png",
+      "sameImage": true,
+      "beforeMeanCie76": 30.516333173190187,
+      "afterMeanCie76": 26.933145173935838,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "monochrome",
+      "target": "1.png",
+      "sameImage": false,
+      "beforeMeanCie76": 39.74611567825135,
+      "afterMeanCie76": 24.94504098598414,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    },
+    {
+      "style": "monochrome",
+      "target": "2.png",
+      "sameImage": false,
+      "beforeMeanCie76": 31.129773956653963,
+      "afterMeanCie76": 27.48601455844095,
+      "closerToKnownGrade": true,
+      "exactPixels": false,
+      "amount": 1,
+      "functionalPass": true,
+      "zeroRestoresExact": true
+    }
+  ],
+  "controlledMetric": "CIE76 per aligned pixel against the known grade on this target; lower is closer, not a perfection percentage",
+  "formats": [
+    {
+      "file": "reference-srgb-profile.png",
+      "passed": true,
+      "accepted": true,
+      "convertedIcc": true
+    },
+    {
+      "file": "unsupported.webp",
+      "passed": true,
+      "accepted": false,
+      "reason": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"Choose a JPEG, PNG or TIFF reference image.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30"
+    },
+    {
+      "file": "transparent.png",
+      "passed": true,
+      "accepted": false,
+      "reason": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"Use an opaque edited photo as the colour reference.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30"
+    },
+    {
+      "file": "corrupt.jpg",
+      "passed": true,
+      "accepted": false,
+      "reason": "Page.evaluate: Error: {\"code\":\"AURA-ML-5146\",\"message\":\"Choose a JPEG, PNG or TIFF reference image.\",\"retryable\":false,\"runbookUrl\":\"https://aura.app/e/AURA-ML-5146\"}\n    at eval (eval at evaluate (:311:30), <anonymous>:3:36)\n    at async <anonymous>:337:30"
+    }
+  ],
+  "rawTest": {
+    "sessionId": "bbd63a38-d312-4579-b6d8-2319444ecaa4",
+    "photoId": "pht_01a16438-a93d-71e0-80b4-94da4ac8033d",
+    "reference": {
+      "id": "44f0c05ed7542457354c0b2ff30ec34b84d5c4169ec94318bda88011557e1303",
+      "name": "warm-cinematic.jpg",
+      "width": 4000,
+      "height": 6000,
+      "convertedIcc": false,
+      "regions": [
+        "whole image",
+        "face skin",
+        "body skin",
+        "hair",
+        "clothes",
+        "background"
+      ],
+      "group": "",
+      "favorite": false
+    },
+    "controls": {
+      "amount": 0.5,
+      "tone": 1.0,
+      "color": 1.0,
+      "whiteBalance": 1.0,
+      "detail": {
+        "exposure": 1.0,
+        "contrast": 1.0,
+        "highlights": 1.0,
+        "shadows": 1.0,
+        "whites": 1.0,
+        "blacks": 1.0,
+        "curves": 1.0,
+        "temperature": 1.0,
+        "tint": 1.0,
+        "vibrance": 1.0,
+        "saturation": 1.0,
+        "hue": 1.0
+      }
+    },
+    "matchedRegions": [
+      "whole image",
+      "clothes",
+      "background"
+    ],
+    "beforeDistance": 20.367283,
+    "afterDistance": 19.539862,
+    "changed": 32,
+    "protectedFields": 0,
+    "fullResolutionChecked": true,
+    "current": true
+  },
+  "rawInputs": {
+    "raw": "H:\\AURA EDIT\\989A2865.CR3",
+    "reference": "C:\\Users\\Admin\\Documents\\project\\output\\aura-internet-reference-2026-10-22\\warm-cinematic.jpg",
+    "rawBeforeSha256": "b0c804647a3b066772ad6fb8f056b0c73894d513a3b7265658ca33a66a28e5ae",
+    "referenceSha256": "d9b26549f50bbe6d33d2318ada74b28d243b076110272e7f06b6035be40c484e",
+    "exitCode": 0,
+    "rawAfterSha256": "b0c804647a3b066772ad6fb8f056b0c73894d513a3b7265658ca33a66a28e5ae",
+    "originalUnchanged": true
+  },
+  "checks": {
+    "ui-tests-retry": {
+      "command": [
+        "npm.cmd",
+        "--prefix",
+        "ui",
+        "run",
+        "test",
+        "--",
+        "--run"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 58.547
+    },
+    "ui-build": {
+      "command": [
+        "npm.cmd",
+        "--prefix",
+        "ui",
+        "run",
+        "build"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 14.156
+    },
+    "desktop-build": {
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "ui/src-tauri/Cargo.toml",
+        "--target-dir",
+        "target/desktop-launch",
+        "--features",
+        "custom-protocol",
+        "-j",
+        "2"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 69.422
+    },
+    "native-raw-reference": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "aura-app",
+        "--test",
+        "color_reference_match",
+        "native_raw_reference_match_does_not_touch_originals",
+        "--",
+        "--ignored",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 162.11
+    },
+    "native-reference-integration": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "aura-app",
+        "--test",
+        "color_reference_match"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 20.313
+    },
+    "desktop-ui-qualified": {
+      "command": [
+        "python",
+        "scripts/verify-aura-internet-color-match.py",
+        "--references",
+        "output/aura-internet-reference-2026-10-22",
+        "--output",
+        "output/aura-internet-reference-2026-10-22/ui-qualified",
+        "--port",
+        "9764"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 233.313
+    }
+  },
+  "controlledExecutableSha256": "e6d5618879b90b6b181805bc143c15c469e8ffa0711fcda5f0f7e7620be29d9e",
+  "sourceSha256": {
+    "ui/src/App.tsx": "817bc04f37d0cf77164b3b5b1b96abeec1badeaffcdc17902462f1f3f2808ec7",
+    "ui/src/components/develop/PhotoStudio.tsx": "ba1b4f5a45ba662be4d4f1a6d1851783d3cc0f29dfd1fd9d0e9c75327564952d",
+    "ui/src/components/develop/PhotoStudio.test.tsx": "338fd98bc3e80d6eab3417ef0bee6537917bc4f21348ab0ffa37a171f3371a66",
+    "scripts/verify-aura-internet-color-match.py": "1fa215b970231e162977d69ae92bdd4dfca0ddec77059a2dd83a3522dc0f1bd0",
+    "scripts/select-native-reference.py": "3d38e128a9791aa2f730e5c5f8cefabf80b23ccd37b9e9e5d73b71a8cd2dc5e3",
+    "scripts/audit-aura-reference-grades.py": "202c52f3efab23822c4f9ac46ff1d211b5e81c4d74ca4205d59e9325463189a3",
+    "scripts/report-aura-reference-match.py": "fc14093fa265a40d9c1b88c1b72ff3b2ac77bb1e462b95764320a2a49f9a2357"
+  }
+}

@@ -176,6 +176,47 @@ pub(super) fn skin_preserved(before: &[Region], after: &[Region]) -> bool {
     })
 }
 
+/// A genuinely achromatic reference requests removal of chroma. Preserve each
+/// person's tone and reject new casts while allowing movement toward neutral.
+/// Ordinary colour references always use the stricter colour-preservation guard.
+pub(super) fn skin_preserved_achromatic(before: &[Region], after: &[Region]) -> bool {
+    let toward_neutral = |a: aura_core::contract::look::ZoneTint,
+                          b: aura_core::contract::look::ZoneTint| {
+        let norm = a.a * a.a + a.b * a.b;
+        let projection = if norm > 0.0001 {
+            ((a.a * b.a + a.b * b.b) / norm).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        (b.a - a.a * projection).hypot(b.b - a.b * projection) <= 2.0
+    };
+    before.iter().filter(|r| r.name.ends_with("skin")).all(|a| {
+        after.iter().find(|b| b.name == a.name).is_some_and(|b| {
+            a.appearance
+                .tone
+                .as_array()
+                .iter()
+                .zip(b.appearance.tone.as_array())
+                .all(|(x, y)| (x - y).abs() <= 0.12)
+                && b.appearance.chroma_p50 <= a.appearance.chroma_p50 + 0.5 / 128.0
+                && b.appearance.chroma_p90 <= a.appearance.chroma_p90 + 0.5 / 128.0
+                && toward_neutral(a.appearance.shadow, b.appearance.shadow)
+                && toward_neutral(a.appearance.mid, b.appearance.mid)
+                && toward_neutral(a.appearance.high, b.appearance.high)
+        })
+    })
+}
+
+pub(super) fn achromatic_reference(regions: &[Region]) -> bool {
+    regions
+        .iter()
+        .find(|r| r.name == "whole image")
+        .is_some_and(|r| {
+            r.appearance.chroma_p90 * 128.0 <= 0.75
+                && r.appearance.mid.a.hypot(r.appearance.mid.b) <= 0.75
+        })
+}
+
 pub(super) fn clipped(image: &Rgb8) -> f32 {
     let total = image.data.len() / 3;
     if total == 0 {
@@ -214,5 +255,37 @@ mod tests {
         after[2] = region("guard:person-1 face skin", [150, 60, 45]);
         assert!(skin_preserved(&before, &before));
         assert!(!skin_preserved(&before, &after));
+    }
+
+    #[test]
+    fn achromatic_intent_allows_desaturation_but_rejects_casts_and_person_damage() {
+        let before = vec![
+            region("face skin", [140, 110, 85]),
+            region("guard:person-0 face skin", [140, 110, 85]),
+        ];
+        let neutral = vec![
+            region("face skin", [116, 116, 116]),
+            region("guard:person-0 face skin", [116, 116, 116]),
+        ];
+        assert!(!skin_preserved(&before, &neutral));
+        assert!(skin_preserved_achromatic(&before, &neutral));
+        let mut damaged = neutral.clone();
+        damaged[1] = region("guard:person-0 face skin", [20, 20, 20]);
+        assert!(!skin_preserved_achromatic(&before, &damaged));
+        damaged[1] = region("guard:person-0 face skin", [90, 120, 130]);
+        assert!(!skin_preserved_achromatic(&before, &damaged));
+    }
+
+    #[test]
+    fn only_nearly_achromatic_references_enable_the_achromatic_guard() {
+        assert!(achromatic_reference(&[region(
+            "whole image",
+            [120, 120, 120]
+        )]));
+        assert!(!achromatic_reference(&[region(
+            "whole image",
+            [120, 118, 115]
+        )]));
+        assert!(!achromatic_reference(&[]));
     }
 }

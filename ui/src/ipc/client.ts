@@ -130,6 +130,7 @@ export async function pickImportPaths(directory: boolean): Promise<string[]> {
 export type ReferenceAnalysis = {
   id: string; origin: string; measured: number; skipped: number; colors: string[];
   brightness: number; contrast: number; warmth: number; saturation: number;
+  calibration?: { trainingSamples: number; validationSamples: number; meanError: number; p95Error: number; occupiedColorCells: number };
 };
 export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
 export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
@@ -206,9 +207,9 @@ export async function pickLightroomCatalog(): Promise<string | null> {
 
 export const referenceStyle = {
   /** Measure a folder of reference photos, or an Instagram data export when `fromExport`. Nothing is downloaded. */
-  analyse: (address: string, folder: string, cancelId: string, fromExport = false) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId, export: fromExport } }),
-  apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null) => invoke<ApplyReport>('apply_reference_style', {
-    input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null } }),
+  analyse: (address: string, folder: string, cancelId: string, fromExport = false, original?: string) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId, export: fromExport, ...(original ? { original } : {}) } }),
+  apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null, cancelId?: string) => invoke<ApplyReport>('apply_reference_style', {
+    input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null, cancelId: cancelId ?? null } }),
 };
 
 export type PairedReferenceReport = {
