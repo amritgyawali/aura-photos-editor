@@ -100,10 +100,14 @@ fn unrelated_reframed_and_local_edit_pairs_are_refused() {
 #[test]
 fn calibration_is_deterministic_and_cancelled_work_is_not_published() {
     let original = chart(1, |rgb| rgb);
-    let edited = chart(1, |rgb| grade(rgb, 0));
-    let (one, _) = fit(&original, &edited, &CancelToken::new()).unwrap();
-    let (two, _) = fit(&original, &edited, &CancelToken::new()).unwrap();
-    assert_eq!(one, two);
+    let simple = |rgb| grade(rgb, 0);
+    for operation in [simple as fn([f32; 3]) -> [f32; 3], detailed_grade] {
+        let edited = chart(1, operation);
+        let (one, _) = fit(&original, &edited, &CancelToken::new()).unwrap();
+        let (two, _) = fit(&original, &edited, &CancelToken::new()).unwrap();
+        assert_eq!(one, two);
+    }
+    let edited = chart(1, detailed_grade);
     let cancelled = CancelToken::new();
     cancelled.cancel();
     assert!(fit(&original, &edited, &cancelled).is_err());
@@ -143,4 +147,70 @@ fn nonlinear_linear_light_wb_and_s_curve_transfer_to_a_different_palette() {
             "{name}: {before} -> {after}"
         );
     }
+}
+
+fn detailed_grade(rgb: [f32; 3]) -> [f32; 3] {
+    let [r, g, b] = rgb;
+    let teal = (-((r - 0.2).powi(2) + (g - 0.65).powi(2) + (b - 0.35).powi(2)) / 0.04).exp();
+    [r - 0.04 * teal, g + 0.02 * teal, b + 0.08 * teal]
+        .map(|v| v + 0.035 * (2.0 * std::f32::consts::TAU * v).sin())
+}
+
+#[test]
+fn a_detailed_colour_grade_generalises_beyond_the_cubic_model() {
+    let original = chart(1, |rgb| rgb);
+    let edited = chart(1, detailed_grade);
+    let rows = pairs(&original, &edited).unwrap();
+    let mut cells = [0; 64];
+    for row in rows.iter().filter(|row| row.partition == Partition::Train) {
+        cells[row.cell] += 1;
+    }
+    let cubic = Evaluator::new(&train(&rows, &cells, &CancelToken::new()).unwrap());
+    let (model, report) = fit(&original, &edited, &CancelToken::new()).unwrap();
+    let learned = Evaluator::new(&model);
+    let target = chart(73, |[r, g, b]| {
+        [0.1 + 0.8 * b, 0.1 + 0.8 * r, 0.1 + 0.8 * g]
+    });
+    let mut base_error = 0.0;
+    let mut learned_error = 0.0;
+    for p in target.data.chunks_exact(3) {
+        let rgb = [p[0], p[1], p[2]].map(|v| f32::from(v) / 255.0);
+        let truth = detailed_grade(rgb);
+        base_error += pixel_error(cubic.encoded_srgb(rgb), truth);
+        learned_error += pixel_error(learned.encoded_srgb(rgb), truth);
+    }
+    let count = (target.width * target.height) as f32;
+    base_error /= count;
+    learned_error /= count;
+    println!("detailed held-out grade: cubic {base_error:.4}, adaptive {learned_error:.4}; final validation {:.4}, p95 {:.4}", report.mean_error, report.p95_error);
+    assert!(report.residual_refined);
+    assert!(learned_error < 0.35 && learned_error < 0.4 * base_error);
+    assert_eq!(
+        report.training_samples + report.selection_samples + report.validation_samples,
+        rows.len()
+    );
+}
+
+#[test]
+fn a_neutral_ramp_alone_cannot_qualify_unstable_colour_extrapolation() {
+    let mut model = CalibratedLook {
+        version: 2,
+        coefficients: vec![[0.0; 3]; TERMS],
+        amount: 1.0,
+        residual_lut: Some(aura_recipe::calibrated_look::ResidualLut {
+            values: vec![[0.0; 3]; aura_recipe::calibrated_look::RESIDUAL_NODES],
+        }),
+    };
+    model.coefficients[1][0] = 8.0;
+    model.coefficients[2][0] = -8.0;
+    model.validate().unwrap();
+    let evaluator = Evaluator::new(&model);
+    assert!(
+        tone_ordered(&evaluator),
+        "the red/green residual cancels on grey"
+    );
+    assert!(
+        !colour_stable(&evaluator),
+        "tiny red/green differences amplify excessively off the neutral axis"
+    );
 }
