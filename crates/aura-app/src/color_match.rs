@@ -26,6 +26,8 @@ mod content;
 pub use calibration::CalibrationReport;
 mod fine;
 pub use fine::FineControls;
+mod quality;
+pub use quality::MatchQuality;
 pub(crate) mod gallery_fit;
 mod grade;
 mod library;
@@ -140,6 +142,8 @@ pub struct ReferenceSummary {
     pub default_controls: Option<Controls>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thumbnail: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Reference {
@@ -185,6 +189,12 @@ struct Session {
 #[serde(rename_all = "camelCase")]
 pub struct FitDiagnostics {
     pub engine: String,
+    #[serde(default)]
+    pub quality: MatchQuality,
+    #[serde(default)]
+    pub target_samples: usize,
+    #[serde(default)]
+    pub max_iterations: usize,
     pub refinement_candidates: usize,
     pub unique_renders: usize,
     pub cached_proposals: usize,
@@ -214,6 +224,8 @@ pub struct PrepareInput {
     pub photo_id: String,
     pub reference_id: String,
     pub cancel_id: String,
+    #[serde(default)]
+    pub quality: MatchQuality,
 }
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -363,6 +375,7 @@ fn new_summary(
         favorite: false,
         default_controls: None,
         thumbnail: None,
+        preview: None,
     }
 }
 
@@ -378,9 +391,17 @@ fn persist_reference(
     if let Some(mut existing) = read::<Reference>(state, &key)? {
         if existing.engine == ENGINE {
             if existing.summary.thumbnail.is_some() {
+                let mut updated = false;
                 if existing.small_rgb.len() != content::BYTES {
                     existing.small_rgb = content::thumbnail(image);
                     existing.achromatic = content::achromatic(image);
+                    updated = true;
+                }
+                if existing.summary.preview.is_none() {
+                    existing.summary.preview = Some(reference_preview(image)?);
+                    updated = true;
+                }
+                if updated {
                     store(state, &key, &existing)?;
                 }
                 return Ok(existing.summary);
@@ -408,6 +429,7 @@ fn persist_reference(
         "data:image/png;base64,{}",
         crate::develop_commands::base64(&bytes)
     ));
+    summary.preview = Some(reference_preview(image)?);
     let regions = regions
         .into_iter()
         .map(|mut r| {
@@ -428,6 +450,34 @@ fn persist_reference(
         },
     )?;
     Ok(summary)
+}
+
+/// Locally stored comparison image; portable libraries deliberately export descriptors only.
+/// Bound each JPEG to 32 KiB so 128 references still fit the library metadata budget.
+fn reference_preview(image: &Rgb8) -> AuraResult<String> {
+    let rgb = image::RgbImage::from_raw(image.width, image.height, image.data.clone())
+        .ok_or_else(|| invalid("Reference preview dimensions are invalid."))?;
+    for edge in [512, 384, 256, 128] {
+        let small = image::imageops::thumbnail(&rgb, edge, edge);
+        let mut bytes = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 82)
+            .encode(
+                small.as_raw(),
+                small.width(),
+                small.height(),
+                image::ExtendedColorType::Rgb8,
+            )
+            .map_err(|_| invalid("Cannot save the reference comparison preview."))?;
+        if bytes.len() <= 32 * 1024 {
+            return Ok(format!(
+                "data:image/jpeg;base64,{}",
+                crate::develop_commands::base64(&bytes)
+            ));
+        }
+    }
+    Err(invalid(
+        "The reference comparison preview exceeds its storage limit.",
+    ))
 }
 
 /// List locally saved reference descriptors. Clearing preview caches does not delete these.
@@ -560,7 +610,7 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
         let baseline_hash = aura_recipe::hash::recipe_hash(&baseline)?;
         // Fit reduced pixels from the native full decode. A camera's embedded thumbnail
         // already has its own colour treatment and is not the RAW export's fitting domain.
-        let frame = fitting_frame(state, &photo)?;
+        let frame = fitting_frame_quality(state, &photo, input.quality)?;
         let before = rendered(state, &frame, &baseline)?;
         let target_regions = appearance::analyse(&before)?;
         let before_distance = appearance::distance(&reference.regions, &target_regions);
@@ -739,6 +789,9 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             "No colour treatment could preserve this photo's native skin tones and highlights. No edit was saved."))?;
         let fitting = Some(FitDiagnostics {
             engine: "bounded-pattern-search-v1".into(),
+            quality: input.quality,
+            target_samples: (frame.width as usize) * (frame.height as usize),
+            max_iterations: 0,
             refinement_candidates: refined.evaluations,
             unique_renders: scores.len().saturating_sub(1),
             cached_proposals,
@@ -794,10 +847,18 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
 }
 
 fn fitting_frame(state: &AppState, photo: &PhotoId) -> AuraResult<Frame> {
+    fitting_frame_quality(state, photo, MatchQuality::Precise)
+}
+
+fn fitting_frame_quality(
+    state: &AppState,
+    photo: &PhotoId,
+    quality: MatchQuality,
+) -> AuraResult<Frame> {
     let full =
         crate::photo_frames::CatalogFrames::new(state.clone()).frame(photo, RenderLevel::Full)?;
     let edge = full.width.max(full.height).max(1);
-    let scale = (512.0 / f64::from(edge)).min(1.0);
+    let scale = (f64::from(quality.fitting_edge()) / f64::from(edge)).min(1.0);
     let width = (f64::from(full.width) * scale).round().max(1.0) as u32;
     let height = (f64::from(full.height) * scale).round().max(1.0) as u32;
     let small = aura_raw::demosaic::resize(
@@ -1001,6 +1062,22 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reference_comparison_preview_is_bounded_and_separate_from_portable_descriptors() {
+        let image = Rgb8 {
+            width: 600,
+            height: 400,
+            data: (0..600 * 400 * 3).map(|i| (i % 251) as u8).collect(),
+        };
+        let preview = reference_preview(&image).unwrap();
+        assert!(preview.starts_with("data:image/jpeg;base64,"));
+        assert!(
+            preview.len() <= "data:image/jpeg;base64,".len() + (32_usize * 1024).div_ceil(3) * 4
+        );
+        let old: ReferenceSummary = serde_json::from_str(r#"{"id":"reference","name":"Old","width":600,"height":400,"convertedIcc":false,"regions":[]}"#).unwrap();
+        assert!(old.preview.is_none());
+    }
 
     #[test]
     fn monochrome_contribution_is_continuous_reversible_and_preserves_manual_saturation() {

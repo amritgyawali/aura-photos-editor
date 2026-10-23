@@ -44,7 +44,6 @@ const CHROMA_QUANTILES: usize = 33;
 pub(super) const TARGET_SAMPLES: usize = 40_000;
 const REFERENCE_SAMPLES: usize = 65_536;
 const MIN_SAMPLES: usize = 256;
-const ITERATIONS: usize = 4;
 const SAME_SCENE: f32 = 0.8;
 /// Authored regularisation toward no edit when object/illumination correspondence is unknown.
 /// This is a strength prior, not a calibrated probability of a correct match.
@@ -792,6 +791,7 @@ struct FitContext<'a> {
     content: f32,
     monochrome: bool,
     toned: bool,
+    iterations: usize,
 }
 
 impl FitContext<'_> {
@@ -829,7 +829,7 @@ impl FitContext<'_> {
         checkpoint: &mut impl FnMut() -> AuraResult<()>,
     ) -> AuraResult<usize> {
         let iterations = if self.corresponding() || self.toned {
-            ITERATIONS
+            self.iterations
         } else {
             1
         };
@@ -898,10 +898,27 @@ impl FitContext<'_> {
 /// Fit an estimated look from an edited reference. Same-scene structure permits distribution
 /// refinement; unrelated scenes use conservative shared-colour evidence. Neither a lower
 /// distribution distance nor the content score proves recovery of the original editing operation.
+#[cfg(test)]
 pub(super) fn fit_with_checkpoint(
     reference: &GradeStats,
     target: &[Sample],
     similarity: Option<f32>,
+    checkpoint: impl FnMut() -> AuraResult<()>,
+) -> AuraResult<Fit> {
+    fit_with_quality_checkpoint(
+        reference,
+        target,
+        similarity,
+        super::MatchQuality::Precise,
+        checkpoint,
+    )
+}
+
+pub(super) fn fit_with_quality_checkpoint(
+    reference: &GradeStats,
+    target: &[Sample],
+    similarity: Option<f32>,
+    quality: super::MatchQuality,
     mut checkpoint: impl FnMut() -> AuraResult<()>,
 ) -> AuraResult<Fit> {
     checkpoint()?;
@@ -930,6 +947,7 @@ pub(super) fn fit_with_checkpoint(
         content,
         monochrome: reference.achromatic || keep_target_grey,
         toned: at(&reference.chroma, CHROMA_QUANTILES - 2) < 0.012,
+        iterations: quality.iterations(),
     };
     let mut grade = fitter.initial(&start);
     let mut best = (before, identity.clone());

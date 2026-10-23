@@ -414,6 +414,11 @@ fn edited_preview_references_keep_library_metadata_and_saved_strengths_after_reo
     )
     .expect("create from actual edited preview");
     assert!(reference
+        .preview
+        .as_ref()
+        .expect("comparison preview")
+        .starts_with("data:image/jpeg;base64,"));
+    assert!(reference
         .thumbnail
         .as_ref()
         .expect("preview")
@@ -453,6 +458,10 @@ fn edited_preview_references_keep_library_metadata_and_saved_strengths_after_reo
         .with_cache_root(&directory.path().join("cache"));
     let references = color_match::list_references(&reopened).expect("durable library");
     let saved = references.first().expect("saved reference");
+    assert_eq!(
+        saved.preview, reference.preview,
+        "comparison pixels survive reopening"
+    );
     assert_eq!(saved.name, "Warm reception");
     assert_eq!(saved.group, "Weddings");
     assert!(saved.favorite);
@@ -666,6 +675,7 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id.clone(),
             cancel_id: job(),
@@ -677,12 +687,22 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
         .fitting
         .as_ref()
         .expect("measured fitting diagnostics");
-    assert_eq!(fitting.engine, "bounded-pattern-search-v1");
-    assert!((1..=160).contains(&fitting.refinement_candidates));
-    assert!(fitting.unique_renders <= 238 && fitting.cached_proposals > 0);
-    assert!(fitting.grade_candidates <= 36);
+    assert_eq!(fitting.engine, "reference-grade-transfer-v3");
+    assert_eq!(fitting.quality, color_match::MatchQuality::Precise);
+    assert_eq!(fitting.max_iterations, 4);
+    assert!((1..=fitting.max_iterations).contains(&fitting.refinement_candidates));
+    assert!((1..=40_000).contains(&fitting.target_samples));
+    assert_eq!(fitting.unique_renders, 2);
+    assert_eq!(fitting.cached_proposals, 0);
+    assert_eq!(fitting.grade_candidates, 0);
     assert!(fitting.native_candidate_checked);
     assert!((0.0..=1.0).contains(&fitting.native_backtrack_factor));
+    let transfer = fitting
+        .transfer
+        .as_ref()
+        .expect("rendered transfer diagnostics");
+    assert_eq!(transfer.rendered_before.total, prepared.before_distance);
+    assert_eq!(transfer.rendered_after.total, prepared.after_distance);
     assert!(prepared.after_distance <= prepared.before_distance);
     assert!(
         prepared.after_distance < prepared.before_distance - 0.01,
@@ -703,6 +723,37 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
         .load(&photo)
         .expect("read full strength")
         .expect("recipe");
+    let history_count = || -> i64 {
+        state
+            .catalog()
+            .read(|conn| {
+                conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| row.get(0))
+                    .map_err(|e| {
+                        aura_core::errors::db::statement_failed("count repeated colour history", &e)
+                    })
+            })
+            .expect("history count")
+    };
+    let full_history = history_count();
+    let repeated = color_match::apply(&state, &input(color_match::Controls::default()))
+        .expect("repeat identical strengths through native renderer");
+    assert_eq!(
+        repeated.changed, 0,
+        "same strengths must not create a duplicate edit"
+    );
+    assert_eq!(
+        history_count(),
+        full_history,
+        "identical native controls add no Undo step"
+    );
+    assert_eq!(
+        state
+            .recipe_store()
+            .load(&photo)
+            .expect("same recipe")
+            .expect("saved"),
+        full
+    );
     let half_controls = color_match::Controls {
         amount: 0.5,
         ..color_match::Controls::default()
@@ -730,6 +781,10 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
         .expect("saved");
     assert_eq!(restored.global, original.global);
     assert_eq!(restored.retouch, original.retouch);
+    assert_eq!(
+        restored.extra, original.extra,
+        "zero also removes the matched colour extension exactly"
+    );
     let status = color_match::status(&state, &photo.to_db())
         .expect("status")
         .expect("saved strengths");
@@ -788,6 +843,7 @@ fn native_raw_reference_match_does_not_touch_originals() {
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id,
             cancel_id: job(),

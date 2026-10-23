@@ -3,9 +3,10 @@ import type { FineMatchControls } from './colorMatchDetails';
 
 export type ColorMatchControls = { amount: number; tone: number; color: number; whiteBalance: number; detail?: FineMatchControls };
 export const DEFAULT_MATCH_CONTROLS: ColorMatchControls = { amount: 1, tone: 1, color: 1, whiteBalance: 1 };
+export type ColorMatchQuality = 'quick' | 'precise';
 export type ColorReference = {
   id: string; name: string; width: number; height: number; convertedIcc: boolean; regions: string[];
-  group?: string; favorite?: boolean; defaultControls?: ColorMatchControls; thumbnail?: string;
+  group?: string; favorite?: boolean; defaultControls?: ColorMatchControls; thumbnail?: string; preview?: string;
 };
 export type ReferenceMetadata = { name?: string; group?: string; favorite?: boolean; defaultControls?: ColorMatchControls };
 export type ColorMatchReport = {
@@ -13,6 +14,7 @@ export type ColorMatchReport = {
   matchedRegions: string[]; beforeDistance: number; afterDistance: number; changed: number;
   protectedFields: number; fullResolutionChecked: boolean; current: boolean;
   fitting?: { engine: string; refinementCandidates: number; uniqueRenders: number; cachedProposals: number;
+    quality?: ColorMatchQuality; targetSamples?: number; maxIterations?: number;
     gradeCandidates?: number; nativeCandidateChecked?: boolean; nativeBacktrackFactor?: number;
     structureSimilarity?: number | null; regularizationWeight?: number };
   referenceMonochrome?: boolean;
@@ -25,8 +27,8 @@ export const colorMatch = {
     invoke<ColorReference | null>('manage_color_reference', { input: { referenceId, action, ...metadata } }),
   capture: (projectId: string, photoId: string, name: string, cancelId: string) =>
     invoke<ColorReference>('capture_color_reference', { input: { projectId, photoId, name, cancelId } }),
-  prepare: (photoId: string, referenceId: string, cancelId: string) =>
-    invoke<ColorMatchReport>('prepare_color_match', { input: { photoId, referenceId, cancelId } }),
+  prepare: (photoId: string, referenceId: string, cancelId: string, quality?: ColorMatchQuality) =>
+    invoke<ColorMatchReport>('prepare_color_match', { input: { photoId, referenceId, cancelId, ...(quality ? { quality } : {}) } }),
   apply: (photoId: string, sessionId: string, controls: ColorMatchControls, cancelId: string) =>
     invoke<ColorMatchReport>('apply_color_match', { input: { photoId, sessionId, controls, cancelId } }),
 };

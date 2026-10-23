@@ -35,3 +35,34 @@ it('stops between analysis and application without saving that photo', async () 
   expect(results).toHaveLength(0);
   expect(colorMatch.apply).not.toHaveBeenCalled();
 });
+it('syncs only selected collection members and forwards the real fitting quality', async () => {
+  const results = await matchColorCollection('project', 'ref', controls, 'job', () => false, vi.fn(), vi.fn(),
+    { photoIds: ['b', 'b', 'another-project'], quality: 'quick' });
+  expect(results.map(item => item.photoId)).toEqual(['b']);
+  expect(colorMatch.prepare).toHaveBeenCalledOnce();
+  expect(colorMatch.prepare).toHaveBeenCalledWith('b', 'ref', 'job', 'quick');
+  expect(colorMatch.apply).toHaveBeenCalledOnce();
+  expect(colorMatch.apply).toHaveBeenCalledWith('b', 'session-b', controls, 'job');
+});
+it('does not expand an empty selection to the whole collection', async () => {
+  expect(await matchColorCollection('project', 'ref', controls, 'job', () => false, vi.fn(), vi.fn(), { photoIds: [] })).toEqual([]);
+  expect(api.listImages).not.toHaveBeenCalled();
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+});
+it('refits when the selected quality differs from a previous match', async () => {
+  vi.mocked(colorMatch.status).mockImplementation(async photo => result(photo));
+  await matchColorCollection('project', 'ref', controls, 'job', () => false, vi.fn(), vi.fn(), { quality: 'quick' });
+  expect(colorMatch.prepare).toHaveBeenCalledTimes(2);
+  expect(colorMatch.prepare).toHaveBeenNthCalledWith(1, 'a', 'ref', 'job', 'quick');
+});
+it('defaults to precise instead of reusing a saved quick fit', async () => {
+  vi.mocked(colorMatch.status).mockImplementation(async photo => ({ ...result(photo), fitting: { quality: 'quick' } } as ColorMatchReport));
+  await matchColorCollection('project', 'ref', controls, 'job', () => false, vi.fn(), vi.fn());
+  expect(colorMatch.prepare).toHaveBeenCalledTimes(2);
+  expect(colorMatch.prepare).toHaveBeenNthCalledWith(1, 'a', 'ref', 'job');
+});
+it('rejects a native result for a different reference', async () => {
+  vi.mocked(colorMatch.apply).mockResolvedValueOnce({ ...result('a'), reference: { ...result('a').reference, id: 'other' } });
+  const results = await matchColorCollection('project', 'ref', controls, 'job', () => false, vi.fn(), vi.fn());
+  expect(results.map(r => r.outcome)).toEqual(['failed', 'matched']);
+});

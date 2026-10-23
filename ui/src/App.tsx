@@ -427,6 +427,7 @@ export function App(): JSX.Element {
               {focusedPhoto && <>
                 <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
                 <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} photoIds={rows.map(row=>row.id)} disabled={editing || workflowBusy} revision={revision}
+                  active={workspace === 'edit' || workspace === 'look' || (workspace === 'hot' && hotFeature !== 'train')}
                   referenceMode={workspace === 'look' || (workspace === 'hot' && hotFeature === 'color')}
                   featureMode={workspace === 'hot' && (hotFeature === 'liquify' || hotFeature === 'skin' || hotFeature === 'glare') ? hotFeature : null} onBusyChange={setSaving} />
                 <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>

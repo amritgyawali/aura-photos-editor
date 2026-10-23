@@ -57,6 +57,7 @@ fn session() -> Session {
             favorite: false,
             default_controls: None,
             thumbnail: None,
+            preview: None,
         },
         baseline_hash: aura_recipe::hash::recipe_hash(&baseline).unwrap(),
         last_hash: "last".into(),
