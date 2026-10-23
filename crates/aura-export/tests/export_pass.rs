@@ -17,7 +17,7 @@ use aura_core::contract::delivery::{
 use aura_core::ProjectId;
 use aura_export::api::{Export, ExportPass};
 use aura_export::fixtures::{wedding, Plate, ScriptedField, ScriptedSource};
-use aura_export::read::Frame;
+use aura_export::read::{Frame, Rendered, Source};
 use aura_export::store::ExportStore;
 use aura_export::verify::hash_file;
 
@@ -234,6 +234,8 @@ fn a_resized_set_writes_smaller_files_and_never_larger_ones() {
     let mut job = one_set(images.clone(), out, "{seq}");
     job.sets[0].resize = Resize::LongEdge { pixels: 240 };
     job.sets[0].sharpen = OutputSharpen::Screen;
+    job.metadata.strip_gps = true;
+    job.metadata.strip_camera_serial = true;
 
     let result = ExportPass::new(&store, &field, &source, "0.1.0")
         .run(project, &job)
@@ -529,5 +531,97 @@ fn progress_is_reported_after_every_file_in_order() {
     assert_eq!(
         batches.into_inner().expect("lock"),
         vec![(1, 5), (2, 5), (3, 5), (4, 5), (5, 5)]
+    );
+}
+
+#[derive(Debug)]
+struct SnapshotSource(ScriptedSource);
+
+impl Source for SnapshotSource {
+    fn render(
+        &self,
+        project: ProjectId,
+        image: aura_core::PhotoId,
+        colour: DeliveryColour,
+        bit_depth: u8,
+    ) -> aura_core::AuraResult<Rendered> {
+        let mut rendered = self.0.render(project, image, colour, bit_depth)?;
+        rendered.recipe_json = Some(Arc::from(r#"{"renderedSnapshot":true}"#));
+        Ok(rendered)
+    }
+}
+
+#[test]
+fn sidecars_follow_rendered_snapshots_through_parallel_output_processing() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (catalog, project) = catalog(dir.path());
+    let images = wedding(2);
+    seed_photos(&catalog, project, &images);
+    let store = ExportStore::new(Arc::clone(&catalog));
+    let mut field = ScriptedField::new(None, 2, 2);
+    for image in &images {
+        field = field.with_frame(
+            *image,
+            Frame {
+                image: Some(*image),
+                recipe_json: Some(r#"{"stalePlanningSnapshot":true}"#.into()),
+                ..Frame::default()
+            },
+        );
+    }
+    let source = SnapshotSource(ScriptedSource::new(Plate::Gradient, 640, 480));
+    let out = dir.path().join("delivery");
+    let mut job = one_set(images, out.clone(), "{seq}");
+    job.sets[0].sidecar = true;
+    job.sets[0].resize = Resize::LongEdge { pixels: 240 };
+    job.sets[0].sharpen = OutputSharpen::Screen;
+    let delivered = ExportPass::new(&store, &field, &source, "test")
+        .with_workers(2)
+        .run(project, &job)
+        .expect("export with sidecars");
+    assert_eq!(delivered.files.len(), 2);
+    for file in &delivered.files {
+        assert!(file.verified);
+        assert_eq!((file.width, file.height), (240, 180));
+        let sidecar = out.join(&file.path).with_extension("xmp");
+        assert_eq!(
+            std::fs::read_to_string(sidecar).expect("recipe sidecar"),
+            r#"{"renderedSnapshot":true}"#,
+        );
+    }
+    let outline = Export::new(store, 2, 2).outline(project).expect("outline");
+    assert_eq!(outline.sidecars, 2);
+    assert!(outline.manifest_sealed);
+}
+
+#[test]
+fn optional_disclosures_cannot_hide_written_sidecars() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (catalog, project) = catalog(dir.path());
+    let images = wedding(1);
+    seed_photos(&catalog, project, &images);
+    let store = ExportStore::new(Arc::clone(&catalog));
+    let field = ScriptedField::new(None, 1, 1);
+    let source = SnapshotSource(ScriptedSource::new(Plate::Gradient, 320, 240));
+    let out = dir.path().join("delivery");
+    let mut job = one_set(images, out.clone(), "{seq}");
+    job.sets[0].sidecar = true;
+    job.sets[0].resize = Resize::LongEdge { pixels: 1000 };
+    job.sets[0].sharpen = OutputSharpen::Screen;
+    job.metadata.strip_gps = true;
+    job.metadata.strip_camera_serial = true;
+    let delivered = ExportPass::new(&store, &field, &source, "test")
+        .run(project, &job)
+        .expect("export");
+    let file = &delivered.files[0];
+    assert!(out.join(&file.path).with_extension("xmp").is_file());
+    assert!(file
+        .reasons
+        .iter()
+        .any(|reason| reason.code == DeliveryCode::SidecarWritten));
+    let outline = Export::new(store, 1, 1).outline(project).expect("outline");
+    assert_eq!(
+        (outline.sidecars, outline.written, outline.verified),
+        (1, 1, 1)
     );
 }

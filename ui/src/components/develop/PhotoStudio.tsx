@@ -54,8 +54,8 @@ function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
   return [0, 0, 1, 1];
 }
 
-export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision = 0, onBusyChange }: {
-  projectId: string; photoId: string; photoIds?: readonly string[]; disabled: boolean; revision?: number; onBusyChange: (busy: boolean) => void;
+export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision = 0, referenceMode = false, onBusyChange }: {
+  projectId: string; photoId: string; photoIds?: readonly string[]; disabled: boolean; revision?: number; referenceMode?: boolean; onBusyChange: (busy: boolean) => void;
 }): JSX.Element {
   const [recipe, setRecipe] = useState<RecipeDto | null>(null);
   const [history, setHistory] = useState<HistoryDto | null>(null);
@@ -64,10 +64,10 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   const [busy, setBusy] = useState(false);
   const [retouchOpen, setRetouchOpen] = useState(false);
   const [panel, setPanel] = useState<EditorPanel>('all');
-  const shows = (value: EditorPanel) => panel === 'all' || panel === value;
+  const shows = (value: EditorPanel) => referenceMode ? value === 'references' : panel === 'all' || panel === value;
   // A tool chosen in the Effects library opens Retouch, which then picks the tool up. ADR-0135.
   const effectRequest = useEffectRequest(state => state.request);
-  useEffect(() => { if (effectRequest) setRetouchOpen(true); }, [effectRequest]);
+  useEffect(() => { if (effectRequest && !referenceMode) setRetouchOpen(true); }, [effectRequest, referenceMode]);
   const writing = useRef(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'essentials' | 'advanced'>('essentials');
@@ -99,6 +99,11 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   const [sketch, setSketch] = useState<[number, number][] | null>(null);
   // Evoto-style finishing (ADR-0108): the liquify brush, when one is chosen.
   const [liquifyTool, setLiquifyTool] = useState<LiquifyTool>(null);
+  useEffect(() => {
+    if (!referenceMode) return;
+    setRetouchOpen(false); setPicking(false); setMaskTool(null); setLiquifyTool(null);
+    setProbing(false); drag.current = null; setSketch(null);
+  }, [referenceMode]);
   useEffect(() => {
     let active = true;
     if (inTauri()) editProfiles.list().then(value => { if (active) setProfiles(value); })
@@ -265,7 +270,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
     </div>
     {problem && <p role="alert">{problem} <button type="button" onClick={() => setRefresh(value => value + 1)}>Retry preview</button></p>}
     {writeError && <p role="alert">Edit could not be saved: {writeError} <button type="button" onClick={() => setWriteError(null)}>Dismiss edit error</button></p>}
-    <nav className="editor-panel-navigation" aria-label="Editing panels">
+    <nav hidden={referenceMode} className="editor-panel-navigation" aria-label="Editing panels">
       {EDITOR_PANELS.map(([value, label]) => <button type="button" key={value} aria-pressed={panel === value}
         disabled={busy || disabled} onClick={() => {
           setPanel(value); setPicking(false); setMaskTool(null); setLiquifyTool(null);

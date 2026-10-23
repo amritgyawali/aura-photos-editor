@@ -351,6 +351,7 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 #[derive(Debug)]
 pub struct ExportSource<'a> {
     state: &'a AppState,
+    capture_recipe: bool,
     expected_recipes: Option<&'a std::collections::BTreeMap<String, String>>,
 }
 
@@ -360,6 +361,7 @@ impl<'a> ExportSource<'a> {
     pub fn new(state: &'a AppState) -> Self {
         Self {
             state,
+            capture_recipe: true,
             expected_recipes: None,
         }
     }
@@ -387,6 +389,10 @@ impl Source for ExportSource<'_> {
         if let Some(expected) = self.expected_recipes {
             require_checked_recipe(expected, &image.to_db(), &recipe)?;
         }
+        let recipe_json = self
+            .capture_recipe
+            .then(|| aura_recipe::canonical(&recipe).map(Arc::<str>::from))
+            .transpose()?;
 
         // `RenderPurpose::Export`: nothing is skipped, at full precision. The interactive path
         // skips restoration and heavy retouch, and a delivered file that skipped them is a file
@@ -416,6 +422,7 @@ impl Source for ExportSource<'_> {
             },
             colour,
             render_hash: rendered.render_hash,
+            recipe_json,
         })
     }
 }
@@ -622,6 +629,7 @@ pub(crate) fn export_run_checked(
     let field = ExportField::new(state, project)?;
     let source = ExportSource {
         state,
+        capture_recipe: job.sets.iter().any(|set| set.sidecar),
         expected_recipes,
     };
     let store = ExportStore::new(Arc::clone(state.catalog()));

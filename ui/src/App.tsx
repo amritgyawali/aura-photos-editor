@@ -358,10 +358,15 @@ export function App(): JSX.Element {
             <ProfileGallery selection={profile} disabled={locked} onChange={changeProfile} previewPhotoId={focusedPhoto?.id ?? null} />
           </div>}
           <div hidden={workspace !== 'start' && workspace !== 'look'} className={workspace === 'start' ? 'start-reference' : undefined}>
+            {workspace === 'look' && <header className="workspace-heading"><div><span className="eyebrow">REFERENCE COLOUR MATCHING</span><h1>Match a colour reference.</h1>
+              <p>Choose a photo below, upload an edited JPEG, PNG or TIFF, and analyse its tone, colour and warmth. Apply the strengths to preview the result; Undo keeps your earlier edit available.</p>
+              {!focusedPhoto && <p>Add your target photos in Photos to match a single reference.</p>}</div></header>}
+            <details open={workspace === 'start'}><summary>Learn a style from a reference folder or Instagram export</summary>
             <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}
               onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
               heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a look you love</h2>
                 <p>Choose a folder of reference photos, or your own Instagram data export, to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
+            </details>
           </div>
           {workspace === 'start' && <section className="start-step start-upload" aria-label="Add photos">
             <header className="step-heading"><span className="step-number">3</span><div><span className="eyebrow">YOUR PHOTOS</span><h2>Finish a whole folder, or upload to review first</h2>
@@ -395,16 +400,18 @@ export function App(): JSX.Element {
               <ImportWizard disabled={locked} running={progress.running} done={progress.done} total={progress.total} onStart={roots => void startImport(roots)} onCancel={() => void cancelImport()} />
               {rows.length > 0 ? <div className="studio-library"><VirtualGrid rows={rows} onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)} /></div> : <div className="studio-empty"><strong>Your next great edit starts here.</strong><p>Choose a folder above. Your photos will appear here.</p></div>}
             </>}
-            <div hidden={workspace !== 'edit'}>
+            <div hidden={workspace !== 'edit' && workspace !== 'look'}>
+              <div hidden={workspace !== 'edit'}>
               <div className="workspace-heading"><div><span className="eyebrow">LIGHT. COLOR. FINISH.</span><h1>A good starting point, in one click.</h1></div><button type="button" disabled={locked} onClick={() => setWorkspace('look')}>Match a reference look →</button></div>
               <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
                 automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference}
                 profile={profile} profileName={profileName} />
+              </div>
               {/* Stays mounted while another section is open, so the photograph, its full-quality
                   preview and an open retouch are exactly where they were on return. ADR-0097. */}
               {focusedPhoto && <>
                 <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
-                <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} photoIds={rows.map(row=>row.id)} disabled={editing || workflowBusy} revision={revision} onBusyChange={setSaving} />
+                <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} photoIds={rows.map(row=>row.id)} disabled={editing || workflowBusy} revision={revision} referenceMode={workspace === 'look'} onBusyChange={setSaving} />
                 <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
               </>}
             </div>

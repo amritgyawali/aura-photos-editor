@@ -696,6 +696,9 @@ pub fn stage_for(path: &str) -> Option<Stage> {
                 || path.starts_with("extra.color_lab_v1")
                 || path.starts_with("spatial_lab_v1")
                 || path.starts_with("extra.spatial_lab_v1")
+                || path.starts_with("calibrated_look_v1")
+                || path.starts_with("extra.calibrated_look_v1")
+                || path.starts_with("reference_grade_v1")
             {
                 Some(Stage::Sharpen)
             } else if path.starts_with("cleanup") {
@@ -774,7 +777,7 @@ pub fn render_hash(
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.1",
         ENGINE,
         crate::profiles::PROFILES_VER,
         aura_portrait::PARSE_VER,

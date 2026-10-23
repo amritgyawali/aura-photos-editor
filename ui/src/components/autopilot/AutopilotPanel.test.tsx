@@ -7,7 +7,7 @@ import { prepareCollection } from './prepareCollection';
 vi.mock('./prepareCollection', () => ({ prepareCollection: vi.fn().mockResolvedValue([{ photoId: 'photo', name: 'photo.jpg', outcome: 'ready' }]) }));
 
 vi.mock('../../ipc/client', () => ({
-  api: { listImages: vi.fn().mockResolvedValue([{ id: 'a', fileName: 'portrait.jpg' }, { id: 'b', fileName: 'landscape.jpg' }]) },
+  api: { listImages: vi.fn().mockResolvedValue([{ id: 'a', fileName: 'portrait.jpg' }, { id: 'b', fileName: 'landscape.jpg' }]), cancelJob: vi.fn().mockResolvedValue(null) },
   asIpcError: (error: Error) => ({ message: error.message, code: 'test' }),
   autopilot: {
     autopilotStatus: vi.fn(), autopilotStages: vi.fn().mockResolvedValue([]),
@@ -34,6 +34,19 @@ it('shows a blocked preflight without starting a job', async () => {
   fireEvent.click(screen.getByText('Start edit'));
   await screen.findByText('Needs attention');
   expect(autopilot.autopilotStart).not.toHaveBeenCalled();
+});
+
+it('cancels the active native reference fit when Stop is pressed', async () => {
+  let finish!: (value: never[]) => void;
+  vi.mocked(prepareCollection).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const errors = vi.fn();
+  render(<AutopilotPanel projectId="p" onError={errors} />);
+  fireEvent.click(screen.getByText('Start edit'));
+  await screen.findByRole('button', { name: 'Stop automatic editing' });
+  fireEvent.click(screen.getByRole('button', { name: 'Stop automatic editing' }));
+  await waitFor(() => expect(api.cancelJob).toHaveBeenCalledWith(expect.stringMatching(/^reference-prepare-/)));
+  finish([]);
+  await screen.findByText('Stopped. Completed edits are saved.');
 });
 it('ignores repeated clicks while the preflight is pending', async () => {
   let finish!: (value: never) => void;

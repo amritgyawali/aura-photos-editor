@@ -30,12 +30,25 @@ separately. Save pending retouch edits before changing automatic strengths.
 
 ## Match an edited reference photo
 
-In **Reference colour matching**, choose **Upload colour reference** for an edited
+Open **Match a look**, select a target photo in the filmstrip and, in
+**Reference colour matching**, choose **Upload colour reference** for an edited
 JPEG, PNG or TIFF. Choose the saved reference, select **Analyse reference match**,
 adjust strengths and choose **Apply colour strengths**. A reference can depict a
 different photograph. Similar subjects and lighting usually provide a more useful
 comparison. AURA fits visible appearance; a finished JPEG does not uniquely reveal
 the editor's original slider values.
+
+The [Internet-reference and known-grade test report](reports/AURA-reference-colour-match-2026-10-22.md)
+includes original-resolution downloads, native RAW verification and before/after
+comparisons. Matching approximates appearance; arbitrary exact grade cloning is
+not established. Strong split tones and monochrome references may need substantial
+manual finishing. JPEG, opaque PNG and TIFF are supported reference formats;
+WebP and transparent references are refused.
+
+The [exported-colour verification](reports/AURA-exported-colour-verification-2026-10-22.md)
+checks the actual delivered JPEGs and PNGs, including a 4480 × 6720 CR3 export.
+Selected strengths reduce the regional distance, while reference-grade and
+calibrated-white-balance equality remain unverified.
 
 The overall, tone, colour and warmth controls range from 0–200%. **Fine matching
 controls** separately scale exposure, contrast, highlights, shadows, whites,
@@ -44,6 +57,30 @@ They scale the fitted treatment rather than setting absolute camera values. The
 native renderer still checks highlights and skin colour. A stronger request can
 be refused or reduced if it fails those checks. A zero fitted component cannot be
 amplified into a new correction; use Develop to author that correction directly.
+
+The adaptive matcher can explore corrections that were absent from its initial
+guess, including independent curve anchors, colour bands and tone-dependent casts.
+It uses image-structure evidence to limit large extra corrections between unrelated
+scenes. Analysis checks its proposed treatment on the native decode and can reduce
+that proposal; Apply checks the exact strengths you choose again. An accepted edit
+does not certify an exact reference match.
+
+Newly imported genuinely monochrome references can remove colour continuously.
+Amount, Colour and Saturation match scale this contribution, and zero restores the
+baseline. The monochrome guard preserves each person's tone and rejects new casts;
+ordinary colour references retain the colour-preservation guard. A selective-colour
+reference is kept as a colour reference. Reimport an older reference's source file
+to supply fresh structure and monochrome evidence; portable libraries keep their
+descriptor-only format.
+
+To compare the updated matcher with an existing match, first choose **Remove
+matched treatment**, upload the reference again, then choose **Analyse reference
+match** and **Apply colour strengths**. Saved sessions retain their earlier fit
+until you analyse again. Removing the old contribution first avoids treating it
+as part of the next analysis baseline.
+
+See the [adaptive matcher report](reports/AURA-adaptive-colour-matching-2026-10-22.md)
+for code changes, retained prototype regressions and measured comparisons.
 
 Matching starts from the saved analysis baseline to avoid compounding. Later
 manual edits require a fresh analysis. **Remove matched treatment** restores the

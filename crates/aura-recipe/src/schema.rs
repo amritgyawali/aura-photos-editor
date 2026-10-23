@@ -54,12 +54,13 @@ const METADATA_PREFIX: &str = "provenance";
 /// neutral" rather than "not mentioned" - otherwise applying a look with a colour grade and
 /// then one without it would leave the first grade behind forever, which is exactly the
 /// compounding every automated pass promises not to do.
-pub const OPTIONAL_BLOCKS: [&str; 5] = [
+pub const OPTIONAL_BLOCKS: [&str; 6] = [
     "global.parametric",
     "global.channel_curves",
     "global.colour_grade",
     "global.calibration",
     "global.effects",
+    "calibrated_look_v1",
 ];
 
 /// What a merge did.
@@ -357,6 +358,7 @@ impl Validation {
         crate::material_lab::read(recipe)?;
         crate::spatial_lab::read(recipe)?;
         crate::color_lab::read(recipe)?;
+        crate::calibrated_look::read(recipe)?;
         if recipe.schema == 0 {
             return Err(recipe_invalid("schema", "must be at least 1"));
         }

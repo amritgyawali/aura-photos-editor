@@ -766,6 +766,15 @@ impl CpuEngine {
         crate::material_lab::apply(&mut rgb, width, height, recipe, frame);
         crate::color_lab::apply(&mut rgb, width, height, recipe, frame);
         crate::spatial_lab::apply(&mut rgb, width, height, recipe, frame);
+        // ---- a matched reference grade (ADR-0160) -------------------------------------------
+        //
+        // Last of the colour stages: it was fitted to the photograph as every stage above leaves
+        // it, so it must see exactly that.
+        {
+            let _t = crate::perf::step("render.reference_grade");
+            crate::reference_grade::apply(&mut rgb, recipe);
+            crate::calibrated_look::apply(&mut rgb, recipe);
+        }
         // ---- sharpening ----------------------------------------------------------------
         if plan.stages.contains(&Stage::Sharpen) {
             spatial::unsharp(
@@ -845,6 +854,8 @@ impl CpuEngine {
         before.extra.remove(aura_recipe::material_lab::KEY);
         before.extra.remove(aura_recipe::color_lab::KEY);
         before.extra.remove(aura_recipe::spatial_lab::KEY);
+        before.extra.remove(aura_recipe::reference_grade::KEY);
+        before.extra.remove(aura_recipe::calibrated_look::KEY);
         before.global.sharpen.amount = 0;
         before.global.effects = aura_recipe::Effects::default();
         before.geometry = aura_recipe::Geometry::default();
