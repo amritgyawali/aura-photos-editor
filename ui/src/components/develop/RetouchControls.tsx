@@ -5,6 +5,8 @@ import { RetouchSkinSelection } from './RetouchSkinSelection';
 import { colorHex, colorRgb } from './retouchColor';
 import { RetouchToolPicker } from './RetouchToolPicker';
 import { RetouchOpticsControls } from './RetouchOpticsControls';
+import { EffectControls } from './EffectControls';
+import { EFFECT_SOURCE, isEffectTool, isWarpTool } from '../../ipc/retouchEffects';
 
 export function validRetouch(draft: NativeRetouchEdit): boolean {
   return [...draft.region, draft.amount, draft.feather, draft.radius, draft.texture, draft.tone, draft.warmth, draft.tint, ...(draft.source ?? [])].every(Number.isFinite)
@@ -20,7 +22,7 @@ export function validRetouch(draft: NativeRetouchEdit): boolean {
     && (!draft.targetColor || (draft.targetColor.length === 3 && draft.targetColor.every(v => Number.isFinite(v) && v >= 0 && v <= 1)))
     && (!['colorize', 'background_color', 'color_despill'].includes(draft.tool) || Boolean(draft.targetColor))
     && !(draft.tool === 'color_despill' && draft.targetColor && Math.max(...draft.targetColor) - Math.min(...draft.targetColor) < .02)
-    && !(draft.tool === 'reshape' && draft.selection?.inverted)
+    && !(isWarpTool(draft.tool) && draft.selection?.inverted)
     // A blemish brush with nothing painted would save an operation that does nothing.
     && !(draft.tool === 'acne_clear' && draft.mask && draft.mask.strokes.length === 0)
     && (!draft.skin || (Number.isFinite(draft.skin.tolerance) && draft.skin.tolerance >= .015 && draft.skin.tolerance <= .3
@@ -61,6 +63,7 @@ export function RetouchControls(props: Props) {
       {draft.tool === 'highlight_glow' && <label>Highlight threshold ({(draft.tone * 4).toFixed(2)} stops above middle gray)<input type="range" aria-label="Highlight threshold" min="0" max="4" step=".05" value={draft.tone * 4}
         onChange={event => onChange({ tone: Number(event.target.value) / 4 })} /></label>}
     </>}
+    {isEffectTool(draft.tool) && <EffectControls draft={{ ...draft, tool: draft.tool }} onChange={onChange} onTool={props.onTool}/>}
     {draft.tool === 'reshape' && <>
       {(['warmth','tint'] as const).map((key,index) => <label key={key}>{index ? 'Local height' : 'Local width'} ({Math.round(draft[key]*25)}%)
         <input type="range" aria-label={index ? 'Local height' : 'Local width'} min="-1" max="1" step=".01" value={draft[key]} onChange={event=>onChange({[key]:Number(event.target.value)})}/>
@@ -109,7 +112,7 @@ export function RetouchControls(props: Props) {
     </details>}
     <RetouchSkinSelection draft={draft} edits={props.edits} onChange={onChange}/>
     <RetouchSelectionControls draft={draft} onChange={onChange} colorPicking={props.colorPicking} onColorPick={props.onColorPick}/>
-    {draft.tool === 'reshape' && draft.selection?.inverted && <p role="status">Local proportions changes the selected ellipse. Turn off Invert selection before applying.</p>}
+    {isWarpTool(draft.tool) && draft.selection?.inverted && <p role="status">{draft.tool === 'reshape' ? 'Local proportions' : 'Liquify'} changes the selected ellipse. Turn off Invert selection before applying.</p>}
     <button type="button" onClick={props.onSelectAll}>Select entire photo</button>
     <details open><summary>{draft.mask || draft.selection?.gradient ? 'Clone anchor / keyboard target' : 'Target region'}</summary>
       {['Center X (%)', 'Center Y (%)', 'Horizontal radius (%)', 'Vertical radius (%)'].map((label, index) => <label key={label}>{label}
@@ -117,7 +120,7 @@ export function RetouchControls(props: Props) {
           onChange={event => { const region = [...draft.region] as NativeRetouchEdit['region']; region[index] = Number(event.target.value) / 100; onChange({ region }); }}/>
       </label>)}
     </details>
-    {(sampled || (['heal', 'patch_heal', 'clone', 'color_match', 'texture_graft', 'fabric_stain'] as RetouchTool[]).includes(draft.tool)) && <details open><summary>{sampled ? 'Skin reference sample' : 'Source sample'}</summary>
+    {(sampled || (['heal', 'patch_heal', 'clone', 'color_match', 'texture_graft', 'fabric_stain'] as RetouchTool[]).includes(draft.tool) || (isEffectTool(draft.tool) && Boolean(EFFECT_SOURCE[draft.tool]))) && <details open><summary>{sampled ? 'Skin reference sample' : 'Source sample'}</summary>
       <button type="button" aria-pressed={props.sourceMode} onClick={props.onSourceMode}>{props.sourceMode ? 'Cancel source picker' : sampled ? 'Pick skin sample on photo' : 'Pick source on photo'}</button>
       {['Source X (%)', 'Source Y (%)'].map((label, index) => <label key={label}>{label}
         <input type="number" min="0" max="100" step="0.1" value={draft.source ? Number(((draft.source[index] ?? 0) * 100).toFixed(2)) : ''}

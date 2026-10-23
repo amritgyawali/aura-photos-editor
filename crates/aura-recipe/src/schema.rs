@@ -351,7 +351,9 @@ impl Validation {
     #[allow(clippy::too_many_lines)]
     pub fn check(recipe: &Recipe) -> AuraResult<()> {
         crate::retouch_tools::read(recipe)?;
+        crate::retouch_intensity::read(recipe)?;
         crate::studio_finish::read(recipe)?;
+        crate::studio_color::read(recipe)?;
         if recipe.schema == 0 {
             return Err(recipe_invalid("schema", "must be at least 1"));
         }

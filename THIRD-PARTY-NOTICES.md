@@ -17,6 +17,20 @@ the existing release notice generator, `scripts/third-party-notices.py`, which r
 all compiled Windows dependencies. GPU output uses the installed graphics driver;
 no proprietary GPU SDK or separately downloaded driver is bundled by this change.
 
+## Hexadecimal float parser - `hexf-parse` 0.2.1
+
+Naga's shader parser depends on `hexf-parse` 0.2.1 by Kang Seonghoon. The
+published 0.2.1 crate declares `CC0-1.0` in its packaged `Cargo.toml`; the
+scoped entry in `deny.toml` covers this existing dependency only. It does not
+allow CC0 for other crates. This records the published artifact's terms rather
+than the license on the upstream development branch.
+
+CC0 dedicates copyright and related rights to the public domain, with a fallback
+license where the waiver is ineffective. It does not grant patent or trademark
+rights and provides no warranties. The release notice generator retains the
+resolved dependency's license record. Sources: [published crate](https://crates.io/crates/hexf-parse/0.2.1)
+and [CC0 legal text](https://creativecommons.org/publicdomain/zero/1.0/legalcode.en).
+
 ## MediaPipe Selfie Multiclass segmentation weights
 
 AURA bundles a conversion of Google's MediaPipe Selfie Multiclass image segmenter

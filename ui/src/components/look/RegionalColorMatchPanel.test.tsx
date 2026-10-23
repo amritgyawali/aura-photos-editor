@@ -30,6 +30,18 @@ beforeEach(() => {
   }));
 });
 const open = () => fireEvent.click(screen.getByText('Match skin, hair, clothing and background separately'));
+it('links only the changed strength across fitted regions without copying other draft fields', async () => {
+  render(<RegionalColorMatchPanel {...props}/>); open();
+  fireEvent.click(screen.getByRole('button', { name: 'Analyse regional colour match' }));
+  await screen.findByRole('slider', { name: 'Face skin match amount' });
+  fireEvent.change(screen.getByRole('slider', { name: 'Background match white balance' }), { target: { value: '150' } });
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Link regional matching strengths' }));
+  fireEvent.change(screen.getByRole('slider', { name: 'Face skin match amount' }), { target: { value: '60' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Apply regional colour strengths' }));
+  await waitFor(() => expect(regionalColorMatch.apply).toHaveBeenCalledWith('photo','regions','saved-recipe',{
+    face_skin: { ...controls, amount: .6 }, background: { ...controls, amount: .6, whiteBalance: 1.5 },
+  }, expect.any(String)));
+});
 it('explains a detected region without a useful correction and disables its effect controls', async () => {
   vi.mocked(regionalColorMatch.status).mockResolvedValue({ ...report, regions: [{ ...report.regions[0]!, correctionAvailable: false, reason: 'No bounded correction improved this region.' }] });
   render(<RegionalColorMatchPanel {...props}/>); open();

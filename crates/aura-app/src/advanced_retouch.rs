@@ -220,6 +220,8 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
     };
     by_name.or(Some(match edit.tool {
         // These tools are explicit manual edits and must never be planned as automatic retouch.
+        // So are the material, optical and colour finishing tools (ADR-0127..0129) and the selected
+        // effects (ADR-0131): a photographer places every one of them.
         Tool::Colorize
         | Tool::BackgroundColor
         | Tool::Reshape
@@ -232,7 +234,102 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         | Tool::ZoomBlur
         | Tool::ColorDespill
         | Tool::HighlightCompress
-        | Tool::ColorSaturation => return None,
+        | Tool::ColorSaturation
+        | Tool::LiquifyPush
+        | Tool::LiquifyBloat
+        | Tool::LiquifyPucker
+        | Tool::LiquifyTwirl
+        | Tool::SpinBlur
+        | Tool::Pixelate
+        | Tool::PrivacyBlur
+        | Tool::SoftFocus
+        | Tool::OrtonGlow
+        | Tool::LocalSharpen
+        | Tool::LocalDenoise
+        | Tool::HueShift
+        | Tool::InvertColors
+        | Tool::ChromaKey
+        | Tool::VeinReduce
+        | Tool::ColorUnify
+        | Tool::LightLeak
+        | Tool::Glitch
+        | Tool::Haze
+        | Tool::Starburst
+        | Tool::LocalWhiteBalance
+        | Tool::Catchlight
+        | Tool::EyeGlowFix
+        | Tool::LipGloss
+        | Tool::Freckles
+        | Tool::FloorReflection
+        | Tool::DropShadow
+        | Tool::Halation
+        | Tool::DustScratches
+        | Tool::JpegCleanup
+        | Tool::Deband
+        | Tool::AutoLevels
+        | Tool::AutoNeutral
+        | Tool::FlattenLight
+        | Tool::HdrDetail
+        | Tool::BokehHighlights
+        | Tool::TiltShift
+        | Tool::Duotone
+        | Tool::Posterize
+        | Tool::Halftone
+        | Tool::PencilSketch
+        | Tool::OilPaint
+        | Tool::CrossProcess
+        | Tool::Infrared
+        | Tool::MirrorSymmetry
+        | Tool::LensFlare
+        | Tool::GodRays
+        | Tool::Weather
+        | Tool::SplitTone
+        | Tool::FilmFade
+        | Tool::BleachBypass
+        | Tool::TealOrange
+        | Tool::ColourSplash
+        | Tool::SkyBlue
+        | Tool::Spotlight
+        | Tool::RimLight
+        | Tool::ChromaticAberration
+        | Tool::Fisheye
+        | Tool::AnamorphicStreak
+        | Tool::Kaleidoscope
+        | Tool::Watercolor
+        | Tool::StainedGlass
+        | Tool::Cartoon
+        | Tool::NeonEdges
+        | Tool::Thermal
+        | Tool::ClippedHighlightRepair
+        | Tool::LocalDehaze
+        | Tool::LimbalRing
+        | Tool::LashDarken
+        | Tool::HairFill
+        | Tool::MatchGrain
+        | Tool::ChannelSwap
+        | Tool::SunsetGlow
+        | Tool::DayToNight
+        | Tool::Lomo
+        | Tool::InstantFilm
+        | Tool::PopArt
+        | Tool::IrisBlur
+        | Tool::EchoDouble
+        | Tool::Ripple
+        | Tool::FrostedGlass
+        | Tool::PixelSort
+        | Tool::VhsRetro
+        | Tool::Emboss
+        | Tool::Crosshatch
+        | Tool::Sparkle
+        | Tool::FairyLights
+        | Tool::RainbowPrism
+        | Tool::BodyHairSoften
+        | Tool::Cellulite
+        | Tool::TanLine
+        | Tool::HandRejuvenate
+        | Tool::KnuckleEven
+        | Tool::LensReflection
+        | Tool::ShadowRemove => return None,
         Tool::AutoBlemish
         | Tool::PatchHeal
         | Tool::FrequencyHeal

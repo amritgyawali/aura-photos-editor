@@ -81,8 +81,19 @@ pub fn save_studio_finish(
     let (project, photo) = ids(&input.project_id, &input.photo_id)?;
     studio_finish::validate(&input.finish)?;
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
+    let mut finish = input.finish.clone();
+    // A tool that tells the people from their background is given the learned selection the
+    // first time one is used, frozen into the recipe (ADR-0150). Kept once made.
+    if finish.needs_subject() && finish.subject_matte.is_none() {
+        finish.subject_matte = studio_finish::read(&base)?.subject_matte.or_else(|| {
+            crate::local_mask_commands::subject_matte(state, &input.project_id, photo)
+                .ok()
+                .flatten()
+                .map(|(m, _)| m)
+        });
+    }
     let mut proposal = base.clone();
-    studio_finish::write(&mut proposal, &input.finish)?;
+    studio_finish::write(&mut proposal, &finish)?;
     let (merged, changes) = schema::merge(&base, &proposal, EditSource::User)?;
     schema::Validation::check(&merged)?;
     let label = input
@@ -101,6 +112,38 @@ pub fn save_studio_finish(
         finish: studio_finish::read(&merged)?,
         recipe: crate::develop_commands::recipe_dto(&input.photo_id, &merged),
     })
+}
+
+/// The white background an ID photograph needs, written into `proposal` over what `base`
+/// carries: the photographer's other finishing is kept, and the learned person outline is
+/// measured once and frozen into the recipe. Only the ID framing presets call it, on a
+/// photographer's press. Returns what separated the person when it was measured now. ADR-0150.
+pub(crate) fn white_id_background(
+    state: &AppState,
+    project_id: &str,
+    photo: PhotoId,
+    base: &aura_recipe::Recipe,
+    proposal: &mut aura_recipe::Recipe,
+) -> IpcResult<Option<&'static str>> {
+    let mut finish = studio_finish::read(base)?;
+    finish.background = Some(studio_finish::Background {
+        mode: studio_finish::BackgroundMode::Colour,
+        colour: [1.0, 1.0, 1.0],
+        colour2: [1.0, 1.0, 1.0],
+        amount: 100.0,
+        feather: 25.0,
+    });
+    let mut measured = None;
+    if finish.subject_matte.is_none() {
+        if let Some((matte, source)) =
+            crate::local_mask_commands::subject_matte(state, project_id, photo)?
+        {
+            finish.subject_matte = Some(matte);
+            measured = Some(source);
+        }
+    }
+    studio_finish::write(proposal, &finish)?;
+    Ok(measured)
 }
 
 /// What Auto light proposes. ADR-0127.

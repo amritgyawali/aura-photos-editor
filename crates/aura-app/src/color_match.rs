@@ -25,7 +25,9 @@ mod fine;
 pub use fine::FineControls;
 mod library;
 pub use library::{
-    capture as capture_reference, manage as manage_reference, CaptureInput, ManageInput,
+    capture as capture_reference, manage as manage_reference, workflow as library_workflow,
+    CaptureInput, ManageInput, WorkflowInput as LibraryWorkflowInput,
+    WorkflowSnapshot as LibraryWorkflowSnapshot,
 };
 mod reference_image;
 mod regional;
@@ -222,6 +224,18 @@ fn store<T: Serialize>(state: &AppState, key: &str, value: &T) -> AuraResult<()>
     let key = key.to_owned();
     let at = aura_catalog::rfc3339(state.clock().now_utc());
     state.catalog().writer().with(move |conn| {
+        if key.starts_with(ASSET) {
+            // One SQLite statement makes admission atomic even across two catalogue handles.
+            // Existing identifiers remain updateable when the library is full.
+            let changed = conn.execute("INSERT INTO setting(key,value_json,updated_at)
+                SELECT ?1,?2,?3 WHERE EXISTS(SELECT 1 FROM setting WHERE key=?1)
+                OR (SELECT COUNT(*) FROM setting WHERE key LIKE 'colour_reference_v1:%') < 128
+                ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at",
+                rusqlite::params![key,text,at])
+                .map_err(|e| aura_core::errors::db::statement_failed("save colour reference", &e))?;
+            if changed == 0 { return Err(invalid("The reference library holds at most 128 references. Remove an unused reference before importing another.")); }
+            return Ok(());
+        }
         conn.execute("INSERT INTO setting(key,value_json,updated_at) VALUES(?1,?2,?3)
             ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at",
             rusqlite::params![key, text, at])
@@ -364,20 +378,7 @@ fn persist_reference(
 /// # Errors
 /// Catalogue or stored reference failure.
 pub fn list_references(state: &AppState) -> IpcResult<Vec<ReferenceSummary>> {
-    Ok(state.catalog().read(|conn| {
-        let mut query = conn.prepare("SELECT value_json FROM setting WHERE key LIKE 'colour_reference_v1:%' ORDER BY updated_at DESC LIMIT 128")
-            .map_err(|e| aura_core::errors::db::statement_failed("list colour references", &e))?;
-        let rows = query.query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| aura_core::errors::db::statement_failed("list colour references", &e))?;
-        let mut out = Vec::new();
-        for row in rows {
-            let text = row.map_err(|e| aura_core::errors::db::statement_failed("colour reference row", &e))?;
-            if text.len() > 8 * 1024 * 1024 { continue; }
-            let reference: Reference = serde_json::from_str(&text).map_err(|_| invalid("A saved reference is unreadable."))?;
-            if reference.engine == ENGINE { out.push(reference.summary); }
-        }
-        Ok(out)
-    })?)
+    library::ordered_references(state)
 }
 
 fn rendered(state: &AppState, frame: &Frame, recipe: &Recipe) -> AuraResult<Rgb8> {

@@ -22,3 +22,10 @@ equivalence with another editor. It organizes AURA's existing native tools.
 Reference matching also includes independent regional colour strengths. See the
 [reference workflow](adjustable-finishing-and-reference-colour.md#match-regions-independently)
 for analysis, supported regions and limits.
+
+Color & light includes [Levels and extended local colour](studio-color-tools.md),
+[framing and inspection](framing-and-inspection.md). Masks includes the twelve
+[selection workflows](mask-selection-workflows.md). Reference matching adds an
+organized group/batch manager and portable AURA descriptor libraries. See the
+[numbered implementation ledger](reports/AURA-fifty-capabilities-2026-10-20.md)
+for what is new and how it differs from existing tools.

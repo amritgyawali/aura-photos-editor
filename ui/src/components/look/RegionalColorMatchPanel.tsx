@@ -12,6 +12,7 @@ export function RegionalColorMatchPanel({ photoId, referenceId, referenceAvailab
 }): JSX.Element {
   const [report, setReport] = useState<RegionalMatchReport | null>(null);
   const [draft, setDraft] = useState<RegionalStrengths>({});
+  const [linked, setLinked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -83,12 +84,15 @@ export function RegionalColorMatchPanel({ photoId, referenceId, referenceAvailab
       <p>Regional reference: {report.reference.name}.</p>
       {!report.current && <p role="status">This photo changed. Analyse again before applying regional strengths.</p>}
       {!report.regions.length && <p>No shared supported regions were found. Try a similar reference or use whole-photo matching.</p>}
+      <label><input type="checkbox" checked={linked} disabled={locked || !report.current} onChange={event => setLinked(event.target.checked)}/> Link regional matching strengths</label>
       {report.regions.map(region => <fieldset key={region.name} disabled={locked || !report.current || !region.correctionAvailable}>
         <legend>{REGIONAL_MATCH_LABELS[region.name]}</legend>
         {FIELDS.map(([field, label]) => <label key={field}>{label} ({Math.round((draft[region.name]?.[field] ?? 1) * 100)}%)
           <input type="range" aria-label={`${REGIONAL_MATCH_LABELS[region.name]} match ${label.toLowerCase()}`} min="0" max="200" step="1"
             value={Math.round((draft[region.name]?.[field] ?? 1) * 100)}
-            onChange={event => setDraft(value => ({ ...value, [region.name]: { ...region.controls, ...value[region.name], [field]: Number(event.target.value) / 100 } }))}/>
+            onChange={event => setDraft(value => linked
+              ? Object.fromEntries(report.regions.map(item => [item.name, { ...item.controls, ...value[item.name], ...(item.correctionAvailable ? { [field]: Number(event.target.value) / 100 } : {}) }]))
+              : ({ ...value, [region.name]: { ...region.controls, ...value[region.name], [field]: Number(event.target.value) / 100 } }))}/>
         </label>)}
         <p className="lr-hint">Appearance distance {region.beforeDistance.toFixed(2)} → {region.afterDistance.toFixed(2)}.</p>
         {region.reason && <p>{region.reason}</p>}

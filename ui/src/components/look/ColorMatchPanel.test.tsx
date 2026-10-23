@@ -4,6 +4,7 @@ import { ColorMatchPanel } from './ColorMatchPanel';
 import { colorMatch, pickColorReference, pickColorReferences, type ColorMatchReport } from '../../ipc/colorMatch';
 import { api } from '../../ipc/client';
 vi.mock('./RegionalColorMatchPanel', () => ({ RegionalColorMatchPanel: () => null }));
+vi.mock('./ReferenceLibraryManager', () => ({ ReferenceLibraryManager: () => null }));
 
 vi.mock('../../ipc/client', () => ({ inTauri: () => true, api: { cancelJob: vi.fn() },
   asIpcError: (error: Error) => ({ message: error.message }) }));

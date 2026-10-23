@@ -5,6 +5,8 @@ import type { HistoryDto, RecipeDto, RenderDto } from '../../ipc/types';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { AutoRetouchSettings } from './AutoRetouchSettings';
 import { AdvancedRetouch } from './AdvancedRetouch';
+import { RetouchIntensity } from './RetouchIntensity';
+import { EFFECT_COLOR, EFFECT_DEFAULTS, isEffectTool } from '../../ipc/retouchEffects';
 import { changesDataUrl, coverageDataUrl } from './rgbImage';
 import { previewSource, useProgressivePreview } from '../../state/previewCache';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
@@ -15,6 +17,7 @@ import { AutomaticFinishControls } from './AutomaticFinishControls';
 import { BlemishReview } from './BlemishReview';
 import { useRetouchDraftPreview } from './useRetouchDraftPreview';
 import { retouchCollection, type RetouchOutcome } from './batchRetouch';
+import { useEffectRequest } from '../../state/effectRequest';
 import './precision-retouch.css';
 
 /** A short provenance tag for operations the automatic pass wrote. */
@@ -144,16 +147,30 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     if(selected&&dirty){setError('Apply or discard your changes before choosing another tool.');return;}
     const defringe=tool==='defringe';
     setSourceMode(false);
-      setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:defringe?1:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:defringe?1:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null,
-        ...(defringe?{region:[.5,.5,1,1] as [number,number,number,number],feather:0,radius:.003,mask:null,selection:null,matte:null}:{}),
-        ...(tool==='fabric_stain'?{source:null}:{}),
-          ...(tool==='zoom_blur'?{source:[.5,.5] as [number,number],radius:.02}:{}),
-          ...(tool==='motion_blur'?{radius:.02}:{}),
-          ...(tool==='color_despill'?{targetColor:[0,1,0] as [number,number,number]}:{}),
-          ...(tool==='color_saturation'?{warmth:0,tint:.25}:{}),
-        ...(['fabric_moire','fabric_stain','shadow_balance','background_blur','highlight_glow'].includes(tool)?{radius:.02}:{}),
-      });
+    setSelected(null);change({id:'draft',tool,repairPasses:undefined,enabled:true,amount:defringe?1:.65,texture:1,tone:.5,warmth:tool==='makeup'?.2:defringe?1:0,tint:tool==='makeup'?.2:0,targetColor:['colorize','background_color'].includes(tool)?[.45,.2,.1]:null,
+      ...(defringe?{region:[.5,.5,1,1] as [number,number,number,number],feather:0,radius:.003,mask:null,selection:null,matte:null}:{}),
+      ...(tool==='fabric_stain'?{source:null}:{}),
+      ...(tool==='zoom_blur'?{source:[.5,.5] as [number,number],radius:.02}:{}),
+      ...(tool==='motion_blur'?{radius:.02}:{}),
+      ...(tool==='color_despill'?{targetColor:[0,1,0] as [number,number,number]}:{}),
+      ...(tool==='color_saturation'?{warmth:0,tint:.25}:{}),
+      ...(['fabric_moire','fabric_stain','shadow_balance','background_blur','highlight_glow'].includes(tool)?{radius:.02}:{}),
+      // Each selected effect starts where it is most useful (ADR-0131).
+      ...(isEffectTool(tool)?{...EFFECT_DEFAULTS[tool],targetColor:EFFECT_COLOR[tool]?.initial??null}:{})});
   };
+  // A tool chosen in the Effects library (ADR-0135), taken once the saved stack has loaded. An
+  // unsaved draft is never replaced: the request waits and the photographer is told why.
+  const effectRequest=useEffectRequest(state=>state.request);
+  const consumeEffect=useEffectRequest(state=>state.consume);
+  useEffect(()=>{
+    if(!effectRequest||busy||!loaded)return;
+    if(dirty){setError('Apply or discard your draft to open the tool you chose in Effects.');return;}
+    consumeEffect(effectRequest.sequence);
+    setSelected(null);
+    chooseTool(effectRequest.tool);
+    if(Object.keys(effectRequest.patch).length)change(effectRequest.patch);
+  // chooseTool and change are recreated every render; the request is what this reacts to.
+  },[effectRequest,busy,loaded,dirty,consumeEffect]);
   const chooseMode=(next:RetouchMode)=>{
     setMode(next);setSourceMode(false);setMaskView(false);
     if(next==='gradient'){change({mask:null,selection:{...draft.selection,gradient:draft.selection?.gradient??{start:[.2,.5],end:[.8,.5]}}});return;}
@@ -283,6 +300,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         <PortraitAutoReport recipe={recipe}/>
         <AutomaticFinishControls key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId}
           revision={retouchRecipe?.recipeHash ?? ''} disabled={stackBlocked || !retouchRecipe} onApply={task=>save(task)}/>
+        <RetouchIntensity projectId={projectId} photoId={photoId} version={retouchRecipe?.recipeHash ?? null} disabled={stackBlocked||!preview} onRun={task=>void save(task)}/>
         {dirty&&<p className="lr-hint">{draftNotice}</p>}
         <RetouchOperationList edits={edits} selected={selected} disabled={stackBlocked} automaticLabel={automaticLabel}
           onSelect={edit=>{setSelected(edit.id);setDirty(false);setMode(edit.selection?.gradient?'gradient':edit.mask?'paint':'ellipse');setDraft({...edit,region:[...edit.region],source:edit.source?[...edit.source]:null});setCompare(false);}}

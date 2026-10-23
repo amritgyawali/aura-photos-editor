@@ -2,6 +2,46 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## A hundred measured portrait, attire, background and delivery tools - 2026-10-22
+
+- **Sliders that find what they act on** (ADR-0150), in the style of Evoto: twenty more face sliders
+  (eye height, tilt, corners and a measured eye symmetry; nose bridge, tip, lift and nostrils; each lip,
+  the brows, temples, chin and hair volume) and ten more body sliders (thighs, calves, a flat stomach on
+  the side the silhouette shows it, hips, shoulders, torso, height, neck, double chin, a level head).
+- **Skin and makeup on every face**: aegyo-sal, lip lines, glow, stubble shadow, rosy complexion, even
+  teeth, feature sharpening, beard definition, clothing colour on skin, pores; eyeliner and wing on the
+  measured lid line, lashes, lip liner, ombre lips, highlighter, bronzer, enhance worn makeup, fill brows.
+- **Hair, attire, background and people**: hair shine, parting, colour depth and edge; gold jewellery,
+  clipped red fabric, veil clarity, embroidery, garment edges, mehndi, white and dark garments, outfit
+  colour; background saturation, brightness, warmth, depth blur, noise, backdrop light, light wrap, a
+  colour that keeps shadows and a sky with clouds; people exposure, warmth, clarity, group face and skin
+  balance, relight, harsh shadows, backlight rescue, a face-aware vignette and face brightness.
+- **Seven tools you place yourself**: body hair, cellulite, tan lines, hands, knuckles and elbows, glasses
+  reflection colour, and a cast shadow.
+- **Framing, delivery and review**: ID photographs on white, measured crops, level eyes, a transparent PNG
+  cut-out, an Instagram grid in posting order, carousel slides, before and after, a 2x enlargement without
+  halos, a face picker and a list of faces showing no white of the eye (not a blink verdict: that needs
+  a trained eye-state model). See [the tool list](docs/evoto-hundred-tools.md).
+- **Fixed**: moving a Portrait studio slider back to zero, Reset all, Keep original background, Clear
+  liquify and turning the light off now take effect; the merge kept the old value of any field the
+  saved finish left out. The portrait parse (version 4) centres the mouth on the line between the lips,
+  keeps blush out of the lips and lid shimmer out of the whites of the eyes.
+
+## Fifty studio capabilities - 2026-10-20
+
+- Update the workspace and desktop TLS locks to rustls 0.23.46 for four
+  RustSec fixes; record the existing GPU parser's scoped CC0 license exception.
+- Add native Levels, luminosity Levels, selective CMYK and sampled endpoints;
+  extend masks with curves, HSL, colour grading, sharpening and dehaze.
+- Add twelve composed-selection workflows, including whole inversion,
+  duplication, saved-mask combinations, morphology and connected-area cleanup.
+- Add durable empty reference groups, ordering, transactional batch management
+  and bounded descriptor-library import/export.
+- Add free/exact/custom framing, physical print sizing/export, measured placement
+  and alignment, reusable templates, linked regional strengths and RGB/Lab inspection.
+- Keep originals, manual work and history; distinguish documented counterparts
+  from AURA extensions in the [50-item report](docs/reports/AURA-fifty-capabilities-2026-10-20.md).
+
 ## Adjustable automatic finishing and reference library - 2026-10-20
 
 - Add genuine regional reference-colour fitting with independent skin, hair,
@@ -70,6 +110,74 @@ All notable changes to AURA. One entry per phase, newest first.
 - See [ADR-0126](docs/adr/ADR-0126-import-recovery-and-responsive-retouch-review.md)
   and the [validation report](docs/reports/AURA-workflow-improvements-2026-10-19.md).
 
+## An Effects screen, and twenty more tools - 2026-10-20
+
+- **Effects in the sidebar** (ADR-0135): all 119 retouch tools and effects in one searchable place,
+  grouped, with quick jobs, favourites and recently used. Each card says what the tool needs (a
+  point, a skin sample, a colour). **Use on this photo** opens Retouch with the tool chosen and
+  never replaces an unsaved draft.
+- **Grooming**: darken lashes and liner, fill thin hair or brows, and match grain, which gives an
+  over-smoothed area the grain the photograph itself measures.
+- **Stylised looks**: channel swap, sunset glow, day to night with lamps kept lit, Lomo, instant
+  film, pop art.
+- **Optics and texture**: iris blur, double exposure echo, ripple, frosted glass, pixel sort, VHS
+  tape, emboss, crosshatch.
+- **Light**: sparkle on real glints, fairy lights, rainbow prism.
+
+## Twenty more effects: colour looks, light and lens, art, repair - 2026-10-20
+
+- **Colour looks** (ADR-0134): split tone, film fade, bleach bypass, teal and orange that holds
+  skin, colour splash, and a sky-blue restore that leaves skin and cloud alone.
+- **Light and lens**: spotlight, rim light along a selected subject's edge, chromatic aberration,
+  fisheye, anamorphic streaks, kaleidoscope.
+- **Art**: watercolour, stained glass, cartoon and neon edges that follow colour edges, thermal.
+- **Repair**: blown highlights given back the colour of their surroundings at their own
+  brightness, dehaze measured on the selection, and the iris's limbal ring.
+
+## Twenty more tools, a whole-app test, and two fixes it found - 2026-10-20
+
+- **Eight practical repairs** (ADR-0132): dust and scratches, JPEG artifact cleanup, banding
+  removal, auto levels and colour-cast removal measured on the selection, even out uneven
+  lighting, HDR detail, and bokeh highlights.
+- **Twelve creative looks**: tilt-shift, duotone, posterize, halftone print, pencil sketch, oil
+  paint, cross-process, infrared, mirror symmetry, lens flare, god rays, snow and rain.
+- **Matching a finished PNG of the same photo works up to the documented 16 megapixels.** Every
+  PNG reference over 8 megapixels was refused as too large to open, with a message telling the
+  photographer to contact support.
+- **A photo that has not been analysed yet says so**, rather than that it could not be read.
+- **Portrait retouch no longer mistakes gold silk or gilded carving for a tilted face**
+  (ADR-0133). On a photo of a bride's mehndi hands it had smoothed the dress as skin. A tilted face
+  found by only a few windows now needs both eyes confirmed; on 67 wedding photographs every real
+  face is still found.
+- `scripts/test-everything-gui.py` exercises every tool and feature in the real window on real
+  photographs, including RAW, and writes a report.
+
+## Twenty-nine effects you place yourself - 2026-10-20
+
+- **Liquify** (ADR-0131): push, enlarge, shrink and twirl, tapering to nothing at the ellipse
+  edge so a warp never tears; never used by automatic retouch.
+- **Blur and optics**: spin blur, pixelate and privacy blur, soft focus, Orton glow, local
+  sharpening and edge-preserving local noise reduction. (A defringe was also built and then
+  withdrawn on merging `main`, whose measured Defringe of ADR-0125 does the job better.)
+- **Colour**: hue shift and colour unify that keep brightness, green-screen colour replacement
+  with spill removal, local white balance from a picked neutral, vein reduction, invert.
+- **Light and portrait**: light leak, glitch, haze, sun rays, film halation, catchlights, a pet-eye
+  glow fix, lip gloss, freckles, floor reflection and drop shadow, plus seven named shortcuts.
+- Every effect is an ordinary saved retouch operation with its own selection, strength and Undo,
+  deterministic on every machine, and changes nothing outside its selection (the drop shadow
+  falls beside its subject by design).
+
+## Retouch strength sliders after Auto retouch - 2026-10-19
+
+- **Turn each kind of automatic retouch up or down after it has run** (ADR-0130): blemish and
+  acne removal, skin smoothing, even skin tone, dark circles, teeth, shine, body skin, clothing,
+  background and more, one slider each, 100% being exactly what Auto retouch did and 0% removing
+  it. The measured operations are never rewritten, so moving a slider back restores the automatic
+  result bit for bit, and running Auto retouch again keeps the sliders where they were.
+- **Sliders stop where they stop changing anything**: above 100% only operations below full
+  strength can rise, and a slider whose areas are all at full strength stops at 100%.
+- **Apply these strengths to the collection** gives every other auto-retouched photo the same
+  strengths over its own measured retouch. Operations made or changed by hand are never scaled.
 ## Portrait light: relight a face, open its shadows, add catchlights and a glow, or press Auto light - 2026-10-17
 
 - **A key light shaped by the head** (ADR-0127), in a new **Light** tab of the Portrait studio. Each
