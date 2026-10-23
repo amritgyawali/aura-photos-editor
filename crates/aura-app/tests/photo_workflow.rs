@@ -3,7 +3,7 @@
 use aura_app::contract::ipc::*;
 use aura_app::{photo_auto_edit, AppState};
 use aura_core::progress::{CancelToken, NullProgress};
-use aura_core::{ImportId, ProjectId};
+use aura_core::{ImportId, PhotoId, ProjectId};
 use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 use aura_raw::codec::{decode_jpeg, encode_jpeg, Rgb8};
 use std::sync::Arc;
@@ -198,6 +198,7 @@ fn imported_pixels_are_edited_protected_and_exported_without_changing_originals(
         .expect("JPEG preset");
     let mut set = serde_json::to_value(preset).expect("preset json");
     set["imageIds"] = serde_json::json!([photo]);
+    set["sidecar"] = serde_json::json!(true);
     let destination = dir.path().join("export");
     let job: ExportJobInput = serde_json::from_value(serde_json::json!({
         "projectId": project.id, "sets": [set], "destination": destination,
@@ -205,9 +206,26 @@ fn imported_pixels_are_edited_protected_and_exported_without_changing_originals(
         "creator": null, "keywords": [], "stripGps": true, "stripCameraSerial": true, "verify": true
     }))
     .expect("job");
-    aura_app::export_run(&state, job).expect("first export");
+    let delivered = aura_app::export_run(&state, job).expect("first export");
+    assert_eq!(
+        delivered.sidecars, 1,
+        "a requested recipe sidecar must be written"
+    );
     let exported = walk_jpegs(&destination);
     assert!(!exported.is_empty(), "first export must create a JPEG");
+    let sidecar: aura_recipe::Recipe = serde_json::from_str(
+        &std::fs::read_to_string(exported[0].with_extension("xmp")).expect("recipe sidecar"),
+    )
+    .expect("canonical recipe JSON");
+    let stored = state
+        .recipe_store()
+        .load(&PhotoId::from_db(photo).expect("photo id"))
+        .expect("read saved edit")
+        .expect("saved edit");
+    assert_eq!(
+        sidecar, stored,
+        "sidecar must describe the rendered saved edit"
+    );
     let decoded = decode_jpeg(
         &std::fs::read(&exported[0]).expect("export bytes"),
         aura_raw::DecodeLimits::tier3(),

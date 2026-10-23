@@ -1,19 +1,17 @@
 //! Reference-first local style analysis and per-photo, rendered style fitting.
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use aura_core::contract::look::{LookAggregate, MIN_REFERENCES};
-use aura_core::contract::style::{LightingBucket, StyleDelta};
+use aura_core::contract::style::LightingBucket;
 use aura_core::progress::CancelToken;
 use aura_core::{PhotoId, ProjectId};
-use aura_look::verify::{OwnFrame, Renderer};
-use aura_look::{aggregate, measure, solve};
-use aura_preview::contract::service::{PreviewService, Priority};
-use aura_recipe::{schema, EditSource};
+use aura_look::{aggregate, measure};
+use aura_recipe::EditSource;
 use aura_render::{FrameSource, RenderLevel};
 use serde::{Deserialize, Serialize};
 
+use crate::color_match::gallery_fit;
 use crate::{commands::IpcResult, AppState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +26,8 @@ pub struct ReferenceAnalysis {
     pub contrast: f32,
     pub warmth: f32,
     pub saturation: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calibration: Option<crate::color_match::CalibrationReport>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,6 +36,14 @@ struct StoredReference {
     analysis: ReferenceAnalysis,
     global: LookAggregate,
     lighting: BTreeMap<LightingBucket, LookAggregate>,
+    #[serde(default)]
+    thumbnail: Vec<u8>,
+    #[serde(default)]
+    dimensions: [u32; 2],
+    #[serde(default)]
+    monochrome: bool,
+    #[serde(default)]
+    calibration: Option<aura_recipe::calibrated_look::CalibratedLook>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,12 +52,16 @@ pub struct AnalyseReferenceInput {
     /// Whose look this is, for the label: a name, an @handle or a profile address. Optional and
     /// never fetched - AURA reads only the folder the photographer chose.
     pub address: String,
+    /// A folder of references, or one finished JPEG/PNG/TIFF.
     pub folder: String,
     pub cancel_id: String,
     /// The folder is an Instagram "Download your information" export, so its posted media is
     /// found where Instagram puts it rather than by walking the whole tree.
     #[serde(default)]
     pub export: bool,
+    /// Optional unedited version of the same single reference, with identical framing.
+    #[serde(default)]
+    pub original: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +76,8 @@ pub struct ApplyReferenceInput {
     /// That profile's strength, `0..=1.5`; 1 when absent.
     #[serde(default)]
     pub profile_strength: Option<f32>,
+    #[serde(default)]
+    pub cancel_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -105,29 +119,101 @@ pub fn analyse_reference(
     Ok(result?)
 }
 
+fn sources(
+    input: &AnalyseReferenceInput,
+) -> aura_core::AuraResult<(bool, Vec<aura_look::source::ReferenceFile>, String)> {
+    let single = Path::new(&input.folder).is_file() && !input.export;
+    let (files, origin) = if single {
+        let label = input.address.trim();
+        let origin = if label.is_empty() {
+            "Edited reference".to_string()
+        } else {
+            aura_core::contract::look::ReferenceOrigin::parse(label)
+                .map_or_else(|_| label.to_owned(), |value| value.title())
+        };
+        (
+            vec![aura_look::source::ReferenceFile {
+                path: PathBuf::from(&input.folder),
+                key: "edited-reference".into(),
+            }],
+            origin,
+        )
+    } else {
+        let reference = aura_look::source::resolve(
+            &input.address,
+            if input.export {
+                aura_core::contract::look::MediaSource::InstagramExport
+            } else {
+                aura_core::contract::look::MediaSource::Folder
+            },
+            Some(Path::new(&input.folder)),
+        )?;
+        (reference.files, reference.origin.title())
+    };
+    Ok((single, files, origin))
+}
+
+fn decode_reference(
+    file: &aura_look::source::ReferenceFile,
+    single: bool,
+) -> aura_core::AuraResult<aura_raw::codec::Rgb8> {
+    if !single
+        && file
+            .path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("webp"))
+    {
+        aura_look::source::decode(file)
+    } else {
+        gallery_fit::decode(&file.path)
+    }
+}
+
+#[allow(clippy::too_many_lines)]
 fn analyse(
     state: &AppState,
     input: &AnalyseReferenceInput,
     cancel: &CancelToken,
 ) -> aura_core::AuraResult<ReferenceAnalysis> {
-    let reference = aura_look::source::resolve(
-        &input.address,
-        if input.export {
-            aura_core::contract::look::MediaSource::InstagramExport
-        } else {
-            aura_core::contract::look::MediaSource::Folder
-        },
-        Some(Path::new(&input.folder)),
-    )?;
+    let (single, files, origin) = sources(input)?;
+    if input.original.is_some() && (!single || input.export) {
+        return Err(refused(
+            "An original/edited pair requires one edited reference photo.",
+        ));
+    }
+    let mut calibrated = None;
+    let mut calibration_report = None;
+    let mut thumbnail = Vec::new();
+    let mut dimensions = [0; 2];
+    let mut monochrome = true;
     let mut readings = Vec::new();
     let mut palette = [0_usize; 64];
-    for file in &reference.files {
+    for file in &files {
         if cancel.is_cancelled() {
             return Err(refused(
                 "Reference analysis stopped. No style was selected.",
             ));
         }
-        if let Ok(image) = aura_look::source::decode(file) {
+        let image = match decode_reference(file, single) {
+            Ok(image) => image,
+            Err(error) if single => return Err(error),
+            Err(error) => {
+                tracing::debug!(code = %error.code, "Reference photo skipped during analysis");
+                continue;
+            }
+        };
+        {
+            if let Some(original) = &input.original {
+                let (model, report) =
+                    gallery_fit::calibrate(state, Path::new(original), &file.path, cancel)?;
+                calibrated = Some(model);
+                calibration_report = Some(report);
+            }
+            monochrome &= gallery_fit::monochrome(&image);
+            if single {
+                thumbnail = gallery_fit::thumbnail(&image);
+                dimensions = [image.width, image.height];
+            }
             let image = aura_raw::thumb::scale_to(&image, 256);
             readings.push(measure::read_at(&file.key, &image, 256));
             for pixel in image.data.chunks_exact(3) {
@@ -141,8 +227,13 @@ fn analyse(
             }
         }
     }
-    if readings.len() < MIN_REFERENCES as usize {
+    if readings.is_empty() || (!single && readings.len() < MIN_REFERENCES as usize) {
         return Err(refused(format!("Only {} reference photos decoded successfully. Add at least {MIN_REFERENCES} distinct JPEG or PNG photos.", readings.len())));
+    }
+    if cancel.is_cancelled() {
+        return Err(refused(
+            "Reference analysis stopped. No style was selected.",
+        ));
     }
     let global = aggregate::fold(&aggregate::all(&readings));
     let mut colors: Vec<_> = palette
@@ -153,9 +244,9 @@ fn analyse(
     colors.sort_by_key(|(bin, count)| (std::cmp::Reverse(**count), *bin));
     let analysis = ReferenceAnalysis {
         id: uuid::Uuid::new_v4().to_string(),
-        origin: reference.origin.title(),
+        origin,
         measured: readings.len(),
-        skipped: reference.files.len() - readings.len(),
+        skipped: files.len() - readings.len(),
         colors: colors
             .iter()
             .take(6)
@@ -172,16 +263,21 @@ fn analyse(
         contrast: global.tone.p95 - global.tone.p05,
         warmth: global.mid.b,
         saturation: global.chroma_p50,
+        calibration: calibration_report,
     };
     let lighting = aggregate::by_lighting(&readings)
         .into_iter()
         .filter_map(|(bucket, rows)| (rows.len() >= 4).then(|| (bucket, aggregate::fold(&rows))))
         .collect();
     let stored = StoredReference {
-        version: 1,
+        version: 3,
         analysis: analysis.clone(),
         global,
         lighting,
+        thumbnail,
+        dimensions,
+        monochrome,
+        calibration: calibrated,
     };
     let path = profile_path(state, &analysis.id)?;
     if let Some(parent) = path.parent() {
@@ -200,19 +296,56 @@ pub fn apply_reference(
     state: &AppState,
     input: &ApplyReferenceInput,
 ) -> IpcResult<ApplyReferenceReport> {
-    if !input.strength.is_finite() || !(0.0..=1.0).contains(&input.strength) {
-        return Err(refused("Look strength must be between 0 and 100 percent").into());
+    let cancel = CancelToken::new();
+    if let Some(id) = &input.cancel_id {
+        state.register_job(id, cancel.clone());
     }
+    let result = apply_with_cancel(state, input, &cancel);
+    if let Some(id) = &input.cancel_id {
+        state.finish_job(id);
+    }
+    result
+}
+
+fn load_reference(
+    state: &AppState,
+    input: &ApplyReferenceInput,
+) -> aura_core::AuraResult<StoredReference> {
     let bytes = std::fs::read(profile_path(state, &input.reference_id)?).map_err(|_| {
         refused("This reference style is no longer cached. Analyse the references again.")
     })?;
     let reference: StoredReference =
         serde_json::from_slice(&bytes).map_err(|e| refused(e.to_string()))?;
-    if reference.version != 1 {
-        return Err(refused("Analyse this reference again with the current version.").into());
+    if !matches!(reference.version, 1..=3) {
+        return Err(refused(
+            "Analyse this reference again with the current version.",
+        ));
     }
+    if let Some(model) = &reference.calibration {
+        model.validate()?;
+    }
+    Ok(reference)
+}
+
+#[allow(clippy::too_many_lines)]
+pub(crate) fn apply_with_cancel(
+    state: &AppState,
+    input: &ApplyReferenceInput,
+    cancel: &CancelToken,
+) -> IpcResult<ApplyReferenceReport> {
+    if !input.strength.is_finite() || !(0.0..=1.0).contains(&input.strength) {
+        return Err(refused("Look strength must be between 0 and 100 percent").into());
+    }
+    if cancel.is_cancelled() {
+        return Err(refused("Reference matching stopped. No edit was saved.").into());
+    }
+    let reference = load_reference(state, input)?;
     let photo =
         PhotoId::from_db(&input.photo_id).map_err(|_| refused("Invalid photo identifier"))?;
+    let current = state.recipe_store().load(&photo)?.ok_or_else(|| {
+        refused("Save an initial edit or run Auto edit before matching this reference.")
+    })?;
+    let hash = aura_recipe::hash::recipe_hash(&current)?;
     let project_key: String = state.catalog().read(|conn| {
         conn.query_row(
             "SELECT project_id FROM photo WHERE photo_id=?1",
@@ -222,82 +355,87 @@ pub fn apply_reference(
         .map_err(|e| aura_core::errors::db::statement_failed("reference photo", &e))
     })?;
     let project = ProjectId::from_db(&project_key).map_err(|_| refused("Invalid collection"))?;
-    let original = state.previews(&project_key)?.get(
-        photo,
-        aura_raw::PixelLevel::Thumb(384),
-        Priority::Interactive,
+    let full =
+        crate::photo_frames::CatalogFrames::new(state.clone()).frame(&photo, RenderLevel::Full)?;
+    let small = gallery_fit::reduced(&full)?;
+    let source = gallery_fit::render(
+        state,
+        &small,
+        &crate::develop_commands::neutral_recipe(state, photo),
     )?;
-    let preview = original
-        .as_srgb8()
-        .ok_or_else(|| refused("Photo preview is not sRGB"))?;
-    let current = crate::develop_commands::load_or_neutral(state, photo)?;
-    // The baseline is the measured correction, or an edit profile over it: either way it is
-    // rebuilt from a neutral develop, so a repeated application never compounds.
-    let chosen = match input.profile_id.as_deref() {
-        None => None,
-        Some(id) => crate::edit_profiles::resolve(state, id)?,
-    };
-    let baseline = crate::edit_profiles::build(
+    let chosen = input
+        .profile_id
+        .as_deref()
+        .map(|id| crate::edit_profiles::resolve(state, id))
+        .transpose()?
+        .flatten();
+    let mut baseline = crate::edit_profiles::build(
         &current,
         chosen.as_ref(),
         input.profile_strength.unwrap_or(1.0),
-        crate::edit_profiles::AutoCorrection::measure(preview)?,
-        crate::edit_profiles::SceneStats::measure(preview)?,
+        crate::edit_profiles::AutoCorrection::measure(&source.data)?,
+        crate::edit_profiles::SceneStats::measure(&source.data)?,
     )?
     .0;
-    let pixels = crate::photo_frames::CatalogFrames::new(state.clone())
-        .frame(&photo, RenderLevel::Screen(384, 384))?;
-    let mut frame = OwnFrame {
-        key: input.photo_id.clone(),
-        width: pixels.width,
-        height: pixels.height,
-        frame: pixels,
-        baseline: baseline.clone(),
-        lighting: LightingBucket::Unknown,
-        user_edited: false,
-    };
-    let renderer = Renderer::new(
-        Arc::clone(state.clock()),
-        aura_render::contract::render::OutputSpec::default(),
-    );
-    let reading = renderer.read_with(&frame, &StyleDelta::neutral())?;
+    // Rebuild every match from its baseline. A calibration belongs to the selected reference,
+    // so changing references or strength must replace it rather than compound it.
+    baseline.extra.remove(aura_recipe::calibrated_look::KEY);
+    let rendered = gallery_fit::render(state, &small, &baseline)?;
+    let reading = measure::read("reference-baseline", &rendered);
     let target = reference
         .lighting
         .get(&reading.lighting)
         .filter(|_| reading.lighting_confidence >= 0.5)
         .unwrap_or(&reference.global);
-    let measured = aggregate::fold(&[&reading]);
-    let initial = solve::initial(target, &measured);
-    let before = solve::distance(target, &measured);
-    let mut best_distance = before;
-    let mut best = baseline.clone();
-    // Compare bounded candidates through the same renderer used by export. A
-    // stronger setting cannot force a candidate whose measured fit is worse.
-    if input.strength > 0.0 {
-        for factor in [1.0, 0.66, 0.33] {
-            let proposal =
-                aura_look::verify::shift(&baseline, &initial.scaled(input.strength * factor));
-            let candidate = schema::merge(&current, &proposal, EditSource::Ai)?.0;
-            schema::Validation::check(&candidate)?;
-            frame.baseline = candidate.clone();
-            let result = renderer.read_with(&frame, &StyleDelta::neutral())?;
-            let distance = solve::distance(target, &aggregate::fold(&[&result]));
-            if distance < best_distance {
-                best_distance = distance;
-                best = candidate;
-            }
-        }
+    let same_aspect = reference.dimensions[0] > 0
+        && reference.dimensions[1] > 0
+        && ((f64::from(rendered.width) / f64::from(rendered.height))
+            / (f64::from(reference.dimensions[0]) / f64::from(reference.dimensions[1]))
+            - 1.0)
+            .abs()
+            < 0.02;
+    let request = gallery_fit::Request {
+        full: &full,
+        baseline: &baseline,
+        current: &current,
+        target,
+        thumbnail: if same_aspect {
+            &reference.thumbnail
+        } else {
+            &[]
+        },
+        monochrome: reference.monochrome,
+        strength: input.strength,
+        cancel,
+    };
+    let fitted = if let Some(model) = &reference.calibration {
+        gallery_fit::apply_calibrated(state, &request, model)?
+    } else {
+        gallery_fit::fit(state, &request)?
+    };
+    if cancel.is_cancelled() {
+        return Err(refused("Reference matching stopped. No edit was saved.").into());
     }
-    best.provenance.source = EditSource::Ai;
-    best.provenance.confidence = 0.4;
-    let (merged, report) = schema::merge(&current, &best, EditSource::Ai)?;
-    schema::Validation::check(&merged)?;
-    state.recipe_store().save(&project, &photo, &merged, &report.changed,
-        &format!("Reference style: {} ({} photos); measured appearance distance {:.2} → {:.2}. Original settings cannot be recovered from a finished photo.", reference.analysis.origin, reference.analysis.measured, before, best_distance))?;
+    let mut recipe = fitted.recipe;
+    recipe.provenance.source = EditSource::Ai;
+    recipe.provenance.confidence = 0.4;
+    if !fitted.changed.is_empty() {
+        state.recipe_store().save_if_current(
+            &project,
+            &photo,
+            &recipe,
+            &fitted.changed,
+            &format!(
+                "Reference style: {} ({} photos); native measured distance {:.2} -> {:.2}.",
+                reference.analysis.origin, reference.analysis.measured, fitted.before, fitted.after
+            ),
+            &hash,
+        )?;
+    }
     Ok(ApplyReferenceReport {
-        changed: report.changed.len(),
-        before_distance: before,
-        after_distance: best_distance,
+        changed: fitted.changed.len(),
+        before_distance: fitted.before,
+        after_distance: fitted.after,
         protected_fields: current.provenance.user_edited_fields.len(),
     })
 }

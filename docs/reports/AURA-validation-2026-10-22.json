@@ -1,0 +1,4387 @@
+{
+  "date": "2026-10-22",
+  "newCapabilities": 100,
+  "groups": {
+    "colour": 25,
+    "spatial": 25,
+    "selection": 25,
+    "inspection": 25
+  },
+  "native": {
+    "passed": 4502,
+    "failed": 0,
+    "ignored": 53,
+    "groups": 291
+  },
+  "finalLibraries": {
+    "passed": 778,
+    "failed": 0,
+    "ignored": 5,
+    "groups": 3
+  },
+  "finalSelectionTests": {
+    "passed": 16,
+    "failed": 0,
+    "ignored": 0,
+    "groups": 1
+  },
+  "finalRendererTests": {
+    "passed": 323,
+    "failed": 0,
+    "ignored": 3,
+    "groups": 1
+  },
+  "frontend": {
+    "tests": 998,
+    "files": 111
+  },
+  "commands": {
+    "clippy-final": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "-j",
+        "2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 101,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 79.562
+    },
+    "clippy-verified": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "-j",
+        "2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 98.781
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "-j",
+        "2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 101,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 3480.204
+    },
+    "contracts-final": {
+      "command": [
+        "cargo",
+        "xtask",
+        "contracts",
+        "--check"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 3583.781
+    },
+    "contracts": {
+      "command": [
+        "cargo",
+        "xtask",
+        "check-contracts"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 1,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 3611.11
+    },
+    "desktop-audit-final": {
+      "command": [
+        "python",
+        "scripts/audit-aura-next100-desktop.py",
+        "--output",
+        ".work-checks/aura-2026-10-22/desktop",
+        "--port",
+        "9391",
+        "--ledger",
+        "docs/reports/AURA-capabilities-2026-10-22.json",
+        "--expected-tools",
+        "75",
+        "--expected-diagnostics",
+        "70"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 91.953
+    },
+    "desktop-audit": {
+      "command": [
+        "python",
+        "scripts/audit-aura-next100-desktop.py",
+        "--output",
+        ".work-checks/aura-2026-10-22/desktop",
+        "--port",
+        "9391",
+        "--ledger",
+        "docs/reports/AURA-capabilities-2026-10-22.json",
+        "--expected-tools",
+        "75",
+        "--expected-diagnostics",
+        "70"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 1,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 192.328
+    },
+    "desktop-build-final": {
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "ui/src-tauri/Cargo.toml",
+        "--target-dir",
+        "target/desktop-launch",
+        "--features",
+        "custom-protocol",
+        "-j",
+        "2"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 911.562
+    },
+    "first100-audit-final": {
+      "command": [
+        "python",
+        "scripts/audit-aura100-desktop.py",
+        "--output",
+        ".work-checks/aura-2026-10-22/first100",
+        "--port",
+        "9393",
+        "--selection-count",
+        "75"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 54.282
+    },
+    "first100-audit": {
+      "command": [
+        "python",
+        "scripts/audit-aura100-desktop.py",
+        "--output",
+        ".work-checks/aura-2026-10-22/first100",
+        "--port",
+        "9393",
+        "--selection-count",
+        "75"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 1,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 98.516
+    },
+    "format-clean": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 1,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 72.516
+    },
+    "format-final-tests": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 8.062
+    },
+    "format-final": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 7.843
+    },
+    "format-fixtures": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 7.547
+    },
+    "format-verified": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 11.422
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 1,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 13.843
+    },
+    "ipc": {
+      "command": [
+        "bash",
+        "scripts/check-ipc-surface.sh"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 4.328
+    },
+    "native-libraries-final": {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "aura-app",
+        "-p",
+        "aura-render",
+        "-p",
+        "aura-recipe",
+        "--lib",
+        "-j",
+        "2"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 1674.281
+    },
+    "native-render-fixtures": {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "aura-render",
+        "--lib",
+        "-j",
+        "2"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 163.407
+    },
+    "native-selection-final": {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "aura-app",
+        "--lib",
+        "mask_workflows::photographic::experimental::tests",
+        "-j",
+        "2"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 189.687
+    },
+    "native-tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--no-fail-fast",
+        "-j",
+        "2"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 4488.125
+    },
+    "photo-audit": {
+      "command": [
+        "python",
+        "scripts/audit-aura100-photos.py",
+        "H:\\AURA EDIT",
+        "output/aura-2026-10-22",
+        "--full-export",
+        "--additions20261022",
+        "--preview-reference",
+        ".work-checks/evoto-next/runtime-color/Evoto-989A2698-watermarked-preview.png",
+        "--port",
+        "9394"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 1357.109
+    },
+    "previous100-audit-final": {
+      "command": [
+        "python",
+        "scripts/audit-aura-next100-desktop.py",
+        "--output",
+        ".work-checks/aura-2026-10-22/previous100",
+        "--port",
+        "9392",
+        "--expected-tools",
+        "75",
+        "--expected-diagnostics",
+        "70"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 94.235
+    },
+    "previous100-audit": {
+      "command": [
+        "python",
+        "scripts/audit-aura-next100-desktop.py",
+        "--output",
+        ".work-checks/aura-2026-10-22/previous100",
+        "--port",
+        "9392",
+        "--expected-tools",
+        "75",
+        "--expected-diagnostics",
+        "70"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 1,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 125.141
+    },
+    "python-tests-final": {
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts/tests"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 22.219
+    },
+    "python-tests": {
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts/tests"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 6.984
+    },
+    "real-photo-tools-audit": {
+      "command": [
+        "python",
+        "scripts/audit-aura-next100-desktop.py",
+        "--output",
+        ".work-checks/aura-2026-10-22/real-photo-tools",
+        "--port",
+        "9395",
+        "--ledger",
+        "docs/reports/AURA-capabilities-2026-10-22.json",
+        "--expected-tools",
+        "75",
+        "--expected-diagnostics",
+        "70",
+        "--photo",
+        "output/aura-2026-10-22/989A2698.CR3-before.jpg"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 63.031
+    },
+    "review-launch": {
+      "command": [
+        "powershell.exe",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/open-aura-qualified-photos.ps1"
+      ],
+      "cwd": "C:\\Users\\Admin\\Documents\\project",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 1.766
+    },
+    "ui-build-final": {
+      "command": [
+        "npm.cmd",
+        "run",
+        "build"
+      ],
+      "cwd": "ui",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 28.938
+    },
+    "ui-build-label": {
+      "command": [
+        "npm.cmd",
+        "run",
+        "build"
+      ],
+      "cwd": "ui",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 107.281
+    },
+    "ui-label-check": {
+      "command": [
+        "npm.cmd",
+        "test",
+        "--",
+        "MaskLabControls.test.tsx"
+      ],
+      "cwd": "ui",
+      "exitCode": 0,
+      "environment": {
+        "CARGO_INCREMENTAL": "0",
+        "AURA_PERF_HOST_SCALE": "6"
+      },
+      "seconds": 26.516
+    }
+  },
+  "executableSha256": "7e892b23b765f53a1695ac8a350862a98c46fac6dd5399de4cfad10921f5dce1",
+  "sourceFiles": 1497,
+  "sourceChanges": [],
+  "desktopChecks": [
+    108,
+    108,
+    108,
+    138
+  ],
+  "tools": [
+    {
+      "id": "sigmoid_contrast",
+      "label": "Normalized sigmoid contrast",
+      "mechanism": "Apply a normalized logistic curve in bounded luminance coordinates, preserving black and HDR output.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "name": "Normalized sigmoid contrast",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "sigmoid_contrast",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.9001
+      },
+      "realPhotoProxy": {
+        "name": "sigmoid_contrast",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6102
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "exponential_shoulder",
+      "label": "Exponential highlight rolloff",
+      "mechanism": "Use an exponential absorption shoulder normalized at unit white.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Exponential highlight rolloff",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "exponential_shoulder",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.7823
+      },
+      "realPhotoProxy": {
+        "name": "exponential_shoulder",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5957
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "hermite_tone",
+      "label": "Monotone Hermite contrast",
+      "mechanism": "Shape a cubic Hermite contrast curve with matching endpoint slopes and a continuous HDR extension.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Monotone Hermite contrast",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "hermite_tone",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6933
+      },
+      "realPhotoProxy": {
+        "name": "hermite_tone",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5817
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "schlick_bias",
+      "label": "Rational light bias",
+      "mechanism": "Redistribute linear luminance with a rational bias curve and continuous highlight extension.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Rational light bias",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "schlick_bias",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6286
+      },
+      "realPhotoProxy": {
+        "name": "schlick_bias",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5852
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "solarize_luma",
+      "label": "Luminance solarization",
+      "mechanism": "Fold luminance above an explicit threshold into an exponential creative solarization shoulder.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "name": "Luminance solarization",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "solarize_luma",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6832
+      },
+      "realPhotoProxy": {
+        "name": "solarize_luma",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5932
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "zone_exposure",
+      "label": "Stop-zone exposure lift",
+      "mechanism": "Apply a Gaussian exposure lift around a chosen stop-domain luminance anchor.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "name": "Stop-zone exposure lift",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "zone_exposure",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.7919
+      },
+      "realPhotoProxy": {
+        "name": "zone_exposure",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5723
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "black_floor",
+      "label": "Linear black-floor subtraction",
+      "mechanism": "Subtract an explicit linear black floor and rescale the remaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot"
+      ],
+      "name": "Linear black-floor subtraction",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "black_floor",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.4473
+      },
+      "realPhotoProxy": {
+        "name": "black_floor",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.576
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "dark_channel_dehaze",
+      "label": "Selected dark-channel haze removal",
+      "mechanism": "Estimate local transmission from selected dark-channel minima and selected 99th-percentile atmospheric channel values.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Selected dark-channel haze removal",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "dark_channel_dehaze",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.4338
+      },
+      "realPhotoProxy": {
+        "name": "dark_channel_dehaze",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6411
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "local_wiener_tone",
+      "label": "Variance-guided luminance cleanup",
+      "mechanism": "Shrink local luminance residuals using the Wiener ratio of measured variance to variance plus noise power.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Variance-guided luminance cleanup",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "local_wiener_tone",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.4677
+      },
+      "realPhotoProxy": {
+        "name": "local_wiener_tone",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6016
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "local_midrange",
+      "label": "Local extrema tone contraction",
+      "mechanism": "Contract luminance toward the midpoint of selected neighbourhood extrema.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Local extrema tone contraction",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "local_midrange",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3532
+      },
+      "realPhotoProxy": {
+        "name": "local_midrange",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.7059
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "chroma_shear",
+      "label": "Opponent-plane colour shear",
+      "mechanism": "Shear red-opponent chroma by blue-opponent chroma while retaining photographed luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Opponent-plane colour shear",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "chroma_shear",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3296
+      },
+      "realPhotoProxy": {
+        "name": "chroma_shear",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5908
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "chroma_spiral",
+      "label": "Radius-dependent hue spiral",
+      "mechanism": "Rotate hue by a continuous angle proportional to colour radius, keeping neutral colours stable.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Radius-dependent hue spiral",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "chroma_spiral",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3103
+      },
+      "realPhotoProxy": {
+        "name": "chroma_spiral",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5958
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "tonal_hue_twist",
+      "label": "Luminance-dependent hue twist",
+      "mechanism": "Rotate shadows and highlights in opposing hue directions around a luminance anchor.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "name": "Luminance-dependent hue twist",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "tonal_hue_twist",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.325
+      },
+      "realPhotoProxy": {
+        "name": "tonal_hue_twist",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5822
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "duotone_gradient",
+      "label": "Complementary duotone gradient",
+      "mechanism": "Rebuild chroma along a complementary shadow-to-highlight colour axis at original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "target"
+      ],
+      "name": "Complementary duotone gradient",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "duotone_gradient",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3906
+      },
+      "realPhotoProxy": {
+        "name": "duotone_gradient",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5936
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "channel_crossfeed",
+      "label": "Cyclic channel crossfeed",
+      "mechanism": "Mix each linear channel with its cyclic neighbour and restore original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Cyclic channel crossfeed",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "channel_crossfeed",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3693
+      },
+      "realPhotoProxy": {
+        "name": "channel_crossfeed",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6119
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "selective_density",
+      "label": "Subtractive colour density",
+      "mechanism": "Apply Beer-Lambert channel absorption from an explicit density colour and restore original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width",
+        "target"
+      ],
+      "name": "Subtractive colour density",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "selective_density",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3042
+      },
+      "realPhotoProxy": {
+        "name": "selective_density",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5931
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "bradford_adaptation",
+      "label": "Bradford cone-response adaptation",
+      "mechanism": "Adapt the selected mean illuminant to an explicit target using XYZ Bradford cone responses, retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target"
+      ],
+      "name": "Bradford cone-response adaptation",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "bradford_adaptation",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3277
+      },
+      "realPhotoProxy": {
+        "name": "bradford_adaptation",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6365
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "channel_ratio_limit",
+      "label": "RGB channel-ratio limiter",
+      "mechanism": "Limit peak channels against the darkest channel with a luminance-based stabilizing floor.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "RGB channel-ratio limiter",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "channel_ratio_limit",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3668
+      },
+      "realPhotoProxy": {
+        "name": "channel_ratio_limit",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6082
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "median_despill",
+      "label": "Median-channel spill suppression",
+      "mechanism": "Reduce only channel excursions above the per-pixel median channel and restore luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Median-channel spill suppression",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "median_despill",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3041
+      },
+      "realPhotoProxy": {
+        "name": "median_despill",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6173
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "harmonic_hue_snap",
+      "label": "Three-axis hue harmony",
+      "mechanism": "Move hue toward a target-aligned threefold harmonic harmony using a continuous sinusoidal angular field.",
+      "controls": [
+        "amount",
+        "strength",
+        "width",
+        "target"
+      ],
+      "name": "Three-axis hue harmony",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "harmonic_hue_snap",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3206
+      },
+      "realPhotoProxy": {
+        "name": "harmonic_hue_snap",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6055
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "chroma_luma_detrend",
+      "label": "Colour-luminance regression removal",
+      "mechanism": "Measure selected chroma-versus-luminance regression and remove its slope around the selected mean.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "name": "Colour-luminance regression removal",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "chroma_luma_detrend",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3261
+      },
+      "realPhotoProxy": {
+        "name": "chroma_luma_detrend",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6057
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "guided_chroma",
+      "label": "Luminance-guided colour cleanup",
+      "mechanism": "Fit local chroma to luminance with ridge-regularized selected covariance, preserving aligned colour edges.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Luminance-guided colour cleanup",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "guided_chroma",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3173
+      },
+      "realPhotoProxy": {
+        "name": "guided_chroma",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6558
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "median_chroma",
+      "label": "Weighted median colour repair",
+      "mechanism": "Replace opponent chroma with the weighted selected neighbourhood median, preserving luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius"
+      ],
+      "name": "Weighted median colour repair",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "median_chroma",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3321
+      },
+      "realPhotoProxy": {
+        "name": "median_chroma",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.7134
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "channel_rank_align",
+      "label": "Channel-distribution alignment",
+      "mechanism": "Map each channel rank to the luminance-weighted barycenter of selected channel quantile distributions, preserving luminance.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "name": "Channel-distribution alignment",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "channel_rank_align",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3241
+      },
+      "realPhotoProxy": {
+        "name": "channel_rank_align",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6192
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "bilateral_chroma",
+      "label": "Range-aware bilateral colour cleanup",
+      "mechanism": "Average selected chroma with both spatial and chromatic range weights at constant luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Range-aware bilateral colour cleanup",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "bilateral_chroma",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3211
+      },
+      "realPhotoProxy": {
+        "name": "bilateral_chroma",
+        "passed": true,
+        "group": "colour",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6859
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "adaptive_median_impulse",
+      "label": "Adaptive impulse median",
+      "mechanism": "Expand the selected median neighborhood up to seven cells to identify isolated bright or dark impulses.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Adaptive impulse median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "adaptive_median_impulse",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3108
+      },
+      "realPhotoProxy": {
+        "name": "adaptive_median_impulse",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6059
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "sigma_range_mean",
+      "label": "Sigma-gated colour smoothing",
+      "mechanism": "Average only selected neighbours within an explicit RGB distance from the current pixel.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Sigma-gated colour smoothing",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "sigma_range_mean",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3012
+      },
+      "realPhotoProxy": {
+        "name": "sigma_range_mean",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5791
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "spatial_weighted_median",
+      "label": "Distance-weighted colour median",
+      "mechanism": "Estimate each channel with a weighted median that favors nearby selected samples.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Distance-weighted colour median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "spatial_weighted_median",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3102
+      },
+      "realPhotoProxy": {
+        "name": "spatial_weighted_median",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5924
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "luminance_winsor",
+      "label": "Luminance percentile limiter",
+      "mechanism": "Clamp luminance to the selected neighborhood tenth and ninetieth percentiles while retaining channel ratios.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Luminance percentile limiter",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "luminance_winsor",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3004
+      },
+      "realPhotoProxy": {
+        "name": "luminance_winsor",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5904
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "chroma_bilateral",
+      "label": "Chroma range smoothing",
+      "mechanism": "Average colour differences with chroma-distance and spatial weights while preserving luminance.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Chroma range smoothing",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "chroma_bilateral",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.2838
+      },
+      "realPhotoProxy": {
+        "name": "chroma_bilateral",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5968
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "chroma_covariance",
+      "label": "Chroma covariance denoising",
+      "mechanism": "Measure two-dimensional chroma covariance and shrink its noisy principal components while preserving luminance.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Chroma covariance denoising",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "chroma_covariance",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3013
+      },
+      "realPhotoProxy": {
+        "name": "chroma_covariance",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5804
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "rgb_covariance",
+      "label": "Colour covariance denoising",
+      "mechanism": "Diagonalize measured local RGB covariance and suppress components below the chosen noise floor.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Colour covariance denoising",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "rgb_covariance",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.2931
+      },
+      "realPhotoProxy": {
+        "name": "rgb_covariance",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5829
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "entropy_detail",
+      "label": "Entropy-weighted detail",
+      "mechanism": "Measure an eight-bin local luminance entropy and use it to weight residual detail gain.",
+      "controls": [
+        "amount",
+        "detail"
+      ],
+      "name": "Entropy-weighted detail",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "entropy_detail",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.2946
+      },
+      "realPhotoProxy": {
+        "name": "entropy_detail",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6025
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "rms_contrast",
+      "label": "Local RMS contrast",
+      "mechanism": "Rescale luminance residuals toward a chosen local RMS contrast, with bounded gain.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Local RMS contrast",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "rms_contrast",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.2855
+      },
+      "realPhotoProxy": {
+        "name": "rms_contrast",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6414
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "log_retinex",
+      "label": "Log-illumination correction",
+      "mechanism": "Estimate geometric mean illumination and move it toward an authored reference while retaining reflectance.",
+      "controls": [
+        "amount",
+        "threshold",
+        "detail"
+      ],
+      "name": "Log-illumination correction",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "log_retinex",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.296
+      },
+      "realPhotoProxy": {
+        "name": "log_retinex",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6222
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "periodic_notch",
+      "label": "Oriented periodic notch",
+      "mechanism": "Fit a local sine and cosine at an authored frequency and orientation, then subtract their bounded luminance contribution.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "threshold"
+      ],
+      "name": "Oriented periodic notch",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "periodic_notch",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.2995
+      },
+      "realPhotoProxy": {
+        "name": "periodic_notch",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6196
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "cross_median",
+      "label": "Cross-footprint median",
+      "mechanism": "Take a selected-only colour median along a cross rather than a square footprint.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Cross-footprint median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "cross_median",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3333
+      },
+      "realPhotoProxy": {
+        "name": "cross_median",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6275
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "hessian_ridge",
+      "label": "Curvature ridge detail",
+      "mechanism": "Measure Hessian principal curvature and adjust ridge contrast with a bounded luminance correction.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "name": "Curvature ridge detail",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "hessian_ridge",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3272
+      },
+      "realPhotoProxy": {
+        "name": "hessian_ridge",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6167
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "coherence_detail",
+      "label": "Coherent structure detail",
+      "mechanism": "Measure structure-tensor coherence to concentrate detail gain along consistent edges.",
+      "controls": [
+        "amount",
+        "detail"
+      ],
+      "name": "Coherent structure detail",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "coherence_detail",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3227
+      },
+      "realPhotoProxy": {
+        "name": "coherence_detail",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6132
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "directional_median",
+      "label": "Least-dispersion line median",
+      "mechanism": "Choose the colour median of the least dispersed horizontal, vertical, or diagonal selected line.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Least-dispersion line median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "directional_median",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3037
+      },
+      "realPhotoProxy": {
+        "name": "directional_median",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6258
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "quadratic_residual",
+      "label": "Curved-surface residual detail",
+      "mechanism": "Fit a local six-term quadratic surface and adjust residual detail above smooth curved illumination.",
+      "controls": [
+        "amount",
+        "detail"
+      ],
+      "name": "Curved-surface residual detail",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "quadratic_residual",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3392
+      },
+      "realPhotoProxy": {
+        "name": "quadratic_residual",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6353
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "lanczos_shift",
+      "label": "Windowed-sinc selection shift",
+      "mechanism": "Resample an explicit shift with a six-tap Lanczos kernel and clamp ringing to the selected footprint range.",
+      "controls": [
+        "amount",
+        "shift"
+      ],
+      "name": "Windowed-sinc selection shift",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "lanczos_shift",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.2952
+      },
+      "realPhotoProxy": {
+        "name": "lanczos_shift",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.7241
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "elliptical_aperture",
+      "label": "Elliptical aperture integration",
+      "mechanism": "Integrate a rotated elliptical Gaussian aperture within the selection.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle"
+      ],
+      "name": "Elliptical aperture integration",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "elliptical_aperture",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.2985
+      },
+      "realPhotoProxy": {
+        "name": "elliptical_aperture",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6316
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "hexagonal_aperture",
+      "label": "Hexagonal aperture integration",
+      "mechanism": "Integrate a uniform six-sided aperture with selection-aware samples.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle"
+      ],
+      "name": "Hexagonal aperture integration",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "hexagonal_aperture",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.2925
+      },
+      "realPhotoProxy": {
+        "name": "hexagonal_aperture",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6093
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "cat_eye_aperture",
+      "label": "Cat-eye aperture integration",
+      "mechanism": "Integrate intersecting discs; aperture clipping increases away from the authored optical centre.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "source"
+      ],
+      "name": "Cat-eye aperture integration",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "cat_eye_aperture",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.285
+      },
+      "realPhotoProxy": {
+        "name": "cat_eye_aperture",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.5927
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "highlight_streak",
+      "label": "One-sided highlight streak",
+      "mechanism": "Spread only brighter-than-current highlight energy along a rotated exponential trail.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "threshold"
+      ],
+      "name": "One-sided highlight streak",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "highlight_streak",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3011
+      },
+      "realPhotoProxy": {
+        "name": "highlight_streak",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6379
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "bilateral_tone_compress",
+      "label": "Range-aware base compression",
+      "mechanism": "Compress a luminance-range-filtered local base while retaining its fine residual.",
+      "controls": [
+        "amount",
+        "threshold",
+        "detail"
+      ],
+      "name": "Range-aware base compression",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "bilateral_tone_compress",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3095
+      },
+      "realPhotoProxy": {
+        "name": "bilateral_tone_compress",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6247
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "dark_channel_haze",
+      "label": "Selected dark-channel haze repair",
+      "mechanism": "Estimate selected airlight and local dark-channel transmission for bounded haze inversion. This is a heuristic, not scene-depth inference.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Selected dark-channel haze repair",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "dark_channel_haze",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3249
+      },
+      "realPhotoProxy": {
+        "name": "dark_channel_haze",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6259
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "connected_impulse",
+      "label": "Connected spot repair",
+      "mechanism": "Repair colour-connected components of at most four working cells from their selected boundary median.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Connected spot repair",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "connected_impulse",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3125
+      },
+      "realPhotoProxy": {
+        "name": "connected_impulse",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.6127
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "chroma_median",
+      "label": "Luminance-preserving chroma median",
+      "mechanism": "Apply channel-difference medians while retaining luminance and reducing out-of-gamut chroma.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Luminance-preserving chroma median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "chroma_median",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.3199
+      },
+      "realPhotoProxy": {
+        "name": "chroma_median",
+        "passed": true,
+        "group": "spatial",
+        "pixelsChanged": true,
+        "staleRejected": true,
+        "undoRedoExact": true,
+        "noOpHistoryExact": true,
+        "scenarioSeconds": 0.668
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "lab_sample_distance",
+      "label": "CIE Lab sampled distance",
+      "mechanism": "Convert source sRGB through D65 XYZ into CIE Lab; select by CIE76 distance to the sample. Tolerance scales to 150 Lab units.",
+      "controls": [
+        "point",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "CIE Lab sampled distance",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "lab_sample_distance",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.5509
+      },
+      "realPhotoProxy": {
+        "name": "lab_sample_distance",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.9399
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "mahalanobis_colour",
+      "label": "Covariance colour distance",
+      "mechanism": "Estimate a regularized RGB covariance in the sample patch and select by Mahalanobis distance. Flat patches remain finite; this measures colour statistics, not subjects.",
+      "controls": [
+        "point",
+        "radius",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Covariance colour distance",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "mahalanobis_colour",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.291
+      },
+      "realPhotoProxy": {
+        "name": "mahalanobis_colour",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6687
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "geodesic_colour",
+      "label": "Geodesic colour propagation",
+      "mechanism": "Propagate from the sample by minimum accumulated RGB edge cost with deterministic integer Dijkstra traversal. Radius sets cost budget and tolerance sets colour crossing cost.",
+      "controls": [
+        "point",
+        "radius",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Geodesic colour propagation",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "geodesic_colour",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.2852
+      },
+      "realPhotoProxy": {
+        "name": "geodesic_colour",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6489
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "local_otsu",
+      "label": "Local Otsu threshold",
+      "mechanism": "Choose a separate 16-bin between-class variance threshold in each local luminance patch. Flat patches are excluded. Produces hard coverage.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Local Otsu threshold",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "local_otsu",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.4528
+      },
+      "realPhotoProxy": {
+        "name": "local_otsu",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.8851
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "sauvola_threshold",
+      "label": "Sauvola adaptive threshold",
+      "mechanism": "Compare source luminance with a local mean and standard-deviation threshold. Corner sets the Sauvola coefficient; pure black stays unselected.",
+      "controls": [
+        "radius",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "name": "Sauvola adaptive threshold",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "sauvola_threshold",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.3044
+      },
+      "realPhotoProxy": {
+        "name": "sauvola_threshold",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.844
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "gabor_response",
+      "label": "Gabor frequency response",
+      "mechanism": "Measure DC-removed Gaussian-windowed cosine response. Angle sets frequency direction; corner maps wavelength from 2 to 16 cells. Select the response with the range.",
+      "controls": [
+        "radius",
+        "corner",
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Gabor frequency response",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "gabor_response",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 1.0481
+      },
+      "realPhotoProxy": {
+        "name": "gabor_response",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 2.1863
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "directional_ridge",
+      "label": "Directional bright ridges",
+      "mechanism": "Project the source Hessian onto an angle and select negative curvature. This isolates bright ridges rather than first-derivative edges.",
+      "controls": [
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Directional bright ridges",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "directional_ridge",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6325
+      },
+      "realPhotoProxy": {
+        "name": "directional_ridge",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6391
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "local_skewness",
+      "label": "Local tonal skewness",
+      "mechanism": "Measure the third standardized local luminance moment. Symmetry and flat patches map to 0.5; positive outlier tails map above it.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Local tonal skewness",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "local_skewness",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 1.7626
+      },
+      "realPhotoProxy": {
+        "name": "local_skewness",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.8164
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "local_kurtosis",
+      "label": "Local tonal kurtosis",
+      "mechanism": "Measure local excess fourth standardized luminance moment, centered at 0.5 and scaled by 12. Flat patches map to 0.5.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Local tonal kurtosis",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "local_kurtosis",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 1.9119
+      },
+      "realPhotoProxy": {
+        "name": "local_kurtosis",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.8211
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "colour_line_residual",
+      "label": "Colour-line residual",
+      "mechanism": "Estimate the dominant RGB covariance direction in a sample patch using power iteration. Select perpendicular distance to that colour line; this can isolate colours outside a shading ramp.",
+      "controls": [
+        "point",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Colour-line residual",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "colour_line_residual",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.9278
+      },
+      "realPhotoProxy": {
+        "name": "colour_line_residual",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6376
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "coverage_opening",
+      "label": "Grayscale morphological opening",
+      "mechanism": "Erode then dilate coverage with the same square structuring element. Removes thin bright protrusions and retains grayscale values. Outside-frame coverage is transparent.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Grayscale morphological opening",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "coverage_opening",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.7595
+      },
+      "realPhotoProxy": {
+        "name": "coverage_opening",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.7134
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "coverage_closing",
+      "label": "Grayscale morphological closing",
+      "mechanism": "Dilate then erode coverage with the same square structuring element. Bridges small dark gaps. Transparent boundaries can trim coverage at the frame edge.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Grayscale morphological closing",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "coverage_closing",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 1.1857
+      },
+      "realPhotoProxy": {
+        "name": "coverage_closing",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6568
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "morphological_reconstruction",
+      "label": "Opening by reconstruction",
+      "mechanism": "Erode coverage to form a marker, then propagate its grayscale maxima under the original coverage ceiling. Connected surviving regions recover their contours.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Opening by reconstruction",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "morphological_reconstruction",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 1.7226
+      },
+      "realPhotoProxy": {
+        "name": "morphological_reconstruction",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6226
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "grayscale_area_opening",
+      "label": "Grayscale area opening",
+      "mechanism": "Build descending upper-level components with a union-find max-tree. Suppress bright structures whose area is below the minimum at each coverage level.",
+      "controls": [
+        "minArea"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "minArea": 16
+        }
+      },
+      "name": "Grayscale area opening",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "grayscale_area_opening",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 1.7959
+      },
+      "realPhotoProxy": {
+        "name": "grayscale_area_opening",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6317
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "border_connected",
+      "label": "Keep border-connected regions",
+      "mechanism": "Retain complete four-connected regions that touch any frame edge at the 50% coverage threshold. Preserves retained grayscale coverage.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "name": "Keep border-connected regions",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "border_connected",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 3.3535
+      },
+      "realPhotoProxy": {
+        "name": "border_connected",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6233
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "geodesic_rings",
+      "label": "Seed geodesic distance bands",
+      "mechanism": "Measure shortest four-neighbor path distance inside the 50% selection from the sample. Range selects distance divided by radius; disconnected islands remain excluded.",
+      "controls": [
+        "point",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Seed geodesic distance bands",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "geodesic_rings",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 1.3503
+      },
+      "realPhotoProxy": {
+        "name": "geodesic_rings",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6169
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "hole_bearing_regions",
+      "label": "Keep regions enclosing holes",
+      "mechanism": "Flood each component complement from a padded exterior to detect enclosed holes. Retain the surrounding component, preserving its coverage; solid regions are excluded.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "name": "Keep regions enclosing holes",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "hole_bearing_regions",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6354
+      },
+      "realPhotoProxy": {
+        "name": "hole_bearing_regions",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6192
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "regional_maxima",
+      "label": "Regional coverage maxima",
+      "mechanism": "Traverse equal-coverage plateaus and retain only nonzero plateaus with no greater four-neighbor coverage. Flat-topped maxima stay connected.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "name": "Regional coverage maxima",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "regional_maxima",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.4869
+      },
+      "realPhotoProxy": {
+        "name": "regional_maxima",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.635
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "spiral_marquee",
+      "label": "Archimedean spiral ribbon",
+      "mechanism": "Construct a ribbon around a growing Archimedean spiral within elliptical bounds. Radius sets turn count, angle rotates it, and tolerance sets radial half-width.",
+      "controls": [
+        "bounds",
+        "radius",
+        "angle",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Archimedean spiral ribbon",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "spiral_marquee",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.5869
+      },
+      "realPhotoProxy": {
+        "name": "spiral_marquee",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6895
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "barycentric_triangle",
+      "label": "Barycentric triangle gradient",
+      "mechanism": "Use the first three vertices to construct a triangle with coverage fading from vertex one toward the opposite edge. Corner controls the gradient exponent; collinear vertices are rejected.",
+      "controls": [
+        "vertices",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "name": "Barycentric triangle gradient",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "barycentric_triangle",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 1.0061
+      },
+      "realPhotoProxy": {
+        "name": "barycentric_triangle",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6421
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "coverage_shear",
+      "label": "Affine selection shear",
+      "mechanism": "Inverse-map coverage through a horizontal shear about the bounds center. Angle maps through sine to shear strength from -1.5 to 1.5. Transparent sampling clips outside the frame.",
+      "controls": [
+        "bounds",
+        "angle"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "angle": 30
+        }
+      },
+      "name": "Affine selection shear",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "coverage_shear",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 2.0887
+      },
+      "realPhotoProxy": {
+        "name": "coverage_shear",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6619
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "coverage_twirl",
+      "label": "Radial selection twirl",
+      "mechanism": "Rotate source sample coordinates with a quadratic radial falloff inside elliptical bounds. Angle sets centre rotation; the ellipse boundary stays fixed.",
+      "controls": [
+        "bounds",
+        "angle"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "angle": 90
+        }
+      },
+      "name": "Radial selection twirl",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "coverage_twirl",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 2.7793
+      },
+      "realPhotoProxy": {
+        "name": "coverage_twirl",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6826
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "coverage_spherize",
+      "label": "Spherical selection remap",
+      "mechanism": "Inverse-map coverage with a normalized arctangent radial projection inside elliptical bounds. Corner blends projection strength; the bounds boundary stays fixed.",
+      "controls": [
+        "bounds",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "name": "Spherical selection remap",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "coverage_spherize",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6246
+      },
+      "realPhotoProxy": {
+        "name": "coverage_spherize",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6664
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "coverage_displace",
+      "label": "Image-gradient displacement",
+      "mechanism": "Move coverage sample coordinates along source luminance gradients. Tolerance sets displacement strength; source pixels remain read-only and out-of-frame coverage is transparent.",
+      "controls": [
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Image-gradient displacement",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "coverage_displace",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6105
+      },
+      "realPhotoProxy": {
+        "name": "coverage_displace",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6667
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "signed_distance_smooth",
+      "label": "Signed-distance edge smoothing",
+      "mechanism": "Compute graph distance on both sides of the 50% selection interface and remap it with a logistic profile. Radius sets softness; fully selected or empty frames retain exact coverage.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Signed-distance edge smoothing",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "signed_distance_smooth",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.5251
+      },
+      "realPhotoProxy": {
+        "name": "signed_distance_smooth",
+        "passed": true,
+        "group": "selection",
+        "pixelsChanged": true,
+        "recipeChanged": true,
+        "undoRedoExact": true,
+        "scenarioSeconds": 0.6536
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "robust-tone-quantiles",
+      "name": "Luminance quantile landmarks",
+      "description": "Interpolated observed linear luminance landmarks; no assumed target exposure.",
+      "mechanism": "Interpolated observed linear luminance landmarks; no assumed target exposure.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "robust-tone-quantiles",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 9,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "robust-tone-quantiles",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 9,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "median-deviation",
+      "name": "Robust luminance dispersion",
+      "description": "Median absolute departure from median luminance, interquartile range, and central 90% span.",
+      "mechanism": "Median absolute departure from median luminance, interquartile range, and central 90% span.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "median-deviation",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "median-deviation",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "luminance-inequality",
+      "name": "Light energy inequality",
+      "description": "Gini coefficient of nonnegative photographed luminance; zero for uniform light. Scene composition changes this value.",
+      "mechanism": "Gini coefficient of nonnegative photographed luminance; zero for uniform light. Scene composition changes this value.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "luminance-inequality",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 1,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "luminance-inequality",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 1,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "hue-concentration",
+      "name": "Circular hue concentration",
+      "description": "Chroma-weighted circular resultant length and mean opponent angle. Neutral pixels contribute no weight.",
+      "mechanism": "Chroma-weighted circular resultant length and mean opponent angle. Neutral pixels contribute no weight.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "hue-concentration",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 2,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "hue-concentration",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 2,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "tone-hue-drift",
+      "name": "Hue drift through light levels",
+      "description": "Circular hue difference from the photo-wide mean in eight square-root luminance bins. Empty or neutral bins report zero.",
+      "mechanism": "Circular hue difference from the photo-wide mean in eight square-root luminance bins. Empty or neutral bins report zero.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "tone-hue-drift",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 8,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "tone-hue-drift",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 8,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "highlight-headroom",
+      "name": "Channel highlight headroom",
+      "description": "One minus each channel's observed 99th percentile. Negative values indicate working signal above nominal white, not necessarily export clipping.",
+      "mechanism": "One minus each channel's observed 99th percentile. Negative values indicate working signal above nominal white, not necessarily export clipping.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "highlight-headroom",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "highlight-headroom",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "chroma-tail",
+      "name": "Absolute chroma tails",
+      "description": "Opponent channel-difference radius at median, 90th, 99th and maximum quantiles.",
+      "mechanism": "Opponent channel-difference radius at median, 90th, 99th and maximum quantiles.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "chroma-tail",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "chroma-tail",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "exposure-locations",
+      "name": "Light averaging models",
+      "description": "Arithmetic mean of nonnegative luminance, geometric mean and harmonic mean of strictly positive luminance. These describe distribution, not correct exposure.",
+      "mechanism": "Arithmetic mean of nonnegative luminance, geometric mean and harmonic mean of strictly positive luminance. These describe distribution, not correct exposure.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "exposure-locations",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "exposure-locations",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "local-colour-jumps",
+      "name": "Local colour transitions",
+      "description": "Mean adjacent opponent-colour distance in 8 by 8 regions. Brightness and photographed colour boundaries both affect it.",
+      "mechanism": "Mean adjacent opponent-colour distance in 8 by 8 regions. Brightness and photographed colour boundaries both affect it.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "local-colour-jumps",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 64,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "local-colour-jumps",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 64,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "highlight-rolloff",
+      "name": "Upper quantile spacing",
+      "description": "Slope of observed luminance versus population rank across upper quantile intervals. Describes highlight concentration, not sensor response.",
+      "mechanism": "Slope of observed luminance versus population rank across upper quantile intervals. Describes highlight concentration, not sensor response.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "highlight-rolloff",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "highlight-rolloff",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "gamut-excursion-energy",
+      "name": "Working range excursion energy",
+      "description": "Root mean squared channel distance outside the nominal zero-to-one working cube; this is not an sRGB gamut test.",
+      "mechanism": "Root mean squared channel distance outside the nominal zero-to-one working cube; this is not an sRGB gamut test.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "gamut-excursion-energy",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "gamut-excursion-energy",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "colour-variogram",
+      "name": "Colour spatial variogram",
+      "description": "Half mean squared opponent-colour difference at four horizontal preview lags; distinguishes spatial colour structure from global palette spread.",
+      "mechanism": "Half mean squared opponent-colour difference at four horizontal preview lags; distinguishes spatial colour structure from global palette spread.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "colour-variogram",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "colour-variogram",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "structure-coherence",
+      "name": "Regional structure coherence",
+      "description": "Anisotropy of the 2 by 2 luminance gradient structure tensor. Zero includes flat regions; one indicates a dominant direction.",
+      "mechanism": "Anisotropy of the 2 by 2 luminance gradient structure tensor. Zero includes flat regions; one indicates a dominant direction.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "structure-coherence",
+        "passed": true,
+        "group": "inspection",
+        "samples": 38250,
+        "values": 64,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "structure-coherence",
+        "passed": true,
+        "group": "inspection",
+        "samples": 172890,
+        "values": 64,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "hessian-signature",
+      "name": "Surface curvature classes",
+      "description": "Fractions of positive curvature, negative curvature, saddle and flat Hessians on interior preview pixels. This is mathematical structure, not skin classification.",
+      "mechanism": "Fractions of positive curvature, negative curvature, saddle and flat Hessians on interior preview pixels. This is mathematical structure, not skin classification.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "hessian-signature",
+        "passed": true,
+        "group": "inspection",
+        "samples": 38250,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "hessian-signature",
+        "passed": true,
+        "group": "inspection",
+        "samples": 172890,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "gradient-tailedness",
+      "name": "Gradient tail weight",
+      "description": "Excess kurtosis of bounded-domain gradient magnitude. Sparse strong boundaries produce heavier tails.",
+      "mechanism": "Excess kurtosis of bounded-domain gradient magnitude. Sparse strong boundaries produce heavier tails.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "gradient-tailedness",
+        "passed": true,
+        "group": "inspection",
+        "samples": 38250,
+        "values": 1,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "gradient-tailedness",
+        "passed": true,
+        "group": "inspection",
+        "samples": 172890,
+        "values": 1,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "edge-polarity",
+      "name": "Signed edge transitions",
+      "description": "Counts of positive and negative horizontal and vertical interior derivatives above a small numerical floor.",
+      "mechanism": "Counts of positive and negative horizontal and vertical interior derivatives above a small numerical floor.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "edge-polarity",
+        "passed": true,
+        "group": "inspection",
+        "samples": 38250,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "edge-polarity",
+        "passed": true,
+        "group": "inspection",
+        "samples": 172890,
+        "values": 4,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "normalized-total-variation",
+      "name": "Relative total variation",
+      "description": "Mean absolute adjacent asinh-luminance change divided by mean absolute asinh luminance, independently across axes.",
+      "mechanism": "Mean absolute adjacent asinh-luminance change divided by mean absolute asinh luminance, independently across axes.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "normalized-total-variation",
+        "passed": true,
+        "group": "inspection",
+        "samples": 78259,
+        "values": 2,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "normalized-total-variation",
+        "passed": true,
+        "group": "inspection",
+        "samples": 348331,
+        "values": 2,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "dct-energy",
+      "name": "Cosine frequency energy",
+      "description": "Orthonormal 8 by 8 block DCT energy in radial AC frequency bands of asinh luminance. Incomplete border blocks are excluded.",
+      "mechanism": "Orthonormal 8 by 8 block DCT energy in radial AC frequency bands of asinh luminance. Incomplete border blocks are excluded.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "dct-energy",
+        "passed": true,
+        "group": "inspection",
+        "samples": 576,
+        "values": 8,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "dct-energy",
+        "passed": true,
+        "group": "inspection",
+        "samples": 2688,
+        "values": 8,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "chroma-edge-alignment",
+      "name": "Chroma and light edge alignment",
+      "description": "Mean absolute angular cosine between red-green opponent gradients and luminance gradients with nonzero support.",
+      "mechanism": "Mean absolute angular cosine between red-green opponent gradients and luminance gradients with nonzero support.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "chroma-edge-alignment",
+        "passed": true,
+        "group": "inspection",
+        "samples": 38250,
+        "values": 1,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "chroma-edge-alignment",
+        "passed": true,
+        "group": "inspection",
+        "samples": 171669,
+        "values": 1,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "residual-asymmetry",
+      "name": "Fine residual polarity",
+      "description": "Positive and negative four-neighbor residual mass and their normalized signed balance in asinh luminance.",
+      "mechanism": "Positive and negative four-neighbor residual mass and their normalized signed balance in asinh luminance.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "residual-asymmetry",
+        "passed": true,
+        "group": "inspection",
+        "samples": 38250,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "residual-asymmetry",
+        "passed": true,
+        "group": "inspection",
+        "samples": 172890,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "local-bit-entropy",
+      "name": "Regional tone entropy",
+      "description": "Shannon entropy in fixed 16-bin nominal luminance histograms per region. HDR and negative samples accumulate in boundary bins.",
+      "mechanism": "Shannon entropy in fixed 16-bin nominal luminance histograms per region. HDR and negative samples accumulate in boundary bins.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "local-bit-entropy",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 64,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "local-bit-entropy",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 64,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "illumination-plane",
+      "name": "Linear lighting trend",
+      "description": "Least-squares horizontal and vertical slopes in centred normalized coordinates of asinh luminance. Scene reflectance contributes.",
+      "mechanism": "Least-squares horizontal and vertical slopes in centred normalized coordinates of asinh luminance. Scene reflectance contributes.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "illumination-plane",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 2,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "illumination-plane",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 2,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "illumination-curvature",
+      "name": "Quadratic lighting trend",
+      "description": "Orthogonal centred quadratic and cross-coordinate coefficients of asinh luminance; measures broad shape without claiming lens calibration.",
+      "mechanism": "Orthogonal centred quadratic and cross-coordinate coefficients of asinh luminance; measures broad shape without claiming lens calibration.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "illumination-curvature",
+        "passed": true,
+        "group": "inspection",
+        "samples": 39424,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "illumination-curvature",
+        "passed": true,
+        "group": "inspection",
+        "samples": 174592,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "edge-euler",
+      "name": "Edge topology",
+      "description": "Cubical Euler characteristic V minus E plus F of above-mean significant gradient pixels. Closed pixel squares include corner contacts.",
+      "mechanism": "Cubical Euler characteristic V minus E plus F of above-mean significant gradient pixels. Closed pixel squares include corner contacts.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "edge-euler",
+        "passed": true,
+        "group": "inspection",
+        "samples": 14417,
+        "values": 1,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "edge-euler",
+        "passed": true,
+        "group": "inspection",
+        "samples": 45156,
+        "values": 1,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    },
+    {
+      "id": "edge-box-dimension",
+      "name": "Edge occupancy scaling",
+      "description": "Finite-scale box-count slopes from significant edges at one, two, four and eight preview pixels. Not an asymptotic fractal claim.",
+      "mechanism": "Finite-scale box-count slopes from significant edges at one, two, four and eight preview pixels. Not an asymptotic fractal claim.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification",
+      "qualification": "passed native desktop routes on synthetic and real-photo proxies",
+      "synthetic": {
+        "name": "edge-box-dimension",
+        "passed": true,
+        "group": "inspection",
+        "samples": 14417,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "realPhotoProxy": {
+        "name": "edge-box-dimension",
+        "passed": true,
+        "group": "inspection",
+        "samples": 45156,
+        "values": 3,
+        "nativeRevisionBound": true
+      },
+      "evotoParity": "unverified",
+      "perfection": "not established"
+    }
+  ],
+  "photos": {
+    "source": "H:\\AURA EDIT",
+    "projectId": "prj_01a15ffb-4a2d-7982-9c44-3ffd3996245b",
+    "completed": true,
+    "originalsUnchanged": true,
+    "fullExportRequested": true,
+    "export": {
+      "photos": 27,
+      "selected": 0,
+      "requested": 27,
+      "written": 27,
+      "verified": 27,
+      "unverified": 0,
+      "corrupt": 0,
+      "renderFailed": 0,
+      "renamed": 0,
+      "sidecars": 0,
+      "bytes": 276835125,
+      "manifestSealed": true,
+      "ms": 483510
+    },
+    "exportFiles": [
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2698.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "6c58a87ebd74095344e9ecc6c8a3abfacfcb49ee5f8447b4ff1a6f8328d9edb7"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2699.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "b065cda71bb67e8f36e02268c5d3c448106da6c8568636d1b4b637db8c70adcc"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2703.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "50bbf42fc4e62b6011275a6eb5f539c23934b7f4f0a934ca87c8e03e1a9f58c6"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2704.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "ac67884f2e004fa98a6a77194ea808b3d97e598268726cd382e17520902520ab"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2705.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "7e324a06b3e98100f979ccef5ed861d1d6bc6dbd29bb3d4e873f71d89bada7e7"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2706.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "cde837321818f4428de7f2b0cfedabf183a2e1ab16b870ed40bf871727f24655"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2707.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "ea855e1972586c8a86e8b5661a544b0a08dd8156317f2b04ace78e8b1604b794"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2708.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "a9e58e13f27db8d28323fd2a196f97c13b2abdc01ad945323751382051250178"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2709.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "70799420f99536e8216d67ef094b8931c310f39a981b21a2d7f2941e27956e7c"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2710.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "786afaea30f9ab131d647ca62e35252d1993c77bc57d99a1902d3171c7d19c9e"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2742.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "3aed58d302dc57970891ea33997b21bc8f1dfb2b1391061a8f24722e8375f2e4"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2746.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "b8ebaacb24ee1bd37d6b0af7795e64074055efaaaea570bd53fde748edd13770"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2748.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "dbc7d3afccd462bdc88cbb35d3b75669983882ae2757ba66f542c67095851e02"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2865.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "6c6659f156b9cb427d6c7902f7219361b717c0156ab101bfdf221298a4e095c9"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2890.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "3aa04815d8f6ad2b2b88de168af9a1eb00dfe1ca46d19625df54270603cf5f50"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2892.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "27bbb509746768a5746640983e05d36b5c49837def185f30d365db98ebff0e56"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2925.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "17b7c9a2b512cbb54688f97ee2f4661943db90ebb6ea14b60dfd3cdbe112fff3"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2933.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "baf65a3b214068d50121543d4c6943920c95cfda2d5923fbb6875cfbcba62ded"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A2934.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "660bfdcaa4d2a960c0b417577c042c286c75b5a1f2099fd97a8e11e55dfefaf7"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A3150.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "818b0c69f8fd5b51a79009e316bf816daf646e1dbc5daafc4ae832b5b0ab7a66"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A3151.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "592a9c1926bb62c79b7a4b11f472b67bbcee5bac2f3d4de0b0b6bc82641ea9bd"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A3267.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "9ac2894097ebad1b64c936add5f5314c62abc6cbfc1edd42e43e93e08b0e4a3c"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A3272.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "2738c832cf230244de2b1341078060db9586f5a327c8511acae58481f94123dd"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A3839.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "4532a87ba0c0572e287894309dd177856cc67e201fde3db58ad33e46adbb2def"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A3842.jpg",
+        "width": 4480,
+        "height": 6720,
+        "sha256": "029f053f2211900fdf15b2f4c79a5655d49174b1065b8d6e2cc3d43b5f2f14fb"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A3870.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "0b4415ef0310af66809c151ed74bfcb8b12697bf700c76b57dfe040e4202960e"
+      },
+      {
+        "file": "C:\\Users\\Admin\\Documents\\project\\output\\aura-2026-10-22\\full-resolution\\edited\\989A3872.jpg",
+        "width": 6720,
+        "height": 4480,
+        "sha256": "4e3280ddfecfd417898448ff4a90c944306632b41a629519b9db93cb935e960d"
+      }
+    ],
+    "screenshotGuidedVariant": {
+      "source": "989A2698.CR3",
+      "referencePath": "C:\\Users\\Admin\\Documents\\project\\.work-checks\\evoto-next\\runtime-color\\Evoto-989A2698-watermarked-preview.png",
+      "referenceSha256": "9cc5677523094549332e93a9472290c035d5bd5f56afec80603f1bf7cf5a6abd",
+      "match": {
+        "sessionId": "dab3ec1b-2a53-4ad8-be9f-640c906b3632",
+        "photoId": "pht_01a15ffb-4c1d-7463-8ff2-58efac7917b1",
+        "reference": {
+          "id": "a14200207079b04950ee74107b594720267dd2071caa46c5941c9a013151ecf8",
+          "name": "Evoto-989A2698-watermarked-preview.png",
+          "width": 520,
+          "height": 779,
+          "convertedIcc": false,
+          "regions": [
+            "whole image",
+            "face skin",
+            "body skin",
+            "hair",
+            "clothes",
+            "background"
+          ],
+          "group": "",
+          "favorite": false,
+          "thumbnail": null,
+          "thumbnailOmittedFromPublication": true
+        },
+        "controls": {
+          "amount": 0.5,
+          "tone": 0.6,
+          "color": 0.6,
+          "whiteBalance": 0.5,
+          "detail": {
+            "exposure": 1,
+            "contrast": 1,
+            "highlights": 1,
+            "shadows": 1,
+            "whites": 1,
+            "blacks": 1,
+            "curves": 1,
+            "temperature": 1,
+            "tint": 1,
+            "vibrance": 1,
+            "saturation": 1,
+            "hue": 1
+          }
+        },
+        "matchedRegions": [
+          "whole image",
+          "face skin",
+          "body skin",
+          "hair",
+          "clothes",
+          "background"
+        ],
+        "beforeDistance": 9.427736,
+        "afterDistance": 8.8913555,
+        "changed": 28,
+        "protectedFields": 0,
+        "fullResolutionChecked": true,
+        "current": true
+      },
+      "attempts": [
+        {
+          "controls": {
+            "amount": 0.5,
+            "tone": 0.6,
+            "color": 0.6,
+            "whiteBalance": 0.5
+          },
+          "passed": true
+        }
+      ],
+      "recipeHash": "8a608ffef49a43026bc331e11584e635e996f2a814b1eb182b08cdfc1ed559f7",
+      "provenance": "Approximation guided by the earlier displayed watermarked Evoto preview. No Evoto export or pixel-fidelity score is available.",
+      "export": {
+        "photos": 27,
+        "selected": 0,
+        "requested": 1,
+        "written": 1,
+        "verified": 1,
+        "unverified": 0,
+        "corrupt": 0,
+        "renderFailed": 0,
+        "renamed": 0,
+        "sidecars": 0,
+        "bytes": 8902738,
+        "manifestSealed": true,
+        "ms": 21504
+      },
+      "baselineRestored": true
+    }
+  },
+  "evoto": {
+    "files": 1860,
+    "bytes": 4873227287,
+    "completeInventory": true,
+    "treeManifestSha256": "61bf5b14dca7394f04d1e0ca576a442dae62fa7156e5c727d9aea2f395363162",
+    "manifest": {
+      "match": 1854
+    },
+    "reaEvidence": "C:\\Users\\Admin\\Documents\\project\\.work-checks\\evoto-2026-10-22\\rea-evidence.json"
+  },
+  "exactEvotoParity": false,
+  "proprietaryModelsRecovered": false,
+  "limits": [
+    "100 additions are 50 render methods,25 selections,25 diagnostics, not100 trained AI models.",
+    "Desktop scenarios exercise all new methods on one synthetic and one real-photo proxy, not all settings on all27 RAWs.",
+    "All27 RAWs receive native automatic enhancement, an explicit gentle stop-zone layer,70 diagnostics and verified full-resolution exports.",
+    "Evoto native exports remain unavailable in prior evidence; no per-tool fidelity/perfection score is justified.",
+    "Spatial corrections use a256-pixel grid; inspection uses a512-pixel preview. Full-frame colour methods can require substantial memory.",
+    "Complete file inventory and PE resources do not constitute complete decompilation or recovered trained logic."
+  ],
+  "publicationNote": "Publication preparation removed embedded photo thumbnails and updated scripts/check-banned.sh to recognize dedicated tests.rs modules. Application code and the qualified executable were unchanged; the source-manifest match describes the qualification snapshot before this checker-only change."
+}

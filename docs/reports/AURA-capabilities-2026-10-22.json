@@ -1,0 +1,1345 @@
+{
+  "date": "2026-10-22",
+  "count": 100,
+  "groups": {
+    "colour": 25,
+    "spatial": 25,
+    "selection": 25,
+    "inspection": 25
+  },
+  "exactEvotoParity": false,
+  "proprietaryModelsRecovered": false,
+  "capabilities": [
+    {
+      "id": "sigmoid_contrast",
+      "label": "Normalized sigmoid contrast",
+      "mechanism": "Apply a normalized logistic curve in bounded luminance coordinates, preserving black and HDR output.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "name": "Normalized sigmoid contrast",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "exponential_shoulder",
+      "label": "Exponential highlight rolloff",
+      "mechanism": "Use an exponential absorption shoulder normalized at unit white.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Exponential highlight rolloff",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "hermite_tone",
+      "label": "Monotone Hermite contrast",
+      "mechanism": "Shape a cubic Hermite contrast curve with matching endpoint slopes and a continuous HDR extension.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Monotone Hermite contrast",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "schlick_bias",
+      "label": "Rational light bias",
+      "mechanism": "Redistribute linear luminance with a rational bias curve and continuous highlight extension.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Rational light bias",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "solarize_luma",
+      "label": "Luminance solarization",
+      "mechanism": "Fold luminance above an explicit threshold into an exponential creative solarization shoulder.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "name": "Luminance solarization",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "zone_exposure",
+      "label": "Stop-zone exposure lift",
+      "mechanism": "Apply a Gaussian exposure lift around a chosen stop-domain luminance anchor.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "name": "Stop-zone exposure lift",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "black_floor",
+      "label": "Linear black-floor subtraction",
+      "mechanism": "Subtract an explicit linear black floor and rescale the remaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot"
+      ],
+      "name": "Linear black-floor subtraction",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "dark_channel_dehaze",
+      "label": "Selected dark-channel haze removal",
+      "mechanism": "Estimate local transmission from selected dark-channel minima and selected 99th-percentile atmospheric channel values.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Selected dark-channel haze removal",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "local_wiener_tone",
+      "label": "Variance-guided luminance cleanup",
+      "mechanism": "Shrink local luminance residuals using the Wiener ratio of measured variance to variance plus noise power.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Variance-guided luminance cleanup",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "local_midrange",
+      "label": "Local extrema tone contraction",
+      "mechanism": "Contract luminance toward the midpoint of selected neighbourhood extrema.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Local extrema tone contraction",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "chroma_shear",
+      "label": "Opponent-plane colour shear",
+      "mechanism": "Shear red-opponent chroma by blue-opponent chroma while retaining photographed luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Opponent-plane colour shear",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "chroma_spiral",
+      "label": "Radius-dependent hue spiral",
+      "mechanism": "Rotate hue by a continuous angle proportional to colour radius, keeping neutral colours stable.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Radius-dependent hue spiral",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "tonal_hue_twist",
+      "label": "Luminance-dependent hue twist",
+      "mechanism": "Rotate shadows and highlights in opposing hue directions around a luminance anchor.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "name": "Luminance-dependent hue twist",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "duotone_gradient",
+      "label": "Complementary duotone gradient",
+      "mechanism": "Rebuild chroma along a complementary shadow-to-highlight colour axis at original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "target"
+      ],
+      "name": "Complementary duotone gradient",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "channel_crossfeed",
+      "label": "Cyclic channel crossfeed",
+      "mechanism": "Mix each linear channel with its cyclic neighbour and restore original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Cyclic channel crossfeed",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "selective_density",
+      "label": "Subtractive colour density",
+      "mechanism": "Apply Beer-Lambert channel absorption from an explicit density colour and restore original luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width",
+        "target"
+      ],
+      "name": "Subtractive colour density",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "bradford_adaptation",
+      "label": "Bradford cone-response adaptation",
+      "mechanism": "Adapt the selected mean illuminant to an explicit target using XYZ Bradford cone responses, retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target"
+      ],
+      "name": "Bradford cone-response adaptation",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "channel_ratio_limit",
+      "label": "RGB channel-ratio limiter",
+      "mechanism": "Limit peak channels against the darkest channel with a luminance-based stabilizing floor.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "RGB channel-ratio limiter",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "median_despill",
+      "label": "Median-channel spill suppression",
+      "mechanism": "Reduce only channel excursions above the per-pixel median channel and restore luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "name": "Median-channel spill suppression",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "harmonic_hue_snap",
+      "label": "Three-axis hue harmony",
+      "mechanism": "Move hue toward a target-aligned threefold harmonic harmony using a continuous sinusoidal angular field.",
+      "controls": [
+        "amount",
+        "strength",
+        "width",
+        "target"
+      ],
+      "name": "Three-axis hue harmony",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "chroma_luma_detrend",
+      "label": "Colour-luminance regression removal",
+      "mechanism": "Measure selected chroma-versus-luminance regression and remove its slope around the selected mean.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "name": "Colour-luminance regression removal",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "guided_chroma",
+      "label": "Luminance-guided colour cleanup",
+      "mechanism": "Fit local chroma to luminance with ridge-regularized selected covariance, preserving aligned colour edges.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Luminance-guided colour cleanup",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "median_chroma",
+      "label": "Weighted median colour repair",
+      "mechanism": "Replace opponent chroma with the weighted selected neighbourhood median, preserving luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius"
+      ],
+      "name": "Weighted median colour repair",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "channel_rank_align",
+      "label": "Channel-distribution alignment",
+      "mechanism": "Map each channel rank to the luminance-weighted barycenter of selected channel quantile distributions, preserving luminance.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "name": "Channel-distribution alignment",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "bilateral_chroma",
+      "label": "Range-aware bilateral colour cleanup",
+      "mechanism": "Average selected chroma with both spatial and chromatic range weights at constant luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "width"
+      ],
+      "name": "Range-aware bilateral colour cleanup",
+      "group": "colour",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "adaptive_median_impulse",
+      "label": "Adaptive impulse median",
+      "mechanism": "Expand the selected median neighborhood up to seven cells to identify isolated bright or dark impulses.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Adaptive impulse median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "sigma_range_mean",
+      "label": "Sigma-gated colour smoothing",
+      "mechanism": "Average only selected neighbours within an explicit RGB distance from the current pixel.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Sigma-gated colour smoothing",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "spatial_weighted_median",
+      "label": "Distance-weighted colour median",
+      "mechanism": "Estimate each channel with a weighted median that favors nearby selected samples.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Distance-weighted colour median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "luminance_winsor",
+      "label": "Luminance percentile limiter",
+      "mechanism": "Clamp luminance to the selected neighborhood tenth and ninetieth percentiles while retaining channel ratios.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Luminance percentile limiter",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "chroma_bilateral",
+      "label": "Chroma range smoothing",
+      "mechanism": "Average colour differences with chroma-distance and spatial weights while preserving luminance.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Chroma range smoothing",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "chroma_covariance",
+      "label": "Chroma covariance denoising",
+      "mechanism": "Measure two-dimensional chroma covariance and shrink its noisy principal components while preserving luminance.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Chroma covariance denoising",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "rgb_covariance",
+      "label": "Colour covariance denoising",
+      "mechanism": "Diagonalize measured local RGB covariance and suppress components below the chosen noise floor.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Colour covariance denoising",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "entropy_detail",
+      "label": "Entropy-weighted detail",
+      "mechanism": "Measure an eight-bin local luminance entropy and use it to weight residual detail gain.",
+      "controls": [
+        "amount",
+        "detail"
+      ],
+      "name": "Entropy-weighted detail",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "rms_contrast",
+      "label": "Local RMS contrast",
+      "mechanism": "Rescale luminance residuals toward a chosen local RMS contrast, with bounded gain.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Local RMS contrast",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "log_retinex",
+      "label": "Log-illumination correction",
+      "mechanism": "Estimate geometric mean illumination and move it toward an authored reference while retaining reflectance.",
+      "controls": [
+        "amount",
+        "threshold",
+        "detail"
+      ],
+      "name": "Log-illumination correction",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "periodic_notch",
+      "label": "Oriented periodic notch",
+      "mechanism": "Fit a local sine and cosine at an authored frequency and orientation, then subtract their bounded luminance contribution.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "threshold"
+      ],
+      "name": "Oriented periodic notch",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "cross_median",
+      "label": "Cross-footprint median",
+      "mechanism": "Take a selected-only colour median along a cross rather than a square footprint.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Cross-footprint median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "hessian_ridge",
+      "label": "Curvature ridge detail",
+      "mechanism": "Measure Hessian principal curvature and adjust ridge contrast with a bounded luminance correction.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "name": "Curvature ridge detail",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "coherence_detail",
+      "label": "Coherent structure detail",
+      "mechanism": "Measure structure-tensor coherence to concentrate detail gain along consistent edges.",
+      "controls": [
+        "amount",
+        "detail"
+      ],
+      "name": "Coherent structure detail",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "directional_median",
+      "label": "Least-dispersion line median",
+      "mechanism": "Choose the colour median of the least dispersed horizontal, vertical, or diagonal selected line.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Least-dispersion line median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "quadratic_residual",
+      "label": "Curved-surface residual detail",
+      "mechanism": "Fit a local six-term quadratic surface and adjust residual detail above smooth curved illumination.",
+      "controls": [
+        "amount",
+        "detail"
+      ],
+      "name": "Curved-surface residual detail",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "lanczos_shift",
+      "label": "Windowed-sinc selection shift",
+      "mechanism": "Resample an explicit shift with a six-tap Lanczos kernel and clamp ringing to the selected footprint range.",
+      "controls": [
+        "amount",
+        "shift"
+      ],
+      "name": "Windowed-sinc selection shift",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "elliptical_aperture",
+      "label": "Elliptical aperture integration",
+      "mechanism": "Integrate a rotated elliptical Gaussian aperture within the selection.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle"
+      ],
+      "name": "Elliptical aperture integration",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "hexagonal_aperture",
+      "label": "Hexagonal aperture integration",
+      "mechanism": "Integrate a uniform six-sided aperture with selection-aware samples.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle"
+      ],
+      "name": "Hexagonal aperture integration",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "cat_eye_aperture",
+      "label": "Cat-eye aperture integration",
+      "mechanism": "Integrate intersecting discs; aperture clipping increases away from the authored optical centre.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "source"
+      ],
+      "name": "Cat-eye aperture integration",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "highlight_streak",
+      "label": "One-sided highlight streak",
+      "mechanism": "Spread only brighter-than-current highlight energy along a rotated exponential trail.",
+      "controls": [
+        "amount",
+        "radius",
+        "angle",
+        "threshold"
+      ],
+      "name": "One-sided highlight streak",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "bilateral_tone_compress",
+      "label": "Range-aware base compression",
+      "mechanism": "Compress a luminance-range-filtered local base while retaining its fine residual.",
+      "controls": [
+        "amount",
+        "threshold",
+        "detail"
+      ],
+      "name": "Range-aware base compression",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "dark_channel_haze",
+      "label": "Selected dark-channel haze repair",
+      "mechanism": "Estimate selected airlight and local dark-channel transmission for bounded haze inversion. This is a heuristic, not scene-depth inference.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Selected dark-channel haze repair",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "connected_impulse",
+      "label": "Connected spot repair",
+      "mechanism": "Repair colour-connected components of at most four working cells from their selected boundary median.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "name": "Connected spot repair",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "chroma_median",
+      "label": "Luminance-preserving chroma median",
+      "mechanism": "Apply channel-difference medians while retaining luminance and reducing out-of-gamut chroma.",
+      "controls": [
+        "amount"
+      ],
+      "name": "Luminance-preserving chroma median",
+      "group": "spatial",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "lab_sample_distance",
+      "label": "CIE Lab sampled distance",
+      "mechanism": "Convert source sRGB through D65 XYZ into CIE Lab; select by CIE76 distance to the sample. Tolerance scales to 150 Lab units.",
+      "controls": [
+        "point",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "CIE Lab sampled distance",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "mahalanobis_colour",
+      "label": "Covariance colour distance",
+      "mechanism": "Estimate a regularized RGB covariance in the sample patch and select by Mahalanobis distance. Flat patches remain finite; this measures colour statistics, not subjects.",
+      "controls": [
+        "point",
+        "radius",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Covariance colour distance",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "geodesic_colour",
+      "label": "Geodesic colour propagation",
+      "mechanism": "Propagate from the sample by minimum accumulated RGB edge cost with deterministic integer Dijkstra traversal. Radius sets cost budget and tolerance sets colour crossing cost.",
+      "controls": [
+        "point",
+        "radius",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Geodesic colour propagation",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "local_otsu",
+      "label": "Local Otsu threshold",
+      "mechanism": "Choose a separate 16-bin between-class variance threshold in each local luminance patch. Flat patches are excluded. Produces hard coverage.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Local Otsu threshold",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "sauvola_threshold",
+      "label": "Sauvola adaptive threshold",
+      "mechanism": "Compare source luminance with a local mean and standard-deviation threshold. Corner sets the Sauvola coefficient; pure black stays unselected.",
+      "controls": [
+        "radius",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "name": "Sauvola adaptive threshold",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "gabor_response",
+      "label": "Gabor frequency response",
+      "mechanism": "Measure DC-removed Gaussian-windowed cosine response. Angle sets frequency direction; corner maps wavelength from 2 to 16 cells. Select the response with the range.",
+      "controls": [
+        "radius",
+        "corner",
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Gabor frequency response",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "directional_ridge",
+      "label": "Directional bright ridges",
+      "mechanism": "Project the source Hessian onto an angle and select negative curvature. This isolates bright ridges rather than first-derivative edges.",
+      "controls": [
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Directional bright ridges",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "local_skewness",
+      "label": "Local tonal skewness",
+      "mechanism": "Measure the third standardized local luminance moment. Symmetry and flat patches map to 0.5; positive outlier tails map above it.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Local tonal skewness",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "local_kurtosis",
+      "label": "Local tonal kurtosis",
+      "mechanism": "Measure local excess fourth standardized luminance moment, centered at 0.5 and scaled by 12. Flat patches map to 0.5.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Local tonal kurtosis",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "colour_line_residual",
+      "label": "Colour-line residual",
+      "mechanism": "Estimate the dominant RGB covariance direction in a sample patch using power iteration. Select perpendicular distance to that colour line; this can isolate colours outside a shading ramp.",
+      "controls": [
+        "point",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Colour-line residual",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "coverage_opening",
+      "label": "Grayscale morphological opening",
+      "mechanism": "Erode then dilate coverage with the same square structuring element. Removes thin bright protrusions and retains grayscale values. Outside-frame coverage is transparent.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Grayscale morphological opening",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "coverage_closing",
+      "label": "Grayscale morphological closing",
+      "mechanism": "Dilate then erode coverage with the same square structuring element. Bridges small dark gaps. Transparent boundaries can trim coverage at the frame edge.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Grayscale morphological closing",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "morphological_reconstruction",
+      "label": "Opening by reconstruction",
+      "mechanism": "Erode coverage to form a marker, then propagate its grayscale maxima under the original coverage ceiling. Connected surviving regions recover their contours.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Opening by reconstruction",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "grayscale_area_opening",
+      "label": "Grayscale area opening",
+      "mechanism": "Build descending upper-level components with a union-find max-tree. Suppress bright structures whose area is below the minimum at each coverage level.",
+      "controls": [
+        "minArea"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "minArea": 16
+        }
+      },
+      "name": "Grayscale area opening",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "border_connected",
+      "label": "Keep border-connected regions",
+      "mechanism": "Retain complete four-connected regions that touch any frame edge at the 50% coverage threshold. Preserves retained grayscale coverage.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "name": "Keep border-connected regions",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "geodesic_rings",
+      "label": "Seed geodesic distance bands",
+      "mechanism": "Measure shortest four-neighbor path distance inside the 50% selection from the sample. Range selects distance divided by radius; disconnected islands remain excluded.",
+      "controls": [
+        "point",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Seed geodesic distance bands",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "hole_bearing_regions",
+      "label": "Keep regions enclosing holes",
+      "mechanism": "Flood each component complement from a padded exterior to detect enclosed holes. Retain the surrounding component, preserving its coverage; solid regions are excluded.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "name": "Keep regions enclosing holes",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "regional_maxima",
+      "label": "Regional coverage maxima",
+      "mechanism": "Traverse equal-coverage plateaus and retain only nonzero plateaus with no greater four-neighbor coverage. Flat-topped maxima stay connected.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "name": "Regional coverage maxima",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "spiral_marquee",
+      "label": "Archimedean spiral ribbon",
+      "mechanism": "Construct a ribbon around a growing Archimedean spiral within elliptical bounds. Radius sets turn count, angle rotates it, and tolerance sets radial half-width.",
+      "controls": [
+        "bounds",
+        "radius",
+        "angle",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Archimedean spiral ribbon",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "barycentric_triangle",
+      "label": "Barycentric triangle gradient",
+      "mechanism": "Use the first three vertices to construct a triangle with coverage fading from vertex one toward the opposite edge. Corner controls the gradient exponent; collinear vertices are rejected.",
+      "controls": [
+        "vertices",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "name": "Barycentric triangle gradient",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "coverage_shear",
+      "label": "Affine selection shear",
+      "mechanism": "Inverse-map coverage through a horizontal shear about the bounds center. Angle maps through sine to shear strength from -1.5 to 1.5. Transparent sampling clips outside the frame.",
+      "controls": [
+        "bounds",
+        "angle"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "angle": 30
+        }
+      },
+      "name": "Affine selection shear",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "coverage_twirl",
+      "label": "Radial selection twirl",
+      "mechanism": "Rotate source sample coordinates with a quadratic radial falloff inside elliptical bounds. Angle sets centre rotation; the ellipse boundary stays fixed.",
+      "controls": [
+        "bounds",
+        "angle"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "angle": 90
+        }
+      },
+      "name": "Radial selection twirl",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "coverage_spherize",
+      "label": "Spherical selection remap",
+      "mechanism": "Inverse-map coverage with a normalized arctangent radial projection inside elliptical bounds. Corner blends projection strength; the bounds boundary stays fixed.",
+      "controls": [
+        "bounds",
+        "corner"
+      ],
+      "qualificationOverrides": {},
+      "name": "Spherical selection remap",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "coverage_displace",
+      "label": "Image-gradient displacement",
+      "mechanism": "Move coverage sample coordinates along source luminance gradients. Tolerance sets displacement strength; source pixels remain read-only and out-of-frame coverage is transparent.",
+      "controls": [
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "name": "Image-gradient displacement",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "signed_distance_smooth",
+      "label": "Signed-distance edge smoothing",
+      "mechanism": "Compute graph distance on both sides of the 50% selection interface and remap it with a logistic profile. Radius sets softness; fully selected or empty frames retain exact coverage.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "name": "Signed-distance edge smoothing",
+      "group": "selection",
+      "implementation": "Independent AURA implementation; Evoto numerical parity unverified.",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "robust-tone-quantiles",
+      "name": "Luminance quantile landmarks",
+      "description": "Interpolated observed linear luminance landmarks; no assumed target exposure.",
+      "mechanism": "Interpolated observed linear luminance landmarks; no assumed target exposure.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "median-deviation",
+      "name": "Robust luminance dispersion",
+      "description": "Median absolute departure from median luminance, interquartile range, and central 90% span.",
+      "mechanism": "Median absolute departure from median luminance, interquartile range, and central 90% span.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "luminance-inequality",
+      "name": "Light energy inequality",
+      "description": "Gini coefficient of nonnegative photographed luminance; zero for uniform light. Scene composition changes this value.",
+      "mechanism": "Gini coefficient of nonnegative photographed luminance; zero for uniform light. Scene composition changes this value.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "hue-concentration",
+      "name": "Circular hue concentration",
+      "description": "Chroma-weighted circular resultant length and mean opponent angle. Neutral pixels contribute no weight.",
+      "mechanism": "Chroma-weighted circular resultant length and mean opponent angle. Neutral pixels contribute no weight.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "tone-hue-drift",
+      "name": "Hue drift through light levels",
+      "description": "Circular hue difference from the photo-wide mean in eight square-root luminance bins. Empty or neutral bins report zero.",
+      "mechanism": "Circular hue difference from the photo-wide mean in eight square-root luminance bins. Empty or neutral bins report zero.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "highlight-headroom",
+      "name": "Channel highlight headroom",
+      "description": "One minus each channel's observed 99th percentile. Negative values indicate working signal above nominal white, not necessarily export clipping.",
+      "mechanism": "One minus each channel's observed 99th percentile. Negative values indicate working signal above nominal white, not necessarily export clipping.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "chroma-tail",
+      "name": "Absolute chroma tails",
+      "description": "Opponent channel-difference radius at median, 90th, 99th and maximum quantiles.",
+      "mechanism": "Opponent channel-difference radius at median, 90th, 99th and maximum quantiles.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "exposure-locations",
+      "name": "Light averaging models",
+      "description": "Arithmetic mean of nonnegative luminance, geometric mean and harmonic mean of strictly positive luminance. These describe distribution, not correct exposure.",
+      "mechanism": "Arithmetic mean of nonnegative luminance, geometric mean and harmonic mean of strictly positive luminance. These describe distribution, not correct exposure.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "local-colour-jumps",
+      "name": "Local colour transitions",
+      "description": "Mean adjacent opponent-colour distance in 8 by 8 regions. Brightness and photographed colour boundaries both affect it.",
+      "mechanism": "Mean adjacent opponent-colour distance in 8 by 8 regions. Brightness and photographed colour boundaries both affect it.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "highlight-rolloff",
+      "name": "Upper quantile spacing",
+      "description": "Slope of observed luminance versus population rank across upper quantile intervals. Describes highlight concentration, not sensor response.",
+      "mechanism": "Slope of observed luminance versus population rank across upper quantile intervals. Describes highlight concentration, not sensor response.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "gamut-excursion-energy",
+      "name": "Working range excursion energy",
+      "description": "Root mean squared channel distance outside the nominal zero-to-one working cube; this is not an sRGB gamut test.",
+      "mechanism": "Root mean squared channel distance outside the nominal zero-to-one working cube; this is not an sRGB gamut test.",
+      "group": "inspection",
+      "reviewGroup": "Delivery statistics",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "colour-variogram",
+      "name": "Colour spatial variogram",
+      "description": "Half mean squared opponent-colour difference at four horizontal preview lags; distinguishes spatial colour structure from global palette spread.",
+      "mechanism": "Half mean squared opponent-colour difference at four horizontal preview lags; distinguishes spatial colour structure from global palette spread.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/statistics.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "structure-coherence",
+      "name": "Regional structure coherence",
+      "description": "Anisotropy of the 2 by 2 luminance gradient structure tensor. Zero includes flat regions; one indicates a dominant direction.",
+      "mechanism": "Anisotropy of the 2 by 2 luminance gradient structure tensor. Zero includes flat regions; one indicates a dominant direction.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "hessian-signature",
+      "name": "Surface curvature classes",
+      "description": "Fractions of positive curvature, negative curvature, saddle and flat Hessians on interior preview pixels. This is mathematical structure, not skin classification.",
+      "mechanism": "Fractions of positive curvature, negative curvature, saddle and flat Hessians on interior preview pixels. This is mathematical structure, not skin classification.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "gradient-tailedness",
+      "name": "Gradient tail weight",
+      "description": "Excess kurtosis of bounded-domain gradient magnitude. Sparse strong boundaries produce heavier tails.",
+      "mechanism": "Excess kurtosis of bounded-domain gradient magnitude. Sparse strong boundaries produce heavier tails.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "edge-polarity",
+      "name": "Signed edge transitions",
+      "description": "Counts of positive and negative horizontal and vertical interior derivatives above a small numerical floor.",
+      "mechanism": "Counts of positive and negative horizontal and vertical interior derivatives above a small numerical floor.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "normalized-total-variation",
+      "name": "Relative total variation",
+      "description": "Mean absolute adjacent asinh-luminance change divided by mean absolute asinh luminance, independently across axes.",
+      "mechanism": "Mean absolute adjacent asinh-luminance change divided by mean absolute asinh luminance, independently across axes.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "dct-energy",
+      "name": "Cosine frequency energy",
+      "description": "Orthonormal 8 by 8 block DCT energy in radial AC frequency bands of asinh luminance. Incomplete border blocks are excluded.",
+      "mechanism": "Orthonormal 8 by 8 block DCT energy in radial AC frequency bands of asinh luminance. Incomplete border blocks are excluded.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "chroma-edge-alignment",
+      "name": "Chroma and light edge alignment",
+      "description": "Mean absolute angular cosine between red-green opponent gradients and luminance gradients with nonzero support.",
+      "mechanism": "Mean absolute angular cosine between red-green opponent gradients and luminance gradients with nonzero support.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "residual-asymmetry",
+      "name": "Fine residual polarity",
+      "description": "Positive and negative four-neighbor residual mass and their normalized signed balance in asinh luminance.",
+      "mechanism": "Positive and negative four-neighbor residual mass and their normalized signed balance in asinh luminance.",
+      "group": "inspection",
+      "reviewGroup": "Surface review",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "local-bit-entropy",
+      "name": "Regional tone entropy",
+      "description": "Shannon entropy in fixed 16-bin nominal luminance histograms per region. HDR and negative samples accumulate in boundary bins.",
+      "mechanism": "Shannon entropy in fixed 16-bin nominal luminance histograms per region. HDR and negative samples accumulate in boundary bins.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "illumination-plane",
+      "name": "Linear lighting trend",
+      "description": "Least-squares horizontal and vertical slopes in centred normalized coordinates of asinh luminance. Scene reflectance contributes.",
+      "mechanism": "Least-squares horizontal and vertical slopes in centred normalized coordinates of asinh luminance. Scene reflectance contributes.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "illumination-curvature",
+      "name": "Quadratic lighting trend",
+      "description": "Orthogonal centred quadratic and cross-coordinate coefficients of asinh luminance; measures broad shape without claiming lens calibration.",
+      "mechanism": "Orthogonal centred quadratic and cross-coordinate coefficients of asinh luminance; measures broad shape without claiming lens calibration.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "edge-euler",
+      "name": "Edge topology",
+      "description": "Cubical Euler characteristic V minus E plus F of above-mean significant gradient pixels. Closed pixel squares include corner contacts.",
+      "mechanism": "Cubical Euler characteristic V minus E plus F of above-mean significant gradient pixels. Closed pixel squares include corner contacts.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    },
+    {
+      "id": "edge-box-dimension",
+      "name": "Edge occupancy scaling",
+      "description": "Finite-scale box-count slopes from significant edges at one, two, four and eight preview pixels. Not an asymptotic fractal claim.",
+      "mechanism": "Finite-scale box-count slopes from significant edges at one, two, four and eight preview pixels. Not an asymptotic fractal claim.",
+      "group": "inspection",
+      "reviewGroup": "Lighting geometry",
+      "source": "crates/aura-app/src/photo_analysis/delivery/structure.rs",
+      "nativeCommand": "inspect_photo_diagnostics",
+      "status": "implemented_pending_qualification"
+    }
+  ],
+  "limitations": [
+    "50 rendering methods, 25 selection operations, 25 read-only diagnostics; no new trained models.",
+    "Native, desktop, and real-photo results must be read from the validation report.",
+    "All parameter combinations and subjective visual perfection are not established by automated tests."
+  ]
+}

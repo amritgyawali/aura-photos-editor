@@ -53,7 +53,7 @@ function adaptedRetouch(report: unknown): string | undefined {
 /** A real pixel-based baseline before optional model stages. Every outcome is reviewable. */
 export async function prepareCollection(projectId: string, stopped: () => boolean,
   onProgress: (message: string) => void, onPhoto: (photo: PreparedPhoto) => void, reference?: ReferenceSelection | null, profile?: ProfileSelection | null,
-  profileName?: string, photoIds?: readonly string[]): Promise<PreparedPhoto[]> {
+  profileName?: string, photoIds?: readonly string[], cancelId?: string): Promise<PreparedPhoto[]> {
   const selected = photoIds ? new Set(photoIds) : null;
   if (selected?.size === 0) return [];
   const photos = [];
@@ -92,7 +92,8 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
       checkStop();
       if (reference) {
         onProgress(`Matching reference style ${index + 1} of ${photos.length}: ${photo.fileName}`);
-        if (profile) await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile);
+        if (cancelId) await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile ?? null, cancelId);
+        else if (profile) await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile);
         else await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength);
         checkStop();
       }
@@ -105,7 +106,7 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
       if (preview.status === 'rejected') throw preview.reason;
       const look = profile ? `${profileName ?? profile.profileId} profile at ${Math.round(profile.strength * 100)}%` : 'Local exposure, contrast, highlights and shadows';
       const detail = reference
-        ? `${profile ? `${look}, then m` : 'M'}atched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength. Tone, white balance and color fit checked in rendered previews. Manual settings protected. ${adaptations.join(' ')}`
+        ? `${profile ? `${look}, then m` : 'M'}atched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength. Tone, white balance and color fit checked at native resolution. Manual settings protected. ${adaptations.join(' ')}`
         : `${look} saved. Preview rendered. Manual settings protected.${adaptations.length ? ` ${adaptations.join(' ')}` : ''}`;
       result = { photoId: photo.id, name: photo.fileName, outcome: 'ready', detail, settings: savedSettings(saved.value) };
     } catch (error) {

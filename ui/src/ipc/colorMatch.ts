@@ -12,6 +12,10 @@ export type ColorMatchReport = {
   sessionId: string; photoId: string; reference: ColorReference; controls: ColorMatchControls;
   matchedRegions: string[]; beforeDistance: number; afterDistance: number; changed: number;
   protectedFields: number; fullResolutionChecked: boolean; current: boolean;
+  fitting?: { engine: string; refinementCandidates: number; uniqueRenders: number; cachedProposals: number;
+    gradeCandidates?: number; nativeCandidateChecked?: boolean; nativeBacktrackFactor?: number;
+    structureSimilarity?: number | null; regularizationWeight?: number };
+  referenceMonochrome?: boolean;
 };
 export const colorMatch = {
   list: () => invoke<ColorReference[]>('list_color_references'),
@@ -26,9 +30,9 @@ export const colorMatch = {
   apply: (photoId: string, sessionId: string, controls: ColorMatchControls, cancelId: string) =>
     invoke<ColorMatchReport>('apply_color_match', { input: { photoId, sessionId, controls, cancelId } }),
 };
-export async function pickColorReference(): Promise<string | null> {
+export async function pickColorReference(title = 'Choose an edited colour reference'): Promise<string | null> {
   const result = await invoke<string | string[] | null>('plugin:dialog|open', { options: {
-    directory: false, multiple: false, title: 'Choose an edited colour reference',
+    directory: false, multiple: false, title,
     filters: [{ name: 'Edited photo', extensions: ['jpg', 'jpeg', 'png', 'tif', 'tiff'] }],
   } });
   return Array.isArray(result) ? result[0] ?? null : result;

@@ -1,0 +1,1920 @@
+{
+  "date": "2026-10-22",
+  "iteration": "advanced",
+  "count": 100,
+  "groups": {
+    "colour": 25,
+    "spatial": 25,
+    "selection": 25,
+    "inspection": 25
+  },
+  "capabilities": [
+    {
+      "id": "spatial_chroma_plane",
+      "label": "Measured spatial cast removal",
+      "name": "Measured spatial cast removal",
+      "mechanism": "Fit two selected-only affine chroma surfaces and remove their spatial slopes while retaining the selected mean colour.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "radial_log_illumination",
+      "label": "Measured radial illumination correction",
+      "name": "Measured radial illumination correction",
+      "mechanism": "Fit log-luminance against squared distance from an authored optical centre and remove the fitted radial variation.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "gaussian_palette_transport",
+      "label": "Gaussian patch palette transport",
+      "name": "Gaussian patch palette transport",
+      "mechanism": "Compute the symmetric Gaussian optimal-transport map between two selected patch chroma covariances and means.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "second",
+        "radius",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "palette_simplex",
+      "label": "Three-anchor palette constraint",
+      "name": "Three-anchor palette constraint",
+      "mechanism": "Project chroma onto the closest point of the triangle defined by two selected patches and an explicit target colour.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "second",
+        "radius",
+        "target"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "hue_density_equalize",
+      "label": "Measured circular hue redistribution",
+      "name": "Measured circular hue redistribution",
+      "mechanism": "Compute a selected hue CDF with a seam in the least populated angular bin and redistribute hue into an authored angular span.",
+      "controls": [
+        "amount",
+        "strength",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Target must have nonzero chroma to define hue; otherwise exact identity.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "chroma_copula_map",
+      "label": "Chroma marginal copula remapping",
+      "name": "Chroma marginal copula remapping",
+      "mechanism": "Map the two selected opponent-chroma marginal ranks through logistic quantiles while retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "hue_radius_balance",
+      "label": "Hue-dependent colourfulness balance",
+      "name": "Hue-dependent colourfulness balance",
+      "mechanism": "Fit log colour radius to first circular harmonics and remove its measured dependence on hue.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "kmeans_palette_recolor",
+      "label": "Cluster-residual palette recolouring",
+      "name": "Cluster-residual palette recolouring",
+      "mechanism": "Fit three deterministic Lloyd clusters and translate each cluster toward authored anchors while retaining within-cluster residuals.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "second",
+        "radius",
+        "target"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "channel_regression_recover",
+      "label": "Measured channel-response reconstruction",
+      "name": "Measured channel-response reconstruction",
+      "mechanism": "Fit channel regressions from selected below-threshold pixels and estimate above-threshold channel values from the other channels.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "qualificationOverrides": {
+        "pivot": 0.8,
+        "width": 0.2
+      },
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "At least6 selected below-threshold training pixels, and an above-threshold channel to reconstruct; otherwise identity is expected.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "kubelka_munk_mix",
+      "label": "Kubelka-Munk pigment mixing",
+      "name": "Kubelka-Munk pigment mixing",
+      "mechanism": "Interpolate reflectance-derived absorption-to-scattering ratios and invert the Kubelka-Munk relation; this is a creative reflectance approximation.",
+      "controls": [
+        "amount",
+        "strength",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "pca_monochrome",
+      "label": "Variance-preserving principal monochrome",
+      "name": "Variance-preserving principal monochrome",
+      "mechanism": "Project selected RGB covariance onto its dominant eigenvector and normalize projected variance to measured luminance variance.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "fisher_monochrome",
+      "label": "Two-patch discriminant monochrome",
+      "name": "Two-patch discriminant monochrome",
+      "mechanism": "Solve a regularized Fisher discriminant from two selected patch distributions to separate their colours in monochrome.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "second",
+        "radius",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "isoluminant_edge_light",
+      "label": "Isoluminant colour-edge lighting",
+      "name": "Isoluminant colour-edge lighting",
+      "mechanism": "Convert selected chroma differences unsupported by luminance contrast into a bounded luminance lift.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "pivot",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "luminance_error_diffusion",
+      "label": "Selected error-diffusion tones",
+      "name": "Selected error-diffusion tones",
+      "mechanism": "Quantize linear luminance and redistribute quantization error to selected forward neighbours with Floyd-Steinberg weights.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "amplitude_dotscreen",
+      "label": "Area-modulated photographic dots",
+      "name": "Area-modulated photographic dots",
+      "mechanism": "Render a spatial dot screen whose covered area follows photographed luminance, with antialiased dot boundaries.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "pivot"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "iso_luma_contours",
+      "label": "Stop-domain luminance contours",
+      "name": "Stop-domain luminance contours",
+      "mechanism": "Render periodic contour bands on log-luminance isosurfaces, retaining the photographed colour direction.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "exposure_fusion",
+      "label": "Analytical exposure fusion",
+      "name": "Analytical exposure fusion",
+      "mechanism": "Fuse three bounded synthetic exposure renderings using their measured well-exposedness weights.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "perceptual_lightness_lift",
+      "label": "Constant-Lab-chroma lightness lift",
+      "name": "Constant-Lab-chroma lightness lift",
+      "mechanism": "Lift CIE Lab lightness with a bounded bell while keeping Lab a and b fixed, then return to linear Rec.2020.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "uv_cast_translate",
+      "label": "Uniform-chromaticity cast translation",
+      "name": "Uniform-chromaticity cast translation",
+      "mechanism": "Translate CIE u-prime/v-prime chromaticity from the selected mean toward a target while retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Target must have positive luminance to define chromaticity; otherwise exact identity.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "chroma_group_lasso",
+      "label": "Robust group-lasso chroma cleanup",
+      "name": "Robust group-lasso chroma cleanup",
+      "mechanism": "Estimate a selected robust chroma noise scale and apply the vector group-lasso proximal operator.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "geometric_median_neutral",
+      "label": "Geometric-median cast balance",
+      "name": "Geometric-median cast balance",
+      "mechanism": "Estimate the continuous weighted chroma geometric median with fixed-count Weiszfeld updates and remove that robust cast.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "aitchison_tint",
+      "label": "Compositional-geodesic colour tint",
+      "name": "Compositional-geodesic colour tint",
+      "mechanism": "Interpolate channel compositions along an Aitchison log-ratio geodesic toward a chosen target, retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "energy_conserving_lightness",
+      "label": "Fixed-energy lightness redistribution",
+      "name": "Fixed-energy lightness redistribution",
+      "mechanism": "Solve an exponential-tilting KL projection toward a luminance anchor while preserving the total RGB channel energy.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "dichromatic_specular",
+      "label": "Dichromatic reflection subtraction",
+      "name": "Dichromatic reflection subtraction",
+      "mechanism": "Fit a two-basis diffuse-plus-illuminant reflection model and subtract a bounded specular component.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "radius",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "qualificationOverrides": {
+        "target": [
+          0.8,
+          0.9,
+          1.0
+        ],
+        "source": [
+          0.25,
+          0.5
+        ]
+      },
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity. Diffuse and target illuminant bases must be non-collinear.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "mirror_hue_fold",
+      "label": "Mirrored palette hue folding",
+      "name": "Mirrored palette hue folding",
+      "mechanism": "Fold hue through a repeated angular reflection into a bounded palette sector while retaining chroma radius and luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Target must have nonzero chroma to define hue; otherwise exact identity.",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "local_dct_shrink",
+      "label": "Local cosine shrinkage",
+      "name": "Local cosine shrinkage",
+      "mechanism": "Soft-threshold a five-by-five discrete cosine transform and reconstruct its centre while retaining luminance ratios.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Cosine basis across a 5x5 patch differs from Haar block wavelets and scalar residual clipping.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "cdf53_shrink",
+      "label": "Biorthogonal lifting cleanup",
+      "name": "Biorthogonal lifting cleanup",
+      "mechanism": "Apply reversible CDF 5/3 predict-update lifting along both axes and shrink its detail coefficients.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Predict-update biorthogonal lifting differs from Haar coefficient thresholding and DCT analysis.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "geometric_median",
+      "label": "Geometric colour median",
+      "name": "Geometric colour median",
+      "mechanism": "Use eight Weiszfeld iterations to minimize joint RGB distance; unlike a medoid, the result can lie between samples.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Continuous joint-distance minimizer differs from sample medoid and channelwise median estimators.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "mean_shift_colour",
+      "label": "Iterative colour mode",
+      "name": "Iterative colour mode",
+      "mechanism": "Move a Gaussian colour kernel five times toward the measured local colour-density mode.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Kernel centre moves over five density iterations; sigma/bilateral filters retain a fixed range centre.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "hodges_lehmann",
+      "label": "Pairwise robust colour location",
+      "name": "Pairwise robust colour location",
+      "mechanism": "Take the weighted median of all local Walsh pair averages rather than individual samples.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Walsh pair-average distribution is distinct from sample ranks, trimmed means and median-of-means.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "geodesic_range",
+      "label": "Geodesic colour averaging",
+      "name": "Geodesic colour averaging",
+      "mechanism": "Measure shortest four-connected contrast paths and average samples by their path cost.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Shortest contrast paths use connectivity, unlike straight spatial distance or recursive domain smoothing.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "patch_low_rank",
+      "label": "Spatial patch low-rank repair",
+      "name": "Spatial patch low-rank repair",
+      "mechanism": "Measure covariance of overlapping nine-dimensional luminance patches and shrink its principal spatial mode.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Covariance is over nine spatial luminance dimensions rather than three RGB channels.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "mahalanobis_range",
+      "label": "Covariance-distance smoothing",
+      "name": "Covariance-distance smoothing",
+      "mechanism": "Use a regularized inverse RGB covariance to measure range weights before averaging colours.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Inverse covariance defines the range metric; earlier RGB covariance shrinkage reconstructs principal-component amplitudes.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "lee_speckle",
+      "label": "Multiplicative Lee restoration",
+      "name": "Multiplicative Lee restoration",
+      "mechanism": "Estimate multiplicative noise using local relative variance and a signal-dependent gain.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Signal-dependent multiplicative relative-noise variance differs from additive-noise Wiener estimation.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "frost_speckle",
+      "label": "Frost spatial damping",
+      "name": "Frost spatial damping",
+      "mechanism": "Use measured coefficient of variation to set exponential spatial damping for multiplicative-noise smoothing.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Variation-dependent exponential spatial damping differs from Lee gain and Gaussian range weighting.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "gamma_map_speckle",
+      "label": "Gamma-MAP speckle restoration",
+      "name": "Gamma-MAP speckle restoration",
+      "mechanism": "Use homogeneous, Gamma-MAP texture, and strong-edge regimes derived from measured relative variance.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Three-regime Gamma posterior mode includes a quadratic texture solution rather than Lee linear gain.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "qualificationOverrides": {
+        "threshold": 0.8
+      },
+      "qualificationNote": "The low-noise strong-edge regime intentionally returns the source; exercise the homogeneous/texture estimator on the qualification chart.",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "biharmonic_stencil",
+      "label": "Fourth-order surface repair",
+      "name": "Fourth-order surface repair",
+      "mechanism": "Solve the centre of a bounded biharmonic finite-difference stencil rather than a harmonic neighbour mean.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "Fourth-order stencil includes signed diagonal and distance-two terms, unlike harmonic averaging.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "fractional_laplacian",
+      "label": "Fractional spatial detail",
+      "name": "Fractional spatial detail",
+      "mechanism": "Adjust a truncated fractional-Laplacian residual with power-law distance weights.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "distinctness": "Truncated power-law nonlocal derivative differs from a difference of two box means.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "parabolic_background",
+      "label": "Parabolic background separation",
+      "name": "Parabolic background separation",
+      "mechanism": "Estimate a non-flat parabolic morphological opening and adjust detail above that background.",
+      "controls": [
+        "amount",
+        "threshold",
+        "detail"
+      ],
+      "distinctness": "Non-flat quadratic structuring function differs from flat morphology or geodesic reconstruction.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "directional_scratch",
+      "label": "Oriented scratch repair",
+      "name": "Oriented scratch repair",
+      "mechanism": "Combine line opening and closing along an authored normal to reduce thin bright and dark scratches.",
+      "controls": [
+        "amount",
+        "angle",
+        "threshold"
+      ],
+      "distinctness": "Line opening/closing is directional and separable from earlier isotropic top-hat cleanup.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "phase_only_detail",
+      "label": "Quadrature phase detail",
+      "name": "Quadrature phase detail",
+      "mechanism": "Normalize a local even residual by truncated Riesz-like quadrature amplitude for bounded phase-sensitive detail.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "distinctness": "Even/odd quadrature normalization differs from Hessian curvature or residual gain alone.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "spectral_residual_detail",
+      "label": "Spectral surprise detail",
+      "name": "Spectral surprise detail",
+      "mechanism": "Remove local log-spectrum averages, reconstruct spectral-residual saliency, and use it to weight detail.",
+      "controls": [
+        "amount",
+        "detail"
+      ],
+      "distinctness": "Log-spectrum residual saliency differs from an authored sinusoidal notch or spatial entropy.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "hampel_impulse",
+      "label": "MAD impulse repair",
+      "name": "MAD impulse repair",
+      "mechanism": "Replace luminance outliers using a median absolute deviation test and an explicit minimum separation.",
+      "controls": [
+        "amount",
+        "threshold"
+      ],
+      "distinctness": "MAD scale tests differ from expanding-window extrema or ordinary median replacement.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "circular_hue_smooth",
+      "label": "Circular hue smoothing",
+      "name": "Circular hue smoothing",
+      "mechanism": "Average chroma directions on the unit circle while retaining chroma magnitude and luminance where gamut permits.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Unit-direction averaging preserves chroma strength rather than filtering chroma coordinates.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "chroma_magnitude_median",
+      "label": "Chroma strength median",
+      "name": "Chroma strength median",
+      "mechanism": "Filter chroma magnitude by a weighted median while retaining the original hue direction and luminance.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Scalar chroma magnitude changes while hue direction stays fixed, unlike chroma coordinate medians.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "white_patch_adapt",
+      "label": "Local white-patch adaptation",
+      "name": "Local white-patch adaptation",
+      "mechanism": "Estimate channel illumination from local upper percentiles and adapt colour while retaining luminance.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Upper channel percentiles estimate a local illuminant; this is a colour adaptation heuristic.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "gray_edge_adapt",
+      "label": "Local gray-edge adaptation",
+      "name": "Local gray-edge adaptation",
+      "mechanism": "Estimate channel illumination from local gradient energy and adapt colour while retaining luminance.",
+      "controls": [
+        "amount"
+      ],
+      "distinctness": "Derivative-energy illuminant estimation differs from intensity-percentile white-patch adaptation.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "local_skewness_balance",
+      "label": "Luminance skewness balance",
+      "name": "Luminance skewness balance",
+      "mechanism": "Use the measured third central moment to reduce local luminance asymmetry with a bounded correction.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "distinctness": "Measured third central moment corrects asymmetry rather than variance or histogram rank.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "local_kurtosis_detail",
+      "label": "Tail-weighted detail",
+      "name": "Tail-weighted detail",
+      "mechanism": "Use the measured fourth central moment to adjust detail according to local tail weight.",
+      "controls": [
+        "amount",
+        "detail",
+        "threshold"
+      ],
+      "distinctness": "Measured fourth central moment adjusts tail response rather than entropy or third-moment balance.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "minmod_edge_limiter",
+      "label": "Monotonic edge limiter",
+      "name": "Monotonic edge limiter",
+      "mechanism": "Reconstruct from slope-limited neighbouring intervals to suppress directional overshoot while retaining linear ramps.",
+      "controls": [
+        "amount",
+        "angle",
+        "threshold"
+      ],
+      "distinctness": "Monotone slope-limited interval reconstruction differs from polynomial residual fits and shock evolution.",
+      "workingResolution": "native, bounded stripe/tile processing",
+      "group": "spatial",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "median_absolute_deviation",
+      "name": "Robust median deviation",
+      "mechanism": "Select source luminance distance from its patch median, normalized by median absolute deviation. Flat neighborhoods remain finite.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "robust_deviation_and_binary_transition_descriptors_have_known_answers",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "binary_pattern_transitions",
+      "name": "Local binary-pattern transitions",
+      "mechanism": "Count circular bright/dark transitions around an eight-neighbor luminance binary pattern. Measures texture topology rather than brightness.",
+      "controls": [
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "robust_deviation_and_binary_transition_descriptors_have_known_answers",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "patch_autocorrelation",
+      "name": "Directional patch autocorrelation",
+      "mechanism": "Measure Pearson correlation between each source patch and a one-cell shifted copy along the angle direction. Flat patches map to neutral 0.5.",
+      "controls": [
+        "radius",
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "source_pair_statistics_distinguish_direction_and_flat_patches",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "patch_semivariance",
+      "name": "Directional semivariance",
+      "mechanism": "Measure mean squared luminance differences across one-cell source pairs along the angle direction. This measures spatial roughness without patch-mean subtraction.",
+      "controls": [
+        "radius",
+        "angle",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "source_pair_statistics_distinguish_direction_and_flat_patches",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "log_chroma_distance",
+      "name": "Log-chromaticity sample distance",
+      "mechanism": "Compare log red/green and blue/green ratios to the sample. A one-code-value floor bounds near-black ratios.",
+      "controls": [
+        "point",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "logarithmic_colour_ratio_preserves_shading_and_prototypes_resolve_ties",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "edge_nonmaximum",
+      "name": "Gradient nonmaximum suppression",
+      "mechanism": "Retain source gradient magnitudes that are local maxima along their quantized gradient direction, producing thin edge coverage.",
+      "controls": [
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "nonmaximum_edges_suppress_shallower_neighbors",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "edge_hysteresis",
+      "name": "Connected hysteresis edges",
+      "mechanism": "Keep weak gradient cells only when eight-connected to a strong gradient cell. Range supplies low and high gradient thresholds.",
+      "controls": [
+        "range"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "range": [
+            0.02,
+            0.12
+          ]
+        }
+      },
+      "mechanismTest": "hysteresis_keeps_connected_weak_edges_and_excludes_disconnected_ones",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "local_moran",
+      "name": "Local Moran spatial association",
+      "mechanism": "Measure local standardized association between centre luminance and its four neighbors against patch statistics. Neutral or flat association maps to 0.5.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "moran_template_and_circular_hue_measure_different_patch_properties",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "template_patch_correlation",
+      "name": "Sampled patch correlation",
+      "mechanism": "Compare every source patch with the sampled luminance template using zero-mean normalized correlation. Radius is capped at four cells.",
+      "controls": [
+        "point",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "moran_template_and_circular_hue_measure_different_patch_properties",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "local_hue_dispersion",
+      "name": "Circular hue dispersion",
+      "mechanism": "Measure one minus the length of the chroma-weighted local hue resultant. Uniform hues are zero and opposing hues approach one.",
+      "controls": [
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "moran_template_and_circular_hue_measure_different_patch_properties",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "colour_prototype_partition",
+      "name": "Colour prototype partition",
+      "mechanism": "Sample RGB prototypes at vertices and retain source cells closest to the selected prototype in RGB space. Ties use input order.",
+      "controls": [
+        "vertices",
+        "seedIndex"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.2,
+              0.3
+            ],
+            [
+              0.7,
+              0.6
+            ]
+          ],
+          "seedIndex": 0
+        }
+      },
+      "mechanismTest": "logarithmic_colour_ratio_preserves_shading_and_prototypes_resolve_ties",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "selection_articulations",
+      "name": "Connectivity articulation cells",
+      "mechanism": "Use iterative Tarjan traversal to identify selected cells whose removal disconnects a four-connected region. Keeps original coverage at those critical cells.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "mechanismTest": "articulations_and_graph_cores_preserve_only_selected_support",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "selection_k_core",
+      "name": "Selection graph core",
+      "mechanism": "Repeatedly peel selected cells below the required graph degree. Corner maps the required eight-neighbor graph degree from one to four.",
+      "controls": [
+        "corner"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "corner": 1
+        }
+      },
+      "qualificationNote": "Dense ellipse fixtures can already satisfy the chosen graph degree, so an unchanged output is valid. The known-answer test uses a square with a thin attachment and verifies peeling.",
+      "mechanismTest": "articulations_and_graph_cores_preserve_only_selected_support",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "coverage_watershed",
+      "name": "Seeded coverage watershed",
+      "mechanism": "Flood from selected seeds with minimax inverse-coverage path cost. Keep the chosen basin; ties follow seed order. Each seed must lie inside selected coverage.",
+      "controls": [
+        "vertices",
+        "seedIndex"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.2,
+              0.5
+            ],
+            [
+              0.3,
+              0.5
+            ]
+          ],
+          "seedIndex": 0
+        }
+      },
+      "mechanismTest": "minimax_watershed_uses_seed_distance_ties_and_rejects_duplicate_seeds_atomically",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "coverage_anisotropic_diffusion",
+      "name": "Anisotropic coverage diffusion",
+      "mechanism": "Diffuse mask coverage with Perona-Malik gradient conductance. Tolerance controls boundary resistance and radius controls iteration count.",
+      "controls": [
+        "radius",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "nonlinear_diffusion_resists_strong_edges_and_curvature_preserves_straight_ramps",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "coverage_curvature_flow",
+      "name": "Coverage curvature flow",
+      "mechanism": "Evolve coverage by level-set mean curvature with fixed frame values. Smooths curved interfaces while straight linear ramps remain stationary.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "nonlinear_diffusion_resists_strong_edges_and_curvature_preserves_straight_ramps",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "region_inscribed_disk",
+      "name": "Region maximum inscribed disk",
+      "mechanism": "Compute exact Euclidean distance to each component complement and retain its largest inscribed disk. Ties select the first maximum in raster order.",
+      "controls": [],
+      "qualificationOverrides": {},
+      "mechanismTest": "exact_inscribed_disks_trim_square_corners_and_keep_component_centres",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "directional_run_width",
+      "name": "Directional selected run width",
+      "mechanism": "Measure the complete horizontal or vertical selected run through each cell. Angle chooses the closer axis; range selects run length divided by radius.",
+      "controls": [
+        "angle",
+        "radius",
+        "range",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "directional_run_width_is_axis_sensitive_and_selection_limited",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "thin_plate_coverage_warp",
+      "name": "Thin-plate landmark deformation",
+      "mechanism": "Interleave source and destination landmarks. Solve regularized thin-plate radial basis functions to inverse-map coverage. Requires 3-8 noncollinear landmark pairs.",
+      "controls": [
+        "vertices",
+        "corner"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.15,
+              0.15
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.85,
+              0.15
+            ],
+            [
+              0.8,
+              0.25
+            ],
+            [
+              0.85,
+              0.85
+            ],
+            [
+              0.9,
+              0.8
+            ],
+            [
+              0.15,
+              0.85
+            ],
+            [
+              0.1,
+              0.9
+            ]
+          ]
+        }
+      },
+      "mechanismTest": "landmark_deformations_have_identity_and_nonidentity_known_answers",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "mean_value_cage_warp",
+      "name": "Mean-value cage deformation",
+      "mechanism": "Interleave source and destination convex cage vertices. Mean-value coordinates interpolate source coverage continuously inside the destination cage. Outside coverage is retained.",
+      "controls": [
+        "vertices"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.15,
+              0.15
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.85,
+              0.15
+            ],
+            [
+              0.8,
+              0.25
+            ],
+            [
+              0.85,
+              0.85
+            ],
+            [
+              0.9,
+              0.8
+            ],
+            [
+              0.15,
+              0.85
+            ],
+            [
+              0.1,
+              0.9
+            ]
+          ]
+        }
+      },
+      "mechanismTest": "landmark_deformations_have_identity_and_nonidentity_known_answers",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "triangulated_cage_warp",
+      "name": "Triangulated cage deformation",
+      "mechanism": "Interleave source and destination convex cage vertices. A triangle fan maps destination barycentric coordinates to source triangles, preserving piecewise straight deformation.",
+      "controls": [
+        "vertices"
+      ],
+      "qualificationOverrides": {
+        "advanced": {
+          "vertices": [
+            [
+              0.15,
+              0.15
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.85,
+              0.15
+            ],
+            [
+              0.8,
+              0.25
+            ],
+            [
+              0.85,
+              0.85
+            ],
+            [
+              0.9,
+              0.8
+            ],
+            [
+              0.15,
+              0.85
+            ],
+            [
+              0.1,
+              0.9
+            ]
+          ]
+        }
+      },
+      "mechanismTest": "landmark_deformations_have_identity_and_nonidentity_known_answers",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "mobius_coverage_warp",
+      "name": "Conformal Mobius deformation",
+      "mechanism": "Inverse-map coverage with a complex fractional transformation inside elliptical bounds. Corner controls displacement and angle its direction; the ellipse boundary stays on itself.",
+      "controls": [
+        "bounds",
+        "corner",
+        "angle"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "mobius_and_path_maps_match_identity_and_reject_zero_length_paths",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "path_normal_unwrap",
+      "name": "Path-normal coverage unwrap",
+      "mechanism": "Unwrap coverage along polyline arc length. Output X follows the path and Y samples its perpendicular strip with tolerance as half-width.",
+      "controls": [
+        "vertices",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "mobius_and_path_maps_match_identity_and_reject_zero_length_paths",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "coverage_seam_carve",
+      "name": "Coverage-aware seam compression",
+      "mechanism": "Remove the requested number of minimum-coverage vertical seams with dynamic programming, then resample to the original frame width. Radius is capped by width minus one.",
+      "controls": [
+        "radius"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "seam_compression_preserves_uniform_coverage_and_changes_nonuniform_support",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "lissajous_ribbon",
+      "name": "Lissajous ribbon construction",
+      "mechanism": "Construct coverage around a closed sine-parametric path. Radius and radius plus one set crossing frequencies; angle sets phase and tolerance controls ribbon width.",
+      "controls": [
+        "bounds",
+        "radius",
+        "angle",
+        "tolerance"
+      ],
+      "qualificationOverrides": {},
+      "mechanismTest": "lissajous_ribbon_has_bounded_geometric_support",
+      "group": "selection",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "log-ratio-neutrality",
+      "name": "Log channel-ratio distribution",
+      "mechanism": "10th,50th,90th percentiles of log red/green and blue/green ratios. Nonpositive channels use a 1e-6 floor; this is not a semantic skin estimate.",
+      "group": "inspection",
+      "reviewGroup": "Colour stability",
+      "source": "crates/aura-app/src/photo_analysis/advanced/colour.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "white-patch-illuminant",
+      "name": "White-patch chromaticity",
+      "mechanism": "Normalized per-channel95th-percentile nonnegative working RGB; a scene-dependent illuminant candidate, not a white-balance verdict.",
+      "group": "inspection",
+      "reviewGroup": "Colour stability",
+      "source": "crates/aura-app/src/photo_analysis/advanced/colour.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "gray-edge-illuminant",
+      "name": "Gray-edge chromaticity",
+      "mechanism": "Normalized sixth-power mean of asinh channel derivatives over right/lower adjacency. Scene edges bias this independent illuminant candidate.",
+      "group": "inspection",
+      "reviewGroup": "Colour stability",
+      "source": "crates/aura-app/src/photo_analysis/advanced/colour.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "opponent-colourfulness",
+      "name": "Opponent colourfulness proxy",
+      "mechanism": "Opponent-plane spread plus0.3 times mean magnitude in signed asinh working RGB. Descriptive proxy, not calibrated display perception.",
+      "group": "inspection",
+      "reviewGroup": "Colour stability",
+      "source": "crates/aura-app/src/photo_analysis/advanced/colour.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "hue-gap-coverage",
+      "name": "Hue occupancy and largest gap",
+      "mechanism": "Fraction of36 opponent-hue bins occupied and longest circular empty sector. Near-neutral samples are excluded; no chromatic support reports zero coverage and full gap.",
+      "group": "inspection",
+      "reviewGroup": "Colour stability",
+      "source": "crates/aura-app/src/photo_analysis/advanced/colour.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "local-hue-winding",
+      "name": "Local hue discontinuity",
+      "mechanism": "Mean shortest angular change to valid right/lower neighbours divided by pi. Undefined neutral hues are excluded, not assigned an angle.",
+      "group": "inspection",
+      "reviewGroup": "Colour stability",
+      "source": "crates/aura-app/src/photo_analysis/advanced/colour.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "chroma-light-information",
+      "name": "Chroma-light mutual information",
+      "mechanism": "Discrete mutual information in bits between sixteen frame-relative asinh-luminance and opponent-chroma bins. Zero means independent bin populations.",
+      "group": "inspection",
+      "reviewGroup": "Colour stability",
+      "source": "crates/aura-app/src/photo_analysis/advanced/colour.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "patch-chroma-dispersion",
+      "name": "Regional colour dispersion",
+      "mechanism": "Square root of the sum of opponent covariance diagonal entries in each grid cell. Measures local colour spread without classifying skin.",
+      "group": "inspection",
+      "reviewGroup": "Colour stability",
+      "source": "crates/aura-app/src/photo_analysis/advanced/colour.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "tukey-tail-support",
+      "name": "Robust luminance outliers",
+      "mechanism": "Fraction belowQ1-1.5IQR or aboveQ3+1.5IQR in asinh working luminance. A descriptive tail fence, not a defect or exposure judgment.",
+      "group": "inspection",
+      "reviewGroup": "Delivery integrity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/integrity.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "channel-tail-dependence",
+      "name": "Channel highlight dependence",
+      "mechanism": "Joint above95th-percentile support divided by the smaller marginal support, per channel pair. Ties at the percentile do not count as exceedances.",
+      "group": "inspection",
+      "reviewGroup": "Delivery integrity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/integrity.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "patch-mean-variance-fit",
+      "name": "Regional mean-variance fit",
+      "mechanism": "Least-squares regional variance versus mean in asinh luminance; texture also contributes, so this is not sensor noise calibration.",
+      "group": "inspection",
+      "reviewGroup": "Delivery integrity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/integrity.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "clipping-component-support",
+      "name": "Connected clipping support",
+      "mechanism": "Four-connected components with any working RGB channel at or outside0..1. Counts connected samples, not clipped source-sensor pixels.",
+      "group": "inspection",
+      "reviewGroup": "Delivery integrity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/integrity.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "edge-clipping-overlap",
+      "name": "Clipping-weighted edge fraction",
+      "mechanism": "Fraction of right/lower absolute asinh-luminance edge energy touching an out-of-range or endpoint working RGB sample.",
+      "group": "inspection",
+      "reviewGroup": "Delivery integrity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/integrity.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "robust-strip-drift",
+      "name": "Robust strip lighting profile",
+      "mechanism": "Median asinh luminance across eight vertical then eight horizontal strips. Median resists rare specular pixels; these are preview coordinates.",
+      "group": "inspection",
+      "reviewGroup": "Delivery integrity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/integrity.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "thumbnail-alias-sensitivity",
+      "name": "Thumbnail phase sensitivity",
+      "mechanism": "Mean absolute difference between top-left decimation and2x2 box averages in complete blocks. Predicts phase sensitivity of a simple thumbnail, not camera or JPEG quality.",
+      "group": "inspection",
+      "reviewGroup": "Delivery integrity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/integrity.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "ordinal-texture-entropy",
+      "name": "Ordinal texture entropy",
+      "mechanism": "Normalized six-permutation entropy of horizontal triples; exact ties are reported separately. Asinh working luminance.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "sample-texture-entropy",
+      "name": "Sequence sample entropy",
+      "mechanism": "Half-count-smoothed length-2 to length-3 template continuation on at most 384 evenly spaced samples; scene complexity, not a noise verdict.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "quantized-run-lengths",
+      "name": "Quantized texture runs",
+      "mechanism": "Horizontal equal-bin run distribution after sixteen-level frame-relative luminance quantization; last bin includes runs of eight or more.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "cooccurrence-texture",
+      "name": "Neighbour co-occurrence texture",
+      "mechanism": "Sixteen-level right/lower co-occurrence contrast, homogeneity, energy and natural-log entropy. Frame-relative asinh luminance.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "bright-mass-lacunarity",
+      "name": "Bright mass lacunarity",
+      "mechanism": "Second moment divided by squared mean of above-median mass in complete 2,4,8,16-pixel boxes. Zero denotes no bright support.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "harris-corner-response",
+      "name": "Regional corner response",
+      "mechanism": "Signed Harris determinant minus 0.04 times squared trace of the regional gradient tensor; positive corners and negative straight edges.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "local-plane-residual",
+      "name": "Local illumination fit residual",
+      "mechanism": "RMS residual after a least-squares affine plane fit within each grid cell. Texture and nonplanar illumination both contribute.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "line-spectral-flatness",
+      "name": "Line spectral flatness",
+      "mechanism": "Geometric/arithmetic non-DC Fourier-power ratio on up to eight 64-sample lines per direction. Uniform lines report zero.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "neighbour-moran-index",
+      "name": "Neighbour Moran index",
+      "mechanism": "Population-centred luminance autocorrelation over right/lower grid adjacency, normalized by total frame variance; constant fields report zero.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    },
+    {
+      "id": "robust-neighbour-roughness",
+      "name": "Robust local roughness",
+      "mechanism": "Median absolute asinh-luminance difference to right/lower neighbours in each grid cell; isolates typical variation from rare large edges.",
+      "group": "inspection",
+      "reviewGroup": "Texture fidelity",
+      "source": "crates/aura-app/src/photo_analysis/advanced/texture.rs",
+      "status": "implemented_pending_qualification",
+      "evotoParity": "unverified"
+    }
+  ],
+  "existingToolFixes": {
+    "colour": [
+      {
+        "id": "bounded-local-target-memory",
+        "issue": "Four creative local methods retained a full-frame RGB target plane and allocated per-pixel vectors/sets.",
+        "change": "Evaluate the same selected-only 7x7 stencil directly during final parallel blending using fixed-capacity stack scratch.",
+        "saved_retained_bytes_per_pixel": 12
+      },
+      {
+        "id": "wiener-unused-chroma-planes",
+        "issue": "Luminance-only Wiener cleanup retained four unused chroma/covariance planes.",
+        "change": "Build chroma and cross-moment planes only for guided chroma.",
+        "saved_retained_bytes_per_pixel": 16
+      },
+      {
+        "id": "empty-selection-short-circuit",
+        "issue": "An empty selection still built method statistics and local planes.",
+        "change": "Return exact identity before constructing any method context."
+      },
+      {
+        "id": "error-diffusion-finite-fallback",
+        "issue": "The new sequential diffusion path bypassed the generic finite-output fallback.",
+        "change": "Reject nonfinite candidate values and residuals before they can propagate; ordinary finite outputs retain the same formula."
+      },
+      {
+        "id": "selected-reference-patch-validity",
+        "issue": "New patch-based operations could use zero statistics from an empty selected reference patch.",
+        "change": "Explicit patch-validity checks return exact identity when a required selected reference patch is absent; the UI explains the prerequisite."
+      },
+      {
+        "id": "undefined-target-chromaticity",
+        "issue": "A black target has no u-prime/v-prime chromaticity, and a neutral target has no hue for angular palette operators.",
+        "change": "Return exact identity for those undefined target cases; ordinary valid targets retain the same mathematical operators."
+      },
+      {
+        "id": "dotscreen-white-endpoint",
+        "issue": "Finite dot-cell sampling could leave dark gaps at nominal white.",
+        "change": "Explicit full-coverage white endpoint independent of the dot-cell phase; black remains exact black."
+      },
+      {
+        "id": "signed-diffusion-output",
+        "issue": "Sequential diffusion bypassed the generic nonnegative final-output safeguard for signed working-space samples.",
+        "change": "Apply the generic finite/nonnegative blend safeguard while preserving excluded samples exactly."
+      },
+      {
+        "id": "signed-unavailable-reference-identity",
+        "issue": "Returning an unchanged pixel from inside a transform still passed through the generic nonnegative clamp.",
+        "change": "Unavailable scientific-reference operations exit before per-pixel blending, preserving even signed source values bit-exactly."
+      }
+    ],
+    "spatial": [
+      {
+        "id": "native_local_spatial_resolution",
+        "problem": "The fixed 256-edge nearest-cell grid could miss a 3x3 authored selection and sensor-scale features entirely.",
+        "change": "44 finite-footprint local methods (19 existing plus 25 new) now use immutable native-resolution stripes and 192-pixel tiles with four-pixel halos. Every original pixel remains addressable; selection coverage blends once.",
+        "evidence": "Passing native_path_repairs_a_three_pixel_selection_that_coarse_sampling_misses and immutable_native_halos_match_monolithic_processing_across_stripe_and_tile_seams tests.",
+        "memory": "At most 2,097,152 RGB source cells (24 MiB) per stripe, a reused four-row source cache up to approximately 11 MiB, plus bounded tile/evaluator scratch. No full-resolution source clone.",
+        "existingToolsImproved": [
+          "adaptive_median_impulse",
+          "sigma_range_mean",
+          "spatial_weighted_median",
+          "luminance_winsor",
+          "chroma_bilateral",
+          "chroma_covariance",
+          "rgb_covariance",
+          "entropy_detail",
+          "rms_contrast",
+          "log_retinex",
+          "periodic_notch",
+          "cross_median",
+          "hessian_ridge",
+          "coherence_detail",
+          "directional_median",
+          "quadratic_residual",
+          "bilateral_tone_compress",
+          "connected_impulse",
+          "chroma_median"
+        ]
+      }
+    ],
+    "selection": [
+      {
+        "id": "hidden_radius_draft_guard",
+        "evidence": "Choosing guided_smooth with radius9 then directional_ridge left Apply disabled even though radius is hidden and requestOptions sends default4.",
+        "change": "Apply the patch radius UI guard only when the chosen workflow actually exposes radius.",
+        "regression": "does not block a workflow because an unrelated hidden patch radius was previously excessive"
+      },
+      {
+        "id": "source_resource_preflight",
+        "evidence": "Existing experimental source radius validation happened after Frame::load in photographic::edit.",
+        "change": "Validate all photographic source radius limits, including template4, before preview loading.",
+        "regression": "source_radius_preflight_runs_independently_of_preview_loading"
+      }
+    ]
+  },
+  "exactEvotoParity": false,
+  "proprietaryModelsRecovered": false,
+  "limitations": [
+    "50 rendering methods,25 selections,25 read-only diagnostics; no recovered trained models.",
+    "Read validation results for measured functional coverage and residual limits."
+  ]
+}

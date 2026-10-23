@@ -8,6 +8,7 @@ use super::plane::Plane;
 use super::*;
 use aura_recipe::local_masks::LocalMask;
 use std::collections::BTreeMap;
+mod laboratory;
 
 fn plane(alpha: &[u8], width: usize) -> Plane {
     Plane {
@@ -271,6 +272,13 @@ fn native_workflow_preserves_manual_work_history_stale_safety_membership_and_ori
         recipe_hash: hash.clone(),
         cancel_id: uuid::Uuid::new_v4().to_string(),
         action: Action::Invert,
+        component_index: 0,
+        target_index: 0,
+        source: None,
+        mode: None,
+        transform: None,
+        point: None,
+        advanced: None,
         other_mask_id: None,
         value: 0,
     };
@@ -382,6 +390,13 @@ fn native_workflow_preserves_manual_work_history_stale_safety_membership_and_ori
             recipe_hash: aura_recipe::hash::recipe_hash(&loaded).expect("hash"),
             cancel_id: uuid::Uuid::new_v4().to_string(),
             action,
+            component_index: 0,
+            target_index: 0,
+            source: None,
+            mode: None,
+            transform: None,
+            point: None,
+            advanced: None,
             other_mask_id: None,
             value: 1,
         };
@@ -391,5 +406,452 @@ fn native_workflow_preserves_manual_work_history_stale_safety_membership_and_ori
             local_masks::read_mattes(&loaded).expect("mattes").len() <= 2,
             "only current target and duplicate selections are retained"
         );
+    }
+    assert_new_workflows_persist_atomically(&reopened, project_id, photo);
+    laboratory::assert_persisted(&reopened, project_id, photo);
+    assert_eq!(
+        std::fs::read(&path).expect("unchanged source"),
+        original_bytes
+    );
+}
+
+#[test]
+fn placement_topology_boundary_median_xor_and_hull_have_distinct_effects() {
+    let token = CancelToken::new();
+    let mut translated = plane(&[0, 0, 0, 0, 255, 0, 0, 0, 0], 3);
+    translated
+        .transform(
+            authoring::Transform {
+                offset: [1.0 / 3.0, 0.0],
+                scale: [1.0, 1.0],
+                angle: 0.0,
+            },
+            &token,
+        )
+        .expect("translate");
+    assert_eq!(translated.alpha, vec![0, 0, 0, 0, 0, 255, 0, 0, 0]);
+    let mut identity = plane(&[0, 85, 170, 255], 2);
+    identity
+        .transform(
+            authoring::Transform {
+                offset: [0.0, 0.0],
+                scale: [1.0, 1.0],
+                angle: 0.0,
+            },
+            &token,
+        )
+        .expect("identity");
+    assert_eq!(identity.alpha, vec![0, 85, 170, 255]);
+    let mut regions = plane(&[255, 0, 0, 0, 255, 0, 0, 170, 170, 170], 5);
+    regions.keep_connected([0.0, 0.0], &token).expect("seed");
+    assert_eq!(regions.alpha, vec![255, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    assert!(regions.keep_connected([0.9, 0.1], &token).is_err());
+    assert_eq!(
+        edit(
+            &[255, 0, 0, 0, 255, 0, 0, 170, 170, 170],
+            5,
+            Action::KeepLargest,
+            0
+        ),
+        vec![0, 0, 0, 0, 255, 0, 0, 170, 170, 170]
+    );
+    let ring = edit(
+        &[
+            0, 0, 0, 0, 0, 0, 255, 255, 255, 0, 0, 255, 255, 255, 0, 0, 255, 255, 255, 0, 0, 0, 0,
+            0, 0,
+        ],
+        5,
+        Action::BorderSelection,
+        1,
+    );
+    assert_eq!(ring[12], 0);
+    assert_eq!(ring[11], 255);
+    assert_eq!(
+        edit(&[0, 0, 0, 0, 255, 0, 0, 0, 0], 3, Action::MedianCleanup, 1),
+        vec![0; 9]
+    );
+    let mut xor = plane(&[255, 128, 0], 3);
+    xor.edit(
+        Action::ExclusiveUnion,
+        0,
+        Some(&plane(&[255, 0, 255], 3)),
+        &token,
+    )
+    .expect("xor");
+    assert_eq!(xor.alpha, vec![0, 128, 255]);
+    let hull = edit(
+        &[255, 0, 255, 0, 0, 0, 255, 0, 255],
+        3,
+        Action::ConvexHull,
+        0,
+    );
+    assert_eq!(hull, vec![255; 9]);
+    let cancelled = CancelToken::new();
+    cancelled.cancel();
+    assert!(regions.keep_largest(&cancelled).is_err());
+}
+
+fn request(action: Action) -> Input {
+    serde_json::from_value(serde_json::json!({"projectId":"p","photoId":"p","maskId":"one","recipeHash":"h","cancelId":"c","action": action_name(action)})).expect("input defaults")
+}
+fn action_name(action: Action) -> &'static str {
+    match action {
+        Action::EditLinear => "edit_linear",
+        Action::EditRadial => "edit_radial",
+        Action::EditBrush => "edit_brush",
+        Action::EditLuminance => "edit_luminance",
+        Action::ComponentMode => "component_mode",
+        Action::ReorderComponent => "reorder_component",
+        Action::ExtractComponent => "extract_component",
+        Action::CopyComponent => "copy_component",
+        _ => "freeze",
+    }
+}
+fn authored_mask() -> LocalMask {
+    LocalMask {
+        id: "one".into(),
+        name: "Authored".into(),
+        enabled: true,
+        amount: 0.4,
+        params: aura_recipe::MaskParams {
+            exposure: Some(0.5),
+            ..Default::default()
+        },
+        components: vec![
+            Component {
+                mode: Mode::Add,
+                invert: false,
+                source: Source::Linear {
+                    start: [0.1, 0.1],
+                    end: [0.8, 0.9],
+                },
+            },
+            Component {
+                mode: Mode::Subtract,
+                invert: false,
+                source: Source::Radial {
+                    centre: [0.4, 0.5],
+                    radii: [0.1, 0.2],
+                    angle: 12.0,
+                    feather: 0.3,
+                },
+            },
+            Component {
+                mode: Mode::Add,
+                invert: false,
+                source: Source::Brush {
+                    strokes: vec![aura_recipe::retouch_tools::BrushStroke {
+                        erase: false,
+                        radius: 0.02,
+                        opacity: 0.6,
+                        points: vec![[0.2, 0.2, 0.8], [0.4, 0.4, 0.8]],
+                    }],
+                    feather: 0.3,
+                },
+            },
+            Component {
+                mode: Mode::Intersect,
+                invert: false,
+                source: Source::Luminance {
+                    range: aura_recipe::retouch_tools::LuminanceRange {
+                        low: -2.0,
+                        high: 2.0,
+                        softness: 0.5,
+                    },
+                },
+            },
+        ],
+    }
+}
+#[test]
+fn authored_geometry_edits_retain_original_components_and_validate_type_and_limits() {
+    let original = authored_mask();
+    let replacements = [
+        (
+            Action::EditLinear,
+            Source::Linear {
+                start: [0.2, 0.3],
+                end: [0.9, 0.7],
+            },
+        ),
+        (
+            Action::EditRadial,
+            Source::Radial {
+                centre: [0.2, 0.3],
+                radii: [0.3, 0.4],
+                angle: 55.0,
+                feather: 0.7,
+            },
+        ),
+        (
+            Action::EditBrush,
+            Source::Brush {
+                strokes: vec![aura_recipe::retouch_tools::BrushStroke {
+                    erase: true,
+                    radius: 0.03,
+                    opacity: 0.5,
+                    points: vec![[0.3, 0.4, 0.7]],
+                }],
+                feather: 0.8,
+            },
+        ),
+        (
+            Action::EditLuminance,
+            Source::Luminance {
+                range: aura_recipe::retouch_tools::LuminanceRange {
+                    low: -1.0,
+                    high: 3.0,
+                    softness: 1.0,
+                },
+            },
+        ),
+    ];
+    for (index, (action, source)) in replacements.into_iter().enumerate() {
+        let mut masks = vec![original.clone()];
+        let mut input = request(action);
+        input.component_index = index;
+        input.source = Some(source.clone());
+        authoring::edit(&input, &mut masks).expect("edit geometry");
+        assert_eq!(masks[0].params, original.params);
+        assert_eq!(masks[0].components[index].source, source);
+        for (i, component) in masks[0].components.iter().enumerate() {
+            if i != index {
+                assert_eq!(component, &original.components[i]);
+            }
+        }
+        local_masks::validate(&masks, &BTreeMap::new()).expect("valid edited geometry");
+        let rendered = |source: Source| {
+            let mut recipe =
+                aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "geometry");
+            let mut isolated = original.clone();
+            isolated.components = vec![Component {
+                mode: Mode::Add,
+                invert: false,
+                source,
+            }];
+            local_masks::write(&mut recipe, &[isolated], &BTreeMap::new())
+                .expect("isolated geometry");
+            let pixels: Vec<f32> = (0_u16..32 * 32)
+                .flat_map(|i| [0.005 + f32::from(i % 32) / 40.0; 3])
+                .collect();
+            aura_render::local_masks::coverage(&pixels, 32, 32, &recipe, None, "one")
+                .expect("render authored geometry")
+        };
+        assert_ne!(
+            rendered(original.components[index].source.clone()),
+            rendered(source),
+            "{action:?} changes native coverage"
+        );
+        input.component_index = (index + 1) % 4;
+        assert!(
+            authoring::edit(&input, &mut masks).is_err(),
+            "source type mismatch"
+        );
+    }
+    let mut masks = vec![original.clone()];
+    let mut input = request(Action::ComponentMode);
+    input.mode = Some(Mode::Intersect);
+    input.component_index = 1;
+    authoring::edit(&input, &mut masks).expect("mode");
+    assert_eq!(masks[0].components[1].mode, Mode::Intersect);
+    input.action = Action::ReorderComponent;
+    input.target_index = 3;
+    authoring::edit(&input, &mut masks).expect("reorder");
+    assert!(matches!(
+        masks[0].components[3].source,
+        Source::Radial { .. }
+    ));
+    input.target_index = 4;
+    assert!(authoring::edit(&input, &mut masks).is_err());
+    input.action = Action::ExtractComponent;
+    input.component_index = 3;
+    let id = authoring::edit(&input, &mut masks).expect("extract");
+    assert_ne!(id, original.id);
+    assert_eq!(masks.len(), 2);
+    assert_eq!(masks[1].components[0].mode, Mode::Add);
+    assert_eq!(masks[1].params, original.params);
+    input.action = Action::CopyComponent;
+    input.other_mask_id = Some(id);
+    authoring::edit(&input, &mut masks).expect("copy");
+    assert_eq!(masks[1].components.len(), 2);
+    assert_eq!(masks[0].components.len(), 4);
+    input.component_index = 999;
+    assert!(authoring::edit(&input, &mut masks).is_err());
+}
+
+#[allow(clippy::cast_precision_loss)] // Seed coordinates derive from a bounded image proxy.
+fn assert_new_workflows_persist_atomically(state: &AppState, project: ProjectId, photo: PhotoId) {
+    let mut baseline = crate::develop_commands::load_or_neutral(state, photo).expect("baseline");
+    let mut other = authored_mask();
+    other.id = "two".into();
+    other.name = "Other".into();
+    other.components.truncate(1);
+    local_masks::write(&mut baseline, &[authored_mask(), other], &BTreeMap::new())
+        .expect("authoring baseline");
+    let mut color = aura_recipe::studio_color::read(&baseline).expect("color");
+    color.local.insert(
+        "one".into(),
+        aura_recipe::studio_color::LocalColor {
+            vibrance: 17.0,
+            ..Default::default()
+        },
+    );
+    aura_recipe::studio_color::write(&mut baseline, &color).expect("local color");
+    state
+        .recipe_store()
+        .save(
+            &project,
+            &photo,
+            &baseline,
+            &[
+                local_masks::KEY.into(),
+                aura_recipe::studio_color::KEY.into(),
+            ],
+            "Authoring baseline",
+        )
+        .expect("baseline save");
+    let baseline = crate::develop_commands::load_or_neutral(state, photo).expect("stored baseline");
+    let hash = aura_recipe::hash::recipe_hash(&baseline).expect("hash");
+    for (action, index, value) in [
+        (Action::EditLinear, 0, 0),
+        (Action::EditRadial, 1, 0),
+        (Action::EditBrush, 2, 0),
+        (Action::EditLuminance, 3, 0),
+        (Action::ComponentMode, 1, 0),
+        (Action::ReorderComponent, 0, 0),
+        (Action::ExtractComponent, 1, 0),
+        (Action::CopyComponent, 1, 0),
+        (Action::TransformSelection, 0, 0),
+        (Action::BorderSelection, 0, 1),
+        (Action::KeepLargest, 0, 0),
+        (Action::KeepConnected, 0, 0),
+        (Action::MedianCleanup, 0, 1),
+        (Action::ExclusiveUnion, 0, 0),
+        (Action::ConvexHull, 0, 0),
+    ] {
+        let mut input = request(action);
+        input.action = action;
+        input.project_id = project.to_db();
+        input.photo_id = photo.to_db();
+        input.recipe_hash = hash.clone();
+        input.cancel_id = uuid::Uuid::new_v4().to_string();
+        input.component_index = index;
+        input.target_index = 3;
+        input.value = value;
+        input.other_mask_id = if matches!(action, Action::CopyComponent | Action::ExclusiveUnion) {
+            Some("two".into())
+        } else {
+            None
+        };
+        input.mode = Some(Mode::Intersect);
+        input.transform = Some(authoring::Transform {
+            offset: [0.1, 0.05],
+            scale: [0.8, 1.1],
+            angle: 10.0,
+        });
+        input.source = match action {
+            Action::EditLinear => Some(Source::Linear {
+                start: [0.3, 0.1],
+                end: [0.8, 0.7],
+            }),
+            Action::EditRadial => Some(Source::Radial {
+                centre: [0.3, 0.2],
+                radii: [0.2, 0.2],
+                angle: 35.0,
+                feather: 0.7,
+            }),
+            Action::EditBrush => Some(Source::Brush {
+                strokes: vec![aura_recipe::retouch_tools::BrushStroke {
+                    erase: false,
+                    radius: 0.07,
+                    opacity: 0.9,
+                    points: vec![[0.5, 0.4, 0.8]],
+                }],
+                feather: 0.9,
+            }),
+            Action::EditLuminance => Some(Source::Luminance {
+                range: aura_recipe::retouch_tools::LuminanceRange {
+                    low: -3.0,
+                    high: 3.0,
+                    softness: 1.0,
+                },
+            }),
+            _ => None,
+        };
+        if action == Action::KeepConnected {
+            let (rgb, width, height) = state
+                .render()
+                .expect("renderer")
+                .local_mask_coverage(&photo, &baseline, "one")
+                .expect("coverage");
+            let seed = rgb
+                .chunks_exact(3)
+                .position(|p| p[0] >= 128)
+                .expect("selected seed");
+            input.point = Some([
+                ((seed % width as usize) as f32 + 0.5) / width as f32,
+                ((seed / width as usize) as f32 + 0.5) / height as f32,
+            ]);
+        }
+        let edited = apply(state, &input).unwrap_or_else(|e| panic!("{action:?}: {e:?}"));
+        assert_ne!(edited.recipe.recipe_hash, hash, "{action:?} changes recipe");
+        let saved = crate::develop_commands::load_or_neutral(state, photo).expect("saved");
+        assert_eq!(saved.global, baseline.global);
+        assert_eq!(
+            local_masks::read(&saved).expect("masks")[0].params,
+            authored_mask().params
+        );
+        if action == Action::ExtractComponent {
+            let local = aura_recipe::studio_color::read(&saved).expect("color");
+            assert_eq!(
+                local
+                    .local
+                    .get(edited.mask_id.as_deref().expect("new mask")),
+                local.local.get("one")
+            );
+        }
+        assert!(
+            apply(state, &input).is_err(),
+            "{action:?} refuses stale request"
+        );
+        crate::develop_commands::history_step(
+            state,
+            &crate::contract::ipc::HistoryStepInput {
+                project_id: project.to_db(),
+                photo_id: photo.to_db(),
+                action: "undo".into(),
+            },
+        )
+        .expect("single undo");
+        let undone = crate::develop_commands::load_or_neutral(state, photo).expect("undone");
+        assert_eq!(
+            aura_recipe::hash::recipe_hash(&undone).expect("hash"),
+            hash,
+            "one-step exact undo for {action:?}"
+        );
+        crate::develop_commands::history_step(
+            state,
+            &crate::contract::ipc::HistoryStepInput {
+                project_id: project.to_db(),
+                photo_id: photo.to_db(),
+                action: "redo".into(),
+            },
+        )
+        .expect("redo");
+        let redone = crate::develop_commands::load_or_neutral(state, photo).expect("redone");
+        assert_eq!(
+            aura_recipe::hash::recipe_hash(&redone).expect("hash"),
+            edited.recipe.recipe_hash,
+            "exact redo for {action:?}"
+        );
+        crate::develop_commands::history_step(
+            state,
+            &crate::contract::ipc::HistoryStepInput {
+                project_id: project.to_db(),
+                photo_id: photo.to_db(),
+                action: "undo".into(),
+            },
+        )
+        .expect("return baseline");
     }
 }

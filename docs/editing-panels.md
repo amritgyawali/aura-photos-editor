@@ -1,7 +1,8 @@
 # Editing panels
 
 Photo Studio groups the existing tools into Color & light, Portrait studio,
-Masks, Reference matching, Automatic finish, and History. All tools shows them
+Masks, Reference matching, Automatic finish, History, Material & texture, and
+Photo inspection. All tools shows them
 together. Precision retouch opens the separate brush and saved-operation
 workspace.
 
@@ -29,3 +30,17 @@ Color & light includes [Levels and extended local colour](studio-color-tools.md)
 organized group/batch manager and portable AURA descriptor libraries. See the
 [numbered implementation ledger](reports/AURA-fifty-capabilities-2026-10-20.md)
 for what is new and how it differs from existing tools.
+
+**Material & texture** exposes the [fifteen selection-bound material tools](material-and-texture-lab.md)
+with an explicit draft/Apply stack. **Photo inspection** exposes [twenty computed
+scopes and measurements](reports/AURA-photo-inspection-2026-10-20.md) of the saved
+edit without applying changes. Masks also includes [component editing and
+selection topology](mask-authoring-topology-workflows.md). These further additions
+are enumerated in their [separate fifty-item ledger](reports/AURA-next-fifty-capabilities-2026-10-20.md).
+
+**Colour lab** adds [twenty-five selected colour and tone methods](reports/AURA-Evoto-colour-runtime-2026-10-21.md).
+**Spatial repair** adds [twenty-five spatial repair methods](spatial-repair-lab.md).
+Both panels require authored masks and keep an editable operation stack until Apply.
+**Masks** includes a [selection laboratory with twenty-five more workflows](mask-selection-laboratory.md).
+**Review & checkpoints** includes [cohort checkpoints, comparison, correction issues and handoff](reports/AURA-workflow-lab-2026-10-20.md)
+in four tabs. The [100-item report](reports/AURA-hundred-capabilities-2026-10-21.md) records verification and limits.

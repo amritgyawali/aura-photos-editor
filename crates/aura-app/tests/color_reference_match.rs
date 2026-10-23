@@ -673,6 +673,16 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
     )
     .expect("fit a different image");
     assert!(!prepared.full_resolution_checked);
+    let fitting = prepared
+        .fitting
+        .as_ref()
+        .expect("measured fitting diagnostics");
+    assert_eq!(fitting.engine, "bounded-pattern-search-v1");
+    assert!((1..=160).contains(&fitting.refinement_candidates));
+    assert!(fitting.unique_renders <= 238 && fitting.cached_proposals > 0);
+    assert!(fitting.grade_candidates <= 36);
+    assert!(fitting.native_candidate_checked);
+    assert!((0.0..=1.0).contains(&fitting.native_backtrack_factor));
     assert!(prepared.after_distance <= prepared.before_distance);
     assert!(
         prepared.after_distance < prepared.before_distance - 0.01,
@@ -687,6 +697,7 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
     let applied =
         color_match::apply(&state, &input(color_match::Controls::default())).expect("native apply");
     assert!(applied.full_resolution_checked && applied.changed > 0);
+    assert!(applied.after_distance <= applied.before_distance + 0.0001);
     let full = state
         .recipe_store()
         .load(&photo)

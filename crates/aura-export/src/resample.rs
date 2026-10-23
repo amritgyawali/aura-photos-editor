@@ -171,6 +171,7 @@ pub fn downscale(src: &Rendered, target_w: u32, target_h: u32) -> Rendered {
         data: samples,
         colour: src.colour,
         render_hash: src.render_hash.clone(),
+        recipe_json: src.recipe_json.clone(),
     }
 }
 
@@ -312,6 +313,7 @@ pub fn sharpen(image: &Rendered, mode: OutputSharpen, scale: f32) -> Rendered {
         data: samples,
         colour: image.colour,
         render_hash: image.render_hash.clone(),
+        recipe_json: image.recipe_json.clone(),
     }
 }
 
@@ -332,6 +334,7 @@ mod tests {
             data: Samples::Eight(data),
             colour: DeliveryColour::Srgb,
             render_hash: "0".repeat(64),
+            recipe_json: None,
         }
     }
 
@@ -451,10 +454,27 @@ mod tests {
             data: Samples::Sixteen(vec![30000_u16; 8 * 8 * 3]),
             colour: DeliveryColour::AdobeRgb,
             render_hash: "0".repeat(64),
+            recipe_json: None,
         };
         let small = downscale(&src, 4, 4);
         assert_eq!(small.data.bit_depth(), 16);
         let sharp = sharpen(&small, OutputSharpen::Print, 0.5);
         assert_eq!(sharp.data.bit_depth(), 16);
+    }
+
+    #[test]
+    fn output_processing_keeps_the_recipe_snapshot_shared_with_its_pixels() {
+        let mut source = plate(16, 16, |x, y| [(x * 15) as u8, (y * 15) as u8, 80]);
+        let recipe: std::sync::Arc<str> = std::sync::Arc::from(r#"{"global":{"exposure":0.4}}"#);
+        source.recipe_json = Some(std::sync::Arc::clone(&recipe));
+        let small = downscale(&source, 8, 8);
+        let sharp = sharpen(&small, OutputSharpen::Print, 0.5);
+        for frame in [&source, &small, &sharp] {
+            assert!(std::sync::Arc::ptr_eq(
+                frame.recipe_json.as_ref().expect("snapshot"),
+                &recipe,
+            ));
+        }
+        assert_eq!((sharp.width, sharp.height), (8, 8));
     }
 }

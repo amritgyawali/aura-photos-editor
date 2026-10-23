@@ -80,8 +80,23 @@ pub fn save(state: &AppState, input: &SaveStudioColorInput) -> IpcResult<StudioC
         &input.photo_id,
         &input.recipe_hash,
     )?;
+    studio_color::validate(&input.color)?;
+    // Canonical JSON rounds f32 controls. Compare decoded settings before the
+    // leaf merge so reapplying them cannot manufacture another Undo entry.
+    if studio_color::read(&base)? == input.color {
+        return Ok(StudioColorDto {
+            color: studio_color::read(&base)?,
+            recipe: crate::develop_commands::recipe_dto(&input.photo_id, &base),
+        });
+    }
     let mut proposal = base.clone();
     studio_color::write(&mut proposal, &input.color)?;
+    if aura_recipe::recipe_hash(&proposal)? == input.recipe_hash {
+        return Ok(StudioColorDto {
+            color: studio_color::read(&base)?,
+            recipe: crate::develop_commands::recipe_dto(&input.photo_id, &base),
+        });
+    }
     // A complete panel snapshot replaces its map. Generic leaf merge retains removed keys.
     let (mut merged, mut changes) = schema::merge(&base, &proposal, EditSource::User)?;
     if base.extra.get(studio_color::KEY) != proposal.extra.get(studio_color::KEY) {

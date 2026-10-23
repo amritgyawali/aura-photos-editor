@@ -25,6 +25,10 @@ __pycache__/
 # Evidence from running the application on photographs: exports, recipes, screenshots.
 # Written by the verification scripts for a person to look at; portraits are not committed.
 /output
+# Local qualification screenshots containing supplied private photographs.
+/docs/reports/assets/aura-advanced-*.png
+# Local native analysis database; inspected proprietary artifacts never ship.
+/analysis-work/evoto-camera-next100/
 # A photographer's own provider addresses and API keys. Never committed.
 /AI-CONFIG.md
 *AI-CONFIG.md

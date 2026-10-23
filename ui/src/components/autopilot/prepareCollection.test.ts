@@ -95,6 +95,14 @@ it('applies the selected reference to each new photo before rendering it', async
   expect(results.every(photo => photo.outcome === 'ready' && photo.detail.includes('@reference'))).toBe(true);
 });
 
+it('passes the active cancellation job into each native reference fit', async () => {
+  const selection = { analysis: { id: 'style', origin: '@reference' }, strength: 0.8 };
+  await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never,
+    null, undefined, undefined, 'reference-job');
+  expect(referenceStyle.apply).toHaveBeenNthCalledWith(1, 'a', 'style', 0.8, null, 'reference-job');
+  expect(referenceStyle.apply).toHaveBeenNthCalledWith(2, 'b', 'style', 0.8, null, 'reference-job');
+});
+
 it('applies the chosen edit profile instead of the plain enhancement and reports its adaptations', async () => {
   const profile = { profileId: 'film-portra', strength: 0.9 };
   const results = await prepareCollection('project', () => false, vi.fn(), vi.fn(), null, profile, 'Portra Film');

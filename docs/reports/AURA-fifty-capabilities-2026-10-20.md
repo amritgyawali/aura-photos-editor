@@ -1,5 +1,18 @@
 # Fifty additional studio capabilities
 
+See the [comprehensive 2026-10-22 desktop audit](AURA-comprehensive-test-2026-10-22.md)
+for the fresh full-folder edit/export run, declared-tool coverage, and the
+unchanged-colour-save history repair. Exact Evoto parity remains unverified.
+
+The latest request adds [another 100 tools and full-folder validation](AURA-next-hundred-validation-2026-10-21.md), with [the distinct new capability ledger](AURA-next-hundred-capabilities-2026-10-21.json) and [all 1,860 Evoto installation files](AURA-evoto-file-inventory-2026-10-21.csv). That report records current completion and limits; the earlier reports below remain historical.
+
+For the subsequent request, see [fifty further capabilities](AURA-next-fifty-capabilities-2026-10-20.md): material editing, selection authoring and photo inspection. This earlier report and its historical verification remain separate.
+
+The latest continuation adds [100 more capabilities and the 27-RAW qualification](AURA-hundred-capabilities-2026-10-21.md), with the complete tool ledger, desktop results, photo exports and Evoto comparison limits.
+
+The [current correctness and revalidation report](AURA-revalidation-2026-10-21.md)
+records the repaired hundred-tool expansion and fresh checks of the rebuilt desktop.
+
 Date: 2026-10-20. Branch: `feat/fifty-studio-capabilities`, based on the
 regional matching/adjustable-finishing branch in PR #61.
 

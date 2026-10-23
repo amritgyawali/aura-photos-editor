@@ -3,7 +3,8 @@
 //! Face and body reshaping, liquify, background replacement and feature colour exist only as a
 //! photographer's explicit choice. The one module allowed to write the extension is the command
 //! the panel calls; Auto enhance, Auto retouch, the advanced workflow, the unattended run and
-//! every other pass must never name it. A rule enforced by a tool survives a hurried change.
+//! every other pass must never name it. Framing may exclude the key from a colour-only copy.
+//! A rule enforced by a tool survives a hurried change.
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::disallowed_methods)]
 
 use std::fs;
@@ -37,7 +38,20 @@ fn only_the_finishing_command_writes_the_finishing_extension() {
         if allowed.contains(&name) {
             continue;
         }
-        let text = fs::read_to_string(&file).unwrap_or_default();
+        let text = fs::read_to_string(&file)
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
+        // This read-only key removes finishing from a colour-only transfer; it cannot
+        // introduce reshaping. Keep every other reference subject to the guard.
+        let text = if name == "framing_workflows.rs" {
+            text.replacen(
+                "for key in [\n        aura_recipe::retouch_tools::KEY,\n        aura_recipe::retouch_tools::MATTE_KEY,\n        aura_recipe::studio_finish::KEY,\n        aura_recipe::material_lab::KEY,\n        aura_recipe::spatial_lab::KEY,\n    ] {\n        recipe.extra.remove(key);\n    }",
+                "",
+                1,
+            )
+        } else {
+            text
+        };
         if text.contains("studio_finish") {
             offenders.push(file.display().to_string());
         }

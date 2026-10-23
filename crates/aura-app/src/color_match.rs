@@ -21,14 +21,24 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{commands::IpcResult, AppState};
 
 mod appearance;
+mod calibration;
+mod content;
+pub use calibration::CalibrationReport;
 mod fine;
 pub use fine::FineControls;
+pub(crate) mod gallery_fit;
+mod grade;
 mod library;
+mod matcher;
+pub use matcher::TransferDiagnostics;
+mod refine;
+mod transfer;
 pub use library::{
     capture as capture_reference, manage as manage_reference, workflow as library_workflow,
     CaptureInput, ManageInput, WorkflowInput as LibraryWorkflowInput,
     WorkflowSnapshot as LibraryWorkflowSnapshot,
 };
+pub use transfer::{Distance as TransferDistance, SkinReview};
 mod reference_image;
 mod regional;
 use appearance::Region;
@@ -136,6 +146,10 @@ struct Reference {
     engine: String,
     summary: ReferenceSummary,
     regions: Vec<Region>,
+    #[serde(default)]
+    small_rgb: Vec<u8>,
+    #[serde(default)]
+    achromatic: bool,
 }
 #[derive(Debug, Serialize, Deserialize)]
 struct Session {
@@ -155,6 +169,37 @@ struct Session {
     checked_hash: Option<String>,
     measured_before: Option<f32>,
     measured_after: Option<f32>,
+    #[serde(default)]
+    fitting: Option<FitDiagnostics>,
+    #[serde(default)]
+    reference_monochrome: bool,
+    #[serde(default)]
+    grade_offsets: [f32; 6],
+    /// Present for sessions fitted by distribution transfer (ADR-0160); older sessions keep
+    /// the slider fit above.
+    #[serde(default)]
+    transfer: Option<matcher::TransferSession>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FitDiagnostics {
+    pub engine: String,
+    pub refinement_candidates: usize,
+    pub unique_renders: usize,
+    pub cached_proposals: usize,
+    #[serde(default)]
+    pub grade_candidates: usize,
+    #[serde(default)]
+    pub native_candidate_checked: bool,
+    #[serde(default)]
+    pub native_backtrack_factor: f32,
+    #[serde(default)]
+    pub structure_similarity: Option<f32>,
+    #[serde(default)]
+    pub regularization_weight: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transfer: Option<TransferDiagnostics>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -193,6 +238,9 @@ pub struct MatchReport {
     pub protected_fields: usize,
     pub full_resolution_checked: bool,
     pub current: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fitting: Option<FitDiagnostics>,
+    pub reference_monochrome: bool,
 }
 
 fn read<T: DeserializeOwned>(state: &AppState, key: &str) -> AuraResult<Option<T>> {
@@ -326,9 +374,15 @@ fn persist_reference(
 ) -> AuraResult<ReferenceSummary> {
     check_cancel(cancel)?;
     let key = asset_key(&summary.id)?;
-    if let Some(existing) = read::<Reference>(state, &key)? {
+    transfer::remember(state, &summary.id, image)?;
+    if let Some(mut existing) = read::<Reference>(state, &key)? {
         if existing.engine == ENGINE {
             if existing.summary.thumbnail.is_some() {
+                if existing.small_rgb.len() != content::BYTES {
+                    existing.small_rgb = content::thumbnail(image);
+                    existing.achromatic = content::achromatic(image);
+                    store(state, &key, &existing)?;
+                }
                 return Ok(existing.summary);
             }
             summary = existing.summary;
@@ -369,6 +423,8 @@ fn persist_reference(
             engine: ENGINE.into(),
             summary: summary.clone(),
             regions,
+            small_rgb: content::thumbnail(image),
+            achromatic: content::achromatic(image),
         },
     )?;
     Ok(summary)
@@ -423,6 +479,8 @@ fn report(
         protected_fields: protected,
         full_resolution_checked: full,
         current,
+        fitting: session.fitting.clone(),
+        reference_monochrome: session.reference_monochrome,
     }
 }
 
@@ -436,9 +494,55 @@ fn proposal(baseline: &Recipe, delta: &StyleDelta) -> AuraResult<Recipe> {
     Ok(merged)
 }
 
+fn matching_proposal(
+    baseline: &Recipe,
+    delta: &StyleDelta,
+    monochrome: bool,
+    strength: f32,
+) -> AuraResult<Recipe> {
+    let mut candidate = proposal(baseline, delta)?;
+    if monochrome && strength > 0.0 {
+        // Native saturation and the default BW operator use the same linear
+        // luminance. Blend toward -100 without replacing an existing BW mixer.
+        let saturation = f32::from(candidate.global.saturation);
+        candidate.global.saturation =
+            (saturation - (saturation + 100.0) * strength.clamp(0.0, 1.0)).round() as i16;
+        candidate = schema::merge(baseline, &candidate, EditSource::Ai)?.0;
+        schema::Validation::check(&candidate)?;
+    }
+    Ok(candidate)
+}
+
+fn skin_guard(before: &[Region], after: &[Region], monochrome: bool) -> bool {
+    if monochrome {
+        appearance::skin_preserved_achromatic(before, after)
+    } else {
+        appearance::skin_preserved(before, after)
+    }
+}
+
+fn treatment_proposal(
+    baseline: &Recipe,
+    delta: &StyleDelta,
+    monochrome: bool,
+    monochrome_strength: f32,
+    offsets: &[f32; 6],
+    grade_strength: f32,
+) -> AuraResult<Recipe> {
+    let mut candidate = matching_proposal(baseline, delta, monochrome, monochrome_strength)?;
+    if grade_strength > 0.0 && offsets.iter().any(|v| *v != 0.0) {
+        grade::apply(&mut candidate.global.colour_grade, offsets, grade_strength);
+        candidate = schema::merge(baseline, &candidate, EditSource::Ai)?.0;
+        schema::Validation::check(&candidate)?;
+    }
+    Ok(candidate)
+}
+
 /// Measure one target and fit a bounded appearance proposal without changing its saved edit.
 /// # Errors
 /// Missing reference/baseline, cancellation, decode, render or catalogue failures.
+// Keep the legacy recipe/hash/render checks in their existing cancellation scope.
+#[allow(clippy::too_many_lines)]
 pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport> {
     job(state, &input.cancel_id, |cancel| {
         let photo = PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo."))?;
@@ -448,6 +552,11 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
         let baseline = state.recipe_store().load(&photo)?.ok_or_else(|| {
             invalid("Save an initial correction or edit on this photo before matching a reference.")
         })?;
+        // A reference measured by this build is matched by distribution transfer (ADR-0160).
+        // One imported before it keeps the slider fit below until it is imported again.
+        if let Some(stats) = transfer::recall(state, &input.reference_id)? {
+            return matcher::prepare(state, cancel, input, photo, reference, baseline, stats);
+        }
         let baseline_hash = aura_recipe::hash::recipe_hash(&baseline)?;
         // Fit reduced pixels from the native full decode. A camera's embedded thumbnail
         // already has its own colour treatment and is not the RAW export's fitting domain.
@@ -472,22 +581,55 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
         let mut fitted = StyleDelta::neutral();
         let mut best_distance = before_distance;
         let before_clip = appearance::clipped(&before);
-        let evaluate = |candidate: &StyleDelta| -> AuraResult<f32> {
+        let reference_monochrome = reference.achromatic
+            && appearance::achromatic_reference(&reference.regions)
+            && target_regions
+                .iter()
+                .find(|r| r.name == "whole image")
+                .is_some_and(|r| r.appearance.chroma_p90 * 128.0 > 2.0);
+        let mut scores =
+            std::collections::BTreeMap::from([(baseline_hash.clone(), before_distance)]);
+        let mut cached_proposals = 0;
+        let neutral_grade = [0.0; 6];
+        let mut evaluate = |candidate: &StyleDelta, offsets: &[f32; 6]| -> AuraResult<f32> {
             check_cancel(cancel)?;
-            let pixels = rendered(state, &frame, &proposal(&baseline, candidate)?)?;
-            let readings = appearance::readings(&pixels, &target_regions);
-            if appearance::clipped(&pixels) > before_clip + 0.01
-                || !appearance::skin_preserved(&target_regions, &readings)
-            {
-                return Ok(f32::INFINITY);
+            let candidate = treatment_proposal(
+                &baseline,
+                candidate,
+                reference_monochrome,
+                1.0,
+                offsets,
+                1.0,
+            )?;
+            let key = aura_recipe::hash::recipe_hash(&candidate)?;
+            if let Some(score) = scores.get(&key) {
+                cached_proposals += 1;
+                return Ok(*score);
             }
-            Ok(appearance::distance(&reference.regions, &readings))
+            let pixels = rendered(state, &frame, &candidate)?;
+            let readings = appearance::readings(&pixels, &target_regions);
+            let distance = if appearance::clipped(&pixels) > before_clip + 0.01
+                || !skin_guard(&target_regions, &readings, reference_monochrome)
+            {
+                f32::INFINITY
+            } else {
+                appearance::distance(&reference.regions, &readings)
+            };
+            scores.insert(key, distance);
+            Ok(distance)
         };
+        if reference_monochrome {
+            let distance = evaluate(&fitted, &neutral_grade)?;
+            if !distance.is_finite() {
+                return Err(invalid("This monochrome reference could not preserve the photo's skin tones and highlights. No edit was saved."));
+            }
+            best_distance = distance;
+        }
         // Exposure, curves and cast can compensate for each other. Test joint bounded
         // seeds before refinement rather than requiring each axis to improve alone.
         for factor in [0.25, 0.5, 0.75, 1.0] {
             let candidate = seed.scaled(factor);
-            let distance = evaluate(&candidate)?;
+            let distance = evaluate(&candidate, &neutral_grade)?;
             if distance.is_finite() && distance + 1e-4 < best_distance {
                 fitted = candidate;
                 best_distance = distance;
@@ -499,13 +641,114 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             for factor in [0.0, 0.5, 1.0] {
                 let mut candidate = fitted.clone();
                 set_axis(&mut candidate, &seed, axis, factor);
-                let distance = evaluate(&candidate)?;
+                let distance = evaluate(&candidate, &neutral_grade)?;
                 if distance.is_finite() && distance + 1e-4 < best_distance {
                     fitted = candidate;
                     best_distance = distance;
                 }
             }
         }
+        // Keep the established guarded fit as an incumbent, then search signed
+        // additive corrections. A zero or incorrectly signed heuristic no longer
+        // freezes a parameter; each tone-curve anchor and supported colour band
+        // can move independently. No candidate can replace the incumbent unless
+        // its actual rendered appearance improves and the existing guards pass.
+        let incumbent = fitted.clone();
+        let structure_similarity = content::similarity(&reference.small_rgb, &before);
+        let regularization_weight = content::regularization(structure_similarity);
+        let supported_bands = std::array::from_fn(|index| {
+            target_regions.iter().any(|actual| {
+                reference
+                    .regions
+                    .iter()
+                    .find(|r| r.name == actual.name)
+                    .is_some_and(|r| {
+                        actual
+                            .appearance
+                            .bands
+                            .get(index)
+                            .zip(r.appearance.bands.get(index))
+                            .is_some_and(|(a, b)| {
+                                a.share >= aura_look::solve::BAND_MIN_SHARE
+                                    && b.share >= aura_look::solve::BAND_MIN_SHARE
+                            })
+                    })
+            })
+        });
+        let refined = refine::search(&fitted, best_distance, supported_bands, |d| {
+            evaluate(d, &neutral_grade)
+                .map(|score| score + regularization_weight * refine::effort(d, &incumbent))
+        })?;
+        fitted = refined.delta;
+        best_distance = refined.distance;
+        let (mut grade_offsets, grade_distance, grade_candidates) = if reference_monochrome {
+            (neutral_grade, best_distance, 0)
+        } else {
+            grade::search(best_distance, |offsets| {
+                evaluate(&fitted, offsets).map(|score| {
+                    let wheel_effort: f32 = offsets
+                        .chunks_exact(2)
+                        .filter_map(|p| match p {
+                            &[x, y] => Some(x.hypot(y) / grade::MAX_CAST),
+                            _ => None,
+                        })
+                        .sum();
+                    score
+                        + regularization_weight
+                            * (refine::effort(&fitted, &incumbent) + wheel_effort)
+                })
+            })?
+        };
+        best_distance = grade_distance;
+        // Reduced fitting can miss a small highlight or a person's skin edge.
+        // Validate the proposal on the actual native decode before publishing the
+        // analysis. Backtrack the fitted treatment, not the user's later sliders.
+        // Apply still rechecks the exact requested strengths against current data.
+        let full_frame = crate::photo_frames::CatalogFrames::new(state.clone())
+            .frame(&photo, RenderLevel::Full)?;
+        check_cancel(cancel)?;
+        let native_before = rendered(state, &full_frame, &baseline)?;
+        let native_regions = appearance::readings(&native_before, &target_regions);
+        let native_clip = appearance::clipped(&native_before);
+        let native_distance = appearance::distance(&reference.regions, &native_regions);
+        drop(native_before);
+        let mut native_backtrack_factor = None;
+        for factor in [1.0, 0.75, 0.5, 0.25, 0.0] {
+            check_cancel(cancel)?;
+            let delta = fitted.scaled(factor);
+            let offsets = grade_offsets.map(|v| v * factor);
+            let candidate =
+                treatment_proposal(&baseline, &delta, reference_monochrome, 1.0, &offsets, 1.0)?;
+            let pixels = rendered(state, &full_frame, &candidate)?;
+            let readings = appearance::readings(&pixels, &target_regions);
+            let distance = appearance::distance(&reference.regions, &readings);
+            if distance.is_finite()
+                && distance <= native_distance + 0.0001
+                && appearance::clipped(&pixels) <= native_clip + 0.01
+                && skin_guard(&native_regions, &readings, reference_monochrome)
+            {
+                fitted = delta;
+                grade_offsets = offsets;
+                native_backtrack_factor = Some(factor);
+                // Keep preview before/after measurements in the same fitting domain.
+                best_distance = evaluate(&fitted, &grade_offsets)?;
+                break;
+            }
+        }
+        let native_backtrack_factor = native_backtrack_factor.ok_or_else(|| invalid(
+            "No colour treatment could preserve this photo's native skin tones and highlights. No edit was saved."))?;
+        let fitting = Some(FitDiagnostics {
+            engine: "bounded-pattern-search-v1".into(),
+            refinement_candidates: refined.evaluations,
+            unique_renders: scores.len().saturating_sub(1),
+            cached_proposals,
+            grade_candidates,
+            native_candidate_checked: true,
+            native_backtrack_factor,
+            structure_similarity,
+            regularization_weight,
+            transfer: None,
+        });
         check_cancel(cancel)?;
         if aura_recipe::hash::recipe_hash(&crate::develop_commands::load_or_neutral(state, photo)?)?
             != baseline_hash
@@ -532,6 +775,10 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             checked_hash: None,
             measured_before: None,
             measured_after: None,
+            fitting,
+            reference_monochrome,
+            grade_offsets,
+            transfer: None,
         };
         let result = report(
             &session,
@@ -597,7 +844,11 @@ pub fn status(state: &AppState, photo_id: &str) -> IpcResult<Option<MatchReport>
     let photo = PhotoId::from_db(photo_id).map_err(|_| invalid("Invalid photo."))?;
     let hash =
         aura_recipe::hash::recipe_hash(&crate::develop_commands::load_or_neutral(state, photo)?)?;
-    let checked = session.checked_hash.as_deref() == Some(hash.as_str());
+    let measurements_current = session
+        .transfer
+        .as_ref()
+        .is_none_or(|saved| saved.reference.usable());
+    let checked = measurements_current && session.checked_hash.as_deref() == Some(hash.as_str());
     let mut result = report(
         &session,
         0,
@@ -608,7 +859,9 @@ pub fn status(state: &AppState, photo_id: &str) -> IpcResult<Option<MatchReport>
             session.fitted_distance
         },
         checked,
-        session.engine == ENGINE && (hash == session.last_hash || hash == session.baseline_hash),
+        measurements_current
+            && session.engine == ENGINE
+            && (hash == session.last_hash || hash == session.baseline_hash),
     );
     if checked {
         result.before_distance = session.measured_before.unwrap_or(session.before_distance);
@@ -622,6 +875,8 @@ pub fn status(state: &AppState, photo_id: &str) -> IpcResult<Option<MatchReport>
 /// Apply explicit strengths from the saved baseline, checking actual full-resolution renders.
 /// # Errors
 /// Invalid strengths, stale baseline, missing source, cancellation or full-resolution guard failure.
+// Keep the legacy validation, merge and save in the same guarded job scope.
+#[allow(clippy::too_many_lines)]
 pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
     input.controls.check()?;
     job(state, &input.cancel_id, |cancel| {
@@ -642,7 +897,25 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
         if hash != session.last_hash && hash != session.baseline_hash {
             return Err(invalid("The photo changed after reference analysis. Your newer edit was kept. Analyse again before applying."));
         }
-        let candidate = proposal(&session.baseline, &input.controls.delta(&session.fitted))?;
+        if let Some(transfer) = session.transfer.clone() {
+            return matcher::apply(
+                state, cancel, input, &key, session, transfer, photo, &current, hash,
+            );
+        }
+        let mono_strength =
+            input.controls.amount * input.controls.color * input.controls.detail.saturation;
+        let grade_strength = input.controls.amount
+            * input.controls.color
+            * input.controls.detail.saturation
+            * input.controls.detail.hue;
+        let candidate = treatment_proposal(
+            &session.baseline,
+            &input.controls.delta(&session.fitted),
+            session.reference_monochrome,
+            mono_strength,
+            &session.grade_offsets,
+            grade_strength,
+        )?;
         let frame = crate::photo_frames::CatalogFrames::new(state.clone())
             .frame(&photo, RenderLevel::Full)?;
         check_cancel(cancel)?;
@@ -655,7 +928,11 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
         let after = rendered(state, &frame, &candidate)?;
         let after_regions = appearance::readings(&after, &session.target_regions);
         if appearance::clipped(&after) > before_clip + 0.01
-            || !appearance::skin_preserved(&baseline_regions, &after_regions)
+            || !skin_guard(
+                &baseline_regions,
+                &after_regions,
+                session.reference_monochrome,
+            )
         {
             return Err(invalid("This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again."));
         }
@@ -665,7 +942,7 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
                 "The final colour measurement was unavailable. No edit was saved.",
             ));
         }
-        if distance > before_distance + 0.25 {
+        if distance > before_distance + 0.0001 {
             return Err(invalid("These strengths moved the native-resolution colour farther from the reference. Reduce the strengths or analyse again. No edit was saved."));
         }
         let (mut merged, mut changes) = schema::merge(&current, &candidate, EditSource::Ai)?;
@@ -675,6 +952,10 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
         if merged.global.hsl != candidate.global.hsl {
             merged.global.hsl.clone_from(&candidate.global.hsl);
             changes.changed.push("global.hsl".into());
+        }
+        if merged.global.colour_grade != candidate.global.colour_grade {
+            merged.global.colour_grade = candidate.global.colour_grade;
+            changes.changed.push("global.colour_grade".into());
         }
         check_cancel(cancel)?;
         let project: String = state.catalog().read(|conn| {
@@ -720,6 +1001,47 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn monochrome_contribution_is_continuous_reversible_and_preserves_manual_saturation() {
+        let mut baseline =
+            aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "test");
+        baseline.global.saturation = 20;
+        let zero = StyleDelta::neutral();
+        assert_eq!(
+            matching_proposal(&baseline, &zero, true, 0.0).unwrap(),
+            baseline
+        );
+        assert_eq!(
+            matching_proposal(&baseline, &zero, true, 0.5)
+                .unwrap()
+                .global
+                .saturation,
+            -40
+        );
+        assert_eq!(
+            matching_proposal(&baseline, &zero, true, 1.0)
+                .unwrap()
+                .global
+                .saturation,
+            -100
+        );
+        assert_eq!(
+            matching_proposal(&baseline, &zero, false, 1.0).unwrap(),
+            baseline
+        );
+        baseline
+            .provenance
+            .user_edited_fields
+            .push("global.saturation".into());
+        assert_eq!(
+            matching_proposal(&baseline, &zero, true, 1.0)
+                .unwrap()
+                .global
+                .saturation,
+            20
+        );
+    }
 
     fn fitted() -> StyleDelta {
         let mut value = StyleDelta::neutral();
