@@ -257,6 +257,138 @@ fn calibrated_pair_transfers_to_another_scene_and_restores_exactly() {
 }
 
 #[test]
+fn an_adaptive_pair_grade_transfers_through_native_preview_export_and_history() {
+    let directory = tempfile::tempdir().unwrap();
+    let original_path = directory.path().join("original.png");
+    let edited_path = directory.path().join("edited.png");
+    let target_path = directory.path().join("different-scene.png");
+    image::RgbImage::from_fn(128, 96, |x, y| {
+        let h = x.wrapping_mul(374_761_393) ^ y.wrapping_mul(668_265_263);
+        image::Rgb([
+            25 + (x * 200 / 128) as u8,
+            25 + (y * 200 / 96) as u8,
+            30 + ((h >> 16) % 190) as u8,
+        ])
+    })
+    .save(&original_path)
+    .unwrap();
+    image::RgbImage::from_fn(96, 128, |x, y| {
+        let h = x.wrapping_mul(668_265_263) ^ y.wrapping_mul(374_761_393);
+        image::Rgb([
+            40 + ((h >> 16) % 170) as u8,
+            45 + (x * 160 / 96) as u8,
+            40 + (y * 170 / 128) as u8,
+        ])
+    })
+    .save(&target_path)
+    .unwrap();
+    let original_bytes = std::fs::read(&original_path).unwrap();
+    let target_bytes = std::fs::read(&target_path).unwrap();
+    let analyse =
+        |state: &AppState, original: Option<&std::path::Path>, edited: &std::path::Path| {
+            reference_style::analyse_reference(
+                state,
+                &reference_style::AnalyseReferenceInput {
+                    address: "Detailed colour grade".into(),
+                    folder: edited.to_string_lossy().into_owned(),
+                    cancel_id: uuid::Uuid::new_v4().to_string(),
+                    export: false,
+                    original: original.map(|p| p.to_string_lossy().into_owned()),
+                },
+            )
+            .unwrap()
+        };
+    let apply = |state: &AppState, photo: PhotoId, id: &str, strength| {
+        reference_style::apply_reference(
+            state,
+            &reference_style::ApplyReferenceInput {
+                photo_id: photo.to_db(),
+                reference_id: id.into(),
+                strength,
+                profile_id: None,
+                profile_strength: None,
+                cancel_id: None,
+            },
+        )
+        .unwrap()
+    };
+    let grade = |bytes: &[u8]| {
+        bytes
+            .chunks_exact(3)
+            .flat_map(|p| {
+                let [r, g, b] = [p[0], p[1], p[2]].map(|v| f32::from(v) / 255.0);
+                let teal =
+                    (-((r - 0.2).powi(2) + (g - 0.65).powi(2) + (b - 0.35).powi(2)) / 0.04).exp();
+                [r - 0.04 * teal, g + 0.02 * teal, b + 0.08 * teal].map(|v| {
+                    ((v + 0.035 * (2.0 * std::f32::consts::TAU * v).sin()).clamp(0.0, 1.0) * 255.0)
+                        .round() as u8
+                })
+            })
+            .collect::<Vec<_>>()
+    };
+    let (source, source_project, source_photo) = setup(&original_path, directory.path());
+    let ordinary = analyse(&source, None, &original_path);
+    apply(&source, source_photo, &ordinary.id, 0.0);
+    image::RgbImage::from_raw(
+        128,
+        96,
+        grade(&render(&source, source_project, source_photo)),
+    )
+    .unwrap()
+    .save(&edited_path)
+    .unwrap();
+    let target_dir = directory.path().join("target-catalog");
+    std::fs::create_dir_all(&target_dir).unwrap();
+    let (state, project, photo) = setup(&target_path, &target_dir);
+    let ordinary = analyse(&state, None, &original_path);
+    apply(&state, photo, &ordinary.id, 0.0);
+    let baseline = render(&state, project, photo);
+    let reference = analyse(&state, Some(&original_path), &edited_path);
+    assert!(reference.calibration.as_ref().unwrap().residual_refined);
+    apply(&state, photo, &reference.id, 1.0);
+    let matched = render(&state, project, photo);
+    let truth = grade(&baseline);
+    let (before, after) = (error(&baseline, &truth), error(&matched, &truth));
+    println!("adaptive native different-scene RGB error: {before:.4} -> {after:.4}");
+    assert!(after < 1.5 && after < 0.3 * before, "{before} -> {after}");
+    let model =
+        aura_recipe::calibrated_look::read(&state.recipe_store().load(&photo).unwrap().unwrap())
+            .unwrap()
+            .unwrap();
+    assert_eq!(model.version, 2);
+    let exported = aura_app::render_image(
+        &state,
+        &aura_app::contract::ipc::RenderImageInput {
+            photo_id: photo.to_db(),
+            level: Some("full".into()),
+            screen: None,
+            colour_space: Some("srgb".into()),
+            purpose: Some("export".into()),
+        },
+    )
+    .unwrap();
+    assert_eq!(base64_decode(&exported.rgb_base64), matched);
+    assert_eq!(apply(&state, photo, &reference.id, 1.0).changed, 0);
+    apply(&state, photo, &reference.id, 0.5);
+    let half = render(&state, project, photo);
+    assert!(error(&half, &baseline) < error(&matched, &baseline));
+    apply(&state, photo, &reference.id, 0.0);
+    assert_eq!(render(&state, project, photo), baseline);
+    aura_app::history_step(
+        &state,
+        &aura_app::contract::ipc::HistoryStepInput {
+            project_id: project.to_db(),
+            photo_id: photo.to_db(),
+            action: "undo".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(render(&state, project, photo), half);
+    assert_eq!(std::fs::read(&original_path).unwrap(), original_bytes);
+    assert_eq!(std::fs::read(&target_path).unwrap(), target_bytes);
+}
+
+#[test]
 fn single_reference_changes_native_pixels_without_compounding_and_zero_restores() {
     let directory = tempfile::tempdir().unwrap();
     let target_path = directory.path().join("target.png");
