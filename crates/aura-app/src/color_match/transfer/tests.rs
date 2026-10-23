@@ -211,6 +211,7 @@ fn unchanged(target: &Rgb8) -> Vec<[f32; 3]> {
 fn the_same_photograph_graded_eight_ways_is_matched_closely() {
     let source = outdoor();
     let mut report = Vec::new();
+    let mut failures = Vec::new();
     for (name, grade) in GRADES {
         let truth = grade_image(&source, grade);
         let similarity =
@@ -222,11 +223,12 @@ fn the_same_photograph_graded_eight_ways_is_matched_closely() {
             "{name}: {before:.2} -> {after:.2} (stats {:.2} -> {:.2})",
             fit.before.total, fit.after.total
         ));
-        assert!(after < 0.4 * before, "{name}: {before:.2} -> {after:.2}");
-        assert!(after < 3.5, "{name}: {before:.2} -> {after:.2}");
-        assert!(fit.after.total < fit.before.total, "{name}");
+        if !(after < 0.4 * before && after < 3.5 && fit.after.total < fit.before.total) {
+            failures.push(name);
+        }
     }
     println!("{}", report.join("\n"));
+    assert!(failures.is_empty(), "Unmet accuracy checks: {failures:?}");
 }
 
 #[test]
@@ -237,6 +239,7 @@ fn a_different_photograph_takes_the_look_of_an_edited_reference() {
     let reference_scene = indoor();
     let target = outdoor();
     let mut report = Vec::new();
+    let mut failures = Vec::new();
     for (name, grade) in GRADES {
         let reference = grade_image(&reference_scene, grade);
         let truth = grade_image(&target, grade);
@@ -251,10 +254,12 @@ fn a_different_photograph_takes_the_look_of_an_edited_reference() {
             "{name}: {before:.2} -> {after:.2} (stats {:.2} -> {:.2})",
             fit.before.total, fit.after.total
         ));
-        assert!(after < before, "{name}: {before:.2} -> {after:.2}");
-        assert!(fit.after.total < fit.before.total, "{name}");
+        if !(after < before && fit.after.total < fit.before.total) {
+            failures.push(name);
+        }
     }
     println!("{}", report.join("\n"));
+    assert!(failures.is_empty(), "Unmet accuracy checks: {failures:?}");
 }
 
 #[test]
@@ -263,17 +268,31 @@ fn a_batch_matched_to_one_reference_converges_on_one_look() {
     let stats = reference_stats(&reference);
     let first = outdoor();
     let second = grade_image(&outdoor(), warm);
-    for target in [first, second] {
+    let mut failures = Vec::new();
+    for (index, target) in [first, second].into_iter().enumerate() {
         let pixels = samples(&target, TARGET_SAMPLES);
         let fit = fit(&stats, &pixels, None);
+        // A large histogram decrease can be achieved by repainting different objects.
+        // Require fidelity to the known grade instead, retaining descriptor non-regression.
+        let truth = grade_image(&target, split_tone);
+        let before = error(&unchanged(&target), &truth);
+        let after = error(&transformed(&fit.grade, &pixels), &truth);
+        println!("batch split tone: {before:.3} -> {after:.3}");
+        if !before.is_finite() || !after.is_finite() || after >= 0.6 * before {
+            failures.push(format!("target {index}: {before:.3} -> {after:.3}"));
+        }
         assert!(
-            fit.after.total < 0.5 * fit.before.total,
+            fit.after.total < fit.before.total,
             "{:?} -> {:?}",
             fit.before,
             fit.after
         );
         fit.grade.validate().unwrap();
     }
+    assert!(
+        failures.is_empty(),
+        "Unmet batch accuracy checks: {failures:?}"
+    );
 }
 
 #[test]
@@ -417,6 +436,6 @@ fn stored_measurements_round_trip_and_reject_another_version() {
     let back: GradeStats = serde_json::from_str(&text).unwrap();
     assert_eq!(back, stats);
     let mut old = stats;
-    old.version = 0;
+    old.version = 2;
     assert!(!old.usable());
 }

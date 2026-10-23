@@ -7,17 +7,18 @@
 //! and the photograph as distributions in `OKLab` and fits `aura_recipe::reference_grade`
 //! directly:
 //!
-//! * **tone** - lightness quantiles mapped onto the reference's, blended toward a landmark-only
-//!   curve when the two are different scenes, slope-limited so nothing posterises;
+//! * **tone** - slope-limited lightness quantiles for corresponding scenes; unrelated colour
+//!   scenes keep their tone rather than copying the relative area of bright/dark objects;
 //! * **white balance and split toning** - each photograph's neutral axis at nine lightnesses,
 //!   estimated from its most neutral pixels;
 //! * **colourfulness** - chroma quantiles measured from the neutral axis, then the residual per
 //!   hue sector and per lightness zone, each normalised so it cannot absorb a global change;
 //! * **hue** - per-sector mean hue, bounded and shrunk by the support both photographs share.
 //!
-//! Every component is then re-measured on the transformed photograph, through the evaluator the
-//! renderer executes, and corrected again until the statistics agree. Nothing is refused for
-//! being far from the reference. A person's skin that would turn is limited instead.
+//! Corresponding scenes are iteratively re-measured through the renderer's evaluator. Across
+//! unrelated scenes only supported casts, shared-colour saturation and bounded hue evidence
+//! are used, with shrinkage toward identity. These are estimates of a look, not recovery of an
+//! unknown editing operation. Native checks additionally limit clipping and skin changes.
 use std::f32::consts::{PI, TAU};
 
 use aura_core::AuraResult;
@@ -34,7 +35,7 @@ use super::appearance::Region;
 use super::AppState;
 
 /// Bump when [`measure`] changes; a stored measurement of another version is re-taken.
-pub(super) const STATS_VERSION: u32 = 2;
+pub(super) const STATS_VERSION: u32 = 3;
 const STATS: &str = "colour_reference_grade_v1:";
 const LIGHT_QUANTILES: usize = 65;
 const CHROMA_QUANTILES: usize = 33;
@@ -44,9 +45,13 @@ pub(super) const TARGET_SAMPLES: usize = 40_000;
 const REFERENCE_SAMPLES: usize = 65_536;
 const MIN_SAMPLES: usize = 256;
 const ITERATIONS: usize = 4;
+const SAME_SCENE: f32 = 0.8;
+/// Authored regularisation toward no edit when object/illumination correspondence is unknown.
+/// This is a strength prior, not a calibrated probability of a correct match.
+const UNRELATED_SHRINKAGE: f32 = 0.5;
 const SECTOR_WIDTH: f32 = TAU / SECTORS as f32;
-/// Lightness landmarks, as indices into the 65 lightness quantiles, for the curve used between
-/// different scenes: 0.2, 5, 15, 30, 50, 70, 85, 95 and 99.8 per cent.
+/// Lightness landmarks, as indices into the 65 lightness quantiles, for the coarse part of tone
+/// fitting: 0.2, 5, 15, 30, 50, 70, 85, 95 and 99.8 per cent.
 const LANDMARKS: [usize; 9] = [0, 3, 9, 19, 32, 45, 55, 61, 64];
 
 fn at(values: &[f32], index: usize) -> f32 {
@@ -98,7 +103,7 @@ pub(super) struct GradeStats {
 }
 
 impl GradeStats {
-    fn usable(&self) -> bool {
+    pub(super) fn usable(&self) -> bool {
         self.version == STATS_VERSION
             && self.lightness.len() == LIGHT_QUANTILES
             && self.axis.len() == AXIS_NODES
@@ -603,6 +608,42 @@ fn update_zones(grade: &mut ReferenceGrade, reference: &GradeStats, actual: &Gra
     }
 }
 
+/// Match colourfulness using colours both scenes contain, rather than matching the fraction
+/// of the frame occupied by coloured objects. A neutral wall must not desaturate green trees.
+fn shared_chroma_scale(reference: &GradeStats, actual: &GradeStats) -> f32 {
+    let mut ratios: Vec<_> = (0..SECTORS)
+        .filter_map(|k| {
+            let support = at(&reference.sector_share, k).min(at(&actual.sector_share, k));
+            let (rc, ac) = (
+                at(&reference.sector_chroma, k),
+                at(&actual.sector_chroma, k),
+            );
+            (support >= 0.005 && rc > 0.01 && ac > 0.01)
+                .then_some(((rc / ac).ln().clamp(-0.7, 0.7), support))
+        })
+        .collect();
+    weighted_quantile(&mut ratios, 0.5).unwrap_or(0.0).exp()
+}
+
+/// Shared hue evidence may guide a different scene, but object brightness and colourfulness
+/// within a sector must not be copied along with it. Apply one bounded update, without chasing
+/// the changing histogram through repeated reassignments of pixels to hue sectors.
+fn update_shared_hues(grade: &mut ReferenceGrade, reference: &GradeStats, actual: &GradeStats) {
+    let turns: Vec<_> = (0..SECTORS)
+        .map(|k| {
+            let support = at(&reference.sector_share, k).min(at(&actual.sector_share, k));
+            if support < 0.005 {
+                return 0.0;
+            }
+            0.64 * support / (support + 0.02)
+                * wrap(at(&reference.sector_hue, k) - at(&actual.sector_hue, k))
+        })
+        .collect();
+    for (shift, turn) in grade.hue_shift.iter_mut().zip(smooth_circular(&turns)) {
+        *shift += turn;
+    }
+}
+
 fn transformed(grade: &ReferenceGrade, samples: &[Sample]) -> Vec<[f32; 3]> {
     let evaluator = Evaluator::new(grade);
     samples
@@ -744,12 +785,119 @@ pub(super) struct Fit {
     pub content: f32,
 }
 
-/// Fit the transform that makes `target` measure like `reference`.
-///
-/// `similarity` is the structural similarity of the two photographs when known. The same scene
-/// is matched quantile for quantile; a different scene keeps more of its own tonal detail and
-/// trusts per-hue differences less, because there they describe different things as well as a
-/// different grade.
+/// The evidence available for a fit. Similarity is structural correspondence, not confidence.
+struct FitContext<'a> {
+    reference: &'a GradeStats,
+    target: &'a [Sample],
+    content: f32,
+    monochrome: bool,
+    toned: bool,
+}
+
+impl FitContext<'_> {
+    fn corresponding(&self) -> bool {
+        self.content >= SAME_SCENE
+    }
+
+    fn initial(&self, start: &GradeStats) -> ReferenceGrade {
+        let mut grade = ReferenceGrade::identity();
+        grade.cast_in.clone_from(&start.axis);
+        if !self.monochrome {
+            grade.cast_out.clone_from(&self.reference.axis);
+        }
+        if self.corresponding() || self.monochrome || self.toned {
+            let tone = tone_curve(
+                &start.lightness,
+                &self.reference.lightness,
+                0.35 + 0.65 * self.content,
+            );
+            let amount = if self.corresponding() { 1.0 } else { 0.1 };
+            for (v, &fitted) in grade.tone.iter_mut().zip(&tone) {
+                *v += amount * (fitted - *v);
+            }
+        }
+        if self.monochrome {
+            grade.chroma.fill(0.0);
+        }
+        grade.bounded()
+    }
+
+    fn refine(
+        &self,
+        grade: &mut ReferenceGrade,
+        best: &mut (Distance, ReferenceGrade),
+        checkpoint: &mut impl FnMut() -> AuraResult<()>,
+    ) -> AuraResult<usize> {
+        let iterations = if self.corresponding() || self.toned {
+            ITERATIONS
+        } else {
+            1
+        };
+        for _ in 0..iterations {
+            checkpoint()?;
+            let now = measure(&transformed(grade, self.target));
+            let score = distance(self.reference, &now);
+            if self.corresponding() {
+                if score.total.is_finite() && score.total + 1e-4 < best.0.total {
+                    *best = (score, grade.clone());
+                }
+                let correction = tone_curve(
+                    &now.lightness,
+                    &self.reference.lightness,
+                    0.35 + 0.65 * self.content,
+                );
+                grade.tone = regularise_tone(
+                    grade
+                        .tone
+                        .iter()
+                        .map(|v| nodes_at(&correction, 1.0, *v))
+                        .collect(),
+                );
+            }
+            if self.monochrome {
+                continue;
+            }
+            if self.corresponding() {
+                for (out, (r, a)) in grade
+                    .cast_out
+                    .iter_mut()
+                    .zip(self.reference.axis.iter().zip(&now.axis))
+                {
+                    out[0] += 0.8 * (r[0] - a[0]);
+                    out[1] += 0.8 * (r[1] - a[1]);
+                }
+            }
+            *grade = grade.clone().bounded();
+            checkpoint()?;
+            let now = measure(&transformed(grade, self.target));
+            if self.corresponding() || self.toned {
+                grade.chroma = chroma_curve(&now.chroma, &self.reference.chroma, &grade.chroma);
+            } else {
+                let scale = shared_chroma_scale(self.reference, &now).powf(0.25);
+                grade.chroma.iter_mut().for_each(|v| *v *= scale);
+            }
+            checkpoint()?;
+            let now = measure(&transformed(grade, self.target));
+            if self.corresponding() {
+                update_sectors(grade, self.reference, &now, 0.55 + 0.45 * self.content);
+            } else if !self.toned {
+                update_shared_hues(grade, self.reference, &now);
+            }
+            *grade = grade.clone().bounded();
+            checkpoint()?;
+            if self.corresponding() {
+                let now = measure(&transformed(grade, self.target));
+                update_zones(grade, self.reference, &now);
+            }
+            *grade = grade.clone().bounded();
+        }
+        Ok(iterations)
+    }
+}
+
+/// Fit an estimated look from an edited reference. Same-scene structure permits distribution
+/// refinement; unrelated scenes use conservative shared-colour evidence. Neither a lower
+/// distribution distance nor the content score proves recovery of the original editing operation.
 pub(super) fn fit_with_checkpoint(
     reference: &GradeStats,
     target: &[Sample],
@@ -774,71 +922,28 @@ pub(super) fn fit_with_checkpoint(
             content,
         });
     }
-    let detail = 0.35 + 0.65 * content;
-    let trust = 0.55 + 0.45 * content;
-    // A colour reference cannot restore colours absent from a genuinely grey target. A
-    // toned print can still supply its cast; a multicolour scene must not paint grey noise.
+    // A colour reference cannot restore colours absent from a genuinely grey target.
     let keep_target_grey = start.achromatic && at(&reference.chroma, CHROMA_QUANTILES - 2) > 0.02;
-    let mono = reference.achromatic || keep_target_grey;
-    let mut grade = identity.clone();
-    grade.cast_in.clone_from(&start.axis);
-    grade.cast_out = if mono {
-        vec![[0.0; 2]; AXIS_NODES]
-    } else {
-        reference.axis.clone()
+    let fitter = FitContext {
+        reference,
+        target,
+        content,
+        monochrome: reference.achromatic || keep_target_grey,
+        toned: at(&reference.chroma, CHROMA_QUANTILES - 2) < 0.012,
     };
-    grade.tone = tone_curve(&start.lightness, &reference.lightness, detail);
-    if mono {
-        grade.chroma = vec![0.0; CHROMA_NODES];
-    }
-    grade = grade.bounded();
+    let mut grade = fitter.initial(&start);
     let mut best = (before, identity.clone());
-    for _ in 0..ITERATIONS {
-        checkpoint()?;
-        let now = measure(&transformed(&grade, target));
-        let score = distance(reference, &now);
-        // Keep intermediate answers for a strongly corresponding scene. Between unrelated
-        // scenes this loss also describes different objects, so an intermediate statistic
-        // minimum is insufficient evidence to replace the completed component fit.
-        if content >= 0.8 && score.total.is_finite() && score.total + 1e-4 < best.0.total {
-            best = (score, grade.clone());
-        }
-        let correction = tone_curve(&now.lightness, &reference.lightness, detail);
-        grade.tone = regularise_tone(
-            grade
-                .tone
-                .iter()
-                .map(|v| nodes_at(&correction, 1.0, *v))
-                .collect(),
-        );
-        if !mono {
-            for (out, (r, a)) in grade
-                .cast_out
-                .iter_mut()
-                .zip(reference.axis.iter().zip(&now.axis))
-            {
-                out[0] += 0.8 * (r[0] - a[0]);
-                out[1] += 0.8 * (r[1] - a[1]);
-            }
-            grade = grade.bounded();
-            checkpoint()?;
-            let now = measure(&transformed(&grade, target));
-            grade.chroma = chroma_curve(&now.chroma, &reference.chroma, &grade.chroma);
-            checkpoint()?;
-            let now = measure(&transformed(&grade, target));
-            update_sectors(&mut grade, reference, &now, trust);
-            grade = grade.bounded();
-            checkpoint()?;
-            let now = measure(&transformed(&grade, target));
-            update_zones(&mut grade, reference, &now);
-        }
-        grade = grade.bounded();
-    }
-    // The fit cannot end worse than where it started: when every component is constrained the
-    // best answer may be part of the way, and a short search over the whole transform finds it.
+    let iterations = fitter.refine(&mut grade, &mut best, &mut checkpoint)?;
+    let scene_amount = if fitter.corresponding() || fitter.monochrome || fitter.toned {
+        1.0
+    } else {
+        UNRELATED_SHRINKAGE
+    };
+    // Identity is always an incumbent. This guards only the measured objective; on unrelated
+    // scenes it cannot establish fidelity to an unseen intended grade.
     for t in [1.0, 0.75, 0.5, 0.25] {
         checkpoint()?;
-        let candidate = toward(&identity, &grade, t);
+        let candidate = toward(&identity, &grade, t * scene_amount);
         let d = distance(reference, &measure(&transformed(&candidate, target)));
         if d.total.is_finite() && d.total + 1e-4 < best.0.total {
             best = (d, candidate);
@@ -848,7 +953,7 @@ pub(super) fn fit_with_checkpoint(
         grade: best.1,
         before,
         after: best.0,
-        iterations: ITERATIONS,
+        iterations,
         content,
     })
 }

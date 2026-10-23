@@ -62,7 +62,7 @@ it('sends independent slider strengths and uses an explicit native application',
 it('refuses to apply a stale analysis and restores saved strengths', async () => {
   vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, current: false, controls: { ...analysis.controls, amount: 0.4 } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
-  await screen.findByText(/photo changed after analysis/);
+  await screen.findByText(/analysis is no longer current/);
   expect((screen.getByRole('slider', { name: 'Match amount' }) as HTMLInputElement).value).toBe('40');
   expect((screen.getByRole('button', { name: 'Apply colour strengths' }).closest('fieldset') as HTMLFieldSetElement).disabled).toBe(true);
   expect(colorMatch.apply).not.toHaveBeenCalled();
