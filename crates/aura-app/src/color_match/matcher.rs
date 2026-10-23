@@ -14,9 +14,9 @@ use aura_render::{FrameSource, RenderLevel};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    appearance, check_cancel, content, fitting_frame, invalid, rendered, report, session_key,
-    skin_guard, store, transfer, AppState, ApplyInput, Controls, FitDiagnostics, MatchReport,
-    PrepareInput, Reference, Session, ENGINE,
+    appearance, check_cancel, content, fitting_frame_quality, invalid, rendered, report,
+    session_key, skin_guard, store, transfer, AppState, ApplyInput, Controls, FitDiagnostics,
+    MatchReport, PrepareInput, Reference, Session, ENGINE,
 };
 
 const ENGINE_NAME: &str = "reference-grade-transfer-v3";
@@ -51,6 +51,20 @@ fn measured(reference: &transfer::GradeStats, image: &Rgb8) -> transfer::Distanc
     transfer::distance(reference, &transfer::measure_image(image))
 }
 
+fn verify_baseline_current(
+    state: &AppState,
+    photo: PhotoId,
+    expected_hash: &str,
+) -> AuraResult<()> {
+    let recipe = crate::develop_commands::load_or_neutral(state, photo)?;
+    if aura_recipe::hash::recipe_hash(&recipe)? != expected_hash {
+        return Err(invalid(
+            "The photo changed during analysis. Your newer edit was kept. Analyse it again.",
+        ));
+    }
+    Ok(())
+}
+
 /// Measure the photograph without any earlier reference grade and fit the reference onto it.
 pub(super) fn prepare(
     state: &AppState,
@@ -65,15 +79,17 @@ pub(super) fn prepare(
     let prior = grade_model::read(&baseline).ok().flatten();
     let mut ungraded = baseline.clone();
     ungraded.extra.remove(grade_model::KEY);
-    let frame = fitting_frame(state, &photo)?;
+    let frame = fitting_frame_quality(state, &photo, input.quality)?;
     let plain = rendered(state, &frame, &ungraded)?;
     check_cancel(cancel)?;
     let target_regions = appearance::analyse(&plain)?;
     let similarity = content::similarity(&reference.small_rgb, &plain);
-    let mut fit = transfer::fit_with_checkpoint(
+    let target_samples = transfer::samples(&plain, input.quality.target_samples());
+    let mut fit = transfer::fit_with_quality_checkpoint(
         &reference_measurements,
-        &transfer::samples(&plain, transfer::TARGET_SAMPLES),
+        &target_samples,
         similarity,
+        input.quality,
         || check_cancel(cancel),
     )?;
     let monochrome = reference_measurements.achromatic || reference.achromatic;
@@ -95,15 +111,12 @@ pub(super) fn prepare(
         &rendered(state, &frame, &candidate)?,
     );
     check_cancel(cancel)?;
-    if aura_recipe::hash::recipe_hash(&crate::develop_commands::load_or_neutral(state, photo)?)?
-        != baseline_hash
-    {
-        return Err(invalid(
-            "The photo changed during analysis. Your newer edit was kept. Analyse it again.",
-        ));
-    }
+    verify_baseline_current(state, photo, &baseline_hash)?;
     let fitting = FitDiagnostics {
         engine: ENGINE_NAME.into(),
+        quality: input.quality,
+        target_samples: target_samples.len(),
+        max_iterations: input.quality.iterations(),
         refinement_candidates: fit.iterations,
         unique_renders: if prior.is_some() { 3 } else { 2 },
         cached_proposals: 0,
@@ -200,7 +213,11 @@ fn candidate(
         grade_model::write(&mut candidate, &model)?;
     }
     schema::Validation::check(&candidate)?;
-    Ok(candidate)
+    // Verification and repeated-strength equality must use the precision actually saved.
+    // Raw f32-derived extension values otherwise differ from the six-decimal stored recipe,
+    // which can manufacture stale hashes or duplicate Undo entries on an identical request.
+    serde_json::from_str(&aura_recipe::canonical(&candidate)?)
+        .map_err(|_| invalid("The fitted reference recipe could not be encoded."))
 }
 
 /// Native quality checks use the exact candidate, including extrapolated strength controls.
@@ -284,7 +301,10 @@ pub(super) fn apply(
             merged.extra.remove(grade_model::KEY);
         }
     }
-    let changed: Vec<String> = if merged == *current {
+    // Canonical identity is the renderer/store contract; JSON number representations may
+    // compare differently in memory even when their stored values and pixels are identical.
+    let candidate_hash = aura_recipe::hash::recipe_hash(&merged)?;
+    let changed: Vec<String> = if candidate_hash == hash {
         Vec::new()
     } else {
         vec![format!("extra.{}", grade_model::KEY)]
@@ -322,7 +342,7 @@ pub(super) fn apply(
     session.last_hash = if changed.is_empty() {
         hash
     } else {
-        aura_recipe::hash::recipe_hash(&merged)?
+        candidate_hash
     };
     session.controls = input.controls;
     session.checked_hash = Some(session.last_hash.clone());

@@ -6,7 +6,7 @@ import { api } from '../../ipc/client';
 vi.mock('./RegionalColorMatchPanel', () => ({ RegionalColorMatchPanel: () => null }));
 vi.mock('./ReferenceLibraryManager', () => ({ ReferenceLibraryManager: () => null }));
 
-vi.mock('../../ipc/client', () => ({ inTauri: () => true, api: { cancelJob: vi.fn() },
+vi.mock('../../ipc/client', () => ({ inTauri: () => true, api: { cancelJob: vi.fn(), listImages: vi.fn() },
   asIpcError: (error: Error) => ({ message: error.message }) }));
 vi.mock('../../ipc/colorMatch', () => ({
   DEFAULT_MATCH_CONTROLS: { amount: 1, tone: 1, color: 1, whiteBalance: 1 }, pickColorReference: vi.fn(), pickColorReferences: vi.fn(),
@@ -20,6 +20,7 @@ const onApply = async (action: () => Promise<unknown>) => { await action(); };
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.cancelJob).mockResolvedValue(true);
+  vi.mocked(api.listImages).mockResolvedValue([]);
   vi.mocked(colorMatch.list).mockResolvedValue([reference]);
   vi.mocked(colorMatch.status).mockResolvedValue(null);
   vi.mocked(colorMatch.prepare).mockResolvedValue(analysis);
@@ -153,4 +154,200 @@ it('cancels analysis on photo navigation while the component stays mounted', asy
   await act(async () => finish(analysis));
   expect(api.cancelJob).toHaveBeenCalled();
   expect(screen.queryByTestId('colour-match-measurement')).toBeNull();
+});
+
+it('opens with live matching off and never edits just because a reference is displayed', async () => {
+  const selected = vi.fn();
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply} onReferenceChange={selected}/>);
+  await screen.findByRole('option', { name: reference.name });
+  expect((screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }) as HTMLInputElement).checked).toBe(false);
+  expect(screen.getByText('Recommended from your library: shared measured regions, then favorites.')).toBeTruthy();
+  expect(selected).toHaveBeenLastCalledWith(reference);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)); });
+  expect(colorMatch.prepare).not.toHaveBeenCalled();
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+});
+
+it('debounces live changes and saves the newest strengths from one immutable analysis', async () => {
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '20' } });
+  fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '80' } });
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
+  expect(colorMatch.prepare).toHaveBeenCalledOnce();
+  expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise');
+  expect(colorMatch.apply).toHaveBeenLastCalledWith('photo', 'session', expect.objectContaining({ amount: 0.8 }), expect.any(String));
+  fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '40' } });
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledTimes(2));
+  expect(colorMatch.prepare).toHaveBeenCalledOnce();
+  expect(colorMatch.apply).toHaveBeenLastCalledWith('photo', 'session', expect.objectContaining({ amount: 0.4 }), expect.any(String));
+});
+
+it('queues strengths during analysis and never applies the superseded request', async () => {
+  let finish!: (value: ColorMatchReport) => void;
+  vi.mocked(colorMatch.prepare).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  await waitFor(() => expect(colorMatch.prepare).toHaveBeenCalledOnce());
+  fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '35' } });
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+  await act(async () => finish(analysis));
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
+  expect(colorMatch.apply).toHaveBeenCalledWith('photo', 'session', expect.objectContaining({ amount: 0.35 }), expect.any(String));
+  expect(colorMatch.prepare).toHaveBeenCalledOnce();
+});
+
+it('serializes writes while the parent locks its own live save and leaves Stop usable', async () => {
+  let finish!: (value: ColorMatchReport) => void;
+  vi.mocked(colorMatch.status).mockResolvedValue(analysis);
+  vi.mocked(colorMatch.apply).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const props = { photoId: 'photo', disabled: false, onApply };
+  const view = render(<ColorMatchPanel {...props}/>);
+  await screen.findByTestId('colour-match-measurement');
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
+  view.rerender(<ColorMatchPanel {...props} disabled/>);
+  const stop = screen.getByRole('button', { name: 'Stop colour matching' }) as HTMLButtonElement;
+  expect(stop.disabled).toBe(false);
+  expect(stop.closest('fieldset')).toBeNull();
+  fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '25' } });
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)); });
+  expect(colorMatch.apply).toHaveBeenCalledOnce();
+  expect(api.cancelJob).not.toHaveBeenCalled();
+  await act(async () => finish({ ...analysis, fullResolutionChecked: true }));
+  view.rerender(<ColorMatchPanel {...props}/>);
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledTimes(2));
+  expect(colorMatch.apply).toHaveBeenLastCalledWith('photo', 'session', expect.objectContaining({ amount: 0.25 }), expect.any(String));
+});
+
+it('cancels hidden live analysis and ignores its late completion', async () => {
+  let finish!: (value: ColorMatchReport) => void;
+  vi.mocked(colorMatch.prepare).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const props = { photoId: 'photo', disabled: false, onApply };
+  const view = render(<ColorMatchPanel {...props}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  await waitFor(() => expect(colorMatch.prepare).toHaveBeenCalledOnce());
+  view.rerender(<ColorMatchPanel {...props} active={false}/>);
+  expect(api.cancelJob).toHaveBeenCalledWith(vi.mocked(colorMatch.prepare).mock.calls[0]?.[2]);
+  await act(async () => finish(analysis));
+  view.rerender(<ColorMatchPanel {...props}/>);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)); });
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+  expect((screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }) as HTMLInputElement).checked).toBe(false);
+});
+
+it('surfaces failed live analysis without writing and allows a later strength change to retry', async () => {
+  vi.mocked(colorMatch.prepare).mockRejectedValueOnce(new Error('Native analysis failed'));
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  expect((await screen.findByRole('alert')).textContent).toContain('Native analysis failed');
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '30' } });
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
+});
+
+it('refuses stale sessions in real-time mode instead of silently replacing manual edits', async () => {
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, current: false });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByText(/analysis is no longer current/);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  expect((await screen.findByRole('alert')).textContent).toContain('Analyse the reference again');
+  expect(colorMatch.prepare).not.toHaveBeenCalled();
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+});
+
+it('uses real Quick analysis and persists the authored Extreme strengths as a reference preset', async () => {
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Matching mode' }), { target: { value: 'quick' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
+  await screen.findByTestId('colour-match-measurement');
+  expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'quick');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Color Match Preferences' }), { target: { value: 'extreme' } });
+  expect((screen.getByRole('slider', { name: 'Match amount' }) as HTMLInputElement).value).toBe('200');
+  fireEvent.click(screen.getByRole('button', { name: 'Save Preset' }));
+  await waitFor(() => expect(colorMatch.manage).toHaveBeenCalledWith('ref', { defaultControls: { amount: 2, tone: 1, color: 1, whiteBalance: 1 } }, 'update'));
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+});
+
+it('syncs selected other photos with independent fitting and quality forwarding', async () => {
+  vi.mocked(api.listImages).mockResolvedValue([{ id: 'photo', fileName: 'Active.jpg' }, { id: 'target', fileName: 'Target.jpg' }, { id: 'unselected', fileName: 'Other.jpg' }] as never);
+  vi.mocked(colorMatch.prepare).mockImplementation(async photoId => ({ ...analysis, photoId }));
+  vi.mocked(colorMatch.apply).mockImplementation(async (photoId, _session, controls) => ({ ...analysis, photoId, controls, fullResolutionChecked: true }));
+  render(<ColorMatchPanel projectId="project" photoId="photo" disabled={false} onApply={onApply} selectedPhotoIds={['photo', 'target']}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Sync' }));
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
+  expect(colorMatch.prepare).toHaveBeenCalledWith('target', 'ref', expect.any(String), 'precise');
+  expect(colorMatch.apply).toHaveBeenCalledWith('target', 'session', expect.any(Object), expect.any(String));
+  expect(await screen.findByRole('list', { name: 'Collection colour matching results' })).toBeTruthy();
+});
+
+it('does not trigger another automatic edit when its saved recipe revision refreshes', async () => {
+  const saved = { ...analysis, fullResolutionChecked: true };
+  vi.mocked(colorMatch.status).mockResolvedValue(saved);
+  const props = { photoId: 'photo', disabled: false, onApply };
+  const view = render(<ColorMatchPanel {...props} revision="before"/>);
+  await screen.findByTestId('colour-match-measurement');
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  await screen.findByText('Real-time colour strengths saved. Use Undo to compare.');
+  view.rerender(<ColorMatchPanel {...props} revision="after"/>);
+  await waitFor(() => expect(colorMatch.status).toHaveBeenCalledTimes(2));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)); });
+  expect(colorMatch.apply).toHaveBeenCalledOnce();
+  expect(colorMatch.prepare).not.toHaveBeenCalled();
+});
+
+it('Stop cancels the live job and discards queued strengths and late results', async () => {
+  let finish!: (value: ColorMatchReport) => void;
+  vi.mocked(colorMatch.status).mockResolvedValue(analysis);
+  vi.mocked(colorMatch.apply).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByTestId('colour-match-measurement');
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
+  fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '15' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Stop colour matching' }));
+  expect(api.cancelJob).toHaveBeenCalledWith(vi.mocked(colorMatch.apply).mock.calls[0]?.[3]);
+  await act(async () => finish({ ...analysis, controls: { ...analysis.controls, amount: 1.8 }, fullResolutionChecked: true }));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)); });
+  expect(colorMatch.apply).toHaveBeenCalledOnce();
+  expect((screen.getByRole('slider', { name: 'Match amount' }) as HTMLInputElement).value).toBe('15');
+  expect((screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }) as HTMLInputElement).checked).toBe(false);
+});
+
+it('refuses incomplete native verification instead of reporting a saved live match', async () => {
+  vi.mocked(colorMatch.status).mockResolvedValue(analysis);
+  vi.mocked(colorMatch.apply).mockResolvedValue({ ...analysis, fullResolutionChecked: false });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByTestId('colour-match-measurement');
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  expect((await screen.findByRole('alert')).textContent).toContain('no current native-resolution colour check');
+  expect(screen.queryByText('Real-time colour strengths saved. Use Undo to compare.')).toBeNull();
+});
+
+it('waits for an external editor lock before applying completed live analysis', async () => {
+  let finish!: (value: ColorMatchReport) => void;
+  vi.mocked(colorMatch.prepare).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const write = vi.fn(async (action: () => Promise<unknown>) => { await action(); });
+  const props = { photoId: 'photo', disabled: false, onApply: write };
+  const view = render(<ColorMatchPanel {...props}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  await waitFor(() => expect(colorMatch.prepare).toHaveBeenCalledOnce());
+  view.rerender(<ColorMatchPanel {...props} disabled/>);
+  expect((screen.getByRole('slider', { name: 'Match amount' }).closest('fieldset') as HTMLFieldSetElement).disabled).toBe(true);
+  await act(async () => finish(analysis));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 420)); });
+  expect(write).not.toHaveBeenCalled();
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+  view.rerender(<ColorMatchPanel {...props}/>);
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
+  expect(write).toHaveBeenCalledOnce();
+  expect(colorMatch.prepare).toHaveBeenCalledOnce();
+  expect(colorMatch.apply).toHaveBeenCalledWith('photo', 'session', analysis.controls, expect.any(String));
 });

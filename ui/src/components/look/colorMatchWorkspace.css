@@ -1,0 +1,20 @@
+.color-match-panel { background: #202223; border: 1px solid #35383b; border-radius: 12px; padding: 16px; }
+.color-match-heading > span { color: #b0b7c4; font-size: 10px; letter-spacing: .14em; }
+.color-match-heading h3 { margin: 6px 0 12px; }
+.color-match-live { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.color-match-live input { order: 1; width: 18px; height: 18px; accent-color: #77a8ff; }
+.color-match-primary-actions, .color-match-footer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.color-match-primary-actions button { min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px solid #727e93; }
+.color-match-primary-actions button span { font-size: 23px; color: #a7d5f0; }
+.color-match-tabs { display: flex; gap: 12px; border-bottom: 1px solid #484c51; margin-top: 14px; }
+.color-match-tabs button { background: transparent; border: 0; border-radius: 0; padding: 9px 2px; color: #b8bec8; }
+.color-match-tabs button[aria-selected="true"] { color: #fff; box-shadow: inset 0 -2px #b5c7ff; }
+.color-match-reference-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; max-height: 310px; overflow-y: auto; }
+.color-match-reference-cards button { min-width: 0; padding: 0; overflow: hidden; border: 1px solid #4b5056; display: flex; flex-direction: column; text-align: left; }
+.color-match-reference-cards button[aria-pressed="true"] { border-color: #f0cd76; box-shadow: 0 0 0 1px #f0cd76; }
+.color-match-reference-cards img { width: 100%; height: 140px; object-fit: contain; background: #111; }
+.color-match-reference-cards button > span:last-child { padding: 7px; max-width: 100%; overflow-wrap: anywhere; }
+.color-match-no-preview { min-height: 115px; display: grid; place-items: center; background: #292d34; color: #c1c8d4; }
+.color-match-footer button { border-radius: 20px; }
+.color-match-panel label > select { width: 100%; }
+@media (max-width: 480px) { .color-match-primary-actions, .color-match-reference-cards { grid-template-columns: 1fr; } }

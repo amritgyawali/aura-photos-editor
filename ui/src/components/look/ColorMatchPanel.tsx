@@ -7,13 +7,17 @@ import { FINE_MATCH_FIELDS } from '../../ipc/colorMatchDetails';
 import { ColorReferenceLibrary } from './ColorReferenceLibrary';
 import { RegionalColorMatchPanel } from './RegionalColorMatchPanel';
 import { ReferenceLibraryManager } from './ReferenceLibraryManager';
+import { COLOR_MATCH_PREFERENCES, matchPreference, preferenceOf, recommendedReferences } from './colorMatchPreferences';
+import './colorMatchWorkspace.css';
 
 const SLIDERS = [
   ['amount', 'Match amount'], ['tone', 'Tone match'], ['color', 'Colour match'], ['whiteBalance', 'Warmth match'],
 ] as const;
 
-export function ColorMatchPanel({ photoId, projectId, disabled, revision, onApply }: {
+export function ColorMatchPanel({ photoId, projectId, disabled, revision, onApply, active = true, selectedPhotoIds = [], onReferenceChange }: {
   photoId: string; projectId?: string; disabled: boolean; revision?: string;
+  active?: boolean; selectedPhotoIds?: readonly string[];
+  onReferenceChange?: (reference: ColorReference | null) => void;
   onApply: (action: () => Promise<unknown>) => Promise<void>;
 }): JSX.Element {
   const [references, setReferences] = useState<ColorReference[]>([]);
@@ -26,6 +30,23 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const [error, setError] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<ColorMatchOutcome[]>([]);
   const [captureName, setCaptureName] = useState('Edited photo');
+  const [live, setLive] = useState(false);
+  const [quality, setQuality] = useState<'quick' | 'precise'>('precise');
+  const [referenceTab, setReferenceTab] = useState<'recommended' | 'mine'>('recommended');
+  const [syncScope, setSyncScope] = useState<'selected' | 'collection'>('selected');
+  const [liveSignal, setLiveSignal] = useState(0);
+  const liveEnabled = useRef(live); liveEnabled.current = live;
+  const visible = useRef(active); visible.current = active;
+  const disabledRef = useRef(disabled); disabledRef.current = disabled;
+  // A parent locks the editor while onApply saves. Only that phase owns its lock;
+  // an unrelated workflow that starts during analysis must delay our write.
+  const ownWrite = useRef(false);
+  const intent = useRef(0);
+  const pendingLive = useRef(false);
+  const reportRef = useRef(report); reportRef.current = report;
+  const controlsRef = useRef(controls); controlsRef.current = controls;
+  const qualityRef = useRef(quality); qualityRef.current = quality;
+  const referenceCallback = useRef(onReferenceChange); referenceCallback.current = onReferenceChange;
   const mounted = useRef(true);
   const running = useRef(false);
   const job = useRef<string | null>(null);
@@ -35,14 +56,37 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   activePhoto.current = photoId;
   const activeReference = useRef(selected);
   activeReference.current = selected;
+  const acceptReport = (value: ColorMatchReport | null) => { reportRef.current = value; setReport(value); };
+  const requestLive = () => {
+    ++intent.current;
+    if (liveEnabled.current && visible.current) { pendingLive.current = true; setLiveSignal(value => value + 1); }
+  };
+  const changeControls = (value: ColorMatchControls) => {
+    controlsRef.current = value; setControls(value); requestLive();
+  };
+  const stop = () => {
+    ++intent.current; pendingLive.current = false; stopped.current = true;
+    liveEnabled.current = false; setLive(false);
+    if (job.current) void api.cancelJob(job.current).catch(cause => { if (mounted.current) setError(asIpcError(cause).message); });
+  };
+
+  useEffect(() => {
+    referenceCallback.current?.(references.find(item => item.id === selected) ?? (report?.reference.id === selected ? report.reference : null));
+  }, [references, selected, report?.reference]);
+  useEffect(() => () => { referenceCallback.current?.(null); }, []);
+  useEffect(() => {
+    if (!active) stop();
+  }, [active]);
 
   useEffect(() => { mounted.current = true; return () => {
     mounted.current = false;
+    pendingLive.current = false; ++intent.current;
     stopped.current = true;
     if (job.current) void api.cancelJob(job.current).catch(() => undefined);
   }; }, []);
   useEffect(() => {
-    setReport(null); setOutcomes([]); setMessage(null); setError(null);
+    acceptReport(null); setOutcomes([]); setMessage(null); setError(null);
+    pendingLive.current = false; ++intent.current;
     if (job.current) {
       stopped.current = true;
       void api.cancelJob(job.current).catch(cause => { if (mounted.current) setError(asIpcError(cause).message); });
@@ -53,21 +97,26 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     const token = ++generation.current;
     void Promise.all([colorMatch.list(), colorMatch.status(photoId)]).then(([items, saved]) => {
       if (!mounted.current || token !== generation.current || running.current) return;
-      setReferences(items); setReport(saved);
-      if (saved) { setSelected(saved.reference.id); setControls(saved.controls); }
+      setReferences(items); acceptReport(saved);
+      if (saved) {
+        if (!pendingLive.current) {
+          setSelected(saved.reference.id); setControls(saved.controls); setQuality(saved.fitting?.quality ?? 'precise');
+        }
+        if (!saved.current) { pendingLive.current = false; liveEnabled.current = false; setLive(false); }
+      }
       else {
         const reference = items.find(item => item.id === activeReference.current) ?? items[0];
-        setSelected(reference?.id || ''); setControls(reference?.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS });
+        if (!pendingLive.current) { setSelected(reference?.id || ''); setControls(reference?.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS }); }
       }
     }).catch(cause => { if (mounted.current && token === generation.current) setError(asIpcError(cause).message); });
   }, [photoId, revision]);
 
   const run = async (action: (id: string, current: () => boolean) => Promise<void>) => {
-    if (running.current || disabled || !inTauri()) return;
+    if (running.current || disabledRef.current || !visible.current || !inTauri()) return;
     running.current = true; ++generation.current; setBusy(true); setError(null); setMessage(null);
     stopped.current = false;
     const id = crypto.randomUUID(); job.current = id;
-    const current = () => mounted.current && activePhoto.current === photoId && !stopped.current;
+    const current = () => mounted.current && visible.current && activePhoto.current === photoId && !stopped.current;
     try { await action(id, current); }
     catch (cause) { if (current()) setError(asIpcError(cause).message); }
     finally { job.current = null; running.current = false; if (mounted.current) {
@@ -75,40 +124,89 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       if (stopped.current && activePhoto.current === photoId) setMessage('Stopped. Completed changes remain saved.');
     } }
   };
+  useEffect(() => {
+    if (!live || !active || disabled || busy || regionalBusy || !pendingLive.current || !selected || !inTauri()) return;
+    const timer = window.setTimeout(() => {
+      if (!pendingLive.current || running.current || !visible.current || !liveEnabled.current) return;
+      const sequence = intent.current;
+      const referenceId = activeReference.current;
+      const next = structuredClone(controlsRef.current);
+      const mode = qualityRef.current;
+      pendingLive.current = false;
+      void run(async (id, current) => {
+        const latest = () => current() && sequence === intent.current && referenceId === activeReference.current && liveEnabled.current;
+        let analysis = reportRef.current;
+        if (analysis && !analysis.current) {
+          liveEnabled.current = false; setLive(false);
+          setError('This photo changed. Analyse the reference again before enabling real-time matching.'); return;
+        }
+        if (!analysis || analysis.reference.id !== referenceId || (analysis.fitting?.quality ?? 'precise') !== mode) {
+          analysis = await colorMatch.prepare(photoId, referenceId, id, mode);
+          if (!current()) return;
+          acceptReport(analysis);
+        }
+        if (!latest()) return;
+        if (!analysis.current || analysis.photoId !== photoId) throw new Error('The analysis is no longer current. Analyse this photo again.');
+        if (disabledRef.current) { pendingLive.current = true; return; }
+        const session = analysis.sessionId;
+        ownWrite.current = true;
+        try {
+          await onApply(async () => {
+            if (!latest()) return;
+            const result = await colorMatch.apply(photoId, session, next, id);
+            if (!current()) return;
+            if (!result.current || !result.fullResolutionChecked || result.photoId !== photoId || result.reference.id !== referenceId) {
+              throw new Error('This photo returned no current native-resolution colour check. Analyse the reference again.');
+            }
+            acceptReport(result);
+            if (latest()) { setControls(result.controls); setMessage('Real-time colour strengths saved. Use Undo to compare.'); }
+          });
+        } finally { ownWrite.current = false; }
+      });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [liveSignal, live, active, disabled, busy, regionalBusy, selected]);
   const upload = () => run(async (id, current) => {
     const path = await pickColorReference();
     if (!path || !current()) return;
     const reference = await colorMatch.import(path, id);
     if (!current()) return;
     setReferences(items => [reference, ...items.filter(item => item.id !== reference.id)]);
-    setSelected(reference.id); setReport(null);
+    activeReference.current = reference.id; setSelected(reference.id); acceptReport(null);
     setControls(reference.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS });
+    controlsRef.current = reference.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS }; requestLive();
     setMessage('Reference saved. Analyse its colour treatment against this photo.');
   });
   const analyse = () => run(async (id, current) => {
-    const result = await colorMatch.prepare(photoId, selected, id);
+    const result = quality === 'precise' ? await colorMatch.prepare(photoId, selected, id) : await colorMatch.prepare(photoId, selected, id, quality);
     if (!current()) return;
-    setReport(result);
+    acceptReport(result);
     setMessage('Analysis ready. Adjust the strengths, then apply to see the saved result.');
   });
   const apply = (next = controls) => run(async (id, current) => {
-    if (!report || !report.current) return;
+    if (!report || !report.current || report.photoId !== photoId || report.reference.id !== selected ||
+        (report.fitting?.quality ?? 'precise') !== quality) return;
     await onApply(async () => {
       const result = await colorMatch.apply(photoId, report.sessionId, next, id);
       if (!current()) return;
-      setReport(result); setControls(result.controls);
+      if (!result.current || !result.fullResolutionChecked || result.photoId !== photoId || result.reference.id !== selected) {
+        throw new Error('This photo returned no current native-resolution colour check. Analyse the reference again.');
+      }
+      acceptReport(result); setControls(result.controls);
       setMessage(result.changed ? 'Colour strengths saved. Use Undo to compare.' : 'These strengths did not change the saved edit.');
     });
   });
   const choose = (reference: ColorReference) => {
-    setSelected(reference.id); setReport(null); setMessage(null);
+    ++generation.current; activeReference.current = reference.id;
+    setSelected(reference.id); acceptReport(null); setMessage(null);
     setControls(reference.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS });
+    controlsRef.current = reference.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS }; requestLive();
   };
   const manage = (reference: ColorReference, metadata: ReferenceMetadata, remove = false) => void run(async (_id, current) => {
     const updated = await colorMatch.manage(reference.id, metadata, remove ? 'remove' : 'update');
     if (!current()) return;
     setReferences(items => updated ? items.map(item => item.id === updated.id ? updated : item) : items.filter(item => item.id !== reference.id));
-    if (!updated && selected === reference.id && report?.reference.id !== reference.id) { setSelected(''); setReport(null); }
+    if (!updated && selected === reference.id && report?.reference.id !== reference.id) { setSelected(''); acceptReport(null); }
     setMessage(updated ? 'Reference library updated.' : 'Reference removed from the library. Saved photo edits are kept.');
   });
   const capture = () => void run(async (id, current) => {
@@ -135,59 +233,114 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     if (paths.length) setMessage(`${imported.length} references saved; ${failures.length} could not be imported.`);
     if (failures.length) setError(failures.join(' '));
   });
-  const collection = () => run(async (id, current) => {
+  const collection = (scope: 'selected' | 'collection' = 'collection') => run(async (id, current) => {
     if (!projectId || !selected) return;
     setOutcomes([]);
     await onApply(async () => {
       await matchColorCollection(projectId, selected, { ...controls }, id,
         () => !current(),
         value => { if (current()) setMessage(value); },
-        result => { if (current()) setOutcomes(items => [...items, result]); });
+        result => { if (current()) setOutcomes(items => [...items, result]); },
+        { quality, ...(scope === 'selected' ? { photoIds: selectedPhotoIds.filter(value => value !== photoId) } : {}) });
       if (!current()) return;
       const saved = await colorMatch.status(photoId);
-      if (current() && saved) { setReport(saved); setControls(saved.controls); }
+      if (current() && saved) { acceptReport(saved); setControls(saved.controls); }
     });
   });
 
-  const locked = disabled || busy || regionalBusy || !inTauri();
+  const locked = !active || disabled || busy || regionalBusy || !inTauri();
+  // During our own live job the next slider value is queued, while other tools stay locked.
+  const strengthsLocked = !active || regionalBusy || !inTauri() || (disabled && !(live && ownWrite.current)) || (busy && !live);
   const libraryReference = references.some(item => item.id === selected);
   const removedSession = !libraryReference && report?.reference.id === selected;
-  const ready = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected);
+  const ready = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected &&
+    (report.fitting?.quality ?? 'precise') === quality);
   return <section className="lr-panel color-match-panel" aria-label="Reference colour matching" aria-busy={busy || regionalBusy}>
-    <h3>Reference colour matching</h3>
+    <header className="color-match-heading"><span>AI STYLE</span><h3>Color Match</h3></header>
     <p className="lr-hint">Choose an edited JPEG, PNG or TIFF to guide the colour of a different photo. Tone and colour are matched; facial retouching stays with this photo.</p>
-    <button type="button" disabled={locked} onClick={() => void upload()}>Upload colour reference</button>
-    <button type="button" disabled={locked} onClick={uploadSeveral}>Upload several colour references</button>
+    <label className="color-match-live"><input type="checkbox" checked={live} disabled={!active || regionalBusy || (!live && (disabled || busy)) || !inTauri()}
+      onChange={event => {
+        liveEnabled.current = event.target.checked; setLive(event.target.checked);
+        if (event.target.checked) requestLive(); else stop();
+      }}/>Real-Time Color Adjustments</label>
+    <p className="lr-hint">When enabled, reference and strength changes are saved after a short pause. Undo keeps earlier edits available.</p>
+    <div className="color-match-primary-actions">
+      <button type="button" disabled={locked} onClick={uploadSeveral}><span aria-hidden="true">＋</span>Upload References</button>
+      {projectId && <button type="button" disabled={locked || !captureName.trim()} onClick={capture}><span aria-hidden="true">▧</span>Create Reference</button>}
+    </div>
+    <details><summary>Upload options</summary>
+      <button type="button" disabled={locked} onClick={() => void upload()}>Upload colour reference</button>
+      <button type="button" disabled={locked} onClick={uploadSeveral}>Upload several colour references</button>
+    </details>
     {projectId && <details><summary>Use this edited photo as a reference</summary>
       <label>Edited reference name<input maxLength={120} value={captureName} disabled={locked} onChange={event => setCaptureName(event.target.value)}/></label>
       <button type="button" disabled={locked || !captureName.trim()} onClick={capture}>Create colour reference from this edit</button>
     </details>}
+    <label>Matching mode<select aria-label="Matching mode" value={quality} disabled={strengthsLocked} onChange={event => {
+      const next = event.target.value === 'quick' ? 'quick' : 'precise';
+      qualityRef.current = next; setQuality(next); requestLive();
+    }}><option value="quick">Quick Mode</option><option value="precise">Precise Mode</option></select></label>
+    <p className="lr-hint">Quick uses a smaller fitting budget. Both modes check saved output at native resolution.</p>
     <label>Saved colour reference<select aria-label="Saved colour reference" value={selected} disabled={locked}
-      onChange={event => { const reference = references.find(item => item.id === event.target.value); if (reference) choose(reference); else { setSelected(''); setReport(null); } }}>
+      onChange={event => { const reference = references.find(item => item.id === event.target.value); if (reference) choose(reference); else {
+        ++intent.current; pendingLive.current = false; activeReference.current = ''; setSelected(''); acceptReport(null);
+      } }}>
       <option value="">Choose a reference</option>
       {removedSession && <option value={selected}>{report.reference.name} (saved match only)</option>}
       {references.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
     </select></label>
+    <div className="color-match-tabs" role="tablist" aria-label="Colour reference views">
+      <button type="button" role="tab" aria-selected={referenceTab === 'recommended'} aria-controls="recommended-color-references" id="recommended-color-tab"
+        onClick={() => setReferenceTab('recommended')}>Recommended</button>
+      <button type="button" role="tab" aria-selected={referenceTab === 'mine'} aria-controls="my-color-references" id="my-color-tab"
+        onClick={() => setReferenceTab('mine')}>My References</button>
+    </div>
+    <div role="tabpanel" id={referenceTab === 'recommended' ? 'recommended-color-references' : 'my-color-references'}
+      aria-labelledby={referenceTab === 'recommended' ? 'recommended-color-tab' : 'my-color-tab'}>
+      <p className="lr-hint">{referenceTab === 'recommended' ? 'Recommended from your library: shared measured regions, then favorites.' : 'Your uploaded and created references, stored locally.'}</p>
+      <div className="color-match-reference-cards">{(referenceTab === 'recommended' ? recommendedReferences(references, report?.matchedRegions ?? []) : references).map(reference =>
+        <button type="button" key={reference.id} aria-label={`Match reference ${reference.name}`} aria-pressed={reference.id === selected} disabled={locked} onClick={() => choose(reference)}>
+          {reference.thumbnail ? <img src={reference.thumbnail} alt="" loading="lazy"/> : <span className="color-match-no-preview">Colour descriptor</span>}
+          <span>{reference.name}</span>
+        </button>)}</div>
+      {!references.length && <p>Upload a finished photo or create a reference from your edit to begin.</p>}
+    </div>
     <ColorReferenceLibrary references={references} selected={selected} disabled={locked} controls={controls} onSelect={choose} onManage={manage}/>
     {removedSession && <p>This reference was removed from the library. You can still adjust its saved match. Upload it again to analyse a new match.</p>}
     <button type="button" disabled={locked || !libraryReference} onClick={() => void analyse()}>Analyse reference match</button>
-    <fieldset disabled={locked || !selected || Boolean(report && !report.current)}>
+    <label>Color Match Preferences<select aria-label="Color Match Preferences" value={preferenceOf(controls)} disabled={strengthsLocked || !selected} onChange={event => {
+      const next = matchPreference(event.target.value); if (next) changeControls(next);
+    }}><option value="custom">Custom</option>{COLOR_MATCH_PREFERENCES.map(preference => <option key={preference.id} value={preference.id}>{preference.name}</option>)}</select></label>
+    <p className="lr-hint">AURA strengths: Subtle 50%, Standard 100%, Strong 150%, Extreme 200%. Tone, colour and warmth are 100%. Native skin and highlight checks remain active.</p>
+    <fieldset disabled={strengthsLocked || !selected || Boolean(report && !report.current)}>
       <legend>Colour matching strengths</legend>
       {SLIDERS.map(([key, label]) => <label key={key}>{label} ({Math.round(controls[key] * 100)}%)
         <input type="range" aria-label={label} min="0" max="200" step="1" value={Math.round(controls[key] * 100)}
-          onChange={event => setControls(value => ({ ...value, [key]: Number(event.target.value) / 100 }))}/>
+          onChange={event => changeControls({ ...controlsRef.current, [key]: Number(event.target.value) / 100 })}/>
       </label>)}
       <details><summary>Fine matching controls</summary>
         <p className="lr-hint">Adjust each part of the matched look. These strengths act within the overall tone, colour and warmth settings. Stronger settings still pass the native highlight and skin-colour checks.</p>
         {FINE_MATCH_FIELDS.map(([key, label]) => <label key={key}>{label} ({Math.round((controls.detail?.[key] ?? 1) * 100)}%)
           <input type="range" aria-label={label} min="0" max="200" step="1" value={Math.round((controls.detail?.[key] ?? 1) * 100)}
-            onChange={event => setControls(value => ({ ...value, detail: { ...value.detail, [key]: Number(event.target.value) / 100 } }))}/>
+            onChange={event => changeControls({ ...controlsRef.current, detail: { ...controlsRef.current.detail, [key]: Number(event.target.value) / 100 } })}/>
         </label>)}
       </details>
-      <button type="button" disabled={!ready} onClick={() => void apply()}>Apply colour strengths</button>
-      <button type="button" disabled={!ready} onClick={() => void apply({ ...controls, amount: 0 })}>Remove matched treatment</button>
+      <button type="button" disabled={locked || !ready} onClick={() => void apply()}>Apply colour strengths</button>
+      <button type="button" disabled={locked || !ready} onClick={() => void apply({ ...controls, amount: 0 })}>Remove matched treatment</button>
     </fieldset>
-    {projectId && <details><summary>Match this collection</summary>
+    <div className="color-match-footer">
+      <button type="button" disabled={locked || !libraryReference} onClick={() => {
+        const reference = references.find(item => item.id === selected); if (reference) manage(reference, { defaultControls: structuredClone(controls) });
+      }}>Save Preset</button>
+      {projectId && <button type="button" disabled={locked || !libraryReference || (syncScope === 'selected' && !selectedPhotoIds.some(value => value !== photoId))}
+        onClick={() => void collection(syncScope)}>Sync</button>}
+    </div>
+    <p className="lr-hint">Save Preset remembers these matching strengths for the selected reference.</p>
+    {projectId && <label>Sync destination<select aria-label="Sync destination" value={syncScope} disabled={locked} onChange={event => setSyncScope(event.target.value === 'collection' ? 'collection' : 'selected')}>
+      <option value="selected">Selected photos ({new Set(selectedPhotoIds.filter(value => value !== photoId)).size})</option>
+      <option value="collection">Entire collection</option>
+    </select></label>}
+    {projectId && <details open={outcomes.length > 0 || undefined}><summary>Match this collection</summary>
       <p className="lr-hint">Apply the chosen strengths to every photo in this collection. Each photo is measured separately and checked at native resolution. Save initial corrections on new photos first.</p>
       <button type="button" disabled={locked || !libraryReference} onClick={() => void collection()}>Match colour across this collection</button>
       {outcomes.length > 0 && <ol aria-label="Collection colour matching results">{outcomes.map((item, index) =>
@@ -195,7 +348,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     </details>}
     <ReferenceLibraryManager disabled={locked} controls={controls} onUpdated={setReferences}/>
     <RegionalColorMatchPanel key={`regions:${photoId}:${selected}`} photoId={photoId} referenceId={selected}
-      referenceAvailable={libraryReference} revision={revision} disabled={disabled || busy || !inTauri()}
+      referenceAvailable={libraryReference} revision={revision} disabled={!active || disabled || busy || !inTauri()}
       onApply={onApply} onBusyChange={setRegionalBusy}/>
     {report && <>
       {!report.current && <p role="status">This analysis is no longer current. Analyse again to keep your saved edits.</p>}
@@ -207,7 +360,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         {report.protectedFields > 0 && ` ${report.protectedFields} manual fields protected.`}</p>
     </>}
     {busy && <><p role="status">{message ?? 'Measuring colour and checking the image…'}</p>
-      <button type="button" onClick={() => { stopped.current = true; if (job.current) void api.cancelJob(job.current).catch(cause => setError(asIpcError(cause).message)); }}>Stop colour matching</button></>}
+      <button type="button" onClick={stop}>Stop colour matching</button></>}
     {!busy && message && <p role="status">{message}</p>}
     {error && <p role="alert">{error}</p>}
   </section>;

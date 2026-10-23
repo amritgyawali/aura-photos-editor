@@ -232,6 +232,38 @@ fn the_same_photograph_graded_eight_ways_is_matched_closely() {
 }
 
 #[test]
+fn quality_modes_fit_real_samples_with_distinct_iteration_budgets() {
+    let source = outdoor();
+    let reference = grade_image(&source, punchy);
+    let stats = reference_stats(&reference);
+    for quality in [
+        super::super::MatchQuality::Quick,
+        super::super::MatchQuality::Precise,
+    ] {
+        let target = samples(&source, quality.target_samples());
+        let result =
+            fit_with_quality_checkpoint(&stats, &target, Some(1.0), quality, || Ok(())).unwrap();
+        assert_eq!(result.iterations, quality.iterations());
+        assert!(target.len() <= quality.target_samples());
+        assert!(result.after.total < result.before.total);
+        result.grade.validate().unwrap();
+        // Lower computational budgets must not alter the exact zero-strength endpoint.
+        let identity = ReferenceGrade::identity();
+        assert_eq!(toward(&identity, &result.grade, 0.0), identity);
+        let mut checkpoints = 0;
+        let cancelled = fit_with_quality_checkpoint(&stats, &target, Some(1.0), quality, || {
+            checkpoints += 1;
+            if checkpoints >= 2 {
+                Err(super::super::invalid("Stopped for quality test"))
+            } else {
+                Ok(())
+            }
+        });
+        assert!(cancelled.is_err());
+    }
+}
+
+#[test]
 fn a_different_photograph_takes_the_look_of_an_edited_reference() {
     // The reference is one scene edited; the photograph is another scene. The answer is the same
     // edit applied to the photograph, which the fit never sees. This is the case the slider fit

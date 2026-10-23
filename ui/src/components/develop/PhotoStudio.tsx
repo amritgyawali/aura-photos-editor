@@ -14,6 +14,9 @@ import { MasksPanel, type BrushSettings, type MaskTool } from './MasksPanel';
 import { coverageDataUrl } from './rgbImage';
 import { PairedReference } from '../look/PairedReference';
 import { ColorMatchPanel } from '../look/ColorMatchPanel';
+import { ReferenceComparison } from '../look/ReferenceComparison';
+import type { ColorReference } from '../../ipc/colorMatch';
+import { useStore } from '../../state/store';
 import { localMasks, masksOf, type MaskCoverage, type MaskSource } from '../../ipc/localMasks';
 import type { BrushStroke } from '../../ipc/nativeRetouch';
 import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
@@ -54,9 +57,10 @@ function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
   return [0, 0, 1, 1];
 }
 
-export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision = 0, referenceMode = false, featureMode = null, onBusyChange }: {
+export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision = 0, referenceMode = false, featureMode = null, active = true, onBusyChange }: {
   projectId: string; photoId: string; photoIds?: readonly string[]; disabled: boolean; revision?: number; referenceMode?: boolean; onBusyChange: (busy: boolean) => void;
   featureMode?: 'liquify' | 'skin' | 'glare' | null;
+  active?: boolean;
 }): JSX.Element {
   const [recipe, setRecipe] = useState<RecipeDto | null>(null);
   const [history, setHistory] = useState<HistoryDto | null>(null);
@@ -66,6 +70,10 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   const [retouchOpen, setRetouchOpen] = useState(false);
   const inRetouch = retouchOpen || featureMode === 'skin' || featureMode === 'glare';
   const [panel, setPanel] = useState<EditorPanel>('all');
+  const [comparisonReference, setComparisonReference] = useState<ColorReference | null>(null);
+  const selection = useStore(state => state.selection);
+  const selectedPhotoIds = useMemo(() => [...selection], [selection]);
+  const referenceWorkspace = referenceMode || (featureMode === null && panel === 'references');
   const shows = (value: EditorPanel) => referenceMode ? value === 'references' : featureMode === 'liquify' ? value === 'portrait' : panel === 'all' || panel === value;
   // A tool chosen in the Effects library opens Retouch, which then picks the tool up. ADR-0135.
   const effectRequest = useEffectRequest(state => state.request);
@@ -287,8 +295,9 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
       <button type="button" disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
         onClick={() => { setRetouchOpen(true); setPicking(false); }}>Precision retouch</button>
     </nav>
-    <div className="studio-layout editor-panel-layout">
+    <div className={`studio-layout editor-panel-layout${referenceWorkspace ? ' is-reference-workspace' : ''}`}>
       <div className="editor-preview-column">
+        <ReferenceComparison enabled={referenceWorkspace} reference={comparisonReference}>
         <div className={`studio-canvas${picking ? ' studio-picking' : ''}${maskTool || liquifyTool ? ' studio-masking' : ''}`} aria-busy={busy || loading || waiting}
           onPointerDown={event => {
             if ((!maskTool && !liquifyTool) || view !== 'edited' || busy) return;
@@ -339,6 +348,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
             {(busy || loading || waiting) && <span className="studio-updating" role="status">Updating preview…</span>}
           </> : <p>{problem ? 'Photo preview unavailable' : 'Loading your photograph…'}</p>}
         </div>
+        </ReferenceComparison>
         {colorError && <p role="alert">Colour-only preview: {colorError}</p>}
         <button type="button" aria-pressed={probing} disabled={!displayedRender || view === 'split'} onClick={() => { setProbing(!probing); setPicking(false); setMaskTool(null); setLiquifyTool(null); }}>Inspect RGB / Lab point</button>
         {probing && <p className="lr-hint">Click the displayed photograph. Readout measures rendered sRGB and CIE Lab D65, not source RAW sensor values.</p>}
@@ -448,7 +458,9 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
         </div>
       </fieldset>
       <div hidden={!shows('references')} className="editor-reference-panel" aria-label="Reference matching panel">
-      <ColorMatchPanel key={`colour:${projectId}:${photoId}`} projectId={projectId} photoId={photoId} revision={recipe?.recipeHash} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
+      <ColorMatchPanel key={`colour:${projectId}:${photoId}`} projectId={projectId} photoId={photoId} revision={recipe?.recipeHash}
+        active={active && shows('references')} selectedPhotoIds={selectedPhotoIds} onReferenceChange={setComparisonReference}
+        disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       <PairedReference key={`paired:${projectId}:${photoId}`} photoId={photoId} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       </div>
       </div>
