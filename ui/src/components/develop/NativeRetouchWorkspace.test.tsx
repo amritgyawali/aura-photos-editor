@@ -18,6 +18,14 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('opens the glare feature with local glare softening selected and saves the actual operation', async () => {
+  render(<NativeRetouchWorkspace projectId="project" photoId="photo" feature="glare" onClose={vi.fn()} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Retouched photograph');
+  expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('glare');
+  expect(screen.getByText(/fully opaque glare/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Apply retouch' }));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [expect.objectContaining({ tool: 'glare', amount: .5 })]));
+});
 it('saves local saturation and vibrance with a sampled color range and brightness intersection', async () => {
   open(); await screen.findByAltText('Retouched photograph');
   fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'color_saturation'}});

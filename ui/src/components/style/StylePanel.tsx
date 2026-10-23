@@ -36,6 +36,7 @@ export type StylePanelProps = {
   projectId: string | null;
   /** Surface an error to the app's banner. The same shape every other panel uses. */
   onError: (error: { code: string; message: string } | null) => void;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 function toBanner(error: unknown): { code: string; message: string } {
@@ -46,7 +47,7 @@ function toBanner(error: unknown): { code: string; message: string } {
   };
 }
 
-export function StylePanel({ projectId, onError }: StylePanelProps): JSX.Element {
+export function StylePanel({ projectId, onError, onBusyChange }: StylePanelProps): JSX.Element {
   const [status, setStatus] = useState<StyleStatusDto | null>(null);
   const [profiles, setProfiles] = useState<StyleProfileDto[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -164,6 +165,7 @@ export function StylePanel({ projectId, onError }: StylePanelProps): JSX.Element
 
       <TeachMyAi
         projectId={projectId}
+        onBusyChange={onBusyChange}
         onTrained={(profileId) => {
           setSelected(profileId);
           void reload();

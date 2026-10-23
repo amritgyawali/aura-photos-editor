@@ -54,13 +54,14 @@ const METADATA_PREFIX: &str = "provenance";
 /// neutral" rather than "not mentioned" - otherwise applying a look with a colour grade and
 /// then one without it would leave the first grade behind forever, which is exactly the
 /// compounding every automated pass promises not to do.
-pub const OPTIONAL_BLOCKS: [&str; 6] = [
+pub const OPTIONAL_BLOCKS: [&str; 7] = [
     "global.parametric",
     "global.channel_curves",
     "global.colour_grade",
     "global.calibration",
     "global.effects",
     "calibrated_look_v1",
+    "studio_finish_v1.backgroundRepair",
 ];
 
 /// What a merge did.
@@ -165,9 +166,13 @@ pub fn merge(
         let prefix = format!("{block}.");
         let in_base: Vec<&String> = base_leaves
             .keys()
-            .filter(|path| path.starts_with(&prefix))
+            .filter(|path| path.as_str() == block || path.starts_with(&prefix))
             .collect();
-        if in_base.is_empty() || proposal_leaves.keys().any(|p| p.starts_with(&prefix)) {
+        if in_base.is_empty()
+            || proposal_leaves
+                .keys()
+                .any(|p| p == block || p.starts_with(&prefix))
+        {
             continue;
         }
         if source.is_automated() && in_base.iter().any(|p| is_protected(&protected, p)) {

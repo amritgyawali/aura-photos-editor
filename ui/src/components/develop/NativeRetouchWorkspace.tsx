@@ -35,13 +35,14 @@ export function automaticLabel(id: string): string {
   return ` · Auto (${kind} ${Number(face[1]) + 1})`;
 }
 
-export function NativeRetouchWorkspace({projectId, photoId, disabled = false, revision = 0, onClose, onBusyChange}: {
+export function NativeRetouchWorkspace({projectId, photoId, disabled = false, revision = 0, feature, onClose, onBusyChange}: {
   projectId: string; photoId: string; disabled?: boolean; revision?: number; onClose: () => void; onBusyChange: (busy: boolean) => void;
+  feature?: 'skin' | 'glare';
 }) {
   const [edits,setEdits] = useState<NativeRetouchEdit[]>([]);
   const [recipe,setRecipe] = useState<RecipeDto|null>(null);
   const [analysing,setAnalysing] = useState(false);
-  const [draft,setDraft] = useState(freshRetouch);
+  const [draft,setDraft] = useState(() => feature === 'glare' ? { ...freshRetouch(), tool: 'glare' as const, amount: .5 } : freshRetouch());
   const [selected,setSelected] = useState<string|null>(null);
   const [compare,setCompare] = useState(false);
   const [split,setSplit] = useState(false);
@@ -219,7 +220,9 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     else return;
     event.preventDefault();
   }}>
-    <div className="studio-toolbar"><div><span className="eyebrow">NATIVE RETOUCH</span><h2>Precision, at your pace.</h2></div><button type="button" disabled={busy||disabled} onClick={()=>{if(dirty)setError('Apply your changes or choose Discard draft before leaving Retouch.');else onClose();}}>Back to Develop</button></div>
+    <div className="studio-toolbar"><div><span className="eyebrow">NATIVE RETOUCH</span><h2>{feature === 'skin' ? 'Face Freckles & Acne' : feature === 'glare' ? 'Remove Glasses Glare' : 'Precision, at your pace.'}</h2></div>{!feature && <button type="button" disabled={busy||disabled} onClick={()=>{if(dirty)setError('Apply your changes or choose Discard draft before leaving Retouch.');else onClose();}}>Back to Develop</button>}</div>
+    {feature === 'glare' && <p className="feature-instructions">Glare softening is selected. Place a small ellipse over each reflection, or paint only the lens glare. Preview, adjust Amount, then Apply retouch. Detail hidden by fully opaque glare needs a clear source photograph; softening cannot reconstruct it.</p>}
+    {feature === 'skin' && <p className="feature-instructions">Start with Acne · keep freckles, or choose Acne & freckles to include dark marks. Run automatic retouch, compare at full size, then use the Blemish brush for remaining spots. Keep moles and pore texture are enabled by default.</p>}
     {collectionMessage&&<section aria-label="Collection cleanup results"><p role="status">{collectionMessage}</p>
       {collectionRunning&&<button type="button" onClick={()=>{stopCollection.current=true;}}>Stop after current photo</button>}
       <ul>{collectionResults.map(row=><li key={row.photoId}>{row.name}: {row.outcome}. {row.detail}</li>)}</ul>
@@ -291,7 +294,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
         {preview?.backend === 'wgpu' && !draftState.image && <p className="lr-hint" title="The graphics card processed the final color conversion for this preview.">GPU output</p>}
         <AdvancedRetouch projectId={projectId} photoId={photoId} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} onRun={task=>void save(task)}/>
         <button type="button" disabled={stackBlocked||!preview} onClick={autoPortrait}>{analysing?'Detecting faces and preparing skin retouch…':'Auto portrait'}</button>
-        <AutoRetouchSettings key={`${photoId}:${retouchRecipe?.recipeHash ?? 'loading'}`} recipe={retouchRecipe} disabled={stackBlocked||!preview||!retouchRecipe} busy={analysing} onRunCollection={applyCollection} onRun={options=>void save(async()=>{
+        <AutoRetouchSettings key={`${photoId}:${retouchRecipe?.recipeHash ?? 'loading'}`} recipe={retouchRecipe} initialSkinPreset={feature === 'skin'} disabled={stackBlocked||!preview||!retouchRecipe} busy={analysing} onRunCollection={applyCollection} onRun={options=>void save(async()=>{
           setAnalysing(true);
           try { await nativeRetouch.autoRetouch(projectId,photoId,options); }
           finally { if(mounted.current)setAnalysing(false); }

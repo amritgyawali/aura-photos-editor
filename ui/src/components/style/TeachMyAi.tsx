@@ -10,7 +10,7 @@
  * expecting one-click magic from twenty photographs, and the mitigation is a strength meter and
  * a minimum-data sentence rather than a false ready state.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { asIpcError, style } from '../../ipc/client';
 import type { ScanArchiveDto, TrainProfileDto } from '../../ipc/types';
@@ -19,6 +19,7 @@ export type TeachMyAiProps = {
   projectId: string | null;
   onTrained?: (profileId: string) => void;
   onError?: (message: string) => void;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 /** What the scan's headline says. The unmatched finals are the number that matters. */
@@ -51,12 +52,13 @@ export function trainHeadline(result: TrainProfileDto): string {
   return `${result.accepted.toLocaleString()} photographs used, ${result.rejected.toLocaleString()} left out. ${better}`;
 }
 
-export function TeachMyAi({ projectId, onTrained, onError }: TeachMyAiProps) {
+export function TeachMyAi({ projectId, onTrained, onError, onBusyChange }: TeachMyAiProps) {
   const [name, setName] = useState('personal');
   const [roots, setRoots] = useState('');
   const [scan, setScan] = useState<ScanArchiveDto | null>(null);
   const [result, setResult] = useState<TrainProfileDto | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
 
   const fail = useCallback(
     (err: unknown) => {
@@ -111,15 +113,16 @@ export function TeachMyAi({ projectId, onTrained, onError }: TeachMyAiProps) {
 
       <label>
         <span>What to call this look</span>
-        <input value={name} onChange={(event) => setName(event.target.value)} />
+        <input value={name} disabled={busy} onChange={(event) => { setName(event.target.value); setScan(null); setResult(null); }} />
       </label>
 
       <label>
         <span>Folders, one per line</span>
         <textarea
           value={roots}
+          disabled={busy}
           rows={4}
-          onChange={(event) => setRoots(event.target.value)}
+          onChange={(event) => { setRoots(event.target.value); setScan(null); setResult(null); }}
           placeholder={'D:\\weddings\\2025-06-smith\nD:\\weddings\\2025-07-patel'}
         />
       </label>
