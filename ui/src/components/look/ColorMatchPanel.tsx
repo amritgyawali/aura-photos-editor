@@ -300,7 +300,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       <p className="lr-hint">{referenceTab === 'recommended' ? 'Recommended from your library: shared measured regions, then favorites.' : 'Your uploaded and created references, stored locally.'}</p>
       <div className="color-match-reference-cards">{(referenceTab === 'recommended' ? recommendedReferences(references, report?.matchedRegions ?? []) : references).map(reference =>
         <button type="button" key={reference.id} aria-label={`Match reference ${reference.name}`} aria-pressed={reference.id === selected} disabled={locked} onClick={() => choose(reference)}>
-          {reference.thumbnail ? <img src={reference.thumbnail} alt="" loading="lazy"/> : <span className="color-match-no-preview">Colour descriptor</span>}
+          {reference.preview || reference.thumbnail ? <img src={reference.preview || reference.thumbnail} alt="" loading="lazy"/> : <span className="color-match-no-preview">Colour descriptor</span>}
           <span>{reference.name}</span>
         </button>)}</div>
       {!references.length && <p>Upload a finished photo or create a reference from your edit to begin.</p>}
@@ -341,7 +341,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       <option value="collection">Entire collection</option>
     </select></label>}
     {projectId && <details open={outcomes.length > 0 || undefined}><summary>Match this collection</summary>
-      <p className="lr-hint">Apply the chosen strengths to every photo in this collection. Each photo is measured separately and checked at native resolution. Save initial corrections on new photos first.</p>
+      <p className="lr-hint">Apply the chosen strengths to every photo in this collection. Each photo is measured separately and checked at native resolution. New photos start from their camera baseline.</p>
       <button type="button" disabled={locked || !libraryReference} onClick={() => void collection()}>Match colour across this collection</button>
       {outcomes.length > 0 && <ol aria-label="Collection colour matching results">{outcomes.map((item, index) =>
         <li key={`${item.photoId}:${index}`}>{item.name}: {item.outcome}. {item.detail}</li>)}</ol>}

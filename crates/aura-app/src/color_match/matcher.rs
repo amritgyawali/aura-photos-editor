@@ -14,9 +14,9 @@ use aura_render::{FrameSource, RenderLevel};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    appearance, check_cancel, content, fitting_frame_quality, invalid, rendered, report,
-    session_key, skin_guard, store, transfer, AppState, ApplyInput, Controls, FitDiagnostics,
-    MatchReport, PrepareInput, Reference, Session, ENGINE,
+    appearance, baseline, check_cancel, content, fitting_frame_quality, invalid, rendered, report,
+    session_key, skin_guard, store, transfer, AnalysisBaseline, AppState, ApplyInput, Controls,
+    FitDiagnostics, MatchReport, PrepareInput, Reference, Session, ENGINE,
 };
 
 const ENGINE_NAME: &str = "reference-grade-transfer-v3";
@@ -51,20 +51,6 @@ fn measured(reference: &transfer::GradeStats, image: &Rgb8) -> transfer::Distanc
     transfer::distance(reference, &transfer::measure_image(image))
 }
 
-fn verify_baseline_current(
-    state: &AppState,
-    photo: PhotoId,
-    expected_hash: &str,
-) -> AuraResult<()> {
-    let recipe = crate::develop_commands::load_or_neutral(state, photo)?;
-    if aura_recipe::hash::recipe_hash(&recipe)? != expected_hash {
-        return Err(invalid(
-            "The photo changed during analysis. Your newer edit was kept. Analyse it again.",
-        ));
-    }
-    Ok(())
-}
-
 /// Measure the photograph without any earlier reference grade and fit the reference onto it.
 pub(super) fn prepare(
     state: &AppState,
@@ -72,9 +58,11 @@ pub(super) fn prepare(
     input: &PrepareInput,
     photo: PhotoId,
     reference: Reference,
-    baseline: Recipe,
+    baseline: AnalysisBaseline,
     reference_measurements: transfer::GradeStats,
 ) -> AuraResult<MatchReport> {
+    let observed_hash = baseline.observed_hash;
+    let baseline = baseline.recipe;
     let baseline_hash = aura_recipe::hash::recipe_hash(&baseline)?;
     let prior = grade_model::read(&baseline).ok().flatten();
     let mut ungraded = baseline.clone();
@@ -111,7 +99,7 @@ pub(super) fn prepare(
         &rendered(state, &frame, &candidate)?,
     );
     check_cancel(cancel)?;
-    verify_baseline_current(state, photo, &baseline_hash)?;
+    baseline::verify_current(state, photo, &observed_hash)?;
     let fitting = FitDiagnostics {
         engine: ENGINE_NAME.into(),
         quality: input.quality,
@@ -121,7 +109,8 @@ pub(super) fn prepare(
         unique_renders: if prior.is_some() { 3 } else { 2 },
         cached_proposals: 0,
         grade_candidates: 0,
-        native_candidate_checked: true,
+        native_candidate_checked: false,
+        // No backtracking was performed; full-resolution acceptance is deferred to Apply.
         native_backtrack_factor: 1.0,
         structure_similarity: similarity,
         regularization_weight: 0.0,
@@ -143,7 +132,7 @@ pub(super) fn prepare(
         reference: reference.summary.clone(),
         baseline,
         baseline_hash: baseline_hash.clone(),
-        last_hash: baseline_hash,
+        last_hash: observed_hash,
         fitted: StyleDelta::neutral(),
         reference_regions: reference.regions,
         target_regions,
@@ -277,6 +266,7 @@ pub(super) fn apply(
     photo: PhotoId,
     current: &Recipe,
     hash: String,
+    has_saved_recipe: bool,
 ) -> AuraResult<MatchReport> {
     if !transfer.reference.usable() {
         return Err(invalid(
@@ -292,6 +282,9 @@ pub(super) fn apply(
         &photo,
         &candidate,
     )?;
+    if let Some(fitting) = session.fitting.as_mut() {
+        fitting.native_candidate_checked = true;
+    }
     let mut merged = current.clone();
     match candidate.extra.get(grade_model::KEY) {
         Some(value) => {
@@ -321,7 +314,8 @@ pub(super) fn apply(
     let project = ProjectId::from_db(&project).map_err(|_| invalid("Invalid collection."))?;
     if !changed.is_empty() {
         let c = &input.controls;
-        state.recipe_store().save_if_current(
+        super::save_verified(
+            state,
             &project,
             &photo,
             &merged,
@@ -336,7 +330,7 @@ pub(super) fn apply(
                 before.total,
                 after.total
             ),
-            &hash,
+            has_saved_recipe.then_some(hash.as_str()),
         )?;
     }
     session.last_hash = if changed.is_empty() {

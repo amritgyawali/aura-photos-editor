@@ -16,6 +16,8 @@ Recommended references come from the user's local library, ranked by overlapping
 
 Quick uses a 256-pixel fitting frame, up to 10,000 target samples and two transfer iterations. Precise defaults to 512 pixels, 40,000 samples and four iterations. Unrelated scenes retain the existing conservative one-iteration transfer. Both modes use the same full-resolution application validation and immutable baseline, so changing strength does not compound the treatment. Older requests and diagnostics default to Precise.
 
+Fresh imports can be matched directly. Analysis reads the implicit neutral camera recipe without creating an edit or Undo step. First Apply checks that a saved recipe is still absent in the same transaction that saves the match; subsequent edits require the measured recipe hash to remain current. A concurrent manual correction therefore wins on both fresh and previously edited photos.
+
 Live requests are serialised; newer strengths replace queued intentions. Hidden panels, photo switches, cancellation, and external editor locks guard writes. Native recipe candidates are canonicalised before verification and equality checks so stored precision cannot create false stale sessions or duplicate Undo steps.
 
 ## Investigation and limits
@@ -29,7 +31,9 @@ The user's already-running AURA process is not replaced or closed by this change
 ## Verification
 
 - Frontend: 119 files, 1,119 tests passed; TypeScript and production build passed.
-- Native integration: `color_reference_match` five passed, one optional local-RAW review ignored; `reference_style_native` four passed, one optional local-photo review ignored. These cover native application, masks, preview/export, manual edits, zero-strength restoration and noncompounding strengths. The repeated-control regression was observed failing before the precision fix and passing afterward.
+- Native integration: `color_reference_match` nine passed, one optional local-RAW review ignored; `reference_style_native` four passed, one optional local-photo review ignored. These cover native application, masks, preview/export, manual edits, zero-strength restoration, duplicate refusal and noncompounding strengths. The repeated-control regression was observed failing before the precision fix and passing afterward.
+- The first real desktop pass exposed a pre-existing requirement to save an initial correction before matching. Two new pristine-import regressions pass after the fix: analysis/zero create no edit, first Apply has exactly one Undo step, Undo/Redo restore the correct recipes, and concurrent first manual edits remain protected. Both transfer and older descriptor-only matching paths are covered.
 - Native reference unit coverage: 64 tests passed with the existing demanding unpaired batch accuracy gate explicitly excluded; its failure is disclosed above rather than reclassified as passing.
 - Repository: formatting, banned-pattern scan, strict workspace Clippy and all 83 locked contracts passed.
 - `scripts/test-reference-workspace-gui.py` runs a real desktop smoke check with its own catalogue, resized test copies and WebView profile. It records live strengths, fitting modes, persisted presets, collection refits, source hashes, screenshot and page errors under `.work-checks/reference-workspace-*`.
+- Final distinct-photo testing is recorded in [the ten-photo assessment](AURA-unique-color-match-2026-10-24.md). It found six small Standard changes and four native safety refusals, with zero strong statistical matches. This is evidence of a remaining appearance-transfer limitation, even though workflow and preservation checks pass.
